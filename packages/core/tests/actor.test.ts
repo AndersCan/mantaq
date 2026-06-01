@@ -4,20 +4,31 @@ import { event } from "../src/event.ts";
 import { state } from "../src/state.ts";
 
 test("actor", () => {
-  // Events
+  // Input events
   const toggle = event("toggled")();
   const powerOff = event("powerOff")();
+  // const bad = event("bad")();
+  // Output events
   const stateChanged = event("stateChanged")<"on" | "off">();
   const isOff = event("isOff")();
 
   // States
-  const off = state("off");
-  const on = state("on");
+  const off = state("off")<{ offCounter: number }>();
+  const on = state("on")<{ onCounter: number }>().effect((options) => {
+    // Correct slice
+    console.log(options.context.onCounter++);
+    //@ts-expect-error this should fail
+    console.log(options.context.offCounter++);
+  });
 
   // Actor
   const light = new Actor({
     inputs: [toggle, powerOff],
     outputs: [stateChanged, isOff],
+    context: {
+      offCounter: 0,
+      onCounter: 0,
+    },
     states: [on, off],
     initial: off,
     transitions: {
@@ -25,7 +36,7 @@ test("actor", () => {
         toggled: () => ({ next: on }),
       },
       on: {
-        toggled: () => ({ next: off }),
+        toggled: (e) => ({ next: off, e }),
         powerOff: () => ({ next: off, emit: [stateChanged] }),
       },
     },
