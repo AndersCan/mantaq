@@ -1,0 +1,37 @@
+{
+  "name": "@mantaq/sugar",
+  "version": "0.1.0",
+  "description": "Userland sugar for mantaq actors — matches, effect helpers, transition utilities.",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "mutation": "stryker run",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "@mantaq/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "catalog:",
+    "@stryker-mutator/vitest-runner": "catalog:",
+    "@types/node": "^25.6.2",
+    "@typescript/native-preview": "7.0.0-dev.20260509.2",
+    "typescript": "^6.0.3",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  }
+}

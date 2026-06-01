@@ -11,6 +11,10 @@ catalog:
   vite: npm:@voidzero-dev/vite-plus-core@latest
   vitest: npm:@voidzero-dev/vite-plus-test@latest
   vite-plus: latest
+  "@stryker-mutator/core": ^9
+  "@stryker-mutator/vitest-runner": ^9
+  "@varlock/bumpy": ^1.13.1
+  sharp: ^0.34.5
 overrides:
   vite: "catalog:"
   vitest: "catalog:"
@@ -21,3 +25,6 @@ peerDependencyRules:
   allowedVersions:
     vite: "*"
     vitest: "*"
+allowBuilds:
+  esbuild: true
+  sharp: true

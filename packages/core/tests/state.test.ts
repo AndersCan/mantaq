@@ -1,0 +1,59 @@
+import { expect, test } from "vite-plus/test";
+import { state, StateRef } from "../src/state.ts";
+
+test("state creates a StateRef with correct name", () => {
+  const s = state("idle")();
+  expect(s).toBeInstanceOf(StateRef);
+  expect(s.name).toBe("idle");
+});
+
+test("state name is a string literal type", () => {
+  const s = state("myState")();
+  expect(typeof s.name).toBe("string");
+  expect(s.name).toBe("myState");
+});
+
+test("final() marks state as final and returns self", () => {
+  const s = state("done")();
+  expect(s.isFinal).toBe(false);
+  const result = s.final();
+  expect(s.isFinal).toBe(true);
+  expect(result).toBe(s);
+});
+
+test("regions() configures multiple regions and returns self", () => {
+  const s = state("multi")();
+  const result = s.regions({
+    left: {
+      initial: "a",
+      states: { a: state("a")(), b: state("b")().final() },
+    },
+    right: {
+      initial: "x",
+      states: { x: state("x")(), y: state("y")().final() },
+    },
+  });
+
+  expect(s._regions).toBeDefined();
+  expect(Object.keys(s._regions!)).toEqual(["left", "right"]);
+  expect(s._regions!.left.initial).toBe("a");
+  expect(s._regions!.right.initial).toBe("x");
+  expect(result).toBe(s);
+});
+
+test("chaining: final().regions() work together", () => {
+  const s = state("chained")()
+    .final()
+    .regions({
+      default: { initial: "a", states: { a: state("a")() } },
+    });
+
+  expect(s.isFinal).toBe(true);
+  expect(s._regions).toBeDefined();
+});
+
+test("default values for optional properties", () => {
+  const s = state("default")();
+  expect(s.isFinal).toBe(false);
+  expect(s._regions).toBeUndefined();
+});

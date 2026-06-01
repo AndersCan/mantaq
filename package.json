@@ -9,6 +9,7 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@varlock/bumpy": "catalog:",
     "vite-plus": "catalog:"
   },
   "engines": {

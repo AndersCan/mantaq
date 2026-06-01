@@ -1,29 +1,22 @@
-# Vite+ Monorepo Starter
+# Mantaq
 
-A starter for creating a Vite+ monorepo.
+A TypeScript state machine library built around actors, events, and hierarchical states.
 
-## Development
+## Packages
 
-- Check everything is ready:
+- **core** — State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock for testing.
+
+## Getting Started
 
 ```bash
+pnpm install
 vp run ready
 ```
 
-- Run the tests:
+## Development
 
 ```bash
-vp run -r test
-```
-
-- Build the monorepo:
-
-```bash
-vp run -r build
-```
-
-- Run the development server:
-
-```bash
-vp run dev
+vp run dev        # start dev server
+vp run -r test    # run all tests
+vp run -r build   # build all packages
 ```
