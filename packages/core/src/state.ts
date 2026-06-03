@@ -2,8 +2,8 @@ export type AnyStateRef = StateRef<string>;
 
 export function state<const T extends string>(id: T) {
   // TODO: Add Payload type here that adds requirements on Event payload (Can not transition to state unless Event has XYZ fields)
-  return <Context>() => {
-    return new StateRef<T, Context>(id);
+  return <Payload>() => {
+    return new StateRef<T, Payload>(id);
   };
 }
 
@@ -19,25 +19,15 @@ interface RegionsOptions<States extends Record<string, AnyStateRef> = Record<str
   [key: string]: RegionOptions<States>;
 }
 
-export class StateRef<T, Context = unknown> {
+export class StateRef<T, Payload = unknown> {
   name: T;
-  // TODO: Hack to expose Context type
-  __context: Context | undefined;
+  // TODO: Hack to expose Payload type
+  __payload: Payload | undefined;
   isFinal = false;
-  _region: RegionOptions | undefined;
   _regions: RegionsOptions | undefined;
-  effects: Array<(...props: unknown[]) => void> = [];
 
   constructor(name: T) {
     this.name = name;
-  }
-
-  region<
-    States extends Record<string, AnyStateRef> = Record<string, AnyStateRef>,
-    K extends keyof States & string = string,
-  >(options: RegionOptions<States, K>) {
-    this._region = options;
-    return this;
   }
 
   regions<
@@ -50,12 +40,6 @@ export class StateRef<T, Context = unknown> {
 
   final() {
     this.isFinal = true;
-    return this;
-  }
-
-  effect(effectFn: (options: { signal: AbortSignal; context: Context }) => void) {
-    //@ts-expect-error TODO: Fix typing
-    this.effects.push(effectFn);
     return this;
   }
 }
