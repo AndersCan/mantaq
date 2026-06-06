@@ -1,101 +1,259 @@
-import type { AnyStateRef, StateRef } from "./state.ts";
-import type { AnyEventRef } from "./event.ts";
+import type { AnyStateRef, StateRef, TransitionState } from "./state.ts";
+import { TransitionState as TransitionStateClass } from "./state.ts";
+import type { AnyEventRef, EventRef } from "./event.ts";
 
 export interface Snapshot {
   path: string[];
   regions: Record<string, Snapshot>;
+  done?: boolean;
 }
 
 export interface Clock {
-  setTimeout(ms: number, cb: () => void): number;
+  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
   clearTimeout(id: number): void;
+  setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
+  clearInterval(id: number): void;
+  now(): number;
 }
 
 class RealClock implements Clock {
-  setTimeout(ms: number, cb: () => void): number {
-    return globalThis.setTimeout(cb, ms) as unknown as number;
+  #start = Date.now();
+
+  now(): number {
+    return Date.now() - this.#start;
+  }
+
+  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    // @ts-expect-error globalThis.setTimeout returns NodeJS.Timeout | number, but we only use browser env
+    return globalThis.setTimeout(cb, ms, { signal: options?.signal });
   }
 
   clearTimeout(id: number): void {
     globalThis.clearTimeout(id);
   }
+
+  setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    // @ts-expect-error globalThis.setInterval returns NodeJS.Timeout | number, but we only use browser env
+    return globalThis.setInterval(cb, ms, { signal: options?.signal });
+  }
+
+  clearInterval(id: number): void {
+    globalThis.clearInterval(id);
+  }
 }
 
 export class VirtualClock implements Clock {
-  private _now = 0;
-  private _timers: Map<number, { deadline: number; cb: () => void }> = new Map();
-  private _nextId = 1;
-  private _drain: (() => void) | null = null;
+  #now = 0;
+  #timers: Map<
+    number,
+    { deadline: number; cb: () => void; signal?: AbortSignal; onAbort?: () => void }
+  > = new Map();
+  #intervals: Map<
+    number,
+    { ms: number; next: number; cb: () => void; signal?: AbortSignal; onAbort?: () => void }
+  > = new Map();
+  #nextId = 1;
+  #drain: (() => void) | null = null;
 
   now(): number {
-    return this._now;
+    return this.#now;
   }
 
-  setTimeout(ms: number, cb: () => void): number {
-    const id = this._nextId++;
-    this._timers.set(id, { deadline: this._now + ms, cb });
+  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    const signal = options?.signal;
+    if (signal?.aborted) return -1;
+    const id = this.#nextId++;
+    const onAbort = signal
+      ? () => {
+          this.#timers.delete(id);
+        }
+      : undefined;
+    if (signal) {
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+    this.#timers.set(id, { deadline: this.#now + ms, cb, signal, onAbort });
     return id;
   }
 
   clearTimeout(id: number): void {
-    this._timers.delete(id);
+    const timer = this.#timers.get(id);
+    if (timer) {
+      if (timer.signal && timer.onAbort) {
+        timer.signal.removeEventListener("abort", timer.onAbort);
+      }
+      this.#timers.delete(id);
+    }
+  }
+
+  setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    const signal = options?.signal;
+    if (signal?.aborted) return -1;
+    const id = this.#nextId++;
+    const onAbort = signal
+      ? () => {
+          this.#intervals.delete(id);
+        }
+      : undefined;
+    if (signal && onAbort) {
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+    this.#intervals.set(id, { ms, next: this.#now + ms, cb, signal, onAbort });
+    return id;
+  }
+
+  clearInterval(id: number): void {
+    const interval = this.#intervals.get(id);
+    if (interval) {
+      if (interval.signal && interval.onAbort) {
+        interval.signal.removeEventListener("abort", interval.onAbort);
+      }
+      this.#intervals.delete(id);
+    }
   }
 
   advance(ms: number): void {
-    this._now += ms;
-    const due = [...this._timers.entries()]
-      .filter(([, t]) => t.deadline <= this._now)
-      .sort((a, b) => a[1].deadline - b[1].deadline);
-    for (const [id] of due) {
-      this._timers.delete(id);
+    const target = this.#now + ms;
+
+    const events: Array<{ time: number; type: "timer" | "interval"; id: number }> = [];
+
+    for (const [id, t] of this.#timers) {
+      if (t.deadline <= target) {
+        events.push({ time: t.deadline, type: "timer", id });
+      }
     }
-    for (const [, t] of due) {
-      t.cb();
+
+    for (const [id, t] of this.#intervals) {
+      let fire = t.next;
+      const step = t.ms || 1;
+      while (fire <= target) {
+        events.push({ time: fire, type: "interval", id });
+        fire += step;
+      }
     }
-    this._drain?.();
+
+    events.sort((a, b) => a.time - b.time);
+
+    for (const ev of events) {
+      this.#now = ev.time;
+      if (ev.type === "timer") {
+        const timer = this.#timers.get(ev.id);
+        if (timer) {
+          if (timer.signal && timer.onAbort) {
+            timer.signal.removeEventListener("abort", timer.onAbort);
+          }
+          this.#timers.delete(ev.id);
+          timer.cb();
+        }
+      } else {
+        const interval = this.#intervals.get(ev.id);
+        if (interval) {
+          interval.cb();
+          if (this.#intervals.has(ev.id)) {
+            interval.next = ev.time + interval.ms;
+          }
+        }
+      }
+    }
+
+    this.#now = target;
+    this.#drain?.();
   }
 
   hasPending(): boolean {
-    return this._timers.size > 0;
+    return this.#timers.size > 0 || this.#intervals.size > 0;
   }
 
   /** @internal */
   _setDrain(fn: () => void): void {
-    this._drain = fn;
+    this.#drain = fn;
   }
 }
 
-/**
- * Convert A | B to A & B
- */
-type UnionToIntersection<T> = (T extends any ? (x: T) => any : never) extends (x: infer R) => any
-  ? R
-  : never;
+export type EffectFn<Inputs extends AnyEventRef[], Internal extends AnyEventRef[], ActorContext> = (
+  options: EffectInput<Inputs, Internal, ActorContext>,
+) => void;
 
-export type EffectFn<Outputs extends AnyEventRef[], ActorContext> = (options: {
+export type EffectInput<
+  Inputs extends AnyEventRef[],
+  Internal extends AnyEventRef[],
+  ActorContext,
+> = {
   signal: AbortSignal;
-  payload: unknown;
+  state: { name: string; payload: unknown };
+  event: Inputs[number] | Internal[number];
   context: ActorContext;
-  emit: (event: ReturnType<Outputs[number]["create"]>) => void;
+  emit: (event: { id: string; [key: string]: unknown }) => void;
   clock: Clock;
-}) => void;
+};
+
+interface AnyActor {
+  state: AnyStateRef;
+  clock: Clock;
+  regions: Record<string, AnyActor>;
+  send(event: AnyEventRef | { id: string; [key: string]: unknown }): void;
+  snapshot(): Snapshot;
+  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  on(event: "error", fn: (error: unknown) => void): () => void;
+  on(event: "done", fn: () => void): () => void;
+  subscribe(fn: (snapshot: Snapshot) => void): () => void;
+  settled(): Promise<void>;
+  __children: Map<string, AnyActor>;
+  __outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null;
+  __pushInternal(event: { id: string; [key: string]: unknown }): void;
+  __drainInternal(): void;
+}
 
 export class Actor<
   const Inputs extends AnyEventRef[],
   const Outputs extends AnyEventRef[],
   const Internal extends AnyEventRef[],
   const States extends AnyStateRef[],
-  const InputNames extends Inputs[number]["id"],
   const InternalNames extends Internal[number]["id"],
   const StateNames extends States[number]["name"],
-  const ActorContext extends UnionToIntersection<NonNullable<States[number]["__payload"]>>,
+  const ActorContext,
 > {
   state: States[number];
-  context: ActorContext;
+  #context: ActorContext;
   clock: Clock;
-  _regionState: Map<string, AnyStateRef> = new Map();
-  _internalQueue: Array<{ id: string; [key: string]: unknown }> = [];
-  _effectAbort: AbortController | null = null;
+  #regions: Record<string, AnyActor> = {};
+  #children: Map<string, AnyActor> = new Map();
+  #internalQueue: Array<{ id: string; [key: string]: unknown }> = [];
+  #queueIndex = 0;
+  #effectAbort: AbortController | null = null;
+  #outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null = null;
+  #processing = false;
+  #subscribers: Set<(snapshot: Snapshot) => void> = new Set();
+  #errorSubscribers: Set<(error: unknown) => void> = new Set();
+  #doneSubscribers: Set<() => void> = new Set();
+  #settledResolvers: Array<() => void> = [];
+
+  get context(): Readonly<ActorContext> {
+    return this.#context;
+  }
+
+  get regions(): Record<string, AnyActor> {
+    return this.#regions;
+  }
+
+  /** @internal */ get __children(): Map<string, AnyActor> {
+    return this.#children;
+  }
+  /** @internal */ get __outputHandler():
+    | ((event: { id: string; [key: string]: unknown }) => void)
+    | null {
+    return this.#outputHandler;
+  }
+  /** @internal */ set __outputHandler(
+    fn: ((event: { id: string; [key: string]: unknown }) => void) | null,
+  ) {
+    this.#outputHandler = fn;
+  }
+  /** @internal */ __pushInternal(event: { id: string; [key: string]: unknown }): void {
+    this.#internalQueue.push(event);
+  }
+  /** @internal */ __drainInternal(): void {
+    this.#processInternalQueue();
+  }
 
   options: {
     inputs: Inputs;
@@ -104,13 +262,16 @@ export class Actor<
     states: States;
     context: ActorContext;
     initial: InitialState<States[number]>;
-    effects: Partial<Record<StateNames, Array<EffectFn<Internal | Outputs, ActorContext>>>>;
+    effects: Partial<
+      Record<StateNames, Array<EffectFn<Inputs | Internal, Internal, ActorContext>>>
+    >;
     transitions: Partial<
       Record<
-        StateNames,
+        StateNames | "Any",
         Partial<{
           [Id in Inputs[number]["id"] | InternalNames]: (
             event: ById<Inputs[number] | Internal[number], Id>,
+            options: { context: ActorContext; actor: AnyActor },
           ) => TransitionResult;
         }>
       >
@@ -119,142 +280,266 @@ export class Actor<
 
   constructor(options: {
     inputs: Inputs;
-    outputs: Outputs;
-    internal: Internal;
+    outputs?: Outputs;
+    internal?: Internal;
     states: States;
-    context: ActorContext;
+    context?: ActorContext;
     initial: InitialState<States[number]>;
     clock?: Clock;
-    effects: Partial<Record<StateNames, Array<EffectFn<Internal | Outputs, ActorContext>>>>;
-    // todo: Support Inputs[number]["id"] - for Events that should run regardless of state (ex: ForceKill)
+    effects?: Partial<
+      Record<StateNames, Array<EffectFn<Inputs | Internal, Internal, ActorContext>>>
+    >;
     transitions: Partial<
       Record<
-        StateNames,
+        StateNames | "Any",
         Partial<{
           [Id in Inputs[number]["id"] | InternalNames]: (
             event: ById<Inputs[number] | Internal[number], Id>,
+            options: { context: ActorContext; actor: AnyActor },
           ) => TransitionResult;
         }>
       >
     >;
+    regions?: Record<string, AnyActor>;
   }) {
-    this.options = options;
+    this.options = {
+      ...options,
+      outputs: (options.outputs ?? []) as Outputs,
+      internal: (options.internal ?? []) as Internal,
+      context: (options.context ?? ({} as ActorContext)) as ActorContext,
+      effects: (options.effects ?? {}) as Exclude<typeof options.effects, undefined>,
+    };
     this.clock = options.clock ?? new RealClock();
     if (this.clock instanceof VirtualClock) {
-      this.clock._setDrain(() => this._processInternalQueue());
+      this.clock._setDrain(() => this.#processInternalQueue());
     }
     const init = resolveInitial(options.initial);
     this.state = init.state;
-    this.context = options.context;
-    this._initRegionState(init.state);
-  }
-
-  private _initRegionState(s: AnyStateRef) {
-    if (s._regions) {
-      for (const [key, region] of Object.entries(s._regions)) {
-        const initial = region.states[region.initial as string];
-        if (initial) {
-          this._regionState.set(`${s.name}.${key}`, initial);
-          this._initRegionState(initial);
-        }
+    this.#context = this.options.context;
+    if (options.regions) {
+      for (const [key, child] of Object.entries(options.regions)) {
+        this.#regions[key] = child;
+        child.__outputHandler = (event) => {
+          this.#internalQueue.push(event);
+          this.#processInternalQueue();
+        };
       }
     }
+  }
+
+  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  on(event: "error", fn: (error: unknown) => void): () => void;
+  on(event: "done", fn: () => void): () => void;
+  on(
+    event: "change" | "error" | "done",
+    fn: ((snapshot: Snapshot) => void) | ((error: unknown) => void) | (() => void),
+  ): () => void {
+    if (event === "change") {
+      const cb = fn as (snapshot: Snapshot) => void;
+      this.#subscribers.add(cb);
+      cb(this.snapshot());
+      return () => {
+        this.#subscribers.delete(cb);
+      };
+    }
+    if (event === "error") {
+      const cb = fn as (error: unknown) => void;
+      this.#errorSubscribers.add(cb);
+      return () => {
+        this.#errorSubscribers.delete(cb);
+      };
+    }
+    if (event === "done") {
+      const cb = fn as () => void;
+      this.#doneSubscribers.add(cb);
+      return () => {
+        this.#doneSubscribers.delete(cb);
+      };
+    }
+    return () => {};
+  }
+
+  subscribe(fn: (snapshot: Snapshot) => void): () => void {
+    return this.on("change", fn);
+  }
+
+  settled(): Promise<void> {
+    if (this.#internalQueue.length === 0 && !this.#processing) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this.#settledResolvers.push(resolve);
+    });
   }
 
   send(event: Inputs[number] | { id: string; [key: string]: unknown }): void {
-    const transition =
-      this.options.transitions?.[this.state.name as StateNames]?.[
-        event.id as InputNames | InternalNames
-      ];
+    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
+    const anyTransition = this.options.transitions?.["Any" as StateNames]?.[event.id as string] as
+      | TransitionHandler<ActorContext>
+      | undefined;
 
-    if (transition) {
-      const step = transition(event as any);
-
+    if (anyTransition) {
+      const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
       if (step.state) {
-        this._effectAbort?.abort();
-        this.state = step.state;
-        this._runEffects(event);
+        this.#applyTransition(event, step);
+        return;
       }
-
       if (step.emit) {
-        this._internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
-        this._processInternalQueue();
+        this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
       }
+    }
+
+    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
+    const stateTransition = this.options.transitions?.[this.state.name as StateNames]?.[
+      event.id as string
+    ] as TransitionHandler<ActorContext> | undefined;
+
+    if (stateTransition) {
+      const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
+      this.#applyTransition(event, step);
+    }
+
+    if (anyTransition && !stateTransition) {
+      this.#processInternalQueue();
     }
   }
 
-  private _runEffects(event: Inputs[number] | { id: string; [key: string]: unknown }) {
-    const effects = this.options.effects?.[this.state.name as StateNames];
+  #applyTransition(
+    event: Inputs[number] | { id: string; [key: string]: unknown },
+    step: TransitionResult,
+  ): void {
+    if (step.state) {
+      this.#effectAbort?.abort();
+      let payload: unknown;
+      if (step.state instanceof TransitionStateClass) {
+        payload = step.state.__payload;
+        this.state = step.state.__stateRef as States[number];
+      } else {
+        this.state = step.state as States[number];
+      }
+      this.#runEffects(event, payload);
+      for (const fn of this.#subscribers) {
+        fn(this.snapshot());
+      }
+      if (this.state.isFinal) {
+        for (const fn of this.#doneSubscribers) {
+          fn();
+        }
+      }
+    }
+
+    if (step.emit) {
+      this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
+      this.#processInternalQueue();
+    }
+  }
+
+  #runEffects(
+    event: Inputs[number] | { id: string; [key: string]: unknown },
+    statePayload: unknown,
+  ): void {
+    // @ts-expect-error state.name is a StateNames but TS can't narrow
+    const effects = this.options.effects?.[this.state.name];
     if (!effects) return;
 
     const abort = new AbortController();
-    this._effectAbort = abort;
+    this.#effectAbort = abort;
     for (const effectFn of effects) {
-      effectFn({
-        signal: abort.signal,
-        payload: event.payload,
-        context: this.context,
-        emit: (e) => this._internalQueue.push(e),
-        clock: this.clock,
-      });
+      try {
+        effectFn({
+          signal: abort.signal,
+          state: { name: this.state.name as string, payload: statePayload },
+          event,
+          context: this.#context,
+          emit: (e: { id: string; [key: string]: unknown }) => this.#internalQueue.push(e),
+          clock: this.clock,
+        });
+      } catch (err) {
+        for (const fn of this.#errorSubscribers) {
+          fn(err);
+        }
+      }
     }
 
-    this._processInternalQueue();
+    this.#processInternalQueue();
   }
 
-  private _processInternalQueue(): void {
-    while (this._internalQueue.length > 0) {
-      const event = this._internalQueue.shift()!;
+  #processInternalQueue(): void {
+    if (this.#processing) return;
+    this.#processing = true;
+    while (this.#queueIndex < this.#internalQueue.length) {
+      const event = this.#internalQueue[this.#queueIndex++];
       if (this.options.internal.some((e) => e.id === event.id)) {
-        this.send(event as unknown as Internal[number]);
+        this.send(event);
+      } else if (this.#outputHandler) {
+        this.#outputHandler(event);
       }
-      // Output events are broadcast externally (not processed internally)
+    }
+    this.#internalQueue.length = 0;
+    this.#queueIndex = 0;
+    this.#processing = false;
+    if (this.#internalQueue.length === 0 && this.#settledResolvers.length > 0) {
+      const resolvers = this.#settledResolvers.splice(0);
+      for (const resolve of resolvers) {
+        resolve();
+      }
     }
   }
 
   snapshot(): Snapshot {
-    return this._snapshot(this.state);
+    return this.#snapshot(this.state);
   }
 
-  private _snapshot(s: AnyStateRef): Snapshot {
+  #snapshot(s: AnyStateRef): Snapshot {
     const path = [s.name];
     const regions: Record<string, Snapshot> = {};
 
-    if (s._regions) {
-      for (const [regionName, region] of Object.entries(s._regions)) {
-        const key = `${s.name}.${regionName}`;
-        const active = this._regionState.get(key) ?? region.states[region.initial as string];
-        if (active) {
-          regions[regionName] = this._snapshot(active);
-        }
-      }
+    for (const [regionName, child] of Object.entries(this.#regions)) {
+      regions[regionName] = child.snapshot();
     }
 
-    return { path, regions };
+    const snap: Snapshot = { path, regions };
+
+    if (s.isFinal) {
+      snap.done = true;
+    }
+
+    return snap;
   }
 }
 
-type ById<T extends { id: string }, K extends T["id"]> = Extract<T, { id: K }>;
+type CreatedEvent<E> = E extends EventRef<infer Id, infer P> ? P & { id: Id } : never;
+
+type ById<T extends { id: string }, K extends T["id"]> = CreatedEvent<Extract<T, { id: K }>>;
+
+type TransitionHandler<AC> = (
+  event: AnyEventRef | { id: string; [key: string]: unknown },
+  options: { context: AC; actor: AnyActor },
+) => TransitionResult;
 
 type TransitionResult = {
-  state?: AnyStateRef;
-  payload?: unknown;
+  state?: AnyStateRef | TransitionState<string, unknown>;
   emit?: unknown[];
 };
 
 type InitialState<S> =
   S extends StateRef<infer _N, infer P>
     ? unknown extends P
-      ? S | { state: S; payload?: P }
-      : { state: S; payload: P }
+      ? S | TransitionState<_N, P> | { state: S; payload?: P }
+      : TransitionState<_N, P> | { state: S; payload: P }
     : never;
 
 function resolveInitial<S>(
   initial: InitialState<S>,
 ): S extends StateRef<infer N, infer P> ? { state: StateRef<N, P>; payload?: P } : never {
-  return (
+  if (initial instanceof TransitionStateClass) {
+    return { state: initial.__stateRef, payload: initial.__payload } as ReturnType<
+      typeof resolveInitial<S>
+    >;
+  }
+  const result =
     typeof initial === "object" && initial !== null && "state" in initial
       ? initial
-      : { state: initial }
-  ) as any;
+      : { state: initial };
+  return result as ReturnType<typeof resolveInitial<S>>;
 }

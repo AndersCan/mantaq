@@ -1,0 +1,14 @@
+{
+  "$schema": "https://bumpy.varlock.dev/config-schema.json",
+  "baseBranch": "main",
+  "changelog": "default",
+  "publish": {
+    "access": "public",
+    "provenance": true
+  },
+  "packages": {
+    "packages/*": {},
+    "apps/*": {},
+    "tools/*": {}
+  }
+}

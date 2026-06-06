@@ -1,0 +1,52 @@
+# GitHub Actions workflow for deploying to GitHub Pages
+
+name: Deploy Docs
+
+# Controls when the action will run.
+# Triggers the workflow on push events to the main branch
+on:
+  push:
+    branches: ["main"]
+
+# Allows this workflow to be run manually from the Actions tab
+# workflow_dispatch: {}
+
+# A workflow run is made up of one or more jobs that can be run independently.
+jobs:
+  # The type of runner that the job will run on
+  build:
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm" # Use pnpm for caching
+
+      # Install dependencies using pnpm
+      - name: Install dependencies
+        run: pnpm install
+
+      # Build the documentation site
+      - name: Build Docs
+        run: vp run docs#build
+        env:
+          # Set the base URL for GitHub Pages
+          NODE_ENV: production
+          PUBLIC_URL: /docs/
+
+      # Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./apps/docs/dist # Directory containing the built site
+          # If you're deploying to a different branch, uncomment the following line:
+          # publish_branch: gh-pages
