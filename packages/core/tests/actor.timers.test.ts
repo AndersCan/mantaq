@@ -38,9 +38,9 @@ function makeLoadActor(clock: VirtualClock) {
         load: (e) => ({ state: loading, payload: { url: (e as any).url } }),
       },
       loading: {
-        fetchDone: (e) => ({ state: success, payload: e.payload }),
-        fetchError: (e) => ({ state: failed, payload: e.payload }),
-        timeout: () => ({ state: failed, payload: { error: "timeout" } }),
+        fetchDone: () => ({ state: success }),
+        fetchError: () => ({ state: failed }),
+        timeout: () => ({ state: failed }),
       },
     },
   });
@@ -182,7 +182,7 @@ describe("timers", () => {
           load: (e) => ({ state: loading, payload: { url: (e as any).url } }),
         },
         loading: {
-          fetchDone: (e) => ({ state: success, payload: e.payload }),
+          fetchDone: () => ({ state: success }),
           timeout: () => ({ state: warned }),
           warn: () => ({ state: warned }),
         },

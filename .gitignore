@@ -29,3 +29,9 @@ dist-ssr
 !.vscode/
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# Stryker mutation testing
+.stryker-tmp
+
+# Package reports
+packages/*/reports

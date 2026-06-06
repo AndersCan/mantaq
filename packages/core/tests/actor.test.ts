@@ -213,8 +213,8 @@ describe("effects", () => {
           load: () => ({ state: loading }),
         },
         loading: {
-          fetchSuccess: (e) => ({ state: success, payload: e.payload }),
-          fetchError: (e) => ({ state: failed, payload: e.payload }),
+          fetchSuccess: () => ({ state: success }),
+          fetchError: () => ({ state: failed }),
         },
       },
     });
