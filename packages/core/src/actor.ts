@@ -68,7 +68,7 @@ export class VirtualClock implements Clock {
           this.#timers.delete(id);
         }
       : undefined;
-    if (signal) {
+    if (signal && onAbort) {
       signal.addEventListener("abort", onAbort, { once: true });
     }
     this.#timers.set(id, { deadline: this.#now + ms, cb, signal, onAbort });
@@ -216,12 +216,14 @@ export class Actor<
   #context: ActorContext;
   clock: Clock;
   #regions: Record<string, AnyActor> = {};
+  #regionState: Map<string, AnyStateRef> = new Map();
   #children: Map<string, AnyActor> = new Map();
   #internalQueue: Array<{ id: string; [key: string]: unknown }> = [];
   #queueIndex = 0;
   #effectAbort: AbortController | null = null;
   #outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null = null;
   #processing = false;
+  #internalIds: Set<string> = new Set();
   #subscribers: Set<(snapshot: Snapshot) => void> = new Set();
   #errorSubscribers: Set<(error: unknown) => void> = new Set();
   #doneSubscribers: Set<() => void> = new Set();
@@ -253,6 +255,18 @@ export class Actor<
   }
   /** @internal */ __drainInternal(): void {
     this.#processInternalQueue();
+  }
+
+  #initRegionState(s: AnyStateRef): void {
+    if (s._regions) {
+      for (const [key, region] of Object.entries(s._regions)) {
+        const initial = region.states[region.initial as string];
+        if (initial) {
+          this.#regionState.set(`${s.name}.${key}`, initial);
+          this.#initRegionState(initial);
+        }
+      }
+    }
   }
 
   options: {
@@ -309,6 +323,7 @@ export class Actor<
       context: (options.context ?? ({} as ActorContext)) as ActorContext,
       effects: (options.effects ?? {}) as Exclude<typeof options.effects, undefined>,
     };
+    this.#internalIds = new Set(this.options.internal.map((e) => e.id));
     this.clock = options.clock ?? new RealClock();
     if (this.clock instanceof VirtualClock) {
       this.clock._setDrain(() => this.#processInternalQueue());
@@ -316,6 +331,7 @@ export class Actor<
     const init = resolveInitial(options.initial);
     this.state = init.state;
     this.#context = this.options.context;
+    this.#initRegionState(this.state);
     if (options.regions) {
       for (const [key, child] of Object.entries(options.regions)) {
         this.#regions[key] = child;
@@ -469,7 +485,7 @@ export class Actor<
     this.#processing = true;
     while (this.#queueIndex < this.#internalQueue.length) {
       const event = this.#internalQueue[this.#queueIndex++];
-      if (this.options.internal.some((e) => e.id === event.id)) {
+      if (this.#internalIds.has(event.id)) {
         this.send(event);
       } else if (this.#outputHandler) {
         this.#outputHandler(event);
@@ -493,6 +509,16 @@ export class Actor<
   #snapshot(s: AnyStateRef): Snapshot {
     const path = [s.name];
     const regions: Record<string, Snapshot> = {};
+
+    if (s._regions) {
+      for (const [regionName, region] of Object.entries(s._regions)) {
+        const key = `${s.name}.${regionName}`;
+        const active = this.#regionState.get(key) ?? region.states[region.initial as string];
+        if (active) {
+          regions[regionName] = this.#snapshot(active);
+        }
+      }
+    }
 
     for (const [regionName, child] of Object.entries(this.#regions)) {
       regions[regionName] = child.snapshot();
@@ -523,10 +549,10 @@ type TransitionResult = {
 };
 
 type InitialState<S> =
-  S extends StateRef<infer _N, infer P>
+  S extends StateRef<infer N extends string, infer P>
     ? unknown extends P
-      ? S | TransitionState<_N, P> | { state: S; payload?: P }
-      : TransitionState<_N, P> | { state: S; payload: P }
+      ? S | TransitionState<N, P> | { state: S; payload?: P }
+      : TransitionState<N, P> | { state: S; payload: P }
     : never;
 
 function resolveInitial<S>(

@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { Actor, type Snapshot, event, state } from "core";
+import { Actor, type Snapshot, event, state } from "@mantaq/core";
 import { matches } from "../src/actors/matches.ts";
 
 function snap(path: string[], regions: Record<string, Snapshot> = {}): Snapshot {

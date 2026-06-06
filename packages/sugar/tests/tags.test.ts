@@ -1,7 +1,7 @@
 import { expect, test, describe } from "vite-plus/test";
-import { state } from "core";
+import { state } from "@mantaq/core";
 import { tag } from "../src/tags.ts";
-import type { Snapshot } from "core";
+import type { Snapshot } from "@mantaq/core";
 
 describe("tag", () => {
   test("matches flat state", () => {

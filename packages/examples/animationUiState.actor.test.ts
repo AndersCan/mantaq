@@ -8,13 +8,13 @@
  *   - `entry`/`exit` actions → handled in transition handlers
  *
  * Structure:
- *   drawer.root → drawer.drawerOpening → drawer.root (animated open)
- *   drawer.root → drawer.drawerClosing → drawer.root (animated close)
+ *   drawerRoot → drawerOpening → drawerRoot (animated open)
+ *   drawerRoot → drawerClosing → drawerRoot (animated close)
  *   Regions: brightness, color, dashboard, sidebar
  */
 
 import { describe, it, expect } from "vite-plus/test";
-import { Actor, VirtualClock, event } from "core";
+import { Actor, VirtualClock, event } from "@mantaq/core";
 import { matches, withTimeout, states, events } from "@mantaq/sugar";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -25,13 +25,19 @@ const brightness = states("dim", "normal", "bright");
 const color = states("blue", "red", "green");
 const dashboard = states("closed", "open");
 const sidebar = states("closed", "open");
-const drawer = states("root", "drawer.drawerOpening", "drawer.drawerClosing");
+const drawer = states("drawerRoot", "drawerOpening", "drawerClosing");
 
 // ── Event refs (immutable, shared) ───────────────────────────────────
 const regionEvents = events("CYCLE_COLOR", "TOGGLE_DASHBOARD", "TOGGLE_SIDEBAR");
 const setBrightnessRegionEvent = event("SET_BRIGHTNESS")<{ level: Brightness }>();
 
-const mainEvents = events("OPEN_DRAWER", "CLOSE_DRAWER", "TOGGLE_DASHBOARD", "TOGGLE_SIDEBAR", "CYCLE_COLOR");
+const mainEvents = events(
+  "OPEN_DRAWER",
+  "CLOSE_DRAWER",
+  "TOGGLE_DASHBOARD",
+  "TOGGLE_SIDEBAR",
+  "CYCLE_COLOR",
+);
 const setBrightnessEvent = event("SET_BRIGHTNESS")<{ level: Brightness }>();
 
 const doneEvents = events("DRAWER_OPEN_DONE", "DRAWER_CLOSE_DONE");
@@ -109,13 +115,13 @@ function createAnimationActor(clock?: VirtualClock) {
     ],
     outputs: [],
     internal: [doneEvents.DRAWER_OPEN_DONE, doneEvents.DRAWER_CLOSE_DONE],
-    states: [drawer.root, drawer.drawerOpening, drawer.drawerClosing],
-    initial: drawer.root,
+    states: [drawer.drawerRoot, drawer.drawerOpening, drawer.drawerClosing],
+    initial: drawer.drawerRoot,
     clock: c,
     context: {} as {},
     effects: {
-      "drawer.drawerOpening": [(input) => withTimeout(300, input, () => ({ id: "DRAWER_OPEN_DONE" }))],
-      "drawer.drawerClosing": [(input) => withTimeout(300, input, () => ({ id: "DRAWER_CLOSE_DONE" }))],
+      drawerOpening: [(input) => withTimeout(300, input, () => ({ id: "DRAWER_OPEN_DONE" }))],
+      drawerClosing: [(input) => withTimeout(300, input, () => ({ id: "DRAWER_CLOSE_DONE" }))],
     },
     regions: {
       brightness: brightnessRegion,
@@ -134,8 +140,7 @@ function createAnimationActor(clock?: VirtualClock) {
           return {};
         },
         SET_BRIGHTNESS: (event, { actor }) => {
-          actor.regions.brightness
-            .send(setBrightnessRegionEvent.create({ level: event.level }));
+          actor.regions.brightness.send(setBrightnessRegionEvent.create({ level: event.level }));
           return {};
         },
         CYCLE_COLOR: (_event, { actor }) => {
@@ -143,15 +148,15 @@ function createAnimationActor(clock?: VirtualClock) {
           return {};
         },
       },
-      root: {
+      drawerRoot: {
         OPEN_DRAWER: () => ({ state: drawer.drawerOpening }),
         CLOSE_DRAWER: () => ({ state: drawer.drawerClosing }),
       },
-      "drawer.drawerOpening": {
-        DRAWER_OPEN_DONE: () => ({ state: drawer.root }),
+      drawerOpening: {
+        DRAWER_OPEN_DONE: () => ({ state: drawer.drawerRoot }),
       },
-      "drawer.drawerClosing": {
-        DRAWER_CLOSE_DONE: () => ({ state: drawer.root }),
+      drawerClosing: {
+        DRAWER_CLOSE_DONE: () => ({ state: drawer.drawerRoot }),
       },
     },
   });
@@ -163,96 +168,96 @@ function createAnimationActor(clock?: VirtualClock) {
 describe("animation & UI state actor", () => {
   it("starts at root with default region states", () => {
     const { actor } = createAnimationActor();
-    expect(matches(actor, "root")).toBe(true);
-    expect(matches(actor, "root.brightness.normal")).toBe(true);
-    expect(matches(actor, "root.color.blue")).toBe(true);
-    expect(matches(actor, "root.dashboard.closed")).toBe(true);
-    expect(matches(actor, "root.sidebar.closed")).toBe(true);
+    expect(matches(actor, "drawerRoot")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.normal")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.blue")).toBe(true);
+    expect(matches(actor, "drawerRoot.dashboard.closed")).toBe(true);
+    expect(matches(actor, "drawerRoot.sidebar.closed")).toBe(true);
   });
 
   it("drawer: root → opening → root (animated open)", () => {
     const { actor, clock } = createAnimationActor();
 
     actor.send(mainEvents.OPEN_DRAWER);
-    expect(matches(actor, "drawer.drawerOpening")).toBe(true);
+    expect(matches(actor, "drawerOpening")).toBe(true);
 
     clock.advance(150);
-    expect(matches(actor, "drawer.drawerOpening")).toBe(true);
+    expect(matches(actor, "drawerOpening")).toBe(true);
 
     clock.advance(150);
-    expect(matches(actor, "root")).toBe(true);
+    expect(matches(actor, "drawerRoot")).toBe(true);
   });
 
   it("drawer: root → closing → root (animated close)", () => {
     const { actor, clock } = createAnimationActor();
 
     actor.send(mainEvents.CLOSE_DRAWER);
-    expect(matches(actor, "drawer.drawerClosing")).toBe(true);
+    expect(matches(actor, "drawerClosing")).toBe(true);
 
     clock.advance(300);
-    expect(matches(actor, "root")).toBe(true);
+    expect(matches(actor, "drawerRoot")).toBe(true);
   });
 
   it("drawer: cannot start new animation while one is in progress", () => {
     const { actor, clock } = createAnimationActor();
 
     actor.send(mainEvents.OPEN_DRAWER);
-    expect(matches(actor, "drawer.drawerOpening")).toBe(true);
+    expect(matches(actor, "drawerOpening")).toBe(true);
 
     actor.send(mainEvents.OPEN_DRAWER);
-    expect(matches(actor, "drawer.drawerOpening")).toBe(true);
+    expect(matches(actor, "drawerOpening")).toBe(true);
 
     clock.advance(300);
-    expect(matches(actor, "root")).toBe(true);
+    expect(matches(actor, "drawerRoot")).toBe(true);
   });
 
   it("dashboard: toggle on and off", () => {
     const { actor } = createAnimationActor();
 
     actor.send(mainEvents.TOGGLE_DASHBOARD);
-    expect(matches(actor, "root.dashboard.open")).toBe(true);
-    expect(matches(actor, "root")).toBe(true);
+    expect(matches(actor, "drawerRoot.dashboard.open")).toBe(true);
+    expect(matches(actor, "drawerRoot")).toBe(true);
 
     actor.send(mainEvents.TOGGLE_DASHBOARD);
-    expect(matches(actor, "root.dashboard.closed")).toBe(true);
+    expect(matches(actor, "drawerRoot.dashboard.closed")).toBe(true);
   });
 
   it("sidebar: toggle independently of dashboard", () => {
     const { actor } = createAnimationActor();
 
     actor.send(mainEvents.TOGGLE_SIDEBAR);
-    expect(matches(actor, "root.sidebar.open")).toBe(true);
+    expect(matches(actor, "drawerRoot.sidebar.open")).toBe(true);
 
     actor.send(mainEvents.TOGGLE_SIDEBAR);
-    expect(matches(actor, "root.sidebar.closed")).toBe(true);
+    expect(matches(actor, "drawerRoot.sidebar.closed")).toBe(true);
   });
 
   it("brightness: cycle normal → bright → normal → dim → normal", () => {
     const { actor } = createAnimationActor();
 
     actor.send(setBrightnessEvent.create({ level: "dim" }));
-    expect(matches(actor, "root.brightness.bright")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.bright")).toBe(true);
 
     actor.send(setBrightnessEvent.create({ level: "bright" }));
-    expect(matches(actor, "root.brightness.normal")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.normal")).toBe(true);
 
     actor.send(setBrightnessEvent.create({ level: "normal" }));
-    expect(matches(actor, "root.brightness.bright")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.bright")).toBe(true);
   });
 
   it("color: cycle blue → red → green → blue", () => {
     const { actor } = createAnimationActor();
 
-    expect(matches(actor, "root.color.blue")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.blue")).toBe(true);
 
     actor.send(mainEvents.CYCLE_COLOR);
-    expect(matches(actor, "root.color.red")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.red")).toBe(true);
 
     actor.send(mainEvents.CYCLE_COLOR);
-    expect(matches(actor, "root.color.green")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.green")).toBe(true);
 
     actor.send(mainEvents.CYCLE_COLOR);
-    expect(matches(actor, "root.color.blue")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.blue")).toBe(true);
   });
 
   it("all region dimensions are independent", () => {
@@ -263,15 +268,15 @@ describe("animation & UI state actor", () => {
     actor.send(setBrightnessEvent.create({ level: "dim" }));
     actor.send(mainEvents.CYCLE_COLOR);
 
-    expect(matches(actor, "root.dashboard.open")).toBe(true);
-    expect(matches(actor, "root.sidebar.open")).toBe(true);
-    expect(matches(actor, "root.brightness.bright")).toBe(true);
-    expect(matches(actor, "root.color.red")).toBe(true);
+    expect(matches(actor, "drawerRoot.dashboard.open")).toBe(true);
+    expect(matches(actor, "drawerRoot.sidebar.open")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.bright")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.red")).toBe(true);
 
     actor.send(setBrightnessEvent.create({ level: "normal" }));
-    expect(matches(actor, "root.brightness.normal")).toBe(true);
-    expect(matches(actor, "root.sidebar.open")).toBe(true);
-    expect(matches(actor, "root.color.red")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.normal")).toBe(true);
+    expect(matches(actor, "drawerRoot.sidebar.open")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.red")).toBe(true);
   });
 
   it("drawer animation does not affect region states", () => {
@@ -282,9 +287,9 @@ describe("animation & UI state actor", () => {
 
     actor.send(mainEvents.OPEN_DRAWER);
     clock.advance(300);
-    expect(matches(actor, "root")).toBe(true);
-    expect(matches(actor, "root.dashboard.open")).toBe(true);
-    expect(matches(actor, "root.brightness.bright")).toBe(true);
+    expect(matches(actor, "drawerRoot")).toBe(true);
+    expect(matches(actor, "drawerRoot.dashboard.open")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.bright")).toBe(true);
   });
 
   it("full flow: open drawer, toggle settings", () => {
@@ -298,13 +303,13 @@ describe("animation & UI state actor", () => {
     actor.send(setBrightnessEvent.create({ level: "dim" }));
     actor.send(mainEvents.CYCLE_COLOR);
 
-    expect(matches(actor, "root.dashboard.open")).toBe(true);
-    expect(matches(actor, "root.sidebar.open")).toBe(true);
-    expect(matches(actor, "root.brightness.bright")).toBe(true);
-    expect(matches(actor, "root.color.red")).toBe(true);
+    expect(matches(actor, "drawerRoot.dashboard.open")).toBe(true);
+    expect(matches(actor, "drawerRoot.sidebar.open")).toBe(true);
+    expect(matches(actor, "drawerRoot.brightness.bright")).toBe(true);
+    expect(matches(actor, "drawerRoot.color.red")).toBe(true);
 
     actor.send(mainEvents.CLOSE_DRAWER);
     clock.advance(300);
-    expect(matches(actor, "root")).toBe(true);
+    expect(matches(actor, "drawerRoot")).toBe(true);
   });
 });

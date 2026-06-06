@@ -9,8 +9,8 @@
     "check": "vp check"
   },
   "dependencies": {
-    "@mantaq/sugar": "workspace:*",
-    "core": "workspace:*"
+    "@mantaq/core": "workspace:*",
+    "@mantaq/sugar": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",

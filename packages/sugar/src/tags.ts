@@ -1,4 +1,4 @@
-import type { Snapshot } from "core";
+import type { Snapshot } from "@mantaq/core";
 
 export interface Tag {
   has(snapshot: Snapshot): boolean;

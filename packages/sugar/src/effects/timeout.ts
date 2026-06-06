@@ -1,4 +1,4 @@
-import type { EffectInput, AnyEventRef } from "core";
+import type { EffectInput, AnyEventRef } from "@mantaq/core";
 
 export function withTimeout<
   Inputs extends AnyEventRef[],

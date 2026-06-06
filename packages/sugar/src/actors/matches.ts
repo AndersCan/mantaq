@@ -1,4 +1,4 @@
-import type { Snapshot } from "core";
+import type { Snapshot } from "@mantaq/core";
 
 function matchSnapshot(snapshot: Snapshot, parts: string[], index: number): boolean {
   const stateName = snapshot.path[0];

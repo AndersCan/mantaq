@@ -43,3 +43,13 @@ export class StateRef<T, Payload = unknown> {
     return this;
   }
 }
+
+export class TransitionState<N extends string = string, P = unknown> {
+  __stateRef: StateRef<N, P>;
+  __payload: P;
+
+  constructor(stateRef: StateRef<N, P>, payload: P) {
+    this.__stateRef = stateRef;
+    this.__payload = payload;
+  }
+}

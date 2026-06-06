@@ -17,9 +17,9 @@
  */
 
 import { describe, it, expect, vi } from "vite-plus/test";
-import { Actor, VirtualClock } from "core";
-import { state, Any } from "core";
-import { event } from "core";
+import { Actor, VirtualClock } from "@mantaq/core";
+import { state } from "@mantaq/core";
+import { event } from "@mantaq/core";
 import { matches, withTimeout } from "@mantaq/sugar";
 
 interface User {
@@ -79,7 +79,7 @@ const signInWithPhoneEffect: InstanceType<typeof Actor>["options"]["effects"][st
         const user: User = {
           uid: `user-${Date.now()}`,
           email: `user${Date.now()}@example.com`,
-          phone: context.phoneNumber,
+          phone: (context as AuthContext).phoneNumber,
         };
         emit(signInDoneEvent.create({ user }));
       } else {
