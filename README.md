@@ -20,3 +20,17 @@ vp run dev        # start dev server
 vp run -r test    # run all tests
 vp run -r build   # build all packages
 ```
+
+## Project Structure
+
+```
+mantaq/
+├── packages/
+│   ├── core/       # State machine runtime
+│   ├── sugar/      # Convenience helpers
+│   ├── utils/      # Shared utilities
+│   └── examples/   # Usage examples
+├── apps/
+│   └── docs/       # Documentation site
+└── vite.config.ts  # Monorepo config
+```
