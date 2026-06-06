@@ -32,7 +32,7 @@ jobs:
         run: pnpm install
 
       - name: Build Docs
-        run: vp run docs#build
+        run: pnpm exec vp run docs#build
         env:
           NODE_ENV: production
           PUBLIC_URL: /docs/
