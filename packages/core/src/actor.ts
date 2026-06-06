@@ -114,42 +114,52 @@ export class VirtualClock implements Clock {
   advance(ms: number): void {
     const target = this.#now + ms;
 
-    const events: Array<{ time: number; type: "timer" | "interval"; id: number }> = [];
+    while (true) {
+      let earliest = target;
+      let hasEvent = false;
 
-    for (const [id, t] of this.#timers) {
-      if (t.deadline <= target) {
-        events.push({ time: t.deadline, type: "timer", id });
+      for (const t of this.#timers.values()) {
+        if (t.deadline <= target && t.deadline <= earliest) {
+          earliest = t.deadline;
+          hasEvent = true;
+        }
       }
-    }
-
-    for (const [id, t] of this.#intervals) {
-      let fire = t.next;
-      const step = t.ms || 1;
-      while (fire <= target) {
-        events.push({ time: fire, type: "interval", id });
-        fire += step;
+      for (const t of this.#intervals.values()) {
+        if (t.next <= target && t.next <= earliest) {
+          earliest = t.next;
+          hasEvent = true;
+        }
       }
-    }
 
-    events.sort((a, b) => a.time - b.time);
+      if (!hasEvent) break;
 
-    for (const ev of events) {
-      this.#now = ev.time;
-      if (ev.type === "timer") {
-        const timer = this.#timers.get(ev.id);
+      this.#now = earliest;
+
+      const timerIds: number[] = [];
+      for (const [id, t] of this.#timers) {
+        if (t.deadline === earliest) timerIds.push(id);
+      }
+      for (const id of timerIds) {
+        const timer = this.#timers.get(id);
         if (timer) {
           if (timer.signal && timer.onAbort) {
             timer.signal.removeEventListener("abort", timer.onAbort);
           }
-          this.#timers.delete(ev.id);
+          this.#timers.delete(id);
           timer.cb();
         }
-      } else {
-        const interval = this.#intervals.get(ev.id);
+      }
+
+      const intervalIds: number[] = [];
+      for (const [id, t] of this.#intervals) {
+        if (t.next === earliest) intervalIds.push(id);
+      }
+      for (const id of intervalIds) {
+        const interval = this.#intervals.get(id);
         if (interval) {
           interval.cb();
-          if (this.#intervals.has(ev.id)) {
-            interval.next = ev.time + interval.ms;
+          if (this.#intervals.has(id)) {
+            interval.next = this.#now + interval.ms;
           }
         }
       }
