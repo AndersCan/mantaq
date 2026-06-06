@@ -25,3 +25,4 @@ peerDependencyRules:
     vitest: "*"
 allowBuilds:
   esbuild: true
+  sharp: true
