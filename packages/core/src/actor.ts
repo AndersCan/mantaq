@@ -494,7 +494,7 @@ export class Actor<
     this.#internalQueue.length = 0;
     this.#queueIndex = 0;
     this.#processing = false;
-    if (this.#internalQueue.length === 0 && this.#settledResolvers.length > 0) {
+    if (this.#settledResolvers.length > 0) {
       const resolvers = this.#settledResolvers.splice(0);
       for (const resolve of resolvers) {
         resolve();
