@@ -161,4 +161,55 @@ describe("VirtualClock", () => {
     expect(fired).toBe(true);
     expect(clock.now()).toBe(1500);
   });
+
+  test("interval fires at scheduled times", () => {
+    const clock = new VirtualClock();
+    const times: number[] = [];
+    clock.setInterval(100, () => {
+      times.push(clock.now());
+    });
+
+    clock.advance(250);
+    expect(times).toEqual([100, 200]);
+  });
+
+  test("timer clears interval at same timestamp — interval does not fire", () => {
+    const clock = new VirtualClock();
+    const timerFired: number[] = [];
+    const intervalFired: number[] = [];
+
+    const intervalId = clock.setInterval(200, () => {
+      intervalFired.push(clock.now());
+    });
+
+    clock.setTimeout(200, () => {
+      timerFired.push(clock.now());
+      clock.clearInterval(intervalId);
+    });
+
+    clock.advance(500);
+    expect(timerFired).toEqual([200]);
+    expect(intervalFired).toEqual([]);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("timer clears interval at later timestamp — only earlier interval fires", () => {
+    const clock = new VirtualClock();
+    const timerFired: number[] = [];
+    const intervalFired: number[] = [];
+
+    const intervalId = clock.setInterval(100, () => {
+      intervalFired.push(clock.now());
+    });
+
+    clock.setTimeout(350, () => {
+      timerFired.push(clock.now());
+      clock.clearInterval(intervalId);
+    });
+
+    clock.advance(500);
+    expect(timerFired).toEqual([350]);
+    expect(intervalFired).toEqual([100, 200, 300]);
+    expect(clock.hasPending()).toBe(false);
+  });
 });
