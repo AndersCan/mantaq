@@ -2,6 +2,11 @@ import type { AnyStateRef, StateRef, TransitionState } from "./state.ts";
 import { TransitionState as TransitionStateClass } from "./state.ts";
 import type { AnyEventRef, EventRef } from "./event.ts";
 
+const IS_DEV =
+  typeof process === "undefined" ||
+  !process.env?.NODE_ENV ||
+  process.env.NODE_ENV === "development";
+
 export interface Snapshot {
   path: string[];
   regions: Record<string, Snapshot>;
@@ -244,6 +249,8 @@ export class Actor<
   #outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null = null;
   #processing = false;
   #internalIds: Set<string> = new Set();
+  #internalBudget: number;
+  #internalCount = 0;
   #subscribers: Set<(snapshot: Snapshot) => void> = new Set();
   #errorSubscribers: Set<(error: unknown) => void> = new Set();
   #doneSubscribers: Set<() => void> = new Set();
@@ -314,6 +321,7 @@ export class Actor<
     context?: ActorContext;
     initial: InitialState<States[number]>;
     clock?: Clock;
+    internalBudget?: number;
     effects?: Partial<
       Record<StateNames, Array<EffectFn<Inputs | Internal, Internal, ActorContext>>>
     >;
@@ -338,11 +346,20 @@ export class Actor<
       effects: options.effects ?? ({} as typeof this.options.effects),
     };
     this.#internalIds = new Set(this.options.internal.map((e) => e.id));
+    this.#internalBudget = options.internalBudget ?? 10000;
     this.clock = options.clock ?? new RealClock();
     if (this.clock instanceof VirtualClock) {
       this.clock._setDrain(() => this.#processInternalQueue());
     }
     const init = resolveInitial(options.initial);
+    if (IS_DEV) {
+      const stateNames = new Set(options.states.map((s) => s.name));
+      if (!stateNames.has(init.state.name)) {
+        console.warn(
+          `[Actor] initial state "${init.state.name}" not found in declared states [${[...stateNames].join(", ")}]`,
+        );
+      }
+    }
     this.state = init.state;
     this.#context = this.options.context;
     if (options.regions) {
@@ -440,6 +457,10 @@ export class Actor<
 
     if (anyEmitted || this.#internalQueue.length > this.#queueIndex) {
       this.#processInternalQueue();
+    } else if (IS_DEV && !stateTransition && !anyTransition) {
+      console.warn(
+        `[Actor] no transition for event "${eventId}" in state "${this.state.name}". Event dropped.`,
+      );
     }
   }
 
@@ -511,8 +532,20 @@ export class Actor<
   #processInternalQueue(): void {
     if (this.#processing) return;
     this.#processing = true;
+    this.#internalCount = 0;
     while (this.#queueIndex < this.#internalQueue.length) {
+      if (this.#internalCount >= this.#internalBudget) {
+        if (IS_DEV) {
+          console.warn(
+            `[Actor] internal budget exceeded (${this.#internalBudget}). Possible infinite loop. Aborting remaining ${this.#internalQueue.length - this.#queueIndex} events.`,
+          );
+        }
+        this.#internalQueue.length = 0;
+        this.#queueIndex = 0;
+        break;
+      }
       const event = this.#internalQueue[this.#queueIndex++];
+      this.#internalCount++;
       if (this.#internalIds.has(event.id)) {
         this.send(event);
       } else if (this.#outputHandler) {
