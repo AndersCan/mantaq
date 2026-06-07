@@ -53,6 +53,8 @@ DESC="<short-description>"
 
 Read this SKILL.md fully before starting.
 
+Branch created once. All iterations commit to same branch. No new branches per iteration.
+
 ### Phase 1: Discover & Plan
 
 Build task inventory based on depth:
@@ -110,6 +112,9 @@ Task(
 
 TYPE: <bug fix|type safety|test coverage|export cleanup|dx improvement>
 BRANCH: self-improvement/<DESC>
+
+You are on branch self-improvement/<DESC>. Do NOT create new branches.
+Work on current branch. Commit directly.
 
 Implement this change following self-improvement-worker skill instructions.
 Return: success/failure, commit hash if successful, error if failed."
@@ -192,6 +197,6 @@ gh pr create --base wip --title "improve: self-improvement loop" --body "## Chan
 ## Orchestration Tips
 
 - Check tooling before starting (bumpy, rtk, etc.) — skip steps that require missing tools
-- Branch dependency: if Run N uses Run M's changes, branch from Run M not wip
+- One branch per orchestration run. All iterations stack commits on it.
 - Parallelism: independent tasks can share a branch
 - Don't add features in one run and test them in another — keep related work together
