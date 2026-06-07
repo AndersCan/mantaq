@@ -15,7 +15,7 @@ import type { Snapshot } from "@mantaq/core";
 
 function snap(path: string[], regions: Record<string, Snapshot> = {}, done?: boolean): Snapshot {
   const s: Snapshot = { path, regions };
-  if (done) s.done = true;
+  if (done !== undefined) s.done = done;
   return s;
 }
 
@@ -36,6 +36,10 @@ describe("isDone", () => {
 
   test("returns true when done is true", () => {
     expect(isDone(snap(["success"], {}, true))).toBe(true);
+  });
+
+  test("returns false when done is explicitly false", () => {
+    expect(isDone(snap(["idle"], {}, false))).toBe(false);
   });
 });
 
