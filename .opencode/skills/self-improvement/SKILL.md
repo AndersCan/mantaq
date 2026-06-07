@@ -34,9 +34,9 @@ ALL output from this skill MUST follow caveman grammar:
 
 ## Core Rule
 
-Last task of every orchestration run: improve this skill and commit to same branch. Non-negotiable. No exceptions.
+**ONE PR per orchestration loop.** All iterations stack commits on same branch. Single PR at end. Never one PR per iteration.
 
-Every PR created must have auto-merge enabled: `gh pr merge $PR --auto --merge`
+Last task of every orchestration run: improve this skill and commit to same branch. Non-negotiable. No exceptions.
 
 ## Core Loop
 
@@ -156,7 +156,7 @@ Then edit SKILL.md with concrete improvements. Commit to same branch.
 
 ### Phase 4: Create PR
 
-Single PR with everything — code changes + skill improvement:
+ONE PR for entire loop. Push branch and create single PR:
 
 ```
 git push -u origin self-improvement/$DESC
@@ -172,6 +172,7 @@ gh pr merge $PR --auto --merge
 
 ## Anti-patterns (avoid these)
 
+- **Creating one PR per iteration** — ONE PR for entire loop. Stack commits.
 - Adding sections to READMEs
 - Multiple small changes across unrelated files
 - "Improving" things already good enough
