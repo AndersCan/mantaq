@@ -72,3 +72,4 @@ Each xstate use case above has a corresponding actor model implementation:
 | Game character       | `gameCharacter.actor.test.ts`            | Guard conditions, context-tracked combat state, regions for movement, effects     |
 | Network connection   | `networkConnectionManager.actor.test.ts` | Regions for health monitor, exponential backoff, guard conditions, reconnection   |
 | WebSocket reconnect  | `websocketConnection.actor.test.ts`      | Retry with exponential backoff, Any handler for cross-state events, async effects |
+| Event sourcing       | `eventSourcing.actor.test.ts`            | Event log in context, fold for state derivation, snapshot + rebuild pattern       |
