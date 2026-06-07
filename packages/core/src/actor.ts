@@ -215,7 +215,6 @@ export interface AnyActor {
   on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
   on(event: "error", fn: (error: unknown) => void): () => void;
   on(event: "done", fn: () => void): () => void;
-  subscribe(fn: (snapshot: Snapshot) => void): () => void;
   settled(): Promise<void>;
   __children: Map<string, AnyActor>;
   __outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null;
@@ -389,10 +388,6 @@ export class Actor<
       };
     }
     return () => {};
-  }
-
-  subscribe(fn: (snapshot: Snapshot) => void): () => void {
-    return this.on("change", fn);
   }
 
   settled(): Promise<void> {

@@ -264,19 +264,3 @@ describe("on('done')", () => {
     expect(doneEvents).toHaveLength(0);
   });
 });
-
-describe("subscribe()", () => {
-  test("subscribe is alias for on('change')", () => {
-    const actor = makeActorWithEffects();
-    const toggle = event("toggled")();
-    const snaps: any[] = [];
-
-    actor.subscribe((snap) => snaps.push(snap));
-
-    actor.send(toggle);
-
-    expect(snaps).toHaveLength(2);
-    expect(snaps[0]).toEqual({ path: ["off"], regions: {} });
-    expect(snaps[1]).toEqual({ path: ["on"], regions: {} });
-  });
-});
