@@ -18,7 +18,7 @@ export class EventRef<const T extends string, Payload = unknown> {
     return anyEvent && anyEvent.id === this.id;
   }
 
-  create(payload: Payload): Payload & { id: string } {
-    return { ...payload, id: this.id };
+  create(payload: Payload): { id: T } & Payload {
+    return { ...payload, id: this.id } as { id: T } & Payload;
   }
 }

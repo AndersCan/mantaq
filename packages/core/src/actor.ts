@@ -24,8 +24,9 @@ class RealClock implements Clock {
   }
 
   setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error Node.js setTimeout type doesn't accept options argument (browser runtime)
-    const id: number = globalThis.setTimeout(cb, ms, options);
+    const id: number = (
+      globalThis as unknown as Record<string, (...args: unknown[]) => number>
+    ).setTimeout(cb, ms, options);
     return id;
   }
 
@@ -34,8 +35,9 @@ class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error Node.js setInterval type doesn't accept options argument (browser runtime)
-    const id: number = globalThis.setInterval(cb, ms, options);
+    const id: number = (
+      globalThis as unknown as Record<string, (...args: unknown[]) => number>
+    ).setInterval(cb, ms, options);
     return id;
   }
 
@@ -387,10 +389,11 @@ export class Actor<
   }
 
   send(event: Inputs[number] | { id: string; [key: string]: unknown }): void {
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const anyTransition = this.options.transitions?.["Any" as StateNames]?.[event.id as string] as
-      | TransitionHandler<ActorContext>
-      | undefined;
+    const transitions = this.options.transitions as unknown as Record<
+      string,
+      Record<string, TransitionHandler<ActorContext> | undefined>
+    >;
+    const anyTransition = transitions["Any"]?.[event.id as string];
 
     if (anyTransition) {
       const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -403,10 +406,7 @@ export class Actor<
       }
     }
 
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const stateTransition = this.options.transitions?.[this.state.name as StateNames]?.[
-      event.id as string
-    ] as TransitionHandler<ActorContext> | undefined;
+    const stateTransition = transitions[this.state.name as string]?.[event.id as string];
 
     if (stateTransition) {
       const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -452,8 +452,11 @@ export class Actor<
     event: Inputs[number] | { id: string; [key: string]: unknown },
     statePayload: unknown,
   ): void {
-    // @ts-expect-error state.name is a StateNames but TS can't narrow
-    const effects = this.options.effects?.[this.state.name];
+    const allEffects = this.options.effects as unknown as Record<
+      string,
+      Array<EffectFn<Inputs, Internal, ActorContext>>
+    >;
+    const effects = allEffects[this.state.name as string];
     if (!effects) return;
 
     const abort = new AbortController();
@@ -463,7 +466,7 @@ export class Actor<
         effectFn({
           signal: abort.signal,
           state: { name: this.state.name as string, payload: statePayload },
-          event,
+          event: event as Inputs[number] | Internal[number],
           context: this.#context,
           emit: (e: { id: string; [key: string]: unknown }) => this.#internalQueue.push(e),
           clock: this.clock,
