@@ -216,7 +216,6 @@ export class Actor<
   #context: ActorContext;
   clock: Clock;
   #regions: Record<string, AnyActor> = {};
-  #regionState: Map<string, AnyStateRef> = new Map();
   #children: Map<string, AnyActor> = new Map();
   #internalQueue: Array<{ id: string; [key: string]: unknown }> = [];
   #queueIndex = 0;
@@ -255,18 +254,6 @@ export class Actor<
   }
   /** @internal */ __drainInternal(): void {
     this.#processInternalQueue();
-  }
-
-  #initRegionState(s: AnyStateRef): void {
-    if (s._regions) {
-      for (const [key, region] of Object.entries(s._regions)) {
-        const initial = region.states[region.initial as string];
-        if (initial) {
-          this.#regionState.set(`${s.name}.${key}`, initial);
-          this.#initRegionState(initial);
-        }
-      }
-    }
   }
 
   options: {
@@ -331,7 +318,6 @@ export class Actor<
     const init = resolveInitial(options.initial);
     this.state = init.state;
     this.#context = this.options.context;
-    this.#initRegionState(this.state);
     if (options.regions) {
       for (const [key, child] of Object.entries(options.regions)) {
         this.#regions[key] = child;
@@ -512,8 +498,7 @@ export class Actor<
 
     if (s._regions) {
       for (const [regionName, region] of Object.entries(s._regions)) {
-        const key = `${s.name}.${regionName}`;
-        const active = this.#regionState.get(key) ?? region.states[region.initial as string];
+        const active = region.states[region.initial as string];
         if (active) {
           regions[regionName] = this.#snapshot(active);
         }
