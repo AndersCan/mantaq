@@ -1,4 +1,4 @@
-import type { Snapshot } from "@mantaq/core";
+import type { Snapshot, StateRef } from "@mantaq/core";
 
 export interface Tag {
   has(snapshot: Snapshot): boolean;
@@ -12,7 +12,7 @@ function hasName(snapshot: Snapshot, name: string): boolean {
   return false;
 }
 
-export function tag(...stateNames: Array<{ name: string }>): Tag {
+export function tag(...stateNames: StateRef<string, unknown>[]): Tag {
   const names = stateNames.map((s) => s.name);
   return {
     has: (snapshot: Snapshot) => names.some((name) => hasName(snapshot, name)),
