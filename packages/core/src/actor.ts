@@ -395,7 +395,8 @@ export class Actor<
       string,
       Record<string, TransitionHandler<ActorContext> | undefined>
     >;
-    const anyTransition = transitions["Any"]?.[event.id as string];
+    const eventId = event.id as string;
+    const anyTransition = transitions["Any"]?.[eventId];
 
     if (anyTransition) {
       const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -408,7 +409,7 @@ export class Actor<
       }
     }
 
-    const stateTransition = transitions[this.state.name as string]?.[event.id as string];
+    const stateTransition = transitions[this.state.name as string]?.[eventId];
 
     if (stateTransition) {
       const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -458,7 +459,7 @@ export class Actor<
       string,
       Array<EffectFn<Inputs, Internal, ActorContext>>
     >;
-    const effects = allEffects[this.state.name as string];
+    const effects = allEffects[this.state.name];
     if (!effects) return;
 
     const abort = new AbortController();
@@ -467,7 +468,7 @@ export class Actor<
       try {
         effectFn({
           signal: abort.signal,
-          state: { name: this.state.name as string, payload: statePayload },
+          state: { name: this.state.name, payload: statePayload },
           event: event as Inputs[number] | Internal[number],
           context: this.#context,
           emit: (e: { id: string; [key: string]: unknown }) => this.#internalQueue.push(e),
@@ -515,7 +516,7 @@ export class Actor<
 
     if (s._regions) {
       for (const [regionName, region] of Object.entries(s._regions)) {
-        const active = region.states[region.initial as string];
+        const active = region.states[region.initial];
         if (active) {
           regions[regionName] = this.#snapshot(active);
         }
