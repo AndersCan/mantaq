@@ -255,6 +255,46 @@ describe("effects", () => {
     expect(internalProcessed).toBe(true);
     expect(actor.state.name).toBe("off");
   });
+
+  test("emit fires exactly once when state and emit both present", () => {
+    const start = event("start")();
+    const next = event("next")();
+    const a = state("a")();
+    const b = state("b")();
+    const c = state("c")();
+    let bEntry = 0;
+
+    const actor = new Actor({
+      inputs: [start],
+      outputs: [],
+      internal: [next],
+      context: {},
+      states: [a, b, c],
+      initial: a,
+      effects: {
+        b: [
+          () => {
+            bEntry++;
+          },
+        ],
+      },
+      transitions: {
+        a: {
+          start: () => ({ state: b, emit: [next.create({})] }),
+        },
+        b: {
+          next: () => ({ state: c }),
+        },
+        c: {
+          next: () => ({ state: b }),
+        },
+      },
+    });
+
+    actor.send(start);
+    expect(bEntry).toBe(1);
+    expect(actor.state.name).toBe("c");
+  });
 });
 
 describe("isIn", () => {

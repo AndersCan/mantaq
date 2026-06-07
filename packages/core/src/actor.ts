@@ -466,11 +466,6 @@ export class Actor<
         }
       }
     }
-
-    if (step.emit) {
-      this.#internalQueue.push(...step.emit);
-      this.#processInternalQueue();
-    }
   }
 
   #runEffects(
