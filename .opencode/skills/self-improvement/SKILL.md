@@ -24,7 +24,13 @@ Caveman output everywhere except code. Agent runs 10 improvement iterations, the
 ### Phase 0: Setup
 
 ```
-rtk git checkout wip && rtk git pull
+rtk git checkout wip && rtk git pull && git checkout -b self-improvement/<short-description>
+```
+
+Set DESC variable immediately to avoid re-typing branch name:
+
+```
+DESC="<short-description>"
 ```
 
 Read this SKILL.md fully before starting.
@@ -73,21 +79,25 @@ git log --oneline --grep="self-improvement" -30
 - Features unrelated to actor model
 - Test coverage for coverage sake
 
-### Phase 2: Execute (10 iterations)
+### Phase 2: Execute (up to 10 iterations)
 
-For each task in DAG order (up to 10):
+For each task in DAG order:
 
 **Step 2a. Branch**
 
 ```
-git checkout wip
-git pull
-git checkout -b self-improvement/<short-description>
+git checkout wip && git pull && git checkout -b self-improvement/$DESC
 ```
+
+DESC already set in Phase 0. Re-use for each iteration:
+
+- Set DESC to new value each iteration
+- NEVER commit to wip directly. Branch first.
 
 **Step 2b. Implement**
 
 - ONE substantive change per iteration
+- Batch multiple small tests (like VirtualClock edge cases) into single iteration
 - No code comments
 - Maintain strict type safety
 
@@ -98,36 +108,34 @@ vp check && vp test --reporter agent
 ```
 
 - If pass → proceed
-- If fail → max 3 fix attempts. If still failing after 3 → abandon task, note in summary, move to next task. Do NOT reset — the abandoned branch holds the failure record.
+- If fail → max 3 fix attempts. If still failing after 3 → abandon task, note in summary, move to next task. Close but do not delete branch.
 
-**Step 2d. Auto-merge**
+**Step 2d. Auto-merge with --auto**
 
 ```
 git add -A
-# Run add-change skill for bumpy, but batch: only create bumpy file if this is the LAST codebase iteration
-git commit -m "improve: <short description>"
-git push -u origin self-improvement/<short-description>
-gh pr create --base wip --title "improve: <short description>" --body "Summary of changes"
+git commit -m "improve: $DESC"
+git push -u origin self-improvement/$DESC
+PR=$(gh pr create --base wip --title "improve: $DESC" --body "Summary of changes" | tail -1)
+echo "PR: $PR"
+gh pr merge $PR --auto --merge
 ```
 
-Wait for PR CI. Check PR status:
+Use `--auto` so GitHub merges immediately when CI passes. No need to poll or watch CI:
 
 ```
-gh pr checks <number> --watch --interval 10
+# Single check — confirm auto-merge was registered:
+gh pr view $PR --json state,mergeStateStatus
 ```
 
-If all checks pass → auto-merge:
+If `mergeStateStatus` is `clean` → already merged. If `blocked` → CI failing, investigate.
+
+If checks fail → max 2 fix commits (`git commit --amend` + `git push --force`). If still failing → close PR, skip task.
+
+**Track progress**:
 
 ```
-gh pr merge <number> --merge
-```
-
-If checks fail → max 2 fix commits. If still failing → close PR, skip task.
-
-**Track progress** — store summary after each iteration:
-
-```
-echo "<iteration N>: <task> — <status>" >> /tmp/self-improvement-log.txt
+echo "<iteration N>: $DESC" >> /tmp/self-improvement-log.txt
 ```
 
 ### Phase 3: Retrospect & Improve Skill
@@ -136,18 +144,16 @@ After 10 iterations (or all available tasks completed), analyze:
 
 1. Read the log: `cat /tmp/self-improvement-log.txt`
 2. Calculate: success rate, avg time per iteration, most common failure reasons
-3. Identify 3 concrete improvements to this SKILL.md:
+3. Identify 3 concrete improvements to this SKILL.md
 
-**Checklist for skill improvement:**
+**Checklist:**
 
-- [ ] Were instructions clear enough that you didn't need to re-read?
-- [ ] Did task ranking produce correct dependency order?
-- [ ] Where did you waste most time? (check failures? re-reading files? etc)
-- [ ] Was auto-merge reliable? Any merge conflicts?
-- [ ] Did you have to re-scan codebase between iterations?
+- [ ] Did `--auto` save time vs `--watch`?
+- [ ] Any wip commits (forgot to branch)?
+- [ ] Batch small tests together?
+- [ ] CI wait still bottleneck?
+- [ ] Which steps still manual that could be automated?
 - [ ] What would make next run 20% faster?
-
-Update SKILL.md with fixes. Target concrete text changes, not vague promises.
 
 ### Phase 4: Commit Skill Improvement
 
