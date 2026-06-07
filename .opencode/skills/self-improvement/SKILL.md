@@ -92,6 +92,14 @@ git log --oneline --grep="self-improvement" -30
 4. Test coverage for uncovered behavior (depends on types)
 5. DX improvements / new tests (lowest priority)
 
+**Batch small cuts.** If multiple tasks each remove <30 lines, combine into single iteration. Not worth spawning worker per trivial removal.
+
+**Validate before moving code.** Before moving X from package A to B:
+
+- Check A depends on B? If yes, cannot move (circular dep).
+- Check who imports X from A? If zero external importers, just delete.
+- Check if X is used as default/fallback in A's internals? If yes, keep or make required param.
+
 **Skip** (not real improvements):
 
 - Generic utilities (deep merge, pick, omit, debounce)
@@ -188,7 +196,8 @@ gh pr merge $PR --auto --merge
 
 ## Orchestration Tips
 
-- Check tooling before starting (bumpy, rtk, etc.) — skip steps that require missing tools
+- Check tooling before starting (bumpy, rtk, etc.) — skip steps that require missing tools. If bumpy unavailable, write `.bumpy/<name>.md` files manually.
 - One branch per orchestration run. All iterations stack commits on it.
 - Parallelism: independent tasks can share a branch
 - Don't add features in one run and test them in another — keep related work together
+- Pre-existing check errors (tsconfig, etc.) are noise — only fail on NEW errors your changes introduced
