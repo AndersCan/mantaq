@@ -93,30 +93,28 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     effects: {
       purging: [
         (input) => {
-          const ctx = input.context as CacheContext;
           const now = input.clock.now();
           const expired: string[] = [];
-          for (const [key, entry] of ctx.entries) {
+          for (const [key, entry] of input.context.entries) {
             if (entry.expiresAt !== null && entry.expiresAt <= now) {
               expired.push(key);
             }
           }
           for (const key of expired) {
-            ctx.entries.delete(key);
-            ctx.accessOrder = ctx.accessOrder.filter((k) => k !== key);
-            ctx.expires++;
+            input.context.entries.delete(key);
+            input.context.accessOrder = input.context.accessOrder.filter((k) => k !== key);
+            input.context.expires++;
           }
           input.emit(purgeDoneEvent.create(undefined));
         },
       ],
       full: [
         (input) => {
-          const ctx = input.context as CacheContext;
-          if (ctx.accessOrder.length >= ctx.capacity) {
-            const lruKey = ctx.accessOrder.shift();
+          if (input.context.accessOrder.length >= input.context.capacity) {
+            const lruKey = input.context.accessOrder.shift();
             if (lruKey) {
-              ctx.entries.delete(lruKey);
-              ctx.evictions++;
+              input.context.entries.delete(lruKey);
+              input.context.evictions++;
             }
           }
           input.emit(evictionDoneEvent.create(undefined));
@@ -126,36 +124,33 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     transitions: {
       Any: {
         GET: (event, { context, actor }) => {
-          const ctx = context as CacheContext;
-          const entry = ctx.entries.get(event.key);
+          const entry = context.entries.get(event.key);
           if (entry) {
             const now = actor.clock.now();
             if (entry.expiresAt !== null && entry.expiresAt <= now) {
-              ctx.entries.delete(event.key);
-              ctx.accessOrder = ctx.accessOrder.filter((k) => k !== event.key);
-              ctx.expires++;
-              ctx.misses++;
+              context.entries.delete(event.key);
+              context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
+              context.expires++;
+              context.misses++;
               return {};
             }
             entry.accessCount++;
             entry.lastAccessed = now;
-            ctx.accessOrder = ctx.accessOrder.filter((k) => k !== event.key);
-            ctx.accessOrder.push(event.key);
-            ctx.hits++;
+            context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
+            context.accessOrder.push(event.key);
+            context.hits++;
             return {};
           }
-          ctx.misses++;
+          context.misses++;
           return {};
         },
         DELETE: (event, { context }) => {
-          const ctx = context as CacheContext;
-          if (ctx.entries.delete(event.key)) {
-            ctx.accessOrder = ctx.accessOrder.filter((k) => k !== event.key);
+          if (context.entries.delete(event.key)) {
+            context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
           }
           return {};
         },
         PUT: (event, { context, actor }) => {
-          const ctx = context as CacheContext;
           const now = actor.clock.now();
           const entry: CacheEntry = {
             value: event.value,
@@ -163,26 +158,24 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
             accessCount: 0,
             lastAccessed: now,
           };
-          if (!ctx.entries.has(event.key)) {
-            ctx.accessOrder.push(event.key);
+          if (!context.entries.has(event.key)) {
+            context.accessOrder.push(event.key);
           }
-          ctx.entries.set(event.key, entry);
-          if (ctx.entries.size > ctx.capacity) {
+          context.entries.set(event.key, entry);
+          if (context.entries.size > context.capacity) {
             return { state: cacheStates.full };
           }
           return {};
         },
         PURGE: () => ({ state: cacheStates.purging }),
         SET_CAPACITY: (event, { context }) => {
-          const ctx = context as CacheContext;
-          ctx.capacity = event.capacity;
+          context.capacity = event.capacity;
           return {};
         },
       },
       purging: {
         PURGE_DONE: (_event, { context }) => {
-          const ctx = context as CacheContext;
-          if (ctx.entries.size > ctx.capacity) {
+          if (context.entries.size > context.capacity) {
             return { state: cacheStates.full };
           }
           return { state: cacheStates.ready };
@@ -190,8 +183,7 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
       },
       full: {
         EVICTION_DONE: (_event, { context }) => {
-          const ctx = context as CacheContext;
-          if (ctx.entries.size > ctx.capacity) {
+          if (context.entries.size > context.capacity) {
             return { state: cacheStates.full };
           }
           return { state: cacheStates.ready };
