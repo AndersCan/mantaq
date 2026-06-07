@@ -323,8 +323,8 @@ export class Actor<
       ...options,
       outputs: (options.outputs ?? []) as Outputs,
       internal: (options.internal ?? []) as Internal,
-      context: (options.context ?? ({} as ActorContext)) as ActorContext,
-      effects: (options.effects ?? {}) as Exclude<typeof options.effects, undefined>,
+      context: options.context ?? ({} as ActorContext),
+      effects: options.effects ?? ({} as typeof this.options.effects),
     };
     this.#internalIds = new Set(this.options.internal.map((e) => e.id));
     this.clock = options.clock ?? new RealClock();
@@ -391,7 +391,7 @@ export class Actor<
   }
 
   send(event: Inputs[number] | { id: string; [key: string]: unknown }): void {
-    const transitions = this.options.transitions as unknown as Record<
+    const transitions = this.options.transitions as Record<
       string,
       Record<string, TransitionHandler<ActorContext> | undefined>
     >;
@@ -454,7 +454,7 @@ export class Actor<
     event: Inputs[number] | { id: string; [key: string]: unknown },
     statePayload: unknown,
   ): void {
-    const allEffects = this.options.effects as unknown as Record<
+    const allEffects = this.options.effects as Record<
       string,
       Array<EffectFn<Inputs, Internal, ActorContext>>
     >;
