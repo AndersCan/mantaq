@@ -1,24 +1,24 @@
 import { expect, test, describe } from "vite-plus/test";
-import { event, EventRef } from "../src/event.ts";
+import { event, EventRef, type AnyEventRef } from "../src/event.ts";
 
 describe("EventRef", () => {
   test("is — returns falsy when anyEvent is falsy", () => {
     const toggled = event("toggled")();
-    expect(toggled.is(null as any)).toBeFalsy();
-    expect(toggled.is(undefined as any)).toBeFalsy();
+    expect(toggled.is(null as unknown as AnyEventRef)).toBeFalsy();
+    expect(toggled.is(undefined as unknown as AnyEventRef)).toBeFalsy();
   });
 
   test("is — returns true when ids match", () => {
     const toggled = event("toggled")();
     const created = toggled.create(undefined);
-    expect(toggled.is(created as any)).toBe(true);
+    expect(toggled.is(created as unknown as AnyEventRef)).toBe(true);
   });
 
   test("is — returns false when ids differ", () => {
     const toggled = event("toggled")();
     const other = event("other")();
     const created = other.create(undefined);
-    expect(toggled.is(created as any)).toBe(false);
+    expect(toggled.is(created as unknown as AnyEventRef)).toBe(false);
   });
 
   test("create — merges payload with id", () => {

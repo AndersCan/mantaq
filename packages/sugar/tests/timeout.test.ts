@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { VirtualClock } from "@mantaq/core";
+import { VirtualClock, EventRef } from "@mantaq/core";
 import { withTimeout } from "../src/effects/timeout.ts";
 
 describe("withTimeout", () => {
@@ -12,9 +12,12 @@ describe("withTimeout", () => {
       100,
       {
         signal: abort.signal,
+        state: { name: "", payload: undefined },
+        event: new EventRef(""),
+        context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
-      } as any,
+      },
       () => ({ id: "timeout" }),
     );
 
@@ -34,9 +37,12 @@ describe("withTimeout", () => {
       100,
       {
         signal: abort.signal,
+        state: { name: "", payload: undefined },
+        event: new EventRef(""),
+        context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
-      } as any,
+      },
       () => ({ id: "timeout" }),
     );
 
@@ -55,9 +61,12 @@ describe("withTimeout", () => {
       100,
       {
         signal: abort.signal,
+        state: { name: "", payload: undefined },
+        event: new EventRef(""),
+        context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
-      } as any,
+      },
       () => ({ id: "timeout" }),
     );
 
@@ -74,9 +83,12 @@ describe("withTimeout", () => {
       50,
       {
         signal: abort.signal,
+        state: { name: "", payload: undefined },
+        event: new EventRef(""),
+        context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
-      } as any,
+      },
       () => ({ id: "customTimeout", reason: "exceeded" }),
     );
 
@@ -93,9 +105,12 @@ describe("withTimeout", () => {
       100,
       {
         signal: abort.signal,
+        state: { name: "", payload: undefined },
+        event: new EventRef(""),
+        context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
-      } as any,
+      },
       () => ({ id: "timeout" }),
     );
 
