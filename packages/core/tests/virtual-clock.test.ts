@@ -212,4 +212,26 @@ describe("VirtualClock", () => {
     expect(intervalFired).toEqual([100, 200, 300]);
     expect(clock.hasPending()).toBe(false);
   });
+
+  test("setTimeout with already-aborted signal returns -1", () => {
+    const clock = new VirtualClock();
+    const aborted = new AbortController();
+    aborted.abort();
+    const id = clock.setTimeout(100, () => {}, { signal: aborted.signal });
+    expect(id).toBe(-1);
+  });
+
+  test("setInterval with already-aborted signal returns -1", () => {
+    const clock = new VirtualClock();
+    const aborted = new AbortController();
+    aborted.abort();
+    const id = clock.setInterval(100, () => {}, { signal: aborted.signal });
+    expect(id).toBe(-1);
+  });
+
+  test("clearInterval on non-existent id is no-op", () => {
+    const clock = new VirtualClock();
+    clock.clearInterval(999);
+    clock.advance(1000);
+  });
 });
