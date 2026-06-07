@@ -234,4 +234,13 @@ describe("VirtualClock", () => {
     clock.clearInterval(999);
     clock.advance(1000);
   });
+
+  test("advance() throws on infinite timer loop", () => {
+    const clock = new VirtualClock();
+    const rearm = () => {
+      clock.setTimeout(0, rearm);
+    };
+    clock.setTimeout(0, rearm);
+    expect(() => clock.advance(1000)).toThrow("exceeded maximum iterations");
+  });
 });

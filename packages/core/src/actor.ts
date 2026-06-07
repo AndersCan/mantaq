@@ -123,8 +123,15 @@ export class VirtualClock implements Clock {
 
   advance(ms: number): void {
     const target = this.#now + ms;
+    let iterations = 0;
+    const maxIterations = 10_000;
 
     while (true) {
+      if (++iterations > maxIterations) {
+        throw new Error(
+          "VirtualClock.advance() exceeded maximum iterations — possible infinite timer loop",
+        );
+      }
       let earliest = target;
       let hasEvent = false;
 
@@ -462,7 +469,11 @@ export class Actor<
       }
       if (this.state.isFinal) {
         for (const fn of this.#doneSubscribers) {
-          fn();
+          try {
+            fn();
+          } catch {
+            /* catch subscriber throw to avoid crash */
+          }
         }
       }
     }

@@ -263,6 +263,41 @@ describe("on('done')", () => {
 
     expect(doneEvents).toHaveLength(0);
   });
+
+  test("done subscriber that throws does not prevent other subscribers", () => {
+    const done1: any[] = [];
+    const done2: any[] = [];
+    const toggle = event("toggled")();
+
+    const off = state("off")();
+    const done = state("done")().final();
+
+    const actor = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [off, done],
+      initial: off,
+      effects: {},
+      transitions: {
+        off: {
+          toggled: () => ({ state: done }),
+        },
+      },
+    });
+
+    actor.on("done", () => {
+      throw new Error("done subscriber error");
+    });
+    actor.on("done", () => done1.push(true));
+    actor.on("done", () => done2.push(true));
+
+    actor.send(toggle);
+
+    expect(done1).toHaveLength(1);
+    expect(done2).toHaveLength(1);
+  });
 });
 
 describe("subscribe()", () => {

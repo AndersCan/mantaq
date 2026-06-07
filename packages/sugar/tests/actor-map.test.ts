@@ -57,6 +57,35 @@ describe("ActorMap", () => {
     expect(map.keys()).toEqual([]);
   });
 
+  test("size returns number of children", () => {
+    const map = new ActorMap();
+    expect(map.size).toBe(0);
+    map.spawn("a", () => makeActor("a").actor);
+    expect(map.size).toBe(1);
+    map.spawn("b", () => makeActor("b").actor);
+    expect(map.size).toBe(2);
+    map.kill("a");
+    expect(map.size).toBe(1);
+  });
+
+  test("has returns true for existing key", () => {
+    const map = new ActorMap();
+    map.spawn("a", () => makeActor("a").actor);
+    expect(map.has("a")).toBe(true);
+  });
+
+  test("has returns false for missing key", () => {
+    const map = new ActorMap();
+    expect(map.has("a")).toBe(false);
+  });
+
+  test("has returns false after kill", () => {
+    const map = new ActorMap();
+    map.spawn("a", () => makeActor("a").actor);
+    map.kill("a");
+    expect(map.has("a")).toBe(false);
+  });
+
   test("send to non-existent key does not throw", () => {
     const map = new ActorMap();
     expect(() => map.send("nonexistent", { id: "test" })).not.toThrow();

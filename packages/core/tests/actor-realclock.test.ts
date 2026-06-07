@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { Actor, VirtualClock } from "../src/actor.ts";
+import { Actor, RealClock, VirtualClock } from "../src/actor.ts";
 import { event } from "../src/event.ts";
 import { state } from "../src/state.ts";
 
@@ -285,5 +285,73 @@ describe("RealClock vs VirtualClock behavioral difference", () => {
 
     virtualClock.advance(50);
     expect(virtualFired).toBe(true);
+  });
+});
+
+describe("RealClock clear methods", () => {
+  test("clearTimeout prevents callback from firing", async () => {
+    const clock = new RealClock();
+    let fired = false;
+    const id = clock.setTimeout(10, () => {
+      fired = true;
+    });
+    clock.clearTimeout(id);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fired).toBe(false);
+  });
+
+  test("clearInterval prevents future callbacks", async () => {
+    const clock = new RealClock();
+    let count = 0;
+    const id = clock.setInterval(10, () => {
+      count++;
+    });
+    await new Promise((r) => setTimeout(r, 25));
+    clock.clearInterval(id);
+    const countAtClear = count;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(count).toBe(countAtClear);
+  });
+});
+
+describe("Empty transitions", () => {
+  test("send to actor with empty transitions is no-op", () => {
+    const toggle = event("toggled")();
+    const off = state("off")();
+
+    const actor = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [off],
+      initial: off,
+      effects: {},
+      transitions: {},
+    });
+
+    actor.send(toggle);
+    expect(actor.state.name).toBe("off");
+  });
+
+  test("send to actor with empty transitions does not fire change subscribers", () => {
+    const toggle = event("toggled")();
+    const off = state("off")();
+
+    const actor = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [off],
+      initial: off,
+      effects: {},
+      transitions: {},
+    });
+
+    const snaps: any[] = [];
+    actor.subscribe((snap) => snaps.push(snap));
+    actor.send(toggle);
+    expect(snaps).toHaveLength(1);
   });
 });

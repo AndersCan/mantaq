@@ -28,6 +28,14 @@ export class ActorMap implements SendableMap<SendableEvent> {
     this.#actors.delete(key);
   }
 
+  get size(): number {
+    return this.#actors.size;
+  }
+
+  has(key: string): boolean {
+    return this.#actors.has(key);
+  }
+
   keys(): string[] {
     return [...this.#actors.keys()];
   }
