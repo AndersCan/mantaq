@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { Actor } from "../src/actor.ts";
+import { Actor, VirtualClock } from "../src/actor.ts";
 import { event } from "../src/event.ts";
 import { state } from "../src/state.ts";
 
@@ -249,6 +249,39 @@ describe("Any wildcard transition", () => {
     actor.send(reset);
     expect(actor.context.count).toBe(1);
     expect(actor.state.name).toBe("on");
+  });
+
+  test("Any emit processed when state handler exists and returns state", () => {
+    const clock = new VirtualClock();
+    const trigger = event("trigger")();
+    const internalEvt = event("internalEvt")();
+    const idle = state("idle")();
+    const processing = state("processing")();
+    const done = state("done")();
+
+    const actor = new Actor({
+      inputs: [trigger],
+      outputs: [],
+      internal: [internalEvt],
+      states: [idle, processing, done],
+      initial: idle,
+      context: {},
+      clock,
+      effects: {},
+      transitions: {
+        Any: {
+          [trigger.id]: () => ({ emit: [internalEvt.create({})] }),
+          [internalEvt.id]: () => ({ state: done }),
+        },
+        idle: {
+          [trigger.id]: () => ({ state: processing }),
+        },
+      },
+    });
+
+    actor.send(trigger);
+
+    expect(actor.state.name).toBe("done");
   });
 
   test("Any transitions fire from every state", () => {
