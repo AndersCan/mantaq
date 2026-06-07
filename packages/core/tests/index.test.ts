@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { Any, isIn, activeLeaves } from "../src/index.ts";
+import { Any, RealClock, isIn, activeLeaves } from "../src/index.ts";
 import type { EffectFn, EffectInput } from "../src/index.ts";
 
 test("Any constant", () => {
@@ -10,3 +10,4 @@ export type _EffectFnCheck = EffectFn<[], [], unknown>;
 export type _EffectInputCheck = EffectInput<[], [], unknown>;
 export type _IsInCheck = typeof isIn;
 export type _ActiveLeavesCheck = typeof activeLeaves;
+export type _RealClockCheck = typeof RealClock;

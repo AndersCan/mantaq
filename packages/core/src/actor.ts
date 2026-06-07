@@ -16,7 +16,7 @@ export interface Clock {
   now(): number;
 }
 
-class RealClock implements Clock {
+export class RealClock implements Clock {
   #start = Date.now();
 
   now(): number {
@@ -346,6 +346,9 @@ export class Actor<
           this.#processInternalQueue();
         };
       }
+    }
+    for (const [key, child] of Object.entries(this.#regions)) {
+      this.#children.set(key, child);
     }
   }
 
