@@ -1,6 +1,30 @@
 ---
 title: Testing Actors
 description: How to test state machine actors using graph traversal patterns.
+script: |
+  (function () {
+    const states = ["green", "yellow", "red"];
+    let current = 0;
+    const stateEl = document.getElementById("tl-state");
+    const nextBtn = document.getElementById("tl-next");
+    const resetBtn = document.getElementById("tl-reset");
+    const logEl = document.getElementById("tl-log");
+    const colors = { green: "#16a34a", yellow: "#ca8a04", red: "#dc2626" };
+    function update(action) {
+      var name = states[current];
+      stateEl.textContent = name;
+      stateEl.style.color = colors[name];
+      logEl.textContent = action + " → " + name;
+    }
+    nextBtn.addEventListener("click", function () {
+      current = (current + 1) % states.length;
+      update("send(NEXT)");
+    });
+    resetBtn.addEventListener("click", function () {
+      current = 0;
+      update("reset");
+    });
+  })();
 ---
 
 Actors are state machines. States are nodes, transitions are edges. Testing means walking the graph and asserting you land where expected.
@@ -67,36 +91,7 @@ Click buttons to send `NEXT` event and walk the graph:
   <div id="tl-log" style="margin-top: 0.5rem; font-size: 0.8rem; color: #999;"></div>
 </div>
 
-<script is:inline>
-  (function () {
-    const states = ["green", "yellow", "red"];
-    let current = 0;
-
-    const stateEl = document.getElementById("tl-state");
-    const nextBtn = document.getElementById("tl-next");
-    const resetBtn = document.getElementById("tl-reset");
-    const logEl = document.getElementById("tl-log");
-
-    const colors = { green: "#16a34a", yellow: "#ca8a04", red: "#dc2626" };
-
-    function update(action) {
-      var name = states[current];
-      stateEl.textContent = name;
-      stateEl.style.color = colors[name];
-      logEl.textContent = action + " → " + name;
-    }
-
-    nextBtn.addEventListener("click", function () {
-      current = (current + 1) % states.length;
-      update("send(NEXT)");
-    });
-
-    resetBtn.addEventListener("click", function () {
-      current = 0;
-      update("reset");
-    });
-  })();
-</script>
+<script is:inline set:html={frontmatter.script} />
 
 ## Testing Patterns
 
