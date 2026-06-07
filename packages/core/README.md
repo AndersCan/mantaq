@@ -8,6 +8,21 @@ State machine library. Small API surface — cook the primitives, not the framew
 npm install @mantaq/core
 ```
 
+## Quick Reference
+
+| Pattern         | Correct                            | Anti-pattern                           |
+| --------------- | ---------------------------------- | -------------------------------------- |
+| Type context    | `context: {} as MyContext`         | casting in every handler               |
+| Type events     | `event("ID")<Payload>()`           | `event("ID")()` without generic        |
+| Send events     | `actor.send(event.create(data))`   | raw `{ id: "ID", ... }` objects        |
+| Effect data     | Use state payload                  | Depend on `event` in effect            |
+| Error handling  | Emit internal event                | Throw in effect or transition          |
+| Internal events | Declare in `internal: [...]`       | Put user events in internal            |
+| Signal check    | `if (signal.aborted) return`       | Skip abort check in async work         |
+| Regions         | Child outputs in parent `internal` | Forget to declare child outputs        |
+| Snapshot        | Save path + context manually       | Expect `snapshot()` to include context |
+| Any handler     | Universal events only (CANCEL)     | State-specific logic in Any            |
+
 ## Quick Start
 
 ```ts
