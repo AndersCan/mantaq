@@ -61,9 +61,11 @@ Pattern across all 4: State drives everything. UI, API calls, timings. No surpri
 
 Each xstate use case above has a corresponding actor model implementation:
 
-| Use Case             | File                                | Key Mapping                                                                    |
-| -------------------- | ----------------------------------- | ------------------------------------------------------------------------------ |
-| Multi-step forms     | `checkout.actor.test.ts`            | States → state(), context → mutable fields, effects → async work               |
-| Async workflows      | `creditCheckWorkflow.actor.test.ts` | invoke:fromPromise → effect + internal events, guards → conditionals           |
-| Animation & UI state | `animationUiState.actor.test.ts`    | Parallel states → regions as child Actors, after → clock.setTimeout            |
-| Authentication       | `authentication.actor.test.ts`      | invoke:fromCallback → effect with clock.setInterval, assign → context mutation |
+| Use Case             | File                                     | Key Mapping                                                                     |
+| -------------------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
+| Multi-step forms     | `checkout.actor.test.ts`                 | States → state(), context → mutable fields, effects → async work                |
+| Async workflows      | `creditCheckWorkflow.actor.test.ts`      | invoke:fromPromise → effect + internal events, guards → conditionals            |
+| Animation & UI state | `animationUiState.actor.test.ts`         | Parallel states → regions as child Actors, after → clock.setTimeout             |
+| Authentication       | `authentication.actor.test.ts`           | invoke:fromCallback → effect with clock.setInterval, assign → context mutation  |
+| Game character       | `gameCharacter.actor.test.ts`            | Guard conditions, context-tracked combat state, regions for movement, effects   |
+| Network connection   | `networkConnectionManager.actor.test.ts` | Regions for health monitor, exponential backoff, guard conditions, reconnection |
