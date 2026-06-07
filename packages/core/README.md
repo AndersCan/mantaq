@@ -214,7 +214,7 @@ const actor = new Actor({
 });
 ```
 
-**Ordering:** External events process one at a time. Internal events emitted during a transition process depth-first after that transition. Internal events from effects process after the effect completes.
+**Ordering:** External events process one at a time. Internal events emitted during a transition process depth-first after that transition. Internal events from effects process after the effect completes — this is a common source of bugs. If an effect emits an internal event and the actor is in a different state by the time that event processes, the handler may not exist or may behave unexpectedly.
 
 **Anti-pattern — mixing internal/external incorrectly:**
 
@@ -413,27 +413,121 @@ const parent = new Actor({
 
 ### Error Handling
 
-Errors in effects are caught and forwarded to `"error"` subscribers. Never throw from transition handlers.
+#### Error Event Subscription
+
+Subscribe to `"error"` to catch effect errors. The callback receives the error object.
 
 ```ts
+const actor = new Actor({
+  /* ... */
+});
+
 actor.on("error", (err) => {
   console.error("Effect error:", err);
+  // send to crash reporting, trigger fallback, etc.
 });
+
+// ✅ subscribe before starting — errors during startup need handlers too
+```
+
+**Anti-pattern — subscribing after error occurs:**
+
+```ts
+actor.send(startEvent); // effect runs, throws
+// ❌ no subscriber yet — error is silently dropped
+actor.on("error", (err) => console.error(err));
+
+// ✅ subscribe first, then send
+actor.on("error", (err) => console.error(err));
+actor.send(startEvent);
+```
+
+#### Effect Error Recovery
+
+Catch errors inside effects and emit recovery events. Never let errors propagate unhandled.
+
+```ts
+const doneEvent = event("WORK_DONE")();
+const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
 effects: {
   working: [
-    ({ emit, clock }) => {
+    ({ signal, emit, clock }) => {
       clock.setTimeout(100, () => {
+        if (signal.aborted) return;
         try {
           const result = riskyOperation();
           emit(doneEvent.create({ result }));
         } catch (err) {
-          // ✅ emit error as internal event instead of throwing
+          // ✅ emit error as internal event — lets transition handle it
           emit(failedEvent.create({ error: String(err) }));
         }
       });
     },
   ],
+}
+
+transitions: {
+  working: {
+    WORK_DONE: (event) => {
+      return { state: doneState, payload: { result: event.result } };
+    },
+    WORK_FAILED: (event) => {
+      // handle error in transition, not in effect
+      return { state: errorState, payload: { error: event.error } };
+    },
+  },
+}
+```
+
+**Anti-pattern — re-throwing in effects:**
+
+```ts
+effects: {
+  working: [
+    ({ signal, emit, clock }) => {
+      clock.setTimeout(100, () => {
+        if (signal.aborted) return;
+        try {
+          const result = riskyOperation();
+          emit(doneEvent.create({ result }));
+        } catch (err) {
+          throw err; // ❌ throw in effect goes to error subscriber, not transition
+        }
+      });
+    },
+  ],
+}
+```
+
+#### Transition Error Handling
+
+Never throw from transition handlers. Return error state or store error in context.
+
+```ts
+type MyContext = { error?: string };
+
+transitions: {
+  idle: {
+    SUBMIT: (event, { context }) => {
+      if (!event.data) {
+        // ✅ store error, transition to error state
+        context.error = "missing data";
+        return { state: errorState };
+      }
+      if (!isValid(event.data)) {
+        context.error = "invalid data";
+        return { state: errorState };
+      }
+      return { state: doneState };
+    },
+  },
+  error: {
+    RETRY: (_event, { context }) => {
+      context.error = undefined;
+      return { state: idleState };
+    },
+  },
 }
 ```
 
@@ -442,26 +536,62 @@ effects: {
 ```ts
 transitions: {
   idle: {
-    PROCESS: (event, { context }) => {
-      // ❌ throw breaks the state machine
-      if (!event.data) throw new Error("missing data");
+    SUBMIT: (event) => {
+      if (!event.data) throw new Error("missing data"); // ❌ breaks state machine
       return { state: doneState };
     },
   },
 }
+```
 
-// ✅ handle errors by transitioning to error state
-transitions: {
-  idle: {
-    PROCESS: (event, { context }) => {
-      if (!event.data) {
-        context.error = "missing data";
-        return { state: errorState };
-      }
-      return { state: doneState };
-    },
-  },
-}
+#### Nested Error Propagation
+
+Errors in child regions bubble up to the parent. Subscribe to parent errors to catch child failures.
+
+```ts
+const childEffect = ({ emit }) => {
+  // this will throw
+  throw new Error("child broke");
+};
+
+const child = new Actor({
+  states: [idleState],
+  initial: idleState,
+  effects: { idle: [childEffect] },
+  transitions: { idle: {} },
+});
+
+const parent = new Actor({
+  states: [idleState],
+  initial: idleState,
+  regions: { child },
+  effects: {},
+  transitions: { idle: {} },
+});
+
+// ✅ parent catches child errors
+parent.on("error", (err) => {
+  console.error("Child error bubbled up:", err);
+});
+```
+
+**Anti-pattern — only subscribing to child errors:**
+
+```ts
+// ❌ child may not exist yet when parent is created
+const child = new Actor({
+  /* ... */
+});
+child.on("error", (err) => console.error(err));
+
+const parent = new Actor({
+  regions: { child }, // child replaced by parent's lifecycle
+  // ...
+});
+// parent's regions own the child — subscribe to parent instead
+
+// ✅ subscribe to parent to catch all child errors
+parent.on("error", (err) => console.error(err));
 ```
 
 ### Any Handler
