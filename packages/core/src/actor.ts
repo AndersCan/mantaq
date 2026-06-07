@@ -400,14 +400,27 @@ export class Actor<
       Record<string, TransitionHandler<ActorContext> | undefined>
     >;
     const eventId = event.id as string;
+    const stateTransition = transitions[this.state.name as string]?.[eventId];
     const anyTransition = transitions["Any"]?.[eventId];
+
+    let transitionApplied = false;
     let anyEmitted = false;
+
+    if (stateTransition) {
+      const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
+      if (step.state) {
+        this.#applyTransition(event, step);
+        transitionApplied = true;
+      }
+      if (step.emit) {
+        this.#internalQueue.push(...step.emit);
+      }
+    }
 
     if (anyTransition) {
       const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
-      if (step.state) {
+      if (step.state && !transitionApplied) {
         this.#applyTransition(event, step);
-        return;
       }
       if (step.emit) {
         this.#internalQueue.push(...step.emit);
@@ -415,14 +428,7 @@ export class Actor<
       }
     }
 
-    const stateTransition = transitions[this.state.name as string]?.[eventId];
-
-    if (stateTransition) {
-      const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
-      this.#applyTransition(event, step);
-    }
-
-    if (anyEmitted && this.#internalQueue.length > 0) {
+    if (anyEmitted || this.#internalQueue.length > this.#queueIndex) {
       this.#processInternalQueue();
     }
   }
