@@ -20,10 +20,8 @@
  */
 
 import { describe, it, expect } from "vite-plus/test";
-import { Actor, VirtualClock } from "@mantaq/core";
-import { state } from "@mantaq/core";
-import { event } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { matches, states, events, withTimeout } from "@mantaq/sugar";
 
 // ── Types ────────────────────────────────────────────────────────────
 interface OrderRequest {
@@ -32,46 +30,38 @@ interface OrderRequest {
   amount: number;
 }
 
-interface InventoryResult {
-  reservationId: string;
-}
-
-interface PaymentResult {
-  transactionId: string;
-}
-
-interface ShipmentResult {
-  trackingNumber: string;
-}
-
 // ── States ───────────────────────────────────────────────────────────
-const idleState = state("idle")();
-const reservingInventoryState = state("reservingInventory")();
-const processingPaymentState = state("processingPayment")();
-const creatingShipmentState = state("creatingShipment")();
-const notifyingState = state("notifying")();
-const completedState = state("completed")().final();
-const failedState = state("failed")().final();
-const compensatingRefundState = state("compensatingRefund")();
-const compensatingReleaseState = state("compensatingRelease")();
+const s = states(
+  "idle",
+  "reservingInventory",
+  "processingPayment",
+  "creatingShipment",
+  "notifying",
+  "compensatingRefund",
+  "compensatingRelease",
+);
+const completed = state("completed")().final();
+const failed = state("failed")().final();
 
 // ── External events ──────────────────────────────────────────────────
-const startEvent = event("START")<{ order: OrderRequest }>();
-const cancelEvent = event("CANCEL")();
+const START = event("START")<{ order: OrderRequest }>();
+const { CANCEL } = events("CANCEL");
 
 // ── Internal events (service responses) ──────────────────────────────
-const inventoryReservedEvent = event("INVENTORY_RESERVED")<{ result: InventoryResult }>();
-const inventoryFailedEvent = event("INVENTORY_FAILED")<{ error: string }>();
-const paymentProcessedEvent = event("PAYMENT_PROCESSED")<{ result: PaymentResult }>();
-const paymentFailedEvent = event("PAYMENT_FAILED")<{ error: string }>();
-const shipmentCreatedEvent = event("SHIPMENT_CREATED")<{ result: ShipmentResult }>();
-const shipmentFailedEvent = event("SHIPMENT_FAILED")<{ error: string }>();
-const notificationSentEvent = event("NOTIFICATION_SENT")();
-const notificationFailedEvent = event("NOTIFICATION_FAILED")<{ error: string }>();
-const refundDoneEvent = event("REFUND_DONE")();
-const refundFailedEvent = event("REFUND_FAILED")<{ error: string }>();
-const releaseDoneEvent = event("RELEASE_DONE")();
-const releaseFailedEvent = event("RELEASE_FAILED")<{ error: string }>();
+const INVENTORY_RESERVED = event("INVENTORY_RESERVED")<{ result: { reservationId: string } }>();
+const INVENTORY_FAILED = event("INVENTORY_FAILED")<{ error: string }>();
+const PAYMENT_PROCESSED = event("PAYMENT_PROCESSED")<{ result: { transactionId: string } }>();
+const PAYMENT_FAILED = event("PAYMENT_FAILED")<{ error: string }>();
+const SHIPMENT_CREATED = event("SHIPMENT_CREATED")<{ result: { trackingNumber: string } }>();
+const SHIPMENT_FAILED = event("SHIPMENT_FAILED")<{ error: string }>();
+const { NOTIFICATION_SENT, REFUND_DONE, RELEASE_DONE } = events(
+  "NOTIFICATION_SENT",
+  "REFUND_DONE",
+  "RELEASE_DONE",
+);
+const NOTIFICATION_FAILED = event("NOTIFICATION_FAILED")<{ error: string }>();
+const REFUND_FAILED = event("REFUND_FAILED")<{ error: string }>();
+const RELEASE_FAILED = event("RELEASE_FAILED")<{ error: string }>();
 
 // ── Context ──────────────────────────────────────────────────────────
 type SagaContext = {
@@ -83,202 +73,163 @@ type SagaContext = {
   completedSteps: string[];
 };
 
-// ── Effect type shorthand ────────────────────────────────────────────
-type Effects = InstanceType<typeof Actor>["options"]["effects"];
-
 // ── Actor factory ────────────────────────────────────────────────────
 function createSagaActor(clock?: VirtualClock) {
   const c = clock ?? new VirtualClock();
 
-  const effects: Effects = {
-    reservingInventory: [
-      (input) => {
-        input.clock.setTimeout(100, () => {
-          if (input.signal.aborted) return;
-          const ctx = input.context as SagaContext;
-          input.emit(
-            inventoryReservedEvent.create({
-              result: { reservationId: `RES-${ctx.order?.orderId ?? "unknown"}` },
-            }),
-          );
-        });
-      },
-    ],
-    processingPayment: [
-      (input) => {
-        input.clock.setTimeout(200, () => {
-          if (input.signal.aborted) return;
-          const ctx = input.context as SagaContext;
-          input.emit(
-            paymentProcessedEvent.create({
-              result: { transactionId: `TXN-${ctx.order?.orderId ?? "unknown"}` },
-            }),
-          );
-        });
-      },
-    ],
-    creatingShipment: [
-      (input) => {
-        input.clock.setTimeout(150, () => {
-          if (input.signal.aborted) return;
-          const ctx = input.context as SagaContext;
-          input.emit(
-            shipmentCreatedEvent.create({
-              result: { trackingNumber: `TRK-${ctx.order?.orderId ?? "unknown"}` },
-            }),
-          );
-        });
-      },
-    ],
-    notifying: [
-      (input) => {
-        input.clock.setTimeout(50, () => {
-          if (input.signal.aborted) return;
-          input.emit(notificationSentEvent.create(undefined));
-        });
-      },
-    ],
-    compensatingRefund: [
-      (input) => {
-        input.clock.setTimeout(100, () => {
-          if (input.signal.aborted) return;
-          input.emit(refundDoneEvent.create(undefined));
-        });
-      },
-    ],
-    compensatingRelease: [
-      (input) => {
-        input.clock.setTimeout(80, () => {
-          if (input.signal.aborted) return;
-          input.emit(releaseDoneEvent.create(undefined));
-        });
-      },
-    ],
-  };
-
   const actor = new Actor({
-    inputs: [startEvent, cancelEvent],
+    inputs: [START, CANCEL],
     outputs: [],
     internal: [
-      inventoryReservedEvent,
-      inventoryFailedEvent,
-      paymentProcessedEvent,
-      paymentFailedEvent,
-      shipmentCreatedEvent,
-      shipmentFailedEvent,
-      notificationSentEvent,
-      notificationFailedEvent,
-      refundDoneEvent,
-      refundFailedEvent,
-      releaseDoneEvent,
-      releaseFailedEvent,
+      INVENTORY_RESERVED,
+      INVENTORY_FAILED,
+      PAYMENT_PROCESSED,
+      PAYMENT_FAILED,
+      SHIPMENT_CREATED,
+      SHIPMENT_FAILED,
+      NOTIFICATION_SENT,
+      NOTIFICATION_FAILED,
+      REFUND_DONE,
+      REFUND_FAILED,
+      RELEASE_DONE,
+      RELEASE_FAILED,
     ],
     states: [
-      idleState,
-      reservingInventoryState,
-      processingPaymentState,
-      creatingShipmentState,
-      notifyingState,
-      completedState,
-      failedState,
-      compensatingRefundState,
-      compensatingReleaseState,
+      s.idle,
+      s.reservingInventory,
+      s.processingPayment,
+      s.creatingShipment,
+      s.notifying,
+      completed,
+      failed,
+      s.compensatingRefund,
+      s.compensatingRelease,
     ],
-    initial: idleState,
+    initial: s.idle,
     clock: c,
     context: { completedSteps: [] } as SagaContext,
-    effects,
+    effects: {
+      reservingInventory: [
+        (input) => {
+          withTimeout(100, input, () =>
+            INVENTORY_RESERVED.create({
+              result: { reservationId: `RES-${input.context.order?.orderId ?? "unknown"}` },
+            }),
+          );
+        },
+      ],
+      processingPayment: [
+        (input) => {
+          withTimeout(200, input, () =>
+            PAYMENT_PROCESSED.create({
+              result: { transactionId: `TXN-${input.context.order?.orderId ?? "unknown"}` },
+            }),
+          );
+        },
+      ],
+      creatingShipment: [
+        (input) => {
+          withTimeout(150, input, () =>
+            SHIPMENT_CREATED.create({
+              result: { trackingNumber: `TRK-${input.context.order?.orderId ?? "unknown"}` },
+            }),
+          );
+        },
+      ],
+      notifying: [
+        (input) => {
+          withTimeout(50, input, () => NOTIFICATION_SENT.create(undefined));
+        },
+      ],
+      compensatingRefund: [
+        (input) => {
+          withTimeout(100, input, () => REFUND_DONE.create(undefined));
+        },
+      ],
+      compensatingRelease: [
+        (input) => {
+          withTimeout(80, input, () => RELEASE_DONE.create(undefined));
+        },
+      ],
+    },
     transitions: {
       Any: {
         CANCEL: (_event, { context }) => {
-          const ctx = context as SagaContext;
-          if (ctx.completedSteps.includes("inventory")) {
-            ctx.error = "Cancelled by user";
-            return { state: compensatingReleaseState };
+          if (context.completedSteps.includes("inventory")) {
+            context.error = "Cancelled by user";
+            return { state: s.compensatingRelease };
           }
-          return { state: failedState };
+          return { state: failed };
         },
       },
       idle: {
         START: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.order = event.order;
-          return { state: reservingInventoryState };
+          context.order = event.order;
+          return { state: s.reservingInventory };
         },
       },
       reservingInventory: {
         INVENTORY_RESERVED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.reservationId = event.result.reservationId;
-          ctx.completedSteps.push("inventory");
-          return { state: processingPaymentState };
+          context.reservationId = event.result.reservationId;
+          context.completedSteps.push("inventory");
+          return { state: s.processingPayment };
         },
         INVENTORY_FAILED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.error = event.error;
-          return { state: failedState };
+          context.error = event.error;
+          return { state: failed };
         },
       },
       processingPayment: {
         PAYMENT_PROCESSED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.transactionId = event.result.transactionId;
-          ctx.completedSteps.push("payment");
-          return { state: creatingShipmentState };
+          context.transactionId = event.result.transactionId;
+          context.completedSteps.push("payment");
+          return { state: s.creatingShipment };
         },
         PAYMENT_FAILED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.error = event.error;
-          ctx.completedSteps.push("payment_failed");
-          return { state: compensatingRefundState };
+          context.error = event.error;
+          context.completedSteps.push("payment_failed");
+          return { state: s.compensatingRefund };
         },
       },
       creatingShipment: {
         SHIPMENT_CREATED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.trackingNumber = event.result.trackingNumber;
-          ctx.completedSteps.push("shipment");
-          return { state: notifyingState };
+          context.trackingNumber = event.result.trackingNumber;
+          context.completedSteps.push("shipment");
+          return { state: s.notifying };
         },
         SHIPMENT_FAILED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.error = event.error;
-          return { state: compensatingRefundState };
+          context.error = event.error;
+          return { state: s.compensatingRefund };
         },
       },
       notifying: {
-        NOTIFICATION_SENT: () => ({ state: completedState }),
+        NOTIFICATION_SENT: () => ({ state: completed }),
         NOTIFICATION_FAILED: (_event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.error = "Notification failed";
-          return { state: completedState };
+          context.error = "Notification failed";
+          return { state: completed };
         },
       },
       compensatingRefund: {
         REFUND_DONE: (_event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.completedSteps.push("refunded");
-          if (ctx.completedSteps.includes("inventory")) {
-            return { state: compensatingReleaseState };
+          context.completedSteps.push("refunded");
+          if (context.completedSteps.includes("inventory")) {
+            return { state: s.compensatingRelease };
           }
-          return { state: failedState };
+          return { state: failed };
         },
         REFUND_FAILED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.error = `Refund failed: ${event.error}`;
-          return { state: failedState };
+          context.error = `Refund failed: ${event.error}`;
+          return { state: failed };
         },
       },
       compensatingRelease: {
         RELEASE_DONE: (_event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.completedSteps.push("released");
-          return { state: failedState };
+          context.completedSteps.push("released");
+          return { state: failed };
         },
         RELEASE_FAILED: (event, { context }) => {
-          const ctx = context as SagaContext;
-          ctx.error = `Release failed: ${event.error}`;
-          return { state: failedState };
+          context.error = `Release failed: ${event.error}`;
+          return { state: failed };
         },
       },
     },
@@ -299,7 +250,7 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-1", items: ["widget"], amount: 99.99 },
       }),
     );
@@ -328,14 +279,14 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-2", items: ["gadget"], amount: 49.99 },
       }),
     );
     clock.advance(100);
     expect(matches(actor, "processingPayment")).toBe(true);
 
-    actor.send(paymentFailedEvent.create({ error: "Card declined" }));
+    actor.send(PAYMENT_FAILED.create({ error: "Card declined" }));
     expect(matches(actor, "compensatingRefund")).toBe(true);
     expect(actor.context.error).toBe("Card declined");
 
@@ -353,7 +304,7 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-3", items: ["thing"], amount: 29.99 },
       }),
     );
@@ -361,7 +312,7 @@ describe("saga orchestrator actor", () => {
     clock.advance(200);
     expect(matches(actor, "creatingShipment")).toBe(true);
 
-    actor.send(shipmentFailedEvent.create({ error: "Carrier unavailable" }));
+    actor.send(SHIPMENT_FAILED.create({ error: "Carrier unavailable" }));
     expect(matches(actor, "compensatingRefund")).toBe(true);
 
     clock.advance(100);
@@ -375,13 +326,13 @@ describe("saga orchestrator actor", () => {
     const { actor } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-4", items: ["part"], amount: 19.99 },
       }),
     );
     expect(matches(actor, "reservingInventory")).toBe(true);
 
-    actor.send(inventoryFailedEvent.create({ error: "Out of stock" }));
+    actor.send(INVENTORY_FAILED.create({ error: "Out of stock" }));
     expect(matches(actor, "failed")).toBe(true);
     expect(actor.context.error).toBe("Out of stock");
     expect(actor.context.completedSteps).toEqual([]);
@@ -390,7 +341,7 @@ describe("saga orchestrator actor", () => {
   it("CANCEL from idle → failed (no compensation)", () => {
     const { actor } = createSagaActor();
 
-    actor.send(cancelEvent);
+    actor.send(CANCEL);
     expect(matches(actor, "failed")).toBe(true);
   });
 
@@ -398,14 +349,14 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-5", items: ["doohickey"], amount: 59.99 },
       }),
     );
     clock.advance(100);
     expect(matches(actor, "processingPayment")).toBe(true);
 
-    actor.send(cancelEvent);
+    actor.send(CANCEL);
     expect(matches(actor, "compensatingRelease")).toBe(true);
     expect(actor.context.error).toBe("Cancelled by user");
 
@@ -417,7 +368,7 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-6", items: ["gizmo"], amount: 39.99 },
       }),
     );
@@ -425,7 +376,7 @@ describe("saga orchestrator actor", () => {
     expect(matches(actor, "processingPayment")).toBe(true);
     expect(actor.context.completedSteps).toContain("inventory");
 
-    actor.send(cancelEvent);
+    actor.send(CANCEL);
     expect(matches(actor, "compensatingRelease")).toBe(true);
 
     clock.advance(80);
@@ -436,13 +387,13 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-7", items: ["widget"], amount: 99.99 },
       }),
     );
     expect(matches(actor, "reservingInventory")).toBe(true);
 
-    actor.send(inventoryFailedEvent.create({ error: "Forced" }));
+    actor.send(INVENTORY_FAILED.create({ error: "Forced" }));
     expect(matches(actor, "failed")).toBe(true);
 
     clock.advance(100);
@@ -455,7 +406,7 @@ describe("saga orchestrator actor", () => {
     expect(actor.context.completedSteps).toEqual([]);
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-8", items: ["a", "b"], amount: 10.0 },
       }),
     );
@@ -475,7 +426,7 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-9", items: ["x"], amount: 100 },
       }),
     );
@@ -503,7 +454,7 @@ describe("saga orchestrator actor", () => {
     const { actor, clock } = createSagaActor();
 
     actor.send(
-      startEvent.create({
+      START.create({
         order: { orderId: "ORD-10", items: ["z"], amount: 5 },
       }),
     );
@@ -512,7 +463,7 @@ describe("saga orchestrator actor", () => {
     clock.advance(150);
     expect(matches(actor, "notifying")).toBe(true);
 
-    actor.send(notificationFailedEvent.create({ error: "Email bounce" }));
+    actor.send(NOTIFICATION_FAILED.create({ error: "Email bounce" }));
     expect(matches(actor, "completed")).toBe(true);
     expect(actor.context.error).toBe("Notification failed");
     expect(actor.snapshot().done).toBe(true);
