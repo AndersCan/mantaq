@@ -65,18 +65,33 @@ export class VirtualClock implements Clock {
     return this.#now;
   }
 
-  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    const signal = options?.signal;
-    if (signal?.aborted) return -1;
-    const id = this.#nextId++;
+  #trackAbort(
+    signal: AbortSignal | undefined,
+    id: number,
+    map: Map<number, { signal?: AbortSignal; onAbort?: () => void }>,
+  ): (() => void) | undefined {
     const onAbort = signal
       ? () => {
-          this.#timers.delete(id);
+          map.delete(id);
         }
       : undefined;
     if (signal && onAbort) {
       signal.addEventListener("abort", onAbort, { once: true });
     }
+    return onAbort;
+  }
+
+  #clearAbort(timer: { signal?: AbortSignal; onAbort?: () => void }): void {
+    if (timer.signal && timer.onAbort) {
+      timer.signal.removeEventListener("abort", timer.onAbort);
+    }
+  }
+
+  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    const signal = options?.signal;
+    if (signal?.aborted) return -1;
+    const id = this.#nextId++;
+    const onAbort = this.#trackAbort(signal, id, this.#timers);
     this.#timers.set(id, { deadline: this.#now + ms, cb, signal, onAbort });
     return id;
   }
@@ -84,9 +99,7 @@ export class VirtualClock implements Clock {
   clearTimeout(id: number): void {
     const timer = this.#timers.get(id);
     if (timer) {
-      if (timer.signal && timer.onAbort) {
-        timer.signal.removeEventListener("abort", timer.onAbort);
-      }
+      this.#clearAbort(timer);
       this.#timers.delete(id);
     }
   }
@@ -95,14 +108,7 @@ export class VirtualClock implements Clock {
     const signal = options?.signal;
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
-    const onAbort = signal
-      ? () => {
-          this.#intervals.delete(id);
-        }
-      : undefined;
-    if (signal && onAbort) {
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
+    const onAbort = this.#trackAbort(signal, id, this.#intervals);
     this.#intervals.set(id, { ms, next: this.#now + ms, cb, signal, onAbort });
     return id;
   }
@@ -110,9 +116,7 @@ export class VirtualClock implements Clock {
   clearInterval(id: number): void {
     const interval = this.#intervals.get(id);
     if (interval) {
-      if (interval.signal && interval.onAbort) {
-        interval.signal.removeEventListener("abort", interval.onAbort);
-      }
+      this.#clearAbort(interval);
       this.#intervals.delete(id);
     }
   }
