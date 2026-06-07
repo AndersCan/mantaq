@@ -396,6 +396,48 @@ import { withTimeout } from "@mantaq/sugar";
 withTimeout(5000, input, () => ({ id: "timeout", reason: "exceeded" }));
 ```
 
+## Migration from Core
+
+Starting with `@mantaq/core`? Here's what sugar adds.
+
+| Core                                    | Sugar                                        | Benefit                                                                   |
+| --------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| `state("idle")()` × N                   | `states("idle", "loading")`                  | Single call. Typed record. No missed names.                               |
+| `event("FETCH")()` × N                  | `events("FETCH", "RESOLVE")`                 | Single call. Typed record. Shared source of truth.                        |
+| `isIn(snapshot, "active")`              | `matches(actor, "active")`                   | Works on actor directly. Dot-notation for hierarchies: `"idle.region.a"`. |
+| Manual `.then()/.catch()` + abort check | `withPromise(promise, signal, emit, events)` | Auto abort-aware. No forgotten `signal.aborted` guard.                    |
+| Group states by variable naming         | `tag(stateA, stateB).has(snapshot)`          | Recursive matching. Works through parallel regions.                       |
+
+**Core alone:**
+
+```ts
+import { state, event, isIn } from "@mantaq/core";
+
+const idle = state("idle")();
+const loading = state("loading")();
+const success = state("success")();
+const failEvent = event("FAIL")();
+
+isIn(actor.snapshot(), "idle"); // flat name only
+```
+
+**With sugar:**
+
+```ts
+import { states, events, matches, tag } from "@mantaq/sugar";
+
+const s = states("idle", "loading", "success");
+const e = events("FAIL");
+
+matches(actor, "idle"); // actor, not snapshot
+matches(actor, "connected.default.active"); // hierarchical
+
+const busy = tag(s.idle, s.loading);
+busy.has(actor.snapshot()); // recursive
+```
+
+No migration needed. Sugar wraps core — use both side by side.
+
 ## License
 
 MIT
