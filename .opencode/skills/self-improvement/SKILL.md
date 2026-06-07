@@ -1,11 +1,24 @@
 ---
 name: self-improvement
-description: Substantial continuous improvements (3-5+ related edits per run): tests, docs, bug fixes, features, typing, code quality. Branch from wip, PR to wip, use ICM + bumpy.
+description: Substantial continuous improvements focused on reducing core API surface and deep documentation. One substantive change per run. Branch from wip, PR to wip, use ICM + bumpy.
 ---
 
 # Self-Improvement Skill
 
 Agent performs continuous improvements. Caveman output everywhere except code.
+
+## Goal
+
+**Primary**: Reduce core API surface. Core must contain ONLY primitives:
+`Actor`, `state`, `event`, `VirtualClock`, `Any`, and their types.
+
+**Everything else is candidate for sugar or removal**:
+
+- Query utilities (`isIn`, `activeLeaves`) → sugar
+- Convenience functions → sugar
+- Testing helpers that aren't primitives → sugar
+
+**Secondary**: Deep documentation (patterns with anti-patterns, not tables or TOCs).
 
 ## Branching
 
@@ -35,23 +48,47 @@ icm recall "self-improvement" -t improvements
 - If existing branch with incomplete work found → `git checkout` that branch, continue from there.
 - If no existing work → pick new task from backlog or identify improvement.
 
-### 3. Branch
+### 3. Check convergence
+
+Before starting work, read recent self-improvement commits to avoid repeating:
+
+```bash
+git log --oneline --grep="self-improvement" -20
+```
+
+If the area you planned to improve was already covered, pick a different area.
+
+### 4. Branch
 
 ```bash
 git checkout -b self-improvement/<short-description>
 ```
 
-### 4. Implement
+### 5. Implement
 
-- **Substantial changes only**: Minimum 3-5 related edits across files per run. Avoid trivial single-line changes.
-- Each run should complete a full logical unit of work (e.g., fully type a module, add a complete feature, fix a bug with tests)
-- Scope: tests, docs, bug fixes, features, typing, code quality (reduce lines, maintain tests), DX improvements
-- **DX improvements**: Find pain points, verbose code, clunky patterns. Prefer sugar package for solutions (core requires deeper understanding and more work)
+- **ONE substantive change per run** — not multiple shallow ones
+- Check `packages/core/src/index.ts` — if it exports non-primitives, fix that
+- Check `packages/core/src/actor.ts` for reducible type casts
+- If reducing core API, ensure sugar re-exports what users need
+- If improving documentation, make it DEEP (patterns + anti-patterns), not organizational
 - No comments in code
 - Maintain strict type safety
-- If backlog item is large, break into clear sub-tasks and do as many as time allows
+- If unable to find meaningful work, store summary in ICM and stop — do not pad
 
-### 5. Verify
+### 6. Self-review before committing
+
+Verify your own work:
+
+- [ ] Core exports fewer things than before? (or types improved?)
+- [ ] No new types/features added to core?
+- [ ] No unnecessary casts added?
+- [ ] Changes are substantive, not organizational?
+- [ ] Tests pass?
+- [ ] Would a user actually benefit from this change?
+
+If you can't check most of these boxes, reconsider whether the change is worth shipping.
+
+### 7. Verify
 
 Run checks. Max **5 attempts** to fix failing tests/checks.
 
@@ -71,7 +108,7 @@ icm store -t improvements -c "failed: <short description> — unable to fix <X> 
 
 Stop. Do not continue with this task.
 
-### 6. Commit with bumpy
+### 8. Commit with bumpy
 
 Run `add-change` skill to create bump file, then commit:
 
@@ -81,7 +118,7 @@ git add -A
 git commit
 ```
 
-### 7. PR to wip
+### 9. PR to wip
 
 Push branch and create PR targeting `wip`:
 
@@ -92,11 +129,19 @@ gh pr create --base wip --title "improve: <short description>" --body "Summary o
 
 ## Rules
 
-- **ONE logical unit of work per run** (but that unit should be 3-5+ related edits, not single-line changes)
+- **ONE substantive change per run** — depth over breadth
 - **ALWAYS use `vp`** for package management and scripts — never `npm`, `pnpm`, or `npx`. All commands: `vp install`, `vp check`, `vp test`, `vp build`, `vp dev`, etc.
 - Never modify: `AGENTS.md`, `CLAUDE.md`, files under `.opencode/`
 - Caveman output: no articles, filler, pleasantries. Keep technical substance.
 - Use ICM to track all work (backlog, progress, failures)
 - Run bumpy for every commit (no commits without bump files)
 - If unable to complete, store summary in ICM for next agent to pick up
-- **Prefer depth over breadth**: Better to fully complete one meaningful task (with tests, docs, types) than to do multiple shallow fixes
+- **If no meaningful work found**: store summary in ICM and stop. Do not pad with trivial changes.
+
+## Anti-patterns (avoid these)
+
+- Adding sections to READMEs (already comprehensive)
+- Tables, TOCs, migration guides (low value organizational changes)
+- Multiple small changes across unrelated files
+- "Improving" things that are already good enough
+- Single-line changes that don't constitute meaningful work
