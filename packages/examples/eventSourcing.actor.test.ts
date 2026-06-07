@@ -1,7 +1,10 @@
 /**
- * Problem: Event sourcing — append-only event log, state derivation from replay,
- * multiple read models (projections), time travel debugging. Actor model has no
- * built-in event log, derived state, or replay mechanism.
+ * Event sourcing — append-only event log, state derivation from replay,
+ * multiple read models (projections), time travel debugging.
+ *
+ * This is a UserLand pattern. Core provides primitives (Actor, state, event,
+ * context, effects). Everything above — event log, fold, snapshot, projection
+ * wiring — is composed with those primitives. No core changes needed.
  *
  * Models a bank account aggregate with event sourcing:
  *   - Commands: open, deposit, withdraw, close
@@ -13,23 +16,20 @@
  * Structure:
  *   account (aggregate) → stores events in context, derives balance via fold
  *   balanceProjection → derived read model, rebuilt from event log
- *   historyProjection → derived read model, tracks all transactions
- *   bankingSystem (parent) → wires aggregate + projections, forwards events
+ *   bankingSystem (parent) → wires aggregate + projection, forwards events
  *
- * DX Issues exposed:
- *   1. Event log in context grows unbounded — no compaction, no pagination
- *   2. State derivation manual — no built-in fold/reduce for event streams
- *   3. Snapshot is actor-level (path/regions), not event-sourced (version + state)
- *   4. Time travel requires linear replay — no random access to version N
- *   5. Cross-actor event bus absent — projections need parent wiring
- *   6. Testing verbose — must replay full command sequence for desired state
- *   7. No event schema versioning — events are plain objects, no migration
+ * UserLand patterns demonstrated:
+ *   1. Event log in context — append-only, UserLand decides compaction policy
+ *   2. State derivation via fold — UserLand fold function over event array
+ *   3. Snapshot/restore — UserLand serializes context, rebuilds via fold
+ *   4. Time travel — foldEventsToVersion(events, n) for random access
+ *   5. Projection wiring — parent forwards events to read models
+ *   6. Replay testing — feed event log into fresh projection actor
  */
 
 import { describe, it, expect } from "vite-plus/test";
-import { Actor, VirtualClock } from "@mantaq/core";
-import { state, event } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
+import { Actor, VirtualClock, event } from "@mantaq/core";
+import { matches, states, events } from "@mantaq/sugar";
 
 // ── Domain Events ──────────────────────────────────────────────────
 
@@ -41,8 +41,12 @@ type AccountEvent =
 
 // ── States ─────────────────────────────────────────────────────────
 
-const activeState = state("active")();
-const closedState = state("closed")().final();
+const {
+  active: activeState,
+  closed: closedStateRef,
+  tracking: trackingState,
+} = states("active", "closed", "tracking");
+const closedState = closedStateRef.final();
 
 // ── Input Events (commands) ────────────────────────────────────────
 
@@ -54,7 +58,7 @@ const closeAccountCmd = event("CLOSE_ACCOUNT")<{ reason: string }>();
 // ── Internal Events ────────────────────────────────────────────────
 
 const eventStoredEvt = event("EVENT_STORED")<{ event: AccountEvent }>();
-const replayCompleteEvt = event("REPLAY_COMPLETE")<{ version: number }>();
+const { REPLAY_COMPLETE: replayCompleteEvt } = events("REPLAY_COMPLETE");
 
 // ── Context ────────────────────────────────────────────────────────
 
@@ -202,8 +206,8 @@ function createBalanceProjection(clock?: VirtualClock) {
     inputs: [eventStoredEvt],
     outputs: [],
     internal: [],
-    states: [state("tracking")()],
-    initial: state("tracking")(),
+    states: [trackingState],
+    initial: trackingState,
     clock: c,
     context: { balance: 0, lastVersion: 0, accountEvents: [] } as BalanceProjectionContext,
     transitions: {
