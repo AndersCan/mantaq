@@ -1,6 +1,11 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
 import type { SendableEvent, SendableMap } from "../transitions/broadcast.ts";
 
+const IS_DEV =
+  typeof process === "undefined" ||
+  !process.env?.NODE_ENV ||
+  process.env.NODE_ENV === "development";
+
 export class ActorMap implements SendableMap<SendableEvent> {
   #actors = new Map<string, AnyActor>();
   #parent: AnyActor | null;
@@ -10,6 +15,12 @@ export class ActorMap implements SendableMap<SendableEvent> {
   }
 
   spawn(key: string, factory: () => AnyActor): void {
+    if (this.#actors.has(key)) {
+      if (IS_DEV) {
+        console.warn(`[ActorMap] spawning over existing key "${key}". Old actor will be aborted.`);
+      }
+      this.kill(key);
+    }
     const child = factory();
     if (this.#parent) {
       child.__outputHandler = (event) => {

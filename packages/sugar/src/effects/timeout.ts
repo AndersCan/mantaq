@@ -1,6 +1,11 @@
 import type { EffectInput, AnyEventRef } from "@mantaq/core";
 import { isAborted } from "@mantaq/utils";
 
+const IS_DEV =
+  typeof process === "undefined" ||
+  !process.env?.NODE_ENV ||
+  process.env.NODE_ENV === "development";
+
 type EmitEvent<
   Inputs extends AnyEventRef[],
   Internal extends AnyEventRef[],
@@ -16,6 +21,9 @@ export function withTimeout<
   input: EffectInput<Inputs, Internal, ActorContext>,
   event: () => EmitEvent<Inputs, Internal, ActorContext>,
 ): void {
+  if (IS_DEV && (typeof ms !== "number" || ms < 0 || !Number.isFinite(ms))) {
+    console.warn(`[withTimeout] invalid ms value: ${ms}. Timeout may not fire.`);
+  }
   input.clock.setTimeout(ms, () => {
     if (isAborted(input.signal)) return;
     input.emit(event());
