@@ -1,5 +1,3 @@
-import { isAborted } from "@mantaq/utils";
-
 type EmitFn = (event: { id: string; [key: string]: unknown }) => void;
 
 export function onSuccess<T>(
@@ -29,9 +27,9 @@ export function withPromise<T>(
 ): void {
   promise
     .then((data) => {
-      if (!isAborted(signal)) emit(events.success(data));
+      if (!signal.aborted) emit(events.success(data));
     })
     .catch((err) => {
-      if (!isAborted(signal)) emit(events.error(err));
+      if (!signal.aborted) emit(events.error(err));
     });
 }

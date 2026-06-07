@@ -1,6 +1,6 @@
-# @mantaq/utils
+# @mantaq/internals
 
-Shared utility helpers for mantaq actor system.
+Internal shared utilities for mantaq actor system.
 
 ## Docs
 

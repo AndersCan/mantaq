@@ -1,5 +1,4 @@
 import type { EffectInput, AnyEventRef } from "@mantaq/core";
-import { isAborted } from "@mantaq/utils";
 
 type EmitEvent<
   Inputs extends AnyEventRef[],
@@ -17,7 +16,7 @@ export function withTimeout<
   event: () => EmitEvent<Inputs, Internal, ActorContext>,
 ): void {
   input.clock.setTimeout(ms, () => {
-    if (isAborted(input.signal)) return;
+    if (input.signal.aborted) return;
     input.emit(event());
   });
 }

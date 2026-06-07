@@ -1,7 +1,8 @@
 {
-  "name": "@mantaq/utils",
+  "name": "@mantaq/internals",
   "version": "0.0.0",
-  "description": "Shared utility helpers for mantaq actor system.",
+  "private": true,
+  "description": "Internal shared utilities for mantaq actor system.",
   "license": "MIT",
   "files": [
     "dist"

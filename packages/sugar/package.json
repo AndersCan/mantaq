@@ -23,8 +23,7 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@mantaq/core": "workspace:*",
-    "@mantaq/utils": "workspace:*"
+    "@mantaq/core": "workspace:*"
   },
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",
