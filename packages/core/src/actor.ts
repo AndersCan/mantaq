@@ -496,7 +496,11 @@ export class Actor<
         });
       } catch (err) {
         for (const fn of this.#errorSubscribers) {
-          fn(err);
+          try {
+            fn(err);
+          } catch {
+            /* catch subscriber throw to avoid crash */
+          }
         }
       }
     }
