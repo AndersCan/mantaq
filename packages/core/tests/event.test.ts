@@ -32,4 +32,16 @@ describe("EventRef", () => {
     expect(ref.id).toBe("myEvent");
     expect(ref.payload).toBeUndefined();
   });
+
+  test("create with undefined payload still has id", () => {
+    const toggled = event("toggled")();
+    const result = toggled.create(undefined);
+    expect(result).toEqual({ id: "toggled" });
+  });
+
+  test("create with payload merges correctly", () => {
+    const dataEv = event("data")<{ value: number }>();
+    const result = dataEv.create({ value: 42 });
+    expect(result).toEqual({ id: "data", value: 42 });
+  });
 });

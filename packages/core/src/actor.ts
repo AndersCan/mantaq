@@ -24,8 +24,9 @@ class RealClock implements Clock {
   }
 
   setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error globalThis.setTimeout returns NodeJS.Timeout | number, but we only use browser env
-    return globalThis.setTimeout(cb, ms, { signal: options?.signal });
+    // @ts-expect-error Node.js setTimeout type doesn't accept options argument (browser runtime)
+    const id: number = globalThis.setTimeout(cb, ms, options);
+    return id;
   }
 
   clearTimeout(id: number): void {
@@ -33,8 +34,9 @@ class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error globalThis.setInterval returns NodeJS.Timeout | number, but we only use browser env
-    return globalThis.setInterval(cb, ms, { signal: options?.signal });
+    // @ts-expect-error Node.js setInterval type doesn't accept options argument (browser runtime)
+    const id: number = globalThis.setInterval(cb, ms, options);
+    return id;
   }
 
   clearInterval(id: number): void {

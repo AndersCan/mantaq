@@ -29,8 +29,9 @@ describe("withPromise", () => {
   test("emits success on resolve", async () => {
     const emitted: unknown[] = [];
     const emit = (e: unknown) => emitted.push(e);
+    const signal = new AbortController().signal;
 
-    withPromise(Promise.resolve(42), emit, {
+    withPromise(Promise.resolve(42), signal, emit, {
       success: (data) => ({ id: "ok", data }),
       error: (err) => ({ id: "err", message: String(err) }),
     });
@@ -42,8 +43,9 @@ describe("withPromise", () => {
   test("emits error on reject", async () => {
     const emitted: unknown[] = [];
     const emit = (e: unknown) => emitted.push(e);
+    const signal = new AbortController().signal;
 
-    withPromise(Promise.reject(new Error("fail")), emit, {
+    withPromise(Promise.reject(new Error("fail")), signal, emit, {
       success: (data) => ({ id: "ok", data }),
       error: (err) => ({ id: "err", message: String(err) }),
     });
@@ -51,5 +53,36 @@ describe("withPromise", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(emitted).toEqual([{ id: "err", message: "Error: fail" }]);
+  });
+
+  test("does not emit if signal aborted before resolve", async () => {
+    const emitted: unknown[] = [];
+    const emit = (e: unknown) => emitted.push(e);
+    const controller = new AbortController();
+
+    withPromise(Promise.resolve(42), controller.signal, emit, {
+      success: (data) => ({ id: "ok", data }),
+      error: (err) => ({ id: "err", message: String(err) }),
+    });
+
+    controller.abort();
+    await Promise.resolve();
+    expect(emitted).toEqual([]);
+  });
+
+  test("does not emit on reject if signal aborted", async () => {
+    const emitted: unknown[] = [];
+    const emit = (e: unknown) => emitted.push(e);
+    const controller = new AbortController();
+
+    withPromise(Promise.reject(new Error("fail")), controller.signal, emit, {
+      success: (data) => ({ id: "ok", data }),
+      error: (err) => ({ id: "err", message: String(err) }),
+    });
+
+    controller.abort();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(emitted).toEqual([]);
   });
 });
