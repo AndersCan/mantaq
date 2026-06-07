@@ -1,1 +1,1 @@
-export { isIn, activeLeaves } from "@mantaq/core/actor";
+export { isIn, activeLeaves } from "@mantaq/core";
