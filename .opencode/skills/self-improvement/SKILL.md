@@ -32,6 +32,12 @@ ALL output from this skill MUST follow caveman grammar:
 - **30 minutes max** per skill run
 - Stop and commit partial work if approaching limit
 
+## Core Rule
+
+Last task of every orchestration run: improve this skill and commit to same branch. Non-negotiable. No exceptions.
+
+Every PR created must have auto-merge enabled: `gh pr merge $PR --auto --merge`
+
 ## Core Loop
 
 ### Phase 0: Setup
@@ -48,6 +54,8 @@ DESC="<short-description>"
 ```
 
 Read this SKILL.md fully before starting.
+
+Branch created once. All iterations commit to same branch. No new branches per iteration.
 
 ### Phase 1: Discover & Plan
 
@@ -107,6 +115,9 @@ Task(
 TYPE: <bug fix|type safety|test coverage|export cleanup|dx improvement>
 BRANCH: self-improvement/<DESC>
 
+You are on branch self-improvement/<DESC>. Do NOT create new branches.
+Work on current branch. Commit directly.
+
 Implement this change following self-improvement-worker skill instructions.
 Return: success/failure, commit hash if successful, error if failed."
 )
@@ -124,30 +135,15 @@ echo "<iteration N>: <description> | <commit hash>" >> /tmp/self-improvement-log
 - Worker returns failure → log failure, continue
 - Max iteration_count iterations total
 
-### Phase 3: Create PR
+### Phase 3: Retrospect & Improve Skill
 
-After all iterations:
+MANDATORY. Do this every run. Analyze what happened:
 
-```
-git push -u origin self-improvement/$DESC
-PR=$(gh pr create --base wip --title "improve: $DESC" --body "## Changes
-$(cat /tmp/self-improvement-log.txt | sed 's/^/- /')
-## Summary
-- <iteration_count> iterations completed
-- <N> successful, <M> failed" | tail -1)
-echo "PR: $PR"
-gh pr merge $PR --auto --merge
-```
+1. Which tasks succeeded? Which failed?
+2. What pain points emerged?
+3. What would make next run faster/better?
 
-### Phase 4: Retrospect & Improve Skill
-
-Analyze run:
-
-1. Read the log: `cat /tmp/self-improvement-log.txt`
-2. Calculate: success rate, most common failures
-3. Identify 3 concrete improvements to this SKILL.md
-
-**Checklist:**
+**Questions to answer:**
 
 - [ ] Worker spawning efficient?
 - [ ] Any tasks that should be batched?
@@ -156,16 +152,22 @@ Analyze run:
 - [ ] iteration_count right?
 - [ ] What would make next run 20% faster?
 
-### Phase 5: Commit Skill Improvement
+Then edit SKILL.md with concrete improvements. Commit to same branch.
+
+### Phase 4: Create PR
+
+Single PR with everything — code changes + skill improvement:
 
 ```
-git checkout wip
-git pull
-git checkout -b self-improvement/improve-loop
-git add .opencode/skills/self-improvement/SKILL.md
-git commit -m "improve: self-improvement loop — <concrete improvement>"
-git push -u origin self-improvement/improve-loop
-gh pr create --base wip --title "improve: self-improvement loop" --body "## Changes\n- <list concrete skill changes>\n## Rationale\n- <why each change improves the loop>\n## Observed issues fixed\n- <issue numbers from pain points>"
+git push -u origin self-improvement/$DESC
+PR=$(gh pr create --base wip --title "improve: $DESC" --body "## Changes
+$(cat /tmp/self-improvement-log.txt | sed 's/^/- /')
+- Updated self-improvement SKILL.md
+## Summary
+- <iteration_count> iterations completed
+- <N> successful, <M> failed" | tail -1)
+echo "PR: $PR"
+gh pr merge $PR --auto --merge
 ```
 
 ## Anti-patterns (avoid these)
@@ -182,3 +184,10 @@ gh pr create --base wip --title "improve: self-improvement loop" --body "## Chan
 - Stopping to read files already read in previous iterations — carry forward
 - Repeating same task type in consecutive iterations — diversify
 - Padding with trivial tasks when real work runs out — stop early, be honest
+
+## Orchestration Tips
+
+- Check tooling before starting (bumpy, rtk, etc.) — skip steps that require missing tools
+- One branch per orchestration run. All iterations stack commits on it.
+- Parallelism: independent tasks can share a branch
+- Don't add features in one run and test them in another — keep related work together
