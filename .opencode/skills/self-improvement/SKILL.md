@@ -9,14 +9,34 @@ Agent performs continuous improvements. Caveman output everywhere except code.
 
 ## Goal
 
-**Primary**: Reduce core API surface. Core must contain ONLY primitives:
+**Primary**: Improve actor model DX. All features must be related to the actor model.
+
+**Core must contain ONLY primitives**:
 `Actor`, `state`, `event`, `VirtualClock`, `Any`, and their types.
 
-**Everything else is candidate for sugar or removal**:
+**Sugar scope — actor-model-specific only**:
 
-- Query utilities (`isIn`, `activeLeaves`) → sugar
-- Convenience functions → sugar
-- Testing helpers that aren't primitives → sugar
+- `matches()` — snapshot pattern matching
+- `tag()` — multi-state matching
+- `ActorMap` — multi-actor management
+- `states()`/`events()` — batch creators
+- `broadcast()` — fan-out events
+- `withTimeout`/`withPromise`/`onSuccess`/`onError` — effect helpers
+- `isIn`/`activeLeaves` — query utilities
+
+**Out of scope — do NOT add to sugar**:
+
+- Generic utilities (deep merge, pick, omit, debounce) — use lodash/ramda/etc
+- Features that could be standalone packages
+- Anything not related to actor model state machines
+
+**Task priority** (highest first):
+
+1. Bug fixes found during exploration or testing
+2. Missing actor model features (guards, region-to-region communication, effects scoping)
+3. DX pain points documented in example files
+4. Type safety improvements
+5. Test coverage for untested actor model behavior
 
 **Secondary**: Deep documentation (patterns with anti-patterns, not tables or TOCs).
 
@@ -57,6 +77,28 @@ git log --oneline --grep="self-improvement" -20
 ```
 
 If the area you planned to improve was already covered, pick a different area.
+
+### 3b. Discover tasks
+
+Search for high-value work:
+
+```bash
+# Find documented pain points
+rg "TODO|FIXME|HACK|pain point|missing|would be nice" packages/
+
+# Check example files for DX friction
+rg "No declarative|awkward|verbose|not supported" packages/examples/
+
+# Find type safety issues
+rg "as any" packages/ --include "*.ts"
+
+# Check GitHub issues if available
+gh issue list
+```
+
+Priority: bugs > missing features > DX pain points > type safety > test coverage.
+
+Skip: generic utils, organizational changes, README edits, boilerplate fixes.
 
 ### 4. Branch
 
@@ -167,3 +209,6 @@ gh pr create --base wip --title "improve: <short description>" --body "Summary o
 - Multiple small changes across unrelated files
 - "Improving" things that are already good enough
 - Single-line changes that don't constitute meaningful work
+- Generic utilities in sugar (deep merge, pick, omit, debounce) — solved by lodash/ramda
+- Features unrelated to actor model state machines
+- Test coverage for test coverage's sake — test actor model behavior, not implementation details
