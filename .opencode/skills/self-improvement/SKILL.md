@@ -32,6 +32,10 @@ ALL output from this skill MUST follow caveman grammar:
 - **30 minutes max** per skill run
 - Stop and commit partial work if approaching limit
 
+## Core Rule
+
+Last task of every orchestration run: improve this skill. Non-negotiable. No exceptions.
+
 ## Core Loop
 
 ### Phase 0: Setup
@@ -141,13 +145,13 @@ gh pr merge $PR --auto --merge
 
 ### Phase 4: Retrospect & Improve Skill
 
-Analyze run:
+MANDATORY. Do this every run. Analyze what happened:
 
-1. Read the log: `cat /tmp/self-improvement-log.txt`
-2. Calculate: success rate, most common failures
-3. Identify 3 concrete improvements to this SKILL.md
+1. Which tasks succeeded? Which failed?
+2. What pain points emerged?
+3. What would make next run faster/better?
 
-**Checklist:**
+**Questions to answer:**
 
 - [ ] Worker spawning efficient?
 - [ ] Any tasks that should be batched?
@@ -158,6 +162,8 @@ Analyze run:
 
 ### Phase 5: Commit Skill Improvement
 
+Create PR with concrete SKILL.md changes. Every time. No exceptions.
+
 ```
 git checkout wip
 git pull
@@ -165,7 +171,7 @@ git checkout -b self-improvement/improve-loop
 git add .opencode/skills/self-improvement/SKILL.md
 git commit -m "improve: self-improvement loop — <concrete improvement>"
 git push -u origin self-improvement/improve-loop
-gh pr create --base wip --title "improve: self-improvement loop" --body "## Changes\n- <list concrete skill changes>\n## Rationale\n- <why each change improves the loop>\n## Observed issues fixed\n- <issue numbers from pain points>"
+gh pr create --base wip --title "improve: self-improvement loop" --body "## Changes\n- <list concrete skill changes>\n## Rationale\n- <why each change improves the loop>"
 ```
 
 ## Anti-patterns (avoid these)
@@ -182,3 +188,10 @@ gh pr create --base wip --title "improve: self-improvement loop" --body "## Chan
 - Stopping to read files already read in previous iterations — carry forward
 - Repeating same task type in consecutive iterations — diversify
 - Padding with trivial tasks when real work runs out — stop early, be honest
+
+## Orchestration Tips
+
+- Check tooling before starting (bumpy, rtk, etc.) — skip steps that require missing tools
+- Branch dependency: if Run N uses Run M's changes, branch from Run M not wip
+- Parallelism: independent tasks can share a branch
+- Don't add features in one run and test them in another — keep related work together
