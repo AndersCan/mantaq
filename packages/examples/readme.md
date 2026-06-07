@@ -67,3 +67,4 @@ Each xstate use case above has a corresponding actor model implementation:
 | Async workflows      | `creditCheckWorkflow.actor.test.ts` | invoke:fromPromise → effect + internal events, guards → conditionals           |
 | Animation & UI state | `animationUiState.actor.test.ts`    | Parallel states → regions as child Actors, after → clock.setTimeout            |
 | Authentication       | `authentication.actor.test.ts`      | invoke:fromCallback → effect with clock.setInterval, assign → context mutation |
+| Undo/redo system     | `undoRedoEditor.actor.test.ts`      | Command pattern, context snapshot/restore, checkpoint history traversal        |
