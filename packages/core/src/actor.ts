@@ -198,7 +198,7 @@ export type EffectInput<
   clock: Clock;
 };
 
-interface AnyActor {
+export interface AnyActor {
   state: AnyStateRef;
   clock: Clock;
   regions: Record<string, AnyActor>;
