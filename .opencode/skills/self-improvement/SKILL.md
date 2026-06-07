@@ -36,6 +36,8 @@ ALL output from this skill MUST follow caveman grammar:
 
 Last task of every orchestration run: improve this skill. Non-negotiable. No exceptions.
 
+Every PR created must have auto-merge enabled: `gh pr merge $PR --auto --merge`
+
 ## Core Loop
 
 ### Phase 0: Setup
@@ -167,7 +169,7 @@ MANDATORY. Do this every run. Analyze what happened:
 
 ### Phase 5: Commit Skill Improvement
 
-Create PR with concrete SKILL.md changes. Every time. No exceptions.
+Create PR with concrete SKILL.md changes. Every time. No exceptions. Enable auto-merge.
 
 ```
 git checkout wip
@@ -176,7 +178,8 @@ git checkout -b self-improvement/improve-loop
 git add .opencode/skills/self-improvement/SKILL.md
 git commit -m "improve: self-improvement loop — <concrete improvement>"
 git push -u origin self-improvement/improve-loop
-gh pr create --base wip --title "improve: self-improvement loop" --body "## Changes\n- <list concrete skill changes>\n## Rationale\n- <why each change improves the loop>"
+PR=$(gh pr create --base wip --title "improve: self-improvement loop" --body "## Changes\n- <list concrete skill changes>\n## Rationale\n- <why each change improves the loop>" | tail -1)
+gh pr merge $PR --auto --merge
 ```
 
 ## Anti-patterns (avoid these)
