@@ -5,20 +5,41 @@ State machine library. Small API surface — cook the primitives, not the framew
 ## Install
 
 ```bash
-vp install
+npm install @mantaq/core
 ```
 
-## Usage
+## Quick Start
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
+
+const idle = state("idle")();
+const active = state("active")();
+const toggle = event("TOGGLE")();
+
+const actor = new Actor({
+  inputs: [toggle],
+  states: [idle, active],
+  initial: idle,
+  transitions: {
+    idle: { TOGGLE: () => ({ state: active }) },
+    active: { TOGGLE: () => ({ state: idle }) },
+  },
+});
+
+actor.on("change", (snap) => console.log(snap.path)); // ["idle"]
+actor.send(toggle);
 ```
+
+## Docs
+
+See [mantaq.dev](https://mantaq.dev) for full documentation.
 
 ## Patterns
 
 ### Typed Actor Context
 
-TypeScript infers `ActorContext` from the `context` option. Pass the object directly — no `as` needed.
+Cast the context type once at the constructor level. Handlers receive the typed context automatically — no casting needed per-handler.
 
 ```ts
 interface AuthContext {
@@ -27,9 +48,7 @@ interface AuthContext {
 }
 
 const actor = new Actor({
-  // ...
   context: {} as AuthContext,
-  // or: context: { user: undefined } as AuthContext,
   transitions: {
     idle: {
       SIGN_IN: (evt, { context }) => {
@@ -53,22 +72,6 @@ transitions: {
     },
   },
 }
-```
-
-If you need the type, cast the entire `Actor` constructor options object once:
-
-```ts
-const opts = {
-  inputs: [signInEvent],
-  states: [idleState, signingInState],
-  initial: idleState,
-  context: {} as AuthContext,
-  transitions: {
-    /* ... */
-  },
-} as const;
-
-const actor = new Actor(opts);
 ```
 
 ### Proper Event Typing
@@ -98,13 +101,14 @@ transitions: {
 }
 ```
 
-**Anti-pattern — untyped events:**
+**Anti-pattern — skipping the generic parameter:**
 
 ```ts
-// ❌ payload is `unknown`, handlers must cast
-const signInEvent = event("SIGN_IN")<{ phoneNumber: string }>();
-// Actually this is fine — the issue is when you skip the generic:
-const badEvent = event("SIGN_IN")(); // payload = unknown, no type safety
+// ❌ payload is `unknown`, no type safety
+const badEvent = event("SIGN_IN")();
+
+// ✅ always provide the payload type
+const goodEvent = event("SIGN_IN")<{ phoneNumber: string }>();
 ```
 
 **Anti-pattern — sending raw objects instead of using `.create()`:**
@@ -117,13 +121,61 @@ actor.send(signInEvent.create({ phoneNumber: "+1234567890" }));
 actor.send({ id: "SIGN_IN", phoneNumber: "+1234567890" });
 ```
 
+### Effects and Event Typing
+
+Effects run when entering a state. The `event` parameter in effects is typed as the union of all possible events (`Inputs[number] | Internal[number]`) — not the specific event that triggered the transition. This is by design: effects live on states, not transitions. Multiple transitions can lead to the same state, so the effect cannot know which event caused entry.
+
+**Store what the effect needs in context, not on the event.**
+
+```ts
+type MyContext = { data: unknown; error?: string };
+
+const actor = new Actor({
+  context: { data: null } as MyContext,
+  effects: {
+    loading: [
+      ({ context, emit, clock }) => {
+        // ✅ context.data was set by the transition handler
+        clock.setTimeout(1000, () => {
+          emit({ id: "LOADED", result: context.data });
+        });
+      },
+    ],
+  },
+  transitions: {
+    idle: {
+      FETCH: (event, { context }) => {
+        context.data = event.url; // store in context
+        return { state: loadingState };
+      },
+    },
+  },
+});
+```
+
+**Anti-pattern — depending on `event` in effects:**
+
+```ts
+effects: {
+  loading: [
+    ({ event, emit }) => {
+      // ❌ event is the union type, not the specific triggering event
+      // event.url doesn't exist on the union
+      emit({ id: "LOADED", result: event.url }); // type error
+    },
+  ],
+}
+```
+
+The `event` parameter exists for convenience (e.g., logging), but should not be relied on for business logic. If the effect needs data from the triggering transition, put it in context.
+
 ### Two-Queue Architecture
 
 Mantaq uses two event queues: **external** (user-sent) and **internal** (effect-emitted). Understanding the difference prevents subtle bugs.
 
 **External events** are sent via `actor.send()` — they trigger transitions on the current state.
 
-**Internal events** are emitted from effects via `emit()` — they queue up and process after the current transition completes.
+**Internal events** are emitted from effects via `emit()` — they process after the current transition completes.
 
 ```ts
 const tickEvent = event("TICK")();
@@ -150,7 +202,7 @@ const actor = new Actor({
 });
 ```
 
-**Ordering guarantee:** Internal events from `emit()` within a transition handler are processed immediately after that transition (depth-first). Events emitted from effects run after the effect completes.
+**Ordering:** External events process one at a time. Internal events emitted during a transition process depth-first after that transition. Internal events from effects process after the effect completes.
 
 **Anti-pattern — mixing internal/external incorrectly:**
 
@@ -164,7 +216,7 @@ inputs: [connectEvent],
 
 ### Effect Pattern
 
-Effects run when entering a state. They receive typed context and emit internal events.
+Effects run on state entry. They receive typed context, an AbortSignal, and an emit function.
 
 ```ts
 type MyContext = { retryCount: number; maxRetries: number };
@@ -246,23 +298,16 @@ effects: {
 
 ```ts
 interface SerializedActor {
-  snapshot: Snapshot;
-  context: unknown; // you must serialize context separately
+  path: string[];
+  regions: Record<string, unknown>;
+  context: Record<string, unknown>;
 }
 
-function saveActor(actor: Actor<any, any, any, any, any, any, any>): SerializedActor {
+function saveActor(actor: { snapshot(): Snapshot; context: unknown }): SerializedActor {
   return {
-    snapshot: actor.snapshot(),
-    // Context is not serializable by default — extract what you need
-    context: { ...actor.context },
+    ...actor.snapshot(),
+    context: { ...(actor.context as Record<string, unknown>) },
   };
-}
-
-function loadActor(
-  data: SerializedActor,
-  factory: (ctx: unknown) => Actor<any, any, any, any, any, any, any>,
-): Actor<any, any, any, any, any, any, any> {
-  return factory(data.context);
 }
 
 // Usage
@@ -271,9 +316,8 @@ localStorage.setItem("actor", JSON.stringify(saved));
 
 const raw = localStorage.getItem("actor");
 if (raw) {
-  const data = JSON.parse(raw);
-  const restored = loadActor(data, (ctx) => createMyActor(ctx));
-  // restored.state.name === data.snapshot.path[0]
+  const data = JSON.parse(raw) as SerializedActor;
+  // restore from data.path and data.context
 }
 ```
 
