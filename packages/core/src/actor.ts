@@ -244,6 +244,8 @@ export class Actor<
   #outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null = null;
   #processing = false;
   #internalIds: Set<string> = new Set();
+  #internalBudget: number;
+  #internalCount = 0;
   #subscribers: Set<(snapshot: Snapshot) => void> = new Set();
   #errorSubscribers: Set<(error: unknown) => void> = new Set();
   #doneSubscribers: Set<() => void> = new Set();
@@ -314,6 +316,7 @@ export class Actor<
     context?: ActorContext;
     initial: InitialState<States[number]>;
     clock?: Clock;
+    internalBudget?: number;
     effects?: Partial<
       Record<StateNames, Array<EffectFn<Inputs | Internal, Internal, ActorContext>>>
     >;
@@ -338,6 +341,7 @@ export class Actor<
       effects: options.effects ?? ({} as typeof this.options.effects),
     };
     this.#internalIds = new Set(this.options.internal.map((e) => e.id));
+    this.#internalBudget = options.internalBudget ?? 10000;
     this.clock = options.clock ?? new RealClock();
     if (this.clock instanceof VirtualClock) {
       this.clock._setDrain(() => this.#processInternalQueue());
@@ -511,8 +515,15 @@ export class Actor<
   #processInternalQueue(): void {
     if (this.#processing) return;
     this.#processing = true;
+    this.#internalCount = 0;
     while (this.#queueIndex < this.#internalQueue.length) {
+      if (this.#internalCount >= this.#internalBudget) {
+        this.#internalQueue.length = 0;
+        this.#queueIndex = 0;
+        break;
+      }
       const event = this.#internalQueue[this.#queueIndex++];
+      this.#internalCount++;
       if (this.#internalIds.has(event.id)) {
         this.send(event);
       } else if (this.#outputHandler) {

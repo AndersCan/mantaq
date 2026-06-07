@@ -415,3 +415,199 @@ describe("activeLeaves", () => {
     ]);
   });
 });
+
+describe("child actors", () => {
+  test("parent forwards child output events to internal queue", () => {
+    const ping = event("ping")();
+    const pong = event("pong")();
+
+    const childIdle = state("childIdle")();
+    const childActive = state("childActive")();
+
+    const child = new Actor({
+      inputs: [ping],
+      outputs: [pong],
+      internal: [],
+      context: {},
+      states: [childIdle, childActive],
+      initial: childIdle,
+      effects: {},
+      transitions: {
+        childIdle: {
+          ping: () => ({ state: childActive, emit: [pong.create(undefined)] }),
+        },
+      },
+    });
+
+    const parentGo = event("go")();
+    const parentIdle = state("parentIdle")();
+    const parentActive = state("parentActive")();
+    let receivedPong = false;
+
+    const parent = new Actor({
+      inputs: [parentGo],
+      outputs: [],
+      internal: [pong],
+      context: {},
+      states: [parentIdle, parentActive],
+      initial: parentIdle,
+      effects: {},
+      regions: { childActor: child },
+      transitions: {
+        parentIdle: {
+          go: () => ({ state: parentActive }),
+        },
+        parentActive: {
+          pong: () => {
+            receivedPong = true;
+            return {};
+          },
+        },
+      },
+    });
+
+    parent.send(parentGo);
+    child.send(ping);
+    expect(receivedPong).toBe(true);
+  });
+
+  test("parent snapshot includes child actor snapshots", () => {
+    const toggle = event("toggle")();
+    const idle = state("idle")();
+    const active = state("active")();
+
+    const child = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [idle, active],
+      initial: idle,
+      effects: {},
+      transitions: {
+        idle: { toggle: () => ({ state: active }) },
+      },
+    });
+
+    const parentIdle = state("parentIdle")();
+    const parent = new Actor({
+      inputs: [],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [parentIdle],
+      initial: parentIdle,
+      effects: {},
+      regions: { myChild: child },
+      transitions: {},
+    });
+
+    const snap = parent.snapshot();
+    expect(snap.regions.myChild).toEqual({ path: ["idle"], regions: {} });
+
+    child.send(toggle);
+    const snap2 = parent.snapshot();
+    expect(snap2.regions.myChild).toEqual({ path: ["active"], regions: {} });
+  });
+});
+
+describe("internal budget", () => {
+  test("stops processing when budget exceeded", () => {
+    const internalEvent = event("loop")();
+    const trigger = event("trigger")();
+    const idle = state("idle")();
+    const active = state("active")();
+
+    let emitCount = 0;
+
+    const actor = new Actor({
+      inputs: [trigger],
+      outputs: [],
+      internal: [internalEvent],
+      context: {},
+      states: [idle, active],
+      initial: idle,
+      effects: {
+        active: [
+          ({ emit }) => {
+            for (let i = 0; i < 200; i++) {
+              emit(internalEvent.create(undefined));
+              emitCount++;
+            }
+          },
+        ],
+      },
+      internalBudget: 50,
+      transitions: {
+        idle: {
+          trigger: () => ({ state: active }),
+        },
+        active: {
+          loop: () => ({}),
+        },
+      },
+    });
+
+    actor.send(trigger);
+    expect(emitCount).toBe(200);
+    expect(actor.state.name).toBe("active");
+  });
+});
+
+describe("concurrent send", () => {
+  test("sequential sends are processed in order", () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")();
+
+    const actor = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      context: { count: 0 },
+      states: [off, on],
+      initial: off,
+      effects: {},
+      transitions: {
+        off: {
+          toggle: () => ({ state: on }),
+        },
+        on: {
+          toggle: () => ({ state: off }),
+        },
+      },
+    });
+
+    actor.send(toggle);
+    expect(actor.state.name).toBe("on");
+    actor.send(toggle);
+    expect(actor.state.name).toBe("off");
+    actor.send(toggle);
+    expect(actor.state.name).toBe("on");
+  });
+
+  test("settled resolves after all sends processed", async () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")();
+
+    const actor = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [off, on],
+      initial: off,
+      effects: {},
+      transitions: {
+        off: { toggle: () => ({ state: on }) },
+        on: { toggle: () => ({ state: off }) },
+      },
+    });
+
+    actor.send(toggle);
+    actor.send(toggle);
+    await actor.settled();
+    expect(actor.state.name).toBe("off");
+  });
+});

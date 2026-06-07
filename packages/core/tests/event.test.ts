@@ -44,4 +44,24 @@ describe("EventRef", () => {
     const result = dataEv.create({ value: 42 });
     expect(result).toEqual({ id: "data", value: 42 });
   });
+
+  test("create with primitive number payload spreads as empty object", () => {
+    const go = event("go")<number>();
+    const result = go.create(42);
+    expect(result.id).toBe("go");
+    expect(typeof result).toBe("object");
+  });
+
+  test("create with primitive string payload spreads characters", () => {
+    const select = event("select")<string>();
+    const result = select.create("active");
+    expect(result.id).toBe("select");
+    expect(typeof result).toBe("object");
+  });
+
+  test("create with null payload keeps id only", () => {
+    const toggle = event("toggle")<null>();
+    const result = toggle.create(null as any);
+    expect(result).toEqual({ id: "toggle" });
+  });
 });

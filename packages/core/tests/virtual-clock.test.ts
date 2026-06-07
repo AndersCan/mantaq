@@ -234,4 +234,56 @@ describe("VirtualClock", () => {
     clock.clearInterval(999);
     clock.advance(1000);
   });
+
+  test("setTimeout abort signal removes timer on abort", () => {
+    const clock = new VirtualClock();
+    const ctrl = new AbortController();
+    let fired = false;
+    clock.setTimeout(
+      100,
+      () => {
+        fired = true;
+      },
+      { signal: ctrl.signal },
+    );
+
+    ctrl.abort();
+    clock.advance(200);
+    expect(fired).toBe(false);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("setInterval abort signal removes interval on abort", () => {
+    const clock = new VirtualClock();
+    const ctrl = new AbortController();
+    const fires: number[] = [];
+    clock.setInterval(
+      100,
+      () => {
+        fires.push(clock.now());
+      },
+      { signal: ctrl.signal },
+    );
+
+    clock.advance(150);
+    expect(fires).toEqual([100]);
+
+    ctrl.abort();
+    clock.advance(200);
+    expect(fires).toEqual([100]);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("advance with no timers just moves time", () => {
+    const clock = new VirtualClock();
+    clock.advance(500);
+    expect(clock.now()).toBe(500);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("zero ms advance is no-op", () => {
+    const clock = new VirtualClock();
+    clock.advance(0);
+    expect(clock.now()).toBe(0);
+  });
 });
