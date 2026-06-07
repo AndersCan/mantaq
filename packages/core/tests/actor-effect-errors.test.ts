@@ -332,6 +332,43 @@ describe("effect error handling", () => {
     expect(received[0]).toBe("string error");
   });
 
+  test("error subscriber that throws does not prevent other subscribers or crash actor", () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")();
+    const received: unknown[] = [];
+
+    const actor = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [off, on],
+      initial: off,
+      effects: {
+        on: [
+          () => {
+            throw new Error("effect failed");
+          },
+        ],
+      },
+      transitions: {
+        off: {
+          toggle: () => ({ state: on }),
+        },
+      },
+    });
+
+    actor.on("error", () => {
+      throw new Error("subscriber failed");
+    });
+    actor.on("error", (err) => received.push(err));
+
+    expect(() => actor.send(toggle)).not.toThrow();
+    expect(received).toHaveLength(1);
+    expect((received[0] as Error).message).toBe("effect failed");
+  });
+
   test("error in effect with emit does not prevent emit processing", () => {
     const toggle = event("toggle")();
     const internal = event("internal")();
