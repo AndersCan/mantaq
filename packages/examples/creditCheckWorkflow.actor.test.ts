@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, vi } from "vite-plus/test";
+import type { EffectFn } from "@mantaq/core";
 import { Actor, VirtualClock } from "@mantaq/core";
 import { state } from "@mantaq/core";
 import { event } from "@mantaq/core";
@@ -64,7 +65,28 @@ type CreditCheckContext = {
 };
 
 // ── Effects ──────────────────────────────────────────────────────────
-const checkCreditEffect: InstanceType<typeof Actor>["options"]["effects"][string] = [
+type CreditCheckEffect = EffectFn<
+  | [typeof startOrderEvent, typeof retryEvent, typeof cancelEvent]
+  | [
+      typeof creditCheckDoneEvent,
+      typeof creditCheckErrorEvent,
+      typeof paymentDoneEvent,
+      typeof paymentErrorEvent,
+      typeof notificationDoneEvent,
+      typeof notificationErrorEvent,
+    ],
+  [
+    typeof creditCheckDoneEvent,
+    typeof creditCheckErrorEvent,
+    typeof paymentDoneEvent,
+    typeof paymentErrorEvent,
+    typeof notificationDoneEvent,
+    typeof notificationErrorEvent,
+  ],
+  CreditCheckContext
+>;
+
+const checkCreditEffect: CreditCheckEffect[] = [
   (input) =>
     withTimeout(1000, input, () => {
       const approved = Math.random() > 0.2;
@@ -77,12 +99,12 @@ const checkCreditEffect: InstanceType<typeof Actor>["options"]["effects"][string
     }),
 ];
 
-const processPaymentEffect: InstanceType<typeof Actor>["options"]["effects"][string] = [
+const processPaymentEffect: CreditCheckEffect[] = [
   (input) =>
     withTimeout(1500, input, () => paymentDoneEvent.create({ transactionId: `TXN-${Date.now()}` })),
 ];
 
-const notifyWarehouseEffect: InstanceType<typeof Actor>["options"]["effects"][string] = [
+const notifyWarehouseEffect: CreditCheckEffect[] = [
   (input) =>
     withTimeout(500, input, () => notificationDoneEvent.create({ warehouseConfirmed: true })),
 ];
