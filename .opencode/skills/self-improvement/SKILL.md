@@ -64,18 +64,39 @@ If the area you planned to improve was already covered, pick a different area.
 git checkout -b self-improvement/<short-description>
 ```
 
-### 5. Implement
+### 5. Pick approach
 
-- **ONE substantive change per run** — not multiple shallow ones
+Choose ONE approach per run:
+
+**A) Code quality** — reduce core API, fix casts, improve types
+
 - Check `packages/core/src/index.ts` — if it exports non-primitives, fix that
 - Check `packages/core/src/actor.ts` for reducible type casts
 - If reducing core API, ensure sugar re-exports what users need
-- If improving documentation, make it DEEP (patterns + anti-patterns), not organizational
+
+**B) Deep documentation** — patterns with anti-patterns, not organizational
+
+- If improving documentation, make it DEEP (patterns + anti-patterns)
+
+**C) Stress-test the API** — try to solve a real problem, find friction
+
+- Pick a real-world problem (e.g., undo/redo, optimistic updates, debounced search, multi-step wizard, WebSocket reconnection)
+- Write a failing test or prototype in `packages/examples/` that solves it using core + sugar
+- If the actor model handles it cleanly → ship the example as documentation
+- If you hit friction (wrong types, missing API, awkward patterns) → that friction IS the improvement:
+  - Missing feature in sugar? Add it.
+  - Core API forcing casts? Fix the types.
+  - Concept missing entirely? Design the minimal API for it.
+- Document the problem and solution in the PR body
+
+### 6. Implement
+
+- **ONE substantive change per run** — not multiple shallow ones
 - No comments in code
 - Maintain strict type safety
 - If unable to find meaningful work, store summary in ICM and stop — do not pad
 
-### 6. Self-review before committing
+### 7. Self-review before committing
 
 Verify your own work:
 
@@ -85,10 +106,11 @@ Verify your own work:
 - [ ] Changes are substantive, not organizational?
 - [ ] Tests pass?
 - [ ] Would a user actually benefit from this change?
+- [ ] If stress-testing: did you find and fix real friction, or just write example code?
 
 If you can't check most of these boxes, reconsider whether the change is worth shipping.
 
-### 7. Verify
+### 8. Verify
 
 Run checks. Max **5 attempts** to fix failing tests/checks.
 
@@ -108,7 +130,7 @@ icm store -t improvements -c "failed: <short description> — unable to fix <X> 
 
 Stop. Do not continue with this task.
 
-### 8. Commit with bumpy
+### 9. Commit with bumpy
 
 Run `add-change` skill to create bump file, then commit:
 
@@ -118,7 +140,7 @@ git add -A
 git commit
 ```
 
-### 9. PR to wip
+### 10. PR to wip
 
 Push branch and create PR targeting `wip`:
 
