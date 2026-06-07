@@ -7,7 +7,7 @@ import {
   isAborted,
   assertNever,
   createDeferred,
-  deepMerge,
+  shallowMerge,
   pick,
   omit,
 } from "../src/index.ts";
@@ -77,25 +77,25 @@ describe("isAborted", () => {
   });
 });
 
-describe("deepMerge", () => {
+describe("shallowMerge", () => {
   test("overrides keys from source", () => {
-    const result = deepMerge({ a: 1, b: 2 }, { b: 3 });
+    const result = shallowMerge({ a: 1, b: 2 }, { b: 3 });
     expect(result).toEqual({ a: 1, b: 3 });
   });
 
   test("ignores undefined values", () => {
-    const result = deepMerge({ a: 1 }, { a: undefined });
+    const result = shallowMerge({ a: 1 }, { a: undefined });
     expect(result).toEqual({ a: 1 });
   });
 
   test("adds new keys", () => {
-    const result = deepMerge({ a: 1 } as Record<string, unknown>, { b: 2 });
+    const result = shallowMerge({ a: 1 } as Record<string, unknown>, { b: 2 });
     expect(result).toEqual({ a: 1, b: 2 });
   });
 
   test("returns copy, not mutation", () => {
     const target = { a: 1 };
-    const result = deepMerge(target, { b: 2 });
+    const result = shallowMerge(target, { b: 2 });
     expect(target).toEqual({ a: 1 });
     expect(result).not.toBe(target);
   });
