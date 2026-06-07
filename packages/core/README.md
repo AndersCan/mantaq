@@ -23,6 +23,29 @@ npm install @mantaq/core
 | Snapshot        | Save path + context manually       | Expect `snapshot()` to include context |
 | Any handler     | Universal events only (CANCEL)     | State-specific logic in Any            |
 
+## Contents
+
+- [Install](#install)
+- [Quick Reference](#quick-reference)
+- [Quick Start](#quick-start)
+- [Docs](#docs)
+- [Patterns](#patterns)
+  - [Typed Actor Context](#typed-actor-context)
+  - [Proper Event Typing](#proper-event-typing)
+  - [Effects and Event Typing](#effects-and-event-typing)
+  - [Two-Queue Architecture](#two-queue-architecture)
+  - [Effect Pattern](#effect-pattern)
+  - [Snapshot & Restore](#snapshot--restore)
+  - [Dynamic Children (Regions)](#dynamic-children-regions)
+  - [Error Handling](#error-handling)
+    - [Error Event Subscription](#error-event-subscription)
+    - [Effect Error Recovery](#effect-error-recovery)
+    - [Transition Error Handling](#transition-error-handling)
+    - [Nested Error Propagation](#nested-error-propagation)
+  - [Any Handler](#any-handler)
+- [Development](#development)
+- [License](#license)
+
 ## Quick Start
 
 ```ts
