@@ -8,10 +8,11 @@ export function isDone(snapshot: Snapshot): boolean {
   return snapshot.done === true;
 }
 
-export function flattenSnapshot(snapshot: Snapshot): Snapshot[] {
+export function flattenSnapshot(snapshot: Snapshot, maxDepth = 50): Snapshot[] {
   const results: Snapshot[] = [snapshot];
+  if (maxDepth <= 0) return results;
   for (const region of Object.values(snapshot.regions)) {
-    results.push(...flattenSnapshot(region));
+    results.push(...flattenSnapshot(region, maxDepth - 1));
   }
   return results;
 }
@@ -60,7 +61,7 @@ export function pick<T extends Record<string, unknown>, K extends keyof T>(
 ): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {
-    if (key in obj) {
+    if (Object.hasOwn(obj, key)) {
       result[key] = obj[key];
     }
   }
@@ -76,4 +77,42 @@ export function omit<T extends Record<string, unknown>, K extends keyof T>(
     delete result[key];
   }
   return result;
+}
+
+export function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const id = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(id);
+        reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+}
+
+export async function retry<T>(
+  fn: (attempt: number) => Promise<T>,
+  options: { attempts: number; delay?: number; signal?: AbortSignal } = { attempts: 3 },
+): Promise<T> {
+  const { attempts, delay: backoff = 0, signal } = options;
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    if (signal?.aborted) throw signal.reason ?? new DOMException("Aborted", "AbortError");
+    try {
+      return await fn(i);
+    } catch (err) {
+      lastError = err;
+      if (i < attempts - 1 && backoff > 0) {
+        await delay(backoff * 2 ** i, signal);
+      }
+    }
+  }
+  throw lastError;
 }
