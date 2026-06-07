@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { Actor, event, state } from "@mantaq/core";
+import { Actor, event, state, VirtualClock } from "@mantaq/core";
 import { ActorMap } from "../src/actors/actor-map.ts";
 import { broadcast } from "../src/transitions/broadcast.ts";
 import { matches } from "../src/actors/matches.ts";
@@ -65,6 +65,46 @@ describe("ActorMap", () => {
   test("kill non-existent key does not throw", () => {
     const map = new ActorMap();
     expect(() => map.kill("nonexistent")).not.toThrow();
+  });
+
+  test("kill aborts child effects", () => {
+    const clock = new VirtualClock();
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")();
+    let effectRan = false;
+
+    const map = new ActorMap();
+    map.spawn("a", () => {
+      const a = new Actor({
+        inputs: [toggle],
+        outputs: [],
+        internal: [],
+        context: {},
+        clock,
+        states: [off, on],
+        initial: off,
+        effects: {
+          on: [
+            () => {
+              effectRan = true;
+            },
+          ],
+        },
+        transitions: {
+          off: { toggle: () => ({ state: on }) },
+        },
+      });
+      return a;
+    });
+
+    map.send("a", toggle.create({}));
+    expect(effectRan).toBe(true);
+
+    effectRan = false;
+    map.kill("a");
+
+    expect(map.snapshot("a")).toBeUndefined();
   });
 
   test("ensure spawns if not exists", () => {

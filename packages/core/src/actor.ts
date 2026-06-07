@@ -221,6 +221,7 @@ export interface AnyActor {
   __outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null;
   __pushInternal(event: { id: string; [key: string]: unknown }): void;
   __drainInternal(): void;
+  __abortEffects(): void;
 }
 
 export class Actor<
@@ -274,6 +275,12 @@ export class Actor<
   }
   /** @internal */ __drainInternal(): void {
     this.#processInternalQueue();
+  }
+  /** @internal */ __abortEffects(): void {
+    this.#effectAbort?.abort();
+    this.#subscribers.clear();
+    this.#errorSubscribers.clear();
+    this.#doneSubscribers.clear();
   }
 
   options: {
