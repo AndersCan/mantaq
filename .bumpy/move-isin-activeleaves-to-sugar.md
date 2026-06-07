@@ -1,6 +1,6 @@
 ---
-"@mantaq/core": minor
+"@mantaq/core": major
 "@mantaq/sugar": minor
 ---
 
-Moved isIn and activeLeaves query utilities from core to sugar. Core no longer exports them directly.
+Moved isIn and activeLeaves from core to sugar. Core no longer exports snapshot query utilities.
