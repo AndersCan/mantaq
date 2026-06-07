@@ -1,6 +1,6 @@
 import type { AnyStateRef, StateRef, TransitionState } from "./state.ts";
 import { TransitionState as TransitionStateClass } from "./state.ts";
-import type { AnyEventRef, EventRef } from "./event.ts";
+import type { AnyEventRef, EventRef, InternalEvent } from "./event.ts";
 
 export interface Snapshot {
   path: string[];
@@ -202,7 +202,7 @@ export type EffectInput<
   state: { name: string; payload: unknown };
   event: Inputs[number] | Internal[number];
   context: ActorContext;
-  emit: (event: { id: string; [key: string]: unknown }) => void;
+  emit: (event: InternalEvent) => void;
   clock: Clock;
 };
 
@@ -210,7 +210,7 @@ export interface AnyActor {
   state: AnyStateRef;
   clock: Clock;
   regions: Record<string, AnyActor>;
-  send(event: AnyEventRef | { id: string; [key: string]: unknown }): void;
+  send(event: AnyEventRef | InternalEvent): void;
   snapshot(): Snapshot;
   on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
   on(event: "error", fn: (error: unknown) => void): () => void;
@@ -218,11 +218,13 @@ export interface AnyActor {
   subscribe(fn: (snapshot: Snapshot) => void): () => void;
   settled(): Promise<void>;
   __children: Map<string, AnyActor>;
-  __outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null;
-  __pushInternal(event: { id: string; [key: string]: unknown }): void;
+  __outputHandler: ((event: InternalEvent) => void) | null;
+  __pushInternal(event: InternalEvent): void;
   __drainInternal(): void;
   __abortEffects(): void;
 }
+
+export type InternalActor = AnyActor;
 
 export class Actor<
   const Inputs extends AnyEventRef[],
@@ -238,10 +240,10 @@ export class Actor<
   clock: Clock;
   #regions: Record<string, AnyActor> = {};
   #children: Map<string, AnyActor> = new Map();
-  #internalQueue: Array<{ id: string; [key: string]: unknown }> = [];
+  #internalQueue: InternalEvent[] = [];
   #queueIndex = 0;
   #effectAbort: AbortController | null = null;
-  #outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null = null;
+  #outputHandler: ((event: InternalEvent) => void) | null = null;
   #processing = false;
   #internalIds: Set<string> = new Set();
   #subscribers: Set<(snapshot: Snapshot) => void> = new Set();
@@ -260,17 +262,13 @@ export class Actor<
   /** @internal */ get __children(): Map<string, AnyActor> {
     return this.#children;
   }
-  /** @internal */ get __outputHandler():
-    | ((event: { id: string; [key: string]: unknown }) => void)
-    | null {
+  /** @internal */ get __outputHandler(): ((event: InternalEvent) => void) | null {
     return this.#outputHandler;
   }
-  /** @internal */ set __outputHandler(
-    fn: ((event: { id: string; [key: string]: unknown }) => void) | null,
-  ) {
+  /** @internal */ set __outputHandler(fn: ((event: InternalEvent) => void) | null) {
     this.#outputHandler = fn;
   }
-  /** @internal */ __pushInternal(event: { id: string; [key: string]: unknown }): void {
+  /** @internal */ __pushInternal(event: InternalEvent): void {
     this.#internalQueue.push(event);
   }
   /** @internal */ __drainInternal(): void {
@@ -330,13 +328,13 @@ export class Actor<
     >;
     regions?: Record<string, AnyActor>;
   }) {
-    this.options = {
+    this.options = Object.freeze({
       ...options,
       outputs: (options.outputs ?? []) as Outputs,
       internal: (options.internal ?? []) as Internal,
       context: options.context ?? ({} as ActorContext),
       effects: options.effects ?? ({} as typeof this.options.effects),
-    };
+    });
     this.#internalIds = new Set(this.options.internal.map((e) => e.id));
     this.clock = options.clock ?? new RealClock();
     if (this.clock instanceof VirtualClock) {
@@ -404,7 +402,7 @@ export class Actor<
     });
   }
 
-  send(event: Inputs[number] | { id: string; [key: string]: unknown }): void {
+  send(event: Inputs[number] | InternalEvent): void {
     const transitions = this.options.transitions as Record<
       string,
       Record<string, TransitionHandler<ActorContext> | undefined>
@@ -443,10 +441,7 @@ export class Actor<
     }
   }
 
-  #applyTransition(
-    event: Inputs[number] | { id: string; [key: string]: unknown },
-    step: TransitionResult,
-  ): void {
+  #applyTransition(event: Inputs[number] | InternalEvent, step: TransitionResult): void {
     if (step.state) {
       this.#effectAbort?.abort();
       let payload: unknown;
@@ -468,10 +463,7 @@ export class Actor<
     }
   }
 
-  #runEffects(
-    event: Inputs[number] | { id: string; [key: string]: unknown },
-    statePayload: unknown,
-  ): void {
+  #runEffects(event: Inputs[number] | InternalEvent, statePayload: unknown): void {
     const allEffects = this.options.effects as Record<
       string,
       Array<EffectFn<Inputs, Internal, ActorContext>>
@@ -488,7 +480,7 @@ export class Actor<
           state: { name: this.state.name, payload: statePayload },
           event: event as Inputs[number] | Internal[number],
           context: this.#context,
-          emit: (e: { id: string; [key: string]: unknown }) => {
+          emit: (e: InternalEvent) => {
             this.#internalQueue.push(e);
             this.#processInternalQueue();
           },
@@ -566,7 +558,7 @@ type CreatedEvent<E> = E extends EventRef<infer Id, infer P> ? P & { id: Id } : 
 type ById<T extends { id: string }, K extends T["id"]> = CreatedEvent<Extract<T, { id: K }>>;
 
 type TransitionHandler<AC> = (
-  event: AnyEventRef | { id: string; [key: string]: unknown },
+  event: AnyEventRef | InternalEvent,
   options: { context: AC; actor: AnyActor },
 ) => TransitionResult;
 
