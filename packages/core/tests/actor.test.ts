@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { Actor } from "../src/actor.ts";
+import { Actor, isIn, activeLeaves } from "../src/actor.ts";
 import { event } from "../src/event.ts";
 import { state } from "../src/state.ts";
 
@@ -254,5 +254,95 @@ describe("effects", () => {
     actor.send(toggle);
     expect(internalProcessed).toBe(true);
     expect(actor.state.name).toBe("off");
+  });
+});
+
+describe("isIn", () => {
+  test("flat — exact match", () => {
+    const { light } = makeActor();
+    expect(isIn(light.snapshot(), "off")).toBe(true);
+    expect(isIn(light.snapshot(), "on")).toBe(false);
+  });
+
+  test("hierarchical — ancestor match", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const connected = state("connected")().regions({
+      default: { initial: "idle", states: { idle, active } },
+    });
+
+    const actor = new Actor({
+      inputs: [],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [connected],
+      initial: connected,
+      effects: {},
+      transitions: {},
+    });
+
+    expect(isIn(actor.snapshot(), "connected")).toBe(true);
+    expect(isIn(actor.snapshot(), "idle")).toBe(true);
+    expect(isIn(actor.snapshot(), "active")).toBe(false);
+  });
+
+  test("unknown state returns false", () => {
+    const { light } = makeActor();
+    expect(isIn(light.snapshot(), "unknown")).toBe(false);
+  });
+});
+
+describe("activeLeaves", () => {
+  test("flat — returns current path", () => {
+    const { light } = makeActor();
+    expect(activeLeaves(light.snapshot())).toEqual(["off"]);
+  });
+
+  test("hierarchical — returns leaf through region", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const connected = state("connected")().regions({
+      default: { initial: "idle", states: { idle, active } },
+    });
+
+    const actor = new Actor({
+      inputs: [],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [connected],
+      initial: connected,
+      effects: {},
+      transitions: {},
+    });
+
+    expect(activeLeaves(actor.snapshot())).toEqual(["connected.default.idle"]);
+  });
+
+  test("parallel — returns all leaves", () => {
+    const paused = state("paused")();
+    const playing = state("playing")();
+    const unmuted = state("unmuted")();
+    const player = state("player")().regions({
+      playback: { initial: "paused", states: { paused, playing } },
+      audio: { initial: "unmuted", states: { unmuted } },
+    });
+
+    const actor = new Actor({
+      inputs: [],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [player],
+      initial: player,
+      effects: {},
+      transitions: {},
+    });
+
+    expect(activeLeaves(actor.snapshot())).toEqual([
+      "player.playback.paused",
+      "player.audio.unmuted",
+    ]);
   });
 });
