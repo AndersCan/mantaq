@@ -24,6 +24,7 @@ export class ActorMap implements SendableMap<SendableEvent> {
   }
 
   kill(key: string): void {
+    this.#actors.get(key)?.__abortEffects();
     this.#actors.delete(key);
   }
 
