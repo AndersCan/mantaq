@@ -332,3 +332,90 @@ What should the state-independent transitions key be called?
 - Explicit `any` key — `{ any: { SET_BRIGHTNESS: handler } }`
 
 Current proposal: top-level event ID (simplest).
+
+---
+
+## DX Findings from Practical Modeling
+
+Modeled a WebSocket reconnection manager (`packages/examples/websocketConnection.actor.test.ts`).
+States: disconnected, connecting, connected, reconnecting, permanentlyDisconnected.
+Context: retryCount, maxRetries, url, error. Uses `Any` handler for DISCONNECT/FORCE_RECONNECT across states.
+
+### Bug 1: `Any` handler preempts state-specific handlers (`actor.ts:397-399`)
+
+`send()` checks `Any` first. If `Any` returns `{ state }`, it returns immediately. State-specific handler never runs.
+
+```ts
+Any: { EV: () => ({ state: cState }) },
+a:   { EV: () => ({ state: bState }) },
+// When in state "a" and EV arrives → goes to "c", not "b"
+```
+
+Consequence: `Any` is NOT a fallback. It is a pre-handler with veto power.
+
+**Fix**: Change resolution order: state-specific first, then `Any` as fallback.
+
+### Bug 2: Queue leak when `Any` emits + state handler returns `{}` (`actor.ts:416-418`)
+
+If `Any` handler pushes to `#internalQueue` and state-specific handler exists but returns `{}` (no state, no emit), the internal queue is never drained.
+
+```ts
+Any: { EV: () => ({ emit: [internalEv] }) },
+a:   { EV: () => ({}) },
+// internalEv pushed to queue but #processInternalQueue never called
+```
+
+`#processInternalQueue` only runs in the `if (anyTransition && !stateTransition)` branch (line 416). Since `stateTransition` exists (handler at `a`), drain is skipped. `#applyTransition` on the `{}` result skips both state-change and emit blocks — nothing triggers processing.
+
+### ~~Issue 3: Effect type not exported (`actor.ts:188-203`)~~ **(Resolved)**
+
+`EffectFn` and `EffectInput` types are now exported from `@mantaq/core` barrel. Examples use `EffectFn` directly.
+
+### Issue 4: Inconsistent event send for internal vs input events
+
+Input events typed into `send()` signature — pass event ref directly: `actor.send(disconnect)`.
+Internal events NOT in Inputs union — must use `.create()`: `actor.send(connectionFailed.create({error: "msg"}))`.
+
+New users hit TS errors trying `actor.send(connFailed)` (internal EventRef passed as-is).
+
+**Fix**: Add internal events to `send()` overloads or accept `EventRef` for internal events.
+
+### Issue 5: Dead code — `#regionState` map never read (`actor.ts:219, 260-270, 334`)
+
+`#regionState` map populated in `#initRegionState()` at constructor time (line 334).
+But `#snapshot()` doesn't read it — always uses `region.states[region.initial]` (line 513).
+Never updated after construction. If a state-level region could change, snapshot would always report initial.
+
+The child Actor approach (`#regions`) works correctly because each child stores its own state.
+
+**Fix**: Remove `#regionState`, `#initRegionState()`. State-level region tracking is dead code.
+
+### Issue 6: Two region mechanisms coexist (`actor.ts:511-522`)
+
+Snapshot iterates both:
+
+- State-level `s._regions` (lines 511-518) — static, never updates
+- Actor-level `this.#regions` (lines 520-522) — full child Actor snapshots
+
+If both are defined for the same region key, the Actor-level snapshot overwrites the state-level one. This silent override is confusing.
+
+**Fix**: Consolidate — only one region mechanism. All regions should be child Actors.
+
+### Pros of current actor model
+
+- Simple constructor-based API. One class, no builder pattern.
+- Virtual Clock makes time-dependent tests deterministic.
+- `Any` handler pattern (once bugs fixed) enables cross-cutting concerns.
+- Context mutation in transitions is straightforward and TypeScript-friendly.
+- Internal event queue + `#processInternalQueue` handles effect→transition chains.
+- Regions as child Actors give each region full lifecycle (effects, own context).
+
+### Cons / gaps
+
+- No type-safe region access: `actor.regions.brightness` typed as `AnyActor`, lose all concrete input/state types.
+- No parent→child event routing declaration: must manually call `actor.regions.X.send(...)` in handler.
+- No child→parent output declaration: child outputs forwarded via `__outputHandler` callback, invisible to parent's type system.
+- Nested regions not ergonomic: no sugar for `actor.regions.foo.regions.bar`.
+- Snapshot format mixes old `_regions` and new `#regions` — inconsistent.
+- `Any` handler naming clashes with real event IDs: if an event is literally named "Any", it breaks.
+- No `matches()` pattern for prefix matching: `matches(actor, "disconnected")` works, but `matches(actor, "reconnecting.*")` doesn't exist.

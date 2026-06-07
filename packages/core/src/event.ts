@@ -6,6 +6,8 @@ export function event<const T extends string>(id: T) {
 
 export type AnyEventRef = EventRef<string>;
 
+export type InternalEvent = { id: string } & Record<string, unknown>;
+
 export class EventRef<const T extends string, Payload = unknown> {
   id: T;
   payload: Payload | undefined;
@@ -14,11 +16,19 @@ export class EventRef<const T extends string, Payload = unknown> {
     this.id = id;
   }
 
-  is(anyEvent: AnyEventRef): anyEvent is typeof this {
-    return anyEvent && anyEvent.id === this.id;
+  is(anyEvent: unknown): anyEvent is typeof this {
+    return (
+      !!anyEvent &&
+      typeof anyEvent === "object" &&
+      "id" in anyEvent &&
+      (anyEvent as { id: string }).id === this.id
+    );
   }
 
-  create(payload: Payload): Payload & { id: string } {
-    return { ...payload, id: this.id };
+  create(payload: Payload): Payload & { id: T } {
+    if (payload === null || (typeof payload !== "object" && typeof payload !== "function")) {
+      return { id: this.id, value: payload } as unknown as Payload & { id: T };
+    }
+    return { ...(payload as Record<string, unknown>), id: this.id } as Payload & { id: T };
   }
 }

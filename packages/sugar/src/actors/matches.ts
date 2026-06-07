@@ -21,7 +21,9 @@ function matchSnapshot(snapshot: Snapshot, parts: string[], index: number): bool
 }
 
 export function matches(actor: { snapshot(): Snapshot }, pattern: string): boolean {
-  if (!pattern || pattern.endsWith(".")) return false;
+  if (!pattern || pattern.endsWith(".") || pattern.startsWith(".") || pattern.includes("..")) {
+    return false;
+  }
   const parts = pattern.split(".");
   return matchSnapshot(actor.snapshot(), parts, 0);
 }
