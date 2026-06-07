@@ -1,23 +1,7 @@
-# vite-plus-starter
+# @mantaq/utils
 
-A starter for creating a Vite Plus project.
+Shared utility helpers for mantaq actor system.
 
-## Development
+## Docs
 
-- Install dependencies:
-
-```bash
-vp install
-```
-
-- Run the unit tests:
-
-```bash
-vp test
-```
-
-- Build the library:
-
-```bash
-vp pack
-```
+See [mantaq.dev](https://mantaq.dev) for full documentation.

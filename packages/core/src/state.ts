@@ -1,7 +1,6 @@
 export type AnyStateRef = StateRef<string>;
 
 export function state<const T extends string>(id: T) {
-  // TODO: Add Payload type here that adds requirements on Event payload (Can not transition to state unless Event has XYZ fields)
   return <Payload>() => {
     return new StateRef<T, Payload>(id);
   };
@@ -21,10 +20,9 @@ interface RegionsOptions<States extends Record<string, AnyStateRef> = Record<str
 
 export class StateRef<T, Payload = unknown> {
   name: T;
-  // TODO: Hack to expose Payload type
-  __payload: Payload | undefined;
+  /** @internal */ readonly __payload: Payload | undefined;
   isFinal = false;
-  _regions: RegionsOptions | undefined;
+  /** @internal */ _regions: RegionsOptions | undefined;
 
   constructor(name: T) {
     this.name = name;
@@ -45,8 +43,8 @@ export class StateRef<T, Payload = unknown> {
 }
 
 export class TransitionState<N extends string = string, P = unknown> {
-  __stateRef: StateRef<N, P>;
-  __payload: P;
+  /** @internal */ readonly __stateRef: StateRef<N, P>;
+  /** @internal */ readonly __payload: P;
 
   constructor(stateRef: StateRef<N, P>, payload: P) {
     this.__stateRef = stateRef;

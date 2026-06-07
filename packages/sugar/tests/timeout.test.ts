@@ -3,19 +3,16 @@ import { VirtualClock } from "@mantaq/core";
 import { withTimeout } from "../src/effects/timeout.ts";
 
 describe("withTimeout", () => {
-  test("emits event after delay", () => {
+  test("emits event after specified ms", () => {
     const clock = new VirtualClock();
-    const emitted: unknown[] = [];
-    const emit = (e: unknown) => emitted.push(e);
+    const emitted: Array<{ id: string; [key: string]: unknown }> = [];
+    const abort = new AbortController();
 
     withTimeout(
       100,
       {
-        signal: new AbortController().signal,
-        state: { name: "loading", payload: undefined },
-        event: { id: "load" },
-        context: {},
-        emit,
+        signal: abort.signal,
+        emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       } as any,
       () => ({ id: "timeout" }),
@@ -28,21 +25,37 @@ describe("withTimeout", () => {
     expect(emitted).toEqual([{ id: "timeout" }]);
   });
 
-  test("does not emit if signal already aborted", () => {
+  test("does not emit if timer aborted before fire", () => {
     const clock = new VirtualClock();
-    const emitted: unknown[] = [];
-    const emit = (e: unknown) => emitted.push(e);
-    const controller = new AbortController();
-    controller.abort();
+    const emitted: Array<{ id: string; [key: string]: unknown }> = [];
+    const abort = new AbortController();
 
     withTimeout(
       100,
       {
-        signal: controller.signal,
-        state: { name: "loading", payload: undefined },
-        event: { id: "load" },
-        context: {},
-        emit,
+        signal: abort.signal,
+        emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
+        clock,
+      } as any,
+      () => ({ id: "timeout" }),
+    );
+
+    abort.abort();
+    clock.advance(200);
+    expect(emitted).toEqual([]);
+  });
+
+  test("does not emit if signal already aborted", () => {
+    const clock = new VirtualClock();
+    const emitted: Array<{ id: string; [key: string]: unknown }> = [];
+    const abort = new AbortController();
+    abort.abort();
+
+    withTimeout(
+      100,
+      {
+        signal: abort.signal,
+        emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       } as any,
       () => ({ id: "timeout" }),
@@ -52,27 +65,42 @@ describe("withTimeout", () => {
     expect(emitted).toEqual([]);
   });
 
+  test("emits correct event payload", () => {
+    const clock = new VirtualClock();
+    const emitted: Array<{ id: string; [key: string]: unknown }> = [];
+    const abort = new AbortController();
+
+    withTimeout(
+      50,
+      {
+        signal: abort.signal,
+        emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
+        clock,
+      } as any,
+      () => ({ id: "customTimeout", reason: "exceeded" }),
+    );
+
+    clock.advance(50);
+    expect(emitted).toEqual([{ id: "customTimeout", reason: "exceeded" }]);
+  });
+
   test("does not emit after advance if aborted later", () => {
     const clock = new VirtualClock();
-    const emitted: unknown[] = [];
-    const emit = (e: unknown) => emitted.push(e);
-    const controller = new AbortController();
+    const emitted: Array<{ id: string; [key: string]: unknown }> = [];
+    const abort = new AbortController();
 
     withTimeout(
       100,
       {
-        signal: controller.signal,
-        state: { name: "loading", payload: undefined },
-        event: { id: "load" },
-        context: {},
-        emit,
+        signal: abort.signal,
+        emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       } as any,
       () => ({ id: "timeout" }),
     );
 
     clock.advance(50);
-    controller.abort();
+    abort.abort();
     clock.advance(100);
     expect(emitted).toEqual([]);
   });

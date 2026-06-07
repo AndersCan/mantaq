@@ -72,4 +72,11 @@ describe("TransitionState", () => {
     expect(ts.__stateRef).toBe(s);
     expect(ts.__payload).toBeUndefined();
   });
+
+  test("payload is mutable", () => {
+    const s = state("loaded")<{ data: string }>();
+    const ts = new TransitionState(s, { data: "hello" });
+    ts.__payload.data = "world";
+    expect(ts.__payload).toEqual({ data: "world" });
+  });
 });

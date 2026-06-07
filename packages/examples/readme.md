@@ -61,9 +61,14 @@ Pattern across all 4: State drives everything. UI, API calls, timings. No surpri
 
 Each xstate use case above has a corresponding actor model implementation:
 
-| Use Case             | File                                | Key Mapping                                                                    |
-| -------------------- | ----------------------------------- | ------------------------------------------------------------------------------ |
-| Multi-step forms     | `checkout.actor.test.ts`            | States → state(), context → mutable fields, effects → async work               |
-| Async workflows      | `creditCheckWorkflow.actor.test.ts` | invoke:fromPromise → effect + internal events, guards → conditionals           |
-| Animation & UI state | `animationUiState.actor.test.ts`    | Parallel states → regions as child Actors, after → clock.setTimeout            |
-| Authentication       | `authentication.actor.test.ts`      | invoke:fromCallback → effect with clock.setInterval, assign → context mutation |
+| Use Case             | File                                     | Key Mapping                                                                       |
+| -------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| Multi-step forms     | `checkout.actor.test.ts`                 | States → state(), context → mutable fields, effects → async work                  |
+| Async workflows      | `creditCheckWorkflow.actor.test.ts`      | invoke:fromPromise → effect + internal events, guards → conditionals              |
+| Animation & UI state | `animationUiState.actor.test.ts`         | Parallel states → regions as child Actors, after → clock.setTimeout               |
+| Authentication       | `authentication.actor.test.ts`           | invoke:fromCallback → effect with clock.setInterval, assign → context mutation    |
+| Undo/redo system     | `undoRedoEditor.actor.test.ts`           | Command pattern, context snapshot/restore, checkpoint history traversal           |
+| Cache with TTL/LRU   | `cacheWithTtlAndLru.actor.test.ts`       | TTL → clock.setTimeout, LRU eviction → context.accessOrder, regions → cache tiers |
+| Game character       | `gameCharacter.actor.test.ts`            | Guard conditions, context-tracked combat state, regions for movement, effects     |
+| Network connection   | `networkConnectionManager.actor.test.ts` | Regions for health monitor, exponential backoff, guard conditions, reconnection   |
+| WebSocket reconnect  | `websocketConnection.actor.test.ts`      | Retry with exponential backoff, Any handler for cross-state events, async effects |

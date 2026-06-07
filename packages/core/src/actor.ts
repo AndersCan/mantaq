@@ -24,8 +24,10 @@ class RealClock implements Clock {
   }
 
   setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error Node.js setTimeout type doesn't accept options argument (browser runtime)
-    const id: number = globalThis.setTimeout(cb, ms, options);
+    const id = globalThis.setTimeout(cb, ms) as unknown as number;
+    if (options?.signal) {
+      options.signal.addEventListener("abort", () => globalThis.clearTimeout(id), { once: true });
+    }
     return id;
   }
 
@@ -34,8 +36,10 @@ class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error Node.js setInterval type doesn't accept options argument (browser runtime)
-    const id: number = globalThis.setInterval(cb, ms, options);
+    const id = globalThis.setInterval(cb, ms) as unknown as number;
+    if (options?.signal) {
+      options.signal.addEventListener("abort", () => globalThis.clearInterval(id), { once: true });
+    }
     return id;
   }
 
@@ -198,7 +202,7 @@ export type EffectInput<
   clock: Clock;
 };
 
-interface AnyActor {
+export interface AnyActor {
   state: AnyStateRef;
   clock: Clock;
   regions: Record<string, AnyActor>;
@@ -387,10 +391,11 @@ export class Actor<
   }
 
   send(event: Inputs[number] | { id: string; [key: string]: unknown }): void {
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const anyTransition = this.options.transitions?.["Any" as StateNames]?.[event.id as string] as
-      | TransitionHandler<ActorContext>
-      | undefined;
+    const transitions = this.options.transitions as unknown as Record<
+      string,
+      Record<string, TransitionHandler<ActorContext> | undefined>
+    >;
+    const anyTransition = transitions["Any"]?.[event.id as string];
 
     if (anyTransition) {
       const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -399,14 +404,11 @@ export class Actor<
         return;
       }
       if (step.emit) {
-        this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
+        this.#internalQueue.push(...step.emit);
       }
     }
 
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const stateTransition = this.options.transitions?.[this.state.name as StateNames]?.[
-      event.id as string
-    ] as TransitionHandler<ActorContext> | undefined;
+    const stateTransition = transitions[this.state.name as string]?.[event.id as string];
 
     if (stateTransition) {
       const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -443,7 +445,7 @@ export class Actor<
     }
 
     if (step.emit) {
-      this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
+      this.#internalQueue.push(...step.emit);
       this.#processInternalQueue();
     }
   }
@@ -452,8 +454,11 @@ export class Actor<
     event: Inputs[number] | { id: string; [key: string]: unknown },
     statePayload: unknown,
   ): void {
-    // @ts-expect-error state.name is a StateNames but TS can't narrow
-    const effects = this.options.effects?.[this.state.name];
+    const allEffects = this.options.effects as unknown as Record<
+      string,
+      Array<EffectFn<Inputs, Internal, ActorContext>>
+    >;
+    const effects = allEffects[this.state.name as string];
     if (!effects) return;
 
     const abort = new AbortController();
@@ -463,7 +468,7 @@ export class Actor<
         effectFn({
           signal: abort.signal,
           state: { name: this.state.name as string, payload: statePayload },
-          event,
+          event: event as Inputs[number] | Internal[number],
           context: this.#context,
           emit: (e: { id: string; [key: string]: unknown }) => this.#internalQueue.push(e),
           clock: this.clock,
@@ -498,6 +503,10 @@ export class Actor<
         resolve();
       }
     }
+  }
+
+  matches(pattern: string): boolean {
+    return matches(this, pattern);
   }
 
   snapshot(): Snapshot {
@@ -542,7 +551,7 @@ type TransitionHandler<AC> = (
 
 type TransitionResult = {
   state?: AnyStateRef | TransitionState<string, unknown>;
-  emit?: unknown[];
+  emit?: Array<{ id: string }>;
 };
 
 type InitialState<S> =
@@ -571,6 +580,32 @@ export function activeLeaves(snapshot: Snapshot): string[] {
     }
   }
   return leaves;
+}
+
+function matchSnapshot(snapshot: Snapshot, parts: string[], index: number): boolean {
+  const stateName = snapshot.path[0];
+
+  for (let end = index; end < parts.length; end++) {
+    const candidate = parts.slice(index, end + 1).join(".");
+    if (candidate !== stateName) continue;
+
+    if (end === parts.length - 1) return true;
+
+    const regionSnap = snapshot.regions[parts[end + 1]];
+    if (!regionSnap) return false;
+
+    if (end + 1 === parts.length - 1) return true;
+
+    return matchSnapshot(regionSnap, parts, end + 2);
+  }
+
+  return false;
+}
+
+export function matches(actor: { snapshot(): Snapshot }, pattern: string): boolean {
+  if (!pattern || pattern.endsWith(".")) return false;
+  const parts = pattern.split(".");
+  return matchSnapshot(actor.snapshot(), parts, 0);
 }
 
 function resolveInitial<S>(

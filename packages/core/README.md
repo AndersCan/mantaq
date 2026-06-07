@@ -1,23 +1,36 @@
-# vite-plus-starter
+# @mantaq/core
 
-A starter for creating a Vite Plus project.
+State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock for testing.
 
-## Development
-
-- Install dependencies:
+## Install
 
 ```bash
-vp install
+npm install @mantaq/core
 ```
 
-- Run the unit tests:
+## Quick start
 
-```bash
-vp test
+```typescript
+import { Actor, state, event } from "@mantaq/core";
+
+const toggle = event("toggled")();
+const on = state("on")();
+const off = state("off")();
+
+const light = new Actor({
+  inputs: [toggle],
+  states: [on, off],
+  initial: off,
+  transitions: {
+    off: { toggled: () => ({ state: on }) },
+    on: { toggled: () => ({ state: off }) },
+  },
+});
+
+light.send(toggle);
+console.log(light.state.name); // "on"
 ```
 
-- Build the library:
+## Docs
 
-```bash
-vp pack
-```
+See [mantaq.dev](https://mantaq.dev) for full documentation.
