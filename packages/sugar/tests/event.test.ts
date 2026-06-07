@@ -1,6 +1,6 @@
 import { expect, test, describe } from "vite-plus/test";
 import { events } from "../src/event.ts";
-import { EventRef } from "@mantaq/core";
+import { EventRef, type AnyEventRef } from "@mantaq/core";
 
 describe("events", () => {
   test("creates multiple event refs from names", () => {
@@ -31,8 +31,8 @@ describe("events", () => {
     const e = events("a", "b");
     const eventA = e.a.create(undefined);
     const eventB = e.b.create(undefined);
-    expect(e.a.is(eventA as any)).toBe(true);
-    expect(e.a.is(eventB as any)).toBe(false);
+    expect(e.a.is(eventA as unknown as AnyEventRef)).toBe(true);
+    expect(e.a.is(eventB as unknown as AnyEventRef)).toBe(false);
   });
 
   test("single event", () => {
