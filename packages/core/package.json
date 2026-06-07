@@ -1,7 +1,7 @@
 {
   "name": "@mantaq/core",
   "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
+  "description": "State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock.",
   "homepage": "https://github.com/author/library#readme",
   "bugs": {
     "url": "https://github.com/author/library/issues"
