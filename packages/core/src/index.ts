@@ -1,4 +1,4 @@
-export { Actor, VirtualClock } from "./actor.ts";
+export { Actor, VirtualClock, matches } from "./actor.ts";
 export type { Snapshot, Clock, EffectFn, EffectInput } from "./actor.ts";
 export { state, StateRef, TransitionState } from "./state.ts";
 export type { AnyStateRef } from "./state.ts";
