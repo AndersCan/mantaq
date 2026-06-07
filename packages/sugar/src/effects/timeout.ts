@@ -1,15 +1,13 @@
-import type { EffectInput, AnyEventRef } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 
-export function withTimeout<
-  Inputs extends AnyEventRef[],
-  Internal extends AnyEventRef[],
-  ActorContext,
->(
+export function withTimeout(
   ms: number,
-  input: EffectInput<Inputs, Internal, ActorContext>,
-  event: () => EffectInput<Inputs, Internal, ActorContext>["emit"] extends (e: infer E) => void
-    ? E
-    : never,
+  input: {
+    signal: AbortSignal;
+    emit: (event: { id: string; [key: string]: unknown }) => void;
+    clock: Clock;
+  },
+  event: () => { id: string; [key: string]: unknown },
 ): void {
   input.clock.setTimeout(ms, () => {
     if (input.signal.aborted) return;
