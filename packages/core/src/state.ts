@@ -18,9 +18,8 @@ interface RegionsOptions<States extends Record<string, AnyStateRef> = Record<str
   [key: string]: RegionOptions<States>;
 }
 
-export class StateRef<T, Payload = unknown> {
+export class StateRef<T, _Payload = unknown> {
   name: T;
-  /** @internal */ readonly __payload: Payload | undefined;
   isFinal = false;
   /** @internal */ _regions: RegionsOptions | undefined;
 
