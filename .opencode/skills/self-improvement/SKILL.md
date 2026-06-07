@@ -1,214 +1,178 @@
 ---
 name: self-improvement
-description: Substantial continuous improvements focused on reducing core API surface and deep documentation. One substantive change per run. Branch from wip, PR to wip, use ICM + bumpy.
+description: Run 10 improvement iterations on codebase, then analyze and improve the loop itself. Single-session, DAG-ordered, auto-merge.
 ---
 
-# Self-Improvement Skill
+# Self-Improvement Meta-Skill
 
-Agent performs continuous improvements. Caveman output everywhere except code.
-
-## Goal
-
-**Primary**: Improve actor model DX. All features must be related to the actor model.
-
-**Core must contain ONLY primitives**:
-`Actor`, `state`, `event`, `VirtualClock`, `Any`, and their types.
-
-**Sugar scope — actor-model-specific only**:
-
-- `matches()` — snapshot pattern matching
-- `tag()` — multi-state matching
-- `ActorMap` — multi-actor management
-- `states()`/`events()` — batch creators
-- `broadcast()` — fan-out events
-- `withTimeout`/`withPromise`/`onSuccess`/`onError` — effect helpers
-- `isIn`/`activeLeaves` — query utilities
-
-**Out of scope — do NOT add to sugar**:
-
-- Generic utilities (deep merge, pick, omit, debounce) — use lodash/ramda/etc
-- Features that could be standalone packages
-- Anything not related to actor model state machines
-
-**Task priority** (highest first):
-
-1. Bug fixes found during exploration or testing
-2. Missing actor model features (guards, region-to-region communication, effects scoping)
-3. DX pain points documented in example files
-4. Type safety improvements
-5. Test coverage for untested actor model behavior
-
-**Secondary**: Deep documentation (patterns with anti-patterns, not tables or TOCs).
+Caveman output everywhere except code. Agent runs 10 improvement iterations, then improves the skill itself.
 
 ## Branching
 
 - Branch from `wip` (integration branch)
-- All PRs target `wip`
+- All codebase PRs target `wip`
 - Branch naming: `self-improvement/<short-description>`
+- Skill improvement committed on same branch as final iteration
 
 ## Time Limit
 
-- **15 minutes max** per agent run
-- Track start time. Stop and commit partial work if approaching limit.
+- **30 minutes max** per skill run (10 iterations)
+- Stop and commit partial work if approaching limit
 
 ## Core Loop
 
-### 1. Init
+### Phase 0: Setup
 
-```bash
+```
 rtk git checkout wip && rtk git pull
 ```
 
-### 2. Check for existing work
+Read this SKILL.md fully before starting.
 
-```bash
-icm recall "self-improvement" -t improvements
+### Phase 1: Discover & Plan (before any implementation)
+
+Build complete task inventory:
+
+```
+# Find all TODOs/FIXMEs
+rg "TODO|FIXME|HACK|XXX|BUG|WORKAROUND" packages/ --include "*.ts" --include "*.md"
+
+# Find all type safety issues
+rg "as any|as unknown|@ts-expect|@ts-ignore" packages/ --include "*.ts"
+
+# Find test gaps — grep test files for patterns not covered
+rg "describe\(|test\(|it\(" packages/ --include "*.test.ts"
+
+# Find dead exports / unused code
+rg "export (const|function|class|interface|type)" packages/ --include "*.ts"
+
+# Find missing barrel exports
+rg "^export .* from " packages/ --include "*.ts" | sort
+rg "^export type" packages/ --include "*.ts" | sort
+
+# Check GitHub issues
+gh issue list --limit 20
+
+# Review recent work
+git log --oneline --grep="self-improvement" -30
 ```
 
-- If existing branch with incomplete work found → `git checkout` that branch, continue from there.
-- If no existing work → pick new task from backlog or identify improvement.
+**Build DAG** — rank tasks by dependency:
 
-### 3. Check convergence
+1. Bug fixes (highest priority — no dependency on other improvements)
+2. Type safety fixes (depend only on bug fixes)
+3. Missing exports / barrel cleanup (independent)
+4. Test coverage for uncovered behavior (depends on types being correct)
+5. DX improvements / new tests (lowest priority)
 
-Before starting work, read recent self-improvement commits to avoid repeating:
+**Skip** (not real improvements):
 
-```bash
-git log --oneline --grep="self-improvement" -20
+- Generic utilities (deep merge, pick, omit, debounce)
+- README/organizational changes
+- Single-line trivial changes
+- Features unrelated to actor model
+- Test coverage for coverage sake
+
+### Phase 2: Execute (10 iterations)
+
+For each task in DAG order (up to 10):
+
+**Step 2a. Branch**
+
 ```
-
-If the area you planned to improve was already covered, pick a different area.
-
-### 3b. Discover tasks
-
-Search for high-value work:
-
-```bash
-# Find documented pain points
-rg "TODO|FIXME|HACK|pain point|missing|would be nice" packages/
-
-# Check example files for DX friction
-rg "No declarative|awkward|verbose|not supported" packages/examples/
-
-# Find type safety issues
-rg "as any" packages/ --include "*.ts"
-
-# Check GitHub issues if available
-gh issue list
-```
-
-Priority: bugs > missing features > DX pain points > type safety > test coverage.
-
-Skip: generic utils, organizational changes, README edits, boilerplate fixes.
-
-### 4. Branch
-
-```bash
+git checkout wip
+git pull
 git checkout -b self-improvement/<short-description>
 ```
 
-### 5. Pick approach
+**Step 2b. Implement**
 
-Choose ONE approach per run:
-
-**A) Code quality** — reduce core API, fix casts, improve types
-
-- Check `packages/core/src/index.ts` — if it exports non-primitives, fix that
-- Check `packages/core/src/actor.ts` for reducible type casts
-- If reducing core API, ensure sugar re-exports what users need
-
-**B) Deep documentation** — patterns with anti-patterns, not organizational
-
-- If improving documentation, make it DEEP (patterns + anti-patterns)
-
-**C) Stress-test the API** — try to solve a real problem, find friction
-
-- Pick a real-world problem (e.g., undo/redo, optimistic updates, debounced search, multi-step wizard, WebSocket reconnection)
-- Write a failing test or prototype in `packages/examples/` that solves it using core + sugar
-- If the actor model handles it cleanly → ship the example as documentation
-- If you hit friction (wrong types, missing API, awkward patterns) → that friction IS the improvement:
-  - Missing feature in sugar? Add it.
-  - Core API forcing casts? Fix the types.
-  - Concept missing entirely? Design the minimal API for it.
-- Document the problem and solution in the PR body
-
-### 6. Implement
-
-- **ONE substantive change per run** — not multiple shallow ones
-- No comments in code
+- ONE substantive change per iteration
+- No code comments
 - Maintain strict type safety
-- If unable to find meaningful work, store summary in ICM and stop — do not pad
 
-### 7. Self-review before committing
+**Step 2c. Check**
 
-Verify your own work:
-
-- [ ] Core exports fewer things than before? (or types improved?)
-- [ ] No new types/features added to core?
-- [ ] No unnecessary casts added?
-- [ ] Changes are substantive, not organizational?
-- [ ] Tests pass?
-- [ ] Would a user actually benefit from this change?
-- [ ] If stress-testing: did you find and fix real friction, or just write example code?
-
-If you can't check most of these boxes, reconsider whether the change is worth shipping.
-
-### 8. Verify
-
-Run checks. Max **5 attempts** to fix failing tests/checks.
-
-```bash
-vp check
-vp test --reporter agent
+```
+vp check && vp test --reporter agent
 ```
 
-- If checks pass → proceed to commit.
-- If checks fail → fix and retry (up to 5 times).
-- If core logic unexpectedly broken and unable to trivially fix:
+- If pass → proceed
+- If fail → max 3 fix attempts. If still failing after 3 → abandon task, note in summary, move to next task. Do NOT reset — the abandoned branch holds the failure record.
 
-```bash
-git reset --hard
-icm store -t improvements -c "failed: <short description> — unable to fix <X> after changing <Y>" -i high
+**Step 2d. Auto-merge**
+
 ```
-
-Stop. Do not continue with this task.
-
-### 9. Commit with bumpy
-
-Run `add-change` skill to create bump file, then commit:
-
-```bash
-icm store -t improvements -c "done: <short description>" -i medium
 git add -A
-git commit
-```
-
-### 10. PR to wip
-
-Push branch and create PR targeting `wip`:
-
-```bash
+# Run add-change skill for bumpy, but batch: only create bumpy file if this is the LAST codebase iteration
+git commit -m "improve: <short description>"
 git push -u origin self-improvement/<short-description>
 gh pr create --base wip --title "improve: <short description>" --body "Summary of changes"
 ```
 
-## Rules
+Wait for PR CI. Check PR status:
 
-- **ONE substantive change per run** — depth over breadth
-- **ALWAYS use `vp`** for package management and scripts — never `npm`, `pnpm`, or `npx`. All commands: `vp install`, `vp check`, `vp test`, `vp build`, `vp dev`, etc.
-- Never modify: `AGENTS.md`, `CLAUDE.md`, files under `.opencode/`
-- Caveman output: no articles, filler, pleasantries. Keep technical substance.
-- Use ICM to track all work (backlog, progress, failures)
-- Run bumpy for every commit (no commits without bump files)
-- If unable to complete, store summary in ICM for next agent to pick up
-- **If no meaningful work found**: store summary in ICM and stop. Do not pad with trivial changes.
+```
+gh pr checks <number> --watch --interval 10
+```
+
+If all checks pass → auto-merge:
+
+```
+gh pr merge <number> --merge
+```
+
+If checks fail → max 2 fix commits. If still failing → close PR, skip task.
+
+**Track progress** — store summary after each iteration:
+
+```
+echo "<iteration N>: <task> — <status>" >> /tmp/self-improvement-log.txt
+```
+
+### Phase 3: Retrospect & Improve Skill
+
+After 10 iterations (or all available tasks completed), analyze:
+
+1. Read the log: `cat /tmp/self-improvement-log.txt`
+2. Calculate: success rate, avg time per iteration, most common failure reasons
+3. Identify 3 concrete improvements to this SKILL.md:
+
+**Checklist for skill improvement:**
+
+- [ ] Were instructions clear enough that you didn't need to re-read?
+- [ ] Did task ranking produce correct dependency order?
+- [ ] Where did you waste most time? (check failures? re-reading files? etc)
+- [ ] Was auto-merge reliable? Any merge conflicts?
+- [ ] Did you have to re-scan codebase between iterations?
+- [ ] What would make next run 20% faster?
+
+Update SKILL.md with fixes. Target concrete text changes, not vague promises.
+
+### Phase 4: Commit Skill Improvement
+
+```
+git checkout wip
+git pull
+git checkout -b self-improvement/improve-loop
+git add .opencode/skills/self-improvement/SKILL.md
+git commit -m "improve: self-improvement loop — <concrete improvement>"
+git push -u origin self-improvement/improve-loop
+gh pr create --base wip --title "improve: self-improvement loop" --body "## Changes\n- <list concrete skill changes>\n## Rationale\n- <why each change improves the loop>\n## Observed issues fixed\n- <issue numbers from pain points>"
+```
 
 ## Anti-patterns (avoid these)
 
-- Adding sections to READMEs (already comprehensive)
-- Tables, TOCs, migration guides (low value organizational changes)
+- Adding sections to READMEs
 - Multiple small changes across unrelated files
-- "Improving" things that are already good enough
-- Single-line changes that don't constitute meaningful work
-- Generic utilities in sugar (deep merge, pick, omit, debounce) — solved by lodash/ramda
+- "Improving" things already good enough
+- Single-line changes not constituting meaningful work
+- Generic utilities in sugar
 - Features unrelated to actor model state machines
-- Test coverage for test coverage's sake — test actor model behavior, not implementation details
+- Test coverage for test coverage's sake
+- Branching per skill improvement — must be on same branch as codebase work
+- Manual review of working PRs — trust CI, auto-merge
+- Creating bumpy files per iteration — batch at end
+- Stopping to read files already read in previous iterations — carry forward
+- Repeating same task type in consecutive iterations — diversify
+- Padding with trivial tasks when real work runs out — stop early, be honest
