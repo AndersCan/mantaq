@@ -19,6 +19,6 @@ export class EventRef<const T extends string, Payload = unknown> {
   }
 
   create(payload: Payload): Payload & { id: string } {
-    return { ...payload, id: this.id };
+    return { ...(payload as Record<string, unknown>), id: this.id } as Payload & { id: string };
   }
 }

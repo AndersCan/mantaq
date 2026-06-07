@@ -24,8 +24,11 @@ class RealClock implements Clock {
   }
 
   setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error globalThis.setTimeout returns NodeJS.Timeout | number, but we only use browser env
-    return globalThis.setTimeout(cb, ms, { signal: options?.signal });
+    const id = globalThis.setTimeout(cb, ms) as unknown as number;
+    if (options?.signal) {
+      options.signal.addEventListener("abort", () => globalThis.clearTimeout(id), { once: true });
+    }
+    return id;
   }
 
   clearTimeout(id: number): void {
@@ -33,8 +36,11 @@ class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error globalThis.setInterval returns NodeJS.Timeout | number, but we only use browser env
-    return globalThis.setInterval(cb, ms, { signal: options?.signal });
+    const id = globalThis.setInterval(cb, ms) as unknown as number;
+    if (options?.signal) {
+      options.signal.addEventListener("abort", () => globalThis.clearInterval(id), { once: true });
+    }
+    return id;
   }
 
   clearInterval(id: number): void {
@@ -389,10 +395,11 @@ export class Actor<
   }
 
   send(event: Inputs[number] | { id: string; [key: string]: unknown }): void {
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const anyTransition = this.options.transitions?.["Any" as StateNames]?.[event.id as string] as
-      | TransitionHandler<ActorContext>
+    const transitions = this.options.transitions as
+      | Record<string, Partial<Record<string, TransitionHandler<ActorContext>>>>
       | undefined;
+
+    const anyTransition = transitions?.["Any"]?.[event.id];
 
     if (anyTransition) {
       const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -401,14 +408,11 @@ export class Actor<
         return;
       }
       if (step.emit) {
-        this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
+        this.#internalQueue.push(...step.emit);
       }
     }
 
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const stateTransition = this.options.transitions?.[this.state.name as StateNames]?.[
-      event.id as string
-    ] as TransitionHandler<ActorContext> | undefined;
+    const stateTransition = transitions?.[this.state.name]?.[event.id];
 
     if (stateTransition) {
       const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -445,7 +449,7 @@ export class Actor<
     }
 
     if (step.emit) {
-      this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
+      this.#internalQueue.push(...step.emit);
       this.#processInternalQueue();
     }
   }
@@ -454,8 +458,7 @@ export class Actor<
     event: Inputs[number] | { id: string; [key: string]: unknown },
     statePayload: unknown,
   ): void {
-    // @ts-expect-error state.name is a StateNames but TS can't narrow
-    const effects = this.options.effects?.[this.state.name];
+    const effects = this.options.effects?.[this.state.name as StateNames];
     if (!effects) return;
 
     const abort = new AbortController();
@@ -465,7 +468,7 @@ export class Actor<
         effectFn({
           signal: abort.signal,
           state: { name: this.state.name as string, payload: statePayload },
-          event,
+          event: event as Inputs[number] | Internal[number],
           context: this.#context,
           emit: (e: { id: string; [key: string]: unknown }) => this.#internalQueue.push(e),
           clock: this.clock,
@@ -545,7 +548,7 @@ type TransitionHandler<AC> = (
 
 type TransitionResult = {
   state?: AnyStateRef | TransitionState<string, unknown>;
-  emit?: unknown[];
+  emit?: Array<{ id: string }>;
 };
 
 type InitialState<S> =

@@ -45,8 +45,8 @@ export class StateRef<T, Payload = unknown> {
 }
 
 export class TransitionState<N extends string = string, P = unknown> {
-  __stateRef: StateRef<N, P>;
-  __payload: P;
+  /** @internal */ readonly __stateRef: StateRef<N, P>;
+  /** @internal */ readonly __payload: P;
 
   constructor(stateRef: StateRef<N, P>, payload: P) {
     this.__stateRef = stateRef;
