@@ -1,7 +1,7 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
-import type { SendableMap } from "../transitions/broadcast.ts";
+import type { SendableEvent, SendableMap } from "../transitions/broadcast.ts";
 
-export class ActorMap implements SendableMap {
+export class ActorMap implements SendableMap<SendableEvent> {
   #actors = new Map<string, AnyActor>();
   #parent: AnyActor | null;
 
@@ -19,8 +19,8 @@ export class ActorMap implements SendableMap {
     this.#actors.set(key, child);
   }
 
-  send(key: string, event: unknown): void {
-    this.#actors.get(key)?.send(event as { id: string; [key: string]: unknown });
+  send(key: string, event: SendableEvent): void {
+    this.#actors.get(key)?.send(event);
   }
 
   kill(key: string): void {
