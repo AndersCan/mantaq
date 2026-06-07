@@ -125,32 +125,44 @@ actor.send({ id: "SIGN_IN", phoneNumber: "+1234567890" });
 
 Effects run when entering a state. The `event` parameter in effects is typed as the union of all possible events (`Inputs[number] | Internal[number]`) — not the specific event that triggered the transition. This is by design: effects live on states, not transitions. Multiple transitions can lead to the same state, so the effect cannot know which event caused entry.
 
-**Store what the effect needs in context, not on the event.**
+**Pass data to effects via state payload.** Set the payload in the transition return, read it from `state.payload` in the effect.
 
 ```ts
-type MyContext = { data: unknown; error?: string };
+const loadingState = state("loading")<{ url: string }>();
 
 const actor = new Actor({
-  context: { data: null } as MyContext,
+  states: [idleState, loadingState],
+  initial: idleState,
   effects: {
     loading: [
-      ({ context, emit, clock }) => {
-        // ✅ context.data was set by the transition handler
+      ({ state, emit, clock }) => {
+        // state.payload is typed as unknown — cast to the known type
+        const { url } = state.payload as { url: string };
         clock.setTimeout(1000, () => {
-          emit({ id: "LOADED", result: context.data });
+          emit({ id: "LOADED", result: url });
         });
       },
     ],
   },
   transitions: {
     idle: {
-      FETCH: (event, { context }) => {
-        context.data = event.url; // store in context
-        return { state: loadingState };
+      FETCH: (event) => {
+        return { state: loadingState, payload: { url: event.url } };
       },
     },
   },
 });
+```
+
+**Context is also possible but less precise.** Context is shared across all states — writing to context in one state leaks into others. Prefer state payload for data that belongs to a specific state entry.
+
+```ts
+// ✅ state payload — scoped to this state entry
+return { state: loadingState, payload: { url: event.url } };
+
+// ⚠️ context — works but shared across all states
+context.url = event.url;
+return { state: loadingState };
 ```
 
 **Anti-pattern — depending on `event` in effects:**
@@ -167,7 +179,7 @@ effects: {
 }
 ```
 
-The `event` parameter exists for convenience (e.g., logging), but should not be relied on for business logic. If the effect needs data from the triggering transition, put it in context.
+The `event` parameter exists for convenience (e.g., logging), not for business logic. Use state payload or context to pass data to effects.
 
 ### Two-Queue Architecture
 
