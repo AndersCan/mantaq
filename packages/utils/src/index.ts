@@ -22,7 +22,7 @@ export function isAborted(signal: AbortSignal): boolean {
   return signal.aborted;
 }
 
-export function deepMerge<T extends Record<string, unknown>, S extends Record<string, unknown>>(
+export function shallowMerge<T extends Record<string, unknown>, S extends Record<string, unknown>>(
   target: T,
   source: S,
 ): T & S {
