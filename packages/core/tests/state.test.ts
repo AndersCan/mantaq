@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { state, StateRef } from "../src/state.ts";
+import { state, StateRef, TransitionState } from "../src/state.ts";
 
 test("state creates a StateRef with correct name", () => {
   const s = state("idle")();
@@ -56,4 +56,18 @@ test("default values for optional properties", () => {
   const s = state("default")();
   expect(s.isFinal).toBe(false);
   expect(s._regions).toBeUndefined();
+});
+
+test("TransitionState stores state ref and payload", () => {
+  const s = state("loaded")<{ data: string }>();
+  const ts = new TransitionState(s, { data: "hello" });
+  expect(ts.__stateRef).toBe(s);
+  expect(ts.__payload).toEqual({ data: "hello" });
+});
+
+test("TransitionState payload is mutable", () => {
+  const s = state("loaded")<{ data: string }>();
+  const ts = new TransitionState(s, { data: "hello" });
+  ts.__payload.data = "world";
+  expect(ts.__payload).toEqual({ data: "world" });
 });
