@@ -401,6 +401,7 @@ export class Actor<
     >;
     const eventId = event.id as string;
     const anyTransition = transitions["Any"]?.[eventId];
+    let anyEmitted = false;
 
     if (anyTransition) {
       const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
@@ -410,6 +411,7 @@ export class Actor<
       }
       if (step.emit) {
         this.#internalQueue.push(...step.emit);
+        anyEmitted = true;
       }
     }
 
@@ -420,7 +422,7 @@ export class Actor<
       this.#applyTransition(event, step);
     }
 
-    if (anyTransition && !stateTransition) {
+    if (anyEmitted && this.#internalQueue.length > 0) {
       this.#processInternalQueue();
     }
   }
