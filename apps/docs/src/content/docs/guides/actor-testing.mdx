@@ -1,0 +1,269 @@
+---
+title: Testing Actors
+description: How to test state machine actors using graph traversal patterns.
+---
+
+Actors are state machines. States are nodes, transitions are edges. Testing means walking the graph and asserting you land where expected.
+
+## Simple Example: Traffic Light
+
+States: `green` → `yellow` → `red` → `green` (cycle)
+Events: `NEXT`
+
+```ts
+import { Actor } from "@mantaq/core";
+import { state, event } from "@mantaq/core";
+import { matches } from "@mantaq/sugar";
+
+const green = state("green")();
+const yellow = state("yellow")();
+const red = state("red")();
+
+const next = event("NEXT")();
+
+function createTrafficLight() {
+  return new Actor({
+    inputs: [next],
+    outputs: [],
+    internal: [],
+    states: [green, yellow, red],
+    initial: green,
+    context: {} as {},
+    effects: {},
+    transitions: {
+      green: { NEXT: () => ({ state: yellow }) },
+      yellow: { NEXT: () => ({ state: red }) },
+      red: { NEXT: () => ({ state: green }) },
+    },
+  });
+}
+```
+
+## Interactive Traversal
+
+Click buttons to send `NEXT` event and walk the graph:
+
+<div
+  id="traffic-light-demo"
+  style="font-family: monospace; padding: 1rem; border: 1px solid #333; border-radius: 8px; max-width: 400px;"
+>
+  <div style="margin-bottom: 1rem;">
+    <strong>Current state:</strong>{" "}
+    <span id="tl-state" style="color: green; font-weight: bold;">
+      green
+    </span>
+  </div>
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+    <button id="tl-next" style="padding: 0.5rem 1rem; cursor: pointer;">
+      NEXT →
+    </button>
+    <button id="tl-reset" style="padding: 0.5rem 1rem; cursor: pointer;">
+      Reset
+    </button>
+  </div>
+  <div style="font-size: 0.85rem; color: #666;">
+    <strong>Graph:</strong> green → yellow → red → green (cycle)
+  </div>
+  <div id="tl-log" style="margin-top: 0.5rem; font-size: 0.8rem; color: #999;"></div>
+</div>
+
+<script is:inline>
+  (function () {
+    const states = ["green", "yellow", "red"];
+    let current = 0;
+
+    const stateEl = document.getElementById("tl-state");
+    const nextBtn = document.getElementById("tl-next");
+    const resetBtn = document.getElementById("tl-reset");
+    const logEl = document.getElementById("tl-log");
+
+    const colors = { green: "#16a34a", yellow: "#ca8a04", red: "#dc2626" };
+
+    function update(action) {
+      var name = states[current];
+      stateEl.textContent = name;
+      stateEl.style.color = colors[name];
+      logEl.textContent = action + " → " + name;
+    }
+
+    nextBtn.addEventListener("click", function () {
+      current = (current + 1) % states.length;
+      update("send(NEXT)");
+    });
+
+    resetBtn.addEventListener("click", function () {
+      current = 0;
+      update("reset");
+    });
+  })();
+</script>
+
+## Testing Patterns
+
+### Assert Initial State
+
+```ts
+const actor = createTrafficLight();
+expect(matches(actor, "green")).toBe(true);
+expect(actor.snapshot().done).toBeFalsy();
+```
+
+### Assert Transition Path
+
+```ts
+actor.send(next);
+expect(matches(actor, "yellow")).toBe(true);
+
+actor.send(next);
+expect(matches(actor, "red")).toBe(true);
+
+actor.send(next);
+expect(matches(actor, "green")).toBe(true); // cycle back
+```
+
+### Assert Context Changes
+
+If your actor stores data in context:
+
+```ts
+type CounterContext = { count: number };
+
+const increment = event("INCREMENT")();
+
+// In transitions:
+// counter: { INCREMENT: (_, { context }) => { context.count++; return {}; } }
+
+actor.send(increment);
+expect(actor.context.count).toBe(1);
+```
+
+### Assert Side Effects with VirtualClock
+
+For actors with timers or async effects:
+
+```ts
+import { VirtualClock } from "@mantaq/core";
+
+const clock = new VirtualClock();
+const actor = createActor(clock);
+
+actor.send(startEvent);
+expect(matches(actor, "loading")).toBe(true);
+
+clock.advance(1000); // fast-forward time
+expect(matches(actor, "done")).toBe(true);
+```
+
+### Assert Final State
+
+```ts
+const successState = state("success")().final();
+// ...
+expect(actor.snapshot().done).toBe(true);
+```
+
+## More Complex Example: Login Flow
+
+States: `idle` → `authenticating` → `authenticated` | `error`
+Events: `LOGIN`, `LOGOUT`, `RETRY`
+
+```ts
+const idle = state("idle")();
+const authenticating = state("authenticating")();
+const authenticated = state("authenticated")().final();
+const error = state("error")();
+
+const login = event("LOGIN")<{ username: string; password: string }>();
+const logout = event("LOGOUT")();
+const retry = event("RETRY")();
+const authDone = event("AUTH_DONE")();
+const authFail = event("AUTH_FAIL")();
+
+type AuthContext = { username?: string; attempts: number };
+
+function createLoginActor() {
+  return new Actor({
+    inputs: [login, logout, retry],
+    outputs: [],
+    internal: [authDone, authFail],
+    states: [idle, authenticating, authenticated, error],
+    initial: idle,
+    context: { attempts: 0 } as AuthContext,
+    effects: {},
+    transitions: {
+      idle: {
+        LOGIN: (event, { context }) => {
+          context.username = event.username;
+          context.attempts++;
+          return { state: authenticating };
+        },
+      },
+      authenticating: {
+        AUTH_DONE: () => ({ state: authenticated }),
+        AUTH_FAIL: () => ({ state: error }),
+      },
+      error: {
+        RETRY: () => ({ state: idle }),
+      },
+      authenticated: {
+        LOGOUT: (_, { context }) => {
+          context.username = undefined;
+          return { state: idle };
+        },
+      },
+    },
+  });
+}
+```
+
+### Test the Full Flow
+
+```ts
+describe("login actor", () => {
+  it("idle → authenticating → authenticated", () => {
+    const actor = createLoginActor();
+    expect(matches(actor, "idle")).toBe(true);
+
+    actor.send(login.create({ username: "user", password: "pass" }));
+    expect(matches(actor, "authenticating")).toBe(true);
+
+    actor.send(authDone);
+    expect(matches(actor, "authenticated")).toBe(true);
+    expect(actor.context.username).toBe("user");
+  });
+
+  it("idle → authenticating → error → retry → idle", () => {
+    const actor = createLoginActor();
+
+    actor.send(login.create({ username: "user", password: "wrong" }));
+    actor.send(authFail);
+    expect(matches(actor, "error")).toBe(true);
+
+    actor.send(retry);
+    expect(matches(actor, "idle")).toBe(true);
+  });
+
+  it("authenticated → logout → idle clears username", () => {
+    const actor = createLoginActor();
+
+    actor.send(login.create({ username: "user", password: "pass" }));
+    actor.send(authDone);
+    expect(matches(actor, "authenticated")).toBe(true);
+
+    actor.send(logout);
+    expect(matches(actor, "idle")).toBe(true);
+    expect(actor.context.username).toBeUndefined();
+  });
+});
+```
+
+## Key Takeaways
+
+- **States are nodes** — `state("name")()` creates a node in the graph
+- **Events are edges** — `event("ID")()` defines a possible transition
+- **Transitions are the graph** — `(state, event) → newState` maps edges
+- **Context is memory** — survives transitions, holds accumulated data
+- **Effects are side effects** — run on state entry, abort on exit
+- **`matches(actor, "state.path")`** — dot-notation for asserting position in graph
+- **`VirtualClock`** — deterministically test time-dependent transitions
+- **`snapshot().done`** — check if actor reached a final state
