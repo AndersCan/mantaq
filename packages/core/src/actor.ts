@@ -471,7 +471,10 @@ export class Actor<
           state: { name: this.state.name, payload: statePayload },
           event: event as Inputs[number] | Internal[number],
           context: this.#context,
-          emit: (e: { id: string; [key: string]: unknown }) => this.#internalQueue.push(e),
+          emit: (e: { id: string; [key: string]: unknown }) => {
+            this.#internalQueue.push(e);
+            this.#processInternalQueue();
+          },
           clock: this.clock,
         });
       } catch (err) {
