@@ -367,17 +367,9 @@ a:   { EV: () => ({}) },
 
 `#processInternalQueue` only runs in the `if (anyTransition && !stateTransition)` branch (line 416). Since `stateTransition` exists (handler at `a`), drain is skipped. `#applyTransition` on the `{}` result skips both state-change and emit blocks — nothing triggers processing.
 
-### Issue 3: Effect type not exported (`actor.ts:176-187`)
+### ~~Issue 3: Effect type not exported (`actor.ts:188-203`)~~ **(Resolved)**
 
-Externalizing effect functions requires this 70+ char type:
-
-```ts
-InstanceType < typeof Actor > ["options"]["effects"][string];
-```
-
-No exported type alias like `EffectDef` or `EffectFn`. Every example file that extracts effects repeats this boilerplate.
-
-**Fix**: Export `EffectFn` from `actor.ts` (already exists as internal type at line 172).
+`EffectFn` and `EffectInput` types are now exported from `@mantaq/core` barrel. Examples use `EffectFn` directly.
 
 ### Issue 4: Inconsistent event send for internal vs input events
 
