@@ -52,11 +52,13 @@ describe("Any wildcard transition", () => {
     expect(actor.state.name).toBe("off");
   });
 
-  test("Any with state returns early — skips specific transition", () => {
+  test("state-specific handler takes priority over Any", () => {
     const toggle = event("toggled")();
     const off = state("off")();
     const on = state("on")();
     const special = state("special")();
+
+    let anyFired = false;
 
     const actor = new Actor({
       inputs: [toggle],
@@ -68,7 +70,10 @@ describe("Any wildcard transition", () => {
       effects: {},
       transitions: {
         Any: {
-          toggled: () => ({ state: special }),
+          toggled: () => {
+            anyFired = true;
+            return { state: special };
+          },
         },
         off: {
           toggled: () => ({ state: on }),
@@ -77,7 +82,8 @@ describe("Any wildcard transition", () => {
     });
 
     actor.send(toggle);
-    expect(actor.state.name).toBe("special");
+    expect(actor.state.name).toBe("on");
+    expect(anyFired).toBe(true);
   });
 
   test("Any without state falls through to specific transition", () => {
@@ -114,36 +120,32 @@ describe("Any wildcard transition", () => {
 
   test("works across multiple states", () => {
     const reset = event("reset")();
-    const off = state("off")();
-    const on = state("on")();
-    const loading = state("loading")();
+    const a = state("a")();
+    const b = state("b")();
 
     const actor = new Actor({
       inputs: [reset],
       outputs: [],
       internal: [],
       context: {},
-      states: [off, on, loading],
-      initial: off,
+      states: [a, b],
+      initial: a,
       effects: {},
       transitions: {
         Any: {
-          reset: () => ({ state: off }),
+          reset: () => ({ state: a }),
         },
-        off: {
-          reset: () => ({ state: loading }),
-        },
-        on: {
-          reset: () => ({ state: loading }),
+        a: {
+          reset: () => ({ state: b }),
         },
       },
     });
 
     actor.send(reset);
-    expect(actor.state.name).toBe("off");
+    expect(actor.state.name).toBe("b");
 
     actor.send(reset);
-    expect(actor.state.name).toBe("off");
+    expect(actor.state.name).toBe("a");
   });
 
   test("Any transition can emit internal events", () => {
