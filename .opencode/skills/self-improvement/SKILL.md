@@ -34,7 +34,7 @@ ALL output from this skill MUST follow caveman grammar:
 
 ## Core Rule
 
-Last task of every orchestration run: improve this skill. Non-negotiable. No exceptions.
+Last task of every orchestration run: improve this skill and commit to same branch. Non-negotiable. No exceptions.
 
 Every PR created must have auto-merge enabled: `gh pr merge $PR --auto --merge`
 
@@ -135,22 +135,7 @@ echo "<iteration N>: <description> | <commit hash>" >> /tmp/self-improvement-log
 - Worker returns failure → log failure, continue
 - Max iteration_count iterations total
 
-### Phase 3: Create PR
-
-After all iterations:
-
-```
-git push -u origin self-improvement/$DESC
-PR=$(gh pr create --base wip --title "improve: $DESC" --body "## Changes
-$(cat /tmp/self-improvement-log.txt | sed 's/^/- /')
-## Summary
-- <iteration_count> iterations completed
-- <N> successful, <M> failed" | tail -1)
-echo "PR: $PR"
-gh pr merge $PR --auto --merge
-```
-
-### Phase 4: Retrospect & Improve Skill
+### Phase 3: Retrospect & Improve Skill
 
 MANDATORY. Do this every run. Analyze what happened:
 
@@ -167,18 +152,21 @@ MANDATORY. Do this every run. Analyze what happened:
 - [ ] iteration_count right?
 - [ ] What would make next run 20% faster?
 
-### Phase 5: Commit Skill Improvement
+Then edit SKILL.md with concrete improvements. Commit to same branch.
 
-Create PR with concrete SKILL.md changes. Every time. No exceptions. Enable auto-merge.
+### Phase 4: Create PR
+
+Single PR with everything — code changes + skill improvement:
 
 ```
-git checkout wip
-git pull
-git checkout -b self-improvement/improve-loop
-git add .opencode/skills/self-improvement/SKILL.md
-git commit -m "improve: self-improvement loop — <concrete improvement>"
-git push -u origin self-improvement/improve-loop
-PR=$(gh pr create --base wip --title "improve: self-improvement loop" --body "## Changes\n- <list concrete skill changes>\n## Rationale\n- <why each change improves the loop>" | tail -1)
+git push -u origin self-improvement/$DESC
+PR=$(gh pr create --base wip --title "improve: $DESC" --body "## Changes
+$(cat /tmp/self-improvement-log.txt | sed 's/^/- /')
+- Updated self-improvement SKILL.md
+## Summary
+- <iteration_count> iterations completed
+- <N> successful, <M> failed" | tail -1)
+echo "PR: $PR"
 gh pr merge $PR --auto --merge
 ```
 
