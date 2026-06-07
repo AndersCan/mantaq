@@ -58,6 +58,18 @@ test("default values for optional properties", () => {
   expect(s._regions).toBeUndefined();
 });
 
+test("regions() called twice overwrites", () => {
+  const s = state("multi")();
+  s.regions({ left: { initial: "a", states: { a: state("a")() } } });
+  expect(s._regions).toBeDefined();
+  expect(s._regions!.left).toBeDefined();
+  const firstRegions = s._regions;
+  s.regions({ right: { initial: "b", states: { b: state("b")() } } });
+  expect(s._regions).not.toBe(firstRegions);
+  expect(s._regions!.left).toBeUndefined();
+  expect(s._regions!.right).toBeDefined();
+});
+
 describe("TransitionState", () => {
   test("stores state ref and payload", () => {
     const s = state("loaded")<{ data: string }>();

@@ -295,6 +295,35 @@ describe("effects", () => {
     expect(bEntry).toBe(1);
     expect(actor.state.name).toBe("c");
   });
+
+  test("send with unmatched event id is silent no-op", () => {
+    const toggle = event("toggled")();
+    const off = state("off")();
+    const on = state("on")();
+    const unknown = event("unknown")();
+
+    const actor = new Actor({
+      inputs: [toggle, unknown],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [off, on],
+      initial: off,
+      effects: {},
+      transitions: {
+        off: {
+          toggled: () => ({ state: on }),
+        },
+        on: {
+          toggled: () => ({ state: off }),
+        },
+      },
+    });
+
+    const stateBefore = actor.state.name;
+    actor.send(unknown.create({}));
+    expect(actor.state.name).toBe(stateBefore);
+  });
 });
 
 describe("isIn", () => {
