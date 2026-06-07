@@ -104,6 +104,9 @@ importers:
       '@mantaq/core':
         specifier: workspace:*
         version: link:../core
+      '@mantaq/utils':
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       '@stryker-mutator/core':
         specifier: 'catalog:'
