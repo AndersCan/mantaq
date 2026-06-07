@@ -1,7 +1,7 @@
 {
   "name": "@mantaq/traverse",
   "version": "0.0.0",
-  "description": "Graph traversal, test exploration, and visualization for mantaq actors.",
+  "description": "Graph traversal and test exploration for mantaq actors.",
   "license": "MIT",
   "files": [
     "dist"

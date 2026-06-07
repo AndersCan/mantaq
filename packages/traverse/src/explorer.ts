@@ -1,4 +1,5 @@
 import type { Graph, Path, CoverageReport } from "./types.ts";
+import { isValidEdge } from "./traverse.ts";
 
 /**
  * Enumerate paths from initial to all reachable final states.
@@ -20,7 +21,7 @@ export function explore(graph: Graph, options?: { maxDepth?: number; maxPaths?: 
 
     if (path.states.length - 1 >= maxDepth) return;
 
-    const edges = graph.edges.filter((e) => e.from === node && e.to !== "" && !e.isWildcard);
+    const edges = graph.edges.filter((e) => e.from === node && isValidEdge(e));
 
     if (edges.length === 0) {
       results.push({ states: [...path.states], events: [...path.events] });
@@ -53,6 +54,7 @@ export function testSequences(graph: Graph, options?: { maxDepth?: number }): Pa
   const paths = explore(graph, { maxDepth: options?.maxDepth });
   const covered = new Set<string>();
   const selected: Path[] = [];
+  const selectedSet = new Set<Path>();
 
   const sorted = [...paths].sort((a, b) => a.states.length - b.states.length);
 
@@ -63,7 +65,7 @@ export function testSequences(graph: Graph, options?: { maxDepth?: number }): Pa
     let bestNewCount = 0;
 
     for (const path of sorted) {
-      if (selected.includes(path)) continue;
+      if (selectedSet.has(path)) continue;
       const newStates = path.states.filter((s) => !covered.has(s));
       if (newStates.length > bestNewCount) {
         bestNewCount = newStates.length;
@@ -74,6 +76,7 @@ export function testSequences(graph: Graph, options?: { maxDepth?: number }): Pa
     if (bestPath === null || bestNewCount === 0) break;
 
     selected.push(bestPath);
+    selectedSet.add(bestPath);
     for (const s of bestPath.states) covered.add(s);
   }
 

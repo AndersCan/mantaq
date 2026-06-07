@@ -24,7 +24,7 @@ export interface ActorConfigInput {
   states: Array<{ name: string; isFinal?: boolean; _regions?: unknown }>;
   transitions: Record<string, Record<string, unknown>>;
   effects?: Record<string, unknown[]>;
-  initial: unknown;
+  initial: string | { name: string } | { state: { name: string } };
   inputs?: Array<{ id: string }>;
   internal?: Array<{ id: string }>;
   regions?: Record<string, unknown>;
@@ -56,6 +56,5 @@ export interface LLMContext {
   activeEffects: string[];
   isFinal: boolean;
   graphSummary: string;
+  stateInGraph: boolean;
 }
-
-export type ExportFormat = "mermaid" | "dot" | "json";

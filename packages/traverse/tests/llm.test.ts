@@ -1,7 +1,6 @@
-import { describe, it, expect, vi } from "vite-plus/test";
+import { describe, it, expect } from "vite-plus/test";
 import { llmContext, llmToolDefinitions, llmToolHandler } from "../src/llm.ts";
 import type { Graph } from "../src/types.ts";
-import type { Snapshot } from "@mantaq/core";
 
 function testGraph(): Graph {
   const nodes = new Map<string, import("../src/types.ts").GraphNode>();
@@ -41,12 +40,7 @@ function testGraph(): Graph {
 function mockActor(stateName: string) {
   return {
     state: { name: stateName },
-    snapshot: vi.fn(
-      (): Snapshot => ({
-        path: [stateName],
-        regions: {},
-      }),
-    ),
+    snapshot: () => ({ path: [stateName], regions: {} }),
     regions: {},
   };
 }
@@ -55,7 +49,7 @@ describe("llmContext", () => {
   it("returns correct current state and transitions", () => {
     const actor = mockActor("Active");
     const graph = testGraph();
-    const ctx = llmContext(actor, graph);
+    const ctx = llmContext(actor as never, graph);
 
     expect(ctx.currentState).toBe("Active");
     expect(ctx.possibleTransitions).toHaveLength(2);
@@ -63,12 +57,13 @@ describe("llmContext", () => {
     expect(ctx.possibleTransitions.map((t) => t.eventId)).toContain("RESET");
     expect(ctx.activeEffects).toEqual(["activeEffect"]);
     expect(ctx.isFinal).toBe(false);
+    expect(ctx.stateInGraph).toBe(true);
   });
 
   it("detects final state", () => {
     const actor = mockActor("Done");
     const graph = testGraph();
-    const ctx = llmContext(actor, graph);
+    const ctx = llmContext(actor as never, graph);
 
     expect(ctx.isFinal).toBe(true);
     expect(ctx.possibleTransitions).toHaveLength(0);
@@ -77,12 +72,24 @@ describe("llmContext", () => {
   it("includes graph summary", () => {
     const actor = mockActor("Idle");
     const graph = testGraph();
-    const ctx = llmContext(actor, graph);
+    const ctx = llmContext(actor as never, graph);
 
     expect(ctx.graphSummary).toContain("3 states");
     expect(ctx.graphSummary).toContain("3 edges");
     expect(ctx.graphSummary).toContain("1 final states");
     expect(ctx.graphSummary).toContain('"Idle"');
+  });
+
+  it("returns stateInGraph false for unknown state", () => {
+    const actor = mockActor("Unknown");
+    const graph = testGraph();
+    const ctx = llmContext(actor as never, graph);
+
+    expect(ctx.stateInGraph).toBe(false);
+    expect(ctx.currentState).toBe("Unknown");
+    expect(ctx.possibleTransitions).toHaveLength(0);
+    expect(ctx.activeEffects).toEqual([]);
+    expect(ctx.isFinal).toBe(false);
   });
 });
 
@@ -92,7 +99,7 @@ describe("llmToolDefinitions", () => {
     expect(Array.isArray(defs)).toBe(true);
     expect(defs).toHaveLength(4);
 
-    const names = defs.map((d) => (d as { function: { name: string } }).function.name);
+    const names = defs.map((d) => d.function.name);
     expect(names).toContain("get_current_state");
     expect(names).toContain("get_possible_transitions");
     expect(names).toContain("get_graph_summary");
@@ -116,6 +123,18 @@ describe("llmToolHandler", () => {
       isFinal: false,
       effects: ["idleEffect"],
     });
+  });
+
+  it("handles get_current_state for unknown state", () => {
+    const actor = mockActor("Unknown") as never;
+    const result = llmToolHandler("get_current_state", {}, actor, testGraph()) as {
+      state: string;
+      isFinal: boolean;
+      effects: string[];
+    };
+    expect(result.state).toBe("Unknown");
+    expect(result.isFinal).toBe(false);
+    expect(result.effects).toEqual([]);
   });
 
   it("handles get_possible_transitions", () => {
@@ -157,10 +176,23 @@ describe("llmToolHandler", () => {
     expect(result.reachable).toBe(false);
   });
 
-  it("throws for unknown tool", () => {
+  it("returns error when targetState is missing", () => {
     const actor = mockActor("Idle") as never;
-    expect(() => llmToolHandler("unknown_tool", {}, actor, testGraph())).toThrow(
-      "Unknown tool: unknown_tool",
-    );
+    const result = llmToolHandler("check_reachable", {}, actor, testGraph()) as { error: string };
+    expect(result.error).toBe("targetState parameter is required and must be a string");
+  });
+
+  it("returns error when targetState is not a string", () => {
+    const actor = mockActor("Idle") as never;
+    const result = llmToolHandler("check_reachable", { targetState: 42 }, actor, testGraph()) as {
+      error: string;
+    };
+    expect(result.error).toBe("targetState parameter is required and must be a string");
+  });
+
+  it("returns error for unknown tool", () => {
+    const actor = mockActor("Idle") as never;
+    const result = llmToolHandler("unknown_tool", {}, actor, testGraph()) as { error: string };
+    expect(result.error).toBe("Unknown tool: unknown_tool");
   });
 });

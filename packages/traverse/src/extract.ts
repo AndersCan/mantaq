@@ -8,7 +8,8 @@ function isStateRef(
   return typeof value === "object" && value !== null && "name" in value;
 }
 
-function resolveInitialName(initial: unknown): string {
+function resolveInitialName(initial: ActorConfigInput["initial"]): string {
+  if (typeof initial === "string") return initial;
   if (isStateRef(initial)) return initial.name;
   if (initial instanceof TransitionState) return (initial as TransitionState).__stateRef.name;
   if (typeof initial === "object" && initial !== null && "state" in initial) {
@@ -78,7 +79,7 @@ function buildNodes(
 export function extractGraph(config: ActorConfigInput): Graph {
   const initialName = resolveInitialName(config.initial);
   const nodes = buildNodes(config.states, config.effects, initialName);
-  const edges = buildEdges(config.transitions, {}, {} as AnyActor);
+  const edges = buildEdges(config.transitions, {}, {} as unknown as AnyActor);
 
   for (const s of config.states) {
     if (s._regions) {
@@ -99,8 +100,11 @@ export function extractGraph(config: ActorConfigInput): Graph {
  * Reads actor.options for full structure including regions.
  */
 export function extractGraphFromActor(actor: AnyActor): Graph {
-  const options = (actor as unknown as { options: ActorConfigInput & { context: unknown } })
+  const options = (actor as unknown as { options?: ActorConfigInput & { context: unknown } })
     .options;
+  if (!options) {
+    throw new Error("extractGraphFromActor: actor.options is required for full graph extraction");
+  }
   const initialName = resolveInitialName(options.initial);
   const states = options.states as Array<{ name: string; isFinal?: boolean; _regions?: unknown }>;
   const effects = options.effects as Record<string, unknown[]> | undefined;

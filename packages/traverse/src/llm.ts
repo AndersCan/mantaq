@@ -1,14 +1,22 @@
 import type { Graph, LLMContext } from "./types.ts";
-import type { AnyActor, Snapshot } from "@mantaq/core";
+import { reachable } from "./traverse.ts";
+import type { AnyActor } from "@mantaq/core";
 
-interface ActorLike {
-  state: { name: string };
-  snapshot(): Snapshot;
-  regions: Record<string, unknown>;
+export interface LLMToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+  };
 }
 
 /** Build LLM context from actor state and graph. */
-export function llmContext(actor: ActorLike, graph: Graph): LLMContext {
+export function llmContext(actor: AnyActor, graph: Graph): LLMContext {
   const currentState = actor.state.name;
   const node = graph.nodes.get(currentState);
 
@@ -22,6 +30,7 @@ export function llmContext(actor: ActorLike, graph: Graph): LLMContext {
 
   const activeEffects = node?.effects ?? [];
   const isFinal = node?.isFinal ?? false;
+  const stateInGraph = node !== undefined;
 
   const totalStates = graph.nodes.size;
   const totalEdges = graph.edges.length;
@@ -34,11 +43,12 @@ export function llmContext(actor: ActorLike, graph: Graph): LLMContext {
     activeEffects,
     isFinal,
     graphSummary,
+    stateInGraph,
   };
 }
 
 /** Return OpenAI-style tool definitions for LLM function calling. */
-export function llmToolDefinitions(): object[] {
+export function llmToolDefinitions(): LLMToolDefinition[] {
   return [
     {
       type: "function",
@@ -126,7 +136,7 @@ export function llmToolHandler(
         }));
     }
     case "get_graph_summary": {
-      const ctx = llmContext(actor as ActorLike, graph);
+      const ctx = llmContext(actor, graph);
       return {
         summary: ctx.graphSummary,
         currentState: ctx.currentState,
@@ -135,30 +145,12 @@ export function llmToolHandler(
       };
     }
     case "check_reachable": {
-      const target = args.targetState as string;
-      return { reachable: bfsReachable(graph, currentStateName, target) };
+      if (typeof args.targetState !== "string") {
+        return { error: "targetState parameter is required and must be a string" };
+      }
+      return { reachable: reachable(graph, currentStateName, args.targetState) };
     }
     default:
-      throw new Error(`Unknown tool: ${toolName}`);
+      return { error: `Unknown tool: ${toolName}` };
   }
-}
-
-function bfsReachable(graph: Graph, from: string, target: string): boolean {
-  if (from === target) return true;
-  const visited = new Set<string>();
-  const queue = [from];
-  visited.add(from);
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const edge of graph.edges) {
-      if (edge.from === current && !visited.has(edge.to)) {
-        if (edge.to === target) return true;
-        visited.add(edge.to);
-        queue.push(edge.to);
-      }
-    }
-  }
-
-  return false;
 }
