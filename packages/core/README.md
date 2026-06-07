@@ -43,6 +43,7 @@ npm install @mantaq/core
     - [Transition Error Handling](#transition-error-handling)
     - [Nested Error Propagation](#nested-error-propagation)
   - [Any Handler](#any-handler)
+  - [Testing with VirtualClock](#testing-with-virtualclock)
 - [Development](#development)
 - [License](#license)
 
@@ -674,6 +675,147 @@ basicInfo: {
     return { state: shippingAddressState };
   },
 }
+```
+
+### Testing with VirtualClock
+
+`VirtualClock` replaces real timers for deterministic tests. Advance time manually, verify state instantly.
+
+#### Basic Usage
+
+```ts
+import { Actor, VirtualClock } from "@mantaq/core";
+
+const clock = new VirtualClock();
+const timer = event("timer")();
+
+const idle = state("idle")();
+const timedOut = state("timedOut")();
+
+const actor = new Actor({
+  states: [idle, timedOut],
+  initial: idle,
+  clock,
+  effects: {
+    idle: [
+      ({ emit, clock }) => {
+        clock.setTimeout(5000, () => emit(timer));
+      },
+    ],
+  },
+  transitions: {
+    idle: { timer: () => ({ state: timedOut }) },
+  },
+});
+
+expect(actor.state.name).toBe("idle");
+
+clock.advance(5000);
+expect(actor.state.name).toBe("timedOut");
+expect(clock.hasPending()).toBe(false);
+```
+
+**Anti-pattern — using `new Date()` or `setTimeout` directly:**
+
+```ts
+// ❌ real timers — slow, flaky, non-deterministic
+setTimeout(() => {
+  expect(actor.state.name).toBe("timedOut");
+}, 5000);
+
+// ✅ VirtualClock — instant, deterministic
+clock.advance(5000);
+expect(actor.state.name).toBe("timedOut");
+```
+
+#### Abort Signal Cleanup
+
+VirtualClock removes timers when the abort signal fires — state exit cleans up automatically.
+
+```ts
+const done = event("done")();
+const loading = state("loading")();
+const success = state("success")();
+
+const actor = new Actor({
+  states: [loading, success],
+  initial: loading,
+  clock,
+  effects: {
+    loading: [
+      ({ signal, emit, clock }) => {
+        const id = clock.setTimeout(5000, () => emit(done));
+        signal.addEventListener("abort", () => clock.clearTimeout(id));
+      },
+    ],
+  },
+  transitions: {
+    loading: { done: () => ({ state: success }) },
+  },
+});
+
+// transition before timer fires — abort signal clears it
+actor.send(event("cancel"));
+clock.advance(10000);
+expect(clock.hasPending()).toBe(false);
+```
+
+**Anti-pattern — forgetting abort cleanup:**
+
+```ts
+// ❌ timer fires even after state exit
+clock.setTimeout(5000, () => emit(done));
+
+// ✅ clear on abort
+const id = clock.setTimeout(5000, () => emit(done));
+signal.addEventListener("abort", () => clock.clearTimeout(id));
+```
+
+#### Interval Testing
+
+`advance()` fires intervals at each elapsed tick. Multiple calls accumulate.
+
+```ts
+const tick = event("tick")();
+let count = 0;
+
+const active = state("active")();
+
+const actor = new Actor({
+  states: [active],
+  initial: active,
+  clock,
+  effects: {
+    active: [
+      ({ emit, clock }) => {
+        clock.setInterval(1000, () => emit(tick));
+      },
+    ],
+  },
+  transitions: {
+    active: {
+      tick: () => {
+        count++;
+        return {};
+      },
+    },
+  },
+});
+
+clock.advance(3500);
+expect(count).toBe(3); // fired at 1000, 2000, 3000
+```
+
+**Anti-pattern — expecting single `advance` to fire interval once:**
+
+```ts
+// ❌ advance(5000) fires interval at 1000, 2000, 3000, 4000, 5000
+clock.advance(5000);
+expect(count).toBe(1); // fails — count is 5
+
+// ✅ match exact ticks or use setTimeout for single fire
+clock.advance(1000);
+expect(count).toBe(1);
 ```
 
 ## Development
