@@ -161,4 +161,138 @@ describe("VirtualClock", () => {
     expect(fired).toBe(true);
     expect(clock.now()).toBe(1500);
   });
+
+  test("interval fires at scheduled times", () => {
+    const clock = new VirtualClock();
+    const times: number[] = [];
+    clock.setInterval(100, () => {
+      times.push(clock.now());
+    });
+
+    clock.advance(250);
+    expect(times).toEqual([100, 200]);
+  });
+
+  test("timer clears interval at same timestamp — interval does not fire", () => {
+    const clock = new VirtualClock();
+    const timerFired: number[] = [];
+    const intervalFired: number[] = [];
+
+    const intervalId = clock.setInterval(200, () => {
+      intervalFired.push(clock.now());
+    });
+
+    clock.setTimeout(200, () => {
+      timerFired.push(clock.now());
+      clock.clearInterval(intervalId);
+    });
+
+    clock.advance(500);
+    expect(timerFired).toEqual([200]);
+    expect(intervalFired).toEqual([]);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("timer clears interval at later timestamp — only earlier interval fires", () => {
+    const clock = new VirtualClock();
+    const timerFired: number[] = [];
+    const intervalFired: number[] = [];
+
+    const intervalId = clock.setInterval(100, () => {
+      intervalFired.push(clock.now());
+    });
+
+    clock.setTimeout(350, () => {
+      timerFired.push(clock.now());
+      clock.clearInterval(intervalId);
+    });
+
+    clock.advance(500);
+    expect(timerFired).toEqual([350]);
+    expect(intervalFired).toEqual([100, 200, 300]);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("setTimeout with already-aborted signal returns -1", () => {
+    const clock = new VirtualClock();
+    const aborted = new AbortController();
+    aborted.abort();
+    const id = clock.setTimeout(100, () => {}, { signal: aborted.signal });
+    expect(id).toBe(-1);
+  });
+
+  test("setInterval with already-aborted signal returns -1", () => {
+    const clock = new VirtualClock();
+    const aborted = new AbortController();
+    aborted.abort();
+    const id = clock.setInterval(100, () => {}, { signal: aborted.signal });
+    expect(id).toBe(-1);
+  });
+
+  test("clearInterval on non-existent id is no-op", () => {
+    const clock = new VirtualClock();
+    clock.clearInterval(999);
+    clock.advance(1000);
+  });
+
+  test("advance() throws on infinite timer loop", () => {
+    const clock = new VirtualClock();
+    const rearm = () => {
+      clock.setTimeout(0, rearm);
+    };
+    clock.setTimeout(0, rearm);
+    expect(() => clock.advance(1000)).toThrow("exceeded maximum iterations");
+  });
+
+  test("setTimeout abort signal removes timer on abort", () => {
+    const clock = new VirtualClock();
+    const ctrl = new AbortController();
+    let fired = false;
+    clock.setTimeout(
+      100,
+      () => {
+        fired = true;
+      },
+      { signal: ctrl.signal },
+    );
+
+    ctrl.abort();
+    clock.advance(200);
+    expect(fired).toBe(false);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("setInterval abort signal removes interval on abort", () => {
+    const clock = new VirtualClock();
+    const ctrl = new AbortController();
+    const fires: number[] = [];
+    clock.setInterval(
+      100,
+      () => {
+        fires.push(clock.now());
+      },
+      { signal: ctrl.signal },
+    );
+
+    clock.advance(150);
+    expect(fires).toEqual([100]);
+
+    ctrl.abort();
+    clock.advance(200);
+    expect(fires).toEqual([100]);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("advance with no timers just moves time", () => {
+    const clock = new VirtualClock();
+    clock.advance(500);
+    expect(clock.now()).toBe(500);
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("zero ms advance is no-op", () => {
+    const clock = new VirtualClock();
+    clock.advance(0);
+    expect(clock.now()).toBe(0);
+  });
 });

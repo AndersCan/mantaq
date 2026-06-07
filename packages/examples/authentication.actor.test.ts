@@ -18,8 +18,8 @@
 
 import { describe, it, expect, vi } from "vite-plus/test";
 import { Actor, VirtualClock } from "@mantaq/core";
-import { state } from "@mantaq/core";
-import { event } from "@mantaq/core";
+import { state, event } from "@mantaq/core";
+import type { EffectInput, AnyEventRef } from "@mantaq/core";
 import { matches, withTimeout } from "@mantaq/sugar";
 
 interface User {
@@ -57,8 +57,8 @@ type AuthContext = {
 // ── Effects ─────────────────────────────────────────────────────────
 // monitorAuthState: fromCallback with setInterval — simulated session check
 // Clock only has setTimeout, so we recurse manually
-const monitorAuthStateEffect: InstanceType<typeof Actor>["options"]["effects"][string] = [
-  ({ signal, emit, clock }) => {
+const monitorAuthStateEffect = [
+  ({ signal, emit, clock }: EffectInput<AnyEventRef[], AnyEventRef[], AuthContext>) => {
     let id: number;
     const tick = () => {
       if (signal.aborted) return;
@@ -71,15 +71,15 @@ const monitorAuthStateEffect: InstanceType<typeof Actor>["options"]["effects"][s
 ];
 
 // signInWithPhone: fromPromise — simulate Firebase phone auth
-const signInWithPhoneEffect: InstanceType<typeof Actor>["options"]["effects"][string] = [
-  ({ signal, context, emit, clock }) => {
+const signInWithPhoneEffect = [
+  ({ signal, context, emit, clock }: EffectInput<AnyEventRef[], AnyEventRef[], AuthContext>) => {
     clock.setTimeout(2000, () => {
       if (signal.aborted) return;
       if (Math.random() > 0.1) {
         const user: User = {
           uid: `user-${Date.now()}`,
           email: `user${Date.now()}@example.com`,
-          phone: (context as AuthContext).phoneNumber,
+          phone: context.phoneNumber,
         };
         emit(signInDoneEvent.create({ user }));
       } else {
@@ -90,8 +90,9 @@ const signInWithPhoneEffect: InstanceType<typeof Actor>["options"]["effects"][st
 ];
 
 // signingOut effect: after 500ms → loggedOut (clearUser happens on entry, not here)
-const signingOutEffect: InstanceType<typeof Actor>["options"]["effects"][string] = [
-  (input) => withTimeout(500, input, () => signingOutDoneEvent.create(undefined)),
+const signingOutEffect = [
+  (input: EffectInput<AnyEventRef[], AnyEventRef[], AuthContext>) =>
+    withTimeout(500, input, () => signingOutDoneEvent.create(undefined)),
 ];
 
 const signingOutDoneEvent = event("SIGNING_OUT_DONE")();

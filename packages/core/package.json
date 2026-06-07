@@ -1,23 +1,15 @@
 {
   "name": "@mantaq/core",
   "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
-  "homepage": "https://github.com/author/library#readme",
-  "bugs": {
-    "url": "https://github.com/author/library/issues"
-  },
+  "description": "State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock.",
   "license": "MIT",
-  "author": "Author Name <author.name@mail.com>",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/author/library.git"
-  },
   "files": [
     "dist"
   ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./actor": "./src/actor.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {

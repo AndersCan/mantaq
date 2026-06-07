@@ -1,6 +1,11 @@
 import type { AnyStateRef, StateRef, TransitionState } from "./state.ts";
 import { TransitionState as TransitionStateClass } from "./state.ts";
-import type { AnyEventRef, EventRef } from "./event.ts";
+import type { AnyEventRef, EventRef, InternalEvent } from "./event.ts";
+
+const IS_DEV =
+  typeof process === "undefined" ||
+  !process.env?.NODE_ENV ||
+  process.env.NODE_ENV === "development";
 
 export interface Snapshot {
   path: string[];
@@ -16,7 +21,7 @@ export interface Clock {
   now(): number;
 }
 
-class RealClock implements Clock {
+export class RealClock implements Clock {
   #start = Date.now();
 
   now(): number {
@@ -24,8 +29,11 @@ class RealClock implements Clock {
   }
 
   setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error globalThis.setTimeout returns NodeJS.Timeout | number, but we only use browser env
-    return globalThis.setTimeout(cb, ms, { signal: options?.signal });
+    const id = globalThis.setTimeout(cb, ms) as unknown as number;
+    if (options?.signal) {
+      options.signal.addEventListener("abort", () => globalThis.clearTimeout(id), { once: true });
+    }
+    return id;
   }
 
   clearTimeout(id: number): void {
@@ -33,8 +41,11 @@ class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    // @ts-expect-error globalThis.setInterval returns NodeJS.Timeout | number, but we only use browser env
-    return globalThis.setInterval(cb, ms, { signal: options?.signal });
+    const id = globalThis.setInterval(cb, ms) as unknown as number;
+    if (options?.signal) {
+      options.signal.addEventListener("abort", () => globalThis.clearInterval(id), { once: true });
+    }
+    return id;
   }
 
   clearInterval(id: number): void {
@@ -59,18 +70,33 @@ export class VirtualClock implements Clock {
     return this.#now;
   }
 
-  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    const signal = options?.signal;
-    if (signal?.aborted) return -1;
-    const id = this.#nextId++;
+  #trackAbort(
+    signal: AbortSignal | undefined,
+    id: number,
+    map: Map<number, { signal?: AbortSignal; onAbort?: () => void }>,
+  ): (() => void) | undefined {
     const onAbort = signal
       ? () => {
-          this.#timers.delete(id);
+          map.delete(id);
         }
       : undefined;
     if (signal && onAbort) {
       signal.addEventListener("abort", onAbort, { once: true });
     }
+    return onAbort;
+  }
+
+  #clearAbort(timer: { signal?: AbortSignal; onAbort?: () => void }): void {
+    if (timer.signal && timer.onAbort) {
+      timer.signal.removeEventListener("abort", timer.onAbort);
+    }
+  }
+
+  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    const signal = options?.signal;
+    if (signal?.aborted) return -1;
+    const id = this.#nextId++;
+    const onAbort = this.#trackAbort(signal, id, this.#timers);
     this.#timers.set(id, { deadline: this.#now + ms, cb, signal, onAbort });
     return id;
   }
@@ -78,9 +104,7 @@ export class VirtualClock implements Clock {
   clearTimeout(id: number): void {
     const timer = this.#timers.get(id);
     if (timer) {
-      if (timer.signal && timer.onAbort) {
-        timer.signal.removeEventListener("abort", timer.onAbort);
-      }
+      this.#clearAbort(timer);
       this.#timers.delete(id);
     }
   }
@@ -89,14 +113,7 @@ export class VirtualClock implements Clock {
     const signal = options?.signal;
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
-    const onAbort = signal
-      ? () => {
-          this.#intervals.delete(id);
-        }
-      : undefined;
-    if (signal && onAbort) {
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
+    const onAbort = this.#trackAbort(signal, id, this.#intervals);
     this.#intervals.set(id, { ms, next: this.#now + ms, cb, signal, onAbort });
     return id;
   }
@@ -104,52 +121,67 @@ export class VirtualClock implements Clock {
   clearInterval(id: number): void {
     const interval = this.#intervals.get(id);
     if (interval) {
-      if (interval.signal && interval.onAbort) {
-        interval.signal.removeEventListener("abort", interval.onAbort);
-      }
+      this.#clearAbort(interval);
       this.#intervals.delete(id);
     }
   }
 
   advance(ms: number): void {
     const target = this.#now + ms;
+    let iterations = 0;
+    const maxIterations = 10_000;
 
-    const events: Array<{ time: number; type: "timer" | "interval"; id: number }> = [];
-
-    for (const [id, t] of this.#timers) {
-      if (t.deadline <= target) {
-        events.push({ time: t.deadline, type: "timer", id });
+    while (true) {
+      if (++iterations > maxIterations) {
+        throw new Error(
+          "VirtualClock.advance() exceeded maximum iterations — possible infinite timer loop",
+        );
       }
-    }
+      let earliest = target;
+      let hasEvent = false;
 
-    for (const [id, t] of this.#intervals) {
-      let fire = t.next;
-      const step = t.ms || 1;
-      while (fire <= target) {
-        events.push({ time: fire, type: "interval", id });
-        fire += step;
+      for (const t of this.#timers.values()) {
+        if (t.deadline <= target && t.deadline <= earliest) {
+          earliest = t.deadline;
+          hasEvent = true;
+        }
       }
-    }
+      for (const t of this.#intervals.values()) {
+        if (t.next <= target && t.next <= earliest) {
+          earliest = t.next;
+          hasEvent = true;
+        }
+      }
 
-    events.sort((a, b) => a.time - b.time);
+      if (!hasEvent) break;
 
-    for (const ev of events) {
-      this.#now = ev.time;
-      if (ev.type === "timer") {
-        const timer = this.#timers.get(ev.id);
+      this.#now = earliest;
+
+      const timerIds: number[] = [];
+      for (const [id, t] of this.#timers) {
+        if (t.deadline === earliest) timerIds.push(id);
+      }
+      for (const id of timerIds) {
+        const timer = this.#timers.get(id);
         if (timer) {
           if (timer.signal && timer.onAbort) {
             timer.signal.removeEventListener("abort", timer.onAbort);
           }
-          this.#timers.delete(ev.id);
+          this.#timers.delete(id);
           timer.cb();
         }
-      } else {
-        const interval = this.#intervals.get(ev.id);
+      }
+
+      const intervalIds: number[] = [];
+      for (const [id, t] of this.#intervals) {
+        if (t.next === earliest) intervalIds.push(id);
+      }
+      for (const id of intervalIds) {
+        const interval = this.#intervals.get(id);
         if (interval) {
           interval.cb();
-          if (this.#intervals.has(ev.id)) {
-            interval.next = ev.time + interval.ms;
+          if (this.#intervals.has(id)) {
+            interval.next = this.#now + interval.ms;
           }
         }
       }
@@ -182,26 +214,28 @@ export type EffectInput<
   state: { name: string; payload: unknown };
   event: Inputs[number] | Internal[number];
   context: ActorContext;
-  emit: (event: { id: string; [key: string]: unknown }) => void;
+  emit: (event: InternalEvent) => void;
   clock: Clock;
 };
 
-interface AnyActor {
+export interface AnyActor {
   state: AnyStateRef;
   clock: Clock;
   regions: Record<string, AnyActor>;
-  send(event: AnyEventRef | { id: string; [key: string]: unknown }): void;
+  send(event: AnyEventRef | InternalEvent): void;
   snapshot(): Snapshot;
   on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
   on(event: "error", fn: (error: unknown) => void): () => void;
   on(event: "done", fn: () => void): () => void;
-  subscribe(fn: (snapshot: Snapshot) => void): () => void;
   settled(): Promise<void>;
   __children: Map<string, AnyActor>;
-  __outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null;
-  __pushInternal(event: { id: string; [key: string]: unknown }): void;
+  __outputHandler: ((event: InternalEvent) => void) | null;
+  __pushInternal(event: InternalEvent): void;
   __drainInternal(): void;
+  __abortEffects(): void;
 }
+
+export type InternalActor = AnyActor;
 
 export class Actor<
   const Inputs extends AnyEventRef[],
@@ -216,14 +250,15 @@ export class Actor<
   #context: ActorContext;
   clock: Clock;
   #regions: Record<string, AnyActor> = {};
-  #regionState: Map<string, AnyStateRef> = new Map();
   #children: Map<string, AnyActor> = new Map();
-  #internalQueue: Array<{ id: string; [key: string]: unknown }> = [];
+  #internalQueue: InternalEvent[] = [];
   #queueIndex = 0;
   #effectAbort: AbortController | null = null;
-  #outputHandler: ((event: { id: string; [key: string]: unknown }) => void) | null = null;
+  #outputHandler: ((event: InternalEvent) => void) | null = null;
   #processing = false;
   #internalIds: Set<string> = new Set();
+  #internalBudget: number;
+  #internalCount = 0;
   #subscribers: Set<(snapshot: Snapshot) => void> = new Set();
   #errorSubscribers: Set<(error: unknown) => void> = new Set();
   #doneSubscribers: Set<() => void> = new Set();
@@ -240,33 +275,23 @@ export class Actor<
   /** @internal */ get __children(): Map<string, AnyActor> {
     return this.#children;
   }
-  /** @internal */ get __outputHandler():
-    | ((event: { id: string; [key: string]: unknown }) => void)
-    | null {
+  /** @internal */ get __outputHandler(): ((event: InternalEvent) => void) | null {
     return this.#outputHandler;
   }
-  /** @internal */ set __outputHandler(
-    fn: ((event: { id: string; [key: string]: unknown }) => void) | null,
-  ) {
+  /** @internal */ set __outputHandler(fn: ((event: InternalEvent) => void) | null) {
     this.#outputHandler = fn;
   }
-  /** @internal */ __pushInternal(event: { id: string; [key: string]: unknown }): void {
+  /** @internal */ __pushInternal(event: InternalEvent): void {
     this.#internalQueue.push(event);
   }
   /** @internal */ __drainInternal(): void {
     this.#processInternalQueue();
   }
-
-  #initRegionState(s: AnyStateRef): void {
-    if (s._regions) {
-      for (const [key, region] of Object.entries(s._regions)) {
-        const initial = region.states[region.initial as string];
-        if (initial) {
-          this.#regionState.set(`${s.name}.${key}`, initial);
-          this.#initRegionState(initial);
-        }
-      }
-    }
+  /** @internal */ __abortEffects(): void {
+    this.#effectAbort?.abort();
+    this.#subscribers.clear();
+    this.#errorSubscribers.clear();
+    this.#doneSubscribers.clear();
   }
 
   options: {
@@ -300,6 +325,7 @@ export class Actor<
     context?: ActorContext;
     initial: InitialState<States[number]>;
     clock?: Clock;
+    internalBudget?: number;
     effects?: Partial<
       Record<StateNames, Array<EffectFn<Inputs | Internal, Internal, ActorContext>>>
     >;
@@ -316,22 +342,30 @@ export class Actor<
     >;
     regions?: Record<string, AnyActor>;
   }) {
-    this.options = {
+    this.options = Object.freeze({
       ...options,
       outputs: (options.outputs ?? []) as Outputs,
       internal: (options.internal ?? []) as Internal,
-      context: (options.context ?? ({} as ActorContext)) as ActorContext,
-      effects: (options.effects ?? {}) as Exclude<typeof options.effects, undefined>,
-    };
+      context: options.context ?? ({} as ActorContext),
+      effects: options.effects ?? ({} as typeof this.options.effects),
+    });
     this.#internalIds = new Set(this.options.internal.map((e) => e.id));
+    this.#internalBudget = options.internalBudget ?? 10000;
     this.clock = options.clock ?? new RealClock();
     if (this.clock instanceof VirtualClock) {
       this.clock._setDrain(() => this.#processInternalQueue());
     }
     const init = resolveInitial(options.initial);
+    if (IS_DEV) {
+      const stateNames = new Set(options.states.map((s) => s.name));
+      if (!stateNames.has(init.state.name)) {
+        console.warn(
+          `[Actor] initial state "${init.state.name}" not found in declared states [${[...stateNames].join(", ")}]`,
+        );
+      }
+    }
     this.state = init.state;
     this.#context = this.options.context;
-    this.#initRegionState(this.state);
     if (options.regions) {
       for (const [key, child] of Object.entries(options.regions)) {
         this.#regions[key] = child;
@@ -340,6 +374,9 @@ export class Actor<
           this.#processInternalQueue();
         };
       }
+    }
+    for (const [key, child] of Object.entries(this.#regions)) {
+      this.#children.set(key, child);
     }
   }
 
@@ -375,10 +412,6 @@ export class Actor<
     return () => {};
   }
 
-  subscribe(fn: (snapshot: Snapshot) => void): () => void {
-    return this.on("change", fn);
-  }
-
   settled(): Promise<void> {
     if (this.#internalQueue.length === 0 && !this.#processing) {
       return Promise.resolve();
@@ -388,42 +421,50 @@ export class Actor<
     });
   }
 
-  send(event: Inputs[number] | { id: string; [key: string]: unknown }): void {
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const anyTransition = this.options.transitions?.["Any" as StateNames]?.[event.id as string] as
-      | TransitionHandler<ActorContext>
-      | undefined;
+  send(event: Inputs[number] | InternalEvent): void {
+    const transitions = this.options.transitions as Record<
+      string,
+      Record<string, TransitionHandler<ActorContext> | undefined>
+    >;
+    const eventId = event.id as string;
+    const stateTransition = transitions[this.state.name as string]?.[eventId];
+    const anyTransition = transitions["Any"]?.[eventId];
 
-    if (anyTransition) {
-      const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
-      if (step.state) {
-        this.#applyTransition(event, step);
-        return;
-      }
-      if (step.emit) {
-        this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
-      }
-    }
-
-    // @ts-expect-error dynamic key lookup on mapped type is safe at runtime
-    const stateTransition = this.options.transitions?.[this.state.name as StateNames]?.[
-      event.id as string
-    ] as TransitionHandler<ActorContext> | undefined;
+    let transitionApplied = false;
+    let anyEmitted = false;
 
     if (stateTransition) {
       const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
-      this.#applyTransition(event, step);
+      if (step.state) {
+        this.#applyTransition(event, step);
+        transitionApplied = true;
+      }
+      if (step.emit) {
+        this.#internalQueue.push(...step.emit);
+      }
     }
 
-    if (anyTransition && !stateTransition) {
+    if (anyTransition) {
+      const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
+      if (step.state && !transitionApplied) {
+        this.#applyTransition(event, step);
+      }
+      if (step.emit) {
+        this.#internalQueue.push(...step.emit);
+        anyEmitted = true;
+      }
+    }
+
+    if (anyEmitted || this.#internalQueue.length > this.#queueIndex) {
       this.#processInternalQueue();
+    } else if (IS_DEV && !stateTransition && !anyTransition) {
+      console.warn(
+        `[Actor] no transition for event "${eventId}" in state "${this.state.name}". Event dropped.`,
+      );
     }
   }
 
-  #applyTransition(
-    event: Inputs[number] | { id: string; [key: string]: unknown },
-    step: TransitionResult,
-  ): void {
+  #applyTransition(event: Inputs[number] | InternalEvent, step: TransitionResult): void {
     if (step.state) {
       this.#effectAbort?.abort();
       let payload: unknown;
@@ -439,23 +480,22 @@ export class Actor<
       }
       if (this.state.isFinal) {
         for (const fn of this.#doneSubscribers) {
-          fn();
+          try {
+            fn();
+          } catch {
+            /* catch subscriber throw to avoid crash */
+          }
         }
       }
     }
-
-    if (step.emit) {
-      this.#internalQueue.push(...(step.emit as Array<{ id: string; [key: string]: unknown }>));
-      this.#processInternalQueue();
-    }
   }
 
-  #runEffects(
-    event: Inputs[number] | { id: string; [key: string]: unknown },
-    statePayload: unknown,
-  ): void {
-    // @ts-expect-error state.name is a StateNames but TS can't narrow
-    const effects = this.options.effects?.[this.state.name];
+  #runEffects(event: Inputs[number] | InternalEvent, statePayload: unknown): void {
+    const allEffects = this.options.effects as Record<
+      string,
+      Array<EffectFn<Inputs, Internal, ActorContext>>
+    >;
+    const effects = allEffects[this.state.name];
     if (!effects) return;
 
     const abort = new AbortController();
@@ -464,15 +504,22 @@ export class Actor<
       try {
         effectFn({
           signal: abort.signal,
-          state: { name: this.state.name as string, payload: statePayload },
-          event,
+          state: { name: this.state.name, payload: statePayload },
+          event: event as Inputs[number] | Internal[number],
           context: this.#context,
-          emit: (e: { id: string; [key: string]: unknown }) => this.#internalQueue.push(e),
+          emit: (e: InternalEvent) => {
+            this.#internalQueue.push(e);
+            this.#processInternalQueue();
+          },
           clock: this.clock,
         });
       } catch (err) {
         for (const fn of this.#errorSubscribers) {
-          fn(err);
+          try {
+            fn(err);
+          } catch {
+            /* catch subscriber throw to avoid crash */
+          }
         }
       }
     }
@@ -483,8 +530,15 @@ export class Actor<
   #processInternalQueue(): void {
     if (this.#processing) return;
     this.#processing = true;
+    this.#internalCount = 0;
     while (this.#queueIndex < this.#internalQueue.length) {
+      if (this.#internalCount >= this.#internalBudget) {
+        this.#internalQueue.length = 0;
+        this.#queueIndex = 0;
+        break;
+      }
       const event = this.#internalQueue[this.#queueIndex++];
+      this.#internalCount++;
       if (this.#internalIds.has(event.id)) {
         this.send(event);
       } else if (this.#outputHandler) {
@@ -494,7 +548,7 @@ export class Actor<
     this.#internalQueue.length = 0;
     this.#queueIndex = 0;
     this.#processing = false;
-    if (this.#internalQueue.length === 0 && this.#settledResolvers.length > 0) {
+    if (this.#settledResolvers.length > 0) {
       const resolvers = this.#settledResolvers.splice(0);
       for (const resolve of resolvers) {
         resolve();
@@ -512,8 +566,7 @@ export class Actor<
 
     if (s._regions) {
       for (const [regionName, region] of Object.entries(s._regions)) {
-        const key = `${s.name}.${regionName}`;
-        const active = this.#regionState.get(key) ?? region.states[region.initial as string];
+        const active = region.states[region.initial];
         if (active) {
           regions[regionName] = this.#snapshot(active);
         }
@@ -539,13 +592,13 @@ type CreatedEvent<E> = E extends EventRef<infer Id, infer P> ? P & { id: Id } : 
 type ById<T extends { id: string }, K extends T["id"]> = CreatedEvent<Extract<T, { id: K }>>;
 
 type TransitionHandler<AC> = (
-  event: AnyEventRef | { id: string; [key: string]: unknown },
+  event: AnyEventRef | InternalEvent,
   options: { context: AC; actor: AnyActor },
 ) => TransitionResult;
 
 type TransitionResult = {
   state?: AnyStateRef | TransitionState<string, unknown>;
-  emit?: unknown[];
+  emit?: Array<{ id: string }>;
 };
 
 type InitialState<S> =
