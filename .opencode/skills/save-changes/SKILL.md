@@ -18,9 +18,11 @@ Write short caveman summary of work done:
 icm store -t context-mantaq -c "[Caveman summary] [Size of change: small/medium/large]"
 ```
 
+> See [`icm` command](../command/icm.md) for docs.
+
 ### 2. Run add-change skill
 
-Load and run `add-change` skill to create bumpy bump file.
+Load and run [`add-change`](../add-change/SKILL.md) skill to create bumpy bump file.
 
 ### 3. Commit changes
 

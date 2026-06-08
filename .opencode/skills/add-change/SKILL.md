@@ -1,6 +1,6 @@
 ---
 name: add-change
-description: Create bumpy bump file for package changes. Use when user wants record change, add bump file, or prepare packages release.
+description: Create bumpy bump file for package changes. Use when user wants to record change, add bump file, or prepare packages release.
 argument-hint: "[description of changes]"
 allowed-tools: Read Grep Glob Bash Edit Write
 ---
