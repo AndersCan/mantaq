@@ -3,6 +3,7 @@ import type { AnyActor } from "@mantaq/core";
 import type { ActorGraph } from "../graph.ts";
 import type { LayoutResult } from "../layout.ts";
 import { buildGraph } from "../graph.ts";
+import type { LayoutOptions } from "../layout.ts";
 import { computeLayout } from "../layout.ts";
 
 export const $actor = atom<AnyActor | null>(null);
@@ -13,6 +14,7 @@ export const $zoom = atom(1);
 export const $pan = atom({ x: 0, y: 0 });
 export const $layoutError = atom<string | null>(null);
 export const $isComputing = atom(false);
+export const $layoutOptions = atom<LayoutOptions>({});
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
@@ -30,7 +32,8 @@ export async function setActor(actor: AnyActor): Promise<void> {
     $isComputing.set(true);
     const graph = buildGraph(actor);
     $graph.set(graph);
-    const layout = await computeLayout(graph);
+    const layoutOptions = $layoutOptions.get();
+    const layout = await computeLayout(graph, layoutOptions);
     if (generation !== layoutGeneration) return;
     $layout.set(layout);
     $layoutError.set(null);

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import { Actor, state, event } from "@mantaq/core";
 import {

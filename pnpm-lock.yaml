@@ -24,6 +24,9 @@ catalogs:
     lit:
       specifier: ^3.3.3
       version: 3.3.3
+    remark-gfm:
+      specifier: ^4.0.1
+      version: 4.0.1
     sharp:
       specifier: ^0.34.5
       version: 0.34.5
@@ -67,6 +70,9 @@ importers:
         specifier: 'catalog:'
         version: 0.34.5
     devDependencies:
+      remark-gfm:
+        specifier: 'catalog:'
+        version: 4.0.1
       typescript:
         specifier: ~6.0.2
         version: 6.0.3
@@ -163,6 +169,9 @@ importers:
         specifier: ^0.11.3
         version: 0.11.4
     devDependencies:
+      '@mantaq/sugar':
+        specifier: workspace:*
+        version: link:../sugar
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.0

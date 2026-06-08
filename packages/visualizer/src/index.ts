@@ -13,6 +13,7 @@ export {
   $pan,
   $layoutError,
   $isComputing,
+  $layoutOptions,
   setActor,
   selectNode,
   zoomIn,

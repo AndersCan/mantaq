@@ -35,6 +35,8 @@ export interface LayoutOptions {
   nodeWidth?: number;
   nodeHeight?: number;
   padding?: number;
+  /** Arbitrary ELK layout options (e.g. "elk.layered.considerModelOrder") */
+  elkOptions?: Record<string, string>;
 }
 
 const DEFAULT_NODE_WIDTH = 120;
@@ -148,6 +150,8 @@ function buildElkGraph(graph: ActorGraph, options: LayoutOptions): ElkGraph {
       "elk.layered.spacing.nodeNodeBetweenLayers": String(LEVEL_SPACING),
       "elk.spacing.nodeNode": String(NODE_SPACING),
       "elk.padding": `[top=${DEFAULT_PADDING},left=${DEFAULT_PADDING},bottom=${DEFAULT_PADDING},right=${DEFAULT_PADDING}]`,
+      "elk.layered.considerModelOrder": "true",
+      ...options.elkOptions,
     },
     children: elkNodes,
     edges: elkEdges,
@@ -195,9 +199,9 @@ function generateEdgePath(
 
   if (direction === "RIGHT") {
     const startX = sx + sw / 2;
-    const startY = sy;
+    const startY = sy + sh / 2;
     const endX = tx - tw / 2;
-    const endY = ty;
+    const endY = ty + th / 2;
 
     const midX = (startX + endX) / 2;
     return {
@@ -207,10 +211,10 @@ function generateEdgePath(
     };
   }
 
-  const startX = sx;
-  const startY = sy + sh / 2;
-  const endX = tx;
-  const endY = ty - th / 2;
+  const startX = sx + sw / 2;
+  const startY = sy + sh;
+  const endX = tx + tw / 2;
+  const endY = ty;
 
   const midY = (startY + endY) / 2;
   return {
@@ -229,6 +233,7 @@ export async function computeLayout(
     nodeWidth: options?.nodeWidth ?? DEFAULT_NODE_WIDTH,
     nodeHeight: options?.nodeHeight ?? DEFAULT_NODE_HEIGHT,
     padding: options?.padding ?? DEFAULT_PADDING,
+    elkOptions: options?.elkOptions,
   };
 
   const elk = await getElk();

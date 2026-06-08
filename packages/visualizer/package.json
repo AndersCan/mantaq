@@ -29,6 +29,7 @@
     "nanostores": "^0.11.3"
   },
   "devDependencies": {
+    "@mantaq/sugar": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260509.2",
     "jsdom": "^26.1.0",
