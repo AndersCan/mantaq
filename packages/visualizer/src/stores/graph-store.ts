@@ -1,7 +1,7 @@
 import { atom, computed, type WritableAtom } from "nanostores";
 import type { AnyActor } from "@mantaq/core";
-import type { ActorGraph, GraphNode } from "../graph.ts";
-import type { ComputedEdge, LayoutResult } from "../layout.ts";
+import { type ActorGraph, type GraphNode, buildGraph } from "../graph.ts";
+import { type ComputedEdge, type LayoutResult, computeLayout } from "../layout.ts";
 
 export const $actor: WritableAtom<AnyActor | null> = atom(null);
 
@@ -59,11 +59,9 @@ export function setActor(actor: AnyActor | null): void {
     return;
   }
 
-  void import("../graph.ts").then(({ buildGraph }) => {
-    const graph = buildGraph(actor);
-    $graph.set(graph);
-    void updateLayout(graph);
-  });
+  const graph = buildGraph(actor);
+  $graph.set(graph);
+  void updateLayout(graph);
 }
 
 export async function updateLayout(graph: ActorGraph): Promise<void> {
@@ -71,7 +69,6 @@ export async function updateLayout(graph: ActorGraph): Promise<void> {
   $layoutError.set(null);
 
   try {
-    const { computeLayout } = await import("../layout.ts");
     const result = await computeLayout(graph);
     $layout.set(result);
   } catch (err) {
@@ -139,11 +136,9 @@ function unsubscribeActorSync(): void {
 }
 
 function rebuildGraphFromActor(actor: AnyActor): void {
-  void import("../graph.ts").then(({ buildGraph }) => {
-    const graph = buildGraph(actor);
-    $graph.set(graph);
-    void updateLayout(graph);
-  });
+  const graph = buildGraph(actor);
+  $graph.set(graph);
+  void updateLayout(graph);
 }
 
 function subscribeToActorChanges(actor: AnyActor): void {
