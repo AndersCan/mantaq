@@ -44,6 +44,7 @@ export class ActorGraph extends LitElement {
 
   #isPanning = false;
   #lastMouse = { x: 0, y: 0 };
+  #showHelp = false;
 
   static styles = css`
     :host {
@@ -91,6 +92,33 @@ export class ActorGraph extends LitElement {
     }
     .controls button:hover {
       background: #f0f0f0;
+    }
+    .help-tooltip {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-family: system-ui, sans-serif;
+      z-index: 10;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .help-tooltip kbd {
+      display: inline-block;
+      padding: 1px 4px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background: #f5f5f5;
+      font-family: monospace;
+      font-size: 11px;
+      min-width: 18px;
+      text-align: center;
     }
     .empty-state {
       display: flex;
@@ -423,6 +451,11 @@ export class ActorGraph extends LitElement {
     return this.#errorCtrl?.value ?? this.error;
   }
 
+  #toggleHelp() {
+    this.#showHelp = !this.#showHelp;
+    this.requestUpdate();
+  }
+
   render() {
     const error = this.#getError();
     const loading = this.#getLoading();
@@ -451,11 +484,25 @@ export class ActorGraph extends LitElement {
       >
         ${this.#renderEdges()} ${this.#renderNodes()}
       </div>
+      ${this.#showHelp
+        ? html`
+            <div class="help-tooltip">
+              <div><kbd>+</kbd> / <kbd>=</kbd> Zoom in</div>
+              <div><kbd>-</kbd> Zoom out</div>
+              <div><kbd>0</kbd> Reset view</div>
+              <div><kbd>F</kbd> Zoom to fit</div>
+              <div>Scroll to zoom</div>
+              <div>Drag to pan</div>
+              <div>Double-click to fit</div>
+            </div>
+          `
+        : ""}
       <div class="controls">
         <button @click=${this.zoomIn} title="Zoom in">+</button>
         <button @click=${this.zoomOut} title="Zoom out">−</button>
         <button @click=${this.resetView} title="Reset view">0</button>
         <button @click=${this.zoomToFit} title="Zoom to fit">⊞</button>
+        <button @click=${() => this.#toggleHelp()} title="Keyboard shortcuts">?</button>
       </div>
     `;
   }
