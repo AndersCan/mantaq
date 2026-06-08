@@ -48,6 +48,8 @@ export const $graphDimensions = computed($layout, (layout): { width: number; hei
 });
 
 export function setActor(actor: AnyActor | null): void {
+  unsubscribeActorSync();
+
   $actor.set(actor);
 
   if (!actor) {
@@ -127,17 +129,48 @@ export function setViewport(width: number, height: number): void {
   $viewport.set({ width, height });
 }
 
+let actorChangeUnsubscribe: (() => void) | null = null;
+
+function unsubscribeActorSync(): void {
+  if (actorChangeUnsubscribe) {
+    actorChangeUnsubscribe();
+    actorChangeUnsubscribe = null;
+  }
+}
+
+function rebuildGraphFromActor(actor: AnyActor): void {
+  void import("../graph.ts").then(({ buildGraph }) => {
+    const graph = buildGraph(actor);
+    $graph.set(graph);
+    void updateLayout(graph);
+  });
+}
+
+function subscribeToActorChanges(actor: AnyActor): void {
+  unsubscribeActorSync();
+  actorChangeUnsubscribe = actor.on("change", () => {
+    rebuildGraphFromActor(actor);
+  });
+}
+
 export function startActorSync(): () => void {
-  return $actor.subscribe((actor) => {
+  const current = $actor.get();
+  if (current) {
+    subscribeToActorChanges(current);
+    rebuildGraphFromActor(current);
+  }
+
+  const unsubAtom = $actor.subscribe((actor) => {
     if (!actor) {
-      $graph.set(null);
+      unsubscribeActorSync();
       return;
     }
-
-    void import("../graph.ts").then(({ buildGraph }) => {
-      const graph = buildGraph(actor);
-      $graph.set(graph);
-      void updateLayout(graph);
-    });
+    subscribeToActorChanges(actor);
+    rebuildGraphFromActor(actor);
   });
+
+  return () => {
+    unsubAtom();
+    unsubscribeActorSync();
+  };
 }
