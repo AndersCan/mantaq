@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vite-plus/test";
-import { applyDefaultStyles, removeDefaultStyles } from "../src/styles.ts";
+import { applyDefaultStyles, removeDefaultStyles } from "../src/graph-store.ts";
 
 describe("styles", () => {
   it("applyDefaultStyles injects style element", () => {
@@ -76,16 +76,10 @@ describe("exports", () => {
     expect(mod.buildGraph).toBeDefined();
     expect(mod.computeLayout).toBeDefined();
     expect(mod.setActor).toBeDefined();
-    expect(mod.selectNode).toBeDefined();
-    expect(mod.zoomIn).toBeDefined();
-    expect(mod.zoomOut).toBeDefined();
     expect(mod.zoomToFit).toBeDefined();
     expect(mod.resetView).toBeDefined();
     expect(mod.setZoom).toBeDefined();
-    expect(mod.setPan).toBeDefined();
     expect(mod.startActorSync).toBeDefined();
-    expect(mod.applyDarkTheme).toBeDefined();
-    expect(mod.removeDarkTheme).toBeDefined();
     expect(mod.applyDefaultStyles).toBeDefined();
     expect(mod.removeDefaultStyles).toBeDefined();
     expect(mod.ActorGraphComponent).toBeDefined();
@@ -96,13 +90,10 @@ describe("exports", () => {
   it("store atoms are exported", async () => {
     const mod = await import("../src/index.ts");
 
-    expect(mod.$actor).toBeDefined();
-    expect(mod.$graph).toBeDefined();
     expect(mod.$layout).toBeDefined();
     expect(mod.$selectedNodeId).toBeDefined();
     expect(mod.$zoom).toBeDefined();
     expect(mod.$pan).toBeDefined();
     expect(mod.$layoutError).toBeDefined();
-    expect(mod.$isComputing).toBeDefined();
   });
 });

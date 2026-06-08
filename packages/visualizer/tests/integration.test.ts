@@ -1,13 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
 import { Actor, state, event } from "@mantaq/core";
-import {
-  setActor,
-  $graph,
-  $layout,
-  selectNode,
-  $selectedNodeId,
-} from "../src/stores/graph-store.ts";
+import { setActor, $layout, $selectedNodeId } from "../src/graph-store.ts";
 import "../src/components/actor-graph.ts";
 import "../src/components/state-node.ts";
 import "../src/components/edge.ts";
@@ -85,7 +79,6 @@ afterEach(() => {
 
 describe("integration: full visualizer flow", () => {
   beforeEach(async () => {
-    $graph.set(null);
     $layout.set(null);
     $selectedNodeId.set(null);
   });
@@ -135,7 +128,7 @@ describe("integration: full visualizer flow", () => {
     const el = createGraphComponent();
     await el.updateComplete;
 
-    selectNode("green");
+    $selectedNodeId.set("green");
     expect($selectedNodeId.get()).toBe("green");
   });
 
@@ -143,10 +136,9 @@ describe("integration: full visualizer flow", () => {
     const actor = createWithRegions();
     await setActor(actor);
 
-    const graph = $graph.get();
-    expect(graph).not.toBeNull();
-
-    const labels = graph!.nodes.map((n) => n.label);
+    expect($layout.get()).not.toBeNull();
+    const layout = $layout.get();
+    const labels = layout!.nodes.map((n) => n.label);
     expect(labels).toContain("parent");
     expect(labels).toContain("subA");
   });
@@ -155,37 +147,37 @@ describe("integration: full visualizer flow", () => {
     const actor = createTrafficLight();
     await setActor(actor);
 
-    let graph = $graph.get();
-    const initialActive = graph!.nodes.find((n) => n.isActive);
+    let layout = $layout.get();
+    const initialActive = layout!.nodes.find((n) => n.isActive);
     expect(initialActive!.label).toBe("green");
 
     const next = event("NEXT")();
     actor.send(next);
     await setActor(actor);
 
-    graph = $graph.get();
-    const newActive = graph!.nodes.find((n) => n.isActive);
+    layout = $layout.get();
+    const newActive = layout!.nodes.find((n) => n.isActive);
     expect(newActive!.label).toBe("yellow");
   });
 
-  it("full cycle: green → yellow → red → green", async () => {
+  it("full cycle: green -> yellow -> red -> green", async () => {
     const actor = createTrafficLight();
     const next = event("NEXT")();
 
     await setActor(actor);
-    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
+    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
 
     actor.send(next);
     await setActor(actor);
-    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("yellow");
+    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("yellow");
 
     actor.send(next);
     await setActor(actor);
-    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("red");
+    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("red");
 
     actor.send(next);
     await setActor(actor);
-    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
+    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
   });
 
   it("component renders after layout computed", async () => {

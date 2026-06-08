@@ -121,13 +121,6 @@ describe("buildGraph", () => {
     expect(labels).toContain("SUCCESS");
   });
 
-  it("tracks active path", () => {
-    const actor = createSimpleActor();
-    const graph = buildGraph(actor);
-
-    expect(graph.activePath).toContain("idle");
-  });
-
   it("handles self-loop transitions", () => {
     const actor = createSelfLoopActor();
     const graph = buildGraph(actor);
@@ -152,15 +145,6 @@ describe("buildGraph", () => {
     for (const node of graph.nodes) {
       expect(node.id).toBeTruthy();
       expect(typeof node.id).toBe("string");
-    }
-  });
-
-  it("nodes have depth property", () => {
-    const actor = createSimpleActor();
-    const graph = buildGraph(actor);
-
-    for (const node of graph.nodes) {
-      expect(node.depth).toBeGreaterThanOrEqual(0);
     }
   });
 

@@ -1,351 +1,187 @@
-import { LitElement, html, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { html } from "lit";
+import { render } from "lit/html.js";
 import {
   $zoom,
   $pan,
   $selectedNodeId,
   $layout,
   $layoutError,
-  selectNode,
-  zoomIn,
-  zoomOut,
   zoomToFit,
   resetView,
   setZoom,
-  setPan,
-} from "../stores/graph-store.ts";
+} from "../graph-store.ts";
 import type { LayoutResult } from "../layout.ts";
 
-@customElement("actor-graph")
-export class ActorGraphComponent extends LitElement {
-  @property({ type: Number }) declare zoom: number;
-  @property({ type: Object }) declare pan: { x: number; y: number };
-  @property({ type: Object }) declare layout: LayoutResult | null;
+const ZOOM_STEP = 0.2;
 
-  @property({ type: String }) declare layoutError: string | null;
-  @property({ type: String }) declare selectedNodeId: string | null;
+const STYLES = `<style>
+  :host { display: block; position: relative; width: 100%; height: 100%; min-height: 400px; overflow: hidden; background: var(--viz-bg, #fafafa); border-radius: 8px; border: 1px solid var(--viz-border, #e5e7eb); }
+  .container { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; outline: none; }
+  .container:focus-visible { box-shadow: inset 0 0 0 2px var(--viz-accent, #3b82f6); }
+  .container:active { cursor: grabbing; }
+  .viewport { position: absolute; transform-origin: 0 0; will-change: transform; }
+  .error { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: monospace; font-size: 13px; color: var(--viz-error-text, #dc2626); background: var(--viz-error-bg, #fef2f2); padding: 12px 16px; border-radius: 6px; border: 1px solid var(--viz-error-border, #fecaca); max-width: 300px; text-align: center; }
+  .zoom-controls { position: absolute; bottom: 12px; left: 12px; display: flex; gap: 4px; background: var(--viz-node-bg); border: 1px solid var(--viz-border); border-radius: 6px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .zoom-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 4px; font-size: 14px; color: var(--viz-node-label); transition: background .15s; }
+  .zoom-btn:hover { background: var(--viz-border); }
+  .zoom-indicator { font-family: monospace; font-size: 11px; color: var(--viz-text-muted, #6b7280); display: flex; align-items: center; padding: 0 6px; min-width: 40px; justify-content: center; }
+  .help-overlay { position: absolute; top: 12px; right: 12px; background: var(--viz-node-bg); border: 1px solid var(--viz-border); border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 11px; color: var(--viz-text-muted); box-shadow: 0 1px 3px rgba(0,0,0,.08); display: flex; gap: 10px; max-width: calc(100% - 24px); }
+  .help-overlay kbd { background: var(--viz-border); border: 1px solid var(--viz-node-border); border-radius: 3px; padding: 0 4px; font-size: 10px; }
+  .empty-state { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-family: monospace; color: var(--viz-text-muted, #9ca3af); }
+  .empty-state-icon { margin-bottom: 8px; opacity: .5; }
+  .empty-state-text { font-size: 14px; }
+  @media (max-width: 480px) { .help-overlay { display: none; } }
+</style>`;
 
-  static styles = css`
-    :host {
-      display: block;
-      position: relative;
-      width: 100%;
-      height: 100%;
-      min-height: 400px;
-      overflow: hidden;
-      background: var(--viz-bg, #fafafa);
-      border-radius: 8px;
-      border: 1px solid var(--viz-border, #e5e7eb);
-    }
-
-    :host([data-theme="dark"]) {
-      background: var(--viz-bg);
-      border-color: var(--viz-border);
-    }
-
-    .container {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      cursor: grab;
-      position: relative;
-      outline: none;
-    }
-
-    .container:focus-visible {
-      box-shadow: inset 0 0 0 2px var(--viz-accent, #3b82f6);
-    }
-
-    .container:active {
-      cursor: grabbing;
-    }
-
-    .viewport {
-      position: absolute;
-      transform-origin: 0 0;
-      will-change: transform;
-    }
-
-    .error {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-family: monospace;
-      font-size: 13px;
-      color: var(--viz-error-text, #dc2626);
-      background: var(--viz-error-bg, #fef2f2);
-      padding: 12px 16px;
-      border-radius: 6px;
-      border: 1px solid var(--viz-error-border, #fecaca);
-      max-width: 300px;
-      text-align: center;
-    }
-
-    :host([data-theme="dark"]) .error {
-      color: var(--viz-error-text);
-      background: var(--viz-error-bg);
-      border-color: var(--viz-error-border);
-    }
-
-    .zoom-controls {
-      position: absolute;
-      bottom: 12px;
-      left: 12px;
-      display: flex;
-      gap: 4px;
-      background: var(--viz-node-bg);
-      border: 1px solid var(--viz-border);
-      border-radius: 6px;
-      padding: 4px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    }
-
-    .zoom-btn {
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      border-radius: 4px;
-      font-size: 14px;
-      color: var(--viz-node-label);
-      transition: background 0.15s;
-    }
-
-    .zoom-btn:hover {
-      background: var(--viz-border);
-    }
-
-    .zoom-indicator {
-      font-family: monospace;
-      font-size: 11px;
-      color: var(--viz-text-muted, #6b7280);
-      display: flex;
-      align-items: center;
-      padding: 0 6px;
-      min-width: 40px;
-      justify-content: center;
-    }
-
-    .help-overlay {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: var(--viz-node-bg);
-      border: 1px solid var(--viz-border);
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-family: monospace;
-      font-size: 11px;
-      color: var(--viz-text-muted);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-      display: flex;
-      gap: 10px;
-      max-width: calc(100% - 24px);
-    }
-
-    .help-overlay kbd {
-      background: var(--viz-border);
-      border: 1px solid var(--viz-node-border);
-      border-radius: 3px;
-      padding: 0 4px;
-      font-size: 10px;
-    }
-
-    .empty-state {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      font-family: monospace;
-      color: var(--viz-text-muted, #9ca3af);
-    }
-
-    .empty-state-icon {
-      margin-bottom: 8px;
-      opacity: 0.5;
-    }
-
-    .empty-state-text {
-      font-size: 14px;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .loading-spinner {
-        animation: none;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .help-overlay {
-        display: none;
-      }
-    }
-  `;
+export class ActorGraphComponent extends HTMLElement {
+  _shadow: ShadowRoot;
+  _drag: { active: boolean; sx: number; sy: number } = { active: false, sx: 0, sy: 0 };
+  _unsubscribers: Array<() => void> = [];
+  _abort: AbortController | null = null;
+  _zoom = 1;
+  _pan = { x: 0, y: 0 };
+  _layout: LayoutResult | null = null;
+  _layoutError: string | null = null;
+  _selectedNodeId: string | null = null;
+  updateComplete = Promise.resolve();
 
   constructor() {
     super();
-    this.zoom = 1;
-    this.pan = { x: 0, y: 0 };
-    this.layout = null;
-
-    this.layoutError = null;
-    this.selectedNodeId = null;
-    this.#isPanning = false;
-    this.#panStart = { x: 0, y: 0 };
-    this.#unsubscribers = [];
-    this.#boundHandlers = [];
-    this.#hasLayout = false;
+    this._shadow = this.attachShadow({ mode: "open" });
   }
 
-  #isPanning: boolean;
-  #panStart: { x: number; y: number };
-  #unsubscribers: Array<() => void>;
-  #boundHandlers: Array<[EventTarget, string, EventListener]>;
-  #hasLayout: boolean;
+  connectedCallback() {
+    const sub = (
+      store: { subscribe: (fn: (v: any) => void) => () => void },
+      fn: (v: any) => void,
+    ) => this._unsubscribers.push(store.subscribe(fn));
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    this.#unsubscribers.push(
-      $zoom.subscribe((v) => (this.zoom = v)),
-      $pan.subscribe((v) => (this.pan = v)),
-      $layout.subscribe((v) => {
-        this.layout = v;
-        if (v && !this.#hasLayout) {
-          this.#hasLayout = true;
-          requestAnimationFrame(() => zoomToFit());
-        }
-      }),
+    sub($zoom, (v) => {
+      this._zoom = v;
+      this._renderComponent();
+    });
+    sub($pan, (v) => {
+      this._pan = v;
+      this._renderComponent();
+    });
+    sub($layout, (v) => {
+      const firstLayout = v && !this._layout;
+      this._layout = v;
+      if (firstLayout) requestAnimationFrame(() => zoomToFit());
+      this._renderComponent();
+    });
+    sub($layoutError, (v) => {
+      this._layoutError = v;
+      this._renderComponent();
+    });
+    sub($selectedNodeId, (v) => {
+      this._selectedNodeId = v;
+      this._renderComponent();
+    });
 
-      $layoutError.subscribe((v) => (this.layoutError = v)),
-      $selectedNodeId.subscribe((v) => (this.selectedNodeId = v)),
+    this._renderComponent();
+    this._attachEvents();
+  }
+
+  disconnectedCallback() {
+    this._abort?.abort();
+    this._abort = null;
+    for (const unsub of this._unsubscribers) unsub();
+    this._unsubscribers = [];
+  }
+
+  _attachEvents() {
+    const el = this._shadow.querySelector(".container");
+    if (!el) return;
+    this._abort = new AbortController();
+    const s = this._abort.signal;
+    el.addEventListener("wheel", this._handleWheel, { passive: false, signal: s });
+    el.addEventListener("mousedown", this._handleMouseDown, { signal: s });
+    el.addEventListener("dblclick", this._handleDblClick, { signal: s });
+    el.addEventListener("node-select", this._handleNodeSelect, { signal: s });
+    window.addEventListener("mousemove", this._handleMouseMove, { signal: s });
+    window.addEventListener("mouseup", this._handleMouseUp, { signal: s });
+  }
+
+  _zoomAtPoint(cursorX: number, cursorY: number, newZoom: number) {
+    const clamped = Math.min(Math.max(newZoom, 0.1), 5);
+    const scale = clamped / this._zoom;
+    setZoom(clamped);
+    $pan.set({
+      x: cursorX - (cursorX - this._pan.x) * scale,
+      y: cursorY - (cursorY - this._pan.y) * scale,
+    });
+  }
+
+  _handleWheel = (e: Event) => {
+    const we = e as WheelEvent;
+    we.preventDefault();
+    const rect = (we.currentTarget as HTMLElement).getBoundingClientRect();
+    this._zoomAtPoint(
+      we.clientX - rect.left,
+      we.clientY - rect.top,
+      this._zoom + (we.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP),
     );
-  }
+  };
 
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    for (const [target, event, handler] of this.#boundHandlers) {
-      target.removeEventListener(event, handler);
-    }
-    this.#boundHandlers = [];
-    for (const unsub of this.#unsubscribers) unsub();
-  }
+  _handleMouseDown = (e: Event) => {
+    if ((e.target as HTMLElement).closest("state-node")) return;
+    const me = e as MouseEvent;
+    this._drag = { active: true, sx: me.clientX - this._pan.x, sy: me.clientY - this._pan.y };
+  };
 
-  firstUpdated(): void {
-    const container = this.shadowRoot?.querySelector(".container");
-    if (!container) return;
-
-    const add = (
-      target: EventTarget,
-      event: string,
-      fn: (e: Event) => void,
-      opts?: AddEventListenerOptions,
-    ) => {
-      target.addEventListener(event, fn as EventListener, opts);
-      this.#boundHandlers.push([target, event, fn as EventListener]);
-    };
-
-    add(container, "wheel", this.#handleWheel, { passive: false });
-    add(container, "mousedown", this.#handleMouseDown);
-    add(container, "dblclick", this.#handleDblClick);
-    add(container, "node-select", this.#handleNodeSelect);
-    add(window, "mousemove", this.#handleMouseMove);
-    add(window, "mouseup", this.#handleMouseUp);
-  }
-
-  #handleWheel = (e: Event): void => {
-    const wheelEvent = e as WheelEvent;
-    wheelEvent.preventDefault();
-    const rect = (wheelEvent.currentTarget as HTMLElement).getBoundingClientRect();
-    const cursorX = wheelEvent.clientX - rect.left;
-    const cursorY = wheelEvent.clientY - rect.top;
-
-    const oldZoom = this.zoom;
-    const delta = wheelEvent.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-    const newZoom = Math.min(Math.max(oldZoom + delta, MIN_ZOOM), MAX_ZOOM);
-    const scale = newZoom / oldZoom;
-
-    setZoom(newZoom);
-    setPan({
-      x: cursorX - (cursorX - this.pan.x) * scale,
-      y: cursorY - (cursorY - this.pan.y) * scale,
+  _handleMouseMove = (e: Event) => {
+    if (!this._drag.active) return;
+    $pan.set({
+      x: (e as MouseEvent).clientX - this._drag.sx,
+      y: (e as MouseEvent).clientY - this._drag.sy,
     });
   };
 
-  #handleMouseDown = (e: Event): void => {
-    const mouseEvent = e as MouseEvent;
-    if ((mouseEvent.target as HTMLElement).closest("state-node")) return;
-    this.#isPanning = true;
-    this.#panStart = { x: mouseEvent.clientX - this.pan.x, y: mouseEvent.clientY - this.pan.y };
+  _handleMouseUp = () => {
+    this._drag.active = false;
   };
 
-  #handleMouseMove = (e: Event): void => {
-    if (!this.#isPanning) return;
-    const mouseEvent = e as MouseEvent;
-    setPan({
-      x: mouseEvent.clientX - this.#panStart.x,
-      y: mouseEvent.clientY - this.#panStart.y,
-    });
+  _handleDblClick = (e: Event) => {
+    const me = e as MouseEvent;
+    const rect = (me.currentTarget as HTMLElement).getBoundingClientRect();
+    this._zoomAtPoint(me.clientX - rect.left, me.clientY - rect.top, this._zoom + ZOOM_STEP * 2);
   };
 
-  #handleMouseUp = (): void => {
-    this.#isPanning = false;
+  _handleNodeSelect = (e: Event) => {
+    $selectedNodeId.set((e as CustomEvent).detail.nodeId);
   };
 
-  #handleDblClick = (e: Event): void => {
-    const mouseEvent = e as MouseEvent;
-    const rect = (mouseEvent.currentTarget as HTMLElement).getBoundingClientRect();
-    const cursorX = mouseEvent.clientX - rect.left;
-    const cursorY = mouseEvent.clientY - rect.top;
-
-    const oldZoom = this.zoom;
-    const newZoom = Math.min(oldZoom + ZOOM_STEP * 2, MAX_ZOOM);
-    const scale = newZoom / oldZoom;
-
-    setZoom(newZoom);
-    setPan({
-      x: cursorX - (cursorX - this.pan.x) * scale,
-      y: cursorY - (cursorY - this.pan.y) * scale,
-    });
-  };
-
-  #handleNodeSelect = (e: Event): void => {
-    const detail = (e as CustomEvent).detail;
-    selectNode(detail.nodeId);
-  };
-
-  #panToNode(nodeId: string): void {
-    const nodes = this.layout?.nodes;
-    if (!nodes) return;
-    const node = nodes.find((n) => n.id === nodeId);
+  _panToNode(nodeId: string) {
+    const node = this._layout?.nodes.find((n) => n.id === nodeId);
     if (!node) return;
-
-    const container = this.shadowRoot?.querySelector(".container");
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    const nodeCenterX = node.x + node.width / 2;
-    const nodeCenterY = node.y + node.height / 2;
-    setPan({
-      x: rect.width / 2 - nodeCenterX * this.zoom,
-      y: rect.height / 2 - nodeCenterY * this.zoom,
+    const el = this._shadow.querySelector(".container");
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    $pan.set({
+      x: r.width / 2 - (node.x + node.width / 2) * this._zoom,
+      y: r.height / 2 - (node.y + node.height / 2) * this._zoom,
     });
   }
 
-  #handleKeyDown = (e: KeyboardEvent): void => {
+  _navigateNode(delta: 1 | -1) {
+    const nodes = this._layout?.nodes;
+    if (!nodes?.length) return;
+    const idx = nodes.findIndex((n) => n.id === this._selectedNodeId);
+    const nextId = nodes[(idx + delta + nodes.length) % nodes.length].id;
+    $selectedNodeId.set(nextId);
+    this._panToNode(nextId);
+  }
+
+  _handleKeyDown = (e: KeyboardEvent) => {
     switch (e.key) {
       case "+":
       case "=":
-        zoomIn();
+        setZoom(this._zoom + ZOOM_STEP);
         break;
       case "-":
-        zoomOut();
+        setZoom(this._zoom - ZOOM_STEP);
         break;
       case "0":
         resetView();
@@ -355,92 +191,77 @@ export class ActorGraphComponent extends LitElement {
         zoomToFit();
         break;
       case "Escape":
-        selectNode(null);
+        $selectedNodeId.set(null);
         break;
       case "ArrowRight":
-      case "ArrowDown": {
+      case "ArrowDown":
         e.preventDefault();
-        const nodes = this.layout?.nodes;
-        if (!nodes?.length) break;
-        const currentIdx = nodes.findIndex((n) => n.id === this.selectedNodeId);
-        const nextIdx = currentIdx < nodes.length - 1 ? currentIdx + 1 : 0;
-        const nextId = nodes[nextIdx].id;
-        selectNode(nextId);
-        this.#panToNode(nextId);
+        this._navigateNode(1);
         break;
-      }
       case "ArrowLeft":
-      case "ArrowUp": {
+      case "ArrowUp":
         e.preventDefault();
-        const nodes = this.layout?.nodes;
-        if (!nodes?.length) break;
-        const currentIdx = nodes.findIndex((n) => n.id === this.selectedNodeId);
-        const prevIdx = currentIdx > 0 ? currentIdx - 1 : nodes.length - 1;
-        const prevId = nodes[prevIdx].id;
-        selectNode(prevId);
-        this.#panToNode(prevId);
+        this._navigateNode(-1);
         break;
-      }
     }
   };
 
-  render() {
-    const layoutErr = this.layoutError;
-    const layout = this.layout;
-
+  _renderComponent() {
+    const {
+      _layoutError: err,
+      _layout: layout,
+      _pan: pan,
+      _zoom: zoom,
+      _selectedNodeId: sel,
+    } = this;
     let content;
-    if (layoutErr) {
-      content = html`<div class="error" role="alert">${layoutErr}</div>`;
+    if (err) {
+      content = html`<div class="error" role="alert">${err}</div>`;
     } else if (!layout) {
-      content = html`
-        <div class="empty-state">
-          <div class="empty-state-icon">
-            <svg
-              width="40"
-              height="40"
-              viewBox="0 0 40 40"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-            >
-              <polygon points="20,2 36,11 36,29 20,38 4,29 4,11" />
-            </svg>
-          </div>
-          <div class="empty-state-text">No actor loaded</div>
+      content = html`<div class="empty-state">
+        <div class="empty-state-icon">
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 40 40"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <polygon points="20,2 36,11 36,29 20,38 4,29 4,11" />
+          </svg>
         </div>
-      `;
+        <div class="empty-state-text">No actor loaded</div>
+      </div>`;
     } else {
-      const transform = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
-      content = html`
-        <div class="viewport" style="transform: ${transform}">
+      content = html` <div
+          class="viewport"
+          style="transform:translate(${pan.x}px,${pan.y}px) scale(${zoom})"
+        >
           ${layout.edges.map(
-            (edge) => html`
-              <edge-path
-                .edgeId=${edge.id}
-                .path=${edge.path}
-                .label=${edge.label}
-                .isActive=${edge.isActive}
-                .labelX=${edge.labelX}
-                .labelY=${edge.labelY}
-                .graphWidth=${layout.width}
-                .graphHeight=${layout.height}
-              ></edge-path>
-            `,
+            (e) => html`<edge-path
+              .edgeId=${e.id}
+              .path=${e.path}
+              .label=${e.label}
+              .isActive=${e.isActive}
+              .labelX=${e.labelX}
+              .labelY=${e.labelY}
+              .graphWidth=${layout.width}
+              .graphHeight=${layout.height}
+            ></edge-path>`,
           )}
           ${layout.nodes.map(
-            (node) => html`
-              <state-node
-                .nodeId=${node.id}
-                .label=${node.label}
-                .isActive=${node.isActive}
-                .isFinal=${node.isFinal}
-                .x=${node.x}
-                .y=${node.y}
-                .width=${node.width}
-                .height=${node.height}
-                .selected=${this.selectedNodeId === node.id}
-              ></state-node>
-            `,
+            (n) => html`<state-node
+              .nodeId=${n.id}
+              .label=${n.label}
+              .isActive=${n.isActive}
+              .isFinal=${n.isFinal}
+              .x=${n.x}
+              .y=${n.y}
+              .width=${n.width}
+              .height=${n.height}
+              .selected=${sel === n.id}
+            ></state-node>`,
           )}
         </div>
         <div class="help-overlay">
@@ -451,27 +272,34 @@ export class ActorGraphComponent extends LitElement {
           <span><kbd>Esc</kbd> deselect</span>
         </div>
         <div class="zoom-controls">
-          <button class="zoom-btn" aria-label="Zoom out" @click=${() => zoomOut()}>&minus;</button>
-          <span class="zoom-indicator" aria-live="polite" aria-label="Zoom level"
-            >${Math.round(this.zoom * 100)}%</span
+          <button
+            class="zoom-btn"
+            aria-label="Zoom out"
+            @click=${() => setZoom(this._zoom - ZOOM_STEP)}
           >
-          <button class="zoom-btn" aria-label="Zoom in" @click=${() => zoomIn()}>+</button>
-        </div>
-      `;
+            &minus;
+          </button>
+          <span class="zoom-indicator" aria-live="polite">${Math.round(zoom * 100)}%</span>
+          <button
+            class="zoom-btn"
+            aria-label="Zoom in"
+            @click=${() => setZoom(this._zoom + ZOOM_STEP)}
+          >
+            +
+          </button>
+        </div>`;
     }
-
-    return html`
-      <div class="container" tabindex="0" @keydown=${this.#handleKeyDown}>${content}</div>
-    `;
+    let resolve: () => void;
+    this.updateComplete = new Promise<void>((r) => {
+      resolve = r;
+    });
+    render(
+      html`${STYLES}
+        <div class="container" tabindex="0" @keydown=${this._handleKeyDown}>${content}</div>`,
+      this._shadow,
+    );
+    resolve!();
   }
 }
 
-const MIN_ZOOM = 0.1;
-const MAX_ZOOM = 5;
-const ZOOM_STEP = 0.2;
-
-declare global {
-  interface HTMLElementTagNameMap {
-    "actor-graph": ActorGraphComponent;
-  }
-}
+customElements.define("actor-graph", ActorGraphComponent);
