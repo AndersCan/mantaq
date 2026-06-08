@@ -4,6 +4,9 @@ import type { GraphNode } from "../graph.ts";
 import type { ComputedEdge } from "../layout.ts";
 import { renderEdge } from "./edge.ts";
 
+const ZOOM_MIN = 0.1;
+const ZOOM_MAX = 5;
+
 @customElement("actor-graph")
 export class ActorGraph extends LitElement {
   @property({ type: Array }) nodes: GraphNode[] = [];
@@ -98,7 +101,7 @@ export class ActorGraph extends LitElement {
   #handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const newZoom = Math.max(0.1, Math.min(5, this.zoom + delta));
+    const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this.zoom + delta));
 
     const rect = this.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -158,12 +161,12 @@ export class ActorGraph extends LitElement {
   };
 
   zoomIn = () => {
-    this.zoom = Math.min(5, this.zoom + 0.2);
+    this.zoom = Math.min(ZOOM_MAX, this.zoom + 0.2);
     this.#dispatchZoomChange();
   };
 
   zoomOut = () => {
-    this.zoom = Math.max(0.1, this.zoom - 0.2);
+    this.zoom = Math.max(ZOOM_MIN, this.zoom - 0.2);
     this.#dispatchZoomChange();
   };
 
@@ -198,7 +201,7 @@ export class ActorGraph extends LitElement {
     const availW = rect.width - padding * 2;
     const availH = rect.height - padding * 2;
 
-    this.zoom = Math.min(availW / graphW, availH / graphH, 2);
+    this.zoom = Math.min(availW / graphW, availH / graphH, ZOOM_MAX);
     this.pan = {
       x: padding + (availW - graphW * this.zoom) / 2 - minX * this.zoom,
       y: padding + (availH - graphH * this.zoom) / 2 - minY * this.zoom,
