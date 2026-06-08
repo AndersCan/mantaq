@@ -93,8 +93,11 @@ export const stateNodeStyles: CSSResultGroup = css`
     font-size: 14px;
     transition: all 0.2s ease;
     min-width: 80px;
-    cursor: pointer;
-    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    box-sizing: border-box;
   }
 
   .node:hover {
@@ -121,6 +124,7 @@ export const stateNodeStyles: CSSResultGroup = css`
     font-weight: 500;
     color: var(--viz-text-primary);
     white-space: nowrap;
+    pointer-events: none;
   }
 `;
 
