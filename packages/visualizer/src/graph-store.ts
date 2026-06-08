@@ -43,6 +43,18 @@ export async function setActor(actor: AnyActor): Promise<void> {
   }
 }
 
+export function selectNode(nodeId: string | null): void {
+  $selectedNodeId.set(nodeId);
+}
+
+export function zoomIn(): void {
+  setZoom($zoom.get() + 0.2);
+}
+
+export function zoomOut(): void {
+  setZoom($zoom.get() - 0.2);
+}
+
 export function setZoom(zoom: number): void {
   $zoom.set(Math.min(Math.max(zoom, MIN_ZOOM), MAX_ZOOM));
 }

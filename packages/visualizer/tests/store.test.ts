@@ -8,6 +8,9 @@ import {
   $layoutError,
   $layoutLoading,
   setActor,
+  selectNode,
+  zoomIn,
+  zoomOut,
   zoomToFit,
   resetView,
   setZoom,
@@ -184,6 +187,47 @@ describe("graph store", () => {
     await Promise.all([p1, p2]);
 
     expect($layoutError.get()).toBeNull();
+  });
+
+  it("selectNode sets selected node id", () => {
+    selectNode("idle");
+    expect($selectedNodeId.get()).toBe("idle");
+  });
+
+  it("selectNode clears selected node id with null", () => {
+    $selectedNodeId.set("active");
+    selectNode(null);
+    expect($selectedNodeId.get()).toBeNull();
+  });
+
+  it("selectNode changes selection", () => {
+    selectNode("idle");
+    selectNode("active");
+    expect($selectedNodeId.get()).toBe("active");
+  });
+
+  it("zoomIn increases zoom by 0.2", () => {
+    $zoom.set(1);
+    zoomIn();
+    expect($zoom.get()).toBeCloseTo(1.2);
+  });
+
+  it("zoomIn does not exceed max zoom", () => {
+    $zoom.set(4.9);
+    zoomIn();
+    expect($zoom.get()).toBe(5);
+  });
+
+  it("zoomOut decreases zoom by 0.2", () => {
+    $zoom.set(1);
+    zoomOut();
+    expect($zoom.get()).toBeCloseTo(0.8);
+  });
+
+  it("zoomOut does not go below min zoom", () => {
+    $zoom.set(0.2);
+    zoomOut();
+    expect($zoom.get()).toBe(0.1);
   });
 
   it("startActorSync returns unsubscribe function", () => {
