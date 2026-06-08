@@ -43,11 +43,16 @@ export class StateNode extends LitElement {
     if (this.isFinal) classes.push("final");
     if (this.isSelected) classes.push("selected");
 
+    const tooltip = [this.nodeId, this.isActive ? "(active)" : "", this.isFinal ? "(final)" : ""]
+      .filter(Boolean)
+      .join(" ");
+
     return html`
       <div
         class="${classes.join(" ")}"
         style="width: ${this.nodeWidth}px; height: ${this.nodeHeight}px; left: ${this
           .xPos}px; top: ${this.yPos}px;"
+        title="${tooltip}"
         @click=${this.handleClick}
       >
         <span class="label">${this.label}</span>
