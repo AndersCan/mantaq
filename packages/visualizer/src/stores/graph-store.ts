@@ -83,12 +83,15 @@ export function selectNode(nodeId: string | null): void {
   $selectedNodeId.set(nodeId);
 }
 
+const ZOOM_MIN = 0.1;
+const ZOOM_MAX = 5;
+
 export function zoomIn(): void {
-  $zoom.set(Math.min($zoom.get() * 1.2, 3));
+  $zoom.set(Math.min($zoom.get() * 1.2, ZOOM_MAX));
 }
 
 export function zoomOut(): void {
-  $zoom.set(Math.max($zoom.get() / 1.2, 0.3));
+  $zoom.set(Math.max($zoom.get() / 1.2, ZOOM_MIN));
 }
 
 export function zoomToFit(): void {
