@@ -46,3 +46,19 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
+
+<!--SKILLS START-->
+
+# Skills
+
+Skills listed in system prompt `available_skills` may be stale. Load from disk:
+
+- `.opencode/skills/add-change/SKILL.md`
+- `.opencode/skills/find-skills/SKILL.md`
+- `.opencode/skills/save-changes/SKILL.md`
+- `.opencode/skills/self-improvement/SKILL.md`
+- `.opencode/skills/self-improvement-worker/SKILL.md`
+
+Use `skill` tool with name matching the directory. Disk versions supersede system prompt.
+
+<!--SKILLS END-->

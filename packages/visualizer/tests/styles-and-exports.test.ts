@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from "vite-plus/test";
 import { applyDefaultStyles, removeDefaultStyles } from "../src/styles.ts";
 

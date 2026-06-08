@@ -9,6 +9,8 @@ export class EdgePath extends LitElement {
   @property({ type: Boolean }) declare isActive: boolean;
   @property({ type: Number }) declare labelX: number;
   @property({ type: Number }) declare labelY: number;
+  @property({ type: Number }) declare graphWidth: number;
+  @property({ type: Number }) declare graphHeight: number;
 
   static styles = css`
     :host {
@@ -71,15 +73,22 @@ export class EdgePath extends LitElement {
     this.isActive = false;
     this.labelX = 0;
     this.labelY = 0;
+    this.graphWidth = 0;
+    this.graphHeight = 0;
   }
 
   render() {
     const labelBgWidth = this.label ? this.label.length * 6.5 + 16 : 0;
     const labelBgHeight = 18;
 
+    const svgWidth = this.graphWidth || 2000;
+    const svgHeight = this.graphHeight || 2000;
+
     return html`
       <svg
-        style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible;"
+        width=${svgWidth}
+        height=${svgHeight}
+        style="position: absolute; left: 0; top: 0; overflow: visible;"
       >
         <defs>
           <marker

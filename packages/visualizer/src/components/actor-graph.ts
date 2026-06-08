@@ -5,7 +5,6 @@ import {
   $pan,
   $selectedNodeId,
   $layout,
-  $isComputing,
   $layoutError,
   selectNode,
   zoomIn,
@@ -22,7 +21,7 @@ export class ActorGraphComponent extends LitElement {
   @property({ type: Number }) declare zoom: number;
   @property({ type: Object }) declare pan: { x: number; y: number };
   @property({ type: Object }) declare layout: LayoutResult | null;
-  @property({ type: Boolean }) declare computing: boolean;
+
   @property({ type: String }) declare layoutError: string | null;
   @property({ type: String }) declare selectedNodeId: string | null;
 
@@ -67,34 +66,6 @@ export class ActorGraphComponent extends LitElement {
       will-change: transform;
     }
 
-    .loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-family: monospace;
-      font-size: 14px;
-      color: var(--viz-text-muted, #6b7280);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .loading-spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid var(--viz-border);
-      border-top-color: var(--viz-accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
     .error {
       position: absolute;
       top: 50%;
@@ -120,7 +91,7 @@ export class ActorGraphComponent extends LitElement {
     .zoom-controls {
       position: absolute;
       bottom: 12px;
-      right: 12px;
+      left: 12px;
       display: flex;
       gap: 4px;
       background: var(--viz-node-bg);
@@ -222,27 +193,35 @@ export class ActorGraphComponent extends LitElement {
     this.zoom = 1;
     this.pan = { x: 0, y: 0 };
     this.layout = null;
-    this.computing = false;
+
     this.layoutError = null;
     this.selectedNodeId = null;
     this.#isPanning = false;
     this.#panStart = { x: 0, y: 0 };
     this.#unsubscribers = [];
     this.#boundHandlers = [];
+    this.#hasLayout = false;
   }
 
   #isPanning: boolean;
   #panStart: { x: number; y: number };
   #unsubscribers: Array<() => void>;
   #boundHandlers: Array<[EventTarget, string, EventListener]>;
+  #hasLayout: boolean;
 
   connectedCallback(): void {
     super.connectedCallback();
     this.#unsubscribers.push(
       $zoom.subscribe((v) => (this.zoom = v)),
       $pan.subscribe((v) => (this.pan = v)),
-      $layout.subscribe((v) => (this.layout = v)),
-      $isComputing.subscribe((v) => (this.computing = v)),
+      $layout.subscribe((v) => {
+        this.layout = v;
+        if (v && !this.#hasLayout) {
+          this.#hasLayout = true;
+          requestAnimationFrame(() => zoomToFit());
+        }
+      }),
+
       $layoutError.subscribe((v) => (this.layoutError = v)),
       $selectedNodeId.subscribe((v) => (this.selectedNodeId = v)),
     );
@@ -406,21 +385,14 @@ export class ActorGraphComponent extends LitElement {
   };
 
   render() {
-    if (this.computing) {
-      return html`
-        <div class="loading" role="status" aria-live="polite">
-          <div class="loading-spinner" aria-hidden="true"></div>
-          Computing layout...
-        </div>
-      `;
-    }
+    const layoutErr = this.layoutError;
+    const layout = this.layout;
 
-    if (this.layoutError) {
-      return html`<div class="error" role="alert">${this.layoutError}</div>`;
-    }
-
-    if (!this.layout) {
-      return html`
+    let content;
+    if (layoutErr) {
+      content = html`<div class="error" role="alert">${layoutErr}</div>`;
+    } else if (!layout) {
+      content = html`
         <div class="empty-state">
           <div class="empty-state-icon">
             <svg
@@ -437,14 +409,11 @@ export class ActorGraphComponent extends LitElement {
           <div class="empty-state-text">No actor loaded</div>
         </div>
       `;
-    }
-
-    const transform = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
-
-    return html`
-      <div class="container" tabindex="0" @keydown=${this.#handleKeyDown}>
+    } else {
+      const transform = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
+      content = html`
         <div class="viewport" style="transform: ${transform}">
-          ${this.layout.edges.map(
+          ${layout.edges.map(
             (edge) => html`
               <edge-path
                 .edgeId=${edge.id}
@@ -453,10 +422,12 @@ export class ActorGraphComponent extends LitElement {
                 .isActive=${edge.isActive}
                 .labelX=${edge.labelX}
                 .labelY=${edge.labelY}
+                .graphWidth=${layout.width}
+                .graphHeight=${layout.height}
               ></edge-path>
             `,
           )}
-          ${this.layout.nodes.map(
+          ${layout.nodes.map(
             (node) => html`
               <state-node
                 .nodeId=${node.id}
@@ -486,7 +457,11 @@ export class ActorGraphComponent extends LitElement {
           >
           <button class="zoom-btn" aria-label="Zoom in" @click=${() => zoomIn()}>+</button>
         </div>
-      </div>
+      `;
+    }
+
+    return html`
+      <div class="container" tabindex="0" @keydown=${this.#handleKeyDown}>${content}</div>
     `;
   }
 }

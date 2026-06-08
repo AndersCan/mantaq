@@ -17,6 +17,10 @@ catalog:
   sharp: ^0.34.5
   lit: ^3.3.3
   "@nanostores/lit": ^0.2.3
+  "@vitest/browser": 4.1.8
+  playwright: ^1.60.0
+  "@vitest/browser-playwright": 4.1.8
+  remark-gfm: ^4.0.1
 overrides:
   vite: "catalog:"
   vitest: "catalog:"

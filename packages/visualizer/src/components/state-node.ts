@@ -138,8 +138,8 @@ export class StateNode extends LitElement {
 
     return html`
       <svg
-        .width=${this.width + 20}
-        .height=${this.height + 20}
+        width=${this.width + 20}
+        height=${this.height + 20}
         role="button"
         tabindex="0"
         aria-label=${ariaLabel}

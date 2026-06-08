@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from "vite-plus/test";
 import "../src/components/state-node.ts";
 import "../src/components/edge.ts";
@@ -397,7 +398,7 @@ describe("ActorGraph component", () => {
     const el = createActorGraph();
     expect(el.zoom).toBe(1);
     expect(el.pan).toEqual({ x: 0, y: 0 });
-    expect(el.computing).toBe(false);
+
     expect(el.layoutError).toBeNull();
     expect(el.selectedNodeId).toBeNull();
   });
@@ -537,6 +538,7 @@ describe("ActorGraph component", () => {
     expect(emptyState).toBeDefined();
 
     const container = el.shadowRoot!.querySelector(".container");
-    expect(container).toBeNull();
+    expect(container).not.toBeNull();
+    expect(container!.querySelector(".empty-state")).not.toBeNull();
   });
 });
