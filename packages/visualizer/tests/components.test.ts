@@ -440,7 +440,7 @@ describe("ActorGraph component", () => {
   });
 
   it("arrow right wraps to first node from last", async () => {
-    selectNode("b");
+    selectNode("c");
     const el = createActorGraph();
     await el.updateComplete;
 

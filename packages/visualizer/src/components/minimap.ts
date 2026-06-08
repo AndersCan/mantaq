@@ -1,8 +1,8 @@
 import { LitElement, html, css } from "lit";
 import { customElement, query } from "lit/decorators.js";
 import { StoreController } from "@nanostores/lit";
-import type { GraphNode } from "../graph.ts";
-import { $flatNodes, $graphDimensions, $zoom, $pan, $viewport } from "../stores/graph-store.ts";
+import { $layout, $zoom, $pan } from "../stores/graph-store.ts";
+import type { LayoutResult } from "../layout.ts";
 
 @customElement("minimap")
 export class Minimap extends LitElement {
@@ -30,19 +30,15 @@ export class Minimap extends LitElement {
 
   @query("canvas") accessor _canvas!: HTMLCanvasElement | null;
 
-  #nodesCtrl?: StoreController<GraphNode[]>;
-  #dimensionsCtrl?: StoreController<{ width: number; height: number }>;
+  #layoutCtrl?: StoreController<LayoutResult | null>;
   #zoomCtrl?: StoreController<number>;
   #panCtrl?: StoreController<{ x: number; y: number }>;
-  #viewportCtrl?: StoreController<{ width: number; height: number }>;
 
   connectedCallback() {
     super.connectedCallback();
-    this.#nodesCtrl = new StoreController(this, $flatNodes);
-    this.#dimensionsCtrl = new StoreController(this, $graphDimensions);
+    this.#layoutCtrl = new StoreController(this, $layout);
     this.#zoomCtrl = new StoreController(this, $zoom);
     this.#panCtrl = new StoreController(this, $pan);
-    this.#viewportCtrl = new StoreController(this, $viewport);
     this.addEventListener("click", this.#handleClick);
   }
 
@@ -51,12 +47,8 @@ export class Minimap extends LitElement {
     this.removeEventListener("click", this.#handleClick);
   }
 
-  #getNodes(): GraphNode[] {
-    return this.#nodesCtrl?.value ?? [];
-  }
-
-  #getDimensions(): { width: number; height: number } {
-    return this.#dimensionsCtrl?.value ?? { width: 800, height: 600 };
+  #getLayout(): LayoutResult | null {
+    return this.#layoutCtrl?.value ?? null;
   }
 
   #getZoom(): number {
@@ -67,27 +59,30 @@ export class Minimap extends LitElement {
     return this.#panCtrl?.value ?? { x: 0, y: 0 };
   }
 
-  #getViewport(): { width: number; height: number } {
-    return this.#viewportCtrl?.value ?? { width: 800, height: 600 };
-  }
-
   #handleClick = (e: MouseEvent) => {
     const canvas = this._canvas;
     if (!canvas) return;
+
+    const layout = this.#getLayout();
+    if (!layout) return;
 
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    const dims = this.#getDimensions();
-    const viewport = this.#getViewport();
-    const scale = Math.min(150 / dims.width, 100 / dims.height);
+    const w = 150;
+    const h = 100;
+    const scale = Math.min(w / layout.width, h / layout.height);
 
     const graphX = clickX / scale;
     const graphY = clickY / scale;
 
-    const newPanX = -graphX * this.#getZoom() + viewport.width / 2;
-    const newPanY = -graphY * this.#getZoom() + viewport.height / 2;
+    const graphEl = document.querySelector("actor-graph");
+    const viewW = graphEl ? graphEl.getBoundingClientRect().width : 800;
+    const viewH = graphEl ? graphEl.getBoundingClientRect().height : 600;
+
+    const newPanX = -graphX * this.#getZoom() + viewW / 2;
+    const newPanY = -graphY * this.#getZoom() + viewH / 2;
 
     $pan.set({ x: newPanX, y: newPanY });
   };
@@ -102,11 +97,9 @@ export class Minimap extends LitElement {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dims = this.#getDimensions();
-    const nodes = this.#getNodes();
+    const layout = this.#getLayout();
     const zoom = this.#getZoom();
     const pan = this.#getPan();
-    const viewport = this.#getViewport();
 
     const w = 150;
     const h = 100;
@@ -118,39 +111,38 @@ export class Minimap extends LitElement {
     ctx.fillStyle = "#fafafa";
     ctx.fillRect(0, 0, w, h);
 
-    if (dims.width === 0 || dims.height === 0) return;
+    if (!layout || layout.width === 0 || layout.height === 0) return;
 
-    const scale = Math.min(w / dims.width, h / dims.height);
-    const offsetX = (w - dims.width * scale) / 2;
-    const offsetY = (h - dims.height * scale) / 2;
+    const scale = Math.min(w / layout.width, h / layout.height);
+    const offsetX = (w - layout.width * scale) / 2;
+    const offsetY = (h - layout.height * scale) / 2;
 
     ctx.save();
     ctx.translate(offsetX, offsetY);
     ctx.scale(scale, scale);
 
-    for (const node of nodes) {
-      const nx = node.x ?? 0;
-      const ny = node.y ?? 0;
-      const nw = node.width ?? 120;
-      const nh = node.height ?? 60;
-
+    for (const node of layout.nodes) {
       ctx.fillStyle = node.isActive ? "#4caf50" : "#e0e0e0";
       ctx.strokeStyle = node.isActive ? "#388e3c" : "#bbb";
       ctx.lineWidth = 1 / scale;
-      ctx.fillRect(nx, ny, nw, nh);
-      ctx.strokeRect(nx, ny, nw, nh);
+      ctx.fillRect(node.x, node.y, node.width, node.height);
+      ctx.strokeRect(node.x, node.y, node.width, node.height);
     }
+
+    const graphEl = document.querySelector("actor-graph");
+    const viewW = graphEl ? graphEl.getBoundingClientRect().width : 800;
+    const viewH = graphEl ? graphEl.getBoundingClientRect().height : 600;
 
     const viewX = -pan.x / zoom;
     const viewY = -pan.y / zoom;
-    const viewW = viewport.width / zoom;
-    const viewH = viewport.height / zoom;
+    const viewPortW = viewW / zoom;
+    const viewPortH = viewH / zoom;
 
     ctx.strokeStyle = "#1976d2";
     ctx.lineWidth = 2 / scale;
     ctx.fillStyle = "rgba(25, 118, 210, 0.08)";
-    ctx.fillRect(viewX, viewY, viewW, viewH);
-    ctx.strokeRect(viewX, viewY, viewW, viewH);
+    ctx.fillRect(viewX, viewY, viewPortW, viewPortH);
+    ctx.strokeRect(viewX, viewY, viewPortW, viewPortH);
 
     ctx.restore();
   }

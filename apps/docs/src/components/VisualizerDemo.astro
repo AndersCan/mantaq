@@ -1,0 +1,167 @@
+---
+interface Props {
+  height?: string;
+}
+
+const { height = "400px" } = Astro.props;
+---
+
+<div class="vis-demo">
+  <div class="vis-controls">
+    <span class="vis-state-label">
+      State: <strong id="vis-state-name" class="vis-state-name">green</strong>
+    </span>
+    <div class="vis-buttons">
+      <button id="vis-btn-next" class="vis-btn">NEXT &rarr;</button>
+      <button id="vis-btn-reset" class="vis-btn vis-btn-secondary">Reset</button>
+    </div>
+  </div>
+  <div class="vis-graph-wrapper">
+    <actor-graph id="vis-actor-graph"></actor-graph>
+  </div>
+  <div id="vis-log" class="vis-log"></div>
+</div>
+
+<style>
+  .vis-demo {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 1rem 0;
+  }
+
+  .vis-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--sl-color-bg-nav);
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .vis-state-label {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--sl-color-gray-2);
+  }
+
+  .vis-state-name {
+    font-weight: 700;
+  }
+
+  .vis-state-name[data-state="green"] { color: #16a34a; }
+  .vis-state-name[data-state="yellow"] { color: #ca8a04; }
+  .vis-state-name[data-state="red"] { color: #dc2626; }
+
+  .vis-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .vis-btn {
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 4px;
+    background: var(--sl-color-bg);
+    color: var(--sl-color-gray-2);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .vis-btn:hover {
+    background: var(--sl-color-gray-6);
+    border-color: var(--sl-color-gray-4);
+  }
+
+  .vis-btn-secondary {
+    background: transparent;
+  }
+
+  .vis-graph-wrapper {
+    height: v-bind(height);
+    position: relative;
+  }
+
+  .vis-graph-wrapper :global(actor-graph) {
+    width: 100%;
+    height: 100%;
+  }
+
+  .vis-log {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--sl-color-gray-5);
+    min-height: 1.5em;
+  }
+</style>
+
+<script>
+  import { Actor, state, event } from "@mantaq/core";
+  import { setActor, startActorSync } from "@mantaq/visualizer";
+
+  function createTrafficLight() {
+    const green = state("green")();
+    const yellow = state("yellow")();
+    const red = state("red")();
+    const next = event("NEXT")();
+
+    const actor = new Actor({
+      inputs: [next],
+      outputs: [],
+      internal: [],
+      states: [green, yellow, red],
+      initial: green,
+      context: {} as {},
+      effects: {},
+      transitions: {
+        green: { NEXT: () => ({ state: yellow }) },
+        yellow: { NEXT: () => ({ state: red }) },
+        red: { NEXT: () => ({ state: green }) },
+      },
+    });
+
+    return { actor, next };
+  }
+
+  function initDemo() {
+    const stateEl = document.getElementById("vis-state-name");
+    const nextBtn = document.getElementById("vis-btn-next");
+    const resetBtn = document.getElementById("vis-btn-reset");
+    const logEl = document.getElementById("vis-log");
+    if (!stateEl || !nextBtn || !resetBtn || !logEl) return;
+
+    let { actor, next } = createTrafficLight();
+
+    function updateUI(action: string) {
+      const snap = actor.snapshot();
+      const currentName = snap.path[snap.path.length - 1];
+      stateEl.textContent = currentName;
+      stateEl.setAttribute("data-state", currentName);
+      logEl.textContent = action ? `${action} \u2192 ${currentName}` : currentName;
+    }
+
+    setActor(actor);
+    startActorSync();
+    updateUI("");
+
+    nextBtn.addEventListener("click", () => {
+      actor.send(next);
+      updateUI("send(NEXT)");
+    });
+
+    resetBtn.addEventListener("click", () => {
+      ({ actor, next } = createTrafficLight());
+      setActor(actor);
+      updateUI("reset");
+    });
+  }
+
+  document.addEventListener("astro:page-load", initDemo);
+  document.addEventListener("DOMContentLoaded", initDemo);
+</script>

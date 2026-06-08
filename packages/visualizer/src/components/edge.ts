@@ -53,11 +53,6 @@ export class EdgePath extends LitElement {
       opacity: 0.9;
     }
 
-    .edge-label.active {
-      fill: var(--viz-edge-active, #22c55e);
-      font-weight: 600;
-    }
-
     .edge-arrow {
       fill: var(--viz-edge-color, #9ca3af);
       transition: fill 0.3s ease;

@@ -6,6 +6,13 @@ import starlight from "@astrojs/starlight";
 export default defineConfig({
   site: "https://anderscan.github.io",
   base: "/mantaq",
+  vite: {
+    build: {
+      rollupOptions: {
+        external: ["web-worker"],
+      },
+    },
+  },
   integrations: [
     starlight({
       title: "Mantaq",

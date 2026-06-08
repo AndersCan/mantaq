@@ -85,28 +85,27 @@ function buildEdgesFromTransitions(
     for (const [eventId, handler] of Object.entries(stateTransitions)) {
       if (!handler) continue;
 
-      const targetStates = Object.keys(transitions).filter((s) => s !== "Any");
-
-      if (targetStates.length <= 1) {
-        edges.push({
-          id: `${sourceId}-${eventId}-self`,
-          source: sourceId,
-          target: sourceId,
-          label: eventId,
-          isActive: activeSet.has(sourceId),
-        });
-      } else {
-        for (const targetName of targetStates) {
-          if (targetName === stateRef.name) continue;
-          edges.push({
-            id: `${sourceId}-${eventId}-${targetName}`,
-            source: sourceId,
-            target: targetName,
-            label: eventId,
-            isActive: activeSet.has(sourceId) || activeSet.has(targetName),
-          });
+      let targetName: string | undefined;
+      try {
+        const result = (handler as Function)({}, {});
+        if (result?.state?.name) {
+          targetName = result.state.name;
         }
+      } catch {
+        // Handler threw - skip this edge
+        continue;
       }
+
+      if (!targetName) continue;
+
+      const targetId = pathPrefix ? `${pathPrefix}.${targetName}` : targetName;
+      edges.push({
+        id: `${sourceId}-${eventId}-${targetId}`,
+        source: sourceId,
+        target: targetId,
+        label: eventId,
+        isActive: activeSet.has(sourceId),
+      });
     }
   }
 
