@@ -1,7 +1,7 @@
 import { Actor, VirtualClock } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
 import { states, events } from "@mantaq/sugar";
-import { setActor, $graph, $layoutOptions } from "../src/index.ts";
+import { setActor, $graph, $layoutOptions, applyDefaultStyles } from "../src/index.ts";
 
 const s = states("idling", "working", "timeout", "reviewing", "completed", "failed");
 s.completed = s.completed.final();
@@ -271,9 +271,28 @@ function initElkControls() {
   }
 }
 
+function initThemeToggle() {
+  applyDefaultStyles();
+  const el = document.getElementById("theme-toggle")!;
+  const btn = document.createElement("button");
+  btn.textContent = "Dark";
+  btn.addEventListener("click", () => {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    if (isDark) {
+      document.documentElement.removeAttribute("data-theme");
+      btn.textContent = "Dark";
+    } else {
+      document.documentElement.setAttribute("data-theme", "dark");
+      btn.textContent = "Light";
+    }
+  });
+  el.appendChild(btn);
+}
+
 initButtons();
 initLayoutControls();
 initElkControls();
+initThemeToggle();
 
 $graph.listen(() => {
   requestAnimationFrame(() => updateButtons());

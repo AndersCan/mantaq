@@ -128,6 +128,72 @@
       #elk-controls button:hover {
         background: #e5e7eb;
       }
+
+      #theme-toggle {
+        margin-top: 12px;
+        display: flex;
+        justify-content: center;
+      }
+
+      #theme-toggle button {
+        padding: 6px 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 13px;
+        font-family: monospace;
+      }
+
+      #theme-toggle button:hover {
+        background: #e5e7eb;
+      }
+
+      [data-theme="dark"] body {
+        background: #1a1a2e;
+      }
+
+      [data-theme="dark"] h1 {
+        color: #e5e7eb;
+      }
+
+      [data-theme="dark"] #current-state {
+        color: #9ca3af;
+      }
+
+      [data-theme="dark"] #buttons button {
+        background: #1f2937;
+        border-color: #4b5563;
+        color: #e5e7eb;
+      }
+
+      [data-theme="dark"] #buttons button:hover:not(:disabled) {
+        background: #374151;
+      }
+
+      [data-theme="dark"] #buttons button.effect-btn {
+        background: #1e3a5f;
+        border-color: #3b82f6;
+        color: #93c5fd;
+      }
+
+      [data-theme="dark"] #buttons button.effect-btn:hover:not(:disabled) {
+        background: #1e40af;
+      }
+
+      [data-theme="dark"] #layout-controls button,
+      [data-theme="dark"] #elk-controls button,
+      [data-theme="dark"] #theme-toggle button {
+        background: #1f2937;
+        border-color: #4b5563;
+        color: #e5e7eb;
+      }
+
+      [data-theme="dark"] #layout-controls button:hover,
+      [data-theme="dark"] #elk-controls button:hover,
+      [data-theme="dark"] #theme-toggle button:hover {
+        background: #374151;
+      }
     </style>
   </head>
   <body>
@@ -137,6 +203,7 @@
     <div id="buttons"></div>
     <div id="layout-controls"></div>
     <div id="elk-controls"></div>
+    <div id="theme-toggle"></div>
 
     <script type="module" src="./main.ts"></script>
   </body>
