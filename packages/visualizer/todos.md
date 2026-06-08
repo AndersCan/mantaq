@@ -42,6 +42,8 @@
 
 ## Medium Priority
 
+- [x] **Transition trigger buttons** — Buttons not implemented. Should show available transitions on active states
+
 - [ ] **Minimap** — Component not implemented. Should show bird's-eye view of graph
 - [ ] **Zoom indicator** — Not rendered. Show current zoom % in bottom center
 - [ ] **Edge hover effects** — Highlight connected nodes when hovering an edge

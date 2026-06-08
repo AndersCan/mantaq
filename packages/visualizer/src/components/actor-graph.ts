@@ -1,6 +1,7 @@
 import { LitElement, html, css, svg } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { StoreController } from "@nanostores/lit";
+import type { AnyActor } from "@mantaq/core";
 import type { GraphNode } from "../graph.ts";
 import type { ComputedEdge } from "../layout.ts";
 import {
@@ -12,6 +13,7 @@ import {
   $selectedNodeId,
   $layoutLoading,
   $layoutError,
+  $actor,
   ZOOM_MIN,
   ZOOM_MAX,
 } from "../stores/graph-store.ts";
@@ -38,6 +40,7 @@ export class ActorGraph extends LitElement {
   #selectedNodeIdCtrl?: StoreController<string | null>;
   #loadingCtrl?: StoreController<boolean>;
   #errorCtrl?: StoreController<string | null>;
+  #actorCtrl?: StoreController<AnyActor | null>;
 
   #isPanning = false;
   #lastMouse = { x: 0, y: 0 };
@@ -154,6 +157,7 @@ export class ActorGraph extends LitElement {
     this.#selectedNodeIdCtrl = new StoreController(this, $selectedNodeId);
     this.#loadingCtrl = new StoreController(this, $layoutLoading);
     this.#errorCtrl = new StoreController(this, $layoutError);
+    this.#actorCtrl = new StoreController(this, $actor);
   }
 
   #handleWheel = (e: WheelEvent) => {
@@ -291,6 +295,30 @@ export class ActorGraph extends LitElement {
     );
   }
 
+  #handleTransitionTrigger(nodeId: string, transitionId: string) {
+    const actor = this.#actorCtrl?.value ?? $actor.get();
+    if (!actor) return;
+
+    const snapshot = actor.snapshot();
+    const currentPath = snapshot.path;
+    let currentNode = "";
+    for (const segment of currentPath) {
+      currentNode = currentNode ? `${currentNode}/${segment}` : segment;
+    }
+
+    if (currentNode === nodeId) {
+      const eventObj = { id: transitionId } as Parameters<typeof actor.send>[0];
+      actor.send(eventObj);
+      this.dispatchEvent(
+        new CustomEvent("transition-sent", {
+          detail: { nodeId, transitionId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    }
+  }
+
   #renderEdges() {
     const edges = this.#getEdges();
     const dims = this.#getDimensions();
@@ -336,9 +364,14 @@ export class ActorGraph extends LitElement {
   #renderNodes() {
     const nodes = this.#getNodes();
     const selectedId = this.#getSelectedNodeId();
+    const edges = this.#getEdges();
 
-    return nodes.map(
-      (node) => html`
+    return nodes.map((node) => {
+      const nodeTransitions = edges
+        .filter((edge) => edge.source === node.id)
+        .map((edge) => edge.label);
+
+      return html`
         <state-node
           .nodeId=${node.id}
           .label=${node.label}
@@ -349,10 +382,13 @@ export class ActorGraph extends LitElement {
           .yPos=${node.y ?? 0}
           .nodeWidth=${node.width ?? 120}
           .nodeHeight=${node.height ?? 60}
+          .transitions=${nodeTransitions}
           @node-select=${(e: CustomEvent) => this.#handleNodeSelect(e.detail.nodeId)}
+          @transition-trigger=${(e: CustomEvent) =>
+            this.#handleTransitionTrigger(e.detail.nodeId, e.detail.transitionId)}
         ></state-node>
-      `,
-    );
+      `;
+    });
   }
 
   #getNodes(): GraphNode[] {

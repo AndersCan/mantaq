@@ -13,6 +13,7 @@ export class StateNode extends LitElement {
   @property({ type: Number }) yPos = 0;
   @property({ type: Number }) nodeWidth = 120;
   @property({ type: Number }) nodeHeight = 60;
+  @property({ type: Array }) transitions: string[] = [];
 
   static styles = [
     css`
@@ -21,6 +22,31 @@ export class StateNode extends LitElement {
         position: absolute;
         cursor: pointer;
         user-select: none;
+      }
+      .transitions {
+        display: flex;
+        gap: 2px;
+        margin-top: 4px;
+        justify-content: center;
+      }
+      .transition-btn {
+        font-size: 9px;
+        padding: 1px 4px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        background: #f5f5f5;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 55px;
+      }
+      .transition-btn:hover {
+        background: #e0e0e0;
+      }
+      .transition-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
       }
     `,
     stateNodeStyles,
@@ -31,6 +57,17 @@ export class StateNode extends LitElement {
     this.dispatchEvent(
       new CustomEvent("node-select", {
         detail: { nodeId: this.nodeId },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
+  private handleTransition = (e: Event, transitionId: string) => {
+    e.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent("transition-trigger", {
+        detail: { nodeId: this.nodeId, transitionId },
         bubbles: true,
         composed: true,
       }),
@@ -56,6 +93,24 @@ export class StateNode extends LitElement {
         @click=${this.handleClick}
       >
         <span class="label">${this.label}</span>
+        ${this.transitions.length > 0
+          ? html`
+              <div class="transitions">
+                ${this.transitions.map(
+                  (t) => html`
+                    <button
+                      class="transition-btn"
+                      ?disabled=${!this.isActive}
+                      @click=${(e: Event) => this.handleTransition(e, t)}
+                      title="Send ${t}"
+                    >
+                      ${t}
+                    </button>
+                  `,
+                )}
+              </div>
+            `
+          : ""}
       </div>
     `;
   }
