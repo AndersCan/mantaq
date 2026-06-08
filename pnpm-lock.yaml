@@ -6,9 +6,6 @@ settings:
 
 catalogs:
   default:
-    '@nanostores/lit':
-      specifier: ^0.2.3
-      version: 0.2.3
     '@stryker-mutator/core':
       specifier: ^9
       version: 9.6.1
@@ -156,9 +153,6 @@ importers:
       '@mantaq/core':
         specifier: workspace:*
         version: link:../core
-      '@nanostores/lit':
-        specifier: 'catalog:'
-        version: 0.2.3(lit@3.3.3)(nanostores@0.11.4)
       elkjs:
         specifier: ^0.9.3
         version: 0.9.3
@@ -918,12 +912,6 @@ packages:
 
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
-
-  '@nanostores/lit@0.2.3':
-    resolution: {integrity: sha512-hIUKzdNrgKXkXCsppzQxmYYYMTn96cncijWhzcYZKn3Yimqj7B6YK94qN/KObjBNEe0xR3JLgMo96ew5fVtW2w==}
-    peerDependencies:
-      lit: ^2.6.0 || ^3.0.0
-      nanostores: '>=0.7 < 1.0.0 || ^1.0.0'
 
   '@napi-rs/wasm-runtime@1.1.4':
     resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
@@ -4239,11 +4227,6 @@ snapshots:
       vfile: 6.0.3
     transitivePeerDependencies:
       - supports-color
-
-  '@nanostores/lit@0.2.3(lit@3.3.3)(nanostores@0.11.4)':
-    dependencies:
-      lit: 3.3.3
-      nanostores: 0.11.4
 
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:

@@ -5,6 +5,8 @@ export { computeLayout } from "./layout.ts";
 export type { LayoutResult, LayoutNode, LayoutEdge, LayoutOptions } from "./layout.ts";
 
 export {
+  $graph,
+  $layoutOptions,
   $layout,
   $selectedNodeId,
   $zoom,

@@ -1,11 +1,13 @@
 import { atom } from "nanostores";
 import type { AnyActor } from "@mantaq/core";
-import { buildGraph } from "./graph.ts";
-import { computeLayout, type LayoutResult } from "./layout.ts";
+import { buildGraph, type ActorGraph } from "./graph.ts";
+import { computeLayout, type LayoutResult, type LayoutOptions } from "./layout.ts";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 
+export const $graph = atom<ActorGraph | null>(null);
+export const $layoutOptions = atom<LayoutOptions>({});
 export const $layout = atom<LayoutResult | null>(null);
 export const $selectedNodeId = atom<string | null>(null);
 export const $zoom = atom(1);
@@ -23,7 +25,9 @@ export async function setActor(actor: AnyActor): Promise<void> {
 
   try {
     const graph = buildGraph(actor);
-    const layout = await computeLayout(graph);
+    $graph.set(graph);
+    const options = $layoutOptions.get();
+    const layout = await computeLayout(graph, options);
     if (generation !== layoutGeneration) return;
     $layout.set(layout);
     $layoutError.set(null);
