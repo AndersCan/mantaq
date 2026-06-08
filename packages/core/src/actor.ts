@@ -228,6 +228,10 @@ export interface AnyActor {
   on(event: "error", fn: (error: unknown) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
+  options?: {
+    transitions?: Record<string, Record<string, unknown>>;
+    states?: Array<{ name: string; isFinal: boolean; _regions?: unknown }>;
+  };
   __children: Map<string, AnyActor>;
   __outputHandler: ((event: InternalEvent) => void) | null;
   __pushInternal(event: InternalEvent): void;
