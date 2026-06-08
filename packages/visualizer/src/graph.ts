@@ -67,8 +67,19 @@ function buildNodes(
         const regionStates = Object.values(region.states);
         const regionSnapshot = snapshot.regions[regionName];
         if (regionStates.length > 0 && regionSnapshot) {
-          const regionNodes = buildNodes(regionStates, regionSnapshot, opts, 0, statePath);
-          children.push(...regionNodes);
+          const regionPath = `${statePath}/${regionName}`;
+          const regionNodes = buildNodes(regionStates, regionSnapshot, opts, 0, regionPath);
+
+          children.push({
+            id: regionPath,
+            label: regionName,
+            isActive: regionSnapshot.path.length > 0,
+            isFinal: false,
+            depth: depth + 1,
+            children: regionNodes,
+            width: estimateNodeWidth(regionName, opts.nodeWidth),
+            height: opts.nodeHeight,
+          });
         }
       }
     }
