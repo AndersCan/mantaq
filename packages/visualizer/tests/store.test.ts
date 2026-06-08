@@ -22,6 +22,7 @@ import {
   setViewport,
   startActorSync,
 } from "../src/stores/graph-store.ts";
+import { getTransitionsForNode } from "../src/graph.ts";
 
 function createTestActor() {
   const idle = state("idle")();
@@ -249,5 +250,20 @@ describe("graph store", () => {
     expect(graphAfter!.nodes.find((n) => n.id === "idle")!.isActive).toBe(false);
 
     unsub();
+  });
+
+  it("getTransitionsForNode returns available transitions", async () => {
+    const actor = createTestActor();
+    setActor(actor);
+    await new Promise((r) => setTimeout(r, 50));
+
+    const graph = $graph.get();
+    expect(graph).not.toBeNull();
+
+    const idleTransitions = getTransitionsForNode(graph!, "idle");
+    expect(idleTransitions).toEqual(["TOGGLE"]);
+
+    const activeTransitions = getTransitionsForNode(graph!, "active");
+    expect(activeTransitions).toEqual(["TOGGLE"]);
   });
 });

@@ -239,3 +239,7 @@ export function flattenNodes(node: GraphNode): GraphNode[] {
 export function collectEdges(graph: ActorGraph): GraphEdge[] {
   return [...graph.edges];
 }
+
+export function getTransitionsForNode(graph: ActorGraph, nodeId: string): string[] {
+  return graph.edges.filter((edge) => edge.source === nodeId).map((edge) => edge.label);
+}
