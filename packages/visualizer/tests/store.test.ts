@@ -16,8 +16,6 @@ import {
   resetView,
   setZoom,
   setPan,
-  applyDarkTheme,
-  removeDarkTheme,
 } from "../src/stores/graph-store.ts";
 import { Actor, state, event } from "@mantaq/core";
 
@@ -181,17 +179,6 @@ describe("graph store", () => {
     const actor = createTestActor();
     await setActor(actor);
     expect($selectedNodeId.get()).toBeNull();
-  });
-
-  it("applyDarkTheme sets attribute on document", () => {
-    applyDarkTheme();
-    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-  });
-
-  it("removeDarkTheme removes attribute from document", () => {
-    document.documentElement.setAttribute("data-theme", "dark");
-    removeDarkTheme();
-    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
   });
 
   it("setActor handles actor with no transitions", async () => {

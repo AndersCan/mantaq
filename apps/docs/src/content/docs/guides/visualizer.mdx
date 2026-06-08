@@ -61,27 +61,28 @@ Mouse wheel zooms toward cursor. Click-drag pans. Double-click fits graph to vie
 
 ### Dark Mode
 
-```ts
-import { applyDarkTheme, removeDarkTheme } from "@mantaq/visualizer";
+Dark mode uses CSS `light-dark()` — automatic, no JavaScript needed. The visualizer follows your OS color scheme by default. Override per-element:
 
-applyDarkTheme(); // toggle on
-removeDarkTheme(); // toggle off
+```css
+actor-graph {
+  color-scheme: dark; /* force dark */
+}
 ```
 
 ### Store (Nanostores)
 
 Reactive state atoms for custom integrations:
 
-| Atom              | Type                   | Purpose                                   |
-| ----------------- | ---------------------- | ----------------------------------------- |
-| `$actor`          | `AnyActor \| null`     | Current actor                             |
-| `$graph`          | `ActorGraph \| null`   | Computed graph                            |
-| `$layout`         | `LayoutResult \| null` | Computed layout                           |
-| `$selectedNodeId` | `string \| null`       | Selected node                             |
-| `$zoom`           | `number`               | Zoom level                                |
-| `$pan`            | `{x, y}`               | Pan offset                                |
-| `$layoutError`    | `string \| null`       | Layout error                              |
-| `$isComputing`    | `boolean`              | Whether layout computation is in progress |
+| Atom              | Type          | Purpose                                   |
+| ----------------- | ------------- | ----------------------------------------- | --------------- |
+| `$actor`          | `AnyActor     | null`                                     | Current actor   |
+| `$graph`          | `ActorGraph   | null`                                     | Computed graph  |
+| `$layout`         | `LayoutResult | null`                                     | Computed layout |
+| `$selectedNodeId` | `string       | null`                                     | Selected node   |
+| `$zoom`           | `number`      | Zoom level                                |
+| `$pan`            | `{x, y}`      | Pan offset                                |
+| `$layoutError`    | `string       | null`                                     | Layout error    |
+| `$isComputing`    | `boolean`     | Whether layout computation is in progress |
 
 Actions: `setActor`, `selectNode`, `setZoom`, `setPan`, `zoomIn`, `zoomOut`, `zoomToFit`, `resetView`, `startActorSync`.
 
@@ -186,14 +187,14 @@ Returns `ActorGraph` with `nodes`, `edges`, `activePath`.
 
 Async. Returns `LayoutResult` with positioned `nodes`, `edges`, `width`, `height`.
 
-| Option                | Type                           | Default   | Description              |
-| --------------------- | ------------------------------ | --------- | ------------------------ |
-| `options.direction`   | `"RIGHT" \| "DOWN"`            | `"RIGHT"` | Layout direction         |
-| `options.nodeWidth`   | `number`                       | `120`     | Node width for ELK       |
-| `options.nodeHeight`  | `number`                       | `60`      | Node height for ELK      |
-| `options.nodeSpacing` | `number`                       | —         | Spacing between nodes    |
-| `options.edgeSpacing` | `number`                       | —         | Spacing between edges    |
-| `options.padding`     | `{ top, bottom, left, right }` | —         | Padding around the graph |
+| Option                | Type                           | Default | Description              |
+| --------------------- | ------------------------------ | ------- | ------------------------ | ---------------- |
+| `options.direction`   | `"RIGHT"                       | "DOWN"` | `"RIGHT"`                | Layout direction |
+| `options.nodeWidth`   | `number`                       | `120`   | Node width for ELK       |
+| `options.nodeHeight`  | `number`                       | `60`    | Node height for ELK      |
+| `options.nodeSpacing` | `number`                       | —       | Spacing between nodes    |
+| `options.edgeSpacing` | `number`                       | —       | Spacing between edges    |
+| `options.padding`     | `{ top, bottom, left, right }` | —       | Padding around the graph |
 
 ### `flattenNodes(node)`
 

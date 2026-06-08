@@ -13,7 +13,7 @@ export class Minimap extends LitElement {
       right: 8px;
       width: 150px;
       height: 100px;
-      background: #fafafa;
+      background: var(--viz-bg, #fafafa);
       border: 1px solid var(--viz-region-border, #ccc);
       border-radius: 4px;
       overflow: hidden;
@@ -108,7 +108,8 @@ export class Minimap extends LitElement {
     ctx.scale(devicePixelRatio, devicePixelRatio);
 
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#fafafa";
+    const bgColor = getComputedStyle(this).getPropertyValue("--viz-bg").trim() || "#fafafa";
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, w, h);
 
     if (!layout || layout.width === 0 || layout.height === 0) return;

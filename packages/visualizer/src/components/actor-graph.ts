@@ -39,11 +39,6 @@ export class ActorGraphComponent extends LitElement {
       border: 1px solid var(--viz-border, #e5e7eb);
     }
 
-    :host([data-theme="dark"]) {
-      background: var(--viz-bg);
-      border-color: var(--viz-border);
-    }
-
     .container {
       width: 100%;
       height: 100%;
@@ -109,12 +104,6 @@ export class ActorGraphComponent extends LitElement {
       border: 1px solid var(--viz-error-border, #fecaca);
       max-width: 300px;
       text-align: center;
-    }
-
-    :host([data-theme="dark"]) .error {
-      color: var(--viz-error-text);
-      background: var(--viz-error-bg);
-      border-color: var(--viz-error-border);
     }
 
     .zoom-controls {

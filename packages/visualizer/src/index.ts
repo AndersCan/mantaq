@@ -22,8 +22,6 @@ export {
   setZoom,
   setPan,
   startActorSync,
-  applyDarkTheme,
-  removeDarkTheme,
 } from "./stores/graph-store.ts";
 
 export { ActorGraphComponent } from "./components/actor-graph.ts";

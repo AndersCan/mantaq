@@ -110,11 +110,3 @@ export function startActorSync(): () => void {
     void setActor(actor);
   });
 }
-
-export function applyDarkTheme(): void {
-  document.documentElement.setAttribute("data-theme", "dark");
-}
-
-export function removeDarkTheme(): void {
-  document.documentElement.removeAttribute("data-theme");
-}

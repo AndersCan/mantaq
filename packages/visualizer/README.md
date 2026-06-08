@@ -54,7 +54,6 @@ startActorSync();
 - `zoomToFit()` - Fit graph to viewport
 - `resetView()` - Reset zoom and pan
 - `startActorSync()` - Auto-sync graph when actor state changes
-- `applyDarkTheme()` / `removeDarkTheme()` - Toggle dark mode
 
 ### Stores
 

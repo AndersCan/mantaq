@@ -3,4 +3,4 @@
   bump: minor
 ---
 
-Added dark mode theme support with applyDarkTheme/removeDarkTheme functions.
+Added dark mode support via CSS `light-dark()`. Follows OS color scheme automatically. No JavaScript API needed.

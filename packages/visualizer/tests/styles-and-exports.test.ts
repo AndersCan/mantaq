@@ -16,7 +16,7 @@ describe("styles", () => {
     const style = document.getElementById("mantaq-visualizer-defaults");
     expect(style!.textContent).toContain("--viz-bg");
     expect(style!.textContent).toContain("--viz-border");
-    expect(style!.textContent).toContain("data-theme");
+    expect(style!.textContent).toContain("light-dark");
   });
 
   it("applyDefaultStyles is idempotent", () => {
@@ -41,12 +41,12 @@ describe("styles", () => {
     expect(style).toBeNull();
   });
 
-  it("default styles include dark mode variables", () => {
+  it("default styles include dark mode variables via light-dark()", () => {
     applyDefaultStyles();
 
     const style = document.getElementById("mantaq-visualizer-defaults");
-    expect(style!.textContent).toContain('[data-theme="dark"]');
-    expect(style!.textContent).toContain("--viz-bg: #111827");
+    expect(style!.textContent).toContain("light-dark(#fafafa, #111827)");
+    expect(style!.textContent).toContain("color-scheme: light dark");
   });
 
   it("default styles include node styling", () => {
@@ -83,8 +83,6 @@ describe("exports", () => {
     expect(mod.setZoom).toBeDefined();
     expect(mod.setPan).toBeDefined();
     expect(mod.startActorSync).toBeDefined();
-    expect(mod.applyDarkTheme).toBeDefined();
-    expect(mod.removeDarkTheme).toBeDefined();
     expect(mod.applyDefaultStyles).toBeDefined();
     expect(mod.removeDefaultStyles).toBeDefined();
     expect(mod.ActorGraphComponent).toBeDefined();
