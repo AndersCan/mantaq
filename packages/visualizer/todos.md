@@ -35,7 +35,7 @@
 
 - [ ] **Region wrapper nodes** — State-level regions render states directly under parent. Need wrapper nodes for region labels (e.g., "sub" region label above subA/subB)
 - [ ] **Actor-level region rendering** — `buildChildGraphs` handles `actor.regions` but no visual distinction from state-level regions
-- [ ] **Store reactivity wiring** — Components don't yet subscribe to nanostores via `useStore` directive. Need `@nanostores/lit` package
+- [x] **Store reactivity wiring** — Components don't yet subscribe to nanostores via `useStore` directive. Need `@nanostores/lit` package
 - [ ] **Real-time actor sync** — `startActorSync()` exists but not called automatically. Need lifecycle hook to auto-update graph when actor state changes
 - [ ] **Edge labels for transitions** — Current edge labels show event IDs but not guard conditions or actions
 - [ ] **Keyboard shortcuts documentation** — +/-/0/F shortcuts work but no tooltip or help overlay

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",
+    "@nanostores/lit": "catalog:",
     "elkjs": "^0.9.3",
     "lit": "^3.2.0",
     "lit-html": "^3.2.0",

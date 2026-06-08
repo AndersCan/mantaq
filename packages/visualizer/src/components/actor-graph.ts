@@ -1,8 +1,20 @@
 import { LitElement, html, css, svg } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { StoreController } from "@nanostores/lit";
 import type { GraphNode } from "../graph.ts";
 import type { ComputedEdge } from "../layout.ts";
-import { ZOOM_MIN, ZOOM_MAX } from "../stores/graph-store.ts";
+import {
+  $flatNodes,
+  $edges,
+  $graphDimensions,
+  $zoom,
+  $pan,
+  $selectedNodeId,
+  $layoutLoading,
+  $layoutError,
+  ZOOM_MIN,
+  ZOOM_MAX,
+} from "../stores/graph-store.ts";
 import { renderEdge } from "./edge.ts";
 
 @customElement("actor-graph")
@@ -16,6 +28,16 @@ export class ActorGraph extends LitElement {
   @property({ type: String }) selectedNodeId: string | null = null;
   @property({ type: String }) error: string | null = null;
   @property({ type: Boolean }) loading = false;
+  @property({ type: Boolean }) useStores = false;
+
+  #nodesCtrl?: StoreController<GraphNode[]>;
+  #edgesCtrl?: StoreController<ComputedEdge[]>;
+  #dimensionsCtrl?: StoreController<{ width: number; height: number }>;
+  #zoomCtrl?: StoreController<number>;
+  #panCtrl?: StoreController<{ x: number; y: number }>;
+  #selectedNodeIdCtrl?: StoreController<string | null>;
+  #loadingCtrl?: StoreController<boolean>;
+  #errorCtrl?: StoreController<string | null>;
 
   #isPanning = false;
   #lastMouse = { x: 0, y: 0 };
@@ -100,6 +122,9 @@ export class ActorGraph extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    if (this.useStores) {
+      this.#initStoreControllers();
+    }
     this.addEventListener("wheel", this.#handleWheel, { passive: false });
     this.addEventListener("mousedown", this.#handleMouseDown);
     this.addEventListener("dblclick", this.#handleDoubleClick);
@@ -118,19 +143,34 @@ export class ActorGraph extends LitElement {
     window.removeEventListener("keydown", this.#handleKeyDown);
   }
 
+  #initStoreControllers() {
+    if (this.#nodesCtrl) return;
+
+    this.#nodesCtrl = new StoreController(this, $flatNodes);
+    this.#edgesCtrl = new StoreController(this, $edges);
+    this.#dimensionsCtrl = new StoreController(this, $graphDimensions);
+    this.#zoomCtrl = new StoreController(this, $zoom);
+    this.#panCtrl = new StoreController(this, $pan);
+    this.#selectedNodeIdCtrl = new StoreController(this, $selectedNodeId);
+    this.#loadingCtrl = new StoreController(this, $layoutLoading);
+    this.#errorCtrl = new StoreController(this, $layoutError);
+  }
+
   #handleWheel = (e: WheelEvent) => {
     e.preventDefault();
+    const currentZoom = this.#getZoom();
+    const currentPan = this.#getPan();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this.zoom + delta));
+    const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, currentZoom + delta));
 
     const rect = this.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const scale = newZoom / this.zoom;
+    const scale = newZoom / currentZoom;
     this.pan = {
-      x: mouseX - scale * (mouseX - this.pan.x),
-      y: mouseY - scale * (mouseY - this.pan.y),
+      x: mouseX - scale * (mouseX - currentPan.x),
+      y: mouseY - scale * (mouseY - currentPan.y),
     };
     this.zoom = newZoom;
     this.#dispatchZoomChange();
@@ -197,7 +237,8 @@ export class ActorGraph extends LitElement {
   };
 
   zoomToFit = () => {
-    if (this.nodes.length === 0) return;
+    const nodes = this.#getNodes();
+    if (nodes.length === 0) return;
     const rect = this.getBoundingClientRect();
     const padding = 40;
 
@@ -205,7 +246,7 @@ export class ActorGraph extends LitElement {
       minY = Infinity,
       maxX = -Infinity,
       maxY = -Infinity;
-    for (const node of this.nodes) {
+    for (const node of nodes) {
       if (node.x != null && node.y != null) {
         minX = Math.min(minX, node.x);
         minY = Math.min(minY, node.y);
@@ -251,14 +292,17 @@ export class ActorGraph extends LitElement {
   }
 
   #renderEdges() {
-    if (this.edges.length === 0) return svg``;
+    const edges = this.#getEdges();
+    const dims = this.#getDimensions();
+
+    if (edges.length === 0) return svg``;
 
     return svg`
       <svg
         class="edges"
-        width="${this.graphWidth}"
-        height="${this.graphHeight}"
-        viewBox="0 0 ${this.graphWidth} ${this.graphHeight}"
+        width="${dims.width}"
+        height="${dims.height}"
+        viewBox="0 0 ${dims.width} ${dims.height}"
       >
         <defs>
           <marker
@@ -284,20 +328,23 @@ export class ActorGraph extends LitElement {
             <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" />
           </marker>
         </defs>
-        ${this.edges.map((edge) => renderEdge(edge))}
+        ${edges.map((edge) => renderEdge(edge))}
       </svg>
     `;
   }
 
   #renderNodes() {
-    return this.nodes.map(
+    const nodes = this.#getNodes();
+    const selectedId = this.#getSelectedNodeId();
+
+    return nodes.map(
       (node) => html`
         <state-node
           .nodeId=${node.id}
           .label=${node.label}
           .isActive=${node.isActive}
           .isFinal=${node.isFinal}
-          .isSelected=${node.id === this.selectedNodeId}
+          .isSelected=${node.id === selectedId}
           .xPos=${node.x ?? 0}
           .yPos=${node.y ?? 0}
           .nodeWidth=${node.width ?? 120}
@@ -308,24 +355,63 @@ export class ActorGraph extends LitElement {
     );
   }
 
+  #getNodes(): GraphNode[] {
+    return this.#nodesCtrl?.value ?? this.nodes;
+  }
+
+  #getEdges(): ComputedEdge[] {
+    return this.#edgesCtrl?.value ?? this.edges;
+  }
+
+  #getDimensions(): { width: number; height: number } {
+    return this.#dimensionsCtrl?.value ?? { width: this.graphWidth, height: this.graphHeight };
+  }
+
+  #getZoom(): number {
+    return this.#zoomCtrl?.value ?? this.zoom;
+  }
+
+  #getPan(): { x: number; y: number } {
+    return this.#panCtrl?.value ?? this.pan;
+  }
+
+  #getSelectedNodeId(): string | null {
+    return this.#selectedNodeIdCtrl?.value ?? this.selectedNodeId;
+  }
+
+  #getLoading(): boolean {
+    return this.#loadingCtrl?.value ?? this.loading;
+  }
+
+  #getError(): string | null {
+    return this.#errorCtrl?.value ?? this.error;
+  }
+
   render() {
-    if (this.error) {
-      return html`<div class="error-state">${this.error}</div>`;
+    const error = this.#getError();
+    const loading = this.#getLoading();
+    const nodes = this.#getNodes();
+
+    if (error) {
+      return html`<div class="error-state">${error}</div>`;
     }
 
-    if (this.loading) {
+    if (loading) {
       return html`<div class="loading-state">Loading...</div>`;
     }
 
-    if (this.nodes.length === 0) {
+    if (nodes.length === 0) {
       return html`<div class="empty-state">No graph data</div>`;
     }
+
+    const zoom = this.#getZoom();
+    const pan = this.#getPan();
+    const dims = this.#getDimensions();
 
     return html`
       <div
         class="container"
-        style="transform: translate(${this.pan.x}px, ${this.pan.y}px) scale(${this
-          .zoom}); width: ${this.graphWidth}px; height: ${this.graphHeight}px;"
+        style="transform: translate(${pan.x}px, ${pan.y}px) scale(${zoom}); width: ${dims.width}px; height: ${dims.height}px;"
       >
         ${this.#renderEdges()} ${this.#renderNodes()}
       </div>
