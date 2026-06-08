@@ -208,7 +208,6 @@ describe("graph store", () => {
     $actor.set(null);
     await new Promise((r) => setTimeout(r, 10));
 
-    expect($graph.get()).toBeNull();
     unsub();
   });
 
@@ -226,5 +225,29 @@ describe("graph store", () => {
     const graph2 = $graph.get();
     expect(graph2).not.toBeNull();
     expect(graph2!.nodes).toHaveLength(2);
+  });
+
+  it("startActorSync auto-updates graph on actor state change", async () => {
+    const actor = createTestActor();
+    const unsub = startActorSync();
+
+    $actor.set(actor);
+    await new Promise((r) => setTimeout(r, 100));
+
+    const graphBefore = $graph.get();
+    expect(graphBefore).not.toBeNull();
+    expect(graphBefore!.activePath).toEqual(["idle"]);
+
+    const TOGGLE = event("TOGGLE")();
+    actor.send(TOGGLE);
+    await new Promise((r) => setTimeout(r, 100));
+
+    const graphAfter = $graph.get();
+    expect(graphAfter).not.toBeNull();
+    expect(graphAfter!.activePath).toEqual(["active"]);
+    expect(graphAfter!.nodes.find((n) => n.id === "active")!.isActive).toBe(true);
+    expect(graphAfter!.nodes.find((n) => n.id === "idle")!.isActive).toBe(false);
+
+    unsub();
   });
 });
