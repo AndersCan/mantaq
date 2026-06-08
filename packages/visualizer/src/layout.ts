@@ -106,7 +106,7 @@ function buildElkGraph(graph: ActorGraph, options: LayoutOptions): ElkGraph {
       "elk.layered.spacing.nodeNodeBetweenLayers": "100",
       "elk.spacing.nodeNode": "60",
       "elk.padding": `[top=${DEFAULT_PADDING},left=${DEFAULT_PADDING},bottom=${DEFAULT_PADDING},right=${DEFAULT_PADDING}]`,
-      "elk.layered.considerModelOrder": "true",
+      "elk.layered.considerModelOrder": "NODES_AND_EDGES",
       ...options.elkOptions,
     },
     children: graph.nodes.map((node) => ({

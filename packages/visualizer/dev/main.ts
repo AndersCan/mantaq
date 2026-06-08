@@ -152,14 +152,14 @@ const presets: LayoutPreset[] = [
     label: "➡ RIGHT + order",
     opts: {
       direction: "RIGHT",
-      elkOptions: { "elk.layered.considerModelOrder": "true" },
+      elkOptions: { "elk.layered.considerModelOrder": "NODES_AND_EDGES" },
     },
   },
   {
     label: "⬇ DOWN + order",
     opts: {
       direction: "DOWN",
-      elkOptions: { "elk.layered.considerModelOrder": "true" },
+      elkOptions: { "elk.layered.considerModelOrder": "NODES_AND_EDGES" },
     },
   },
   {
@@ -167,7 +167,7 @@ const presets: LayoutPreset[] = [
     opts: {
       direction: "RIGHT",
       elkOptions: {
-        "elk.layered.considerModelOrder": "true",
+        "elk.layered.considerModelOrder": "NODES_AND_EDGES",
         "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
       },
     },
@@ -177,7 +177,7 @@ const presets: LayoutPreset[] = [
     opts: {
       direction: "DOWN",
       elkOptions: {
-        "elk.layered.considerModelOrder": "true",
+        "elk.layered.considerModelOrder": "NODES_AND_EDGES",
         "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
       },
     },
