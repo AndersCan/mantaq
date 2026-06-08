@@ -2,10 +2,8 @@ import { LitElement, html, css, svg } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { GraphNode } from "../graph.ts";
 import type { ComputedEdge } from "../layout.ts";
+import { ZOOM_MIN, ZOOM_MAX } from "../stores/graph-store.ts";
 import { renderEdge } from "./edge.ts";
-
-const ZOOM_MIN = 0.1;
-const ZOOM_MAX = 5;
 
 @customElement("actor-graph")
 export class ActorGraph extends LitElement {
