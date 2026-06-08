@@ -286,3 +286,151 @@ describe("collectEdges", () => {
     expect(edges).toHaveLength(2);
   });
 });
+
+describe("edge cases", () => {
+  it("handles single-state actor", () => {
+    const only = state("only")();
+    const actor = new Actor({
+      inputs: [],
+      states: [only],
+      initial: only,
+      transitions: {},
+    });
+
+    const graph = buildGraph(actor);
+    expect(graph.nodes).toHaveLength(1);
+    expect(graph.edges).toHaveLength(0);
+    expect(graph.activePath).toEqual(["only"]);
+    expect(graph.nodes[0].isActive).toBe(true);
+  });
+
+  it("handles actor with no transitions", () => {
+    const a = state("a")();
+    const b = state("b")();
+
+    const actor = new Actor({
+      inputs: [],
+      states: [a, b],
+      initial: a,
+      transitions: {},
+    });
+
+    const graph = buildGraph(actor);
+    expect(graph.nodes).toHaveLength(2);
+    expect(graph.edges).toHaveLength(0);
+  });
+
+  it("handles deeply nested regions", () => {
+    const leaf = state("leaf")();
+    const mid = state("mid")().regions({
+      inner: { initial: "leaf", states: { leaf } },
+    });
+    const root = state("root")().regions({
+      outer: { initial: "mid", states: { mid } },
+    });
+
+    const GO = event("GO")();
+
+    const actor = new Actor({
+      inputs: [GO],
+      states: [root],
+      initial: root,
+      transitions: {
+        root: {
+          GO: () => ({ state: root }),
+        },
+      },
+    });
+
+    const graph = buildGraph(actor);
+    expect(graph.nodes).toHaveLength(1);
+    expect(graph.nodes[0].id).toBe("root");
+
+    const flat = flattenNodes(graph.nodes[0]);
+    expect(flat.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("handles Any wildcard with many states", () => {
+    const a = state("a")();
+    const b = state("b")();
+    const c = state("c")();
+    const d = state("d")();
+
+    const RESET = event("RESET")();
+
+    const actor = new Actor({
+      inputs: [RESET],
+      states: [a, b, c, d],
+      initial: a,
+      transitions: {
+        Any: {
+          RESET: () => ({ state: a }),
+        },
+      },
+    });
+
+    const graph = buildGraph(actor);
+    const resetEdges = graph.edges.filter((e) => e.label === "RESET");
+    expect(resetEdges).toHaveLength(4);
+    expect(resetEdges.every((e) => e.source === "Any")).toBe(true);
+
+    const targets = resetEdges.map((e) => e.target).sort();
+    expect(targets).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("handles multiple events from same state", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const error = state("error")();
+
+    const START = event("START")();
+    const FAIL = event("FAIL")();
+
+    const actor = new Actor({
+      inputs: [START, FAIL],
+      states: [idle, active, error],
+      initial: idle,
+      transitions: {
+        idle: {
+          START: () => ({ state: active }),
+          FAIL: () => ({ state: error }),
+        },
+      },
+    });
+
+    const graph = buildGraph(actor);
+    const idleEdges = graph.edges.filter((e) => e.source === "idle");
+    expect(idleEdges).toHaveLength(2);
+
+    const startEdge = idleEdges.find((e) => e.label === "START");
+    expect(startEdge!.target).toBe("active");
+
+    const failEdge = idleEdges.find((e) => e.label === "FAIL");
+    expect(failEdge!.target).toBe("error");
+  });
+
+  it("assigns unique edge ids", () => {
+    const a = state("a")();
+    const b = state("b")();
+
+    const E1 = event("E1")();
+    const E2 = event("E2")();
+
+    const actor = new Actor({
+      inputs: [E1, E2],
+      states: [a, b],
+      initial: a,
+      transitions: {
+        a: {
+          E1: () => ({ state: b }),
+          E2: () => ({ state: b }),
+        },
+      },
+    });
+
+    const graph = buildGraph(actor);
+    const ids = graph.edges.map((e) => e.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(ids.length);
+  });
+});
