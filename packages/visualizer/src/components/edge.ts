@@ -1,7 +1,7 @@
-import { svg } from "lit-html";
+import { svg, type SVGTemplateResult } from "lit-html";
 import type { ComputedEdge } from "../layout.ts";
 
-export function renderEdge(edge: ComputedEdge) {
+export function renderEdge(edge: ComputedEdge): SVGTemplateResult {
   if (!edge.path) return svg``;
 
   return svg`
