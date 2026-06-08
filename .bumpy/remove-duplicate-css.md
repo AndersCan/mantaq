@@ -1,0 +1,6 @@
+---
+"@mantaq/visualizer":
+  bump: patch
+---
+
+Consolidated duplicate CSS between state-node component and styles module.

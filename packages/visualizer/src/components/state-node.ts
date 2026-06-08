@@ -1,5 +1,6 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { stateNodeStyles } from "../styles.ts";
 
 @customElement("state-node")
 export class StateNode extends LitElement {
@@ -13,48 +14,17 @@ export class StateNode extends LitElement {
   @property({ type: Number }) nodeWidth = 120;
   @property({ type: Number }) nodeHeight = 60;
 
-  static styles = css`
-    :host {
-      display: block;
-      position: absolute;
-      cursor: pointer;
-      user-select: none;
-    }
-    .node {
-      padding: 8px 16px;
-      border: 2px solid #666;
-      border-radius: 8px;
-      background: white;
-      text-align: center;
-      font-family: system-ui, sans-serif;
-      font-size: 14px;
-      transition: all 0.2s ease;
-      min-width: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      box-sizing: border-box;
-    }
-    .node.active {
-      border-color: #4caf50;
-      background: #e8f5e9;
-      box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
-    }
-    .node.final {
-      border-width: 4px;
-      border-style: double;
-    }
-    .node.selected {
-      border-color: #2196f3;
-      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.3);
-    }
-    .label {
-      font-weight: 500;
-      color: #333;
-      pointer-events: none;
-    }
-  `;
+  static styles = [
+    css`
+      :host {
+        display: block;
+        position: absolute;
+        cursor: pointer;
+        user-select: none;
+      }
+    `,
+    stateNodeStyles,
+  ];
 
   private handleClick = (e: Event) => {
     e.stopPropagation();
