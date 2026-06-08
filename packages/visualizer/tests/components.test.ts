@@ -256,7 +256,7 @@ describe("EdgePath component", () => {
     const el = createEdgePath();
     await Promise.resolve();
 
-    const path = el.querySelector(".edge-path");
+    const path = el.shadowRoot!.querySelector(".edge-path");
     expect(path).toBeDefined();
   });
 
@@ -264,7 +264,7 @@ describe("EdgePath component", () => {
     const el = createEdgePath({ isActive: true });
     await Promise.resolve();
 
-    const path = el.querySelector(".edge-path.active");
+    const path = el.shadowRoot!.querySelector(".edge-path.active");
     expect(path).toBeDefined();
   });
 
@@ -272,27 +272,27 @@ describe("EdgePath component", () => {
     const el = createEdgePath({ isActive: false });
     await Promise.resolve();
 
-    const path = el.querySelector(".edge-path.active");
+    const path = el.shadowRoot!.querySelector(".edge-path.active");
     expect(path).toBeNull();
   });
 
   it("renders edge with label property", async () => {
     const el = createEdgePath({ label: "FETCH" });
     await Promise.resolve();
-    expect(el.querySelector(".edge-path")).toBeDefined();
-    expect(el.querySelector(".edge-label")).toBeDefined();
+    expect(el.shadowRoot!.querySelector(".edge-path")).toBeDefined();
+    expect(el.shadowRoot!.querySelector(".edge-label")).toBeDefined();
   });
 
   it("applies active class to edge path", async () => {
     const el = createEdgePath({ isActive: true });
     await Promise.resolve();
-    expect(el.querySelector(".edge-path.active")).toBeDefined();
+    expect(el.shadowRoot!.querySelector(".edge-path.active")).toBeDefined();
   });
 
   it("renders marker with unique id", async () => {
     const el = createEdgePath({ edgeId: "unique-edge-123" });
     await Promise.resolve();
-    expect(el.querySelector("marker")).toBeDefined();
+    expect(el.shadowRoot!.querySelector("marker")).toBeDefined();
   });
 
   it("has correct default properties", async () => {
