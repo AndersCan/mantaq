@@ -63,9 +63,9 @@ describe("EventRef", () => {
     expect(typeof result).toBe("object");
   });
 
-  test("create with null payload keeps id only", () => {
+  test("create with null payload wraps in value", () => {
     const toggle = event("toggle")<null>();
     const result = toggle.create(null as any);
-    expect(result).toEqual({ id: "toggle" });
+    expect(result).toEqual({ id: "toggle", value: null });
   });
 });
