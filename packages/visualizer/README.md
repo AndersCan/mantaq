@@ -5,7 +5,7 @@ Actor model state machine visualizer using Lit and nanostores.
 ## Installation
 
 ```bash
-npm install @mantaq/visualizer
+pnpm add @mantaq/visualizer
 ```
 
 ## Usage
@@ -33,7 +33,11 @@ setActor(myActor);
 ### Functions
 
 - `buildGraph(actor)` - Convert actor snapshot to graph nodes/edges
+- `flattenNodes(graph)` - Flatten nested graph nodes
 - `computeLayout(graph)` - Compute ELK.js layout
+- `defaultPositions(nodes, dimensions)` - Compute default node positions
+- `collectEdges(graph)` - Collect all edges from graph
+- `getTransitionsForNode(graph, nodeId)` - Get transitions for a node
 - `setActor(actor)` - Set actor in store and trigger layout
 - `selectNode(nodeId)` - Select a node
 - `zoomIn()` / `zoomOut()` - Zoom controls
@@ -46,14 +50,18 @@ setActor(myActor);
 - `$actor` - Current actor
 - `$graph` - Computed graph
 - `$layout` - Computed layout result
-- `$selectedNodeId` - Selected node
+- `$selectedNodeId` - Selected node ID
+- `$selectedNode` - Selected node object
 - `$zoom` / `$pan` - Viewport state
+- `$viewport` - Viewport dimensions
+- `$graphDimensions` - Graph dimensions
 - `$layoutError` - Layout error message
 
 ### Components
 
 - `<actor-graph>` - Main container with pan/zoom/keyboard
 - `<state-node>` - Individual state node
+- `renderEdge(edge)` - Edge rendering function
 
 ## Keyboard Shortcuts
 
