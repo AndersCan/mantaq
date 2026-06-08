@@ -119,8 +119,9 @@ function resolveTargetState(
       const ref = result.state as { name?: string };
       if (typeof ref.name === "string") return ref.name;
     }
-  } catch {
-    // transition requires args we can't provide
+  } catch (e) {
+    // transition may require args we can't provide — log for visibility
+    console.warn("[xstate-viz] transition resolution failed:", e);
   }
   return null;
 }
