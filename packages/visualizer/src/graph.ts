@@ -100,7 +100,7 @@ function buildNodes(
   return nodes;
 }
 
-function collectAllStateIds(states: AnyStateRef[], parentPath: string): Set<string> {
+export function collectAllStateIds(states: AnyStateRef[], parentPath: string): Set<string> {
   const ids = new Set<string>();
   for (const state of states) {
     const id = parentPath ? `${parentPath}/${state.name}` : state.name;
@@ -109,7 +109,7 @@ function collectAllStateIds(states: AnyStateRef[], parentPath: string): Set<stri
   return ids;
 }
 
-function resolveTargetState(
+export function resolveTargetState(
   transitionFn: ((...args: unknown[]) => { state?: unknown }) | undefined,
 ): string | null {
   if (!transitionFn) return null;
@@ -160,7 +160,7 @@ function buildEdges(actor: ActorWithOptions, allStateIds: Set<string>): GraphEdg
   return edges;
 }
 
-function buildChildGraphs(
+export function buildChildGraphs(
   regions: Record<string, AnyActor>,
   snapshot: Snapshot,
   opts: Required<GraphBuilderOptions>,

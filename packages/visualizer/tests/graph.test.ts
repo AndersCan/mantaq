@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vite-plus/test";
-import { state, event, Actor } from "@mantaq/core";
+import { state, event, Actor, type AnyActor } from "@mantaq/core";
 import {
   buildGraph,
   flattenNodes,
   collectEdges,
+  estimateNodeWidth,
+  collectAllStateIds,
+  resolveTargetState,
+  buildChildGraphs,
   type GraphNode,
   type ActorGraph,
 } from "../src/graph.ts";
@@ -458,5 +462,178 @@ describe("edge cases", () => {
     const edge = graph.edges.find((e) => e.label === "GO");
     expect(edge).toBeDefined();
     expect(edge!.guard).toBeUndefined();
+  });
+});
+
+describe("estimateNodeWidth", () => {
+  it("returns minWidth when label is short", () => {
+    expect(estimateNodeWidth("ab", 120)).toBe(120);
+  });
+
+  it("scales with label length", () => {
+    const short = estimateNodeWidth("x", 10);
+    const long = estimateNodeWidth("a very long label name", 10);
+    expect(long).toBeGreaterThan(short);
+  });
+
+  it("formula is label.length * 8 + 24", () => {
+    const result = estimateNodeWidth("hello", 0);
+    expect(result).toBe(5 * 8 + 24);
+  });
+
+  it("never returns below minWidth", () => {
+    const result = estimateNodeWidth("hi", 999);
+    expect(result).toBe(999);
+  });
+});
+
+describe("collectAllStateIds", () => {
+  it("collects flat state ids", () => {
+    const a = state("a")();
+    const b = state("b")();
+    const ids = collectAllStateIds([a, b], "");
+    expect(ids).toEqual(new Set(["a", "b"]));
+  });
+
+  it("prepends parent path", () => {
+    const a = state("a")();
+    const b = state("b")();
+    const ids = collectAllStateIds([a, b], "parent");
+    expect(ids).toEqual(new Set(["parent/a", "parent/b"]));
+  });
+
+  it("returns empty set for empty states", () => {
+    const ids = collectAllStateIds([], "");
+    expect(ids.size).toBe(0);
+  });
+
+  it("handles single state", () => {
+    const only = state("only")();
+    const ids = collectAllStateIds([only], "");
+    expect(ids).toEqual(new Set(["only"]));
+  });
+});
+
+describe("resolveTargetState", () => {
+  it("returns null for undefined transition", () => {
+    expect(resolveTargetState(undefined)).toBeNull();
+  });
+
+  it("extracts state name from transition result", () => {
+    const target = state("target")();
+    const fn = () => ({ state: target });
+    expect(resolveTargetState(fn)).toBe("target");
+  });
+
+  it("returns null when transition returns no state", () => {
+    const fn = () => ({});
+    expect(resolveTargetState(fn)).toBeNull();
+  });
+
+  it("returns null when transition throws", () => {
+    const fn = () => {
+      throw new Error("boom");
+    };
+    expect(resolveTargetState(fn)).toBeNull();
+  });
+
+  it("returns null when state has no name", () => {
+    const fn = () => ({ state: {} });
+    expect(resolveTargetState(fn)).toBeNull();
+  });
+
+  it("returns null when state is null", () => {
+    const fn = () => ({ state: null });
+    expect(resolveTargetState(fn)).toBeNull();
+  });
+});
+
+describe("buildChildGraphs", () => {
+  function makeChildActor(): AnyActor {
+    const a = state("a")();
+    const b = state("b")();
+    const GO = event("GO")();
+    return new Actor({
+      inputs: [GO],
+      states: [a, b],
+      initial: a,
+      transitions: {
+        a: { GO: () => ({ state: b }) },
+      },
+    }) as unknown as AnyActor;
+  }
+
+  it("returns empty arrays for empty regions", () => {
+    const result = buildChildGraphs(
+      {},
+      { path: [], regions: {} },
+      { nodeWidth: 120, nodeHeight: 60, padding: 20 },
+      1,
+      "",
+    );
+    expect(result.nodes).toHaveLength(0);
+    expect(result.edges).toHaveLength(0);
+  });
+
+  it("builds nodes from a single region", () => {
+    const actor = makeChildActor();
+    const result = buildChildGraphs(
+      { inner: actor },
+      { path: ["a"], regions: {} },
+      { nodeWidth: 120, nodeHeight: 60, padding: 20 },
+      1,
+      "parent",
+    );
+
+    expect(result.nodes.length).toBeGreaterThan(0);
+    expect(result.nodes[0].id).toContain("parent/inner");
+  });
+
+  it("builds nodes from multiple regions", () => {
+    const actor1 = makeChildActor();
+    const actor2 = makeChildActor();
+
+    const result = buildChildGraphs(
+      { r1: actor1, r2: actor2 },
+      { path: ["a"], regions: {} },
+      { nodeWidth: 120, nodeHeight: 60, padding: 20 },
+      1,
+      "",
+    );
+
+    expect(result.nodes.length).toBeGreaterThanOrEqual(2);
+    const ids = result.nodes.map((n) => n.id);
+    expect(ids.some((id) => id.startsWith("r1"))).toBe(true);
+    expect(ids.some((id) => id.startsWith("r2"))).toBe(true);
+  });
+
+  it("prefixes node and edge ids with parent path", () => {
+    const actor = makeChildActor();
+    const result = buildChildGraphs(
+      { inner: actor },
+      { path: ["a"], regions: {} },
+      { nodeWidth: 120, nodeHeight: 60, padding: 20 },
+      1,
+      "root",
+    );
+
+    for (const node of result.nodes) {
+      expect(node.id.startsWith("root/inner/")).toBe(true);
+    }
+  });
+
+  it("sets depth on child nodes", () => {
+    const actor = makeChildActor();
+    const result = buildChildGraphs(
+      { inner: actor },
+      { path: ["a"], regions: {} },
+      { nodeWidth: 120, nodeHeight: 60, padding: 20 },
+      3,
+      "",
+    );
+
+    for (const node of result.nodes) {
+      expect(node.depth).toBe(3);
+    }
   });
 });

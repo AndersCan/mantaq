@@ -69,7 +69,7 @@ function flattenNodesForLayout(
   return result;
 }
 
-function collectAllEdges(nodes: GraphNode[], edges: GraphEdge[]): GraphEdge[] {
+export function collectAllEdges(nodes: GraphNode[], edges: GraphEdge[]): GraphEdge[] {
   const result: GraphEdge[] = [...edges];
   for (const node of nodes) {
     for (const child of node.children) {
@@ -136,7 +136,7 @@ function sectionsToPath(section: ElkEdgeSection): string {
   return d;
 }
 
-function bezierMidpoint(path: string): { x: number; y: number } {
+export function bezierMidpoint(path: string): { x: number; y: number } {
   const cubicMatch = path.match(
     /M\s+([\d.]+)\s+([\d.]+)\s+C\s+([\d.]+)\s+([\d.]+),\s+([\d.]+)\s+([\d.]+),\s+([\d.]+)\s+([\d.]+)/,
   );
@@ -163,7 +163,7 @@ function bezierMidpoint(path: string): { x: number; y: number } {
   return { x: 0, y: 0 };
 }
 
-function selfLoopPath(x: number, y: number, width: number, height: number): string {
+export function selfLoopPath(x: number, y: number, width: number, height: number): string {
   const startX = x + width;
   const startY = y + height / 2;
   const loopX = x + width + SELF_LOOP_OFFSET;
@@ -172,7 +172,7 @@ function selfLoopPath(x: number, y: number, width: number, height: number): stri
   return `M ${startX} ${startY} C ${loopX} ${loopTop}, ${loopX} ${loopBottom}, ${startX} ${startY}`;
 }
 
-function backwardEdgePath(
+export function backwardEdgePath(
   sx: number,
   sy: number,
   sw: number,
