@@ -45,6 +45,7 @@ export class ActorGraph extends LitElement {
   #isPanning = false;
   #lastMouse = { x: 0, y: 0 };
   #showHelp = false;
+  #windowAbort = new AbortController();
 
   static styles = css`
     :host {
@@ -153,15 +154,17 @@ export class ActorGraph extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    this.#windowAbort = new AbortController();
     if (this.useStores) {
       this.#initStoreControllers();
     }
+    const opts = { signal: this.#windowAbort.signal };
     this.addEventListener("wheel", this.#handleWheel, { passive: false });
     this.addEventListener("mousedown", this.#handleMouseDown);
     this.addEventListener("dblclick", this.#handleDoubleClick);
-    window.addEventListener("mousemove", this.#handleMouseMove);
-    window.addEventListener("mouseup", this.#handleMouseUp);
-    window.addEventListener("keydown", this.#handleKeyDown);
+    window.addEventListener("mousemove", this.#handleMouseMove, opts);
+    window.addEventListener("mouseup", this.#handleMouseUp, opts);
+    window.addEventListener("keydown", this.#handleKeyDown, opts);
   }
 
   disconnectedCallback() {
@@ -169,9 +172,7 @@ export class ActorGraph extends LitElement {
     this.removeEventListener("wheel", this.#handleWheel);
     this.removeEventListener("mousedown", this.#handleMouseDown);
     this.removeEventListener("dblclick", this.#handleDoubleClick);
-    window.removeEventListener("mousemove", this.#handleMouseMove);
-    window.removeEventListener("mouseup", this.#handleMouseUp);
-    window.removeEventListener("keydown", this.#handleKeyDown);
+    this.#windowAbort.abort();
   }
 
   #initStoreControllers() {
