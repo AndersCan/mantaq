@@ -220,7 +220,7 @@ export function applyDefaultStyles(): void {
   }
 }
 
-function themeToVars(t: Theme): string {
+export function themeToVars(t: Theme): string {
   return `
     --viz-node-bg: ${t.nodeBackground};
     --viz-node-border: ${t.nodeBorder};

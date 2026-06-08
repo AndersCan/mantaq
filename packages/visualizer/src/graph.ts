@@ -44,7 +44,7 @@ export interface GraphBuilderOptions {
   padding?: number;
 }
 
-function estimateNodeWidth(label: string, minWidth: number): number {
+export function estimateNodeWidth(label: string, minWidth: number): number {
   const estimated = label.length * 8 + 24;
   return Math.max(estimated, minWidth);
 }

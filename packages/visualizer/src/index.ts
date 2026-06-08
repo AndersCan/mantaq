@@ -1,8 +1,14 @@
 export type { GraphNode, GraphEdge, ActorGraph, GraphBuilderOptions } from "./graph.ts";
-export { buildGraph, flattenNodes } from "./graph.ts";
+export {
+  buildGraph,
+  flattenNodes,
+  collectEdges,
+  getTransitionsForNode,
+  estimateNodeWidth,
+} from "./graph.ts";
 
 export type { LayoutOptions, ComputedEdge, LayoutResult } from "./layout.ts";
-export { computeLayout } from "./layout.ts";
+export { computeLayout, defaultPositions, getElk, SELF_LOOP_RADIUS } from "./layout.ts";
 
 export type { Theme } from "./styles.ts";
 export {
@@ -14,6 +20,7 @@ export {
   applyDefaultStyles,
   applyDarkTheme,
   removeDarkTheme,
+  themeToVars,
 } from "./styles.ts";
 
 export { ActorGraph as ActorGraphComponent } from "./components/actor-graph.ts";

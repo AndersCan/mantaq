@@ -36,12 +36,12 @@ const DEFAULT_NODE_SPACING = 30;
 const DEFAULT_EDGE_SPACING = 20;
 const DEFAULT_PADDING = { top: 20, bottom: 20, left: 20, right: 20 };
 const BEZIER_OFFSET_RATIO = 0.5;
-const SELF_LOOP_RADIUS = 40;
+export const SELF_LOOP_RADIUS = 40;
 const SELF_LOOP_OFFSET = 20;
 
 let elkInstance: ELK | null = null;
 
-async function getElk(): Promise<ELK> {
+export async function getElk(): Promise<ELK> {
   if (!elkInstance) {
     const mod = await import("elkjs");
     const ELKClass = mod.default ?? mod;
