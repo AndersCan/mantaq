@@ -20,6 +20,7 @@ import {
   zoomOut,
   resetView,
   setViewport,
+  startActorSync,
 } from "../src/stores/graph-store.ts";
 
 function createTestActor() {
@@ -175,5 +176,55 @@ describe("graph store", () => {
   it("$graphDimensions returns defaults when no layout", () => {
     const dims = $graphDimensions.get();
     expect(dims).toEqual({ width: 800, height: 600 });
+  });
+
+  it("startActorSync returns unsubscribe function", () => {
+    const unsub = startActorSync();
+    expect(typeof unsub).toBe("function");
+    unsub();
+  });
+
+  it("startActorSync updates graph when actor changes", async () => {
+    const actor = createTestActor();
+    const unsub = startActorSync();
+
+    $actor.set(actor);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect($graph.get()).not.toBeNull();
+    expect($graph.get()!.nodes).toHaveLength(2);
+
+    unsub();
+  });
+
+  it("startActorSync clears graph when actor set to null", async () => {
+    const unsub = startActorSync();
+    const actor = createTestActor();
+    $actor.set(actor);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect($graph.get()).not.toBeNull();
+
+    $actor.set(null);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect($graph.get()).toBeNull();
+    unsub();
+  });
+
+  it("setActor rebuilds graph on re-assignment", async () => {
+    const actor1 = createTestActor();
+    setActor(actor1);
+    await new Promise((r) => setTimeout(r, 50));
+
+    const graph1 = $graph.get();
+    expect(graph1).not.toBeNull();
+
+    setActor(actor1);
+    await new Promise((r) => setTimeout(r, 50));
+
+    const graph2 = $graph.get();
+    expect(graph2).not.toBeNull();
+    expect(graph2!.nodes).toHaveLength(2);
   });
 });
