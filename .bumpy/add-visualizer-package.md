@@ -2,4 +2,4 @@
 mantaq: minor
 ---
 
-Added visualizer package for state machine visualization
+Added visualizer package and documentation

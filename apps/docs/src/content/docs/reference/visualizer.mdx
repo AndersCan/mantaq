@@ -1,0 +1,205 @@
+---
+title: "@mantaq/visualizer"
+description: Visualizer API reference.
+---
+
+## `buildGraph(actor, options?)`
+
+```ts
+function buildGraph(actor: AnyActor, options?: GraphOptions): ActorGraph;
+```
+
+Converts actor snapshot into graph nodes and edges.
+
+| Parameter            | Type       | Default | What           |
+| -------------------- | ---------- | ------- | -------------- |
+| `actor`              | `AnyActor` | —       | Actor instance |
+| `options.nodeWidth`  | `number`   | `120`   | Min node width |
+| `options.nodeHeight` | `number`   | `60`    | Node height    |
+| `options.padding`    | `number`   | `20`    | Node padding   |
+
+### `ActorGraph`
+
+| Property     | Type          | What             |
+| ------------ | ------------- | ---------------- |
+| `nodes`      | `GraphNode[]` | State nodes      |
+| `edges`      | `GraphEdge[]` | Transition edges |
+| `activePath` | `string[]`    | Active state IDs |
+
+### `GraphNode`
+
+| Property   | Type             | What              |
+| ---------- | ---------------- | ----------------- |
+| `id`       | `string`         | Node ID           |
+| `label`    | `string`         | State name        |
+| `isActive` | `boolean`        | Currently active? |
+| `isFinal`  | `boolean`        | Terminal state?   |
+| `depth`    | `number`         | Hierarchy depth   |
+| `parentId` | `string \| null` | Parent node ID    |
+
+### `GraphEdge`
+
+| Property   | Type      | What            |
+| ---------- | --------- | --------------- |
+| `id`       | `string`  | Edge ID         |
+| `source`   | `string`  | Source node ID  |
+| `target`   | `string`  | Target node ID  |
+| `label`    | `string`  | Event ID        |
+| `isActive` | `boolean` | On active path? |
+
+---
+
+## `computeLayout(graph, options?)`
+
+```ts
+async function computeLayout(graph: ActorGraph, options?: LayoutOptions): Promise<LayoutResult>;
+```
+
+Runs ELK layered algorithm. Async. Returns positioned nodes and edges.
+
+| Option               | Type                | Default   | What                |
+| -------------------- | ------------------- | --------- | ------------------- |
+| `options.direction`  | `"RIGHT" \| "DOWN"` | `"RIGHT"` | Layout direction    |
+| `options.nodeWidth`  | `number`            | `120`     | Node width for ELK  |
+| `options.nodeHeight` | `number`            | `60`      | Node height for ELK |
+| `options.padding`    | `number`            | `40`      | Graph padding       |
+
+### `LayoutResult`
+
+| Property | Type           | What               |
+| -------- | -------------- | ------------------ |
+| `nodes`  | `LayoutNode[]` | Positioned nodes   |
+| `edges`  | `LayoutEdge[]` | Positioned edges   |
+| `width`  | `number`       | Total graph width  |
+| `height` | `number`       | Total graph height |
+
+---
+
+## `setActor(actor)`
+
+```ts
+function setActor(actor: AnyActor): Promise<void>;
+```
+
+Sets actor in store. Builds graph. Triggers layout computation.
+
+---
+
+## `startActorSync()`
+
+```ts
+function startActorSync(): () => void;
+```
+
+Subscribes to actor changes. Returns unsubscribe function.
+
+---
+
+## Components
+
+### `ActorGraphComponent`
+
+```ts
+class ActorGraphComponent extends LitElement { ... }
+```
+
+Custom element `<actor-graph>`. Renders the full graph with pan, zoom, keyboard nav.
+
+**Properties:**
+
+| Property         | Type                   | What                |
+| ---------------- | ---------------------- | ------------------- |
+| `zoom`           | `number`               | Zoom level          |
+| `pan`            | `{x, y}`               | Pan offset          |
+| `layout`         | `LayoutResult \| null` | Layout data         |
+| `computing`      | `boolean`              | Layout in progress? |
+| `layoutError`    | `string \| null`       | Error message       |
+| `selectedNodeId` | `string \| null`       | Selected node       |
+
+### `StateNode`
+
+```ts
+class StateNode extends LitElement { ... }
+```
+
+Custom element `<state-node>`. Single state node with active glow, selection ring.
+
+### `EdgePath`
+
+```ts
+class EdgePath extends LitElement { ... }
+```
+
+Custom element `<edge-path>`. Single edge with path, arrow marker, label.
+
+---
+
+## Store (Nanostores)
+
+Reactive atoms for custom integrations.
+
+### Atoms
+
+| Atom              | Type                   | What              |
+| ----------------- | ---------------------- | ----------------- |
+| `$actor`          | `AnyActor \| null`     | Current actor     |
+| `$graph`          | `ActorGraph \| null`   | Computed graph    |
+| `$layout`         | `LayoutResult \| null` | Computed layout   |
+| `$selectedNodeId` | `string \| null`       | Selected node     |
+| `$zoom`           | `number`               | Zoom level        |
+| `$pan`            | `{x, y}`               | Pan offset        |
+| `$layoutError`    | `string \| null`       | Layout error      |
+| `$isComputing`    | `boolean`              | Computing layout? |
+
+### Actions
+
+| Function     | Signature                      | What                     |
+| ------------ | ------------------------------ | ------------------------ |
+| `setActor`   | `(actor) => Promise<void>`     | Set actor, rebuild graph |
+| `selectNode` | `(id: string \| null) => void` | Select node              |
+| `zoomIn`     | `() => void`                   | Zoom in                  |
+| `zoomOut`    | `() => void`                   | Zoom out                 |
+| `zoomToFit`  | `() => void`                   | Fit graph to viewport    |
+| `resetView`  | `() => void`                   | Reset zoom and pan       |
+| `setZoom`    | `(zoom: number) => void`       | Set zoom level           |
+| `setPan`     | `(pan: {x, y}) => void`        | Set pan offset           |
+
+---
+
+## Style Utils
+
+### `applyDefaultStyles()`
+
+```ts
+function applyDefaultStyles(): void;
+```
+
+Injects default CSS variables into `<head>`.
+
+### `removeDefaultStyles()`
+
+```ts
+function removeDefaultStyles(): void;
+```
+
+Removes injected styles.
+
+---
+
+## Theme Utils
+
+### `applyDarkTheme()`
+
+```ts
+function applyDarkTheme(): void;
+```
+
+Sets `data-theme="dark"` on `<html>`.
+
+### `removeDarkTheme()`
+
+```ts
+function removeDarkTheme(): void;
+```
+
+Removes `data-theme` attribute.
