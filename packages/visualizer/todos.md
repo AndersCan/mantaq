@@ -33,7 +33,7 @@
 
 ## High Priority
 
-- [ ] **Region wrapper nodes** — State-level regions render states directly under parent. Need wrapper nodes for region labels (e.g., "sub" region label above subA/subB)
+- [x] **Region wrapper nodes** — State-level regions render states directly under parent. Need wrapper nodes for region labels (e.g., "sub" region label above subA/subB)
 - [ ] **Actor-level region rendering** — `buildChildGraphs` handles `actor.regions` but no visual distinction from state-level regions
 - [x] **Store reactivity wiring** — Components don't yet subscribe to nanostores via `useStore` directive. Need `@nanostores/lit` package
 - [x] **Real-time actor sync** — `startActorSync()` exists but not called automatically. Need lifecycle hook to auto-update graph when actor state changes

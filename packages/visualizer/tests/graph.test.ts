@@ -223,11 +223,16 @@ describe("buildGraph", () => {
 
     const activeNode = graph.nodes.find((n) => n.id === "active");
     expect(activeNode).toBeDefined();
-    expect(activeNode!.children.length).toBe(2);
+    expect(activeNode!.children.length).toBe(1);
 
-    const subIds = activeNode!.children.map((n) => n.id);
-    expect(subIds).toContain("active/subA");
-    expect(subIds).toContain("active/subB");
+    const regionNode = activeNode!.children[0];
+    expect(regionNode.id).toBe("active/sub");
+    expect(regionNode.label).toBe("sub");
+    expect(regionNode.children.length).toBe(2);
+
+    const subIds = regionNode.children.map((n) => n.id);
+    expect(subIds).toContain("active/sub/subA");
+    expect(subIds).toContain("active/sub/subB");
   });
 });
 
