@@ -1,52 +1,9 @@
 ---
 title: Visualizer
 description: Visual state machine graph viewer for actors.
-script: |
-  (function () {
-    var states = ["green", "yellow", "red"];
-    var current = 0;
-    var stateEl = document.getElementById("vis-state");
-    var nextBtn = document.getElementById("vis-next");
-    var resetBtn = document.getElementById("vis-reset");
-    var logEl = document.getElementById("vis-log");
-    var colors = { green: "#16a34a", yellow: "#ca8a04", red: "#dc2626" };
-    var nodes = {
-      green: document.getElementById("vis-node-green"),
-      yellow: document.getElementById("vis-node-yellow"),
-      red: document.getElementById("vis-node-red")
-    };
-    function highlight(name) {
-      for (var s in nodes) {
-        if (s === name) {
-          nodes[s].setAttribute("fill", colors[s]);
-          nodes[s].setAttribute("opacity", "0.2");
-          nodes[s].setAttribute("stroke-width", "2");
-          nodes[s].setAttribute("stroke", colors[s]);
-        } else {
-          nodes[s].setAttribute("fill", "transparent");
-          nodes[s].setAttribute("opacity", "1");
-          nodes[s].setAttribute("stroke-width", "1");
-          nodes[s].setAttribute("stroke", "#999");
-        }
-      }
-    }
-    function update(action) {
-      var name = states[current];
-      stateEl.textContent = name;
-      stateEl.style.color = colors[name];
-      highlight(name);
-      logEl.textContent = action + " \u2192 " + name;
-    }
-    nextBtn.addEventListener("click", function () {
-      current = (current + 1) % states.length;
-      update("send(NEXT)");
-    });
-    resetBtn.addEventListener("click", function () {
-      current = 0;
-      update("reset");
-    });
-  })();
 ---
+
+import VisualizerDemo from "../../../components/VisualizerDemo.astro";
 
 The visualizer renders actor state machines as interactive graph diagrams. States become nodes, transitions become labeled edges. Active states highlight green. Supports pan, zoom, keyboard navigation, and dark mode.
 
@@ -65,7 +22,7 @@ import { setActor } from "@mantaq/visualizer";
 setActor(myActor);
 ```
 
-See [Full Programmatic Example](#full-programmatic-example) below for complete setup including web component registration and style injection.
+See [Full Programmatic Example](#full-programmatic-example) below for complete setup.
 
 ## Features
 
@@ -115,178 +72,34 @@ removeDarkTheme(); // toggle off
 
 Reactive state atoms for custom integrations:
 
-| Atom              | Type                   | Purpose                                        |
-| ----------------- | ---------------------- | ---------------------------------------------- |
-| `$actor`          | `AnyActor \| null`     | Current actor                                  |
-| `$graph`          | `ActorGraph \| null`   | Computed graph                                 |
-| `$layout`         | `LayoutResult \| null` | Computed layout                                |
-| `$layoutLoading`  | `boolean`              | Whether layout computation is in progress      |
-| `$selectedNodeId` | `string \| null`       | Selected node                                  |
-| `$zoom`           | `number`               | Zoom level                                     |
-| `$pan`            | `{x, y}`               | Pan offset                                     |
-| `$layoutError`    | `string \| null`       | Layout error                                   |
-| `$flatNodes`      | `GraphNode[]`          | Flattened list of positioned nodes from layout |
-| `$edges`          | `ComputedEdge[]`       | Positioned edges from layout                   |
+| Atom              | Type                   | Purpose                                   |
+| ----------------- | ---------------------- | ----------------------------------------- |
+| `$actor`          | `AnyActor \| null`     | Current actor                             |
+| `$graph`          | `ActorGraph \| null`   | Computed graph                            |
+| `$layout`         | `LayoutResult \| null` | Computed layout                           |
+| `$selectedNodeId` | `string \| null`       | Selected node                             |
+| `$zoom`           | `number`               | Zoom level                                |
+| `$pan`            | `{x, y}`               | Pan offset                                |
+| `$layoutError`    | `string \| null`       | Layout error                              |
+| `$isComputing`    | `boolean`              | Whether layout computation is in progress |
 
-Actions: `setActor`, `selectNode`, `setViewport`, `setZoom`, `updateLayout`, `zoomIn`, `zoomOut`, `zoomToFit`, `resetView`.
+Actions: `setActor`, `selectNode`, `setZoom`, `setPan`, `zoomIn`, `zoomOut`, `zoomToFit`, `resetView`, `startActorSync`.
 
 ## Interactive Demo
 
-This demo renders a traffic light actor. Buttons send `NEXT` to advance the state. The graph re-renders after each transition.
+This renders a real traffic light actor using the actual visualizer. Click **NEXT** to advance the state, **Reset** to return to green.
 
-<div
-  id="vis-demo"
-  style="font-family: monospace; padding: 1rem; border: 1px solid #333; border-radius: 8px; max-width: 500px;"
->
-  <div style="margin-bottom: 1rem;">
-    <strong>Current state:</strong>{" "}
-    <span id="vis-state" style="color: #16a34a; font-weight: bold;">
-      green
-    </span>
-  </div>
-  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-    <button id="vis-next" style="padding: 0.5rem 1rem; cursor: pointer;">
-      NEXT →
-    </button>
-    <button id="vis-reset" style="padding: 0.5rem 1rem; cursor: pointer;">
-      Reset
-    </button>
-  </div>
-  <div style="border: 1px solid #ddd; border-radius: 4px; padding: 1rem; background: #fafafa; margin-bottom: 0.5rem;">
-    <svg width="400" height="120" viewBox="0 0 400 120">
-      <defs>
-        <marker
-          id="demo-arrow"
-          viewBox="0 0 10 7"
-          refX="10"
-          refY="3.5"
-          markerWidth="10"
-          markerHeight="7"
-          orient="auto-start-reverse"
-        >
-          <polygon points="0 0, 10 3.5, 0 7" fill="#999" />
-        </marker>
-      </defs>
-      <line
-        x1="80"
-        y1="60"
-        x2="155"
-        y2="60"
-        stroke="#999"
-        stroke-width="2"
-        marker-end="url(#demo-arrow)"
-      />
-      <line
-        x1="225"
-        y1="60"
-        x2="300"
-        y2="60"
-        stroke="#999"
-        stroke-width="2"
-        marker-end="url(#demo-arrow)"
-      />
-      <path
-        d="M 300 30 Q 350 0 370 60 Q 350 120 300 90"
-        fill="none"
-        stroke="#999"
-        stroke-width="2"
-        marker-end="url(#demo-arrow)"
-      />
-      <rect
-        id="vis-node-green"
-        x="10"
-        y="35"
-        width="70"
-        height="50"
-        rx="6"
-        fill="#16a34a"
-        opacity="0.2"
-        stroke="#16a34a"
-        stroke-width="2"
-      />
-      <text
-        id="vis-label-green"
-        x="45"
-        y="65"
-        text-anchor="middle"
-        font-size="14"
-        font-family="monospace"
-      >
-        green
-      </text>
-      <rect
-        id="vis-node-yellow"
-        x="160"
-        y="35"
-        width="70"
-        height="50"
-        rx="6"
-        fill="transparent"
-        stroke="#999"
-        stroke-width="1"
-      />
-      <text
-        id="vis-label-yellow"
-        x="195"
-        y="65"
-        text-anchor="middle"
-        font-size="14"
-        font-family="monospace"
-      >
-        yellow
-      </text>
-      <rect
-        id="vis-node-red"
-        x="305"
-        y="35"
-        width="50"
-        height="50"
-        rx="6"
-        fill="transparent"
-        stroke="#999"
-        stroke-width="1"
-      />
-      <text
-        id="vis-label-red"
-        x="330"
-        y="65"
-        text-anchor="middle"
-        font-size="14"
-        font-family="monospace"
-      >
-        red
-      </text>
-      <text x="117" y="55" font-size="11" fill="#999" font-family="monospace">
-        NEXT
-      </text>
-      <text x="262" y="55" font-size="11" fill="#999" font-family="monospace">
-        NEXT
-      </text>
-      <text x="358" y="55" font-size="11" fill="#999" font-family="monospace">
-        NEXT
-      </text>
-    </svg>
-  </div>
-  <div style="font-size: 0.85rem; color: #666;">
-    <strong>Graph:</strong> green → yellow → red → green (cycle)
-  </div>
-  <div id="vis-log" style="margin-top: 0.5rem; font-size: 0.8rem; color: #999;"></div>
-</div>
+<VisualizerDemo />
 
-<script is:inline set:html={frontmatter.script} />
+The graph shows states as nodes and transitions as labeled edges. Active states highlight green. Use mouse wheel to zoom, click-drag to pan, and keyboard shortcuts (+/-/0/F) to navigate.
 
 ## Full Programmatic Example
 
-To use the full visualizer with real actors (requires a bundler):
+To use the visualizer with real actors:
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
-import {
-  setActor,
-  ActorGraphComponent,
-  applyDefaultStyles,
-  startActorSync,
-} from "@mantaq/visualizer";
+import { setActor, startActorSync } from "@mantaq/visualizer";
 
 // Define states and events
 const idle = state("idle")();
@@ -325,93 +138,76 @@ setActor(actor);
 startActorSync();
 
 // Trigger transitions
-actor.send(fetch);  // idle → loading (graph updates)
+actor.send(fetch); // idle → loading (graph updates)
 actor.send(success); // loading → done (graph updates)
 ```
 
-### Adding Transition Buttons
+### Sending Transitions
 
-The visualizer renders the graph but does not yet provide built-in transition buttons. Wire them manually:
+Send events to the actor directly. Combined with `startActorSync()`, the graph updates automatically:
 
 ```ts
-import { setActor } from "@mantaq/visualizer";
+import { setActor, startActorSync } from "@mantaq/visualizer";
 
 const actor = createFetcher();
+setActor(actor);
+startActorSync();
 
-// Find available transitions from current state
+// Send events — graph rebuilds on each transition
+actor.send(fetch);
+actor.send(success);
+```
+
+To build custom transition buttons, query available transitions from the actor snapshot:
+
+```ts
 function getAvailableTransitions(a) {
   const snapshot = a.snapshot();
   const currentState = snapshot.path[snapshot.path.length - 1];
   const transitions = a.options.transitions[currentState] ?? {};
   return Object.keys(transitions);
 }
-
-// Render transition buttons
-function renderButtons(a) {
-  const container = document.getElementById("buttons");
-  container.innerHTML = "";
-  for (const eventId of getAvailableTransitions(a)) {
-    const btn = document.createElement("button");
-    btn.textContent = eventId;
-    btn.addEventListener("click", () => {
-      const events = { FETCH: fetch, SUCCESS: success, FAIL: fail };
-      a.send(events[eventId]);
-      setActor(a);  // re-render graph
-      renderButtons(a);  // update available transitions
-    });
-    container.appendChild(btn);
-  }
-}
-
-renderButtons(actor);
 ```
 
 ## API Reference
 
 ### `buildGraph(actor, options?)`
 
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `actor` | `AnyActor` | — | Actor instance |
-| `options.nodeWidth` | `number` | `120` | Min node width |
-| `options.nodeHeight` | `number` | `60` | Node height |
-| `options.padding` | `number` | `20` | Node padding |
+| Parameter            | Type       | Default | Description    |
+| -------------------- | ---------- | ------- | -------------- |
+| `actor`              | `AnyActor` | —       | Actor instance |
+| `options.nodeWidth`  | `number`   | `120`   | Min node width |
+| `options.nodeHeight` | `number`   | `60`    | Node height    |
+| `options.padding`    | `number`   | `20`    | Node padding   |
 
 Returns `ActorGraph` with `nodes`, `edges`, `activePath`.
-
-### `estimateNodeWidth(label, minWidth)`
-
-Estimate node width based on label text.
-
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `label` | `string` | Node label text |
-| `minWidth` | `number` | Minimum width fallback |
-
-Returns `number` — estimated width (`label.length * 8 + 24`, clamped to at least `minWidth`).
 
 ### `computeLayout(graph, options?)`
 
 Async. Returns `LayoutResult` with positioned `nodes`, `edges`, `width`, `height`.
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `options.direction` | `"RIGHT" \| "DOWN"` | `"RIGHT"` | Layout direction |
-| `options.nodeWidth` | `number` | `120` | Node width for ELK |
-| `options.nodeHeight` | `number` | `60` | Node height for ELK |
-| `options.nodeSpacing` | `number` | — | Spacing between nodes |
-| `options.edgeSpacing` | `number` | — | Spacing between edges |
-| `options.padding` | `{ top, bottom, left, right }` | — | Padding around the graph |
+| Option                | Type                           | Default   | Description              |
+| --------------------- | ------------------------------ | --------- | ------------------------ |
+| `options.direction`   | `"RIGHT" \| "DOWN"`            | `"RIGHT"` | Layout direction         |
+| `options.nodeWidth`   | `number`                       | `120`     | Node width for ELK       |
+| `options.nodeHeight`  | `number`                       | `60`      | Node height for ELK      |
+| `options.nodeSpacing` | `number`                       | —         | Spacing between nodes    |
+| `options.edgeSpacing` | `number`                       | —         | Spacing between edges    |
+| `options.padding`     | `{ top, bottom, left, right }` | —         | Padding around the graph |
 
 ### `flattenNodes(node)`
 
-Flatten a `GraphNode` tree into a flat array.
+Flatten a `GraphNode` tree into a flat array. Used internally by the layout engine.
 
-| Parameter | Type | Description |
-| --- | --- | --- |
-| `node` | `GraphNode` | Root node to flatten |
+| Parameter | Type        | Description          |
+| --------- | ----------- | -------------------- |
+| `node`    | `GraphNode` | Root node to flatten |
 
 Returns `GraphNode[]` — the root node plus all descendants.
+
+:::note
+`flattenNodes` is not currently exported from the package entrypoint. It is used internally by the graph builder.
+:::
 
 ### `setActor(actor)`
 
@@ -423,15 +219,15 @@ Subscribes to the actor's `change` event and the `$actor` store. Returns an unsu
 
 ## Known Issues
 
-:::note[Missing Features]
-- **Transition trigger buttons** — No built-in UI to send events from the graph. Must wire manually (see example above).
-- **Live actor sync** — `startActorSync()` exists but not called automatically. Graph does not update when actor state changes unless consumer calls `setActor` again.
-- **Store-component wiring** — `ActorGraph` component accepts props but does not subscribe to nanostores. Missing `@nanostores/lit` integration. Consumer must bridge store values to component props manually.
+:::note[Known Issues]
+
 - **Region labels** — Sub-region wrapper nodes not rendered. States display directly under parent without visual grouping.
 - **Edge labels** — Shows event IDs only. Guard conditions and action metadata not displayed.
-:::
+- **`startActorSync()` requires explicit call** — Graph does not auto-update on actor state changes unless `startActorSync()` is called after `setActor()`.
+  :::
 
 :::note[Planned Improvements]
+
 - Minimap for large graphs
 - Current zoom percentage indicator
 - Edge hover highlighting (connected nodes)
@@ -444,11 +240,12 @@ Subscribes to the actor's `change` event and the `$actor` store. Returns an unsu
 - Performance memoization
 - ARIA accessibility labels
 - Interactive playground / Storybook
-:::
+  :::
 
 :::caution[Technical Debt]
+
 - ELK.js import uses `dynamic import()` with type cast due to pnpm resolution issues
 - `applyDefaultStyles()` uses raw CSS strings instead of Lit `css` template results
 - `defaultPositions()` exported from `layout.ts` but not re-exported from `index.ts`
 - `HOST_VARS` exported but only used internally
-:::
+  :::
