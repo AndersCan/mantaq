@@ -1,515 +1,502 @@
-import { LitElement, html, css, svg } from "lit";
+import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { StoreController } from "@nanostores/lit";
-import type { AnyActor } from "@mantaq/core";
-import type { GraphNode } from "../graph.ts";
-import type { ComputedEdge } from "../layout.ts";
 import {
-  $flatNodes,
-  $edges,
-  $graphDimensions,
   $zoom,
   $pan,
   $selectedNodeId,
-  $layoutLoading,
+  $layout,
+  $isComputing,
   $layoutError,
-  $actor,
-  ZOOM_MIN,
-  ZOOM_MAX,
+  selectNode,
+  zoomIn,
+  zoomOut,
+  zoomToFit,
+  resetView,
+  setZoom,
+  setPan,
 } from "../stores/graph-store.ts";
-import { renderEdge } from "./edge.ts";
+import type { LayoutResult } from "../layout.ts";
 
 @customElement("actor-graph")
-export class ActorGraph extends LitElement {
-  @property({ type: Array }) nodes: GraphNode[] = [];
-  @property({ type: Array }) edges: ComputedEdge[] = [];
-  @property({ type: Number }) graphWidth = 800;
-  @property({ type: Number }) graphHeight = 600;
-  @property({ type: Number }) zoom = 1;
-  @property({ type: Object }) pan: { x: number; y: number } = { x: 0, y: 0 };
-  @property({ type: String }) selectedNodeId: string | null = null;
-  @property({ type: String }) error: string | null = null;
-  @property({ type: Boolean }) loading = false;
-  @property({ type: Boolean }) useStores = false;
-
-  #nodesCtrl?: StoreController<GraphNode[]>;
-  #edgesCtrl?: StoreController<ComputedEdge[]>;
-  #dimensionsCtrl?: StoreController<{ width: number; height: number }>;
-  #zoomCtrl?: StoreController<number>;
-  #panCtrl?: StoreController<{ x: number; y: number }>;
-  #selectedNodeIdCtrl?: StoreController<string | null>;
-  #loadingCtrl?: StoreController<boolean>;
-  #errorCtrl?: StoreController<string | null>;
-  #actorCtrl?: StoreController<AnyActor | null>;
-
-  #isPanning = false;
-  #lastMouse = { x: 0, y: 0 };
-  #showHelp = false;
+export class ActorGraphComponent extends LitElement {
+  @property({ type: Number }) declare zoom: number;
+  @property({ type: Object }) declare pan: { x: number; y: number };
+  @property({ type: Object }) declare layout: LayoutResult | null;
+  @property({ type: Boolean }) declare computing: boolean;
+  @property({ type: String }) declare layoutError: string | null;
+  @property({ type: String }) declare selectedNodeId: string | null;
 
   static styles = css`
     :host {
       display: block;
       position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
       overflow: hidden;
-      background: #fafafa;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
+      background: var(--viz-bg, #fafafa);
+      border-radius: 8px;
+      border: 1px solid var(--viz-border, #e5e7eb);
     }
+
+    :host([data-theme="dark"]) {
+      background: var(--viz-bg);
+      border-color: var(--viz-border);
+    }
+
     .container {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      cursor: grab;
       position: relative;
-      transform-origin: 0 0;
+      outline: none;
     }
-    svg.edges {
+
+    .container:focus-visible {
+      box-shadow: inset 0 0 0 2px var(--viz-accent, #3b82f6);
+    }
+
+    .container:active {
+      cursor: grabbing;
+    }
+
+    .viewport {
       position: absolute;
-      top: 0;
-      left: 0;
-      pointer-events: none;
+      transform-origin: 0 0;
+      will-change: transform;
     }
-    .edge-path {
-      pointer-events: stroke;
-      cursor: pointer;
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: monospace;
+      font-size: 14px;
+      color: var(--viz-text-muted, #6b7280);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .controls {
+
+    .loading-spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--viz-border);
+      border-top-color: var(--viz-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .error {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--viz-error-text, #dc2626);
+      background: var(--viz-error-bg, #fef2f2);
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--viz-error-border, #fecaca);
+      max-width: 300px;
+      text-align: center;
+    }
+
+    :host([data-theme="dark"]) .error {
+      color: var(--viz-error-text);
+      background: var(--viz-error-bg);
+      border-color: var(--viz-error-border);
+    }
+
+    .zoom-controls {
       position: absolute;
       bottom: 12px;
       right: 12px;
       display: flex;
-      flex-direction: column;
       gap: 4px;
-      z-index: 10;
+      background: var(--viz-node-bg);
+      border: 1px solid var(--viz-border);
+      border-radius: 6px;
+      padding: 4px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     }
-    .controls button {
-      width: 32px;
-      height: 32px;
-      border: 1px solid #ccc;
-      background: white;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 16px;
+
+    .zoom-btn {
+      width: 28px;
+      height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
-    }
-    .controls button:hover {
-      background: #f0f0f0;
-    }
-    .help-tooltip {
-      position: absolute;
-      bottom: 12px;
-      left: 12px;
-      background: white;
-      border: 1px solid #ccc;
+      border: none;
+      background: transparent;
+      cursor: pointer;
       border-radius: 4px;
-      padding: 8px 12px;
-      font-size: 12px;
-      font-family: system-ui, sans-serif;
-      z-index: 10;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+      font-size: 14px;
+      color: var(--viz-node-label);
+      transition: background 0.15s;
     }
-    .help-tooltip kbd {
-      display: inline-block;
-      padding: 1px 4px;
-      border: 1px solid #ccc;
-      border-radius: 3px;
-      background: #f5f5f5;
+
+    .zoom-btn:hover {
+      background: var(--viz-border);
+    }
+
+    .zoom-indicator {
       font-family: monospace;
       font-size: 11px;
-      min-width: 18px;
-      text-align: center;
+      color: var(--viz-text-muted, #6b7280);
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      min-width: 40px;
+      justify-content: center;
     }
+
+    .help-overlay {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--viz-node-bg);
+      border: 1px solid var(--viz-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--viz-text-muted);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      display: flex;
+      gap: 10px;
+      max-width: calc(100% - 24px);
+    }
+
+    .help-overlay kbd {
+      background: var(--viz-border);
+      border: 1px solid var(--viz-node-border);
+      border-radius: 3px;
+      padding: 0 4px;
+      font-size: 10px;
+    }
+
     .empty-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #999;
-      font-family: system-ui, sans-serif;
-      font-size: 14px;
-    }
-    .error-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #d32f2f;
-      font-family: system-ui, sans-serif;
-      font-size: 14px;
-      padding: 16px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       text-align: center;
+      font-family: monospace;
+      color: var(--viz-text-muted, #9ca3af);
     }
-    .loading-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #666;
-      font-family: system-ui, sans-serif;
+
+    .empty-state-icon {
+      margin-bottom: 8px;
+      opacity: 0.5;
+    }
+
+    .empty-state-text {
       font-size: 14px;
     }
-  `;
 
-  connectedCallback() {
-    super.connectedCallback();
-    if (this.useStores) {
-      this.#initStoreControllers();
-    }
-    this.addEventListener("wheel", this.#handleWheel, { passive: false });
-    this.addEventListener("mousedown", this.#handleMouseDown);
-    this.addEventListener("dblclick", this.#handleDoubleClick);
-    window.addEventListener("mousemove", this.#handleMouseMove);
-    window.addEventListener("mouseup", this.#handleMouseUp);
-    window.addEventListener("keydown", this.#handleKeyDown);
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this.removeEventListener("wheel", this.#handleWheel);
-    this.removeEventListener("mousedown", this.#handleMouseDown);
-    this.removeEventListener("dblclick", this.#handleDoubleClick);
-    window.removeEventListener("mousemove", this.#handleMouseMove);
-    window.removeEventListener("mouseup", this.#handleMouseUp);
-    window.removeEventListener("keydown", this.#handleKeyDown);
-  }
-
-  #initStoreControllers() {
-    if (this.#nodesCtrl) return;
-
-    this.#nodesCtrl = new StoreController(this, $flatNodes);
-    this.#edgesCtrl = new StoreController(this, $edges);
-    this.#dimensionsCtrl = new StoreController(this, $graphDimensions);
-    this.#zoomCtrl = new StoreController(this, $zoom);
-    this.#panCtrl = new StoreController(this, $pan);
-    this.#selectedNodeIdCtrl = new StoreController(this, $selectedNodeId);
-    this.#loadingCtrl = new StoreController(this, $layoutLoading);
-    this.#errorCtrl = new StoreController(this, $layoutError);
-    this.#actorCtrl = new StoreController(this, $actor);
-  }
-
-  #handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
-    const currentZoom = this.#getZoom();
-    const currentPan = this.#getPan();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, currentZoom + delta));
-
-    const rect = this.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const scale = newZoom / currentZoom;
-    this.pan = {
-      x: mouseX - scale * (mouseX - currentPan.x),
-      y: mouseY - scale * (mouseY - currentPan.y),
-    };
-    this.zoom = newZoom;
-    this.#dispatchZoomChange();
-  };
-
-  #handleMouseDown = (e: MouseEvent) => {
-    if ((e.target as HTMLElement).closest("state-node")) return;
-    this.#isPanning = true;
-    this.#lastMouse = { x: e.clientX, y: e.clientY };
-    this.style.cursor = "grabbing";
-  };
-
-  #handleMouseMove = (e: MouseEvent) => {
-    if (!this.#isPanning) return;
-    const dx = e.clientX - this.#lastMouse.x;
-    const dy = e.clientY - this.#lastMouse.y;
-    this.pan = { x: this.pan.x + dx, y: this.pan.y + dy };
-    this.#lastMouse = { x: e.clientX, y: e.clientY };
-  };
-
-  #handleMouseUp = () => {
-    this.#isPanning = false;
-    this.style.cursor = "";
-  };
-
-  #handleDoubleClick = () => {
-    this.zoomToFit();
-  };
-
-  #handleKeyDown = (e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement) return;
-    switch (e.key) {
-      case "+":
-      case "=":
-        this.zoomIn();
-        break;
-      case "-":
-        this.zoomOut();
-        break;
-      case "0":
-        this.resetView();
-        break;
-      case "f":
-      case "F":
-        this.zoomToFit();
-        break;
-    }
-  };
-
-  zoomIn = () => {
-    this.zoom = Math.min(ZOOM_MAX, this.zoom + 0.2);
-    this.#dispatchZoomChange();
-  };
-
-  zoomOut = () => {
-    this.zoom = Math.max(ZOOM_MIN, this.zoom - 0.2);
-    this.#dispatchZoomChange();
-  };
-
-  resetView = () => {
-    this.zoom = 1;
-    this.pan = { x: 0, y: 0 };
-    this.#dispatchZoomChange();
-  };
-
-  zoomToFit = () => {
-    const nodes = this.#getNodes();
-    if (nodes.length === 0) return;
-    const rect = this.getBoundingClientRect();
-    const padding = 40;
-
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    for (const node of nodes) {
-      if (node.x != null && node.y != null) {
-        minX = Math.min(minX, node.x);
-        minY = Math.min(minY, node.y);
-        maxX = Math.max(maxX, node.x + (node.width ?? 120));
-        maxY = Math.max(maxY, node.y + (node.height ?? 60));
+    @media (prefers-reduced-motion: reduce) {
+      .loading-spinner {
+        animation: none;
       }
     }
 
-    if (minX === Infinity) return;
+    @media (max-width: 480px) {
+      .help-overlay {
+        display: none;
+      }
+    }
+  `;
 
-    const graphW = maxX - minX;
-    const graphH = maxY - minY;
-    const availW = rect.width - padding * 2;
-    const availH = rect.height - padding * 2;
+  constructor() {
+    super();
+    this.zoom = 1;
+    this.pan = { x: 0, y: 0 };
+    this.layout = null;
+    this.computing = false;
+    this.layoutError = null;
+    this.selectedNodeId = null;
+    this.#isPanning = false;
+    this.#panStart = { x: 0, y: 0 };
+    this.#unsubscribers = [];
+    this.#boundHandlers = [];
+  }
 
-    this.zoom = Math.min(availW / graphW, availH / graphH, ZOOM_MAX);
-    this.pan = {
-      x: padding + (availW - graphW * this.zoom) / 2 - minX * this.zoom,
-      y: padding + (availH - graphH * this.zoom) / 2 - minY * this.zoom,
+  #isPanning: boolean;
+  #panStart: { x: number; y: number };
+  #unsubscribers: Array<() => void>;
+  #boundHandlers: Array<[EventTarget, string, EventListener]>;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.#unsubscribers.push(
+      $zoom.subscribe((v) => (this.zoom = v)),
+      $pan.subscribe((v) => (this.pan = v)),
+      $layout.subscribe((v) => (this.layout = v)),
+      $isComputing.subscribe((v) => (this.computing = v)),
+      $layoutError.subscribe((v) => (this.layoutError = v)),
+      $selectedNodeId.subscribe((v) => (this.selectedNodeId = v)),
+    );
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    for (const [target, event, handler] of this.#boundHandlers) {
+      target.removeEventListener(event, handler);
+    }
+    this.#boundHandlers = [];
+    for (const unsub of this.#unsubscribers) unsub();
+  }
+
+  firstUpdated(): void {
+    const container = this.shadowRoot?.querySelector(".container");
+    if (!container) return;
+
+    const add = (
+      target: EventTarget,
+      event: string,
+      fn: (e: Event) => void,
+      opts?: AddEventListenerOptions,
+    ) => {
+      target.addEventListener(event, fn as EventListener, opts);
+      this.#boundHandlers.push([target, event, fn as EventListener]);
     };
-    this.#dispatchZoomChange();
+
+    add(container, "wheel", this.#handleWheel, { passive: false });
+    add(container, "mousedown", this.#handleMouseDown);
+    add(container, "dblclick", this.#handleDblClick);
+    add(container, "node-select", this.#handleNodeSelect);
+    add(window, "mousemove", this.#handleMouseMove);
+    add(window, "mouseup", this.#handleMouseUp);
+  }
+
+  #handleWheel = (e: Event): void => {
+    const wheelEvent = e as WheelEvent;
+    wheelEvent.preventDefault();
+    const rect = (wheelEvent.currentTarget as HTMLElement).getBoundingClientRect();
+    const cursorX = wheelEvent.clientX - rect.left;
+    const cursorY = wheelEvent.clientY - rect.top;
+
+    const oldZoom = this.zoom;
+    const delta = wheelEvent.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    const newZoom = Math.min(Math.max(oldZoom + delta, MIN_ZOOM), MAX_ZOOM);
+    const scale = newZoom / oldZoom;
+
+    setZoom(newZoom);
+    setPan({
+      x: cursorX - (cursorX - this.pan.x) * scale,
+      y: cursorY - (cursorY - this.pan.y) * scale,
+    });
   };
 
-  #dispatchZoomChange() {
-    this.dispatchEvent(
-      new CustomEvent("zoom-change", {
-        detail: { zoom: this.zoom, pan: { ...this.pan } },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
+  #handleMouseDown = (e: Event): void => {
+    const mouseEvent = e as MouseEvent;
+    if ((mouseEvent.target as HTMLElement).closest("state-node")) return;
+    this.#isPanning = true;
+    this.#panStart = { x: mouseEvent.clientX - this.pan.x, y: mouseEvent.clientY - this.pan.y };
+  };
 
-  #handleNodeSelect(nodeId: string) {
-    this.selectedNodeId = nodeId;
-    this.dispatchEvent(
-      new CustomEvent("node-select", {
-        detail: { nodeId },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
+  #handleMouseMove = (e: Event): void => {
+    if (!this.#isPanning) return;
+    const mouseEvent = e as MouseEvent;
+    setPan({
+      x: mouseEvent.clientX - this.#panStart.x,
+      y: mouseEvent.clientY - this.#panStart.y,
+    });
+  };
 
-  #handleTransitionTrigger(nodeId: string, transitionId: string) {
-    const actor = this.#actorCtrl?.value ?? $actor.get();
-    if (!actor) return;
+  #handleMouseUp = (): void => {
+    this.#isPanning = false;
+  };
 
-    const snapshot = actor.snapshot();
-    const currentPath = snapshot.path;
-    let currentNode = "";
-    for (const segment of currentPath) {
-      currentNode = currentNode ? `${currentNode}/${segment}` : segment;
-    }
+  #handleDblClick = (e: Event): void => {
+    const mouseEvent = e as MouseEvent;
+    const rect = (mouseEvent.currentTarget as HTMLElement).getBoundingClientRect();
+    const cursorX = mouseEvent.clientX - rect.left;
+    const cursorY = mouseEvent.clientY - rect.top;
 
-    if (currentNode === nodeId) {
-      const eventObj = { id: transitionId } as Parameters<typeof actor.send>[0];
-      actor.send(eventObj);
-      this.dispatchEvent(
-        new CustomEvent("transition-sent", {
-          detail: { nodeId, transitionId },
-          bubbles: true,
-          composed: true,
-        }),
-      );
-    }
-  }
+    const oldZoom = this.zoom;
+    const newZoom = Math.min(oldZoom + ZOOM_STEP * 2, MAX_ZOOM);
+    const scale = newZoom / oldZoom;
 
-  #renderEdges() {
-    const edges = this.#getEdges();
-    const dims = this.#getDimensions();
+    setZoom(newZoom);
+    setPan({
+      x: cursorX - (cursorX - this.pan.x) * scale,
+      y: cursorY - (cursorY - this.pan.y) * scale,
+    });
+  };
 
-    if (edges.length === 0) return svg``;
+  #handleNodeSelect = (e: Event): void => {
+    const detail = (e as CustomEvent).detail;
+    selectNode(detail.nodeId);
+  };
 
-    return svg`
-      <svg
-        class="edges"
-        width="${dims.width}"
-        height="${dims.height}"
-        viewBox="0 0 ${dims.width} ${dims.height}"
-      >
-        <defs>
-          <marker
-            id="arrowhead"
-            viewBox="0 0 10 7"
-            refX="10"
-            refY="3.5"
-            markerWidth="10"
-            markerHeight="7"
-            orient="auto-start-reverse"
-          >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#999" />
-          </marker>
-          <marker
-            id="arrowhead-active"
-            viewBox="0 0 10 7"
-            refX="10"
-            refY="3.5"
-            markerWidth="10"
-            markerHeight="7"
-            orient="auto-start-reverse"
-          >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" />
-          </marker>
-        </defs>
-        ${edges.map((edge) => renderEdge(edge))}
-      </svg>
-    `;
-  }
+  #panToNode(nodeId: string): void {
+    const nodes = this.layout?.nodes;
+    if (!nodes) return;
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) return;
 
-  #renderNodes() {
-    const nodes = this.#getNodes();
-    const selectedId = this.#getSelectedNodeId();
-    const edges = this.#getEdges();
+    const container = this.shadowRoot?.querySelector(".container");
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
 
-    return nodes.map((node) => {
-      const nodeTransitions = edges
-        .filter((edge) => edge.source === node.id)
-        .map((edge) => edge.label);
-
-      return html`
-        <state-node
-          .nodeId=${node.id}
-          .label=${node.label}
-          .isActive=${node.isActive}
-          .isFinal=${node.isFinal}
-          .isSelected=${node.id === selectedId}
-          .xPos=${node.x ?? 0}
-          .yPos=${node.y ?? 0}
-          .nodeWidth=${node.width ?? 120}
-          .nodeHeight=${node.height ?? 60}
-          .transitions=${nodeTransitions}
-          @node-select=${(e: CustomEvent) => this.#handleNodeSelect(e.detail.nodeId)}
-          @transition-trigger=${(e: CustomEvent) =>
-            this.#handleTransitionTrigger(e.detail.nodeId, e.detail.transitionId)}
-        ></state-node>
-      `;
+    const nodeCenterX = node.x + node.width / 2;
+    const nodeCenterY = node.y + node.height / 2;
+    setPan({
+      x: rect.width / 2 - nodeCenterX * this.zoom,
+      y: rect.height / 2 - nodeCenterY * this.zoom,
     });
   }
 
-  #getNodes(): GraphNode[] {
-    return this.#nodesCtrl?.value ?? this.nodes;
-  }
-
-  #getEdges(): ComputedEdge[] {
-    return this.#edgesCtrl?.value ?? this.edges;
-  }
-
-  #getDimensions(): { width: number; height: number } {
-    return this.#dimensionsCtrl?.value ?? { width: this.graphWidth, height: this.graphHeight };
-  }
-
-  #getZoom(): number {
-    return this.#zoomCtrl?.value ?? this.zoom;
-  }
-
-  #getPan(): { x: number; y: number } {
-    return this.#panCtrl?.value ?? this.pan;
-  }
-
-  #getSelectedNodeId(): string | null {
-    return this.#selectedNodeIdCtrl?.value ?? this.selectedNodeId;
-  }
-
-  #getLoading(): boolean {
-    return this.#loadingCtrl?.value ?? this.loading;
-  }
-
-  #getError(): string | null {
-    return this.#errorCtrl?.value ?? this.error;
-  }
-
-  #toggleHelp() {
-    this.#showHelp = !this.#showHelp;
-    this.requestUpdate();
-  }
+  #handleKeyDown = (e: KeyboardEvent): void => {
+    switch (e.key) {
+      case "+":
+      case "=":
+        zoomIn();
+        break;
+      case "-":
+        zoomOut();
+        break;
+      case "0":
+        resetView();
+        break;
+      case "f":
+      case "F":
+        zoomToFit();
+        break;
+      case "Escape":
+        selectNode(null);
+        break;
+      case "ArrowRight":
+      case "ArrowDown": {
+        e.preventDefault();
+        const nodes = this.layout?.nodes;
+        if (!nodes?.length) break;
+        const currentIdx = nodes.findIndex((n) => n.id === this.selectedNodeId);
+        const nextIdx = currentIdx < nodes.length - 1 ? currentIdx + 1 : 0;
+        const nextId = nodes[nextIdx].id;
+        selectNode(nextId);
+        this.#panToNode(nextId);
+        break;
+      }
+      case "ArrowLeft":
+      case "ArrowUp": {
+        e.preventDefault();
+        const nodes = this.layout?.nodes;
+        if (!nodes?.length) break;
+        const currentIdx = nodes.findIndex((n) => n.id === this.selectedNodeId);
+        const prevIdx = currentIdx > 0 ? currentIdx - 1 : nodes.length - 1;
+        const prevId = nodes[prevIdx].id;
+        selectNode(prevId);
+        this.#panToNode(prevId);
+        break;
+      }
+    }
+  };
 
   render() {
-    const error = this.#getError();
-    const loading = this.#getLoading();
-    const nodes = this.#getNodes();
-
-    if (error) {
-      return html`<div class="error-state">${error}</div>`;
+    if (this.computing) {
+      return html`
+        <div class="loading" role="status" aria-live="polite">
+          <div class="loading-spinner" aria-hidden="true"></div>
+          Computing layout...
+        </div>
+      `;
     }
 
-    if (loading) {
-      return html`<div class="loading-state">Loading...</div>`;
+    if (this.layoutError) {
+      return html`<div class="error" role="alert">${this.layoutError}</div>`;
     }
 
-    if (nodes.length === 0) {
-      return html`<div class="empty-state">No graph data</div>`;
+    if (!this.layout) {
+      return html`
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 40 40"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <polygon points="20,2 36,11 36,29 20,38 4,29 4,11" />
+            </svg>
+          </div>
+          <div class="empty-state-text">No actor loaded</div>
+        </div>
+      `;
     }
 
-    const zoom = this.#getZoom();
-    const pan = this.#getPan();
-    const dims = this.#getDimensions();
+    const transform = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
 
     return html`
-      <div
-        class="container"
-        style="transform: translate(${pan.x}px, ${pan.y}px) scale(${zoom}); width: ${dims.width}px; height: ${dims.height}px;"
-      >
-        ${this.#renderEdges()} ${this.#renderNodes()}
-      </div>
-      ${this.#showHelp
-        ? html`
-            <div class="help-tooltip">
-              <div><kbd>+</kbd> / <kbd>=</kbd> Zoom in</div>
-              <div><kbd>-</kbd> Zoom out</div>
-              <div><kbd>0</kbd> Reset view</div>
-              <div><kbd>F</kbd> Zoom to fit</div>
-              <div>Scroll to zoom</div>
-              <div>Drag to pan</div>
-              <div>Double-click to fit</div>
-            </div>
-          `
-        : ""}
-      <div class="controls">
-        <button @click=${this.zoomIn} title="Zoom in">+</button>
-        <button @click=${this.zoomOut} title="Zoom out">−</button>
-        <button @click=${this.resetView} title="Reset view">0</button>
-        <button @click=${this.zoomToFit} title="Zoom to fit">⊞</button>
-        <button @click=${() => this.#toggleHelp()} title="Keyboard shortcuts">?</button>
+      <div class="container" tabindex="0" @keydown=${this.#handleKeyDown}>
+        <div class="viewport" style="transform: ${transform}">
+          ${this.layout.edges.map(
+            (edge) => html`
+              <edge-path
+                .edgeId=${edge.id}
+                .path=${edge.path}
+                .label=${edge.label}
+                .isActive=${edge.isActive}
+                .labelX=${edge.labelX}
+                .labelY=${edge.labelY}
+              ></edge-path>
+            `,
+          )}
+          ${this.layout.nodes.map(
+            (node) => html`
+              <state-node
+                .nodeId=${node.id}
+                .label=${node.label}
+                .isActive=${node.isActive}
+                .isFinal=${node.isFinal}
+                .x=${node.x}
+                .y=${node.y}
+                .width=${node.width}
+                .height=${node.height}
+                .selected=${this.selectedNodeId === node.id}
+              ></state-node>
+            `,
+          )}
+        </div>
+        <div class="help-overlay">
+          <span><kbd>+</kbd>/<kbd>-</kbd> zoom</span>
+          <span><kbd>0</kbd> reset</span>
+          <span><kbd>F</kbd> fit</span>
+          <span><kbd>&larr;</kbd><kbd>&rarr;</kbd> navigate</span>
+          <span><kbd>Esc</kbd> deselect</span>
+        </div>
+        <div class="zoom-controls">
+          <button class="zoom-btn" aria-label="Zoom out" @click=${() => zoomOut()}>&minus;</button>
+          <span class="zoom-indicator" aria-live="polite" aria-label="Zoom level"
+            >${Math.round(this.zoom * 100)}%</span
+          >
+          <button class="zoom-btn" aria-label="Zoom in" @click=${() => zoomIn()}>+</button>
+        </div>
       </div>
     `;
   }
 }
 
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 5;
+const ZOOM_STEP = 0.2;
+
 declare global {
   interface HTMLElementTagNameMap {
-    "actor-graph": ActorGraph;
+    "actor-graph": ActorGraphComponent;
   }
 }

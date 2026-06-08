@@ -1,7 +1,7 @@
 {
   "name": "@mantaq/visualizer",
   "version": "0.0.0",
-  "description": "Actor model state machine visualizer using lit-html and nanostores.",
+  "description": "Actor model state machine visualizer using Lit and nanostores.",
   "license": "MIT",
   "files": [
     "dist"
@@ -25,14 +25,15 @@
     "@mantaq/core": "workspace:*",
     "@nanostores/lit": "catalog:",
     "elkjs": "^0.9.3",
-    "lit": "^3.2.0",
-    "lit-html": "^3.2.0",
-    "nanostores": "^0.11.0"
+    "lit": "catalog:",
+    "nanostores": "^0.11.3"
   },
   "devDependencies": {
-    "@types/node": "^25.6.2",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260509.2",
-    "typescript": "^6.0.3",
-    "vite-plus": "catalog:"
+    "jsdom": "^26.1.0",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   }
 }

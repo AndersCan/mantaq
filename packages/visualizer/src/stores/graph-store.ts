@@ -1,83 +1,46 @@
-import { atom, computed, type WritableAtom } from "nanostores";
+import { atom } from "nanostores";
 import type { AnyActor } from "@mantaq/core";
-import type { ActorGraph, GraphNode } from "../graph.ts";
-import type { ComputedEdge, LayoutResult } from "../layout.ts";
+import type { ActorGraph } from "../graph.ts";
+import type { LayoutResult } from "../layout.ts";
+import { buildGraph } from "../graph.ts";
+import { computeLayout } from "../layout.ts";
 
-export const $actor: WritableAtom<AnyActor | null> = atom(null);
+export const $actor = atom<AnyActor | null>(null);
+export const $graph = atom<ActorGraph | null>(null);
+export const $layout = atom<LayoutResult | null>(null);
+export const $selectedNodeId = atom<string | null>(null);
+export const $zoom = atom(1);
+export const $pan = atom({ x: 0, y: 0 });
+export const $layoutError = atom<string | null>(null);
+export const $isComputing = atom(false);
 
-export const $graph: WritableAtom<ActorGraph | null> = atom(null);
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 5;
+const ZOOM_STEP = 0.2;
 
-export const $layout: WritableAtom<LayoutResult | null> = atom(null);
+let layoutGeneration = 0;
 
-export const $layoutLoading: WritableAtom<boolean> = atom(false);
-
-export const $layoutError: WritableAtom<string | null> = atom(null);
-
-export const $selectedNodeId: WritableAtom<string | null> = atom(null);
-
-export const $zoom: WritableAtom<number> = atom(1);
-
-export const $pan: WritableAtom<{ x: number; y: number }> = atom({ x: 0, y: 0 });
-
-export const $viewport: WritableAtom<{ width: number; height: number }> = atom({
-  width: 800,
-  height: 600,
-});
-
-export const $flatNodes = computed($layout, (layout): GraphNode[] => {
-  if (!layout) return [];
-  return layout.nodes;
-});
-
-export const $edges = computed($layout, (layout): ComputedEdge[] => {
-  if (!layout) return [];
-  return layout.edges;
-});
-
-export const $selectedNode = computed(
-  [$layout, $selectedNodeId],
-  (layout, selectedId): GraphNode | null => {
-    if (!layout || !selectedId) return null;
-    return layout.nodes.find((n) => n.id === selectedId) ?? null;
-  },
-);
-
-export const $graphDimensions = computed($layout, (layout): { width: number; height: number } => {
-  if (!layout) return { width: 800, height: 600 };
-  return { width: layout.width, height: layout.height };
-});
-
-export function setActor(actor: AnyActor | null): void {
-  unsubscribeActorSync();
-
+export async function setActor(actor: AnyActor): Promise<void> {
   $actor.set(actor);
+  $selectedNodeId.set(null);
 
-  if (!actor) {
-    $graph.set(null);
-    $layout.set(null);
-    $selectedNodeId.set(null);
-    return;
-  }
-
-  void import("../graph.ts").then(({ buildGraph }) => {
-    const graph = buildGraph(actor);
-    $graph.set(graph);
-    void updateLayout(graph);
-  });
-}
-
-export async function updateLayout(graph: ActorGraph): Promise<void> {
-  $layoutLoading.set(true);
-  $layoutError.set(null);
+  const generation = ++layoutGeneration;
 
   try {
-    const { computeLayout } = await import("../layout.ts");
-    const result = await computeLayout(graph);
-    $layout.set(result);
+    $isComputing.set(true);
+    const graph = buildGraph(actor);
+    $graph.set(graph);
+    const layout = await computeLayout(graph);
+    if (generation !== layoutGeneration) return;
+    $layout.set(layout);
+    $layoutError.set(null);
   } catch (err) {
-    $layoutError.set(err instanceof Error ? err.message : String(err));
+    if (generation !== layoutGeneration) return;
+    $layoutError.set(err instanceof Error ? err.message : "Layout computation failed");
   } finally {
-    $layoutLoading.set(false);
+    if (generation === layoutGeneration) {
+      $isComputing.set(false);
+    }
   }
 }
 
@@ -85,38 +48,44 @@ export function selectNode(nodeId: string | null): void {
   $selectedNodeId.set(nodeId);
 }
 
-export const ZOOM_MIN = 0.1;
-export const ZOOM_MAX = 5;
-
-function clampZoom(value: number): number {
-  return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
-}
-
-export function setZoom(value: number): void {
-  $zoom.set(clampZoom(value));
-}
-
 export function zoomIn(): void {
-  $zoom.set(clampZoom($zoom.get() * 1.2));
+  const current = $zoom.get();
+  $zoom.set(Math.min(current + ZOOM_STEP, MAX_ZOOM));
 }
 
 export function zoomOut(): void {
-  $zoom.set(clampZoom($zoom.get() / 1.2));
+  const current = $zoom.get();
+  $zoom.set(Math.max(current - ZOOM_STEP, MIN_ZOOM));
 }
 
 export function zoomToFit(): void {
   const layout = $layout.get();
-  const viewport = $viewport.get();
-  if (!layout) return;
+  if (!layout) {
+    resetView();
+    return;
+  }
 
-  const scaleX = viewport.width / (layout.width + 40);
-  const scaleY = viewport.height / (layout.height + 40);
-  const scale = Math.min(scaleX, scaleY, 1.5);
+  const graphEl = document.querySelector("actor-graph");
+  if (!graphEl) {
+    resetView();
+    return;
+  }
 
-  $zoom.set(scale);
+  const rect = graphEl.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) {
+    resetView();
+    return;
+  }
+
+  const padding = 80;
+  const scaleX = (rect.width - padding) / layout.width;
+  const scaleY = (rect.height - padding) / layout.height;
+  const newZoom = Math.min(Math.max(Math.min(scaleX, scaleY), MIN_ZOOM), MAX_ZOOM);
+
+  $zoom.set(newZoom);
   $pan.set({
-    x: (viewport.width - layout.width * scale) / 2,
-    y: (viewport.height - layout.height * scale) / 2,
+    x: (rect.width - layout.width * newZoom) / 2,
+    y: (rect.height - layout.height * newZoom) / 2,
   });
 }
 
@@ -125,52 +94,27 @@ export function resetView(): void {
   $pan.set({ x: 0, y: 0 });
 }
 
-export function setViewport(width: number, height: number): void {
-  $viewport.set({ width, height });
+export function setZoom(zoom: number): void {
+  $zoom.set(Math.min(Math.max(zoom, MIN_ZOOM), MAX_ZOOM));
 }
 
-let actorChangeUnsubscribe: (() => void) | null = null;
-
-function unsubscribeActorSync(): void {
-  if (actorChangeUnsubscribe) {
-    actorChangeUnsubscribe();
-    actorChangeUnsubscribe = null;
-  }
-}
-
-function rebuildGraphFromActor(actor: AnyActor): void {
-  void import("../graph.ts").then(({ buildGraph }) => {
-    const graph = buildGraph(actor);
-    $graph.set(graph);
-    void updateLayout(graph);
-  });
-}
-
-function subscribeToActorChanges(actor: AnyActor): void {
-  unsubscribeActorSync();
-  actorChangeUnsubscribe = actor.on("change", () => {
-    rebuildGraphFromActor(actor);
-  });
+export function setPan(pan: { x: number; y: number }): void {
+  $pan.set(pan);
 }
 
 export function startActorSync(): () => void {
-  const current = $actor.get();
-  if (current) {
-    subscribeToActorChanges(current);
-    rebuildGraphFromActor(current);
-  }
+  const actor = $actor.get();
+  if (!actor) return () => {};
 
-  const unsubAtom = $actor.subscribe((actor) => {
-    if (!actor) {
-      unsubscribeActorSync();
-      return;
-    }
-    subscribeToActorChanges(actor);
-    rebuildGraphFromActor(actor);
+  return actor.on("change", () => {
+    void setActor(actor);
   });
+}
 
-  return () => {
-    unsubAtom();
-    unsubscribeActorSync();
-  };
+export function applyDarkTheme(): void {
+  document.documentElement.setAttribute("data-theme", "dark");
+}
+
+export function removeDarkTheme(): void {
+  document.documentElement.removeAttribute("data-theme");
 }

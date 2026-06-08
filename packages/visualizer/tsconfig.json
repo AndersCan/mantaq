@@ -7,7 +7,6 @@
     "moduleResolution": "nodenext",
     "resolveJsonModule": true,
     "types": ["node"],
-    "experimentalDecorators": true,
     "strict": true,
     "noUnusedLocals": true,
     "declaration": true,
@@ -16,6 +15,8 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false
   }
 }
