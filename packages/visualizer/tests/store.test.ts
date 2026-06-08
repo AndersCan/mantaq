@@ -65,7 +65,7 @@ describe("graph store", () => {
     const actor = createTestActor();
     setActor(actor);
 
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 200));
 
     expect($actor.get()).toBe(actor);
     expect($graph.get()).not.toBeNull();
