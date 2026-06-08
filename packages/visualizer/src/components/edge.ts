@@ -8,7 +8,8 @@ const LABEL_APPROX_CHAR_WIDTH = 7;
 export function renderEdge(edge: ComputedEdge): SVGTemplateResult {
   if (!edge.path) return svg``;
 
-  const labelWidth = edge.label.length * LABEL_APPROX_CHAR_WIDTH + LABEL_PADDING * 2;
+  const labelText = edge.guard ? `${edge.label} [${edge.guard}]` : edge.label;
+  const labelWidth = labelText.length * LABEL_APPROX_CHAR_WIDTH + LABEL_PADDING * 2;
   const labelHeight = LABEL_FONT_SIZE + LABEL_PADDING * 2;
 
   return svg`
@@ -39,7 +40,7 @@ export function renderEdge(edge: ComputedEdge): SVGTemplateResult {
         fill="${edge.isActive ? "#4CAF50" : "#666"}"
         font-size="${LABEL_FONT_SIZE}"
         font-family="system-ui, sans-serif"
-      >${edge.label}</text>
+      >${labelText}</text>
     </g>
   `;
 }
