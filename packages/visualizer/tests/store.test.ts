@@ -6,6 +6,7 @@ import {
   $zoom,
   $pan,
   $layoutError,
+  $layoutLoading,
   setActor,
   zoomToFit,
   resetView,
@@ -40,6 +41,7 @@ describe("graph store", () => {
     $zoom.set(1);
     $pan.set({ x: 0, y: 0 });
     $layoutError.set(null);
+    $layoutLoading.set(false);
   });
 
   it("starts with null layout", () => {
@@ -56,6 +58,28 @@ describe("graph store", () => {
 
   it("starts with no selected node", () => {
     expect($selectedNodeId.get()).toBeNull();
+  });
+
+  it("starts with layoutLoading false", () => {
+    expect($layoutLoading.get()).toBe(false);
+  });
+
+  it("setActor sets layoutLoading during computation", async () => {
+    let loadingDuringCompute = false;
+    const unsub = $layoutLoading.subscribe((v) => {
+      if (v) loadingDuringCompute = true;
+    });
+    const actor = createTestActor();
+    await setActor(actor);
+    expect(loadingDuringCompute).toBe(true);
+    expect($layoutLoading.get()).toBe(false);
+    unsub();
+  });
+
+  it("setActor resets layoutLoading after completion", async () => {
+    const actor = createTestActor();
+    await setActor(actor);
+    expect($layoutLoading.get()).toBe(false);
   });
 
   it("setActor populates layout", async () => {

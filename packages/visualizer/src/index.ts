@@ -12,6 +12,7 @@ export {
   $zoom,
   $pan,
   $layoutError,
+  $layoutLoading,
   setActor,
   zoomToFit,
   resetView,

@@ -12,6 +12,7 @@ export const $layout = atom<LayoutResult | null>(null);
 export const $selectedNodeId = atom<string | null>(null);
 export const $zoom = atom(1);
 export const $pan = atom({ x: 0, y: 0 });
+export const $layoutLoading = atom<boolean>(false);
 export const $layoutError = atom<string | null>(null);
 
 let layoutGeneration = 0;
@@ -22,6 +23,7 @@ export async function setActor(actor: AnyActor): Promise<void> {
   $selectedNodeId.set(null);
 
   const generation = ++layoutGeneration;
+  $layoutLoading.set(true);
 
   try {
     const graph = buildGraph(actor);
@@ -34,6 +36,10 @@ export async function setActor(actor: AnyActor): Promise<void> {
   } catch (err) {
     if (generation !== layoutGeneration) return;
     $layoutError.set(err instanceof Error ? err.message : "Layout computation failed");
+  } finally {
+    if (generation === layoutGeneration) {
+      $layoutLoading.set(false);
+    }
   }
 }
 

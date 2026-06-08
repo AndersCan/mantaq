@@ -3,7 +3,14 @@ import { describe, it, expect, afterEach, vi } from "vite-plus/test";
 import "../src/components/state-node.ts";
 import "../src/components/edge.ts";
 import "../src/components/actor-graph.ts";
-import { $layout, $zoom, $pan, $selectedNodeId, $layoutError } from "../src/graph-store.ts";
+import {
+  $layout,
+  $zoom,
+  $pan,
+  $selectedNodeId,
+  $layoutError,
+  $layoutLoading,
+} from "../src/graph-store.ts";
 import type { StateNode } from "../src/components/state-node.ts";
 import type { EdgePath } from "../src/components/edge.ts";
 import type { ActorGraphComponent } from "../src/components/actor-graph.ts";
@@ -145,6 +152,7 @@ afterEach(() => {
   $pan.set({ x: 0, y: 0 });
   $selectedNodeId.set(null);
   $layoutError.set(null);
+  $layoutLoading.set(false);
 });
 
 describe("StateNode component", () => {
@@ -502,5 +510,25 @@ describe("ActorGraph component", () => {
     const container = el.shadowRoot!.querySelector(".container");
     expect(container).not.toBeNull();
     expect(container!.querySelector(".empty-state")).not.toBeNull();
+  });
+
+  it("shows loading overlay when layoutLoading is true", async () => {
+    $layoutLoading.set(true);
+    const el = createActorGraph();
+    await Promise.resolve();
+
+    const overlay = el.shadowRoot!.querySelector(".loading-overlay");
+    expect(overlay).toBeDefined();
+    expect(overlay!.querySelector(".spinner")).toBeDefined();
+    expect(overlay!.textContent).toContain("Layout computation");
+  });
+
+  it("hides loading overlay when layoutLoading is false", async () => {
+    $layoutLoading.set(false);
+    const el = createActorGraph();
+    await Promise.resolve();
+
+    const overlay = el.shadowRoot!.querySelector(".loading-overlay");
+    expect(overlay).toBeNull();
   });
 });

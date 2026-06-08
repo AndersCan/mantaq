@@ -6,6 +6,7 @@ import {
   $selectedNodeId,
   $layout,
   $layoutError,
+  $layoutLoading,
   zoomToFit,
   resetView,
   setZoom,
@@ -30,6 +31,10 @@ const STYLES = `<style>
   .empty-state { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-family: monospace; color: var(--viz-text-muted, #9ca3af); }
   .empty-state-icon { margin-bottom: 8px; opacity: .5; }
   .empty-state-text { font-size: 14px; }
+  .loading-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.04); z-index: 100; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--viz-border, #e5e7eb); border-top-color: var(--viz-accent, #6366f1); border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { margin-top: 10px; font-family: monospace; font-size: 12px; color: var(--viz-text-muted, #6b7280); }
   @media (max-width: 480px) { .help-overlay { display: none; } }
 </style>`;
 
@@ -42,6 +47,7 @@ export class ActorGraphComponent extends HTMLElement {
   _pan = { x: 0, y: 0 };
   _layout: LayoutResult | null = null;
   _layoutError: string | null = null;
+  _layoutLoading = false;
   _selectedNodeId: string | null = null;
   updateComplete = Promise.resolve();
 
@@ -72,6 +78,10 @@ export class ActorGraphComponent extends HTMLElement {
     });
     sub($layoutError, (v) => {
       this._layoutError = v;
+      this._renderComponent();
+    });
+    sub($layoutLoading, (v) => {
+      this._layoutLoading = v;
       this._renderComponent();
     });
     sub($selectedNodeId, (v) => {
@@ -295,7 +305,15 @@ export class ActorGraphComponent extends HTMLElement {
     });
     render(
       html`${STYLES}
-        <div class="container" tabindex="0" @keydown=${this._handleKeyDown}>${content}</div>`,
+        <div class="container" tabindex="0" @keydown=${this._handleKeyDown}>
+          ${content}
+          ${this._layoutLoading
+            ? html`<div class="loading-overlay" role="status">
+                <div class="spinner"></div>
+                <div class="loading-text">Layout computation...</div>
+              </div>`
+            : null}
+        </div>`,
       this._shadow,
     );
     resolve!();

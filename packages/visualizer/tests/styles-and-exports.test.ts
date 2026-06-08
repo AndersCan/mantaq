@@ -95,5 +95,6 @@ describe("exports", () => {
     expect(mod.$zoom).toBeDefined();
     expect(mod.$pan).toBeDefined();
     expect(mod.$layoutError).toBeDefined();
+    expect(mod.$layoutLoading).toBeDefined();
   });
 });
