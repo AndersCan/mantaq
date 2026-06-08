@@ -1,8 +1,8 @@
 export type { GraphNode, GraphEdge, ActorGraph, GraphBuilderOptions } from "./graph.ts";
-export { buildGraph, flattenNodes, collectEdges } from "./graph.ts";
+export { buildGraph, flattenNodes } from "./graph.ts";
 
 export type { LayoutOptions, ComputedEdge, LayoutResult } from "./layout.ts";
-export { computeLayout, defaultPositions } from "./layout.ts";
+export { computeLayout } from "./layout.ts";
 
 export type { Theme } from "./styles.ts";
 export {
@@ -10,10 +10,6 @@ export {
   visualizerStyles,
   stateNodeStyles,
   edgeStyles,
-  regionStyles,
-  controlsStyles,
-  zoomIndicatorStyles,
-  minimapStyles,
   applyDefaultStyles,
 } from "./styles.ts";
 
