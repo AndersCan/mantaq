@@ -1,4 +1,4 @@
-import { css, type CSSResultGroup } from "lit";
+import { css, unsafeCSS, type CSSResultGroup } from "lit";
 
 export interface Theme {
   nodeBackground: string;
@@ -79,35 +79,25 @@ export const darkTheme: Theme = {
   regionBorder: "#333333",
 };
 
-export const HOST_VARS = `
-  --viz-node-bg: ${theme.nodeBackground};
-  --viz-node-border: ${theme.nodeBorder};
-  --viz-node-active-bg: ${theme.nodeActiveBackground};
-  --viz-node-active-border: ${theme.nodeActiveBorder};
-  --viz-node-selected-border: ${theme.nodeSelectedBorder};
-  --viz-edge-stroke: ${theme.edgeStroke};
-  --viz-edge-active-stroke: ${theme.edgeActiveStroke};
-  --viz-graph-bg: ${theme.graphBackground};
-  --viz-text-primary: ${theme.textPrimary};
-  --viz-text-secondary: ${theme.textSecondary};
-  --viz-region-border: ${theme.regionBorder};
-`;
+export function HOST_VARS(t: Theme = theme): string {
+  return themeToVars(t);
+}
 
-export const visualizerStyles: CSSResultGroup = css`
+export const visualizerStyles: CSSResultGroup = unsafeCSS(`
   :host {
-    --viz-node-bg: #ffffff;
-    --viz-node-border: #666666;
-    --viz-node-active-bg: #e8f5e9;
-    --viz-node-active-border: #4caf50;
-    --viz-node-selected-border: #2196f3;
-    --viz-edge-stroke: #999999;
-    --viz-edge-active-stroke: #4caf50;
-    --viz-graph-bg: #fafafa;
-    --viz-text-primary: #333333;
-    --viz-text-secondary: #666666;
-    --viz-region-border: #e0e0e0;
+    --viz-node-bg: ${theme.nodeBackground};
+    --viz-node-border: ${theme.nodeBorder};
+    --viz-node-active-bg: ${theme.nodeActiveBackground};
+    --viz-node-active-border: ${theme.nodeActiveBorder};
+    --viz-node-selected-border: ${theme.nodeSelectedBorder};
+    --viz-edge-stroke: ${theme.edgeStroke};
+    --viz-edge-active-stroke: ${theme.edgeActiveStroke};
+    --viz-graph-bg: ${theme.graphBackground};
+    --viz-text-primary: ${theme.textPrimary};
+    --viz-text-secondary: ${theme.textSecondary};
+    --viz-region-border: ${theme.regionBorder};
   }
-`;
+`);
 
 export const stateNodeStyles: CSSResultGroup = css`
   .node {
@@ -182,7 +172,7 @@ export const edgeStyles: CSSResultGroup = css`
 
 const RAW_DEFAULT_CSS = `
   :host {
-    ${HOST_VARS}
+    ${HOST_VARS()}
   }
   .node {
     padding: 8px 16px;
