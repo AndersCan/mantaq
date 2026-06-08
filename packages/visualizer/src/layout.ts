@@ -18,7 +18,7 @@ export interface LayoutOptions {
 }
 
 export interface ComputedEdge extends GraphEdge {
-  path: string;
+  path: string | null;
   labelX: number;
   labelY: number;
 }
@@ -192,8 +192,6 @@ function computeEdgePath(
   sourceNode: ElkNode,
   targetNode: ElkNode,
   edge: ElkExtendedEdge,
-  _elkResult: ElkNode,
-  _allElkEdges: ElkExtendedEdge[],
 ): string | null {
   const sx = sourceNode.x ?? 0;
   const sy = sourceNode.y ?? 0;
@@ -333,8 +331,7 @@ export async function computeLayout(
     let labelY = 0;
 
     if (sourceNode && targetNode && elkEdge) {
-      const computedPath =
-        computeEdgePath(sourceNode, targetNode, elkEdge, elkResult, elkEdges) ?? "";
+      const computedPath = computeEdgePath(sourceNode, targetNode, elkEdge) ?? "";
       path = computedPath;
 
       if (path) {

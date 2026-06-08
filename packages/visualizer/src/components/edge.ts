@@ -2,6 +2,8 @@ import { svg } from "lit-html";
 import type { ComputedEdge } from "../layout.ts";
 
 export function renderEdge(edge: ComputedEdge) {
+  if (!edge.path) return svg``;
+
   return svg`
     <g class="edge ${edge.isActive ? "active" : ""}">
       <path
