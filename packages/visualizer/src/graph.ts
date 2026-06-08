@@ -5,8 +5,6 @@ export interface GraphNode {
   label: string;
   isActive: boolean;
   isFinal: boolean;
-  depth: number;
-  parentId: string | null;
 }
 
 export interface GraphEdge {
@@ -20,20 +18,13 @@ export interface GraphEdge {
 export interface ActorGraph {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  activePath: string[];
-}
-
-export interface GraphOptions {
-  nodeWidth?: number;
-  nodeHeight?: number;
-  padding?: number;
 }
 
 function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<string>): void {
   const currentName = snapshot.path[snapshot.path.length - 1];
   if (!currentName) return;
 
-  const fullId = prefix ? `${prefix}.${currentName}` : currentName;
+  const fullId = nodeId(prefix, currentName);
   activeSet.add(fullId);
 
   for (const [, regionSnap] of Object.entries(snapshot.regions)) {
@@ -41,31 +32,24 @@ function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<
   }
 }
 
+function nodeId(prefix: string, name: string): string {
+  return prefix ? `${prefix}.${name}` : name;
+}
+
 function buildNodesFromStates(
-  states: Array<{ name: string; isFinal: boolean; _regions?: unknown }>,
-  snapshot: Snapshot,
+  states: Array<{ name: string; isFinal: boolean }>,
   activeSet: Set<string>,
-  parentId: string | null,
-  depth: number,
   pathPrefix: string,
 ): GraphNode[] {
-  const nodes: GraphNode[] = [];
-
-  for (const stateRef of states) {
-    const nodeId = pathPrefix ? `${pathPrefix}.${stateRef.name}` : stateRef.name;
-    const isActive = activeSet.has(nodeId);
-
-    nodes.push({
-      id: nodeId,
+  return states.map((stateRef) => {
+    const nid = nodeId(pathPrefix, stateRef.name);
+    return {
+      id: nid,
       label: stateRef.name,
-      isActive,
+      isActive: activeSet.has(nid),
       isFinal: stateRef.isFinal,
-      depth,
-      parentId,
-    });
-  }
-
-  return nodes;
+    };
+  });
 }
 
 function buildEdgesFromTransitions(
@@ -78,7 +62,7 @@ function buildEdgesFromTransitions(
   if (!transitions) return edges;
 
   for (const stateRef of states) {
-    const sourceId = pathPrefix ? `${pathPrefix}.${stateRef.name}` : stateRef.name;
+    const sourceId = nodeId(pathPrefix, stateRef.name);
     const stateTransitions = transitions[stateRef.name];
     if (!stateTransitions) continue;
 
@@ -87,22 +71,17 @@ function buildEdgesFromTransitions(
 
       let targetName: string | undefined;
       try {
-        const result = (handler as Function)({}, {});
-        if (result?.state?.name) {
-          targetName = result.state.name;
-        }
+        targetName = (handler as Function)({}, {})?.state?.name;
       } catch {
-        // Handler threw - skip this edge
         continue;
       }
 
       if (!targetName) continue;
 
-      const targetId = pathPrefix ? `${pathPrefix}.${targetName}` : targetName;
       edges.push({
-        id: `${sourceId}-${eventId}-${targetId}`,
+        id: `${sourceId}-${eventId}-${nodeId(pathPrefix, targetName)}`,
         source: sourceId,
-        target: targetId,
+        target: nodeId(pathPrefix, targetName),
         label: eventId,
         isActive: activeSet.has(sourceId),
       });
@@ -115,46 +94,35 @@ function buildEdgesFromTransitions(
 function buildForActor(
   actor: AnyActor,
   pathPrefix: string,
-  parentId: string | null,
-  depth: number,
   activeSet: Set<string>,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
-  const snapshot = actor.snapshot();
-  const transitions = actor.options?.transitions as
-    | Record<string, Record<string, unknown>>
-    | undefined;
-
-  const allStates = (actor.options?.states ?? []) as Array<{
-    name: string;
-    isFinal: boolean;
-    _regions?: unknown;
-  }>;
-
-  const nodes = buildNodesFromStates(allStates, snapshot, activeSet, parentId, depth, pathPrefix);
-  const edges = buildEdgesFromTransitions(allStates, transitions, activeSet, pathPrefix);
+  const states = (actor.options?.states ?? []) as Array<{ name: string; isFinal: boolean }>;
+  const nodes = buildNodesFromStates(states, activeSet, pathPrefix);
+  const edges = buildEdgesFromTransitions(
+    states,
+    actor.options?.transitions as Record<string, Record<string, unknown>> | undefined,
+    activeSet,
+    pathPrefix,
+  );
 
   for (const [regionName, childActor] of Object.entries(actor.regions)) {
-    const childPrefix = pathPrefix ? `${pathPrefix}.${regionName}` : regionName;
-    const childParentId = pathPrefix || null;
-    const childResult = buildForActor(childActor, childPrefix, childParentId, depth + 1, activeSet);
-    nodes.push(...childResult.nodes);
-    edges.push(...childResult.edges);
+    const child = buildForActor(childActor, nodeId(pathPrefix, regionName), activeSet);
+    nodes.push(...child.nodes);
+    edges.push(...child.edges);
   }
 
   return { nodes, edges };
 }
 
-export function buildGraph(actor: AnyActor, _options?: GraphOptions): ActorGraph {
+export function buildGraph(actor: AnyActor): ActorGraph {
   const snapshot = actor.snapshot();
   const activeSet = new Set<string>();
   collectActiveStates(snapshot, "", activeSet);
 
-  const { nodes, edges } = buildForActor(actor, "", null, 0, activeSet);
-  const activePath = [...activeSet];
+  const { nodes, edges } = buildForActor(actor, "", activeSet);
 
   return {
     nodes,
     edges,
-    activePath,
   };
 }

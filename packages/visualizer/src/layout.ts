@@ -9,7 +9,6 @@ export interface LayoutNode {
   label: string;
   isActive: boolean;
   isFinal: boolean;
-  depth: number;
 }
 
 export interface LayoutEdge {
@@ -34,22 +33,17 @@ export interface LayoutOptions {
   direction?: "RIGHT" | "DOWN";
   nodeWidth?: number;
   nodeHeight?: number;
-  padding?: number;
-  /** Arbitrary ELK layout options (e.g. "elk.layered.considerModelOrder") */
   elkOptions?: Record<string, string>;
 }
 
 const DEFAULT_NODE_WIDTH = 120;
 const DEFAULT_NODE_HEIGHT = 60;
 const DEFAULT_PADDING = 40;
-const LEVEL_SPACING = 100;
-const NODE_SPACING = 60;
 
 interface ElkNode {
   id: string;
   width: number;
   height: number;
-  children?: ElkNode[];
   layoutOptions?: Record<string, string>;
 }
 
@@ -57,7 +51,6 @@ interface ElkEdge {
   id: string;
   sources: string[];
   targets: string[];
-  label?: string;
   layoutOptions?: Record<string, string>;
 }
 
@@ -78,68 +71,31 @@ interface ElkLayoutNode {
 
 interface ElkLayoutEdge {
   id: string;
-  sources: string[];
-  targets: string[];
   sections: Array<{
     startPoint: { x: number; y: number };
     endPoint: { x: number; y: number };
     bendPoints?: Array<{ x: number; y: number }>;
-  }>;
-  labels?: Array<{
-    text: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
   }>;
 }
 
 interface ElkLayoutResult {
   children?: ElkLayoutNode[];
   edges?: ElkLayoutEdge[];
-  width?: number;
-  height?: number;
 }
 
-let elkInstance: unknown = null;
+type ElkLayoutApi = { layout: (graph: ElkGraph) => Promise<ElkLayoutResult> };
+let elkInstance: ElkLayoutApi | null = null;
 
-async function getElk(): Promise<{
-  layout: (graph: ElkGraph) => Promise<ElkLayoutResult>;
-}> {
-  if (elkInstance) return elkInstance as { layout: (graph: ElkGraph) => Promise<ElkLayoutResult> };
-
-  const ELK = (await import("elkjs")).default as unknown as new () => {
-    layout: (graph: ElkGraph) => Promise<ElkLayoutResult>;
-  };
+async function getElk(): Promise<ElkLayoutApi> {
+  if (elkInstance) return elkInstance;
+  const ELK = (await import("elkjs")).default as unknown as new () => ElkLayoutApi;
   elkInstance = new ELK();
-  return elkInstance as { layout: (graph: ElkGraph) => Promise<ElkLayoutResult> };
+  return elkInstance;
 }
 
 function buildElkGraph(graph: ActorGraph, options: LayoutOptions): ElkGraph {
   const nodeWidth = options.nodeWidth ?? DEFAULT_NODE_WIDTH;
   const nodeHeight = options.nodeHeight ?? DEFAULT_NODE_HEIGHT;
-
-  const elkNodes: ElkNode[] = graph.nodes.map((node) => ({
-    id: node.id,
-    width: nodeWidth,
-    height: nodeHeight,
-    layoutOptions: {
-      "nodeLabels.alignment": "center",
-      "nodeLabels.placement": "T, C, B, L, R",
-    },
-  }));
-
-  const elkEdges: ElkEdge[] = graph.edges.map((edge) => ({
-    id: edge.id,
-    sources: [edge.source],
-    targets: [edge.target],
-    label: edge.label,
-    layoutOptions: {
-      "edge.strategy": "DEFAULT",
-      "edge.edgeRouting": "ORTHOGONAL",
-    },
-  }));
-
   const direction = options.direction ?? "RIGHT";
 
   return {
@@ -147,14 +103,30 @@ function buildElkGraph(graph: ActorGraph, options: LayoutOptions): ElkGraph {
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": direction,
-      "elk.layered.spacing.nodeNodeBetweenLayers": String(LEVEL_SPACING),
-      "elk.spacing.nodeNode": String(NODE_SPACING),
+      "elk.layered.spacing.nodeNodeBetweenLayers": "100",
+      "elk.spacing.nodeNode": "60",
       "elk.padding": `[top=${DEFAULT_PADDING},left=${DEFAULT_PADDING},bottom=${DEFAULT_PADDING},right=${DEFAULT_PADDING}]`,
       "elk.layered.considerModelOrder": "true",
       ...options.elkOptions,
     },
-    children: elkNodes,
-    edges: elkEdges,
+    children: graph.nodes.map((node) => ({
+      id: node.id,
+      width: nodeWidth,
+      height: nodeHeight,
+      layoutOptions: {
+        "nodeLabels.alignment": "center",
+        "nodeLabels.placement": "T, C, B, L, R",
+      },
+    })),
+    edges: graph.edges.map((edge) => ({
+      id: edge.id,
+      sources: [edge.source],
+      targets: [edge.target],
+      layoutOptions: {
+        "edge.strategy": "DEFAULT",
+        "edge.edgeRouting": "ORTHOGONAL",
+      },
+    })),
   };
 }
 
@@ -182,27 +154,17 @@ function generateSelfLoopPath(
 function generateEdgePath(
   sx: number,
   sy: number,
-  sw: number,
-  sh: number,
   tx: number,
   ty: number,
-  tw: number,
-  th: number,
+  nodeW: number,
+  nodeH: number,
   direction: "RIGHT" | "DOWN",
 ): { path: string; labelX: number; labelY: number } {
-  if (sx === tx && sy === ty) {
-    const cx = sx;
-    const cy = sy;
-    const path = generateSelfLoopPath(cx, cy, sw, sh, direction);
-    return { path, labelX: cx + sw / 2 + 20, labelY: cy };
-  }
-
   if (direction === "RIGHT") {
-    const startX = sx + sw / 2;
-    const startY = sy + sh / 2;
-    const endX = tx - tw / 2;
-    const endY = ty + th / 2;
-
+    const startX = sx + nodeW / 2;
+    const startY = sy + nodeH / 2;
+    const endX = tx - nodeW / 2;
+    const endY = ty + nodeH / 2;
     const midX = (startX + endX) / 2;
     return {
       path: `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`,
@@ -211,11 +173,10 @@ function generateEdgePath(
     };
   }
 
-  const startX = sx + sw / 2;
-  const startY = sy + sh;
-  const endX = tx + tw / 2;
+  const startX = sx + nodeW / 2;
+  const startY = sy + nodeH;
+  const endX = tx + nodeW / 2;
   const endY = ty;
-
   const midY = (startY + endY) / 2;
   return {
     path: `M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`,
@@ -224,26 +185,48 @@ function generateEdgePath(
   };
 }
 
+function buildEdgePath(
+  edge: { id: string; source: string; target: string },
+  nodeMap: Map<string, ElkLayoutNode>,
+  edgeMap: Map<string, ElkLayoutEdge>,
+  nodeW: number,
+  nodeH: number,
+  dir: "RIGHT" | "DOWN",
+): { path: string; labelX: number; labelY: number } {
+  const sx = nodeMap.get(edge.source)?.x ?? 0;
+  const sy = nodeMap.get(edge.source)?.y ?? 0;
+  const tx = nodeMap.get(edge.target)?.x ?? 0;
+  const ty = nodeMap.get(edge.target)?.y ?? 0;
+
+  if (edge.source === edge.target) {
+    const path = generateSelfLoopPath(sx, sy, nodeW, nodeH, dir);
+    return { path, labelX: sx + nodeW + 20, labelY: sy };
+  }
+
+  const elkEdge = edgeMap.get(edge.id);
+  if (elkEdge?.sections?.[0]) {
+    const section = elkEdge.sections[0];
+    const points = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint];
+    const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+    const mid = points[Math.floor(points.length / 2)];
+    return { path, labelX: mid.x, labelY: mid.y - 10 };
+  }
+
+  return generateEdgePath(sx, sy, tx, ty, nodeW, nodeH, dir);
+}
+
 export async function computeLayout(
   graph: ActorGraph,
   options?: LayoutOptions,
 ): Promise<LayoutResult> {
-  const opts: LayoutOptions = {
-    direction: options?.direction ?? "RIGHT",
-    nodeWidth: options?.nodeWidth ?? DEFAULT_NODE_WIDTH,
-    nodeHeight: options?.nodeHeight ?? DEFAULT_NODE_HEIGHT,
-    padding: options?.padding ?? DEFAULT_PADDING,
-    elkOptions: options?.elkOptions,
-  };
-
   const elk = await getElk();
-  const elkGraph = buildElkGraph(graph, opts);
+  const elkLayout = await elk.layout(buildElkGraph(graph, options ?? {}));
+  const nodeMap = new Map((elkLayout.children ?? []).map((n) => [n.id, n]));
+  const edgeMap = new Map((elkLayout.edges ?? []).map((e) => [e.id, e]));
 
-  const elkLayout = await elk.layout(elkGraph);
-  const nodeMap = new Map<string, ElkLayoutNode>();
-  for (const n of elkLayout.children ?? []) {
-    nodeMap.set(n.id, n);
-  }
+  const nodeW = options?.nodeWidth ?? DEFAULT_NODE_WIDTH;
+  const nodeH = options?.nodeHeight ?? DEFAULT_NODE_HEIGHT;
+  const dir = options?.direction ?? "RIGHT";
 
   const layoutNodes: LayoutNode[] = graph.nodes.map((node) => {
     const elkNode = nodeMap.get(node.id);
@@ -251,60 +234,16 @@ export async function computeLayout(
       id: node.id,
       x: elkNode?.x ?? 0,
       y: elkNode?.y ?? 0,
-      width: opts.nodeWidth!,
-      height: opts.nodeHeight!,
+      width: nodeW,
+      height: nodeH,
       label: node.label,
       isActive: node.isActive,
       isFinal: node.isFinal,
-      depth: node.depth,
     };
   });
 
   const layoutEdges: LayoutEdge[] = graph.edges.map((edge) => {
-    const elkEdge = (elkLayout.edges ?? []).find((e) => e.id === edge.id);
-    const sourceNode = nodeMap.get(edge.source);
-    const targetNode = nodeMap.get(edge.target);
-
-    const isSelfLoop = edge.source === edge.target;
-    let path: string;
-    let labelX: number;
-    let labelY: number;
-
-    if (isSelfLoop) {
-      const result = generateSelfLoopPath(
-        sourceNode?.x ?? 0,
-        sourceNode?.y ?? 0,
-        opts.nodeWidth!,
-        opts.nodeHeight!,
-        opts.direction!,
-      );
-      path = result;
-      labelX = (sourceNode?.x ?? 0) + opts.nodeWidth! + 20;
-      labelY = sourceNode?.y ?? 0;
-    } else if (elkEdge?.sections?.[0]) {
-      const section = elkEdge.sections[0];
-      const points = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint];
-      path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-      const mid = points[Math.floor(points.length / 2)];
-      labelX = mid.x;
-      labelY = mid.y - 10;
-    } else {
-      const result = generateEdgePath(
-        sourceNode?.x ?? 0,
-        sourceNode?.y ?? 0,
-        opts.nodeWidth!,
-        opts.nodeHeight!,
-        targetNode?.x ?? 0,
-        targetNode?.y ?? 0,
-        opts.nodeWidth!,
-        opts.nodeHeight!,
-        opts.direction!,
-      );
-      path = result.path;
-      labelX = result.labelX;
-      labelY = result.labelY;
-    }
-
+    const { path, labelX, labelY } = buildEdgePath(edge, nodeMap, edgeMap, nodeW, nodeH, dir);
     return {
       id: edge.id,
       source: edge.source,
@@ -320,8 +259,8 @@ export async function computeLayout(
   let maxX = 0;
   let maxY = 0;
   for (const node of layoutNodes) {
-    maxX = Math.max(maxX, node.x + node.width);
-    maxY = Math.max(maxY, node.y + node.height);
+    maxX = Math.max(maxX, node.x + nodeW);
+    maxY = Math.max(maxY, node.y + nodeH);
   }
 
   return {

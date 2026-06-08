@@ -237,3 +237,8 @@ gh pr merge $PR --auto --merge
 - **Identify test framework first.** Before spawning test workers, check package.json for vitest/jest. Include in worker prompt.
 - **Pre-existing TS errors.** Workers may need `--no-verify` for commits if repo has pre-existing type errors. Document in worker prompt.
 - **Parallel worker timing.** Parallel workers may report same commit hash if commits happen simultaneously. Stagger or verify with `git log`.
+- **File-level isolation for parallel workers.** When spawning many parallel workers on same branch, give each worker a distinct file scope. Workers modifying same file (e.g. store) create merge conflicts and broken intermediate states. Pre-assign: "Worker A edits only actor-graph.ts, Worker B edits only state-node.ts".
+- **Dead code detection before conversion.** Check if component is actually used before converting. Worker spent 10 iterations on minimap.ts only for another worker to delete it as dead code. Quick grep for `import.*minimap` or `customElements.get("minimap")` saves cycles.
+- **Prefer lit-html over innerHTML.** Workers default to `el.innerHTML` to avoid lit dependency, but lit-html `html` templates are safer (no XSS, better diffing). Specify in worker prompt: "Use `html` from lit, NOT innerHTML string concatenation".
+- **Batch commit at end, not per-iteration.** For high-parallelism runs (10+ workers), per-iteration commits create 50+ commit noise. Consider having workers batch their changes and make 1-2 commits each, or use a single final commit per worker.
+- **Conflict-prone patterns to avoid in parallel workers:** (1) modifying same store file, (2) changing barrel exports, (3) deleting files other worker might reference, (4) modifying shared types. Assign these to single worker or serialize.

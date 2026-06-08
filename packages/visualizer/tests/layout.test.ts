@@ -4,33 +4,29 @@ import type { ActorGraph } from "../src/graph.ts";
 
 const simpleGraph: ActorGraph = {
   nodes: [
-    { id: "idle", label: "idle", isActive: true, isFinal: false, depth: 0, parentId: null },
-    { id: "loading", label: "loading", isActive: false, isFinal: false, depth: 0, parentId: null },
-    { id: "done", label: "done", isActive: false, isFinal: true, depth: 0, parentId: null },
+    { id: "idle", label: "idle", isActive: true, isFinal: false },
+    { id: "loading", label: "loading", isActive: false, isFinal: false },
+    { id: "done", label: "done", isActive: false, isFinal: true },
   ],
   edges: [
     { id: "idle->loading", source: "idle", target: "loading", label: "FETCH", isActive: true },
     { id: "loading->done", source: "loading", target: "done", label: "SUCCESS", isActive: false },
   ],
-  activePath: ["idle"],
 };
 
 const selfLoopGraph: ActorGraph = {
-  nodes: [
-    { id: "active", label: "active", isActive: true, isFinal: false, depth: 0, parentId: null },
-  ],
+  nodes: [{ id: "active", label: "active", isActive: true, isFinal: false }],
   edges: [
     { id: "active->active", source: "active", target: "active", label: "PING", isActive: true },
   ],
-  activePath: ["active"],
 };
 
 const complexGraph: ActorGraph = {
   nodes: [
-    { id: "a", label: "a", isActive: true, isFinal: false, depth: 0, parentId: null },
-    { id: "b", label: "b", isActive: false, isFinal: false, depth: 0, parentId: null },
-    { id: "c", label: "c", isActive: false, isFinal: false, depth: 0, parentId: null },
-    { id: "d", label: "d", isActive: false, isFinal: true, depth: 0, parentId: null },
+    { id: "a", label: "a", isActive: true, isFinal: false },
+    { id: "b", label: "b", isActive: false, isFinal: false },
+    { id: "c", label: "c", isActive: false, isFinal: false },
+    { id: "d", label: "d", isActive: false, isFinal: true },
   ],
   edges: [
     { id: "a->b", source: "a", target: "b", label: "GO", isActive: true },
@@ -38,13 +34,11 @@ const complexGraph: ActorGraph = {
     { id: "c->d", source: "c", target: "d", label: "FINISH", isActive: false },
     { id: "b->a", source: "b", target: "a", label: "BACK", isActive: false },
   ],
-  activePath: ["a"],
 };
 
 const emptyGraph: ActorGraph = {
   nodes: [],
   edges: [],
-  activePath: [],
 };
 
 describe("computeLayout", () => {
