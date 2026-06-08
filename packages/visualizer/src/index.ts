@@ -7,10 +7,13 @@ export { computeLayout } from "./layout.ts";
 export type { Theme } from "./styles.ts";
 export {
   theme,
+  darkTheme,
   visualizerStyles,
   stateNodeStyles,
   edgeStyles,
   applyDefaultStyles,
+  applyDarkTheme,
+  removeDarkTheme,
 } from "./styles.ts";
 
 export { ActorGraph as ActorGraphComponent } from "./components/actor-graph.ts";

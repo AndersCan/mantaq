@@ -51,6 +51,34 @@ export const theme: Theme = {
   regionBorder: "#e0e0e0",
 };
 
+export const darkTheme: Theme = {
+  nodeBackground: "#1e1e1e",
+  nodeBorder: "#555555",
+  nodeActiveBackground: "#1b3a1b",
+  nodeActiveBorder: "#66BB6A",
+  nodeActiveShadow: "rgba(102, 187, 106, 0.3)",
+  nodeSelectedBorder: "#42A5F5",
+  nodeSelectedShadow: "rgba(66, 165, 245, 0.3)",
+  nodeFinalBorder: "#aaaaaa",
+
+  edgeStroke: "#777777",
+  edgeActiveStroke: "#66BB6A",
+  edgeLabelColor: "#aaaaaa",
+
+  graphBackground: "#121212",
+  graphGridColor: "#1e1e1e",
+
+  textPrimary: "#e0e0e0",
+  textSecondary: "#aaaaaa",
+
+  controlBackground: "#2d2d2d",
+  controlBorder: "#444444",
+  controlHover: "#3a3a3a",
+
+  regionBackground: "rgba(255, 255, 255, 0.03)",
+  regionBorder: "#333333",
+};
+
 export const HOST_VARS = `
   --viz-node-bg: ${theme.nodeBackground};
   --viz-node-border: ${theme.nodeBorder};
@@ -197,5 +225,44 @@ export function applyDefaultStyles(): void {
       style.textContent = RAW_DEFAULT_CSS;
       document.head.appendChild(style);
     }
+  }
+}
+
+function themeToVars(t: Theme): string {
+  return `
+    --viz-node-bg: ${t.nodeBackground};
+    --viz-node-border: ${t.nodeBorder};
+    --viz-node-active-bg: ${t.nodeActiveBackground};
+    --viz-node-active-border: ${t.nodeActiveBorder};
+    --viz-node-active-shadow: ${t.nodeActiveShadow};
+    --viz-node-selected-border: ${t.nodeSelectedBorder};
+    --viz-node-selected-shadow: ${t.nodeSelectedShadow};
+    --viz-edge-stroke: ${t.edgeStroke};
+    --viz-edge-active-stroke: ${t.edgeActiveStroke};
+    --viz-text-primary: ${t.textPrimary};
+    --viz-text-secondary: ${t.textSecondary};
+    --viz-control-background: ${t.controlBackground};
+    --viz-control-border: ${t.controlBorder};
+    --viz-control-hover: ${t.controlHover};
+    --viz-graph-bg: ${t.graphBackground};
+  `;
+}
+
+export function applyDarkTheme(): void {
+  if (typeof document !== "undefined") {
+    let el = document.getElementById("mantaq-dark-theme");
+    if (!el) {
+      el = document.createElement("style");
+      el.id = "mantaq-dark-theme";
+      document.head.appendChild(el);
+    }
+    el.textContent = `actor-graph { ${themeToVars(darkTheme)} }`;
+  }
+}
+
+export function removeDarkTheme(): void {
+  if (typeof document !== "undefined") {
+    const el = document.getElementById("mantaq-dark-theme");
+    if (el) el.remove();
   }
 }
