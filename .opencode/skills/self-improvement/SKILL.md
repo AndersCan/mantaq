@@ -1,25 +1,32 @@
 ---
 name: self-improvement
 description: Orchestrate self-improvement loop. Find tasks, spawn worker agents, track progress, improve skill itself.
+argument-hint: "[iteration_count] [depth]"
+allowed-tools: Read Grep Glob Bash Edit Write Task
+version: 2
 ---
 
 # Self-Improvement Orchestrator
 
 Caveman output everywhere. No exceptions. Orchestrator finds tasks and coordinates workers.
 
+## Context Management (Low Context Priority)
+
+Orchestrator runs on low context. Every token counts. Rules non-negotiable:
+
+1. **Never read files directly.** Use explore agents for ALL discovery.
+2. **Never run rg/grep yourself.** Delegate to explore agents.
+3. **Never carry file contents between iterations.** Workers read fresh.
+4. **Agents return summaries, not dumps.** "3 TODOs in auth.ts:142,187,201" not full file.
+5. **Batch exploration.** One explore agent finds all tasks, not separate agent per file.
+6. **Workers do own exploration.** Don't pre-read files for them.
+7. **Log only hashes and one-liners.** No file contents in logs.
+8. **Skip retrospectives that re-read files.** Recall from logs only.
+
 ## Caveman Requirements
 
-ALL output from this skill MUST follow caveman grammar:
+ALL output from this skill MUST follow caveman grammar. See [AGENTS.md](../../AGENTS.md) for full rules.
 
-- Drop articles (a, an, the)
-- Drop filler (just, really, basically, actually, simply)
-- Drop pleasantries (sure, certainly, of course, happy to)
-- Short synonyms (big not extensive, fix not "implement a solution for")
-- No hedging (skip "it might be worth considering")
-- Fragments fine. No need full sentence
-- Technical terms stay exact. "Polymorphism" stays "polymorphism"
-- Code blocks unchanged. Caveman speak around code, not in code
-- Error messages quoted exact. Caveman only for explanation
 - Commit messages, PR titles, PR bodies, summaries — ALL caveman
 
 ## Parameters
@@ -49,6 +56,8 @@ rtk git checkout wip && rtk git pull
 git checkout -b self-improvement/<short-description>
 ```
 
+> See [`rtk` command](../command/rtk.md) for docs.
+
 Set DESC variable:
 
 ```
@@ -59,48 +68,54 @@ Read this SKILL.md fully before starting.
 
 Branch created once. All iterations commit to same branch. No new branches per iteration.
 
-### Phase 1: Discover & Plan
+### Phase 1: Discover & Plan (AGENT-DRIVEN)
 
-Build task inventory based on depth:
+**Do NOT run rg/grep directly.** Spawn explore agents. Orchestrator stays lean.
 
-**shallow:**
-
-```
-rg "TODO|FIXME|HACK|XXX|BUG|WORKAROUND" packages/ --include "*.ts" --include "*.md"
-rg "as any|as unknown|@ts-expect|@ts-ignore" packages/ --include "*.ts"
-```
-
-**medium (adds):**
+**Step 1a: Spawn single explore agent for full discovery**
 
 ```
-rg "describe\(|test\(|it\(" packages/ --include "*.test.ts"
-rg "export (const|function|class|interface|type)" packages/ --include "*.ts"
-rg "^export .* from " packages/ --include "*.ts" | sort
-rg "^export type" packages/ --include "*.ts" | sort
+Task(
+  subagent_type: "explore",
+  description: "Discover self-improvement tasks",
+  prompt: "Scan codebase for improvement tasks. Return ONLY line-list summary. No file contents.
+
+DEPTH: <shallow|medium|deep>
+
+SHALLOW searches:
+- rg 'TODO|FIXME|HACK|XXX|BUG|WORKAROUND' packages/ --include '*.ts' --include '*.md'
+- rg 'as any|as unknown|@ts-expect|@ts-ignore' packages/ --include '*.ts'
+
+MEDIUM adds:
+- rg 'describe\(|test\(|it\(' packages/ --include '*.test.ts'
+- rg 'export (const|function|class|interface|type)' packages/ --include '*.ts'
+
+DEEP adds:
+- gh issue list --limit 20
+- git log --oneline --grep='self-improvement' -30
+
+RETURN FORMAT (one line per finding):
+<file>:<line> | <type: TODO|FIXME|HACK|TYPE_ISSUE|TEST_GAP|EXPORT> | <one-line description>
+
+Do NOT return file contents. Do NOT return full error messages. Line references only."
+)
 ```
 
-**deep (adds):**
+**Step 1b: Build DAG from agent summary**
 
-```
-gh issue list --limit 20
-git log --oneline --grep="self-improvement" -30
-```
+Orchestrator parses agent output. Rank tasks:
 
-**Build DAG** — rank tasks by dependency:
-
-1. Bug fixes (highest priority — no dependency)
-2. Type safety fixes (depend only on bug fixes)
+1. Bug fixes (highest — no dependency)
+2. Type safety fixes (depend on bug fixes)
 3. Missing exports / barrel cleanup (independent)
 4. Test coverage for uncovered behavior (depends on types)
-5. DX improvements / new tests (lowest priority)
+5. DX improvements / new tests (lowest)
 
-**Batch small cuts.** If multiple tasks each remove <30 lines, combine into single iteration. Not worth spawning worker per trivial removal.
+**Batch small cuts.** Multiple tasks removing <30 lines each → combine single iteration.
 
-**Validate before moving code.** Before moving X from package A to B:
+**Skip trivial worker spawning.** If ALL discovered tasks are <10 line edits (frontmatter, descriptions, links), do them directly in orchestrator. Not worth agent overhead.
 
-- Check A depends on B? If yes, cannot move (circular dep).
-- Check who imports X from A? If zero external importers, just delete.
-- Check if X is used as default/fallback in A's internals? If yes, keep or make required param.
+**Verify before flagging.** Explore agents: check path existence before flagging as issue. `packages/` existing ≠ problem.
 
 **Skip** (not real improvements):
 
@@ -116,6 +131,8 @@ For each task in DAG order:
 
 **Step 2a. Spawn Worker**
 
+Worker does own exploration. Don't pre-read for it.
+
 ```
 Task(
   subagent_type: "general",
@@ -128,7 +145,13 @@ BRANCH: self-improvement/<DESC>
 You are on branch self-improvement/<DESC>. Do NOT create new branches.
 Work on current branch. Commit directly.
 
-Implement this change following self-improvement-worker skill instructions.
+READ ONLY WHAT YOU NEED. Low context environment.
+- Use grep/glob to find relevant code
+- Read minimal snippets around target
+- Don't read entire files unless necessary
+- Carry context forward only what matters
+
+Implement this change following [self-improvement-worker](../self-improvement-worker/SKILL.md) skill instructions.
 Return: success/failure, commit hash if successful, error if failed."
 )
 ```
@@ -147,7 +170,7 @@ echo "<iteration N>: <description> | <commit hash>" >> /tmp/self-improvement-log
 
 ### Phase 3: Retrospect & Improve Skill
 
-MANDATORY. Do this every run. Analyze what happened:
+MANDATORY. Do this every run. Analyze from logs only. Don't re-read files.
 
 1. Which tasks succeeded? Which failed?
 2. What pain points emerged?
@@ -161,6 +184,8 @@ MANDATORY. Do this every run. Analyze what happened:
 - [ ] Depth appropriate?
 - [ ] iteration_count right?
 - [ ] What would make next run 20% faster?
+- [ ] Context usage — where biggest tokens spent?
+- [ ] Were explore agent findings accurate or false positives?
 
 Then edit SKILL.md with concrete improvements. Commit to same branch.
 
@@ -195,6 +220,11 @@ gh pr merge $PR --auto --merge
 - Stopping to read files already read in previous iterations — carry forward
 - Repeating same task type in consecutive iterations — diversify
 - Padding with trivial tasks when real work runs out — stop early, be honest
+- **Orchestrator running rg/grep** — delegate to explore agents
+- **Reading full files in orchestrator** — agents return line refs only
+- **Carrying file contents between iterations** — workers read fresh
+- **Returning full file contents from agents** — summaries only
+- **Spawning workers for trivial edits** — if all tasks <10 lines, do directly
 
 ## Orchestration Tips
 
@@ -203,3 +233,7 @@ gh pr merge $PR --auto --merge
 - Parallelism: independent tasks can share a branch
 - Don't add features in one run and test them in another — keep related work together
 - Pre-existing check errors (tsconfig, etc.) are noise — only fail on NEW errors your changes introduced
+- **Batch same-pattern fixes.** If 3 files have identical issue (e.g. hardcoded colors), spawn single worker for all 3. Less overhead, consistent fix.
+- **Identify test framework first.** Before spawning test workers, check package.json for vitest/jest. Include in worker prompt.
+- **Pre-existing TS errors.** Workers may need `--no-verify` for commits if repo has pre-existing type errors. Document in worker prompt.
+- **Parallel worker timing.** Parallel workers may report same commit hash if commits happen simultaneously. Stagger or verify with `git log`.
