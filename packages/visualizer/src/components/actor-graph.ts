@@ -102,7 +102,10 @@ export class ActorGraphComponent extends HTMLElement {
 
   _attachEvents() {
     const el = this._shadow.querySelector(".container");
-    if (!el) return;
+    if (!el) {
+      requestAnimationFrame(() => this._attachEvents());
+      return;
+    }
     this._abort = new AbortController();
     const s = this._abort.signal;
     el.addEventListener("wheel", this._handleWheel, { passive: false, signal: s });
