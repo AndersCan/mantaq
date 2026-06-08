@@ -59,21 +59,13 @@ npm install @mantaq/visualizer
 ## Basic Usage
 
 ```ts
-import { setActor, ActorGraphComponent, applyDefaultStyles } from "@mantaq/visualizer";
+import { setActor } from "@mantaq/visualizer";
 
-// Register the web component
-customElements.define("actor-graph", ActorGraphComponent);
-
-// Inject default styles into <head>
-applyDefaultStyles();
-
-// Pass your actor
+// Pass your actor — builds graph and triggers layout
 setActor(myActor);
 ```
 
-```html
-<actor-graph></actor-graph>
-```
+See [Full Programmatic Example](#full-programmatic-example) below for complete setup including web component registration and style injection.
 
 ## Features
 
@@ -123,17 +115,20 @@ removeDarkTheme(); // toggle off
 
 Reactive state atoms for custom integrations:
 
-| Atom              | Type                   | Purpose         |
-| ----------------- | ---------------------- | --------------- |
-| `$actor`          | `AnyActor \| null`     | Current actor   |
-| `$graph`          | `ActorGraph \| null`   | Computed graph  |
-| `$layout`         | `LayoutResult \| null` | Computed layout |
-| `$selectedNodeId` | `string \| null`       | Selected node   |
-| `$zoom`           | `number`               | Zoom level      |
-| `$pan`            | `{x, y}`               | Pan offset      |
-| `$layoutError`    | `string \| null`       | Layout error    |
+| Atom              | Type                   | Purpose                                        |
+| ----------------- | ---------------------- | ---------------------------------------------- |
+| `$actor`          | `AnyActor \| null`     | Current actor                                  |
+| `$graph`          | `ActorGraph \| null`   | Computed graph                                 |
+| `$layout`         | `LayoutResult \| null` | Computed layout                                |
+| `$layoutLoading`  | `boolean`              | Whether layout computation is in progress      |
+| `$selectedNodeId` | `string \| null`       | Selected node                                  |
+| `$zoom`           | `number`               | Zoom level                                     |
+| `$pan`            | `{x, y}`               | Pan offset                                     |
+| `$layoutError`    | `string \| null`       | Layout error                                   |
+| `$flatNodes`      | `GraphNode[]`          | Flattened list of positioned nodes from layout |
+| `$edges`          | `ComputedEdge[]`       | Positioned edges from layout                   |
 
-Actions: `setActor`, `selectNode`, `zoomIn`, `zoomOut`, `zoomToFit`, `resetView`.
+Actions: `setActor`, `selectNode`, `setViewport`, `setZoom`, `updateLayout`, `zoomIn`, `zoomOut`, `zoomToFit`, `resetView`.
 
 ## Interactive Demo
 
@@ -314,18 +309,14 @@ function createFetcher() {
     context: {} as {},
     effects: {},
     transitions: {
-      idle: { FETCH: () => ({ state: loading }) },
+      idle: { FETCH: (event, { context }) => ({ state: loading }) },
       loading: {
-        SUCCESS: () => ({ state: done }),
-        FAIL: () => ({ state: idle }),
+        SUCCESS: (event, { context }) => ({ state: done }),
+        FAIL: (event, { context }) => ({ state: idle }),
       },
     },
   });
 }
-
-// Setup
-customElements.define("actor-graph", ActorGraphComponent);
-applyDefaultStyles();
 
 const actor = createFetcher();
 setActor(actor);
@@ -388,6 +379,17 @@ renderButtons(actor);
 
 Returns `ActorGraph` with `nodes`, `edges`, `activePath`.
 
+### `estimateNodeWidth(label, minWidth)`
+
+Estimate node width based on label text.
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `label` | `string` | Node label text |
+| `minWidth` | `number` | Minimum width fallback |
+
+Returns `number` — estimated width (`label.length * 8 + 24`, clamped to at least `minWidth`).
+
 ### `computeLayout(graph, options?)`
 
 Async. Returns `LayoutResult` with positioned `nodes`, `edges`, `width`, `height`.
@@ -397,6 +399,19 @@ Async. Returns `LayoutResult` with positioned `nodes`, `edges`, `width`, `height
 | `options.direction` | `"RIGHT" \| "DOWN"` | `"RIGHT"` | Layout direction |
 | `options.nodeWidth` | `number` | `120` | Node width for ELK |
 | `options.nodeHeight` | `number` | `60` | Node height for ELK |
+| `options.nodeSpacing` | `number` | — | Spacing between nodes |
+| `options.edgeSpacing` | `number` | — | Spacing between edges |
+| `options.padding` | `{ top, bottom, left, right }` | — | Padding around the graph |
+
+### `flattenNodes(node)`
+
+Flatten a `GraphNode` tree into a flat array.
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `node` | `GraphNode` | Root node to flatten |
+
+Returns `GraphNode[]` — the root node plus all descendants.
 
 ### `setActor(actor)`
 
@@ -404,7 +419,7 @@ Sets actor in store, builds graph, triggers layout computation.
 
 ### `startActorSync()`
 
-Subscribes to `$actor` changes. Returns unsubscribe function. Call after `setActor` for live updates.
+Subscribes to the actor's `change` event and the `$actor` store. Returns an unsubscribe function. Call after `setActor` for live updates.
 
 ## Known Issues
 

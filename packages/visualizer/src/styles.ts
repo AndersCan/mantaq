@@ -40,6 +40,8 @@ const DEFAULT_STYLES = `
 
 let stylesInjected = false;
 
+// Uses raw CSS strings instead of Lit's `css` template literal because this injects
+// styles into document.head (not a shadow DOM), so Lit's CSSResult cannot be used here.
 export function applyDefaultStyles(): void {
   if (stylesInjected) return;
   if (typeof document === "undefined") return;

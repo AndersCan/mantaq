@@ -13,10 +13,7 @@ pnpm add @mantaq/visualizer
 ### Basic Usage
 
 ```ts
-import { ActorGraphComponent, setActor } from "@mantaq/visualizer";
-
-// Register the component
-customElements.define("actor-graph", ActorGraphComponent);
+import { setActor } from "@mantaq/visualizer";
 
 // Set the actor to visualize
 setActor(myActor);
@@ -26,6 +23,15 @@ setActor(myActor);
 
 ```html
 <actor-graph></actor-graph>
+```
+
+### Live Updates with `startActorSync`
+
+```ts
+import { startActorSync } from "@mantaq/visualizer";
+
+// Auto-sync graph when actor state changes
+startActorSync();
 ```
 
 ## API
@@ -38,11 +44,16 @@ setActor(myActor);
 - `defaultPositions(nodes, dimensions)` - Compute default node positions
 - `collectEdges(graph)` - Collect all edges from graph
 - `getTransitionsForNode(graph, nodeId)` - Get transitions for a node
+- `estimateNodeWidth(label, minWidth)` - Estimate node width from label
 - `setActor(actor)` - Set actor in store and trigger layout
+- `updateLayout(graph)` - Recompute layout
 - `selectNode(nodeId)` - Select a node
+- `setViewport(width, height)` - Set viewport dimensions
+- `setZoom(value)` - Set zoom level
 - `zoomIn()` / `zoomOut()` - Zoom controls
 - `zoomToFit()` - Fit graph to viewport
 - `resetView()` - Reset zoom and pan
+- `startActorSync()` - Auto-sync graph when actor state changes
 - `applyDarkTheme()` / `removeDarkTheme()` - Toggle dark mode
 
 ### Stores
@@ -50,8 +61,11 @@ setActor(myActor);
 - `$actor` - Current actor
 - `$graph` - Computed graph
 - `$layout` - Computed layout result
+- `$layoutLoading` - Whether layout computation is in progress
 - `$selectedNodeId` - Selected node ID
 - `$selectedNode` - Selected node object
+- `$flatNodes` - Flattened list of positioned nodes
+- `$edges` - Positioned edges
 - `$zoom` / `$pan` - Viewport state
 - `$viewport` - Viewport dimensions
 - `$graphDimensions` - Graph dimensions
