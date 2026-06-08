@@ -72,7 +72,9 @@ function flattenNodesForLayout(
 function collectAllEdges(nodes: GraphNode[], edges: GraphEdge[]): GraphEdge[] {
   const result: GraphEdge[] = [...edges];
   for (const node of nodes) {
-    result.push(...collectAllEdges(node.children, []));
+    for (const child of node.children) {
+      result.push(...collectAllEdges([child], []));
+    }
   }
   return result;
 }
@@ -178,7 +180,6 @@ function backwardEdgePath(
   tx: number,
   ty: number,
   tw: number,
-  _th: number,
 ): string {
   const startX = sx + sw / 2;
   const startY = sy + sh;
@@ -223,7 +224,7 @@ function computeEdgePath(
     return `M ${startX} ${startY} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${endX} ${endY}`;
   }
 
-  return backwardEdgePath(sx, sy, sw, sh, tx, ty, tw, th);
+  return backwardEdgePath(sx, sy, sw, sh, tx, ty, tw);
 }
 
 export function defaultPositions(
