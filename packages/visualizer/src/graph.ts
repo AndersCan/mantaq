@@ -71,7 +71,7 @@ function buildEdgesFromTransitions(
 
       let targetName: string | undefined;
       try {
-        targetName = (handler as Function)({}, {})?.state?.name;
+        targetName = (handler as Function)?.({}, { context: {} })?.state?.name;
       } catch {
         continue;
       }
