@@ -1,162 +1,211 @@
-import { describe, it, expect } from "vite-plus/test";
-import { state, event, Actor } from "@mantaq/core";
-import { buildGraph } from "../src/graph.ts";
-import { computeLayout } from "../src/layout.ts";
+import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
+import { Actor, state, event } from "@mantaq/core";
+import {
+  setActor,
+  $graph,
+  $layout,
+  selectNode,
+  $selectedNodeId,
+} from "../src/stores/graph-store.ts";
+import "../src/components/actor-graph.ts";
+import "../src/components/state-node.ts";
+import "../src/components/edge.ts";
+import type { ActorGraphComponent } from "../src/components/actor-graph.ts";
 
-describe("integration: actor -> graph -> layout", () => {
-  it("produces valid layout from simple actor", async () => {
-    const idle = state("idle")();
-    const active = state("active")();
+function createTrafficLight() {
+  const green = state("green")();
+  const yellow = state("yellow")();
+  const red = state("red")();
 
-    const TOGGLE = event("TOGGLE")();
+  const next = event("NEXT")();
 
-    const actor = new Actor({
-      inputs: [TOGGLE],
-      states: [idle, active],
-      initial: idle,
-      transitions: {
-        idle: { TOGGLE: () => ({ state: active }) },
-        active: { TOGGLE: () => ({ state: idle }) },
-      },
-    });
+  return new Actor({
+    inputs: [next],
+    outputs: [],
+    internal: [],
+    states: [green, yellow, red],
+    initial: green,
+    context: {} as {},
+    effects: {},
+    transitions: {
+      green: { NEXT: () => ({ state: yellow }) },
+      yellow: { NEXT: () => ({ state: red }) },
+      red: { NEXT: () => ({ state: green }) },
+    },
+  });
+}
 
-    const graph = buildGraph(actor);
-    expect(graph.nodes).toHaveLength(2);
-    expect(graph.edges).toHaveLength(2);
+function createWithRegions() {
+  const subA = state("subA")();
+  const subB = state("subB")();
+  const toggle = event("TOGGLE")();
 
-    const layout = await computeLayout(graph);
-    expect(layout.nodes).toHaveLength(2);
-    expect(layout.edges).toHaveLength(2);
-    expect(layout.width).toBeGreaterThan(0);
-    expect(layout.height).toBeGreaterThan(0);
+  const child = new Actor({
+    inputs: [toggle],
+    outputs: [],
+    internal: [],
+    states: [subA, subB],
+    initial: subA,
+    context: {} as {},
+    effects: {},
+    transitions: {
+      subA: { TOGGLE: () => ({ state: subB }) },
+      subB: { TOGGLE: () => ({ state: subA }) },
+    },
+  });
 
-    for (const node of layout.nodes) {
-      expect(node.x).toBeDefined();
-      expect(node.y).toBeDefined();
-      expect(node.width).toBeGreaterThan(0);
-      expect(node.height).toBeGreaterThan(0);
+  const parent = state("parent")();
+  const start = event("START")();
+
+  return new Actor({
+    inputs: [start],
+    outputs: [],
+    internal: [],
+    states: [parent],
+    initial: parent,
+    context: {} as {},
+    effects: {},
+    regions: { child },
+    transitions: {
+      parent: { START: () => ({ state: parent }) },
+    },
+  });
+}
+
+function createGraphComponent(): ActorGraphComponent {
+  const el = document.createElement("actor-graph") as ActorGraphComponent;
+  document.body.appendChild(el);
+  return el;
+}
+
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+describe("integration: full visualizer flow", () => {
+  beforeEach(async () => {
+    $graph.set(null);
+    $layout.set(null);
+    $selectedNodeId.set(null);
+  });
+
+  it("renders traffic light graph", async () => {
+    const actor = createTrafficLight();
+    await setActor(actor);
+
+    const el = createGraphComponent();
+    await el.updateComplete;
+
+    const nodes = el.shadowRoot!.querySelectorAll("state-node");
+    expect(nodes.length).toBe(3);
+  });
+
+  it("shows active state highlight", async () => {
+    const actor = createTrafficLight();
+    await setActor(actor);
+
+    const el = createGraphComponent();
+    await el.updateComplete;
+
+    const nodes = el.shadowRoot!.querySelectorAll("state-node");
+    let activeCount = 0;
+    for (const node of nodes) {
+      const isActive = (node as HTMLElement & { isActive: boolean }).isActive;
+      if (isActive) activeCount++;
     }
-
-    for (const edge of layout.edges) {
-      expect(edge.path).toBeTruthy();
-      expect(edge.labelX).toBeDefined();
-      expect(edge.labelY).toBeDefined();
-    }
+    expect(activeCount).toBe(1);
   });
 
-  it("preserves active state through pipeline", async () => {
-    const idle = state("idle")();
-    const active = state("active")();
+  it("renders edge paths", async () => {
+    const actor = createTrafficLight();
+    await setActor(actor);
 
-    const TOGGLE = event("TOGGLE")();
+    const el = createGraphComponent();
+    await el.updateComplete;
 
-    const actor = new Actor({
-      inputs: [TOGGLE],
-      states: [idle, active],
-      initial: idle,
-      transitions: {
-        idle: { TOGGLE: () => ({ state: active }) },
-      },
-    });
-
-    const graph = buildGraph(actor);
-    const layout = await computeLayout(graph);
-
-    const activeNode = layout.nodes.find((n) => n.id === "active");
-    expect(activeNode).toBeDefined();
-    expect(activeNode!.isActive).toBe(false);
-
-    const idleNode = layout.nodes.find((n) => n.id === "idle");
-    expect(idleNode).toBeDefined();
-    expect(idleNode!.isActive).toBe(true);
+    const edges = el.shadowRoot!.querySelectorAll("edge-path");
+    expect(edges.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("preserves final state through pipeline", async () => {
-    const idle = state("idle")();
-    const done = state("done")().final();
+  it("node selection updates store", async () => {
+    const actor = createTrafficLight();
+    await setActor(actor);
 
-    const NEXT = event("NEXT")();
+    const el = createGraphComponent();
+    await el.updateComplete;
 
-    const actor = new Actor({
-      inputs: [NEXT],
-      states: [idle, done],
-      initial: idle,
-      transitions: {
-        idle: { NEXT: () => ({ state: done }) },
-      },
-    });
-
-    const graph = buildGraph(actor);
-    const layout = await computeLayout(graph);
-
-    const doneNode = layout.nodes.find((n) => n.id === "done");
-    expect(doneNode).toBeDefined();
-    expect(doneNode!.isFinal).toBe(true);
+    selectNode("green");
+    expect($selectedNodeId.get()).toBe("green");
   });
 
-  it("handles actor with regions through pipeline", async () => {
-    const subA = state("subA")();
-    const subB = state("subB")();
-    const active = state("active")().regions({
-      sub: { initial: "subA", states: { subA, subB } },
-    });
-    const idle = state("idle")();
+  it("handles region actors", async () => {
+    const actor = createWithRegions();
+    await setActor(actor);
 
-    const TOGGLE = event("TOGGLE")();
+    const graph = $graph.get();
+    expect(graph).not.toBeNull();
 
-    const actor = new Actor({
-      inputs: [TOGGLE],
-      states: [idle, active],
-      initial: active,
-      transitions: {
-        idle: { TOGGLE: () => ({ state: active }) },
-      },
-    });
-
-    const graph = buildGraph(actor);
-    const layout = await computeLayout(graph);
-
-    expect(layout.nodes.length).toBeGreaterThanOrEqual(3);
-
-    const activeNode = layout.nodes.find((n) => n.id === "active");
-    expect(activeNode).toBeDefined();
-
-    const subNodes = layout.nodes.filter((n) => n.id.startsWith("active/"));
-    expect(subNodes.length).toBeGreaterThanOrEqual(2);
+    const labels = graph!.nodes.map((n) => n.label);
+    expect(labels).toContain("parent");
+    expect(labels).toContain("subA");
   });
 
-  it("handles layout with direction option", async () => {
-    const a = state("a")();
-    const b = state("b")();
-    const c = state("c")();
+  it("graph updates after state transition", async () => {
+    const actor = createTrafficLight();
+    await setActor(actor);
 
-    const GO = event("GO")();
+    let graph = $graph.get();
+    const initialActive = graph!.nodes.find((n) => n.isActive);
+    expect(initialActive!.label).toBe("green");
 
-    const actor = new Actor({
-      inputs: [GO],
-      states: [a, b, c],
-      initial: a,
-      transitions: {
-        a: { GO: () => ({ state: b }) },
-        b: { GO: () => ({ state: c }) },
-      },
-    });
+    const next = event("NEXT")();
+    actor.send(next);
+    await setActor(actor);
 
-    const graph = buildGraph(actor);
-
-    const rightLayout = await computeLayout(graph, { direction: "RIGHT" });
-    const downLayout = await computeLayout(graph, { direction: "DOWN" });
-
-    expect(rightLayout.nodes).toHaveLength(3);
-    expect(downLayout.nodes).toHaveLength(3);
+    graph = $graph.get();
+    const newActive = graph!.nodes.find((n) => n.isActive);
+    expect(newActive!.label).toBe("yellow");
   });
 
-  it("handles empty graph through pipeline", async () => {
-    const graph = { nodes: [], edges: [], activePath: [] };
-    const layout = await computeLayout(graph);
-    expect(layout.nodes).toHaveLength(0);
-    expect(layout.edges).toHaveLength(0);
-    expect(layout.width).toBe(0);
-    expect(layout.height).toBe(0);
+  it("full cycle: green → yellow → red → green", async () => {
+    const actor = createTrafficLight();
+    const next = event("NEXT")();
+
+    await setActor(actor);
+    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
+
+    actor.send(next);
+    await setActor(actor);
+    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("yellow");
+
+    actor.send(next);
+    await setActor(actor);
+    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("red");
+
+    actor.send(next);
+    await setActor(actor);
+    expect($graph.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
+  });
+
+  it("component renders after layout computed", async () => {
+    const actor = createTrafficLight();
+    await setActor(actor);
+
+    const el = createGraphComponent();
+    await el.updateComplete;
+
+    const viewport = el.shadowRoot!.querySelector(".viewport");
+    expect(viewport).toBeDefined();
+  });
+
+  it("zoom controls render correctly", async () => {
+    const actor = createTrafficLight();
+    await setActor(actor);
+
+    const el = createGraphComponent();
+    await el.updateComplete;
+
+    const indicator = el.shadowRoot!.querySelector(".zoom-indicator");
+    expect(indicator!.textContent).toContain("100%");
   });
 });

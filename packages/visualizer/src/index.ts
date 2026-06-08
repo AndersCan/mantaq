@@ -1,49 +1,33 @@
-export type { GraphNode, GraphEdge, ActorGraph, GraphBuilderOptions } from "./graph.ts";
-export { buildGraph, flattenNodes } from "./graph.ts";
+export { buildGraph } from "./graph.ts";
+export type { ActorGraph, GraphNode, GraphEdge, GraphOptions } from "./graph.ts";
 
-export type { LayoutOptions, ComputedEdge, LayoutResult } from "./layout.ts";
 export { computeLayout } from "./layout.ts";
-
-export type { Theme } from "./styles.ts";
-export {
-  theme,
-  darkTheme,
-  visualizerStyles,
-  stateNodeStyles,
-  edgeStyles,
-  applyDefaultStyles,
-  applyDarkTheme,
-  removeDarkTheme,
-} from "./styles.ts";
-
-export { ActorGraph as ActorGraphComponent } from "./components/actor-graph.ts";
-export { StateNode } from "./components/state-node.ts";
-export { renderEdge } from "./components/edge.ts";
+export type { LayoutResult, LayoutNode, LayoutEdge, LayoutOptions } from "./layout.ts";
 
 export {
   $actor,
   $graph,
   $layout,
-  $layoutLoading,
-  $layoutError,
   $selectedNodeId,
   $zoom,
   $pan,
-  $viewport,
-  $flatNodes,
-  $edges,
-  $selectedNode,
-  $graphDimensions,
-  ZOOM_MIN,
-  ZOOM_MAX,
+  $layoutError,
+  $isComputing,
   setActor,
-  updateLayout,
   selectNode,
-  setZoom,
   zoomIn,
   zoomOut,
   zoomToFit,
   resetView,
-  setViewport,
+  setZoom,
+  setPan,
   startActorSync,
+  applyDarkTheme,
+  removeDarkTheme,
 } from "./stores/graph-store.ts";
+
+export { ActorGraphComponent } from "./components/actor-graph.ts";
+export { StateNode } from "./components/state-node.ts";
+export { EdgePath } from "./components/edge.ts";
+
+export { applyDefaultStyles, removeDefaultStyles } from "./styles.ts";

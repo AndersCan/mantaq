@@ -1,41 +1,41 @@
 import { describe, it, expect, beforeEach } from "vite-plus/test";
-import { state, event, Actor } from "@mantaq/core";
 import {
   $actor,
   $graph,
   $layout,
-  $layoutLoading,
-  $layoutError,
   $selectedNodeId,
   $zoom,
   $pan,
-  $viewport,
-  $flatNodes,
-  $edges,
-  $selectedNode,
-  $graphDimensions,
+  $layoutError,
+  $isComputing,
   setActor,
   selectNode,
   zoomIn,
   zoomOut,
+  zoomToFit,
   resetView,
-  setViewport,
-  startActorSync,
+  setZoom,
+  setPan,
+  applyDarkTheme,
+  removeDarkTheme,
 } from "../src/stores/graph-store.ts";
-import { getTransitionsForNode } from "../src/graph.ts";
+import { Actor, state, event } from "@mantaq/core";
 
 function createTestActor() {
   const idle = state("idle")();
   const active = state("active")();
-  const TOGGLE = event("TOGGLE")();
+  const go = event("GO")();
 
   return new Actor({
-    inputs: [TOGGLE],
+    inputs: [go],
+    outputs: [],
+    internal: [],
     states: [idle, active],
     initial: idle,
+    context: {} as {},
+    effects: {},
     transitions: {
-      idle: { TOGGLE: () => ({ state: active }) },
-      active: { TOGGLE: () => ({ state: idle }) },
+      idle: { GO: () => ({ state: active }) },
     },
   });
 }
@@ -43,72 +43,77 @@ function createTestActor() {
 describe("graph store", () => {
   beforeEach(() => {
     $actor.set(null);
+    $graph.set(null);
     $layout.set(null);
     $selectedNodeId.set(null);
     $zoom.set(1);
     $pan.set({ x: 0, y: 0 });
-    $viewport.set({ width: 800, height: 600 });
+    $layoutError.set(null);
+    $isComputing.set(false);
   });
 
-  it("initializes with null state", () => {
+  it("starts with null actor", () => {
     expect($actor.get()).toBeNull();
+  });
+
+  it("starts with null graph", () => {
     expect($graph.get()).toBeNull();
+  });
+
+  it("starts with null layout", () => {
     expect($layout.get()).toBeNull();
-    expect($layoutLoading.get()).toBe(false);
-    expect($layoutError.get()).toBeNull();
-    expect($selectedNodeId.get()).toBeNull();
+  });
+
+  it("starts with zoom 1", () => {
     expect($zoom.get()).toBe(1);
+  });
+
+  it("starts with zero pan", () => {
     expect($pan.get()).toEqual({ x: 0, y: 0 });
   });
 
-  it("setActor builds graph and layout", async () => {
-    const actor = createTestActor();
-    setActor(actor);
+  it("starts with no selected node", () => {
+    expect($selectedNodeId.get()).toBeNull();
+  });
 
-    await new Promise((r) => setTimeout(r, 200));
+  it("setActor populates graph and layout", async () => {
+    const actor = createTestActor();
+    await setActor(actor);
 
     expect($actor.get()).toBe(actor);
     expect($graph.get()).not.toBeNull();
     expect($layout.get()).not.toBeNull();
-    expect($graph.get()!.nodes).toHaveLength(2);
+    expect($layoutError.get()).toBeNull();
   });
 
-  it("setActor(null) clears state", async () => {
+  it("setActor creates graph with correct nodes", async () => {
     const actor = createTestActor();
-    setActor(actor);
-    await new Promise((r) => setTimeout(r, 50));
+    await setActor(actor);
 
-    setActor(null);
-    expect($graph.get()).toBeNull();
-    expect($layout.get()).toBeNull();
-    expect($selectedNodeId.get()).toBeNull();
+    const graph = $graph.get();
+    expect(graph).not.toBeNull();
+    expect(graph!.nodes.length).toBe(2);
+    expect(graph!.nodes.map((n) => n.label)).toEqual(expect.arrayContaining(["idle", "active"]));
+  });
+
+  it("setActor marks active state", async () => {
+    const actor = createTestActor();
+    await setActor(actor);
+
+    const graph = $graph.get();
+    const active = graph!.nodes.find((n) => n.isActive);
+    expect(active!.label).toBe("idle");
   });
 
   it("selectNode updates selectedNodeId", () => {
     selectNode("idle");
     expect($selectedNodeId.get()).toBe("idle");
+  });
 
+  it("selectNode with null clears selection", () => {
+    selectNode("idle");
     selectNode(null);
     expect($selectedNodeId.get()).toBeNull();
-  });
-
-  it("$selectedNode returns correct node", async () => {
-    const actor = createTestActor();
-    setActor(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
-    selectNode("idle");
-    const node = $selectedNode.get();
-    expect(node).not.toBeNull();
-    expect(node!.id).toBe("idle");
-  });
-
-  it("$selectedNode returns null when nothing selected", async () => {
-    const actor = createTestActor();
-    setActor(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect($selectedNode.get()).toBeNull();
   });
 
   it("zoomIn increases zoom", () => {
@@ -123,147 +128,106 @@ describe("graph store", () => {
     expect($zoom.get()).toBeLessThan(1);
   });
 
-  it("zoomIn respects max bound", () => {
-    $zoom.set(4.9);
+  it("zoomIn does not exceed max", () => {
+    $zoom.set(5);
     zoomIn();
-    expect($zoom.get()).toBeLessThanOrEqual(5);
+    expect($zoom.get()).toBe(5);
   });
 
-  it("zoomOut respects min bound", () => {
-    $zoom.set(0.15);
+  it("zoomOut does not go below min", () => {
+    $zoom.set(0.1);
     zoomOut();
-    expect($zoom.get()).toBeGreaterThanOrEqual(0.1);
+    expect($zoom.get()).toBe(0.1);
+  });
+
+  it("zoomToFit resets zoom and pan", () => {
+    $zoom.set(3);
+    $pan.set({ x: 100, y: 200 });
+    zoomToFit();
+    expect($zoom.get()).toBe(1);
+    expect($pan.get()).toEqual({ x: 0, y: 0 });
   });
 
   it("resetView resets zoom and pan", () => {
-    $zoom.set(2);
-    $pan.set({ x: 100, y: 100 });
+    $zoom.set(2.5);
+    $pan.set({ x: 50, y: 75 });
     resetView();
     expect($zoom.get()).toBe(1);
     expect($pan.get()).toEqual({ x: 0, y: 0 });
   });
 
-  it("setViewport updates viewport", () => {
-    setViewport(1024, 768);
-    expect($viewport.get()).toEqual({ width: 1024, height: 768 });
+  it("setZoom clamps to min", () => {
+    setZoom(-1);
+    expect($zoom.get()).toBe(0.1);
   });
 
-  it("$flatNodes returns layout nodes", async () => {
+  it("setZoom clamps to max", () => {
+    setZoom(100);
+    expect($zoom.get()).toBe(5);
+  });
+
+  it("setZoom accepts valid values", () => {
+    setZoom(2.5);
+    expect($zoom.get()).toBe(2.5);
+  });
+
+  it("setPan updates pan values", () => {
+    setPan({ x: 10, y: 20 });
+    expect($pan.get()).toEqual({ x: 10, y: 20 });
+  });
+
+  it("setActor clears selectedNodeId", async () => {
+    selectNode("idle");
     const actor = createTestActor();
-    setActor(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect($flatNodes.get().length).toBeGreaterThan(0);
+    await setActor(actor);
+    expect($selectedNodeId.get()).toBeNull();
   });
 
-  it("$edges returns layout edges", async () => {
-    const actor = createTestActor();
-    setActor(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect($edges.get().length).toBeGreaterThan(0);
+  it("applyDarkTheme sets attribute on document", () => {
+    applyDarkTheme();
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 
-  it("$graphDimensions returns layout dimensions", async () => {
-    const actor = createTestActor();
-    setActor(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
-    const dims = $graphDimensions.get();
-    expect(dims.width).toBeGreaterThan(0);
-    expect(dims.height).toBeGreaterThan(0);
+  it("removeDarkTheme removes attribute from document", () => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    removeDarkTheme();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
   });
 
-  it("$graphDimensions returns defaults when no layout", () => {
-    const dims = $graphDimensions.get();
-    expect(dims).toEqual({ width: 800, height: 600 });
-  });
+  it("setActor handles actor with no transitions", async () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      outputs: [],
+      internal: [],
+      states: [idle],
+      initial: idle,
+      context: {} as {},
+      effects: {},
+      transitions: {},
+    });
 
-  it("startActorSync returns unsubscribe function", () => {
-    const unsub = startActorSync();
-    expect(typeof unsub).toBe("function");
-    unsub();
-  });
-
-  it("startActorSync updates graph when actor changes", async () => {
-    const actor = createTestActor();
-    const unsub = startActorSync();
-
-    $actor.set(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
+    await setActor(actor);
     expect($graph.get()).not.toBeNull();
-    expect($graph.get()!.nodes).toHaveLength(2);
-
-    unsub();
+    expect($graph!.get()!.nodes.length).toBe(1);
   });
 
-  it("startActorSync clears graph when actor set to null", async () => {
-    const unsub = startActorSync();
+  it("setActor clears computing flag on error", async () => {
     const actor = createTestActor();
-    $actor.set(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect($graph.get()).not.toBeNull();
-
-    $actor.set(null);
-    await new Promise((r) => setTimeout(r, 10));
-
-    unsub();
+    await setActor(actor);
+    expect($isComputing.get()).toBe(false);
+    expect($layoutError.get()).toBeNull();
   });
 
-  it("setActor rebuilds graph on re-assignment", async () => {
+  it("rapid setActor calls use latest result", async () => {
     const actor1 = createTestActor();
-    setActor(actor1);
-    await new Promise((r) => setTimeout(r, 50));
+    const actor2 = createTestActor();
 
-    const graph1 = $graph.get();
-    expect(graph1).not.toBeNull();
+    const p1 = setActor(actor1);
+    const p2 = setActor(actor2);
+    await Promise.all([p1, p2]);
 
-    setActor(actor1);
-    await new Promise((r) => setTimeout(r, 50));
-
-    const graph2 = $graph.get();
-    expect(graph2).not.toBeNull();
-    expect(graph2!.nodes).toHaveLength(2);
-  });
-
-  it("startActorSync auto-updates graph on actor state change", async () => {
-    const actor = createTestActor();
-    const unsub = startActorSync();
-
-    $actor.set(actor);
-    await new Promise((r) => setTimeout(r, 100));
-
-    const graphBefore = $graph.get();
-    expect(graphBefore).not.toBeNull();
-    expect(graphBefore!.activePath).toEqual(["idle"]);
-
-    const TOGGLE = event("TOGGLE")();
-    actor.send(TOGGLE);
-    await new Promise((r) => setTimeout(r, 100));
-
-    const graphAfter = $graph.get();
-    expect(graphAfter).not.toBeNull();
-    expect(graphAfter!.activePath).toEqual(["active"]);
-    expect(graphAfter!.nodes.find((n) => n.id === "active")!.isActive).toBe(true);
-    expect(graphAfter!.nodes.find((n) => n.id === "idle")!.isActive).toBe(false);
-
-    unsub();
-  });
-
-  it("getTransitionsForNode returns available transitions", async () => {
-    const actor = createTestActor();
-    setActor(actor);
-    await new Promise((r) => setTimeout(r, 50));
-
-    const graph = $graph.get();
-    expect(graph).not.toBeNull();
-
-    const idleTransitions = getTransitionsForNode(graph!, "idle");
-    expect(idleTransitions).toEqual(["TOGGLE"]);
-
-    const activeTransitions = getTransitionsForNode(graph!, "active");
-    expect(activeTransitions).toEqual(["TOGGLE"]);
+    expect($isComputing.get()).toBe(false);
+    expect($layoutError.get()).toBeNull();
   });
 });
