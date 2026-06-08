@@ -9,6 +9,8 @@ import {
   $layoutLoading,
   zoomToFit,
   resetView,
+  zoomIn,
+  zoomOut,
   setZoom,
 } from "../graph-store.ts";
 import type { LayoutResult } from "../layout.ts";
@@ -191,12 +193,18 @@ export class ActorGraphComponent extends HTMLElement {
     switch (e.key) {
       case "+":
       case "=":
-        setZoom(this._zoom + ZOOM_STEP);
+        if (!e.ctrlKey && !e.metaKey) break;
+        e.preventDefault();
+        zoomIn();
         break;
       case "-":
-        setZoom(this._zoom - ZOOM_STEP);
+        if (!e.ctrlKey && !e.metaKey) break;
+        e.preventDefault();
+        zoomOut();
         break;
       case "0":
+        if (!e.ctrlKey && !e.metaKey) break;
+        e.preventDefault();
         resetView();
         break;
       case "f":
@@ -278,8 +286,8 @@ export class ActorGraphComponent extends HTMLElement {
           )}
         </div>
         <div class="help-overlay">
-          <span><kbd>+</kbd>/<kbd>-</kbd> zoom</span>
-          <span><kbd>0</kbd> reset</span>
+          <span><kbd>Ctrl+</kbd><kbd>+</kbd>/<kbd>-</kbd> zoom</span>
+          <span><kbd>Ctrl+0</kbd> reset</span>
           <span><kbd>F</kbd> fit</span>
           <span><kbd>&larr;</kbd><kbd>&rarr;</kbd> navigate</span>
           <span><kbd>Esc</kbd> deselect</span>

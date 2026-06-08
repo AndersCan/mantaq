@@ -454,7 +454,48 @@ describe("ActorGraph component", () => {
     expect($selectedNodeId.get()).toBeNull();
   });
 
-  it("keyboard + zooms in", async () => {
+  it("keyboard Ctrl+= zooms in", async () => {
+    $zoom.set(1);
+    const el = createActorGraph();
+    await Promise.resolve();
+
+    const container = el.shadowRoot!.querySelector(".container") as HTMLElement;
+    container.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "=", ctrlKey: true, bubbles: true }),
+    );
+
+    expect($zoom.get()).toBeGreaterThan(1);
+  });
+
+  it("keyboard Ctrl+- zooms out", async () => {
+    $zoom.set(1);
+    const el = createActorGraph();
+    await Promise.resolve();
+
+    const container = el.shadowRoot!.querySelector(".container") as HTMLElement;
+    container.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "-", ctrlKey: true, bubbles: true }),
+    );
+
+    expect($zoom.get()).toBeLessThan(1);
+  });
+
+  it("keyboard Ctrl+0 resets view", async () => {
+    $zoom.set(2);
+    $pan.set({ x: 50, y: 50 });
+    const el = createActorGraph();
+    await Promise.resolve();
+
+    const container = el.shadowRoot!.querySelector(".container") as HTMLElement;
+    container.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "0", ctrlKey: true, bubbles: true }),
+    );
+
+    expect($zoom.get()).toBe(1);
+    expect($pan.get()).toEqual({ x: 0, y: 0 });
+  });
+
+  it("plain + does not zoom without Ctrl", async () => {
     $zoom.set(1);
     const el = createActorGraph();
     await Promise.resolve();
@@ -462,31 +503,7 @@ describe("ActorGraph component", () => {
     const container = el.shadowRoot!.querySelector(".container") as HTMLElement;
     container.dispatchEvent(new KeyboardEvent("keydown", { key: "+", bubbles: true }));
 
-    expect($zoom.get()).toBeGreaterThan(1);
-  });
-
-  it("keyboard - zooms out", async () => {
-    $zoom.set(1);
-    const el = createActorGraph();
-    await Promise.resolve();
-
-    const container = el.shadowRoot!.querySelector(".container") as HTMLElement;
-    container.dispatchEvent(new KeyboardEvent("keydown", { key: "-", bubbles: true }));
-
-    expect($zoom.get()).toBeLessThan(1);
-  });
-
-  it("keyboard 0 resets view", async () => {
-    $zoom.set(2);
-    $pan.set({ x: 50, y: 50 });
-    const el = createActorGraph();
-    await Promise.resolve();
-
-    const container = el.shadowRoot!.querySelector(".container") as HTMLElement;
-    container.dispatchEvent(new KeyboardEvent("keydown", { key: "0", bubbles: true }));
-
     expect($zoom.get()).toBe(1);
-    expect($pan.get()).toEqual({ x: 0, y: 0 });
   });
 
   it("keyboard F triggers zoom to fit", async () => {
