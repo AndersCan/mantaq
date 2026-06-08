@@ -1,0 +1,101 @@
+---
+title: Events
+description: Messages that trigger transitions.
+---
+
+Event. Typed message. Triggers transition. `event(id)()` makes one.
+
+## Basic events
+
+```ts
+import { event } from "@mantaq/core";
+
+const start = event("START")();
+const fetchData = event("FETCH")<{ url: string }>();
+
+start.id; // "START"
+```
+
+## Create instances
+
+```ts
+start.create(); // { id: "START" }
+fetchData.create({ url: "/api" }); // { id: "FETCH", url: "/api" }
+```
+
+Primitives get wrapped:
+
+```ts
+const toggle = event("TOGGLE")<boolean>();
+toggle.create(true); // { id: "TOGGLE", value: true }
+```
+
+## Check identity
+
+```ts
+start.is(someEvent); // boolean
+```
+
+`someEvent.id === "START"`.
+
+## Use in transitions
+
+```ts
+const actor = new Actor({
+  inputs: [start, fetchData],
+  states: [idle, loading],
+  initial: idle,
+  transitions: {
+    idle: {
+      START: () => ({ state: loading }),
+      FETCH: (event, { context }) => {
+        context.url = event.url;
+        return { state: loading };
+      },
+    },
+  },
+```
+
+Handler gets typed event object.
+
+## Internal events
+
+Events from effects. Processed after current transition.
+
+```ts
+const authDone = event("AUTH_DONE")();
+
+const actor = new Actor({
+  inputs: [login],
+  internal: [authDone],
+  // ...
+  effects: {
+    authenticating: [
+      ({ emit, signal }) => {
+        authenticate().then(
+          (result) => signal.aborted || emit(authDone.create(result)),
+        );
+      },
+    ],
+  },
+```
+
+## Any transition
+
+Special key `"Any"`. Intercepts all events.
+
+```ts
+transitions: {
+  Any: {
+    CANCEL: (_event, { context }) => {
+      context.cancelled = true;
+      return { state: cancelled };
+    },
+  },
+  idle: {
+    START: () => ({ state: running }),
+  },
+}
+```
+
+State-specific runs first. `Any` runs after.

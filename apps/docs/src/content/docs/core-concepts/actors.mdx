@@ -1,0 +1,91 @@
+---
+title: Actors
+description: Core runtime unit.
+---
+
+Actor. State machine instance. Holds everything.
+
+Current state. Mutable context. Transition handlers. Effects. Clock. Children.
+
+## Make actor
+
+```ts
+import { Actor, state, event } from "@mantaq/core";
+
+const idle = state("idle")();
+const active = state("active")();
+
+const activate = event("ACTIVATE")();
+
+const actor = new Actor({
+  inputs: [activate],
+  states: [idle, active],
+  initial: idle,
+  transitions: {
+    idle: {
+      ACTIVATE: () => ({ state: active }),
+    },
+  },
+});
+```
+
+## Send events
+
+```ts
+actor.send(activate.create());
+```
+
+Events. Plain objects. `id` field required. `event.create(payload)` makes them.
+
+## Check state
+
+```ts
+import { matches } from "@mantaq/sugar";
+
+matches(actor, "active"); // true
+```
+
+## Listen for changes
+
+```ts
+const unsub = actor.on("change", (snapshot) => {
+  console.log("New state:", snapshot.path);
+});
+
+// Call unsub() to stop
+```
+
+Fires immediately. Current snapshot.
+
+## Settled
+
+```ts
+await actor.settled();
+```
+
+Waits. Internal events drained. Use after effects.
+
+## Snapshot
+
+```ts
+actor.snapshot();
+// { path: ["active"], regions: {}, done: undefined }
+```
+
+State tree. Nested for hierarchical actors.
+
+## Constructor options
+
+| Option           | Type                    | What                                 |
+| ---------------- | ----------------------- | ------------------------------------ |
+| `inputs`         | `EventRef[]`            | External events accepted             |
+| `outputs`        | `EventRef[]`            | Events to parent                     |
+| `internal`       | `EventRef[]`            | Events from effects/transitions      |
+| `states`         | `StateRef[]`            | All states                           |
+| `initial`        | `StateRef`              | Start state                          |
+| `context`        | `object`                | Mutable context                      |
+| `transitions`    | `object`                | State/event map                      |
+| `effects`        | `object`                | Side effects per state               |
+| `clock`          | `Clock`                 | Default: `RealClock`                 |
+| `regions`        | `Record<string, Actor>` | Static children                      |
+| `internalBudget` | `number`                | Max internal events (default: 10000) |

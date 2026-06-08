@@ -1,0 +1,88 @@
+---
+title: States
+description: Nodes in the state graph.
+---
+
+State. Node in graph. `state(id)()` makes one.
+
+## Basic states
+
+```ts
+import { state } from "@mantaq/core";
+
+const idle = state("idle")();
+const loading = state("loading")();
+const success = state("success")();
+
+idle.name; // "idle"
+idle.isFinal; // false
+```
+
+## Final states
+
+Mark state done. Signal completion.
+
+```ts
+const done = state("done")().final();
+done.isFinal; // true
+```
+
+Actor enters final state → `"done"` subscribers fire.
+
+## Hierarchical states (regions)
+
+Sub-states. `.regions()` attaches them.
+
+```ts
+const connected = state("connected")().regions({
+  default: {
+    initial: "idle",
+    states: {
+      idle: state("idle")(),
+      active: state("active")(),
+    },
+  },
+});
+```
+
+Snapshot. Nested.
+
+```ts
+{ path: ["connected"], regions: { default: { path: ["idle"], regions: {} } } }
+```
+
+## Parallel states
+
+Multiple regions. Run same time.
+
+```ts
+const player = state("player")().regions({
+  playback: {
+    initial: "stopped",
+    states: {
+      stopped: state("stopped")(),
+      playing: state("playing")(),
+    },
+  },
+  audio: {
+    initial: "unmuted",
+    states: {
+      unmuted: state("unmuted")(),
+      muted: state("muted")(),
+    },
+  },
+});
+```
+
+## TransitionState
+
+Transition needs payload. Carry it.
+
+```ts
+import { TransitionState } from "@mantaq/core";
+
+// In transition handler:
+return { state: new TransitionState(successState, { data: result }) };
+```
+
+Payload in effects. `state.payload`.

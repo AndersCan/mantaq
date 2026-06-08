@@ -1,0 +1,49 @@
+---
+title: Introduction
+description: What is Mantaq.
+---
+
+Mantaq. TypeScript state machine library.
+
+Actors. Events. Hierarchical states. Three concepts.
+
+## Core ideas
+
+- **Actor** — state machine. Has context, states, effects, transitions, clock.
+- **State** — node in graph. Optional: mark final.
+- **Event** — typed message. Triggers transitions.
+- **Effect** — runs on state entry. Aborts on exit.
+- **Context** — mutable record. Survives transitions.
+
+## Packages
+
+| Package         | What                                                      |
+| --------------- | --------------------------------------------------------- |
+| `@mantaq/core`  | Runtime. `Actor`, `state`, `event`, `VirtualClock`        |
+| `@mantaq/sugar` | Helpers. `matches`, `states`, `events`, `ActorMap`, `tag` |
+
+## Quick example
+
+```ts
+import { Actor, state, event } from "@mantaq/core";
+import { matches } from "@mantaq/sugar";
+
+const idle = state("idle")();
+const running = state("running")();
+
+const start = event("START")();
+const stop = event("STOP")();
+
+const machine = new Actor({
+  inputs: [start, stop],
+  states: [idle, running],
+  initial: idle,
+  transitions: {
+    idle: { START: () => ({ state: running }) },
+    running: { STOP: () => ({ state: idle }) },
+  },
+});
+
+machine.send(start.create());
+matches(machine, "running"); // true
+```

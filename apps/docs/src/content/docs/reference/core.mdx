@@ -1,0 +1,161 @@
+---
+title: "@mantaq/core"
+description: Core API reference.
+---
+
+## `state(id)`
+
+```ts
+function state<const T extends string>(id: T): <Payload>() => StateRef<T, Payload>;
+```
+
+State reference. Two calls. First: id. Second: payload type.
+
+```ts
+const idle = state("idle")();
+const withPayload = state("loading")<{ taskId: string }>();
+```
+
+### `StateRef<T, Payload>`
+
+| Property            | Type      | What               |
+| ------------------- | --------- | ------------------ |
+| `name`              | `T`       | State id           |
+| `isFinal`           | `boolean` | Terminal state?    |
+| `.final()`          | `this`    | Mark final         |
+| `.regions(options)` | `this`    | Attach sub-regions |
+
+---
+
+## `event(id)`
+
+```ts
+function event<const T extends string>(id: T): <Payload>() => EventRef<T, Payload>;
+```
+
+Event reference. Two calls. First: id. Second: payload type.
+
+```ts
+const start = event("START")();
+const fetchData = event("FETCH")<{ url: string }>();
+```
+
+### `EventRef<T, Payload>`
+
+| Property           | Type                  | What                |
+| ------------------ | --------------------- | ------------------- |
+| `id`               | `T`                   | Event id            |
+| `.is(event)`       | `boolean`             | Identity check      |
+| `.create(payload)` | `Payload & { id: T }` | Make event instance |
+
+---
+
+## `Actor`
+
+```ts
+class Actor<Inputs, Outputs, Internal, States, ...> {
+  constructor(options: ActorOptions)
+}
+```
+
+### Methods
+
+| Method             | Signature             | What          |
+| ------------------ | --------------------- | ------------- |
+| `send(event)`      | `(event) => void`     | Send event    |
+| `snapshot()`       | `() => Snapshot`      | State tree    |
+| `on("change", fn)` | `(fn) => () => void`  | State changes |
+| `on("error", fn)`  | `(fn) => () => void`  | Effect errors |
+| `on("done", fn)`   | `(fn) => () => void`  | Final state   |
+| `settled()`        | `() => Promise<void>` | Queue drained |
+
+### Properties
+
+| Property  | Type                    | What            |
+| --------- | ----------------------- | --------------- |
+| `state`   | `StateRef`              | Current state   |
+| `context` | `Readonly<T>`           | Current context |
+| `clock`   | `Clock`                 | Clock instance  |
+| `regions` | `Record<string, Actor>` | Children        |
+
+---
+
+## `VirtualClock`
+
+```ts
+class VirtualClock implements Clock {
+  advance(ms: number): void;
+  hasPending(): boolean;
+  now(): number;
+  setTimeout(ms, cb, options?): number;
+  clearTimeout(id): void;
+  setInterval(ms, cb, options?): number;
+  clearInterval(id): void;
+}
+```
+
+Deterministic. Testing. `advance(ms)` fires all due timers instantly.
+
+---
+
+## `RealClock`
+
+```ts
+class RealClock implements Clock {
+  now(): number;
+  setTimeout(ms, cb, options?): number;
+  clearTimeout(id): void;
+  setInterval(ms, cb, options?): number;
+  clearInterval(id): void;
+}
+```
+
+Real timers. `globalThis.setTimeout`. Default for actors.
+
+---
+
+## Types
+
+### `Snapshot`
+
+```ts
+interface Snapshot {
+  path: string[];
+  regions: Record<string, Snapshot>;
+  done?: boolean;
+}
+```
+
+### `Clock`
+
+```ts
+interface Clock {
+  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
+  clearTimeout(id: number): void;
+  setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
+  clearInterval(id: number): void;
+  now(): number;
+}
+```
+
+### `EffectInput`
+
+```ts
+type EffectInput<Inputs, Internal, ActorContext> = {
+  signal: AbortSignal;
+  state: { name: string; payload: unknown };
+  event: Inputs[number] | Internal[number];
+  context: ActorContext;
+  emit: (event: InternalEvent) => void;
+  clock: Clock;
+};
+```
+
+### `TransitionResult`
+
+```ts
+type TransitionResult = {
+  state?: StateRef | TransitionState;
+  emit?: Array<{ id: string }>;
+};
+```

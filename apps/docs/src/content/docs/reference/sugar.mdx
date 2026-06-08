@@ -1,0 +1,155 @@
+---
+title: "@mantaq/sugar"
+description: Convenience helpers.
+---
+
+## `matches(actor, pattern)`
+
+```ts
+function matches(actor: { snapshot(): Snapshot }, pattern: string): boolean;
+```
+
+Dot-separated pattern. Snapshot tree.
+
+```ts
+matches(actor, "idle"); // flat
+matches(actor, "connected.default.active"); // hierarchical
+matches(actor, "player.playback.playing"); // parallel
+```
+
+Prefix semantics. `matches(actor, "connected")` → true if anywhere inside.
+
+---
+
+## `states(...names)`
+
+```ts
+function states<T extends string>(...names: T[]): { [K in T]: StateRef<K> };
+```
+
+Batch state creation.
+
+```ts
+const s = states("idle", "loading", "success", "error");
+s.idle.name; // "idle"
+s.success.final(); // isFinal = true
+```
+
+---
+
+## `events(...names)`
+
+```ts
+function events<T extends string>(...names: T[]): { [K in T]: EventRef<K> };
+```
+
+Batch event creation.
+
+```ts
+const e = events("fetch", "resolve", "fail");
+e.fetch.create({ url: "/api" }); // { id: "fetch", url: "/api" }
+```
+
+---
+
+## `tag(...stateRefs)`
+
+```ts
+function tag(...stateNames: StateRef[]): Tag;
+```
+
+Group states. `tag.has(snapshot)` → true if any active.
+
+```ts
+const busy = tag(s.loading, s.authenticating);
+busy.has(actor.snapshot()); // true if loading or authenticating
+```
+
+---
+
+## `ActorMap`
+
+Dynamic child actor registry.
+
+```ts
+const map = new ActorMap(parentActor);
+
+map.spawn("worker1", () => createWorker());
+map.send("worker1", someEvent);
+map.kill("worker1");
+```
+
+| Method                 | What                           |
+| ---------------------- | ------------------------------ |
+| `spawn(key, factory)`  | Make child. Replace if exists. |
+| `ensure(key, factory)` | No-op if exists.               |
+| `send(key, event)`     | Send to child.                 |
+| `kill(key)`            | Abort. Remove.                 |
+| `has(key)`             | Exists?                        |
+| `keys()`               | List keys.                     |
+| `snapshot(key)`        | Child snapshot.                |
+| `size`                 | Count.                         |
+
+Parent constructor → child outputs auto-forward.
+
+---
+
+## `broadcast(map, event)`
+
+```ts
+function broadcast(map: SendableMap, event: SendableEvent): void;
+```
+
+Send to all children.
+
+---
+
+## `isIn(snapshot, stateName)`
+
+```ts
+function isIn(snapshot: Snapshot, stateRefName: string): boolean;
+```
+
+Recursive search. Snapshot tree. State name.
+
+---
+
+## `activeLeaves(snapshot)`
+
+```ts
+function activeLeaves(snapshot: Snapshot): string[];
+```
+
+All leaf paths. Dot-separated strings.
+
+---
+
+## `withPromise(promise, signal, emit, events)`
+
+```ts
+function withPromise<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+  emit: EmitFn,
+  events: {
+    success: (data: T) => InternalEvent;
+    error: (err: unknown) => InternalEvent;
+  },
+): void;
+```
+
+Promise → actor events. Checks `signal.aborted`.
+
+---
+
+## `withTimeout(ms, input, eventFn)`
+
+```ts
+function withTimeout<Inputs, Internal, ActorContext>(
+  ms: number,
+  input: EffectInput<Inputs, Internal, ActorContext>,
+  event: () => EmitEvent<Inputs, Internal, ActorContext>,
+): void;
+```
+
+Timeout. Actor's clock. Checks abort signal.
