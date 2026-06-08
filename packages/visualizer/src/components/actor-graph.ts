@@ -14,6 +14,8 @@ export class ActorGraph extends LitElement {
   @property({ type: Number }) zoom = 1;
   @property({ type: Object }) pan: { x: number; y: number } = { x: 0, y: 0 };
   @property({ type: String }) selectedNodeId: string | null = null;
+  @property({ type: String }) error: string | null = null;
+  @property({ type: Boolean }) loading = false;
 
   #isPanning = false;
   #lastMouse = { x: 0, y: 0 };
@@ -71,6 +73,26 @@ export class ActorGraph extends LitElement {
       justify-content: center;
       height: 100%;
       color: #999;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+    }
+    .error-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #d32f2f;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      padding: 16px;
+      text-align: center;
+    }
+    .loading-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #666;
       font-family: system-ui, sans-serif;
       font-size: 14px;
     }
@@ -287,6 +309,14 @@ export class ActorGraph extends LitElement {
   }
 
   render() {
+    if (this.error) {
+      return html`<div class="error-state">${this.error}</div>`;
+    }
+
+    if (this.loading) {
+      return html`<div class="loading-state">Loading...</div>`;
+    }
+
     if (this.nodes.length === 0) {
       return html`<div class="empty-state">No graph data</div>`;
     }
