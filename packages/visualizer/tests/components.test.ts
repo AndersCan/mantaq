@@ -152,7 +152,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ nodeId: "test", label: "idle" });
     await Promise.resolve();
 
-    const text = el.querySelector("text");
+    const text = el.shadowRoot!.querySelector("text");
     expect(text).toBeDefined();
     expect(text!.textContent).toContain("idle");
   });
@@ -161,7 +161,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ isActive: true });
     await Promise.resolve();
 
-    const activeGlow = el.querySelector(".active-glow");
+    const activeGlow = el.shadowRoot!.querySelector(".active-glow");
     expect(activeGlow).toBeDefined();
   });
 
@@ -169,7 +169,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ isActive: false });
     await Promise.resolve();
 
-    const activeGlow = el.querySelector(".active-glow");
+    const activeGlow = el.shadowRoot!.querySelector(".active-glow");
     expect(activeGlow).toBeNull();
   });
 
@@ -177,7 +177,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ isFinal: true });
     await Promise.resolve();
 
-    const finalIndicator = el.querySelector(".final-indicator");
+    const finalIndicator = el.shadowRoot!.querySelector(".final-indicator");
     expect(finalIndicator).toBeDefined();
   });
 
@@ -185,7 +185,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ isFinal: false });
     await Promise.resolve();
 
-    const finalIndicator = el.querySelector(".final-indicator");
+    const finalIndicator = el.shadowRoot!.querySelector(".final-indicator");
     expect(finalIndicator).toBeNull();
   });
 
@@ -193,7 +193,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ selected: true });
     await Promise.resolve();
 
-    const selectionRing = el.querySelector(".selection-ring");
+    const selectionRing = el.shadowRoot!.querySelector(".selection-ring");
     expect(selectionRing).toBeDefined();
   });
 
@@ -201,7 +201,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ selected: false });
     await Promise.resolve();
 
-    const selectionRing = el.querySelector(".selection-ring");
+    const selectionRing = el.shadowRoot!.querySelector(".selection-ring");
     expect(selectionRing).toBeNull();
   });
 
@@ -212,8 +212,8 @@ describe("StateNode component", () => {
     const handler = vi.fn();
     el.addEventListener("node-select", handler);
 
-    const node = el.querySelector(".node") as SVGGElement;
-    node.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const node = el.shadowRoot!.querySelector(".node") as SVGGElement;
+    node.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler.mock.calls[0][0].detail.nodeId).toBe("test-id");
@@ -223,7 +223,7 @@ describe("StateNode component", () => {
     const el = createStateNode({ x: 50, y: 100 });
     await Promise.resolve();
 
-    const svg = el.querySelector("svg");
+    const svg = el.shadowRoot!.querySelector("svg");
     expect(svg).toBeDefined();
     const style = svg!.getAttribute("style");
     expect(style).toContain("left:40px");
