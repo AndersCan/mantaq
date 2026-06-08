@@ -18,7 +18,7 @@ export function renderEdge(edge: ComputedEdge): SVGTemplateResult {
         class="edge-path"
         d="${edge.path}"
         fill="none"
-        stroke="${edge.isActive ? "#4CAF50" : "#999"}"
+        stroke="${edge.isActive ? "var(--viz-edge-active-stroke)" : "var(--viz-edge-stroke)"}"
         stroke-width="${edge.isActive ? 3 : 2}"
         marker-end="${edge.isActive ? "url(#arrowhead-active)" : "url(#arrowhead)"}"
       />
@@ -28,7 +28,7 @@ export function renderEdge(edge: ComputedEdge): SVGTemplateResult {
         width="${labelWidth}"
         height="${labelHeight}"
         fill="white"
-        stroke="${edge.isActive ? "#4CAF50" : "#e0e0e0"}"
+        stroke="${edge.isActive ? "var(--viz-edge-active-stroke)" : "var(--viz-edge-stroke)"}"
         stroke-width="1"
         rx="3"
       />
@@ -37,7 +37,7 @@ export function renderEdge(edge: ComputedEdge): SVGTemplateResult {
         y="${edge.labelY}"
         text-anchor="middle"
         dominant-baseline="middle"
-        fill="${edge.isActive ? "#4CAF50" : "#666"}"
+        fill="${edge.isActive ? "var(--viz-edge-active-stroke)" : "var(--viz-text-secondary)"}"
         font-size="${LABEL_FONT_SIZE}"
         font-family="system-ui, sans-serif"
       >${labelText}</text>
