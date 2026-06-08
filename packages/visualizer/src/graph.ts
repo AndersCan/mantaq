@@ -28,6 +28,7 @@ export interface GraphEdge {
   source: string;
   target: string;
   label: string;
+  guard?: string;
   isActive: boolean;
 }
 

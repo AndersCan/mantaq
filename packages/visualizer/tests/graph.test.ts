@@ -438,4 +438,25 @@ describe("edge cases", () => {
     const uniqueIds = new Set(ids);
     expect(uniqueIds.size).toBe(ids.length);
   });
+
+  it("edge has undefined guard by default", () => {
+    const a = state("a")();
+    const b = state("b")();
+
+    const GO = event("GO")();
+
+    const actor = new Actor({
+      inputs: [GO],
+      states: [a, b],
+      initial: a,
+      transitions: {
+        a: { GO: () => ({ state: b }) },
+      },
+    });
+
+    const graph = buildGraph(actor);
+    const edge = graph.edges.find((e) => e.label === "GO");
+    expect(edge).toBeDefined();
+    expect(edge!.guard).toBeUndefined();
+  });
 });
