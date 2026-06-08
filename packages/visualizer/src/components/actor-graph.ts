@@ -52,7 +52,7 @@ export class ActorGraph extends LitElement {
       position: relative;
       overflow: hidden;
       background: #fafafa;
-      border: 1px solid #e0e0e0;
+      border: 1px solid var(--viz-region-border);
       border-radius: 4px;
     }
     .container {
@@ -370,7 +370,7 @@ export class ActorGraph extends LitElement {
             markerHeight="7"
             orient="auto-start-reverse"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#999" />
+            <polygon points="0 0, 10 3.5, 0 7" style="fill: var(--viz-edge-stroke)" />
           </marker>
           <marker
             id="arrowhead-active"
@@ -381,7 +381,7 @@ export class ActorGraph extends LitElement {
             markerHeight="7"
             orient="auto-start-reverse"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" />
+            <polygon points="0 0, 10 3.5, 0 7" style="fill: var(--viz-edge-active-stroke)" />
           </marker>
         </defs>
         ${edges.map((edge) => renderEdge(edge))}

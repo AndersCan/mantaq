@@ -90,6 +90,7 @@ export const HOST_VARS = `
   --viz-graph-bg: ${theme.graphBackground};
   --viz-text-primary: ${theme.textPrimary};
   --viz-text-secondary: ${theme.textSecondary};
+  --viz-region-border: ${theme.regionBorder};
 `;
 
 export const visualizerStyles: CSSResultGroup = css`
@@ -104,6 +105,7 @@ export const visualizerStyles: CSSResultGroup = css`
     --viz-graph-bg: #fafafa;
     --viz-text-primary: #333333;
     --viz-text-secondary: #666666;
+    --viz-region-border: #e0e0e0;
   }
 `;
 
@@ -245,6 +247,7 @@ function themeToVars(t: Theme): string {
     --viz-control-border: ${t.controlBorder};
     --viz-control-hover: ${t.controlHover};
     --viz-graph-bg: ${t.graphBackground};
+    --viz-region-border: ${t.regionBorder};
   `;
 }
 
