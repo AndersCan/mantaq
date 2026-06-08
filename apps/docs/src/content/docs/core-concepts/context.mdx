@@ -1,0 +1,83 @@
+---
+title: Context
+description: Mutable state across transitions.
+---
+
+Context. Mutable record. Survives transitions. Holds data.
+
+## Define context
+
+Pass object to Actor constructor.
+
+```ts
+type CounterContext = { count: number };
+
+const actor = new Actor({
+  inputs: [increment, decrement],
+  states: [idle],
+  initial: idle,
+  context: { count: 0 } as CounterContext,
+  transitions: {
+    idle: {
+      INCREMENT: (_, { context }) => {
+        context.count++;
+        return {};
+      },
+    },
+  },
+```
+
+`{} as CounterContext`. Type safety. No runtime cost.
+
+## Read context
+
+```ts
+actor.context.count; // 0
+```
+
+Getter returns `Readonly<T>`. Handlers get mutable reference.
+
+## Context in transitions
+
+Handler gets context directly.
+
+```ts
+transitions: {
+  idle: {
+    LOGIN: (event, { context }) => {
+      context.username = event.username;
+      context.attempts++;
+      return { state: authenticating };
+    },
+  },
+}
+```
+
+## Context in effects
+
+Effects get context too.
+
+```ts
+effects: {
+  authenticating: [
+    ({ context, emit }) => {
+      authenticate(context.username).then(
+        (result) => emit({ id: "AUTH_DONE", result }),
+      );
+    },
+  ],
+}
+```
+
+## Context in children
+
+Child actors. Own context. Communicate via events.
+
+## Test context
+
+```ts
+const actor = createLoginActor();
+actor.send(login.create({ username: "admin", password: "pass" }));
+expect(actor.context.username).toBe("admin");
+expect(actor.context.attempts).toBe(1);
+```

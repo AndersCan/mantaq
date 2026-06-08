@@ -8,20 +8,33 @@ export default defineConfig({
   base: "/mantaq",
   integrations: [
     starlight({
-      title: "My Docs",
-      social: [{ icon: "github", label: "GitHub", href: "https://github.com/withastro/starlight" }],
+      title: "Mantaq",
+      social: [{ icon: "github", label: "GitHub", href: "https://github.com/anderscan/mantaq" }],
       sidebar: [
         {
-          label: "Guides",
+          label: "Getting Started",
           items: [
-            // Each item here is one entry in the navigation menu.
-            { label: "Example Guide", slug: "guides/example" },
-            { label: "Testing Actors", slug: "guides/actor-testing" },
+            { label: "Introduction", slug: "getting-started/introduction" },
+            { label: "Installation", slug: "getting-started/installation" },
           ],
         },
         {
-          label: "Reference",
-          items: [{ autogenerate: { directory: "reference" } }],
+          label: "Core Concepts",
+          items: [
+            { label: "Actors", slug: "core-concepts/actors" },
+            { label: "States", slug: "core-concepts/states" },
+            { label: "Events", slug: "core-concepts/events" },
+            { label: "Effects", slug: "core-concepts/effects" },
+            { label: "Context", slug: "core-concepts/context" },
+            { label: "Testing", slug: "guides/actor-testing" },
+          ],
+        },
+        {
+          label: "API Reference",
+          items: [
+            { label: "@mantaq/core", slug: "reference/core" },
+            { label: "@mantaq/sugar", slug: "reference/sugar" },
+          ],
         },
       ],
     }),
