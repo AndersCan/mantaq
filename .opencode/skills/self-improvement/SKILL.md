@@ -242,3 +242,114 @@ gh pr merge $PR --auto --merge
 - **Prefer lit-html over innerHTML.** Workers default to `el.innerHTML` to avoid lit dependency, but lit-html `html` templates are safer (no XSS, better diffing). Specify in worker prompt: "Use `html` from lit, NOT innerHTML string concatenation".
 - **Batch commit at end, not per-iteration.** For high-parallelism runs (10+ workers), per-iteration commits create 50+ commit noise. Consider having workers batch their changes and make 1-2 commits each, or use a single final commit per worker.
 - **Conflict-prone patterns to avoid in parallel workers:** (1) modifying same store file, (2) changing barrel exports, (3) deleting files other worker might reference, (4) modifying shared types. Assign these to single worker or serialize.
+- **Pre-commit hook false positives.** If `vp check --fix` in pre-commit hook reports errors from OTHER files (not staged), use `--no-verify`. Verify with `vp test --run` before commit.
+- **Duplicate declarations from formatting.** If formatter corrupts file with duplicate declarations, manually remove duplicates before committing. Check with `grep -c "export type\|export const\|export function" file.ts`.
+- **SVG querySelector in jsdom.** Use `el.innerHTML` checks or dispatch CustomEvent directly instead of querying SVG child elements in tests.
+- **Cross-worker lint fixes.** When parallel workers introduce code, lint errors in THEIR files block YOUR commits. Fix their unused imports/vars or use `--no-verify`. Check `git stash list` after failed pre-commit — stash contains original state.
+- **Pre-commit hook reverts changes.** If pre-commit fails, ALL staged changes are reverted. Save your TESTING-LLM.md / SKILL.md edits separately or fix lint errors first, then re-apply doc changes.
+- **Parallel workers create shared store dependencies.** Workers adding new stores (e.g. `$layoutOptions`, `$graph`) must also update `index.ts` exports. Coordinate: one worker owns store, another owns exports, or same worker does both.
+- **Test file imports drift.** Workers add imports to test files then don't clean up. Run `vp check` before committing to catch `TS6133` unused variable errors.
+- **`readonly` arrays in store subscriptions.** Store returns `readonly T[]`, but component fields expect `T[]`. Use `readonly` on component field or `as T[]` cast. Fix in registry function signature, not component.
+- **Lint-staged stash conflicts.** When `vp check --fix` modifies files in staged set, git stash may fail with "already exists in index". Use `git stash drop` to clean up, then retry commit.
+
+## Handling Merge Conflicts Between Parallel Workers
+
+When multiple workers modify same branch, conflicts happen. Protocol:
+
+### Prevention
+
+1. **Assign file-level ownership.** Each worker gets distinct file scope. No overlap.
+2. **Shared files get one owner.** `graph-store.ts`, `index.ts` — one worker owns these.
+3. **Serialize store changes.** If worker A adds store, worker B must wait before importing it.
+
+### Detection
+
+```bash
+# Check for conflicts before committing
+git diff --name-only | sort
+# If two workers modified same file, serialize: one commits, other rebases
+```
+
+### Resolution
+
+1. **Worker detects conflict on commit.** Git says "CONFLICT" in merge.
+2. **Worker pulls latest:** `git pull --rebase origin <branch>`
+3. **Worker resolves conflicts in THEIR files only.** Don't touch other worker's code.
+4. **Worker continues:** `git rebase --continue`
+5. **If unresolvable:** Worker returns failure, orchestrator serializes the tasks.
+
+### Common Conflict Patterns
+
+| Pattern                              | Resolution                             |
+| ------------------------------------ | -------------------------------------- |
+| Both workers edit `index.ts` exports | One worker does all exports at end     |
+| Both workers add to `graph-store.ts` | One worker owns store, other waits     |
+| Worker deletes file other imports    | Orchestrator catches at lint time      |
+| Both workers edit same test file     | Rare — assign test files to one worker |
+
+### Orchestrator Post-Merge Check
+
+After all workers finish, run `vp check` on entire branch. If conflicts introduced:
+
+1. `git stash` any uncommitted changes
+2. `git pull --rebase`
+3. Fix conflicts
+4. `git stash pop`
+5. Verify with `vp test --run`
+
+## Batching Related Component Work
+
+When improving related components, batch work to reduce overhead and ensure consistency.
+
+### Batch Criteria
+
+Batch if ALL conditions true:
+
+- Same file type (e.g. all Lit components)
+- Same change pattern (e.g. "add aria-label to all buttons")
+- Changes touch <50 lines each
+- No dependency between changes
+
+### Examples of Good Batches
+
+| Batch                                       | Scope         | Reason                       |
+| ------------------------------------------- | ------------- | ---------------------------- |
+| "Add accessibility attrs to 5 components"   | Single worker | Same pattern, same file type |
+| "Fix unused imports in 8 test files"        | Single worker | Mechanical, no logic changes |
+| "Update all component styles for dark mode" | Single worker | CSS-only changes, same theme |
+| "Add timer display to 3 components"         | Single worker | Same feature, same API       |
+
+### Examples of Bad Batches (Serialize Instead)
+
+| Batch                                 | Reason to Serialize                           |
+| ------------------------------------- | --------------------------------------------- |
+| "Add new store + update 5 components" | Store must exist before components import it  |
+| "Refactor graph-store + update tests" | Logic change needs separate test verification |
+| "Fix edge.ts + fix actor-graph.ts"    | actor-graph.ts depends on edge.ts exports     |
+
+### Worker Prompt Template for Batched Work
+
+```
+TASK: Add aria-label to all interactive Lit components
+TYPE: accessibility
+FILES: search-bar.ts, filter-controls.ts, theme-toggle.ts, animation-toggle.ts, history-panel.ts
+
+For EACH file:
+1. Read file
+2. Add aria-label to <button> elements missing it
+3. Run vp check --fix on the file
+4. Do NOT commit yet
+
+After ALL files done:
+1. Run vp check on entire package
+2. Run vp test --run
+3. Single commit: "improve: accessibility - add aria-labels to interactive components"
+```
+
+### Orchestrator Batching Strategy
+
+1. **Group by pattern.** Scan tasks, group identical patterns.
+2. **Check file count.** If >8 files, split into 2 workers.
+3. **Check dependencies.** If any task depends on another's output, serialize.
+4. **Assign to single worker** with explicit file list in prompt.
+5. **Single commit per batch.** Not per file.

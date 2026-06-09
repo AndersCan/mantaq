@@ -21,6 +21,7 @@ catalog:
   playwright: ^1.60.0
   "@vitest/browser-playwright": 4.1.8
   remark-gfm: ^4.0.1
+  unocss: ^66.7.0
 overrides:
   vite: "catalog:"
   vitest: "catalog:"

@@ -1,3 +1,4 @@
+import "virtual:uno.css";
 import { Actor, VirtualClock } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
 import { states, events } from "@mantaq/sugar";
