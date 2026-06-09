@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
   $zoom,
   $pan,
@@ -870,7 +871,7 @@ export class ActorGraphComponent extends HTMLElement {
       resolve = r;
     });
     render(
-      html`${STYLES}
+      html`${unsafeHTML(STYLES)}
         <a
           class="skip-link"
           href="#graph-container"

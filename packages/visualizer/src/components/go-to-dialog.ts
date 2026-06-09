@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { atom } from "nanostores";
 import { $layout, $selectedNodeId, $pan } from "../graph-store.ts";
 
@@ -277,7 +278,7 @@ export class GoToDialog extends HTMLElement {
         </div>`
       : html``;
 
-    render(html`${STYLES}${content}`, this._shadow);
+    render(html`${unsafeHTML(STYLES)}${content}`, this._shadow);
     resolve!();
   }
 }

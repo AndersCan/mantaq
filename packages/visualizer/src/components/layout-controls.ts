@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
   $layoutAlgorithm,
   $edgeRouting,
@@ -133,7 +134,7 @@ export class LayoutControlsComponent extends HTMLElement {
   _render() {
     const presetKeys = Object.keys(LAYOUT_PRESETS);
     render(
-      html`${STYLES}
+      html`${unsafeHTML(STYLES)}
         <div class="relative inline-flex">
           <button
             class="w-7 h-7 flex items-center justify-center border-none bg-[var(--viz-node-bg,#ffffff)] cursor-pointer rounded text-[var(--viz-node-label,#374151)] transition-colors duration-150 border border-[var(--viz-border,#e5e7eb)] text-xs font-mono hover:bg-[var(--viz-border,#e5e7eb)] focus-visible:outline-2 focus-visible:outline-[var(--viz-accent,#6366f1)] focus-visible:outline-offset-2 layout-btn${this

@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
   $history,
   $historyReplayIndex,
@@ -180,7 +181,7 @@ export class HistoryPanelComponent extends HTMLElement {
     `;
 
     render(
-      html`${STYLES}
+      html`${unsafeHTML(STYLES)}
         <div
           class="bg-[var(--viz-node-bg,#ffffff)] border border-[var(--viz-border,#e5e7eb)] rounded-md shadow-sm font-mono text-[11px] text-[var(--viz-text,#374151)] max-h-[300px] overflow-hidden flex flex-col w-[280px]"
           role="region"

@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
   $shortcuts,
   formatShortcutKey,
@@ -137,7 +138,7 @@ export class ShortcutOverlay extends HTMLElement {
         </div>`
       : html``;
 
-    render(html`${STYLES}${content}`, this._shadow);
+    render(html`${unsafeHTML(STYLES)}${content}`, this._shadow);
     resolve!();
   }
 }
