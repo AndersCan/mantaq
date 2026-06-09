@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
   $exportMenuVisible,
   exportAsSvg,
@@ -277,7 +278,7 @@ export class ExportMenuComponent extends HTMLElement {
         </div>`
       : "";
 
-    render(html`${STYLES}${menu}${toast}`, this._shadow);
+    render(html`${unsafeHTML(STYLES)}${menu}${toast}`, this._shadow);
   }
 }
 

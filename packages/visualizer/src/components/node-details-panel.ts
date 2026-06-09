@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
   $selectedNodeId,
   $layout,
@@ -278,7 +279,7 @@ export class NodeDetailsPanel extends HTMLElement {
         : html`<div class="empty">Select a node to view details</div>`;
 
       render(
-        html`${PANEL_STYLES}
+        html`${unsafeHTML(PANEL_STYLES)}
           <div
             class="panel${open ? " open" : ""}"
             role="dialog"
@@ -298,7 +299,7 @@ export class NodeDetailsPanel extends HTMLElement {
       );
     } catch {
       render(
-        html`${PANEL_STYLES}
+        html`${unsafeHTML(PANEL_STYLES)}
           <div
             class="panel${this._open ? " open" : ""}"
             role="dialog"

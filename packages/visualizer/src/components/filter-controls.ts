@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { $filterStatus, type FilterStatus } from "../graph-store.ts";
 
 const STYLES = `<style>
@@ -39,7 +40,7 @@ export class FilterControls extends HTMLElement {
 
   _renderComponent() {
     render(
-      html`${STYLES}
+      html`${unsafeHTML(STYLES)}
         <div
           class="filter-group flex gap-[2px] bg-[var(--viz-node-bg)] border border-[var(--viz-border)] rounded-md p-[2px]"
           role="group"

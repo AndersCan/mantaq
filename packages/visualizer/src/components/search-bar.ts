@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { $searchQuery, $searchResults, setSearchQuery } from "../graph-store.ts";
 
 const STYLES = `<style>
@@ -60,7 +61,7 @@ export class SearchBar extends HTMLElement {
       : "";
 
     render(
-      html`${STYLES}
+      html`${unsafeHTML(STYLES)}
         <div class="relative flex items-center">
           <svg
             class="search-icon absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--viz-text-muted,#9ca3af)] pointer-events-none"

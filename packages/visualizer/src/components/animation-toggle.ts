@@ -1,5 +1,6 @@
 import { html } from "lit";
 import { render } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import {
   $animationEnabled,
   $animationSpeed,
@@ -84,7 +85,7 @@ export class AnimationToggleComponent extends HTMLElement {
   _render() {
     const disabled = this._prefersReducedMotion;
     render(
-      html`${STYLES}
+      html`${unsafeHTML(STYLES)}
         <button
           class="anim-btn w-7 h-7 flex items-center justify-center bg-transparent cursor-pointer rounded text-[var(--viz-node-label,#374151)] transition-colors duration-150 hover:bg-[var(--viz-border,#e5e7eb)] focus-visible:outline-2 focus-visible:outline-[var(--viz-accent,#6366f1)] focus-visible:outline-offset-2${this
             ._enabled
