@@ -1,17 +1,13 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from "vite-plus/test";
+import { describe, it, expect } from "vite-plus/test";
 import { Actor, state, event } from "@mantaq/core";
-import { setActor, $layout, $selectedNodeId } from "../src/graph-store.ts";
-import "../src/components/actor-graph.ts";
-import "../src/components/state-node.ts";
-import "../src/components/edge.ts";
-import type { ActorGraphComponent } from "../src/components/actor-graph.ts";
+import { buildGraph } from "../src/graph.ts";
+import { actorGraphToFlow, toReactFlowNodes, toReactFlowEdges } from "../src/react-flow-adapter.ts";
 
 function createTrafficLight() {
   const green = state("green")();
   const yellow = state("yellow")();
   const red = state("red")();
-
   const next = event("NEXT")();
 
   return new Actor({
@@ -67,138 +63,131 @@ function createWithRegions() {
   });
 }
 
-function createGraphComponent(): ActorGraphComponent {
-  const el = document.createElement("actor-graph") as ActorGraphComponent;
-  document.body.appendChild(el);
-  return el;
-}
+describe("integration: actor -> graph -> react flow", () => {
+  it("builds graph from traffic light actor", () => {
+    const actor = createTrafficLight();
+    const graph = buildGraph(actor);
 
-afterEach(() => {
-  document.body.innerHTML = "";
-});
+    expect(graph.nodes.length).toBe(3);
+    expect(graph.edges.length).toBeGreaterThanOrEqual(3);
 
-describe("integration: full visualizer flow", () => {
-  beforeEach(async () => {
-    $layout.set(null);
-    $selectedNodeId.set(null);
+    const labels = graph.nodes.map((n) => n.label);
+    expect(labels).toContain("green");
+    expect(labels).toContain("yellow");
+    expect(labels).toContain("red");
   });
 
-  it("renders traffic light graph", async () => {
+  it("converts graph to React Flow nodes", () => {
     const actor = createTrafficLight();
-    await setActor(actor);
+    const graph = buildGraph(actor);
+    const nodes = toReactFlowNodes(graph.nodes);
 
-    const el = createGraphComponent();
-    await el.updateComplete;
-
-    const nodes = el.shadowRoot!.querySelectorAll("state-node");
     expect(nodes.length).toBe(3);
-  });
-
-  it("shows active state highlight", async () => {
-    const actor = createTrafficLight();
-    await setActor(actor);
-
-    const el = createGraphComponent();
-    await el.updateComplete;
-
-    const nodes = el.shadowRoot!.querySelectorAll("state-node");
-    let activeCount = 0;
     for (const node of nodes) {
-      const isActive = (node as HTMLElement & { isActive: boolean }).isActive;
-      if (isActive) activeCount++;
+      expect(node.type).toBe("state");
+      expect(node.data).toBeDefined();
+      expect(typeof node.data.label).toBe("string");
+      expect(typeof node.data.isActive).toBe("boolean");
+      expect(typeof node.data.isFinal).toBe("boolean");
     }
-    expect(activeCount).toBe(1);
   });
 
-  it("renders edge paths", async () => {
+  it("converts graph to React Flow edges", () => {
     const actor = createTrafficLight();
-    await setActor(actor);
+    const graph = buildGraph(actor);
+    const edges = toReactFlowEdges(graph.edges);
 
-    const el = createGraphComponent();
-    await el.updateComplete;
-
-    const edges = el.shadowRoot!.querySelectorAll("edge-path");
     expect(edges.length).toBeGreaterThanOrEqual(3);
+    for (const edge of edges) {
+      expect(edge.type).toBe("default");
+      expect(typeof edge.source).toBe("string");
+      expect(typeof edge.target).toBe("string");
+      expect(typeof edge.label).toBe("string");
+    }
   });
 
-  it("node selection updates store", async () => {
+  it("full conversion preserves active state", () => {
     const actor = createTrafficLight();
-    await setActor(actor);
+    const graph = buildGraph(actor);
+    const flow = actorGraphToFlow(graph);
 
-    const el = createGraphComponent();
-    await el.updateComplete;
+    expect(flow.nodes.length).toBe(3);
+    expect(flow.edges.length).toBeGreaterThanOrEqual(3);
 
-    $selectedNodeId.set("green");
-    expect($selectedNodeId.get()).toBe("green");
+    const activeNodes = flow.nodes.filter((n) => n.data.isActive);
+    expect(activeNodes.length).toBe(1);
+    expect(activeNodes[0].data.label).toBe("green");
   });
 
-  it("handles region actors", async () => {
-    const actor = createWithRegions();
-    await setActor(actor);
+  it("graph updates after transition", () => {
+    const actor = createTrafficLight();
+    let graph = buildGraph(actor);
+    let flow = actorGraphToFlow(graph);
 
-    expect($layout.get()).not.toBeNull();
-    const layout = $layout.get();
-    const labels = layout!.nodes.map((n) => n.label);
+    let active = flow.nodes.find((n) => n.data.isActive);
+    expect(active!.data.label).toBe("green");
+
+    const next = event("NEXT")();
+    actor.send(next);
+
+    graph = buildGraph(actor);
+    flow = actorGraphToFlow(graph);
+    active = flow.nodes.find((n) => n.data.isActive);
+    expect(active!.data.label).toBe("yellow");
+  });
+
+  it("full cycle: green -> yellow -> red -> green", () => {
+    const actor = createTrafficLight();
+    const next = event("NEXT")();
+
+    let graph = buildGraph(actor);
+    expect(graph.nodes.find((n) => n.isActive)!.label).toBe("green");
+
+    actor.send(next);
+    graph = buildGraph(actor);
+    expect(graph.nodes.find((n) => n.isActive)!.label).toBe("yellow");
+
+    actor.send(next);
+    graph = buildGraph(actor);
+    expect(graph.nodes.find((n) => n.isActive)!.label).toBe("red");
+
+    actor.send(next);
+    graph = buildGraph(actor);
+    expect(graph.nodes.find((n) => n.isActive)!.label).toBe("green");
+  });
+
+  it("handles region actors", () => {
+    const actor = createWithRegions();
+    const graph = buildGraph(actor);
+
+    expect(graph.nodes.length).toBeGreaterThanOrEqual(2);
+    const labels = graph.nodes.map((n) => n.label);
     expect(labels).toContain("parent");
     expect(labels).toContain("subA");
+
+    const flow = actorGraphToFlow(graph);
+    expect(flow.nodes.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("graph updates after state transition", async () => {
+  it("node IDs are consistent between graph and flow", () => {
     const actor = createTrafficLight();
-    await setActor(actor);
+    const graph = buildGraph(actor);
+    const flow = actorGraphToFlow(graph);
 
-    let layout = $layout.get();
-    const initialActive = layout!.nodes.find((n) => n.isActive);
-    expect(initialActive!.label).toBe("green");
-
-    const next = event("NEXT")();
-    actor.send(next);
-    await setActor(actor);
-
-    layout = $layout.get();
-    const newActive = layout!.nodes.find((n) => n.isActive);
-    expect(newActive!.label).toBe("yellow");
+    const graphIds = new Set(graph.nodes.map((n) => n.id));
+    const flowIds = new Set(flow.nodes.map((n) => n.id));
+    expect(flowIds).toEqual(graphIds);
   });
 
-  it("full cycle: green -> yellow -> red -> green", async () => {
+  it("edge source/target reference valid node IDs", () => {
     const actor = createTrafficLight();
-    const next = event("NEXT")();
+    const graph = buildGraph(actor);
+    const flow = actorGraphToFlow(graph);
 
-    await setActor(actor);
-    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
-
-    actor.send(next);
-    await setActor(actor);
-    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("yellow");
-
-    actor.send(next);
-    await setActor(actor);
-    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("red");
-
-    actor.send(next);
-    await setActor(actor);
-    expect($layout.get()!.nodes.find((n) => n.isActive)!.label).toBe("green");
-  });
-
-  it("component renders after layout computed", async () => {
-    const actor = createTrafficLight();
-    await setActor(actor);
-
-    const el = createGraphComponent();
-    await el.updateComplete;
-
-    const viewport = el.shadowRoot!.querySelector(".viewport");
-    expect(viewport).toBeDefined();
-  });
-
-  it("zoom controls render correctly", async () => {
-    const actor = createTrafficLight();
-    await setActor(actor);
-
-    const el = createGraphComponent();
-    await el.updateComplete;
-
-    const indicator = el.shadowRoot!.querySelector(".zoom-indicator");
-    expect(indicator!.textContent).toContain("100%");
+    const nodeIds = new Set(flow.nodes.map((n) => n.id));
+    for (const edge of flow.edges) {
+      expect(nodeIds.has(edge.source)).toBe(true);
+      expect(nodeIds.has(edge.target)).toBe(true);
+    }
   });
 });

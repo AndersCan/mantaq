@@ -11,9 +11,12 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/react": "^4.2.0",
     "@astrojs/starlight": "^0.39.3",
     "@mantaq/core": "workspace:*",
     "@mantaq/visualizer": "workspace:*",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
     "astro": "^6.3.1",
     "sharp": "catalog:"
   },
