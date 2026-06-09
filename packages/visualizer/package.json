@@ -1,7 +1,7 @@
 {
   "name": "@mantaq/visualizer",
   "version": "0.0.0",
-  "description": "Actor model state machine visualizer using Lit and nanostores.",
+  "description": "Actor model state machine visualizer using React Flow.",
   "license": "MIT",
   "files": [
     "dist"
@@ -23,18 +23,24 @@
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",
-    "elkjs": "^0.9.3",
-    "lit": "catalog:",
-    "nanostores": "^0.11.3"
+    "@xyflow/react": "^12.6.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@mantaq/sugar": "workspace:*",
     "@types/node": "catalog:",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
     "@typescript/native-preview": "7.0.0-dev.20260509.2",
     "jsdom": "^26.1.0",
     "typescript": "catalog:",
     "unocss": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
   }
 }

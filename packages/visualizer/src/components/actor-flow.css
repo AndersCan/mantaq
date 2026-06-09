@@ -1,0 +1,58 @@
+.actor-flow {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  border-radius: 8px;
+  border: 1px solid var(--viz-border, #e5e7eb);
+  overflow: hidden;
+}
+
+.actor-flow .react-flow__node-state {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+}
+
+.state-node {
+  cursor: pointer;
+}
+
+.state-node:hover .node-bg {
+  filter: brightness(1.1);
+}
+
+.node-bg {
+  transition:
+    fill 0.2s ease,
+    stroke 0.2s ease;
+}
+
+.node-label {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  font-size: 13px;
+  pointer-events: none;
+  user-select: none;
+  fill: var(--viz-node-label, #374151);
+}
+
+.active-glow {
+  fill: none;
+  stroke: var(--viz-node-active-border, #22c55e);
+  stroke-width: 3;
+  rx: 8;
+}
+
+.selected-ring {
+  fill: none;
+  stroke: var(--viz-accent, #3b82f6);
+  stroke-width: 2;
+  rx: 8;
+}
+
+.final-indicator {
+  fill: none;
+  stroke: var(--viz-accent, #6366f1);
+  stroke-width: 1.5;
+  rx: 4;
+}
