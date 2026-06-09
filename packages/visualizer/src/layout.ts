@@ -61,8 +61,12 @@ export function computeNodePositions(
     }
   }
 
+  const processed = new Map<string, number>();
   while (queue.length > 0) {
     const current = queue.shift()!;
+    const count = (processed.get(current) ?? 0) + 1;
+    if (count > nodes.length) break;
+    processed.set(current, count);
     const currentLevel = levels.get(current)!;
     const children = adjacency.get(current) ?? [];
     for (const child of children) {
