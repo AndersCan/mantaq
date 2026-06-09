@@ -5,7 +5,7 @@ description: Visual state machine graph viewer for actors.
 
 import VisualizerDemo from "../../../components/VisualizerDemo.astro";
 
-The visualizer renders actor state machines as interactive graph diagrams. States become nodes, transitions become labeled edges. Active states highlight green. Supports pan, zoom, keyboard navigation, and dark mode.
+The visualizer renders actor state machines as interactive graph diagrams using React Flow. States become nodes, transitions become labeled edges. Active states highlight green. Supports pan, zoom, minimap, and dark mode CSS variables.
 
 ## Installation
 
@@ -13,239 +13,206 @@ The visualizer renders actor state machines as interactive graph diagrams. State
 npm install @mantaq/visualizer
 ```
 
+The package includes `@xyflow/react` as a dependency. Make sure React >=18 is installed in your project.
+
 ## Basic Usage
 
-```ts
-import { setActor } from "@mantaq/visualizer";
+```tsx
+import { Actor, state, event } from "@mantaq/core";
+import { ActorFlow, buildGraph } from "@mantaq/visualizer";
+import type { ActorGraph } from "@mantaq/visualizer";
+import { useState } from "react";
 
-// Pass your actor — builds graph and triggers layout
-setActor(myActor);
+function MyFlow() {
+  const [graph, setGraph] = useState<ActorGraph>(() => buildGraph(myActor));
+
+  const sendEvent = (eventName) => {
+    myActor.send(someEvent);
+    setGraph(buildGraph(myActor));
+  };
+
+  return (
+    <div style={{ height: 400 }}>
+      <ActorFlow graph={graph} />
+    </div>
+  );
+}
 ```
-
-See [Full Programmatic Example](#full-programmatic-example) below for complete setup.
 
 ## Features
 
 ### Graph Rendering
 
-`buildGraph(actor)` converts an actor snapshot into nodes and edges:
+`buildGraph(actor)` converts an actor snapshot into graph data:
 
-- **Nodes** — one per state, with `id`, `label`, `isActive`, `isFinal`, `depth`
+- **Nodes** — one per state, with `id`, `label`, `isActive`, `isFinal`
 - **Edges** — one per transition, labeled with event ID, with `source`, `target`, `isActive`
-- **Active path** — edges touching the current state highlight green
-- **Self-loops** — states that transition to themselves render as loop-back edges
-- **Wildcard transitions** — `Any` source creates edges to all states
+- **Active state highlighting** — active nodes render with a green border and background
+- **Final state indicator** — final states render with a double border
+- **Self-loops** — transitions to the same state render correctly
 
-### ELK.js Layout
+### React Flow Integration
 
-`computeLayout(graph)` runs the ELK layered algorithm:
+`actorGraphToFlow(graph, layoutOpts?)` converts graph data into React Flow nodes and edges with automatic layout positioning:
 
-- Hierarchical left-to-right or top-to-bottom layout
-- Bezier edge paths with arrow markers
-- Self-loop path generation
-- Backward edge detection
-- Label midpoint positioning
+- Topological sort places nodes in layers (default: top-to-bottom)
+- Switch to `LR` direction for left-to-right layout
+- Customize spacing via `horizontalSpacing` and `verticalSpacing`
 
-### Pan and Zoom
+### `<ActorFlow>` Component
 
-Mouse wheel zooms toward cursor. Click-drag pans. Double-click fits graph to viewport.
+Wraps React Flow with defaults: dots background, zoom controls, minimap, `fitView`. Accepts:
 
-### Keyboard Shortcuts
+| Prop        | Type            | Default | Description          |
+| ----------- | --------------- | ------- | -------------------- |
+| `graph`     | `ActorGraph`    | —       | Graph data to render |
+| `className` | `string`        | —       | CSS class appended   |
+| `style`     | `CSSProperties` | —       | Inline styles        |
 
-| Key       | Action      |
-| --------- | ----------- |
-| `+` / `=` | Zoom in     |
-| `-`       | Zoom out    |
-| `0`       | Reset view  |
-| `F`       | Zoom to fit |
+### Pan, Zoom, and Minimap
 
-### Dark Mode
+Built into React Flow: mouse wheel zooms, click-drag pans, minimap shows overview. Zoom controls in bottom-left.
 
-```ts
-import { applyDarkTheme, removeDarkTheme } from "@mantaq/visualizer";
+### CSS Custom Properties
 
-applyDarkTheme(); // toggle on
-removeDarkTheme(); // toggle off
-```
+The visualizer uses CSS variables for theming:
 
-### Store (Nanostores)
-
-Reactive state atoms for custom integrations:
-
-| Atom              | Type                   | Purpose                                   |
-| ----------------- | ---------------------- | ----------------------------------------- |
-| `$actor`          | `AnyActor \| null`     | Current actor                             |
-| `$graph`          | `ActorGraph \| null`   | Computed graph                            |
-| `$layout`         | `LayoutResult \| null` | Computed layout                           |
-| `$selectedNodeId` | `string \| null`       | Selected node                             |
-| `$zoom`           | `number`               | Zoom level                                |
-| `$pan`            | `{x, y}`               | Pan offset                                |
-| `$layoutError`    | `string \| null`       | Layout error                              |
-| `$isComputing`    | `boolean`              | Whether layout computation is in progress |
-
-Actions: `setActor`, `selectNode`, `setZoom`, `setPan`, `zoomIn`, `zoomOut`, `zoomToFit`, `resetView`, `startActorSync`.
+| Variable                   | Default                 | Purpose                |
+| -------------------------- | ----------------------- | ---------------------- |
+| `--viz-border`             | `#e5e7eb`               | Container border       |
+| `--viz-node-bg`            | `#ffffff`               | Node background        |
+| `--viz-node-border`        | `#d1d5db`               | Node border            |
+| `--viz-node-active-bg`     | `#dcfce7`               | Active node background |
+| `--viz-node-active-border` | `#22c55e`               | Active node border     |
+| `--viz-node-label`         | `#374151`               | Node label color       |
+| `--viz-accent`             | `#3b82f6`               | Selection ring         |
+| `--viz-edge-label-bg`      | `rgba(255,255,255,0.9)` | Edge label background  |
+| `--viz-edge-label-border`  | `#d1d5db`               | Edge label border      |
+| `--viz-edge-label-text`    | `#374151`               | Edge label text        |
+| `--viz-guard-color`        | `#ca8a04`               | Guard tag color        |
+| `--viz-action-color`       | `#2563eb`               | Action tag color       |
 
 ## Interactive Demo
 
-This renders a real traffic light actor using the actual visualizer. Click **NEXT** to advance the state, **Reset** to return to green.
+This renders a real traffic light actor. Click **NEXT** to advance, **Reset** to return to green.
 
 <VisualizerDemo />
 
-The graph shows states as nodes and transitions as labeled edges. Active states highlight green. Use mouse wheel to zoom, click-drag to pan, and keyboard shortcuts (+/-/0/F) to navigate.
+## Manual Layout
 
-## Full Programmatic Example
-
-To use the visualizer with real actors:
+For custom positioning, use the exported layout function:
 
 ```ts
-import { Actor, state, event } from "@mantaq/core";
-import { setActor, startActorSync } from "@mantaq/visualizer";
+import { computeNodePositions } from "@mantaq/visualizer";
 
-// Define states and events
-const idle = state("idle")();
-const loading = state("loading")();
-const done = state("done")().final();
-
-const fetch = event("FETCH")();
-const success = event("SUCCESS")();
-const fail = event("FAIL")();
-const retry = event("RETRY")();
-
-// Create actor
-function createFetcher() {
-  return new Actor({
-    inputs: [fetch],
-    outputs: [],
-    internal: [success, fail, retry],
-    states: [idle, loading, done],
-    initial: idle,
-    context: {} as {},
-    effects: {},
-    transitions: {
-      idle: { FETCH: (event, { context }) => ({ state: loading }) },
-      loading: {
-        SUCCESS: (event, { context }) => ({ state: done }),
-        FAIL: (event, { context }) => ({ state: idle }),
-      },
-    },
-  });
-}
-
-const actor = createFetcher();
-setActor(actor);
-
-// Auto-sync: graph rebuilds when actor state changes
-startActorSync();
-
-// Trigger transitions
-actor.send(fetch); // idle → loading (graph updates)
-actor.send(success); // loading → done (graph updates)
+const positions = computeNodePositions(graph.nodes, graph.edges, {
+  direction: "LR", // "TB" (default) or "LR"
+  horizontalSpacing: 220, // default
+  verticalSpacing: 120, // default
+  nodeWidth: 160,
+  nodeHeight: 60,
+});
+// positions is a Map<string, {x, y}>
 ```
 
-### Sending Transitions
-
-Send events to the actor directly. Combined with `startActorSync()`, the graph updates automatically:
+Or pass layout options to `actorGraphToFlow`:
 
 ```ts
-import { setActor, startActorSync } from "@mantaq/visualizer";
-
-const actor = createFetcher();
-setActor(actor);
-startActorSync();
-
-// Send events — graph rebuilds on each transition
-actor.send(fetch);
-actor.send(success);
-```
-
-To build custom transition buttons, query available transitions from the actor snapshot:
-
-```ts
-function getAvailableTransitions(a) {
-  const snapshot = a.snapshot();
-  const currentState = snapshot.path[snapshot.path.length - 1];
-  const transitions = a.options.transitions[currentState] ?? {};
-  return Object.keys(transitions);
-}
+const flow = actorGraphToFlow(graph, { direction: "LR" });
 ```
 
 ## API Reference
 
-### `buildGraph(actor, options?)`
+### `buildGraph(actor)`
 
-| Parameter            | Type       | Default | Description    |
-| -------------------- | ---------- | ------- | -------------- |
-| `actor`              | `AnyActor` | —       | Actor instance |
-| `options.nodeWidth`  | `number`   | `120`   | Min node width |
-| `options.nodeHeight` | `number`   | `60`    | Node height    |
-| `options.padding`    | `number`   | `20`    | Node padding   |
+```ts
+function buildGraph(actor: AnyActor): ActorGraph;
+```
 
-Returns `ActorGraph` with `nodes`, `edges`, `activePath`.
+Converts actor snapshot into graph nodes and edges. Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`.
 
-### `computeLayout(graph, options?)`
+### `actorGraphToFlow(graph, layoutOpts?)`
 
-Async. Returns `LayoutResult` with positioned `nodes`, `edges`, `width`, `height`.
+```ts
+function actorGraphToFlow(
+  graph: ActorGraph,
+  opts?: LayoutOptions,
+): { nodes: StateNode[]; edges: StateEdge[] };
+```
 
-| Option                | Type                           | Default   | Description              |
-| --------------------- | ------------------------------ | --------- | ------------------------ |
-| `options.direction`   | `"RIGHT" \| "DOWN"`            | `"RIGHT"` | Layout direction         |
-| `options.nodeWidth`   | `number`                       | `120`     | Node width for ELK       |
-| `options.nodeHeight`  | `number`                       | `60`      | Node height for ELK      |
-| `options.nodeSpacing` | `number`                       | —         | Spacing between nodes    |
-| `options.edgeSpacing` | `number`                       | —         | Spacing between edges    |
-| `options.padding`     | `{ top, bottom, left, right }` | —         | Padding around the graph |
+Converts `ActorGraph` to React Flow-compatible nodes and edges with automatic layout.
 
-### `flattenNodes(node)`
+### `toReactFlowNodes(graphNodes, edges?, layoutOpts?)`
 
-Flatten a `GraphNode` tree into a flat array. Used internally by the layout engine.
+```ts
+function toReactFlowNodes(
+  nodes: GraphNode[],
+  edges?: GraphEdge[],
+  opts?: LayoutOptions,
+): StateNode[];
+```
 
-| Parameter | Type        | Description          |
-| --------- | ----------- | -------------------- |
-| `node`    | `GraphNode` | Root node to flatten |
+Converts graph nodes to React Flow nodes with computed positions.
 
-Returns `GraphNode[]` — the root node plus all descendants.
+### `toReactFlowEdges(graphEdges)`
 
-:::note
-`flattenNodes` is not currently exported from the package entrypoint. It is used internally by the graph builder.
-:::
+```ts
+function toReactFlowEdges(edges: GraphEdge[]): StateEdge[];
+```
 
-### `setActor(actor)`
+Converts graph edges to React Flow edges with `"state-edge"` type.
 
-Sets actor in store, builds graph, triggers layout computation.
+### `computeNodePositions(nodes, edges, opts?)`
 
-### `startActorSync()`
+```ts
+function computeNodePositions(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  opts?: LayoutOptions,
+): Map<string, { x: number; y: number }>;
+```
 
-Subscribes to the actor's `change` event and the `$actor` store. Returns an unsubscribe function. Call after `setActor` for live updates.
+Topological sort layout. Returns positions keyed by node ID.
+
+### `collectActiveStates(snapshot, prefix, activeSet)`
+
+```ts
+function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<string>): void;
+```
+
+Populates a Set with IDs of currently active states from a snapshot. Used internally.
+
+### Components
+
+| Export      | Type            | Description                            |
+| ----------- | --------------- | -------------------------------------- |
+| `ActorFlow` | React component | Main renderer with React Flow          |
+| `nodeTypes` | `object`        | `{ state: StateNodeComponent }`        |
+| `edgeTypes` | `object`        | `{ "state-edge": StateEdgeComponent }` |
+
+### Types
+
+| Type                | Shape                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `ActorGraph`        | `{ nodes: GraphNode[], edges: GraphEdge[] }`                                                                    |
+| `GraphNode`         | `{ id: string, label: string, isActive: boolean, isFinal: boolean }`                                            |
+| `GraphEdge`         | `{ id: string, source: string, target: string, label: string, isActive: boolean, payload?: TransitionPayload }` |
+| `TransitionPayload` | `{ guard?: string, action?: string, meta?: Record<string, unknown> }`                                           |
+| `StateNode`         | React Flow `Node<StateNodeData, "state">`                                                                       |
+| `StateEdge`         | React Flow `Edge<StateEdgeData, "state-edge">`                                                                  |
+| `LayoutOptions`     | `{ direction?: "TB"                                                                                             | "LR", nodeWidth?: number, nodeHeight?: number, horizontalSpacing?: number, verticalSpacing?: number }` |
 
 ## Known Issues
 
-:::note[Known Issues]
+- **Region grouping** — Child states of regions render at the same level as parent states without visual grouping.
+- **Edge detail** — Edge labels show event IDs. Guard conditions and action metadata appear as inline tags when available.
+- **Layout simplicity** — Uses topological sort. For complex graphs (many cross-edges), consider manual positioning via `computeNodePositions`.
 
-- **Region labels** — Sub-region wrapper nodes not rendered. States display directly under parent without visual grouping.
-- **Edge labels** — Shows event IDs only. Guard conditions and action metadata not displayed.
-- **`startActorSync()` requires explicit call** — Graph does not auto-update on actor state changes unless `startActorSync()` is called after `setActor()`.
-  :::
+## Planned
 
-:::note[Planned Improvements]
-
-- Minimap for large graphs
-- Current zoom percentage indicator
-- Edge hover highlighting (connected nodes)
 - Export to SVG/PNG
-- Smooth state transition animations
-- Actor tree hierarchy side panel
-- Event history log panel
-- Simulation controls (play/pause/step)
-- Custom layout algorithms
-- Performance memoization
-- ARIA accessibility labels
-- Interactive playground / Storybook
-  :::
-
-:::caution[Technical Debt]
-
-- ELK.js import uses `dynamic import()` with type cast due to pnpm resolution issues
-- `applyDefaultStyles()` uses raw CSS strings instead of Lit `css` template results
-- `defaultPositions()` exported from `layout.ts` but not re-exported from `index.ts`
-- `HOST_VARS` exported but only used internally
-  :::
+- Smooth transition animations
+- Actor tree hierarchy panel
+- Event history panel
+- Custom layout algorithms (ELK.js integration)
+- Accessibility improvements

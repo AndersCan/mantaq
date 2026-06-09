@@ -8,6 +8,7 @@ import {
   useEdgesState,
   BackgroundVariant,
 } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 import type { ActorGraph } from "../graph.ts";
 import { actorGraphToFlow } from "../react-flow-adapter.ts";

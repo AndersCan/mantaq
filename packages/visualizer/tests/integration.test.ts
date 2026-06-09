@@ -99,7 +99,7 @@ describe("integration: actor -> graph -> react flow", () => {
 
     expect(edges.length).toBeGreaterThanOrEqual(3);
     for (const edge of edges) {
-      expect(edge.type).toBe("default");
+      expect(edge.type).toBe("state-edge");
       expect(typeof edge.source).toBe("string");
       expect(typeof edge.target).toBe("string");
       expect(typeof edge.label).toBe("string");

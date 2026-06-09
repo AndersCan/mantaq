@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Actor, state, event } from "@mantaq/core";
 import { ActorFlow, buildGraph } from "@mantaq/visualizer";
 import type { ActorGraph } from "@mantaq/visualizer";
@@ -9,7 +9,7 @@ function createTrafficLight() {
   const red = state("red")();
   const next = event("NEXT")();
 
-  const actor = new Actor({
+  return new Actor({
     inputs: [next],
     outputs: [],
     internal: [],
@@ -23,42 +23,37 @@ function createTrafficLight() {
       red: { NEXT: () => ({ state: green }) },
     },
   });
-
-  return { actor, next };
 }
 
 export function TrafficLightFlow() {
-  const [actorRef] = useState(() => createTrafficLight());
-  const [graph, setGraph] = useState<ActorGraph>(() => buildGraph(actorRef.actor));
+  const actor = useRef(createTrafficLight());
+  const nextEvent = useRef(event("NEXT")());
+  const [graph, setGraph] = useState<ActorGraph>(() => buildGraph(actor.current));
   const [currentState, setCurrentState] = useState("green");
 
   const handleNext = useCallback(() => {
-    actorRef.actor.send(actorRef.next);
-    const snap = actorRef.actor.snapshot();
+    actor.current.send(nextEvent.current);
+    const snap = actor.current.snapshot();
     const name = snap.path[snap.path.length - 1];
     setCurrentState(name);
-    setGraph(buildGraph(actorRef.actor));
-  }, [actorRef]);
+    setGraph(buildGraph(actor.current));
+  }, []);
 
   const handleReset = useCallback(() => {
-    const fresh = createTrafficLight();
-    Object.assign(actorRef, fresh);
+    actor.current = createTrafficLight();
+    nextEvent.current = event("NEXT")();
     setCurrentState("green");
-    setGraph(buildGraph(fresh.actor));
-  }, [actorRef]);
+    setGraph(buildGraph(actor.current));
+  }, []);
 
-  const stateColor = useMemo(() => {
-    switch (currentState) {
-      case "green":
-        return "#16a34a";
-      case "yellow":
-        return "#ca8a04";
-      case "red":
-        return "#dc2626";
-      default:
-        return "#374151";
-    }
-  }, [currentState]);
+  const stateColor: string =
+    currentState === "green"
+      ? "#16a34a"
+      : currentState === "yellow"
+        ? "#ca8a04"
+        : currentState === "red"
+          ? "#dc2626"
+          : "#374151";
 
   return (
     <div
