@@ -195,6 +195,14 @@ export class VirtualClock implements Clock {
     return this.#timers.size > 0 || this.#intervals.size > 0;
   }
 
+  pendingTimers(): Array<{ id: number; deadline: number; ms: number }> {
+    const result: Array<{ id: number; deadline: number; ms: number }> = [];
+    for (const [id, t] of this.#timers) {
+      result.push({ id, deadline: t.deadline, ms: t.deadline - this.#now });
+    }
+    return result;
+  }
+
   /** @internal */
   _setDrain(fn: () => void): void {
     this.#drain = fn;
@@ -228,6 +236,7 @@ export interface AnyActor {
   on(event: "error", fn: (error: unknown) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
+  context?: Record<string, unknown>;
   options?: {
     transitions?: Record<string, Record<string, unknown>>;
     states?: Array<{ name: string; isFinal: boolean; _regions?: unknown }>;

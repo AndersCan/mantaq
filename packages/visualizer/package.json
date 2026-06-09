@@ -33,6 +33,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260509.2",
     "jsdom": "^26.1.0",
     "typescript": "catalog:",
+    "unocss": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
   }

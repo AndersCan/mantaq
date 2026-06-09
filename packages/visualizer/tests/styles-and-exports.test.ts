@@ -50,6 +50,14 @@ describe("styles", () => {
     expect(style!.textContent).toContain("--viz-bg: #111827");
   });
 
+  it("default styles include high-contrast variables", () => {
+    applyDefaultStyles();
+
+    const style = document.getElementById("mantaq-visualizer-defaults");
+    expect(style!.textContent).toContain('[data-theme="high-contrast"]');
+    expect(style!.textContent).toContain("--viz-bg: #000000");
+  });
+
   it("default styles include node styling", () => {
     applyDefaultStyles();
 
@@ -82,6 +90,10 @@ describe("exports", () => {
     expect(mod.startActorSync).toBeDefined();
     expect(mod.applyDefaultStyles).toBeDefined();
     expect(mod.removeDefaultStyles).toBeDefined();
+    expect(mod.setTheme).toBeDefined();
+    expect(mod.initTheme).toBeDefined();
+    expect(mod.cycleTheme).toBeDefined();
+    expect(mod.setCustomStyles).toBeDefined();
     expect(mod.ActorGraphComponent).toBeDefined();
     expect(mod.StateNode).toBeDefined();
     expect(mod.EdgePath).toBeDefined();
@@ -95,5 +107,7 @@ describe("exports", () => {
     expect(mod.$zoom).toBeDefined();
     expect(mod.$pan).toBeDefined();
     expect(mod.$layoutError).toBeDefined();
+    expect(mod.$theme).toBeDefined();
+    expect(mod.$customStyles).toBeDefined();
   });
 });
