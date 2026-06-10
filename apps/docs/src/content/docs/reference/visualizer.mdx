@@ -58,43 +58,6 @@ Recursively collects active state IDs from a snapshot into the provided Set. Use
 
 ---
 
-## `actorGraphToFlow(graph, layoutOpts?)`
-
-```ts
-function actorGraphToFlow(
-  graph: ActorGraph,
-  opts?: LayoutOptions,
-): { nodes: StateNode[]; edges: StateEdge[] };
-```
-
-Converts `ActorGraph` to React Flow compatible nodes and edges with automatic topological layout.
-
----
-
-## `toReactFlowNodes(graphNodes, edges?, layoutOpts?)`
-
-```ts
-function toReactFlowNodes(
-  nodes: GraphNode[],
-  edges?: GraphEdge[],
-  opts?: LayoutOptions,
-): StateNode[];
-```
-
-Converts graph nodes to React Flow nodes. Positions computed via `computeNodePositions`. Pass edges and layout options to control layout.
-
----
-
-## `toReactFlowEdges(graphEdges)`
-
-```ts
-function toReactFlowEdges(edges: GraphEdge[]): StateEdge[];
-```
-
-Converts graph edges to React Flow edges with `type: "state-edge"` and `data.isActive`, `data.payload`.
-
----
-
 ## `computeNodePositions(nodes, edges, opts?)`
 
 ```ts
@@ -123,7 +86,7 @@ Topological sort layout. Returns positions keyed by node ID.
 
 ### `<ActorFlow>`
 
-React component. Renders an interactive graph with pan, zoom, minimap.
+React component wrapping an X6 `Graph`. Renders an interactive diagram with pan and zoom.
 
 ```tsx
 <ActorFlow graph={graph} className="my-flow" style={{ height: 500 }} />
@@ -134,40 +97,3 @@ React component. Renders an interactive graph with pan, zoom, minimap.
 | `graph`     | `ActorGraph`          | —       | Graph data to render |
 | `className` | `string`              | —       | Additional CSS class |
 | `style`     | `React.CSSProperties` | —       | Inline styles        |
-
-### `nodeTypes`
-
-```ts
-const nodeTypes = { state: StateNodeComponent };
-```
-
-Pre-configured React Flow node types. Pass to custom `ReactFlow` if building your own renderer.
-
-### `edgeTypes`
-
-```ts
-const edgeTypes = { "state-edge": StateEdgeComponent };
-```
-
-Pre-configured React Flow edge types (`"state-edge"`). Shows edge labels with guard and action tags.
-
----
-
-## CSS Variables
-
-Customize appearance by overriding these variables:
-
-| Variable                   | Default                 | Purpose               |
-| -------------------------- | ----------------------- | --------------------- |
-| `--viz-border`             | `#e5e7eb`               | Container border      |
-| `--viz-node-bg`            | `#ffffff`               | Node background       |
-| `--viz-node-border`        | `#d1d5db`               | Node border           |
-| `--viz-node-active-bg`     | `#dcfce7`               | Active node bg        |
-| `--viz-node-active-border` | `#22c55e`               | Active node border    |
-| `--viz-node-label`         | `#374151`               | Node label color      |
-| `--viz-accent`             | `#3b82f6`               | Selection/focus ring  |
-| `--viz-edge-label-bg`      | `rgba(255,255,255,0.9)` | Edge label background |
-| `--viz-edge-label-border`  | `#d1d5db`               | Edge label border     |
-| `--viz-edge-label-text`    | `#374151`               | Edge label text       |
-| `--viz-guard-color`        | `#ca8a04`               | Guard condition tag   |
-| `--viz-action-color`       | `#2563eb`               | Action/tag color      |
