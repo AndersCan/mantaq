@@ -1,218 +1,25 @@
 ---
-title: Visualizer
+title: "visualizer - wip"
 description: Visual state machine graph viewer for actors.
 ---
 
 import VisualizerDemo from "../../../components/VisualizerDemo.astro";
+import UrlLoadDemo from "../../../components/UrlLoadDemo.astro";
 
-The visualizer renders actor state machines as interactive graph diagrams using React Flow. States become nodes, transitions become labeled edges. Active states highlight green. Supports pan, zoom, minimap, and dark mode CSS variables.
-
-## Installation
+## Install
 
 ```bash
-npm install @mantaq/visualizer
+npm install @mantaq/visualizer @antv/x6
 ```
 
-The package includes `@xyflow/react` as a dependency. Make sure React >=18 is installed in your project.
+## Examples
 
-## Basic Usage
-
-```tsx
-import { Actor, state, event } from "@mantaq/core";
-import { ActorFlow, buildGraph } from "@mantaq/visualizer";
-import type { ActorGraph } from "@mantaq/visualizer";
-import { useState } from "react";
-
-function MyFlow() {
-  const [graph, setGraph] = useState<ActorGraph>(() => buildGraph(myActor));
-
-  const sendEvent = (eventName) => {
-    myActor.send(someEvent);
-    setGraph(buildGraph(myActor));
-  };
-
-  return (
-    <div style={{ height: 400 }}>
-      <ActorFlow graph={graph} />
-    </div>
-  );
-}
-```
-
-## Features
-
-### Graph Rendering
-
-`buildGraph(actor)` converts an actor snapshot into graph data:
-
-- **Nodes** — one per state, with `id`, `label`, `isActive`, `isFinal`
-- **Edges** — one per transition, labeled with event ID, with `source`, `target`, `isActive`
-- **Active state highlighting** — active nodes render with a green border and background
-- **Final state indicator** — final states render with a double border
-- **Self-loops** — transitions to the same state render correctly
-
-### React Flow Integration
-
-`actorGraphToFlow(graph, layoutOpts?)` converts graph data into React Flow nodes and edges with automatic layout positioning:
-
-- Topological sort places nodes in layers (default: top-to-bottom)
-- Switch to `LR` direction for left-to-right layout
-- Customize spacing via `horizontalSpacing` and `verticalSpacing`
-
-### `<ActorFlow>` Component
-
-Wraps React Flow with defaults: dots background, zoom controls, minimap, `fitView`. Accepts:
-
-| Prop        | Type            | Default | Description          |
-| ----------- | --------------- | ------- | -------------------- |
-| `graph`     | `ActorGraph`    | —       | Graph data to render |
-| `className` | `string`        | —       | CSS class appended   |
-| `style`     | `CSSProperties` | —       | Inline styles        |
-
-### Pan, Zoom, and Minimap
-
-Built into React Flow: mouse wheel zooms, click-drag pans, minimap shows overview. Zoom controls in bottom-left.
-
-### CSS Custom Properties
-
-The visualizer uses CSS variables for theming:
-
-| Variable                   | Default                 | Purpose                |
-| -------------------------- | ----------------------- | ---------------------- |
-| `--viz-border`             | `#e5e7eb`               | Container border       |
-| `--viz-node-bg`            | `#ffffff`               | Node background        |
-| `--viz-node-border`        | `#d1d5db`               | Node border            |
-| `--viz-node-active-bg`     | `#dcfce7`               | Active node background |
-| `--viz-node-active-border` | `#22c55e`               | Active node border     |
-| `--viz-node-label`         | `#374151`               | Node label color       |
-| `--viz-accent`             | `#3b82f6`               | Selection ring         |
-| `--viz-edge-label-bg`      | `rgba(255,255,255,0.9)` | Edge label background  |
-| `--viz-edge-label-border`  | `#d1d5db`               | Edge label border      |
-| `--viz-edge-label-text`    | `#374151`               | Edge label text        |
-| `--viz-guard-color`        | `#ca8a04`               | Guard tag color        |
-| `--viz-action-color`       | `#2563eb`               | Action tag color       |
-
-## Interactive Demo
-
-This renders a real traffic light actor. Click **NEXT** to advance, **Reset** to return to green.
+### Traffic Light
 
 <VisualizerDemo />
 
-## Manual Layout
+### URL Load with Timeout
 
-For custom positioning, use the exported layout function:
+Click **Load URL** to simulate loading. Auto-timeouts after 3s. Click **Simulate Loaded** to succeed before timeout.
 
-```ts
-import { computeNodePositions } from "@mantaq/visualizer";
-
-const positions = computeNodePositions(graph.nodes, graph.edges, {
-  direction: "LR", // "TB" (default) or "LR"
-  horizontalSpacing: 220, // default
-  verticalSpacing: 120, // default
-  nodeWidth: 160,
-  nodeHeight: 60,
-});
-// positions is a Map<string, {x, y}>
-```
-
-Or pass layout options to `actorGraphToFlow`:
-
-```ts
-const flow = actorGraphToFlow(graph, { direction: "LR" });
-```
-
-## API Reference
-
-### `buildGraph(actor)`
-
-```ts
-function buildGraph(actor: AnyActor): ActorGraph;
-```
-
-Converts actor snapshot into graph nodes and edges. Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`.
-
-### `actorGraphToFlow(graph, layoutOpts?)`
-
-```ts
-function actorGraphToFlow(
-  graph: ActorGraph,
-  opts?: LayoutOptions,
-): { nodes: StateNode[]; edges: StateEdge[] };
-```
-
-Converts `ActorGraph` to React Flow-compatible nodes and edges with automatic layout.
-
-### `toReactFlowNodes(graphNodes, edges?, layoutOpts?)`
-
-```ts
-function toReactFlowNodes(
-  nodes: GraphNode[],
-  edges?: GraphEdge[],
-  opts?: LayoutOptions,
-): StateNode[];
-```
-
-Converts graph nodes to React Flow nodes with computed positions.
-
-### `toReactFlowEdges(graphEdges)`
-
-```ts
-function toReactFlowEdges(edges: GraphEdge[]): StateEdge[];
-```
-
-Converts graph edges to React Flow edges with `"state-edge"` type.
-
-### `computeNodePositions(nodes, edges, opts?)`
-
-```ts
-function computeNodePositions(
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  opts?: LayoutOptions,
-): Map<string, { x: number; y: number }>;
-```
-
-Topological sort layout. Returns positions keyed by node ID.
-
-### `collectActiveStates(snapshot, prefix, activeSet)`
-
-```ts
-function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<string>): void;
-```
-
-Populates a Set with IDs of currently active states from a snapshot. Used internally.
-
-### Components
-
-| Export      | Type            | Description                            |
-| ----------- | --------------- | -------------------------------------- |
-| `ActorFlow` | React component | Main renderer with React Flow          |
-| `nodeTypes` | `object`        | `{ state: StateNodeComponent }`        |
-| `edgeTypes` | `object`        | `{ "state-edge": StateEdgeComponent }` |
-
-### Types
-
-| Type                | Shape                                                                                                           |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `ActorGraph`        | `{ nodes: GraphNode[], edges: GraphEdge[] }`                                                                    |
-| `GraphNode`         | `{ id: string, label: string, isActive: boolean, isFinal: boolean }`                                            |
-| `GraphEdge`         | `{ id: string, source: string, target: string, label: string, isActive: boolean, payload?: TransitionPayload }` |
-| `TransitionPayload` | `{ guard?: string, action?: string, meta?: Record<string, unknown> }`                                           |
-| `StateNode`         | React Flow `Node<StateNodeData, "state">`                                                                       |
-| `StateEdge`         | React Flow `Edge<StateEdgeData, "state-edge">`                                                                  |
-| `LayoutOptions`     | `{ direction?: "TB"                                                                                             | "LR", nodeWidth?: number, nodeHeight?: number, horizontalSpacing?: number, verticalSpacing?: number }` |
-
-## Known Issues
-
-- **Region grouping** — Child states of regions render at the same level as parent states without visual grouping.
-- **Edge detail** — Edge labels show event IDs. Guard conditions and action metadata appear as inline tags when available.
-- **Layout simplicity** — Uses topological sort. For complex graphs (many cross-edges), consider manual positioning via `computeNodePositions`.
-
-## Planned
-
-- Export to SVG/PNG
-- Smooth transition animations
-- Actor tree hierarchy panel
-- Event history panel
-- Custom layout algorithms (ELK.js integration)
-- Accessibility improvements
+<UrlLoadDemo />

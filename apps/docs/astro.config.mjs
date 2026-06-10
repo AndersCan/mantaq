@@ -1,7 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
-import react from "@astrojs/react";
 import remarkGfm from "remark-gfm";
 
 // https://astro.build/config
@@ -12,6 +11,9 @@ export default defineConfig({
     remarkPlugins: [remarkGfm],
   },
   vite: {
+    ssr: {
+      noExternal: ["@antv/x6"],
+    },
     build: {
       rollupOptions: {
         external: ["web-worker"],
@@ -52,6 +54,5 @@ export default defineConfig({
         },
       ],
     }),
-    react(),
   ],
 });

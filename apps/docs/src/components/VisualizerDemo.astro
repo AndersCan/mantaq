@@ -1,13 +1,29 @@
----
-import { TrafficLightFlow } from "./TrafficLightFlow.tsx";
----
+<mantaq-viz id="traffic-light-demo"></mantaq-viz>
 
-<div class="vis-demo-wrapper">
-  <TrafficLightFlow client:load />
-</div>
+<script>
+  import "@mantaq/visualizer";
+  import { Actor, state, event } from "@mantaq/core";
 
-<style>
-  .vis-demo-wrapper {
-    margin: 1rem 0;
-  }
-</style>
+  const green = state("green")();
+  const yellow = state("yellow")();
+  const red = state("red")();
+  const next = event("NEXT")();
+
+  const actor = new Actor({
+    inputs: [next],
+    outputs: [],
+    internal: [],
+    states: [green, yellow, red],
+    initial: green,
+    context: {} as {},
+    effects: {},
+    transitions: {
+      green: { NEXT: () => ({ state: yellow }) },
+      yellow: { NEXT: () => ({ state: red }) },
+      red: { NEXT: () => ({ state: green }) },
+    },
+  });
+
+  const el = document.getElementById("traffic-light-demo")! as any;
+  el.actor = actor;
+</script>

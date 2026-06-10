@@ -36,3 +36,6 @@ dist-ssr
 
 # Package reports
 packages/*/reports
+
+# Astro cache (auto-generated)
+.astro/
