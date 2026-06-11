@@ -24,7 +24,7 @@ function makeActor() {
     effects: {},
     transitions: {
       off: {
-        toggled: () => ({ state: on, payload: { power: 2 } }),
+        toggled: () => ({ state: on.create({ power: 2 }) }),
       },
       on: {
         toggled: () => ({ state: off }),

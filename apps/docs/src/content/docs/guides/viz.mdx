@@ -5,7 +5,7 @@ description: Visual state machine graph viewer for actors.
 
 import VizDemo from "../../../components/VizDemo.astro";
 
-The visualizer renders actor state machines as interactive graph diagrams using X6 canvas rendering and Lit web components. States become nodes, transitions become labeled edges. Active states highlight. Supports pan, zoom, direction routing, and settings panel.
+The visualizer renders actor state machines as interactive graph diagrams. States become nodes, transitions become labeled edges. Active states highlight. Supports pan, zoom, direction routing, and settings panel.
 
 ## Installation
 
@@ -13,9 +13,7 @@ The visualizer renders actor state machines as interactive graph diagrams using 
 npm install @mantaq/viz
 ```
 
-## Basic Usage
-
-### Web Component
+## Usage
 
 ```html
 <mantaq-viz id="my-viz"></mantaq-viz>
@@ -37,73 +35,36 @@ npm install @mantaq/viz
     },
   });
 
-  const el = document.getElementById("my-viz");
-  el.actor = actor;
+  document.getElementById("my-viz").actor = actor;
 </script>
 ```
 
-### Programmatic Rendering
+Import the package once. The `<mantaq-viz>` element registers automatically. Set `.actor` to any `AnyActor` instance and it renders the full state machine graph.
 
-```ts
-import { buildGraph, renderActorFlow } from "@mantaq/viz";
-
-const graph = buildGraph(actor);
-const container = document.getElementById("graph-root");
-
-const instance = renderActorFlow(container, {
-  graph,
-  layoutOptions: { direction: "LR" },
-  onEdgeClick: (eventName) => actor.send(eventName),
-});
-
-// Update later
-instance.update(buildGraph(actor));
-
-// Cleanup
-instance.destroy();
-```
-
-## Features
-
-### Graph Rendering
-
-`buildGraph(actor, internalIds?)` converts an actor snapshot into graph data:
-
-- **Nodes** — one per state, with `id`, `label`, `isActive`, `isFinal`, `isInitial`
-- **Edges** — one per transition, labeled with event ID, with `source`, `target`, `isActive`
-- **Active state highlighting** — active nodes render with blue stroke and light background
-- **Final state indicator** — final states render with green stroke
-- **Initial node** — automatic initial state indicator (circle node)
-- **Effect edges** — internal/effect transitions render as dashed self-loops
-- **Self-loops** — transitions to the same state render correctly
-
-### Layout
-
-`computeNodePositions(nodes, edges, opts?)` uses dagre for hierarchical layout:
-
-- Topological sort places nodes in layers (default: top-to-bottom)
-- Switch to `LR` direction for left-to-right layout
-- Customize spacing via `nodesep` and `ranksep`
-- Configure edge routing: `normal`, `orth`, `manhattan`, `metro`, `er`
-
-### `<mantaq-viz>` Web Component
-
-Self-contained custom element with toolbar, settings panel, and graph rendering.
+## `<mantaq-viz>` Web Component
 
 | Property | Type       | Description        |
 | -------- | ---------- | ------------------ |
 | `actor`  | `AnyActor` | Actor to visualize |
 
-Features:
+### Features
 
-- **Toolbar** — shows current state and available event buttons
-- **Settings panel** — direction, router, edge length controls
-- **Pan and zoom** — mouse drag and scroll wheel
-- **Auto-sync** — re-renders when actor state changes
+- **Toolbar** — shows current state name and available event buttons
+- **Event buttons** — click to send events to the actor
+- **Settings panel** — gear icon opens direction, router, and edge length controls
+- **Pan and zoom** — mouse wheel zooms, click-drag pans
+- **Active state highlighting** — blue stroke and background on active nodes
+- **Final state indicator** — green stroke on final states
+- **Effect edges** — dashed amber self-loops for pending effects/timers
+- **Auto-sync** — re-renders on every actor state change
 
-### Pan, Zoom, and Settings
+### Settings
 
-Built into X6: mouse wheel zooms, click-drag pans. Settings gear icon opens direction/router/edge-length controls.
+| Control     | Options                                  |
+| ----------- | ---------------------------------------- |
+| Direction   | Top→Bottom (`TB`), Left→Right (`LR`)     |
+| Router      | Normal, Orthogonal, Manhattan, Metro, ER |
+| Edge length | Slider from 20 to 320 (default 100)      |
 
 ## Interactive Demo
 
@@ -111,90 +72,10 @@ This renders a real traffic light actor. Click **NEXT** to advance, **Reset** to
 
 <VizDemo />
 
-## Manual Layout
-
-For custom positioning, use the exported layout function:
-
-```ts
-import { computeNodePositions } from "@mantaq/viz";
-
-const positions = computeNodePositions(graph.nodes, graph.edges, {
-  direction: "LR", // "TB" (default) or "LR"
-  nodesep: 80, // horizontal gap between nodes
-  ranksep: 160, // vertical gap between levels
-  nodeWidth: 160,
-  nodeHeight: 60,
-});
-// positions is a Map<string, {x, y}>
-```
-
-## API Reference
-
-### `buildGraph(actor, internalIds?)`
-
-```ts
-function buildGraph(actor: AnyActor, internalIds?: Set<string>): ActorGraph;
-```
-
-Converts actor snapshot into graph nodes and edges. Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`.
-
-### `renderActorFlow(parent, options)`
-
-```ts
-function renderActorFlow(
-  parent: HTMLElement,
-  options: {
-    graph: ActorGraph;
-    layoutOptions?: LayoutOptions;
-    onEdgeClick?: (eventName: string) => void;
-  },
-): ActorFlowInstance;
-```
-
-Creates an X6 graph instance in the parent element. Returns `{ update(graph, opts?), destroy() }`.
-
-### `computeNodePositions(nodes, edges, opts?)`
-
-```ts
-function computeNodePositions(
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  opts?: LayoutOptions,
-): Map<string, { x: number; y: number }>;
-```
-
-Dagre-based hierarchical layout. Returns positions keyed by node ID.
-
-### `collectActiveStates(snapshot, prefix, activeSet)`
-
-```ts
-function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<string>): void;
-```
-
-Populates a Set with IDs of currently active states from a snapshot. Used internally.
-
-### Components
-
-| Export      | Type           | Description                  |
-| ----------- | -------------- | ---------------------------- |
-| `MantaqViz` | Custom Element | `<mantaq-viz>` web component |
-
-### Types
-
-| Type                | Shape                                                                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ActorGraph`        | `{ nodes: GraphNode[], edges: GraphEdge[] }`                                                                                                                               |
-| `GraphNode`         | `{ id: string, label: string, isActive: boolean, isFinal: boolean, isInitial?: boolean }`                                                                                  |
-| `GraphEdge`         | `{ id: string, source: string, target: string, label: string, isActive: boolean, isInternal?: boolean, payload?: TransitionPayload }`                                      |
-| `TransitionPayload` | `{ guard?: string, action?: string, meta?: Record<string, unknown> }`                                                                                                      |
-| `LayoutOptions`     | `{ direction?: "TB" \| "LR", nodeWidth?: number, nodeHeight?: number, nodesep?: number, ranksep?: number, router?: "normal" \| "orth" \| "manhattan" \| "metro" \| "er" }` |
-| `ActorFlowInstance` | `{ update(graph, opts?), destroy() }`                                                                                                                                      |
-
 ## Known Issues
 
 - **Region grouping** — Child states of regions render at the same level as parent states without visual grouping.
 - **Edge detail** — Edge labels show event IDs. Guard conditions and action metadata parsed from handler source.
-- **Layout simplicity** — Uses dagre. For complex graphs, consider manual positioning via `computeNodePositions`.
 
 ## Planned
 

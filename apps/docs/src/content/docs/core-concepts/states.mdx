@@ -74,15 +74,13 @@ const player = state("player")().regions({
 });
 ```
 
-## TransitionState
+## Payloads
 
 Transition needs payload. Carry it.
 
 ```ts
-import { TransitionState } from "@mantaq/core";
-
 // In transition handler:
-return { state: new TransitionState(successState, { data: result }) };
+return { state: successState.create({ data: result }) };
 ```
 
 Payload in effects. `state.payload`.

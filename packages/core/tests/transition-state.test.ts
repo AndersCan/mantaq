@@ -1,25 +1,25 @@
 import { expect, test, describe } from "vite-plus/test";
-import { state, TransitionState, StateRef } from "../src/state.ts";
+import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
 import { Actor, VirtualClock } from "../src/actor.ts";
 
-describe("TransitionState", () => {
-  test("construction with typed payload", () => {
+describe("StateRef.create()", () => {
+  test("returns plain object with state ref and payload", () => {
     const s = state("active")<{ x: number; y: number }>();
-    const ts = new TransitionState(s, { x: 10, y: 20 });
-    expect(ts.__stateRef).toBe(s);
-    expect(ts.__stateRef.name).toBe("active");
-    expect(ts.__payload).toEqual({ x: 10, y: 20 });
+    const result = s.create({ x: 10, y: 20 });
+    expect(result.state).toBe(s);
+    expect(result.state.name).toBe("active");
+    expect(result.payload).toEqual({ x: 10, y: 20 });
   });
 
-  test("construction with undefined payload", () => {
+  test("returns plain object with undefined payload", () => {
     const s = state("idle")();
-    const ts = new TransitionState(s, undefined);
-    expect(ts.__stateRef).toBe(s);
-    expect(ts.__payload).toBeUndefined();
+    const result = s.create(undefined);
+    expect(result.state).toBe(s);
+    expect(result.payload).toBeUndefined();
   });
 
-  test("construction with complex nested payload", () => {
+  test("returns plain object with complex nested payload", () => {
     const s = state("loaded")<{
       items: string[];
       meta: { count: number; tags: Set<string> };
@@ -28,45 +28,45 @@ describe("TransitionState", () => {
       items: ["a", "b", "c"],
       meta: { count: 3, tags: new Set(["x", "y"]) },
     };
-    const ts = new TransitionState(s, payload);
-    expect(ts.__payload).toEqual(payload);
-    expect(ts.__payload.items).toHaveLength(3);
-    expect(ts.__payload.meta.tags.has("x")).toBe(true);
+    const result = s.create(payload);
+    expect(result.payload).toEqual(payload);
+    expect(result.payload.items).toHaveLength(3);
+    expect(result.payload.meta.tags.has("x")).toBe(true);
   });
 
-  test("construction with null payload", () => {
+  test("returns plain object with null payload", () => {
     const s = state("cleared")<string | null>();
-    const ts = new TransitionState(s, null);
-    expect(ts.__payload).toBeNull();
+    const result = s.create(null);
+    expect(result.payload).toBeNull();
   });
 
   test("payload reference identity", () => {
     const s = state("ref")<{ val: number }>();
     const obj = { val: 42 };
-    const ts = new TransitionState(s, obj);
-    expect(ts.__payload).toBe(obj);
+    const result = s.create(obj);
+    expect(result.payload).toBe(obj);
   });
 
-  test("same state ref used in multiple TransitionStates", () => {
+  test("same state ref used in multiple creates", () => {
     const s = state("shared")<{ id: number }>();
-    const ts1 = new TransitionState(s, { id: 1 });
-    const ts2 = new TransitionState(s, { id: 2 });
-    expect(ts1.__stateRef).toBe(ts2.__stateRef);
-    expect(ts1.__stateRef.name).toBe("shared");
-    expect(ts1.__payload).not.toBe(ts2.__payload);
-    expect(ts1.__payload.id).toBe(1);
-    expect(ts2.__payload.id).toBe(2);
+    const r1 = s.create({ id: 1 });
+    const r2 = s.create({ id: 2 });
+    expect(r1.state).toBe(r2.state);
+    expect(r1.state.name).toBe("shared");
+    expect(r1.payload).not.toBe(r2.payload);
+    expect(r1.payload.id).toBe(1);
+    expect(r2.payload.id).toBe(2);
   });
 
-  test("TransitionState is not a StateRef", () => {
+  test("create() returns plain object with correct shape", () => {
     const s = state("check")();
-    const ts = new TransitionState(s, undefined);
-    expect(ts).toBeInstanceOf(TransitionState);
-    expect(ts).not.toBeInstanceOf(StateRef);
+    const result = s.create(undefined);
+    expect(result).toEqual({ state: s, payload: undefined });
+    expect(Object.keys(result)).toEqual(["state", "payload"]);
   });
 });
 
-describe("TransitionState in actor transitions", () => {
+describe("create() in actor transitions", () => {
   function makeActor(clock: VirtualClock) {
     const load = event("load")<{ url: string }>();
     const done = event("done")<{ data: string }>();
@@ -86,7 +86,7 @@ describe("TransitionState in actor transitions", () => {
       transitions: {
         idle: {
           load: (e) => ({
-            state: new TransitionState(loading, { url: (e as { url: string }).url }),
+            state: loading.create({ url: (e as { url: string }).url }),
           }),
         },
         loading: {
@@ -98,7 +98,7 @@ describe("TransitionState in actor transitions", () => {
     return { actor, load, done, idle, loading, success };
   }
 
-  test("send() with TransitionState sets state correctly", () => {
+  test("send() with create() sets state correctly", () => {
     const clock = new VirtualClock();
     const { actor, load } = makeActor(clock);
 
@@ -106,7 +106,7 @@ describe("TransitionState in actor transitions", () => {
     expect(actor.state.name).toBe("loading");
   });
 
-  test("TransitionState payload reaches effect handler", () => {
+  test("create() payload reaches effect handler", () => {
     const clock = new VirtualClock();
     const load = event("load")<{ url: string }>();
     const done = event("done")();
@@ -135,7 +135,7 @@ describe("TransitionState in actor transitions", () => {
       transitions: {
         idle: {
           load: (e) => ({
-            state: new TransitionState(loading, { url: (e as { url: string }).url }),
+            state: loading.create({ url: (e as { url: string }).url }),
           }),
         },
         loading: {
@@ -148,7 +148,7 @@ describe("TransitionState in actor transitions", () => {
     expect(capturedPayload).toEqual({ url: "/api/data" });
   });
 
-  test("TransitionState in initial state", () => {
+  test("create() in initial state", () => {
     const clock = new VirtualClock();
     const done = event("done")();
 
@@ -162,7 +162,7 @@ describe("TransitionState in actor transitions", () => {
       internal: [done],
       context: {},
       states: [idle, active, done_state],
-      initial: new TransitionState(idle, { start: true }),
+      initial: idle.create({ start: true }),
       clock,
       transitions: {
         idle: {
@@ -195,7 +195,7 @@ describe("TransitionState in actor transitions", () => {
       internal: [],
       context: {},
       states: [s1, s2, s3],
-      initial: new TransitionState(s1, { count: 0 }),
+      initial: s1.create({ count: 0 }),
       clock,
       effects: {
         s1: [({ state: s }) => payloads.push(s.payload)],
@@ -204,10 +204,10 @@ describe("TransitionState in actor transitions", () => {
       },
       transitions: {
         s1: {
-          advance: () => ({ state: new TransitionState(s2, { count: 1 }) }),
+          advance: () => ({ state: s2.create({ count: 1 }) }),
         },
         s2: {
-          advance: () => ({ state: new TransitionState(s3, { count: 2 }) }),
+          advance: () => ({ state: s3.create({ count: 2 }) }),
         },
       },
     });
@@ -220,7 +220,7 @@ describe("TransitionState in actor transitions", () => {
     expect(payloads).toEqual([{ count: 1 }, { count: 2 }]);
   });
 
-  test("TransitionState with empty object payload", () => {
+  test("create() with empty object payload", () => {
     const clock = new VirtualClock();
     const go = event("go")();
 
@@ -237,7 +237,7 @@ describe("TransitionState in actor transitions", () => {
       clock,
       transitions: {
         a: {
-          go: () => ({ state: new TransitionState(b, {}) }),
+          go: () => ({ state: b.create({}) }),
         },
       },
     });

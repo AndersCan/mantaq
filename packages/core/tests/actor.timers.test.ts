@@ -35,7 +35,7 @@ function makeLoadActor(clock: VirtualClock) {
     },
     transitions: {
       idle: {
-        load: (e) => ({ state: loading, payload: { url: e.url } }),
+        load: (e) => ({ state: loading.create({ url: e.url }) }),
       },
       loading: {
         fetchDone: () => ({ state: success }),
@@ -179,7 +179,7 @@ describe("timers", () => {
       },
       transitions: {
         idle: {
-          load: (e) => ({ state: loading, payload: { url: e.url } }),
+          load: (e) => ({ state: loading.create({ url: e.url }) }),
         },
         loading: {
           fetchDone: () => ({ state: success }),
@@ -228,7 +228,7 @@ describe("timers", () => {
       },
       transitions: {
         idle: {
-          load: (e) => ({ state: loading, payload: { url: e.url } }),
+          load: (e) => ({ state: loading.create({ url: e.url }) }),
         },
         loading: {
           timeout: () => {

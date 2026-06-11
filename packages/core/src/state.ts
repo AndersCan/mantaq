@@ -18,7 +18,7 @@ interface RegionsOptions<States extends Record<string, AnyStateRef> = Record<str
   [key: string]: RegionOptions<States>;
 }
 
-export class StateRef<T, _Payload = unknown> {
+export class StateRef<T extends string, _Payload = unknown> {
   name: T;
   isFinal = false;
   /** @internal */ _regions: RegionsOptions | undefined;
@@ -39,14 +39,8 @@ export class StateRef<T, _Payload = unknown> {
     this.isFinal = true;
     return this;
   }
-}
 
-export class TransitionState<N extends string = string, P = unknown> {
-  /** @internal */ readonly __stateRef: StateRef<N, P>;
-  /** @internal */ readonly __payload: P;
-
-  constructor(stateRef: StateRef<N, P>, payload: P) {
-    this.__stateRef = stateRef;
-    this.__payload = payload;
+  create(payload: _Payload): { state: StateRef<T, _Payload>; payload: _Payload } {
+    return { state: this, payload };
   }
 }

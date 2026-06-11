@@ -89,7 +89,7 @@ Without sugar:
 ```ts
 effects: {
   idle: [
-    ({ clock, signal }) => {
+    ({ clock, signal, emit }) => {
       clock.setTimeout(5000, () => {
         if (!signal.aborted) emit({ id: "TIMEOUT" });
       }, { signal });
