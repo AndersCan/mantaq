@@ -17,6 +17,11 @@ const ACTIVE_FILL = "#eff6ff";
 const INACTIVE_FILL = "#ffffff";
 const INITIAL_FILL = "#1e293b";
 
+export function nodeTooltip(node: GraphNode): string {
+  if (node.isInitial) return "Initial State";
+  return `State: ${node.label}\nActive: ${node.isActive ? "yes" : "no"}\nFinal: ${node.isFinal ? "yes" : "no"}`;
+}
+
 export function nodeAttrs(node: GraphNode): NodeAttrs {
   if (node.isInitial) {
     return { body: { fill: INITIAL_FILL, stroke: "none" } };

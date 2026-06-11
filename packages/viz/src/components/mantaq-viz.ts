@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import { event } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
 import { buildGraph } from "../graph.ts";
+import { highlightTransition } from "../x6/sync.ts";
 import { renderActorFlow } from "./actor-flow.ts";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import type { LayoutOptions } from "../layout.ts";
@@ -65,17 +66,19 @@ export class MantaqViz extends HTMLElement {
       this.#flow = renderActorFlow(graphEl, {
         graph,
         layoutOptions: this.#layoutOptions(),
-        onEdgeClick: (eventName) => {
+        onEdgeClick: (eventName, edgeId) => {
           if (eventName.startsWith("__EFFECT__")) {
             const timerMs = Number(eventName.replace("__EFFECT__", ""));
             const clock = this.#actor?.clock as { advance?: (ms: number) => void };
             if (typeof clock.advance === "function") {
               clock.advance(timerMs);
             }
+            if (edgeId) highlightTransition(this.#flow!.graph, edgeId);
             this.#renderAll();
             return;
           }
           this.#actor?.send(event(eventName)() as any);
+          if (edgeId) highlightTransition(this.#flow!.graph, edgeId);
           this.#renderAll();
         },
       });

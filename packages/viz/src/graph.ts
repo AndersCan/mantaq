@@ -23,6 +23,7 @@ export interface GraphEdge {
   label: string;
   isActive: boolean;
   isInternal?: boolean;
+  isUndetermined?: boolean;
   effectLabel?: string;
   timerMs?: number;
   payload?: TransitionPayload;
@@ -77,16 +78,13 @@ function buildEdgesFromTransitions(
   transitions: Record<string, Record<string, unknown>> | undefined,
   activeSet: Set<string>,
   pathPrefix: string,
+  actor: AnyActor,
   internalIds?: Set<string>,
 ): GraphEdge[] {
   const edges: GraphEdge[] = [];
   if (!transitions) return edges;
 
-  const mockCtx = new Proxy(
-    {},
-    { get: (_, key) => (key === Symbol.toPrimitive ? undefined : mockCtx) },
-  );
-  const mockOptions = { context: mockCtx, actor: {} };
+  const ctx = actor.context;
 
   for (const stateRef of states) {
     const sourceId = nodeId(pathPrefix, stateRef.name);
@@ -96,36 +94,34 @@ function buildEdgesFromTransitions(
     for (const [eventId, handler] of Object.entries(stateTransitions)) {
       if (typeof handler !== "function") continue;
 
-      const fnStr = handler.toString();
-      const guardMatch = fnStr.match(/if\s*\(([^)]{1,80})\)/);
-      const guard = guardMatch ? guardMatch[1].trim() : undefined;
-
       let targetName: string | undefined;
       let emitNames: string[] = [];
       try {
-        const result = handler({}, mockOptions);
+        const result = handler({}, { context: ctx, actor });
         targetName = result?.state?.name;
         if (result?.emit) {
           emitNames = result.emit.map((e: { id?: string }) => e.id).filter(Boolean);
         }
       } catch {
-        continue;
+        targetName = undefined;
       }
 
-      if (!targetName) continue;
+      const undetermined = !targetName;
+      const targetId = targetName
+        ? nodeId(pathPrefix, targetName)
+        : `${sourceId}-undetermined-${eventId}`;
 
       const payload: TransitionPayload | undefined =
-        guard || emitNames.length > 0
-          ? { guard, action: emitNames.length > 0 ? `emit(${emitNames.join(", ")})` : undefined }
-          : undefined;
+        emitNames.length > 0 ? { action: `emit(${emitNames.join(", ")})` } : undefined;
 
       edges.push({
-        id: `${sourceId}-${eventId}-${nodeId(pathPrefix, targetName)}`,
+        id: `${sourceId}-${eventId}-${targetId}`,
         source: sourceId,
-        target: nodeId(pathPrefix, targetName),
+        target: targetId,
         label: eventId,
         isActive: activeSet.has(sourceId),
         isInternal: internalIds?.has(eventId),
+        isUndetermined: undetermined,
         payload,
       });
     }
@@ -137,13 +133,24 @@ function buildEdgesFromTransitions(
 function buildEffectEdges(
   activeSet: Set<string>,
   pendingTimers?: Array<{ id: number; ms: number }>,
+  effects?: Record<string, unknown[]>,
 ): GraphEdge[] {
   const edges: GraphEdge[] = [];
   if (!pendingTimers || pendingTimers.length === 0) return edges;
 
+  const effectStates = new Set<string>();
+  if (effects) {
+    for (const [stateName, fns] of Object.entries(effects)) {
+      if (Array.isArray(fns) && fns.length > 0) {
+        effectStates.add(stateName);
+      }
+    }
+  }
+
   for (const activeId of activeSet) {
-    // Get active state name from id
     const stateName = activeId.split(".").pop() ?? "";
+    if (!effectStates.has(stateName)) continue;
+
     const displayName = stateName.charAt(0).toUpperCase() + stateName.slice(1);
 
     for (const timer of pendingTimers) {
@@ -178,11 +185,15 @@ function buildForActor(
     actor.options?.transitions as Record<string, Record<string, unknown>> | undefined,
     activeSet,
     pathPrefix,
+    actor,
     internalIds,
   );
 
   // Add effect edges as self-loops on active states
-  const effectEdges = buildEffectEdges(activeSet, pendingTimers);
+  const effects = (actor.options as Record<string, unknown>)?.effects as
+    | Record<string, unknown[]>
+    | undefined;
+  const effectEdges = buildEffectEdges(activeSet, pendingTimers, effects);
   edges.push(...effectEdges);
 
   if (actor.regions) {

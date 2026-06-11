@@ -2,10 +2,26 @@ import type { Graph as X6Graph } from "@antv/x6";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import { computeNodePositions } from "../layout.ts";
 import type { LayoutOptions } from "../layout.ts";
-import { nodeAttrs } from "./node-style.ts";
+import { nodeAttrs, nodeTooltip } from "./node-style.ts";
 import { edgeConfig, edgeLine } from "./edge-style.ts";
 
 const INITIAL_NODE_SIZE = 20;
+
+export function highlightTransition(graph: X6Graph, edgeId: string): void {
+  const cell = graph.getCellById(edgeId);
+  if (!cell?.isEdge()) return;
+
+  const originalStroke = cell.attr("line/stroke") as string;
+  const originalStrokeWidth = cell.attr("line/strokeWidth") as number;
+
+  cell.attr("line/stroke", "#22c55e");
+  cell.attr("line/strokeWidth", 4);
+
+  setTimeout(() => {
+    cell.attr("line/stroke", originalStroke);
+    cell.attr("line/strokeWidth", originalStrokeWidth);
+  }, 600);
+}
 
 export interface SyncResult {
   structureChanged: boolean;
@@ -22,6 +38,7 @@ export function syncNodes(
 
   for (const node of nodes) {
     const cell = graph.getCellById(node.id);
+    const tooltip = nodeTooltip(node);
     if (cell?.isNode()) {
       const pos = movedPositions.get(node.id) ?? {
         x: cell.getPosition().x,
@@ -30,6 +47,7 @@ export function syncNodes(
       cell.setPosition(pos.x, pos.y);
       cell.setAttrs(nodeAttrs(node) as any);
       cell.attr("text/text", node.label);
+      cell.setData({ tooltip }, { overwrite: true });
     } else {
       const pos = movedPositions.get(node.id) ?? positions.get(node.id) ?? { x: 0, y: 0 };
       graph.addNode({
@@ -41,6 +59,7 @@ export function syncNodes(
         height: node.isInitial ? INITIAL_NODE_SIZE : 60,
         label: node.isInitial ? "" : node.label,
         attrs: nodeAttrs(node) as any,
+        data: { tooltip },
       });
       changed = true;
     }
