@@ -1,0 +1,124 @@
+---
+title: Effect Helpers
+description: Promise bridging and timeout helpers for effects.
+---
+
+Effects need patterns. Promise bridging. Timeouts. Sugar provides two.
+
+## withPromise
+
+Bridge promise to actor events. Abort-safe.
+
+```ts
+import { withPromise } from "@mantaq/sugar";
+
+effects: {
+  loading: [
+    ({ signal, emit }) => {
+      withPromise(fetch("/api"), signal, emit, {
+        success: (data) => ({ id: "FETCH_DONE", data }),
+        error: (err) => ({ id: "FETCH_ERROR", error: err }),
+      });
+    },
+  ],
+}
+```
+
+### What it does
+
+1. Awaits promise
+2. On resolve → calls `success` → emits resulting event
+3. On reject → calls `error` → emits resulting event
+4. Checks `signal.aborted` before emitting
+
+Without sugar:
+
+```ts
+effects: {
+  loading: [
+    ({ signal, emit }) => {
+      fetch("/api")
+        .then((data) => {
+          if (!signal.aborted) emit({ id: "FETCH_DONE", data });
+        })
+        .catch((err) => {
+          if (!signal.aborted) emit({ id: "FETCH_ERROR", error: err });
+        });
+    },
+  ],
+}
+```
+
+Same logic. More code. Easy to forget abort check.
+
+### Mapper functions
+
+```ts
+withPromise(promise, signal, emit, {
+  success: (data) => ({ id: "DONE", data }), // must return InternalEvent
+  error: (err) => ({ id: "FAIL", error: err }), // same
+});
+```
+
+Return value emitted as internal event. Actor processes it.
+
+## withTimeout
+
+Timeout via actor's clock. Abort-safe.
+
+```ts
+import { withTimeout } from "@mantaq/sugar";
+
+effects: {
+  idle: [
+    (input) => {
+      withTimeout(5000, input, () => ({ id: "TIMEOUT" }));
+    },
+  ],
+}
+```
+
+### What it does
+
+1. Schedules timeout on actor's clock
+2. On fire → calls `eventFn` → emits resulting event
+3. Aborts automatically on state exit
+
+Without sugar:
+
+```ts
+effects: {
+  idle: [
+    ({ clock, signal }) => {
+      clock.setTimeout(5000, () => {
+        if (!signal.aborted) emit({ id: "TIMEOUT" });
+      }, { signal });
+    },
+  ],
+}
+```
+
+Sugar handles abort wiring.
+
+### VirtualClock testing
+
+```ts
+import { VirtualClock } from "@mantaq/core";
+import { withTimeout } from "@mantaq/sugar";
+
+const clock = new VirtualClock();
+const actor = createActor(clock);
+
+actor.send(startEvent);
+clock.advance(5000); // triggers timeout
+```
+
+Deterministic. Same as core, less boilerplate.
+
+## Abort safety
+
+Both helpers check `signal.aborted`. State exit aborts effect.
+
+Promise resolves after state exit → no emit. Timer fires after exit → no emit.
+
+No manual checks needed. Sugar handles it.

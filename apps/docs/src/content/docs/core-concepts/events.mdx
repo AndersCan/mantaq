@@ -54,6 +54,7 @@ const actor = new Actor({
       },
     },
   },
+});
 ```
 
 Handler gets typed event object.
@@ -72,12 +73,11 @@ const actor = new Actor({
   effects: {
     authenticating: [
       ({ emit, signal }) => {
-        authenticate().then(
-          (result) => signal.aborted || emit(authDone.create(result)),
-        );
+        authenticate().then((result) => signal.aborted || emit(authDone.create(result)));
       },
     ],
   },
+});
 ```
 
 ## Any transition

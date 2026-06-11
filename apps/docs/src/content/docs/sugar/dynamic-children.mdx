@@ -1,0 +1,125 @@
+---
+title: Dynamic Children
+description: Dynamic child management with ActorMap and broadcast.
+---
+
+Static children via `regions`. Dynamic children need more.
+
+## ActorMap
+
+Registry. Spawn, kill, query children by ID.
+
+```ts
+import { ActorMap } from "@mantaq/sugar";
+
+const workers = new ActorMap(actor);
+```
+
+### Operations
+
+```ts
+workers.spawn("worker-1", () => createWorker("worker-1")); // create child
+workers.spawn("worker-2", () => createWorker("worker-2"));
+workers.ensure("worker-3", () => createWorker("worker-3")); // spawn if missing
+
+workers.send("worker-1", someEvent); // send to child
+workers.kill("worker-1"); // remove child
+
+workers.has("worker-1"); // boolean
+workers.keys(); // ["worker-2", "worker-3"]
+
+const snap = workers.snapshot("worker-2"); // single child snapshot
+```
+
+### Factory function
+
+Passed to `spawn` or `ensure`. Returns Actor.
+
+```ts
+workers.spawn("worker-1", () => {
+  return new Actor({
+    inputs: [taskEvent],
+    states: [idle, working],
+    initial: idle,
+    // ...
+  });
+});
+```
+
+## broadcast
+
+Send event to all children.
+
+```ts
+import { broadcast } from "@mantaq/sugar";
+
+broadcast(workers, shutdownEvent);
+```
+
+Without sugar:
+
+```ts
+for (const id of workers.keys()) {
+  workers.send(id, shutdownEvent);
+}
+```
+
+## Worker pool example
+
+```ts
+import { Actor, state, event } from "@mantaq/core";
+import { ActorMap, broadcast } from "@mantaq/sugar";
+
+const task = event("TASK")<{ jobId: string }>();
+const shutdown = event("SHUTDOWN")();
+
+function createParent() {
+  const workers = new ActorMap(/* parent actor */);
+
+  return new Actor({
+    inputs: [task, shutdown],
+    effects: {
+      active: [
+        ({ event }) => {
+          if (event.id === "TASK") {
+            workers.spawn(event.jobId, () => createWorker(event.jobId));
+            workers.send(event.jobId, task.create(event));
+          }
+          if (event.id === "SHUTDOWN") {
+            broadcast(workers, shutdown);
+          }
+        },
+      ],
+    },
+  });
+}
+```
+
+Dynamic pool. Spawn on demand. Broadcast shutdown.
+
+## Snapshot
+
+`ActorMap.snapshot(key)` returns single child's `Snapshot`.
+
+```ts
+const snap = workers.snapshot("worker-1");
+// { path: ["idle"], regions: {}, done: undefined }
+```
+
+Get all children:
+
+```ts
+for (const key of workers.keys()) {
+  const snap = workers.snapshot(key);
+  // ...
+}
+```
+
+## Cleanup
+
+```ts
+workers.kill("worker-1");
+// Actor exits. Effects abort. Context gone.
+```
+
+No manual cleanup. Actor handles it.

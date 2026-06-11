@@ -40,10 +40,11 @@ Events. Plain objects. `id` field required. `event.create(payload)` makes them.
 ## Check state
 
 ```ts
-import { matches } from "@mantaq/sugar";
-
-matches(actor, "active"); // true
+actor.snapshot().path[0]; // "active"
+actor.snapshot().path.includes("active"); // true
 ```
+
+Tip: `@mantaq/sugar` has `matches(actor, "active")` for cleaner checks. See [Sugar](/mantaq/sugar/matching/).
 
 ## Listen for changes
 

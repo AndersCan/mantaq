@@ -74,41 +74,9 @@ Effect error → `"error"` subscriber.
 ```ts
 actor.on("error", (err) => {
   console.error("Effect failed:", err);
+});
 ```
 
 One effect error. Others still run.
 
-## withPromise
-
-`@mantaq/sugar`. Promise → actor events.
-
-```ts
-import { withPromise } from "@mantaq/sugar";
-
-effects: {
-  loading: [
-    ({ signal, emit, context }) => {
-      withPromise(fetch("/api"), signal, emit, {
-        success: (data) => ({ id: "FETCH_DONE", data }),
-        error: (err) => ({ id: "FETCH_ERROR", error: err }),
-      });
-    },
-  ],
-}
-```
-
-## withTimeout
-
-Timeout. Actor's clock.
-
-```ts
-import { withTimeout } from "@mantaq/sugar";
-
-effects: {
-  idle: [
-    (input) => {
-      withTimeout(5000, input, () => ({ id: "TIMEOUT" }));
-    },
-  ],
-}
-```
+Tip: `@mantaq/sugar` provides `withPromise` and `withTimeout` helpers for common effect patterns. See [Sugar](/mantaq/sugar/effect-helpers/).
