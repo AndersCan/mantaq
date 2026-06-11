@@ -10,16 +10,7 @@ export default defineConfig({
   markdown: {
     remarkPlugins: [remarkGfm],
   },
-  vite: {
-    ssr: {
-      noExternal: ["@antv/x6"],
-    },
-    build: {
-      rollupOptions: {
-        external: ["web-worker"],
-      },
-    },
-  },
+  vite: {},
   integrations: [
     starlight({
       title: "Mantaq",
@@ -41,7 +32,7 @@ export default defineConfig({
             { label: "Effects", slug: "core-concepts/effects" },
             { label: "Context", slug: "core-concepts/context" },
             { label: "Testing", slug: "guides/actor-testing" },
-            { label: "Visualizer", slug: "guides/visualizer" },
+            { label: "Viz", slug: "guides/viz" },
           ],
         },
         {
@@ -49,7 +40,7 @@ export default defineConfig({
           items: [
             { label: "@mantaq/core", slug: "reference/core" },
             { label: "@mantaq/sugar", slug: "reference/sugar" },
-            { label: "@mantaq/viz", slug: "reference/visualizer" },
+            { label: "@mantaq/viz", slug: "reference/viz" },
           ],
         },
       ],
