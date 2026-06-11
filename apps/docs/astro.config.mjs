@@ -38,7 +38,7 @@ export default defineConfig({
         {
           label: "Sugar",
           items: [
-            { label: "Overview", slug: "sugar/index" },
+            { label: "Overview", slug: "sugar" },
             { label: "Batch Creation", slug: "sugar/batch-creation" },
             { label: "Matching", slug: "sugar/matching" },
             { label: "Dynamic Children", slug: "sugar/dynamic-children" },
