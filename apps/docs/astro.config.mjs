@@ -49,7 +49,7 @@ export default defineConfig({
           items: [
             { label: "@mantaq/core", slug: "reference/core" },
             { label: "@mantaq/sugar", slug: "reference/sugar" },
-            { label: "@mantaq/visualizer", slug: "reference/visualizer" },
+            { label: "@mantaq/viz", slug: "reference/visualizer" },
           ],
         },
       ],

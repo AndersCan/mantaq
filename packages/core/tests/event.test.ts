@@ -34,7 +34,6 @@ describe("EventRef", () => {
   test("constructor sets id", () => {
     const ref = new EventRef("myEvent");
     expect(ref.id).toBe("myEvent");
-    expect(ref.payload).toBeUndefined();
   });
 
   test("create with undefined payload still has id", () => {

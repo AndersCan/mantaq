@@ -1,6 +1,6 @@
 ---
 "@mantaq/core": patch
-"@mantaq/visualizer": patch
+"@mantaq/viz": patch
 ---
 
 Fixed failing tests for null event payload and layout timing.

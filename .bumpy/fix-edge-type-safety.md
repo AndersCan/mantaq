@@ -1,5 +1,5 @@
 ---
-"@mantaq/visualizer":
+"@mantaq/viz":
   bump: patch
 ---
 
