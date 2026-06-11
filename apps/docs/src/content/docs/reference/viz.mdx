@@ -32,15 +32,16 @@ Converts actor snapshot into graph nodes and edges.
 
 ### `GraphEdge`
 
-| Property     | Type                 | What              |
-| ------------ | -------------------- | ----------------- |
-| `id`         | `string`             | Edge ID           |
-| `source`     | `string`             | Source node ID    |
-| `target`     | `string`             | Target node ID    |
-| `label`      | `string`             | Event ID          |
-| `isActive`   | `boolean`            | Source is active? |
-| `isInternal` | `boolean`            | Internal/effect?  |
-| `payload`    | `TransitionPayload?` | Guard/action info |
+| Property         | Type                 | What                         |
+| ---------------- | -------------------- | ---------------------------- |
+| `id`             | `string`             | Edge ID                      |
+| `source`         | `string`             | Source node ID               |
+| `target`         | `string`             | Target node ID               |
+| `label`          | `string`             | Event ID                     |
+| `isActive`       | `boolean`            | Source is active?            |
+| `isInternal`     | `boolean`            | Internal/effect?             |
+| `isUndetermined` | `boolean`            | Target couldn't be resolved? |
+| `payload`        | `TransitionPayload?` | Guard/action info            |
 
 ### `TransitionPayload`
 
@@ -136,6 +137,9 @@ Features:
 - Settings panel (direction, router, edge length)
 - Pan and zoom via X6
 - Auto-sync on actor state changes
+- Transition animation (green flash on edge click)
+- Node/edge tooltips with metadata
+- Undetermined edge styling (red dashed)
 
 ---
 

@@ -72,15 +72,148 @@ This renders a real traffic light actor. Click **NEXT** to advance, **Reset** to
 
 <VizDemo />
 
+## Comprehensive Example
+
+This example demonstrates most viz features: states, transitions, effects, timers, internal events, hierarchical regions, and context.
+
+```html
+<mantaq-viz id="order-flow"></mantaq-viz>
+
+<script>
+  import "@mantaq/viz";
+  import { Actor, state, event } from "@mantaq/core";
+
+  // Define states
+  const idle = state("idle")();
+  const processing = state("processing")();
+  const shipped = state("shipped")();
+  const delivered = state("delivered")().final();
+  const cancelled = state("cancelled")().final();
+
+  // Define events
+  const placeOrder = event("PLACE_ORDER")();
+  const ship = event("SHIP")();
+  const deliver = event("DELIVER")();
+  const cancel = event("CANCEL")();
+
+  // Define internal events
+  const checkInventory = event("CHECK_INVENTORY")();
+  const sendNotification = event("SEND_NOTIFICATION")();
+
+  // Create actor with effects and regions
+  const orderActor = new Actor({
+    inputs: [placeOrder, ship, deliver, cancel],
+    outputs: [],
+    internal: [checkInventory, sendNotification],
+    states: [idle, processing, shipped, delivered, cancelled],
+    initial: idle,
+    context: { orderId: null, itemCount: 0 } as { orderId: string | null; itemCount: number },
+    effects: {
+      // Effect runs when entering 'processing' state
+      processing: [
+        ({ signal, clock, emit }) => {
+          // Simulate inventory check delay
+          const timerId = clock.setTimeout(1000, () => {
+            emit(checkInventory);
+          }, { signal });
+          return () => clock.clearTimeout(timerId);
+        },
+      ],
+      // Effect runs when entering 'shipped' state
+      shipped: [
+        ({ signal, clock, emit }) => {
+          // Simulate shipping notification
+          const timerId = clock.setTimeout(2000, () => {
+            emit(sendNotification);
+          }, { signal });
+          return () => clock.clearTimeout(timerId);
+        },
+      ],
+    },
+    transitions: {
+      idle: {
+        PLACE_ORDER: (event, { context }) => {
+          // Set context data
+          context.orderId = `ORD-${Date.now()}`;
+          context.itemCount = event.items || 1;
+          return { state: processing };
+        },
+      },
+      processing: {
+        CHECK_INVENTORY: (_, { context }) => {
+          // Internal event: inventory check complete
+          if (context.itemCount > 0) {
+            return { state: processing }; // Stay in processing
+          }
+          return { state: idle }; // No items, go back
+        },
+        SHIP: () => ({ state: shipped }),
+        CANCEL: () => ({ state: cancelled }),
+      },
+      shipped: {
+        SEND_NOTIFICATION: () => ({ state: shipped }), // Stay in shipped
+        DELIVER: () => ({ state: delivered }),
+        CANCEL: () => ({ state: cancelled }),
+      },
+    },
+  });
+
+  // Set actor on viz element
+  const el = document.getElementById("order-flow");
+  el.actor = orderActor;
+</script>
+```
+
+### Features Demonstrated
+
+| Feature                 | How It's Shown                                        |
+| ----------------------- | ----------------------------------------------------- |
+| **States**              | idle, processing, shipped, delivered, cancelled       |
+| **Transitions**         | PLACE_ORDER, SHIP, DELIVER, CANCEL                    |
+| **Final states**        | delivered and cancelled have green borders            |
+| **Internal events**     | CHECK_INVENTORY, SEND_NOTIFICATION (dashed edges)     |
+| **Effects/timers**      | Processing and shipped states have amber effect edges |
+| **Context**             | orderId and itemCount set in transitions              |
+| **Hierarchical states** | See Regions example below                             |
+
+### Visual Indicators
+
+- **Blue nodes/edges**: Active state and transitions
+- **Green borders**: Final states (delivered, cancelled)
+- **Amber dashed loops**: Effects/timers (processing, shipped)
+- **Red dashed edges**: Undetermined transitions (if any)
+- **Gray dashed edges**: Inactive transitions
+
+### Interaction
+
+1. Click **PLACE_ORDER** button to start
+2. Watch the amber effect edge appear during processing
+3. Click **SHIP** to move to shipped state
+4. Click **DELIVER** to complete (green final state)
+5. Use **CANCEL** at any point to cancel
+
+### Settings Panel
+
+Click the gear icon (⚙) to adjust:
+
+- **Direction**: Top→Bottom or Left→Right
+- **Router**: Normal, Orthogonal, Manhattan, Metro, ER
+- **Edge length**: Adjust spacing between nodes
+
+### Keyboard Shortcuts
+
+- `+` or `=`: Zoom in
+- `-`: Zoom out
+- `0`: Reset view
+- `F`: Fit to screen
+
 ## Known Issues
 
 - **Region grouping** — Child states of regions render at the same level as parent states without visual grouping.
-- **Edge detail** — Edge labels show event IDs. Guard conditions and action metadata parsed from handler source.
 
 ## Planned
 
 - Export to SVG/PNG
-- Smooth transition animations
 - Actor tree hierarchy panel
 - Event history panel
 - Custom layout algorithms
