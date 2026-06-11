@@ -144,7 +144,7 @@ interface Clock {
 type EffectInput<Inputs, Internal, ActorContext> = {
   signal: AbortSignal;
   state: { name: string; payload: unknown };
-  event: { id: string } & Record<string, unknown>;
+  event: InternalEvent;
   context: ActorContext;
   emit: (event: InternalEvent) => void;
   clock: Clock;

@@ -10,70 +10,102 @@ pnpm add @mantaq/viz
 
 ## Usage
 
-### HTML
-
 ```html
-<mantaq-viz></mantaq-viz>
-```
-
-### Set Actor
-
-```ts
-import "@mantaq/viz";
-
-const el = document.querySelector("mantaq-viz");
-el.actor = myActor;
+<mantaq-viz id="viz"></mantaq-viz>
+<script type="module">
+  import "@mantaq/viz";
+  const el = document.getElementById("viz");
+  el.actor = myActor;
+</script>
 ```
 
 ## API
 
-### Functions
+### Exports
 
-- `buildGraph(actor)` - Convert actor snapshot to graph nodes/edges
-- `flattenNodes(graph)` - Flatten nested graph nodes
-- `computeLayout(graph)` - Compute ELK.js layout
-- `defaultPositions(nodes, dimensions)` - Compute default node positions
-- `collectEdges(graph)` - Collect all edges from graph
-- `getTransitionsForNode(graph, nodeId)` - Get transitions for a node
-- `estimateNodeWidth(label, minWidth)` - Estimate node width from label
-- `setActor(actor)` - Set actor in store and trigger layout
-- `updateLayout(graph)` - Recompute layout
-- `selectNode(nodeId)` - Select a node
-- `setViewport(width, height)` - Set viewport dimensions
-- `setZoom(value)` - Set zoom level
-- `zoomIn()` / `zoomOut()` - Zoom controls
-- `zoomToFit()` - Fit graph to viewport
-- `resetView()` - Reset zoom and pan
-- `startActorSync()` - Auto-sync graph when actor state changes
-- `applyDarkTheme()` / `removeDarkTheme()` - Toggle dark mode
+```ts
+buildGraph(actor, internalIds?) → ActorGraph
+```
 
-### Stores
+Convert actor snapshot to graph nodes and edges. Optionally pass `internalIds` to mark internal transitions.
 
-- `$actor` - Current actor
-- `$graph` - Computed graph
-- `$layout` - Computed layout result
-- `$layoutLoading` - Whether layout computation is in progress
-- `$selectedNodeId` - Selected node ID
-- `$selectedNode` - Selected node object
-- `$flatNodes` - Flattened list of positioned nodes
-- `$edges` - Positioned edges
-- `$zoom` / `$pan` - Viewport state
-- `$viewport` - Viewport dimensions
-- `$graphDimensions` - Graph dimensions
-- `$layoutError` - Layout error message
+```ts
+computeNodePositions(nodes, edges, options?) → Map<string, { x, y }>
+```
 
-### Components
+Compute dagre layout positions for nodes/edges.
 
-- `<actor-graph>` - Main container with pan/zoom/keyboard
-- `<state-node>` - Individual state node
-- `renderEdge(edge)` - Edge rendering function
+```ts
+renderActorFlow(parent, options) → ActorFlowInstance
+```
 
-## Keyboard Shortcuts
+Render a full actor flow graph into a container element. Returns instance with `update(graph, layoutOptions?)` and `destroy()` methods.
 
-- `+` / `=` - Zoom in
-- `-` - Zoom out
-- `0` - Reset view
-- `F` - Zoom to fit
+```ts
+MantaqViz; // custom element <mantaq-viz>
+```
+
+### Types
+
+```ts
+interface GraphNode {
+  id: string;
+  label: string;
+  isActive: boolean;
+  isFinal: boolean;
+  isInitial?: boolean;
+}
+
+interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  isActive: boolean;
+  isInternal?: boolean;
+  isUndetermined?: boolean;
+  effectLabel?: string;
+  timerMs?: number;
+}
+
+interface ActorGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+interface LayoutOptions {
+  direction?: "TB" | "LR";
+  nodeWidth?: number;
+  nodeHeight?: number;
+  nodesep?: number;
+  ranksep?: number;
+  router?: "normal" | "orth" | "manhattan" | "metro" | "er";
+}
+```
+
+## `<mantaq-viz>` Component
+
+### Props
+
+- `el.actor` — set the actor to visualize
+
+### Features
+
+- **Click edges** to trigger transitions (fires the event on the actor)
+- **Effect edges** (amber dashed) — advance timer on click
+- **Undetermined edges** (red dashed) — transitions where target couldn't be resolved
+- **Transition animation** — green flash on the fired edge
+- **Tooltips** on nodes and edges showing state/event details
+- **Settings panel** — direction (LR/TB), router (normal/orth/manhattan/metro/er), edge length
+
+### Keyboard Shortcuts
+
+| Key       | Action          |
+| --------- | --------------- |
+| `+` / `=` | Zoom in         |
+| `-`       | Zoom out        |
+| `0`       | Reset view      |
+| `F`       | Fit to viewport |
 
 ## Development
 
