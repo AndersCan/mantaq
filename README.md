@@ -28,7 +28,8 @@ mantaq/
 ├── packages/
 │   ├── core/       # State machine runtime
 │   ├── sugar/      # Convenience helpers
-│   ├── utils/      # Shared utilities
+│   ├── viz/        # Visualizer (React Flow)
+│   ├── internals/  # Shared utilities
 │   └── examples/   # Usage examples
 ├── apps/
 │   └── docs/       # Documentation site
