@@ -36,6 +36,16 @@ export default defineConfig({
           ],
         },
         {
+          label: "Sugar",
+          items: [
+            { label: "Overview", slug: "sugar/index" },
+            { label: "Batch Creation", slug: "sugar/batch-creation" },
+            { label: "Matching", slug: "sugar/matching" },
+            { label: "Dynamic Children", slug: "sugar/dynamic-children" },
+            { label: "Effect Helpers", slug: "sugar/effect-helpers" },
+          ],
+        },
+        {
           label: "API Reference",
           items: [
             { label: "@mantaq/core", slug: "reference/core" },

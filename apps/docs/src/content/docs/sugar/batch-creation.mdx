@@ -1,0 +1,89 @@
+---
+title: Batch Creation
+description: Create multiple states and events in one call.
+---
+
+`states()` and `events()`. Batch create. One call, typed record.
+
+## Without sugar
+
+```ts
+import { state, event } from "@mantaq/core";
+
+const idle = state("idle")();
+const loading = state("loading")();
+const success = state("success")();
+const error = state("error")();
+
+const fetch = event("FETCH")();
+const retry = event("RETRY")();
+const cancel = event("CANCEL")();
+```
+
+Seven calls. Repetitive.
+
+## With sugar
+
+```ts
+import { states, events } from "@mantaq/sugar";
+
+const { idle, loading, success, error } = states("idle", "loading", "success", "error");
+const { fetch, retry, cancel } = events("FETCH", "RETRY", "CANCEL");
+```
+
+Two calls. Typed names as keys.
+
+## Return type
+
+`states()` returns `Record<string, StateRef>`. Keys = state names.
+
+`events()` returns `Record<string, EventRef>`. Keys = event names.
+
+Dot access:
+
+```ts
+states.idle; // StateRef
+events.FETCH; // EventRef
+```
+
+Destructure or bracket:
+
+```ts
+const s = states("a", "b", "c");
+s.a; // StateRef
+s["b"]; // StateRef
+```
+
+## Real example
+
+```ts
+import { Actor, state, event } from "@mantaq/core";
+import { states, events } from "@mantaq/sugar";
+
+const { idle, loading, done } = states("idle", "loading", "done");
+const { start, finish } = events("START", "FINISH");
+
+const actor = new Actor({
+  inputs: [start, finish],
+  states: [idle, loading, done],
+  initial: idle,
+  transitions: {
+    idle: { START: () => ({ state: loading }) },
+    loading: { FINISH: () => ({ state: done }) },
+  },
+});
+```
+
+Same actor. Fewer lines.
+
+## Type safety
+
+```ts
+const { idle, active } = states("idle", "active");
+
+// TypeScript knows:
+idle.name; // "idle"
+active.name; // "active"
+```
+
+Names inferred as string literals.

@@ -1,0 +1,135 @@
+---
+title: Matching
+description: State matching, grouping, and leaf detection.
+---
+
+Check where actor is. Group states. Find leaves.
+
+## matches
+
+Dot-notation path check.
+
+```ts
+import { matches } from "@mantaq/sugar";
+
+matches(actor, "active"); // top-level
+matches(actor, "connected.default.active"); // nested path
+```
+
+Without sugar:
+
+```ts
+actor.snapshot().path[0] === "active";
+// or for nested:
+actor.snapshot().path.join(".") === "connected.default.active";
+```
+
+`matches` handles path joining.
+
+## isIn
+
+Recursive search. State anywhere in path.
+
+```ts
+import { isIn } from "@mantaq/sugar";
+
+isIn(actor.snapshot(), "default"); // true if "default" in path
+```
+
+Useful with hierarchical states:
+
+```ts
+// path: ["connected", "default", "active"]
+isIn(snapshot, "connected"); // true
+isIn(snapshot, "default"); // true
+isIn(snapshot, "idle"); // false
+```
+
+Without sugar:
+
+```ts
+actor.snapshot().path.includes("default");
+```
+
+## activeLeaves
+
+All leaf states in current path.
+
+```ts
+import { activeLeaves } from "@mantaq/sugar";
+
+// path: ["connected", "default", "active"]
+activeLeaves(actor.snapshot()); // ["connected.default.active"]
+```
+
+For parallel regions, returns multiple leaves.
+
+Without sugar:
+
+```ts
+// Manual. More code. Sugar handles edge cases.
+```
+
+## tag
+
+Group states. Check membership.
+
+```ts
+import { tag } from "@mantaq/sugar";
+
+const activeTag = tag(idle, loading, success);
+activeTag.has(actor.snapshot()); // true if any of those states
+```
+
+Use for bulk checks:
+
+```ts
+const errorStates = tag(networkError, validationError, timeoutError);
+
+if (errorStates.has(actor.snapshot())) {
+  showErrorUI();
+}
+```
+
+Without sugar:
+
+```ts
+const path = actor.snapshot().path[0];
+if (path === "networkError" || path === "validationError" || path === "timeoutError") {
+  showErrorUI();
+}
+```
+
+Tag scales better. Many states → one check.
+
+## Before/after
+
+### Check state
+
+```ts
+// Before (core only)
+actor.snapshot().path[0] === "active";
+
+// After (sugar)
+matches(actor, "active");
+```
+
+### Check nested state
+
+```ts
+// Before
+actor.snapshot().path.join(".").includes("default");
+
+// After
+isIn(actor.snapshot(), "default");
+```
+
+### Group errors
+
+```ts
+// Before
+const isError = ["err1", "err2", "err3"].includes(actor.snapshot().path[0]);
+
+// After
+const isError = tag(err1, err2, err3).has(actor.snapshot());
+```

@@ -17,17 +17,16 @@ Actors. Events. Hierarchical states. Three concepts.
 
 ## Packages
 
-| Package         | What                                                           |
-| --------------- | -------------------------------------------------------------- |
-| `@mantaq/core`  | Runtime. `Actor`, `state`, `event`, `VirtualClock`             |
-| `@mantaq/sugar` | Helpers. `matches`, `states`, `events`, `ActorMap`, `tag`      |
-| `@mantaq/viz`   | Graph viewer. `ActorGraphComponent`, `buildGraph`, store atoms |
+| Package         | What                                                                     |
+| --------------- | ------------------------------------------------------------------------ |
+| `@mantaq/core`  | Runtime. `Actor`, `state`, `event`, `VirtualClock`                       |
+| `@mantaq/sugar` | Helpers. `matches`, `states`, `events`, `tag`, `ActorMap`, `withPromise` |
+| `@mantaq/viz`   | Graph viewer. `ActorGraphComponent`, `buildGraph`, store atoms           |
 
 ## Quick example
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
 
 const idle = state("idle")();
 const running = state("running")();
@@ -46,5 +45,13 @@ const machine = new Actor({
 });
 
 machine.send(start.create());
-matches(machine, "running"); // true
+machine.snapshot().path[0] === "running"; // true
 ```
+
+:::tip[Sugar exists]
+Core API verbose on purpose. Shows what happens under hood.
+
+`@mantaq/sugar` has helpers: `matches(machine, "running")` instead of `snapshot().path[0] === "running"`. Batch creation, effect helpers, state grouping.
+
+Learn core first. Sugar second. You'll know _why_ each helper exists.
+:::

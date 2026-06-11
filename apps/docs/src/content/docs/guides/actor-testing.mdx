@@ -37,7 +37,6 @@ Events: `NEXT`
 ```ts
 import { Actor } from "@mantaq/core";
 import { state, event } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
 
 const green = state("green")();
 const yellow = state("yellow")();
@@ -99,7 +98,7 @@ Click buttons to send `NEXT` event and walk the graph:
 
 ```ts
 const actor = createTrafficLight();
-expect(matches(actor, "green")).toBe(true);
+expect(actor.snapshot().path[0]).toBe("green");
 expect(actor.snapshot().done).toBeFalsy();
 ```
 
@@ -107,13 +106,13 @@ expect(actor.snapshot().done).toBeFalsy();
 
 ```ts
 actor.send(next);
-expect(matches(actor, "yellow")).toBe(true);
+expect(actor.snapshot().path[0]).toBe("yellow");
 
 actor.send(next);
-expect(matches(actor, "red")).toBe(true);
+expect(actor.snapshot().path[0]).toBe("red");
 
 actor.send(next);
-expect(matches(actor, "green")).toBe(true); // cycle back
+expect(actor.snapshot().path[0]).toBe("green"); // cycle back
 ```
 
 ### Assert Context Changes
@@ -143,10 +142,10 @@ const clock = new VirtualClock();
 const actor = createActor(clock);
 
 actor.send(startEvent);
-expect(matches(actor, "loading")).toBe(true);
+expect(actor.snapshot().path[0]).toBe("loading");
 
 clock.advance(1000); // fast-forward time
-expect(matches(actor, "done")).toBe(true);
+expect(actor.snapshot().path[0]).toBe("done");
 ```
 
 ### Assert Final State
@@ -217,13 +216,13 @@ function createLoginActor() {
 describe("login actor", () => {
   it("idle → authenticating → authenticated", () => {
     const actor = createLoginActor();
-    expect(matches(actor, "idle")).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("idle");
 
     actor.send(login.create({ username: "user", password: "pass" }));
-    expect(matches(actor, "authenticating")).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("authenticating");
 
     actor.send(authDone);
-    expect(matches(actor, "authenticated")).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("authenticated");
     expect(actor.context.username).toBe("user");
   });
 
@@ -232,10 +231,10 @@ describe("login actor", () => {
 
     actor.send(login.create({ username: "user", password: "wrong" }));
     actor.send(authFail);
-    expect(matches(actor, "error")).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("error");
 
     actor.send(retry);
-    expect(matches(actor, "idle")).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("idle");
   });
 
   it("authenticated → logout → idle clears username", () => {
@@ -243,10 +242,10 @@ describe("login actor", () => {
 
     actor.send(login.create({ username: "user", password: "pass" }));
     actor.send(authDone);
-    expect(matches(actor, "authenticated")).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("authenticated");
 
     actor.send(logout);
-    expect(matches(actor, "idle")).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("idle");
     expect(actor.context.username).toBeUndefined();
   });
 });
@@ -259,6 +258,6 @@ describe("login actor", () => {
 - **Transitions are the graph** — `(state, event) → newState` maps edges
 - **Context is memory** — survives transitions, holds accumulated data
 - **Effects are side effects** — run on state entry, abort on exit
-- **`matches(actor, "state.path")`** — dot-notation for asserting position in graph
+- **`snapshot().path[0]`** — check current state name in graph
 - **`VirtualClock`** — deterministically test time-dependent transitions
 - **`snapshot().done`** — check if actor reached a final state

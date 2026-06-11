@@ -1,0 +1,55 @@
+---
+title: Sugar
+description: Convenience helpers for common patterns.
+---
+
+Sugar. Optional package. Wraps core primitives.
+
+Reduces boilerplate. Every pattern here possible in userland. Sugar saves typing.
+
+## What's inside
+
+| Helper                                           | What                        |
+| ------------------------------------------------ | --------------------------- |
+| `states()`, `events()`                           | Batch create states/events  |
+| `matches()`, `isIn()`, `activeLeaves()`, `tag()` | State matching and grouping |
+| `ActorMap`, `broadcast()`                        | Dynamic child management    |
+| `withPromise()`, `withTimeout()`                 | Effect helpers              |
+
+## Install
+
+```bash
+npm install @mantaq/sugar
+```
+
+Needs `@mantaq/core` installed.
+
+## Import
+
+```ts
+import { matches, states, events } from "@mantaq/sugar";
+```
+
+All exports from one entry point.
+
+## When to use
+
+Use sugar when:
+
+- Many states/events → `states()` saves lines
+- Frequent state checks → `matches()` cleaner than path inspection
+- Dynamic children → `ActorMap` handles registry
+- Promises in effects → `withPromise()` bridges them
+
+Skip sugar when:
+
+- Few states/events
+- Minimal state checks
+- No dynamic children
+- Custom effect patterns
+
+## Philosophy
+
+Sugar not required. Core sufficient for everything.
+
+Sugar = less code for common patterns. Nothing hidden. You could write every helper yourself.
