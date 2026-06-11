@@ -5,7 +5,7 @@ description: Visual state machine graph viewer for actors.
 
 import VizDemo from "../../../components/VizDemo.astro";
 
-The visualizer renders actor state machines as interactive graph diagrams using React Flow. States become nodes, transitions become labeled edges. Active states highlight green. Supports pan, zoom, minimap, and dark mode CSS variables.
+The visualizer renders actor state machines as interactive graph diagrams using X6 canvas rendering and Lit web components. States become nodes, transitions become labeled edges. Active states highlight. Supports pan, zoom, direction routing, and settings panel.
 
 ## Installation
 
@@ -13,84 +13,97 @@ The visualizer renders actor state machines as interactive graph diagrams using 
 npm install @mantaq/viz
 ```
 
-The package includes `@xyflow/react` as a dependency. Make sure React >=18 is installed in your project.
-
 ## Basic Usage
 
-```tsx
-import { Actor, state, event } from "@mantaq/core";
-import { ActorFlow, buildGraph } from "@mantaq/viz";
-import type { ActorGraph } from "@mantaq/viz";
-import { useState } from "react";
+### Web Component
 
-function MyFlow() {
-  const [graph, setGraph] = useState<ActorGraph>(() => buildGraph(myActor));
+```html
+<mantaq-viz id="my-viz"></mantaq-viz>
 
-  const sendEvent = (eventName) => {
-    myActor.send(someEvent);
-    setGraph(buildGraph(myActor));
-  };
+<script>
+  import "@mantaq/viz";
+  import { Actor, state, event } from "@mantaq/core";
 
-  return (
-    <div style={{ height: 400 }}>
-      <ActorFlow graph={graph} />
-    </div>
-  );
-}
+  const idle = state("idle")();
+  const running = state("running")();
+  const start = event("START")();
+
+  const actor = new Actor({
+    inputs: [start],
+    states: [idle, running],
+    initial: idle,
+    transitions: {
+      idle: { START: () => ({ state: running }) },
+    },
+  });
+
+  const el = document.getElementById("my-viz");
+  el.actor = actor;
+</script>
+```
+
+### Programmatic Rendering
+
+```ts
+import { buildGraph, renderActorFlow } from "@mantaq/viz";
+
+const graph = buildGraph(actor);
+const container = document.getElementById("graph-root");
+
+const instance = renderActorFlow(container, {
+  graph,
+  layoutOptions: { direction: "LR" },
+  onEdgeClick: (eventName) => actor.send(eventName),
+});
+
+// Update later
+instance.update(buildGraph(actor));
+
+// Cleanup
+instance.destroy();
 ```
 
 ## Features
 
 ### Graph Rendering
 
-`buildGraph(actor)` converts an actor snapshot into graph data:
+`buildGraph(actor, internalIds?)` converts an actor snapshot into graph data:
 
-- **Nodes** — one per state, with `id`, `label`, `isActive`, `isFinal`
+- **Nodes** — one per state, with `id`, `label`, `isActive`, `isFinal`, `isInitial`
 - **Edges** — one per transition, labeled with event ID, with `source`, `target`, `isActive`
-- **Active state highlighting** — active nodes render with a green border and background
-- **Final state indicator** — final states render with a double border
+- **Active state highlighting** — active nodes render with blue stroke and light background
+- **Final state indicator** — final states render with green stroke
+- **Initial node** — automatic initial state indicator (circle node)
+- **Effect edges** — internal/effect transitions render as dashed self-loops
 - **Self-loops** — transitions to the same state render correctly
 
-### React Flow Integration
+### Layout
 
-`actorGraphToFlow(graph, layoutOpts?)` converts graph data into React Flow nodes and edges with automatic layout positioning:
+`computeNodePositions(nodes, edges, opts?)` uses dagre for hierarchical layout:
 
 - Topological sort places nodes in layers (default: top-to-bottom)
 - Switch to `LR` direction for left-to-right layout
-- Customize spacing via `horizontalSpacing` and `verticalSpacing`
+- Customize spacing via `nodesep` and `ranksep`
+- Configure edge routing: `normal`, `orth`, `manhattan`, `metro`, `er`
 
-### `<ActorFlow>` Component
+### `<mantaq-viz>` Web Component
 
-Wraps React Flow with defaults: dots background, zoom controls, minimap, `fitView`. Accepts:
+Self-contained custom element with toolbar, settings panel, and graph rendering.
 
-| Prop        | Type            | Default | Description          |
-| ----------- | --------------- | ------- | -------------------- |
-| `graph`     | `ActorGraph`    | —       | Graph data to render |
-| `className` | `string`        | —       | CSS class appended   |
-| `style`     | `CSSProperties` | —       | Inline styles        |
+| Property | Type       | Description        |
+| -------- | ---------- | ------------------ |
+| `actor`  | `AnyActor` | Actor to visualize |
 
-### Pan, Zoom, and Minimap
+Features:
 
-Built into React Flow: mouse wheel zooms, click-drag pans, minimap shows overview. Zoom controls in bottom-left.
+- **Toolbar** — shows current state and available event buttons
+- **Settings panel** — direction, router, edge length controls
+- **Pan and zoom** — mouse drag and scroll wheel
+- **Auto-sync** — re-renders when actor state changes
 
-### CSS Custom Properties
+### Pan, Zoom, and Settings
 
-The visualizer uses CSS variables for theming:
-
-| Variable                   | Default                 | Purpose                |
-| -------------------------- | ----------------------- | ---------------------- |
-| `--viz-border`             | `#e5e7eb`               | Container border       |
-| `--viz-node-bg`            | `#ffffff`               | Node background        |
-| `--viz-node-border`        | `#d1d5db`               | Node border            |
-| `--viz-node-active-bg`     | `#dcfce7`               | Active node background |
-| `--viz-node-active-border` | `#22c55e`               | Active node border     |
-| `--viz-node-label`         | `#374151`               | Node label color       |
-| `--viz-accent`             | `#3b82f6`               | Selection ring         |
-| `--viz-edge-label-bg`      | `rgba(255,255,255,0.9)` | Edge label background  |
-| `--viz-edge-label-border`  | `#d1d5db`               | Edge label border      |
-| `--viz-edge-label-text`    | `#374151`               | Edge label text        |
-| `--viz-guard-color`        | `#ca8a04`               | Guard tag color        |
-| `--viz-action-color`       | `#2563eb`               | Action tag color       |
+Built into X6: mouse wheel zooms, click-drag pans. Settings gear icon opens direction/router/edge-length controls.
 
 ## Interactive Demo
 
@@ -107,60 +120,38 @@ import { computeNodePositions } from "@mantaq/viz";
 
 const positions = computeNodePositions(graph.nodes, graph.edges, {
   direction: "LR", // "TB" (default) or "LR"
-  horizontalSpacing: 220, // default
-  verticalSpacing: 120, // default
+  nodesep: 80, // horizontal gap between nodes
+  ranksep: 160, // vertical gap between levels
   nodeWidth: 160,
   nodeHeight: 60,
 });
 // positions is a Map<string, {x, y}>
 ```
 
-Or pass layout options to `actorGraphToFlow`:
-
-```ts
-const flow = actorGraphToFlow(graph, { direction: "LR" });
-```
-
 ## API Reference
 
-### `buildGraph(actor)`
+### `buildGraph(actor, internalIds?)`
 
 ```ts
-function buildGraph(actor: AnyActor): ActorGraph;
+function buildGraph(actor: AnyActor, internalIds?: Set<string>): ActorGraph;
 ```
 
 Converts actor snapshot into graph nodes and edges. Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`.
 
-### `actorGraphToFlow(graph, layoutOpts?)`
+### `renderActorFlow(parent, options)`
 
 ```ts
-function actorGraphToFlow(
-  graph: ActorGraph,
-  opts?: LayoutOptions,
-): { nodes: StateNode[]; edges: StateEdge[] };
+function renderActorFlow(
+  parent: HTMLElement,
+  options: {
+    graph: ActorGraph;
+    layoutOptions?: LayoutOptions;
+    onEdgeClick?: (eventName: string) => void;
+  },
+): ActorFlowInstance;
 ```
 
-Converts `ActorGraph` to React Flow-compatible nodes and edges with automatic layout.
-
-### `toReactFlowNodes(graphNodes, edges?, layoutOpts?)`
-
-```ts
-function toReactFlowNodes(
-  nodes: GraphNode[],
-  edges?: GraphEdge[],
-  opts?: LayoutOptions,
-): StateNode[];
-```
-
-Converts graph nodes to React Flow nodes with computed positions.
-
-### `toReactFlowEdges(graphEdges)`
-
-```ts
-function toReactFlowEdges(edges: GraphEdge[]): StateEdge[];
-```
-
-Converts graph edges to React Flow edges with `"state-edge"` type.
+Creates an X6 graph instance in the parent element. Returns `{ update(graph, opts?), destroy() }`.
 
 ### `computeNodePositions(nodes, edges, opts?)`
 
@@ -172,7 +163,7 @@ function computeNodePositions(
 ): Map<string, { x: number; y: number }>;
 ```
 
-Topological sort layout. Returns positions keyed by node ID.
+Dagre-based hierarchical layout. Returns positions keyed by node ID.
 
 ### `collectActiveStates(snapshot, prefix, activeSet)`
 
@@ -184,29 +175,26 @@ Populates a Set with IDs of currently active states from a snapshot. Used intern
 
 ### Components
 
-| Export      | Type            | Description                            |
-| ----------- | --------------- | -------------------------------------- |
-| `ActorFlow` | React component | Main renderer with React Flow          |
-| `nodeTypes` | `object`        | `{ state: StateNodeComponent }`        |
-| `edgeTypes` | `object`        | `{ "state-edge": StateEdgeComponent }` |
+| Export      | Type           | Description                  |
+| ----------- | -------------- | ---------------------------- |
+| `MantaqViz` | Custom Element | `<mantaq-viz>` web component |
 
 ### Types
 
-| Type                | Shape                                                                                                           |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `ActorGraph`        | `{ nodes: GraphNode[], edges: GraphEdge[] }`                                                                    |
-| `GraphNode`         | `{ id: string, label: string, isActive: boolean, isFinal: boolean }`                                            |
-| `GraphEdge`         | `{ id: string, source: string, target: string, label: string, isActive: boolean, payload?: TransitionPayload }` |
-| `TransitionPayload` | `{ guard?: string, action?: string, meta?: Record<string, unknown> }`                                           |
-| `StateNode`         | React Flow `Node<StateNodeData, "state">`                                                                       |
-| `StateEdge`         | React Flow `Edge<StateEdgeData, "state-edge">`                                                                  |
-| `LayoutOptions`     | `{ direction?: "TB"                                                                                             | "LR", nodeWidth?: number, nodeHeight?: number, horizontalSpacing?: number, verticalSpacing?: number }` |
+| Type                | Shape                                                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ActorGraph`        | `{ nodes: GraphNode[], edges: GraphEdge[] }`                                                                                                                               |
+| `GraphNode`         | `{ id: string, label: string, isActive: boolean, isFinal: boolean, isInitial?: boolean }`                                                                                  |
+| `GraphEdge`         | `{ id: string, source: string, target: string, label: string, isActive: boolean, isInternal?: boolean, payload?: TransitionPayload }`                                      |
+| `TransitionPayload` | `{ guard?: string, action?: string, meta?: Record<string, unknown> }`                                                                                                      |
+| `LayoutOptions`     | `{ direction?: "TB" \| "LR", nodeWidth?: number, nodeHeight?: number, nodesep?: number, ranksep?: number, router?: "normal" \| "orth" \| "manhattan" \| "metro" \| "er" }` |
+| `ActorFlowInstance` | `{ update(graph, opts?), destroy() }`                                                                                                                                      |
 
 ## Known Issues
 
 - **Region grouping** — Child states of regions render at the same level as parent states without visual grouping.
-- **Edge detail** — Edge labels show event IDs. Guard conditions and action metadata appear as inline tags when available.
-- **Layout simplicity** — Uses topological sort. For complex graphs (many cross-edges), consider manual positioning via `computeNodePositions`.
+- **Edge detail** — Edge labels show event IDs. Guard conditions and action metadata parsed from handler source.
+- **Layout simplicity** — Uses dagre. For complex graphs, consider manual positioning via `computeNodePositions`.
 
 ## Planned
 
@@ -214,5 +202,5 @@ Populates a Set with IDs of currently active states from a snapshot. Used intern
 - Smooth transition animations
 - Actor tree hierarchy panel
 - Event history panel
-- Custom layout algorithms (ELK.js integration)
+- Custom layout algorithms
 - Accessibility improvements

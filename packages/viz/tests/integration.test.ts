@@ -2,7 +2,6 @@
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, state, event } from "@mantaq/core";
 import { buildGraph } from "../src/graph.ts";
-import { actorGraphToFlow, toReactFlowNodes, toReactFlowEdges } from "../src/react-flow-adapter.ts";
 
 function createTrafficLight() {
   const green = state("green")();
@@ -63,13 +62,13 @@ function createWithRegions() {
   });
 }
 
-describe("integration: actor -> graph -> react flow", () => {
+describe("integration: actor -> graph", () => {
   it("builds graph from traffic light actor", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
 
-    expect(graph.nodes.length).toBe(3);
-    expect(graph.edges.length).toBeGreaterThanOrEqual(3);
+    expect(graph.nodes.length).toBe(4);
+    expect(graph.edges.length).toBeGreaterThanOrEqual(4);
 
     const labels = graph.nodes.map((n) => n.label);
     expect(labels).toContain("green");
@@ -77,63 +76,30 @@ describe("integration: actor -> graph -> react flow", () => {
     expect(labels).toContain("red");
   });
 
-  it("converts graph to React Flow nodes", () => {
+  it("preserves active state", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
-    const nodes = toReactFlowNodes(graph.nodes);
 
-    expect(nodes.length).toBe(3);
-    for (const node of nodes) {
-      expect(node.type).toBe("state");
-      expect(node.data).toBeDefined();
-      expect(typeof node.data.label).toBe("string");
-      expect(typeof node.data.isActive).toBe("boolean");
-      expect(typeof node.data.isFinal).toBe("boolean");
-    }
-  });
+    expect(graph.nodes.length).toBe(4);
 
-  it("converts graph to React Flow edges", () => {
-    const actor = createTrafficLight();
-    const graph = buildGraph(actor);
-    const edges = toReactFlowEdges(graph.edges);
-
-    expect(edges.length).toBeGreaterThanOrEqual(3);
-    for (const edge of edges) {
-      expect(edge.type).toBe("state-edge");
-      expect(typeof edge.source).toBe("string");
-      expect(typeof edge.target).toBe("string");
-      expect(typeof edge.label).toBe("string");
-    }
-  });
-
-  it("full conversion preserves active state", () => {
-    const actor = createTrafficLight();
-    const graph = buildGraph(actor);
-    const flow = actorGraphToFlow(graph);
-
-    expect(flow.nodes.length).toBe(3);
-    expect(flow.edges.length).toBeGreaterThanOrEqual(3);
-
-    const activeNodes = flow.nodes.filter((n) => n.data.isActive);
+    const activeNodes = graph.nodes.filter((n) => n.isActive);
     expect(activeNodes.length).toBe(1);
-    expect(activeNodes[0].data.label).toBe("green");
+    expect(activeNodes[0].label).toBe("green");
   });
 
   it("graph updates after transition", () => {
     const actor = createTrafficLight();
     let graph = buildGraph(actor);
-    let flow = actorGraphToFlow(graph);
 
-    let active = flow.nodes.find((n) => n.data.isActive);
-    expect(active!.data.label).toBe("green");
+    let active = graph.nodes.find((n) => n.isActive);
+    expect(active!.label).toBe("green");
 
     const next = event("NEXT")();
     actor.send(next);
 
     graph = buildGraph(actor);
-    flow = actorGraphToFlow(graph);
-    active = flow.nodes.find((n) => n.data.isActive);
-    expect(active!.data.label).toBe("yellow");
+    active = graph.nodes.find((n) => n.isActive);
+    expect(active!.label).toBe("yellow");
   });
 
   it("full cycle: green -> yellow -> red -> green", () => {
@@ -164,28 +130,22 @@ describe("integration: actor -> graph -> react flow", () => {
     const labels = graph.nodes.map((n) => n.label);
     expect(labels).toContain("parent");
     expect(labels).toContain("subA");
-
-    const flow = actorGraphToFlow(graph);
-    expect(flow.nodes.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("node IDs are consistent between graph and flow", () => {
+  it("node IDs are unique across the graph", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
-    const flow = actorGraphToFlow(graph);
 
-    const graphIds = new Set(graph.nodes.map((n) => n.id));
-    const flowIds = new Set(flow.nodes.map((n) => n.id));
-    expect(flowIds).toEqual(graphIds);
+    const ids = graph.nodes.map((n) => n.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("edge source/target reference valid node IDs", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
-    const flow = actorGraphToFlow(graph);
 
-    const nodeIds = new Set(flow.nodes.map((n) => n.id));
-    for (const edge of flow.edges) {
+    const nodeIds = new Set(graph.nodes.map((n) => n.id));
+    for (const edge of graph.edges) {
       expect(nodeIds.has(edge.source)).toBe(true);
       expect(nodeIds.has(edge.target)).toBe(true);
     }

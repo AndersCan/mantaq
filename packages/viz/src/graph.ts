@@ -1,10 +1,13 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
 
+export const INITIAL_NODE_ID = "__initial__";
+
 export interface GraphNode {
   id: string;
   label: string;
   isActive: boolean;
   isFinal: boolean;
+  isInitial?: boolean;
 }
 
 export interface TransitionPayload {
@@ -19,6 +22,9 @@ export interface GraphEdge {
   target: string;
   label: string;
   isActive: boolean;
+  isInternal?: boolean;
+  effectLabel?: string;
+  timerMs?: number;
   payload?: TransitionPayload;
 }
 
@@ -71,6 +77,7 @@ function buildEdgesFromTransitions(
   transitions: Record<string, Record<string, unknown>> | undefined,
   activeSet: Set<string>,
   pathPrefix: string,
+  internalIds?: Set<string>,
 ): GraphEdge[] {
   const edges: GraphEdge[] = [];
   if (!transitions) return edges;
@@ -118,7 +125,37 @@ function buildEdgesFromTransitions(
         target: nodeId(pathPrefix, targetName),
         label: eventId,
         isActive: activeSet.has(sourceId),
+        isInternal: internalIds?.has(eventId),
         payload,
+      });
+    }
+  }
+
+  return edges;
+}
+
+function buildEffectEdges(
+  activeSet: Set<string>,
+  pendingTimers?: Array<{ id: number; ms: number }>,
+): GraphEdge[] {
+  const edges: GraphEdge[] = [];
+  if (!pendingTimers || pendingTimers.length === 0) return edges;
+
+  for (const activeId of activeSet) {
+    // Get active state name from id
+    const stateName = activeId.split(".").pop() ?? "";
+    const displayName = stateName.charAt(0).toUpperCase() + stateName.slice(1);
+
+    for (const timer of pendingTimers) {
+      edges.push({
+        id: `${activeId}-effect-${timer.id}`,
+        source: activeId,
+        target: activeId,
+        label: `EFFECT_${timer.id}`,
+        isActive: true,
+        isInternal: true,
+        effectLabel: `${displayName} Effect ${timer.id}`,
+        timerMs: timer.ms,
       });
     }
   }
@@ -130,6 +167,8 @@ function buildForActor(
   actor: AnyActor,
   pathPrefix: string,
   activeSet: Set<string>,
+  internalIds?: Set<string>,
+  pendingTimers?: Array<{ id: number; ms: number }>,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   if (!actor) return { nodes: [], edges: [] };
   const states = (actor.options?.states ?? []) as Array<{ name: string; isFinal: boolean }>;
@@ -139,11 +178,22 @@ function buildForActor(
     actor.options?.transitions as Record<string, Record<string, unknown>> | undefined,
     activeSet,
     pathPrefix,
+    internalIds,
   );
+
+  // Add effect edges as self-loops on active states
+  const effectEdges = buildEffectEdges(activeSet, pendingTimers);
+  edges.push(...effectEdges);
 
   if (actor.regions) {
     for (const [regionName, childActor] of Object.entries(actor.regions)) {
-      const child = buildForActor(childActor, nodeId(pathPrefix, regionName), activeSet);
+      const child = buildForActor(
+        childActor,
+        nodeId(pathPrefix, regionName),
+        activeSet,
+        internalIds,
+        pendingTimers,
+      );
       nodes.push(...child.nodes);
       edges.push(...child.edges);
     }
@@ -152,7 +202,7 @@ function buildForActor(
   return { nodes, edges };
 }
 
-export function buildGraph(actor: AnyActor): ActorGraph {
+export function buildGraph(actor: AnyActor, internalIds?: Set<string>): ActorGraph {
   if (!actor) {
     return { nodes: [], edges: [] };
   }
@@ -161,7 +211,36 @@ export function buildGraph(actor: AnyActor): ActorGraph {
     const activeSet = new Set<string>();
     collectActiveStates(snapshot, "", activeSet);
 
-    const { nodes, edges } = buildForActor(actor, "", activeSet);
+    // Get pending timers from the actor's clock if available
+    let pendingTimers: Array<{ id: number; ms: number }> | undefined;
+    const clock = actor.clock as {
+      pendingTimers?: () => Array<{ id: number; deadline: number; ms: number }>;
+    };
+    if (typeof clock.pendingTimers === "function") {
+      pendingTimers = clock.pendingTimers().map((t) => ({ id: t.id, ms: t.ms }));
+    }
+
+    const { nodes, edges } = buildForActor(actor, "", activeSet, internalIds, pendingTimers);
+
+    const initialName = (actor.options as { initial?: { name?: string } })?.initial?.name;
+    if (initialName) {
+      const initNodeId = nodeId("", INITIAL_NODE_ID);
+      const targetId = nodeId("", initialName);
+      nodes.push({
+        id: initNodeId,
+        label: "",
+        isActive: false,
+        isFinal: false,
+        isInitial: true,
+      });
+      edges.push({
+        id: `${initNodeId}->${targetId}`,
+        source: initNodeId,
+        target: targetId,
+        label: "",
+        isActive: true,
+      });
+    }
 
     return {
       nodes,
