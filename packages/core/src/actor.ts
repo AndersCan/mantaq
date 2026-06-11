@@ -1,5 +1,5 @@
-import type { AnyStateRef, StateRef, TransitionState } from "./state.ts";
-import { TransitionState as TransitionStateClass } from "./state.ts";
+import { StateRef } from "./state.ts";
+import type { AnyStateRef } from "./state.ts";
 import type { AnyEventRef, EventRef, InternalEvent } from "./event.ts";
 
 const IS_DEV =
@@ -483,13 +483,16 @@ export class Actor<
   #applyTransition(event: Inputs[number] | InternalEvent, step: TransitionResult): void {
     if (step.state) {
       this.#effectAbort?.abort();
+      let targetState: AnyStateRef;
       let payload: unknown;
-      if (step.state instanceof TransitionStateClass) {
-        payload = step.state.__payload;
-        this.state = step.state.__stateRef as States[number];
+      if (step.state instanceof StateRef) {
+        targetState = step.state;
+        payload = step.payload;
       } else {
-        this.state = step.state as States[number];
+        targetState = step.state.state;
+        payload = step.state.payload;
       }
+      this.state = targetState as States[number];
       this.#runEffects(event, payload);
       for (const fn of this.#subscribers) {
         fn(this.snapshot());
@@ -614,25 +617,21 @@ type TransitionHandler<AC> = (
 ) => TransitionResult;
 
 type TransitionResult = {
-  state?: AnyStateRef | TransitionState<string, unknown>;
+  state?: AnyStateRef | { state: AnyStateRef; payload?: unknown };
+  payload?: unknown;
   emit?: Array<{ id: string }>;
 };
 
 type InitialState<S> =
-  S extends StateRef<infer N extends string, infer P>
+  S extends StateRef<infer _N extends string, infer P>
     ? unknown extends P
-      ? S | TransitionState<N, P> | { state: S; payload?: P }
-      : TransitionState<N, P> | { state: S; payload: P }
+      ? S | { state: S; payload?: P }
+      : { state: S; payload: P }
     : never;
 
 function resolveInitial<S>(
   initial: InitialState<S>,
 ): S extends StateRef<infer N, infer P> ? { state: StateRef<N, P>; payload?: P } : never {
-  if (initial instanceof TransitionStateClass) {
-    return { state: initial.__stateRef, payload: initial.__payload } as ReturnType<
-      typeof resolveInitial<S>
-    >;
-  }
   const result =
     typeof initial === "object" && initial !== null && "state" in initial
       ? initial

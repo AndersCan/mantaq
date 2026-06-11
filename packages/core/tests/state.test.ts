@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { state, StateRef, TransitionState } from "../src/state.ts";
+import { state, StateRef } from "../src/state.ts";
 
 test("state creates a StateRef with correct name", () => {
   const s = state("idle")();
@@ -70,25 +70,25 @@ test("regions() called twice overwrites", () => {
   expect(s._regions!.right).toBeDefined();
 });
 
-describe("TransitionState", () => {
-  test("stores state ref and payload", () => {
+describe("StateRef.create()", () => {
+  test("returns plain object with state and payload", () => {
     const s = state("loaded")<{ data: string }>();
-    const ts = new TransitionState(s, { data: "hello" });
-    expect(ts.__stateRef).toBe(s);
-    expect(ts.__payload).toEqual({ data: "hello" });
+    const result = s.create({ data: "hello" });
+    expect(result.state).toBe(s);
+    expect(result.payload).toEqual({ data: "hello" });
   });
 
   test("payload can be undefined", () => {
     const s = state("empty")();
-    const ts = new TransitionState(s, undefined);
-    expect(ts.__stateRef).toBe(s);
-    expect(ts.__payload).toBeUndefined();
+    const result = s.create(undefined);
+    expect(result.state).toBe(s);
+    expect(result.payload).toBeUndefined();
   });
 
   test("payload is mutable", () => {
     const s = state("loaded")<{ data: string }>();
-    const ts = new TransitionState(s, { data: "hello" });
-    ts.__payload.data = "world";
-    expect(ts.__payload).toEqual({ data: "world" });
+    const result = s.create({ data: "hello" });
+    result.payload.data = "world";
+    expect(result.payload).toEqual({ data: "world" });
   });
 });

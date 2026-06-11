@@ -186,7 +186,7 @@ const actor = new Actor({
   transitions: {
     idle: {
       FETCH: (event) => {
-        return { state: loadingState, payload: { url: event.url } };
+        return { state: loadingState.create({ url: event.url }) };
       },
     },
   },
@@ -197,7 +197,7 @@ const actor = new Actor({
 
 ```ts
 // ✅ state payload — scoped to this state entry
-return { state: loadingState, payload: { url: event.url } };
+return { state: loadingState.create({ url: event.url }) };
 
 // ⚠️ context — works but shared across all states
 context.url = event.url;
@@ -509,11 +509,11 @@ effects: {
 transitions: {
   working: {
     WORK_DONE: (event) => {
-      return { state: doneState, payload: { result: event.result } };
+      return { state: doneState.create({ result: event.result }) };
     },
     WORK_FAILED: (event) => {
       // handle error in transition, not in effect
-      return { state: errorState, payload: { error: event.error } };
+      return { state: errorState.create({ error: event.error }) };
     },
   },
 }

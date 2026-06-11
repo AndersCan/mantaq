@@ -40,9 +40,9 @@ export default new Map([
       import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fguides%2Factor-testing.mdx&astroContentModuleFlag=true"),
   ],
   [
-    "src/content/docs/guides/visualizer.mdx",
+    "src/content/docs/guides/viz.mdx",
     () =>
-      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fguides%2Fvisualizer.mdx&astroContentModuleFlag=true"),
+      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fguides%2Fviz.mdx&astroContentModuleFlag=true"),
   ],
   [
     "src/content/docs/index.mdx",
@@ -60,8 +60,33 @@ export default new Map([
       import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Freference%2Fsugar.mdx&astroContentModuleFlag=true"),
   ],
   [
-    "src/content/docs/reference/visualizer.mdx",
+    "src/content/docs/reference/viz.mdx",
     () =>
-      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Freference%2Fvisualizer.mdx&astroContentModuleFlag=true"),
+      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Freference%2Fviz.mdx&astroContentModuleFlag=true"),
+  ],
+  [
+    "src/content/docs/sugar/batch-creation.mdx",
+    () =>
+      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fsugar%2Fbatch-creation.mdx&astroContentModuleFlag=true"),
+  ],
+  [
+    "src/content/docs/sugar/dynamic-children.mdx",
+    () =>
+      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fsugar%2Fdynamic-children.mdx&astroContentModuleFlag=true"),
+  ],
+  [
+    "src/content/docs/sugar/effect-helpers.mdx",
+    () =>
+      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fsugar%2Feffect-helpers.mdx&astroContentModuleFlag=true"),
+  ],
+  [
+    "src/content/docs/sugar/index.mdx",
+    () =>
+      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fsugar%2Findex.mdx&astroContentModuleFlag=true"),
+  ],
+  [
+    "src/content/docs/sugar/matching.mdx",
+    () =>
+      import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fsugar%2Fmatching.mdx&astroContentModuleFlag=true"),
   ],
 ]);
