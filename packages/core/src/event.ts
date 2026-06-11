@@ -10,13 +10,12 @@ export type InternalEvent = { id: string } & Record<string, unknown>;
 
 export class EventRef<const T extends string, Payload = unknown> {
   id: T;
-  payload: Payload | undefined;
 
   constructor(id: T) {
     this.id = id;
   }
 
-  is(anyEvent: unknown): anyEvent is typeof this {
+  is(anyEvent: unknown): anyEvent is Payload & { id: T } {
     return (
       !!anyEvent &&
       typeof anyEvent === "object" &&

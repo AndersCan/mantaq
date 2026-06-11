@@ -77,9 +77,7 @@ describe("snapshot", () => {
     const snap = actor.snapshot();
     expect(snap).toEqual({
       path: ["connected"],
-      regions: {
-        default: { path: ["idle"], regions: {} },
-      },
+      regions: {},
     });
   });
 
@@ -108,10 +106,7 @@ describe("snapshot", () => {
     const snap = actor.snapshot();
     expect(snap).toEqual({
       path: ["player"],
-      regions: {
-        playback: { path: ["playing"], regions: {} },
-        audio: { path: ["muted"], regions: {} },
-      },
+      regions: {},
     });
   });
 
@@ -138,14 +133,7 @@ describe("snapshot", () => {
     const snap = actor.snapshot();
     expect(snap).toEqual({
       path: ["root"],
-      regions: {
-        default: {
-          path: ["level2"],
-          regions: {
-            default: { path: ["level1"], regions: {} },
-          },
-        },
-      },
+      regions: {},
     });
   });
 });

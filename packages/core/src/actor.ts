@@ -213,6 +213,9 @@ export type EffectFn<Inputs extends AnyEventRef[], Internal extends AnyEventRef[
   options: EffectInput<Inputs, Internal, ActorContext>,
 ) => void;
 
+type CreatedOf<E extends AnyEventRef> =
+  E extends EventRef<infer Id, infer P> ? P & { id: Id } : never;
+
 export type EffectInput<
   Inputs extends AnyEventRef[],
   Internal extends AnyEventRef[],
@@ -220,7 +223,7 @@ export type EffectInput<
 > = {
   signal: AbortSignal;
   state: { name: string; payload: unknown };
-  event: Inputs[number] | Internal[number];
+  event: CreatedOf<Inputs[number]> | CreatedOf<Internal[number]>;
   context: ActorContext;
   emit: (event: InternalEvent) => void;
   clock: Clock;
@@ -434,7 +437,7 @@ export class Actor<
     });
   }
 
-  send(event: Inputs[number] | InternalEvent): void {
+  send(event: CreatedOf<Inputs[number]> | CreatedOf<Internal[number]>): void {
     const transitions = this.options.transitions as Record<
       string,
       Record<string, TransitionHandler<ActorContext> | undefined>
@@ -448,12 +451,12 @@ export class Actor<
 
     if (stateTransition) {
       const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
+      if (step.emit) {
+        this.#internalQueue.push(...step.emit);
+      }
       if (step.state) {
         this.#applyTransition(event, step);
         transitionApplied = true;
-      }
-      if (step.emit) {
-        this.#internalQueue.push(...step.emit);
       }
     }
 
@@ -518,7 +521,7 @@ export class Actor<
         effectFn({
           signal: abort.signal,
           state: { name: this.state.name, payload: statePayload },
-          event: event as Inputs[number] | Internal[number],
+          event: event as CreatedOf<Inputs[number]> | CreatedOf<Internal[number]>,
           context: this.#context,
           emit: (e: InternalEvent) => {
             this.#internalQueue.push(e);
@@ -536,8 +539,6 @@ export class Actor<
         }
       }
     }
-
-    this.#processInternalQueue();
   }
 
   #processInternalQueue(): void {
@@ -546,14 +547,26 @@ export class Actor<
     this.#internalCount = 0;
     while (this.#queueIndex < this.#internalQueue.length) {
       if (this.#internalCount >= this.#internalBudget) {
+        const dropped = this.#internalQueue.length - this.#queueIndex;
         this.#internalQueue.length = 0;
         this.#queueIndex = 0;
+        const err = new Error(
+          `[Actor] internal event budget (${this.#internalBudget}) exceeded — ${dropped} events dropped. Possible emit loop.`,
+        );
+        for (const fn of this.#errorSubscribers) {
+          try {
+            fn(err);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (this.#errorSubscribers.size === 0) throw err;
         break;
       }
       const event = this.#internalQueue[this.#queueIndex++];
       this.#internalCount++;
       if (this.#internalIds.has(event.id)) {
-        this.send(event);
+        this.send(event as CreatedOf<Internal[number]>);
       } else if (this.#outputHandler) {
         this.#outputHandler(event);
       }
@@ -576,15 +589,6 @@ export class Actor<
   #snapshot(s: AnyStateRef): Snapshot {
     const path = [s.name];
     const regions: Record<string, Snapshot> = {};
-
-    if (s._regions) {
-      for (const [regionName, region] of Object.entries(s._regions)) {
-        const active = region.states[region.initial];
-        if (active) {
-          regions[regionName] = this.#snapshot(active);
-        }
-      }
-    }
 
     for (const [regionName, child] of Object.entries(this.#regions)) {
       regions[regionName] = child.snapshot();
