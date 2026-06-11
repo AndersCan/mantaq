@@ -3,10 +3,10 @@ title: "@mantaq/viz"
 description: Visualizer API reference.
 ---
 
-## `buildGraph(actor)`
+## `buildGraph(actor, internalIds?)`
 
 ```ts
-function buildGraph(actor: AnyActor): ActorGraph;
+function buildGraph(actor: AnyActor, internalIds?: Set<string>): ActorGraph;
 ```
 
 Converts actor snapshot into graph nodes and edges.
@@ -20,23 +20,25 @@ Converts actor snapshot into graph nodes and edges.
 
 ### `GraphNode`
 
-| Property   | Type      | What              |
-| ---------- | --------- | ----------------- |
-| `id`       | `string`  | Node ID           |
-| `label`    | `string`  | State name        |
-| `isActive` | `boolean` | Currently active? |
-| `isFinal`  | `boolean` | Terminal state?   |
+| Property    | Type      | What              |
+| ----------- | --------- | ----------------- |
+| `id`        | `string`  | Node ID           |
+| `label`     | `string`  | State name        |
+| `isActive`  | `boolean` | Currently active? |
+| `isFinal`   | `boolean` | Terminal state?   |
+| `isInitial` | `boolean` | Initial state?    |
 
 ### `GraphEdge`
 
-| Property   | Type                 | What              |
-| ---------- | -------------------- | ----------------- |
-| `id`       | `string`             | Edge ID           |
-| `source`   | `string`             | Source node ID    |
-| `target`   | `string`             | Target node ID    |
-| `label`    | `string`             | Event ID          |
-| `isActive` | `boolean`            | Source is active? |
-| `payload`  | `TransitionPayload?` | Guard/action info |
+| Property     | Type                 | What              |
+| ------------ | -------------------- | ----------------- |
+| `id`         | `string`             | Edge ID           |
+| `source`     | `string`             | Source node ID    |
+| `target`     | `string`             | Target node ID    |
+| `label`      | `string`             | Event ID          |
+| `isActive`   | `boolean`            | Source is active? |
+| `isInternal` | `boolean`            | Internal/effect?  |
+| `payload`    | `TransitionPayload?` | Guard/action info |
 
 ### `TransitionPayload`
 
@@ -68,32 +70,88 @@ function computeNodePositions(
 ): Map<string, { x: number; y: number }>;
 ```
 
-Topological sort layout. Returns positions keyed by node ID.
+Dagre-based hierarchical layout. Returns positions keyed by node ID.
 
 ### `LayoutOptions`
 
-| Option              | Type           | Default | Description                    |
-| ------------------- | -------------- | ------- | ------------------------------ |
-| `direction`         | `"TB" \| "LR"` | `"TB"`  | Top-to-bottom or left-to-right |
-| `nodeWidth`         | `number`       | `160`   | Node width for spacing         |
-| `nodeHeight`        | `number`       | `60`    | Node height for spacing        |
-| `horizontalSpacing` | `number`       | `220`   | Horizontal gap between levels  |
-| `verticalSpacing`   | `number`       | `120`   | Vertical gap between nodes     |
+| Option       | Type                                                   | Default    | Description                    |
+| ------------ | ------------------------------------------------------ | ---------- | ------------------------------ |
+| `direction`  | `"TB" \| "LR"`                                         | `"TB"`     | Top-to-bottom or left-to-right |
+| `nodeWidth`  | `number`                                               | `160`      | Node width for spacing         |
+| `nodeHeight` | `number`                                               | `60`       | Node height for spacing        |
+| `nodesep`    | `number`                                               | `80`       | Horizontal gap between nodes   |
+| `ranksep`    | `number`                                               | `160`      | Vertical gap between levels    |
+| `router`     | `"normal" \| "orth" \| "manhattan" \| "metro" \| "er"` | `"normal"` | Edge routing algorithm         |
+
+---
+
+## `renderActorFlow(parent, options)`
+
+```ts
+function renderActorFlow(
+  parent: HTMLElement,
+  options: {
+    graph: ActorGraph;
+    layoutOptions?: LayoutOptions;
+    onEdgeClick?: (eventName: string) => void;
+  },
+): ActorFlowInstance;
+```
+
+Creates an X6 graph in the parent element. Returns `ActorFlowInstance`.
+
+### `ActorFlowInstance`
+
+| Method                          | Description                  |
+| ------------------------------- | ---------------------------- |
+| `update(graph, layoutOptions?)` | Update the graph             |
+| `destroy()`                     | Dispose X6 graph and cleanup |
 
 ---
 
 ## Components
 
-### `<ActorFlow>`
+### `<mantaq-viz>`
 
-React component wrapping React Flow. Renders an interactive diagram with pan and zoom.
+Web component for interactive state machine visualization.
 
-```tsx
-<ActorFlow graph={graph} className="my-flow" style={{ height: 500 }} />
+```html
+<mantaq-viz id="my-viz"></mantaq-viz>
 ```
 
-| Prop        | Type                  | Default | Description          |
-| ----------- | --------------------- | ------- | -------------------- |
-| `graph`     | `ActorGraph`          | —       | Graph data to render |
-| `className` | `string`              | —       | Additional CSS class |
-| `style`     | `React.CSSProperties` | —       | Inline styles        |
+```ts
+const el = document.getElementById("my-viz");
+el.actor = myActor;
+```
+
+| Property | Type       | Description        |
+| -------- | ---------- | ------------------ |
+| `actor`  | `AnyActor` | Actor to visualize |
+
+Features:
+
+- Toolbar with state display and event buttons
+- Settings panel (direction, router, edge length)
+- Pan and zoom via X6
+- Auto-sync on actor state changes
+
+---
+
+## CSS Custom Properties
+
+| Variable                   | Default   | Purpose                |
+| -------------------------- | --------- | ---------------------- |
+| `--viz-border`             | `#e5e7eb` | Container border       |
+| `--viz-node-bg`            | `#ffffff` | Node background        |
+| `--viz-node-border`        | `#d1d5db` | Node border            |
+| `--viz-node-active-bg`     | `#dcfce7` | Active node background |
+| `--viz-node-active-border` | `#22c55e` | Active node border     |
+| `--viz-node-label`         | `#374151` | Node label color       |
+| `--viz-accent`             | `#3b82f6` | Selection ring         |
+| `--viz-edge-color`         | `#9ca3af` | Edge stroke            |
+| `--viz-edge-active`        | `#3b82f6` | Active edge stroke     |
+| `--viz-edge-label`         | `#6b7280` | Edge label text        |
+| `--viz-text`               | `#1f2937` | Primary text           |
+| `--viz-text-muted`         | `#6b7280` | Muted text             |
+| `--viz-panel-bg`           | `#ffffff` | Panel background       |
+| `--viz-panel-border`       | `#e5e7eb` | Panel border           |

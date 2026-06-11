@@ -1,6 +1,6 @@
 # @mantaq/viz
 
-Actor model state machine visualizer using React Flow.
+Actor model state machine visualizer using X6 and Lit web components.
 
 ## Installation
 
@@ -8,30 +8,21 @@ Actor model state machine visualizer using React Flow.
 pnpm add @mantaq/viz
 ```
 
-Requires React >= 18.
-
 ## Usage
 
-```tsx
-import { Actor, state, event } from "@mantaq/core";
-import { ActorFlow, buildGraph } from "@mantaq/viz";
-import type { ActorGraph } from "@mantaq/viz";
-import { useState } from "react";
+### HTML
 
-function MyFlow() {
-  const [graph, setGraph] = useState<ActorGraph>(() => buildGraph(myActor));
+```html
+<mantaq-viz></mantaq-viz>
+```
 
-  const sendEvent = (eventName) => {
-    myActor.send(someEvent);
-    setGraph(buildGraph(myActor));
-  };
+### Set Actor
 
-  return (
-    <div style={{ height: 400 }}>
-      <ActorFlow graph={graph} />
-    </div>
-  );
-}
+```ts
+import "@mantaq/viz";
+
+const el = document.querySelector("mantaq-viz");
+el.actor = myActor;
 ```
 
 ## API
@@ -39,17 +30,50 @@ function MyFlow() {
 ### Functions
 
 - `buildGraph(actor)` - Convert actor snapshot to graph nodes/edges
-- `collectActiveStates(snapshot, prefix, activeSet)` - Collect active state IDs from snapshot
-- `actorGraphToFlow(graph, opts?)` - Convert ActorGraph to React Flow nodes/edges
-- `toReactFlowNodes(nodes, edges?, opts?)` - Convert graph nodes to React Flow nodes
-- `toReactFlowEdges(edges)` - Convert graph edges to React Flow edges
-- `computeNodePositions(nodes, edges, opts?)` - Topological sort layout
+- `flattenNodes(graph)` - Flatten nested graph nodes
+- `computeLayout(graph)` - Compute ELK.js layout
+- `defaultPositions(nodes, dimensions)` - Compute default node positions
+- `collectEdges(graph)` - Collect all edges from graph
+- `getTransitionsForNode(graph, nodeId)` - Get transitions for a node
+- `estimateNodeWidth(label, minWidth)` - Estimate node width from label
+- `setActor(actor)` - Set actor in store and trigger layout
+- `updateLayout(graph)` - Recompute layout
+- `selectNode(nodeId)` - Select a node
+- `setViewport(width, height)` - Set viewport dimensions
+- `setZoom(value)` - Set zoom level
+- `zoomIn()` / `zoomOut()` - Zoom controls
+- `zoomToFit()` - Fit graph to viewport
+- `resetView()` - Reset zoom and pan
+- `startActorSync()` - Auto-sync graph when actor state changes
+- `applyDarkTheme()` / `removeDarkTheme()` - Toggle dark mode
+
+### Stores
+
+- `$actor` - Current actor
+- `$graph` - Computed graph
+- `$layout` - Computed layout result
+- `$layoutLoading` - Whether layout computation is in progress
+- `$selectedNodeId` - Selected node ID
+- `$selectedNode` - Selected node object
+- `$flatNodes` - Flattened list of positioned nodes
+- `$edges` - Positioned edges
+- `$zoom` / `$pan` - Viewport state
+- `$viewport` - Viewport dimensions
+- `$graphDimensions` - Graph dimensions
+- `$layoutError` - Layout error message
 
 ### Components
 
-- `ActorFlow` - Main React Flow renderer with pan/zoom/minimap
-- `nodeTypes` - `{ state: StateNodeComponent }`
-- `edgeTypes` - `{ "state-edge": StateEdgeComponent }`
+- `<actor-graph>` - Main container with pan/zoom/keyboard
+- `<state-node>` - Individual state node
+- `renderEdge(edge)` - Edge rendering function
+
+## Keyboard Shortcuts
+
+- `+` / `=` - Zoom in
+- `-` - Zoom out
+- `0` - Reset view
+- `F` - Zoom to fit
 
 ## Development
 

@@ -73,7 +73,7 @@ describe("buildGraph", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
-    expect(graph.nodes.length).toBe(3);
+    expect(graph.nodes.length).toBe(4);
     expect(graph.nodes.map((n) => n.label)).toEqual(
       expect.arrayContaining(["idle", "loading", "done"]),
     );
@@ -152,8 +152,8 @@ describe("buildGraph", () => {
     const actor = createThreeStateActor();
     const graph = buildGraph(actor);
 
-    expect(graph.nodes.length).toBe(3);
-    expect(graph.edges.length).toBeGreaterThanOrEqual(3);
+    expect(graph.nodes.length).toBe(4);
+    expect(graph.edges.length).toBeGreaterThanOrEqual(4);
   });
 
   it("graph updates after transition", () => {
@@ -183,8 +183,9 @@ describe("buildGraph", () => {
     });
 
     const graph = buildGraph(actor);
-    expect(graph.nodes.length).toBe(1);
-    expect(graph.edges.length).toBe(0);
+    expect(graph.nodes.length).toBe(2);
+    expect(graph.edges.length).toBe(1);
+    expect(graph.edges[0].label).toBe("");
   });
 });
 

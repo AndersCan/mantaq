@@ -1,7 +1,7 @@
 {
   "name": "@mantaq/viz",
   "version": "0.0.0",
-  "description": "Actor model state machine visualizer using React Flow.",
+  "description": "Actor model state machine visualizer using X6 and Lit web components.",
   "license": "MIT",
   "files": [
     "dist"
@@ -22,25 +22,20 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
+    "@antv/x6": "catalog:",
+    "@dagrejs/dagre": "catalog:",
     "@mantaq/core": "workspace:*",
-    "@xyflow/react": "^12.6.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "lit-html": "^3.3.0",
+    "tslib": "catalog:"
   },
   "devDependencies": {
     "@mantaq/sugar": "workspace:*",
     "@types/node": "catalog:",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
     "@typescript/native-preview": "7.0.0-dev.20260509.2",
     "jsdom": "^26.1.0",
     "typescript": "catalog:",
     "unocss": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
   }
 }
