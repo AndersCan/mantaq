@@ -1,11 +1,7 @@
 import { StateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
 import type { AnyEventRef, EventRef, InternalEvent } from "./event.ts";
-
-const IS_DEV =
-  typeof process === "undefined" ||
-  !process.env?.NODE_ENV ||
-  process.env.NODE_ENV === "development";
+import { IS_DEV } from "./utils.ts";
 
 export interface Snapshot {
   path: string[];

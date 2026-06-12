@@ -234,15 +234,6 @@ fetchData()
 
 `withPromise` checks `isAborted(signal)` before each emit. Manual chains fire events into destroyed actors.
 
-**When to use `onSuccess`/`onError`:** Only when you already have the resolved value and need to emit synchronously — not for promise bridging.
-
-```ts
-import { onSuccess } from "@mantaq/sugar";
-
-const data = await fetchData();
-onSuccess(data, emit, (d) => ({ id: "loaded", data: d }));
-```
-
 ## Helpers
 
 ### `matches(actor, pattern)`
@@ -351,26 +342,6 @@ e.click.create({ x: 1, y: 2 }); // { id: "click", x: 1, y: 2 }
 e.click.is(emittedEvent); // boolean
 ```
 
-### `onSuccess(result, emit, eventFn)`
-
-Emit a success event from a resolved value:
-
-```ts
-import { onSuccess } from "@mantaq/sugar";
-
-onSuccess(data, emit, (d) => ({ id: "fetched", data: d }));
-```
-
-### `onError(err, emit, eventFn)`
-
-Emit an error event from a caught error:
-
-```ts
-import { onError } from "@mantaq/sugar";
-
-onError(err, emit, (e) => ({ id: "fetchFailed", reason: String(e) }));
-```
-
 ### `withPromise(promise, signal, emit, events)`
 
 Bridge a promise into actor events. Emits `success` on resolve, `error` on reject. Respects `AbortSignal` — skips emit if aborted before settlement.
@@ -383,8 +354,6 @@ withPromise(fetchData(), input.signal, input.emit, {
   error: (err) => ({ id: "loadFailed", error: String(err) }),
 });
 ```
-
-**Anti-pattern:** Don't use `onSuccess`/`onError` inside a `.then()/.catch()` chain manually — use `withPromise` instead. It handles abort awareness automatically.
 
 ### `withTimeout(ms, input, eventFn)`
 

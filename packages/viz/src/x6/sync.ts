@@ -7,9 +7,26 @@ import { edgeConfig, edgeLine } from "./edge-style.ts";
 
 const INITIAL_NODE_SIZE = 20;
 
+let highlightTimeout: ReturnType<typeof setTimeout> | undefined;
+const disposedGraphs = new WeakSet<X6Graph>();
+
 export function highlightTransition(graph: X6Graph, edgeId: string): void {
   const cell = graph.getCellById(edgeId);
   if (!cell?.isEdge()) return;
+
+  if (highlightTimeout !== undefined) clearTimeout(highlightTimeout);
+
+  if (!disposedGraphs.has(graph)) {
+    graph.on(
+      "dispose",
+      () => {
+        if (highlightTimeout !== undefined) clearTimeout(highlightTimeout);
+        highlightTimeout = undefined;
+        disposedGraphs.add(graph);
+      },
+      { once: true },
+    );
+  }
 
   const originalStroke = cell.attr("line/stroke") as string;
   const originalStrokeWidth = cell.attr("line/strokeWidth") as number;
@@ -17,7 +34,9 @@ export function highlightTransition(graph: X6Graph, edgeId: string): void {
   cell.attr("line/stroke", "#22c55e");
   cell.attr("line/strokeWidth", 4);
 
-  setTimeout(() => {
+  highlightTimeout = setTimeout(() => {
+    highlightTimeout = undefined;
+    if (disposedGraphs.has(graph)) return;
     cell.attr("line/stroke", originalStroke);
     cell.attr("line/strokeWidth", originalStrokeWidth);
   }, 600);

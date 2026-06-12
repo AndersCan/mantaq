@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vite-plus/test";
+import { describe, test, expect } from "vite-plus/test";
 import { buildGraph } from "../src/graph.ts";
 import { Actor, state, event } from "@mantaq/core";
 
@@ -69,7 +69,7 @@ function createThreeStateActor() {
 }
 
 describe("buildGraph", () => {
-  it("creates nodes from actor states", () => {
+  test("creates nodes from actor states", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
@@ -79,7 +79,7 @@ describe("buildGraph", () => {
     );
   });
 
-  it("marks active state correctly", () => {
+  test("marks active state correctly", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
@@ -88,7 +88,7 @@ describe("buildGraph", () => {
     expect(active!.label).toBe("idle");
   });
 
-  it("marks final states", () => {
+  test("marks final states", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
@@ -97,7 +97,7 @@ describe("buildGraph", () => {
     expect(done!.isFinal).toBe(true);
   });
 
-  it("non-final states are not marked final", () => {
+  test("non-final states are not marked final", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
@@ -105,14 +105,14 @@ describe("buildGraph", () => {
     expect(idle!.isFinal).toBe(false);
   });
 
-  it("creates edges from transitions", () => {
+  test("creates edges from transitions", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
     expect(graph.edges.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("edges have correct labels", () => {
+  test("edges have correct labels", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
@@ -121,7 +121,7 @@ describe("buildGraph", () => {
     expect(labels).toContain("SUCCESS");
   });
 
-  it("handles self-loop transitions", () => {
+  test("handles self-loop transitions", () => {
     const actor = createSelfLoopActor();
     const graph = buildGraph(actor);
 
@@ -129,7 +129,7 @@ describe("buildGraph", () => {
     expect(selfLoops.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("self-loop edge has correct label", () => {
+  test("self-loop edge has correct label", () => {
     const actor = createSelfLoopActor();
     const graph = buildGraph(actor);
 
@@ -138,7 +138,7 @@ describe("buildGraph", () => {
     expect(selfLoop!.label).toBe("PING");
   });
 
-  it("node IDs match path convention", () => {
+  test("node IDs match path convention", () => {
     const actor = createSimpleActor();
     const graph = buildGraph(actor);
 
@@ -148,7 +148,7 @@ describe("buildGraph", () => {
     }
   });
 
-  it("handles three-state transitions", () => {
+  test("handles three-state transitions", () => {
     const actor = createThreeStateActor();
     const graph = buildGraph(actor);
 
@@ -156,7 +156,7 @@ describe("buildGraph", () => {
     expect(graph.edges.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("graph updates after transition", () => {
+  test("graph updates after transition", () => {
     const actor = createSimpleActor();
 
     let graph = buildGraph(actor);
@@ -169,7 +169,7 @@ describe("buildGraph", () => {
     expect(graph.nodes.find((n) => n.isActive)?.label).toBe("loading");
   });
 
-  it("handles empty transitions gracefully", () => {
+  test("handles empty transitions gracefully", () => {
     const idle = state("idle")();
     const actor = new Actor({
       inputs: [],
@@ -190,7 +190,7 @@ describe("buildGraph", () => {
 });
 
 describe("buildGraph with regions", () => {
-  it("includes region child states", () => {
+  test("includes region child states", () => {
     const subA = state("subA")();
     const subB = state("subB")();
     const toggle = event("TOGGLE")();

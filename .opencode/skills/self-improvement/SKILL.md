@@ -85,6 +85,7 @@ DEPTH: <shallow|medium|deep>
 SHALLOW searches:
 - rg 'TODO|FIXME|HACK|XXX|BUG|WORKAROUND' packages/ --include '*.ts' --include '*.md'
 - rg 'as any|as unknown|@ts-expect|@ts-ignore' packages/ --include '*.ts'
+- Check if TESTING-LLM.md is stale (compare last-modified vs README.md or recent commits)
 
 MEDIUM adds:
 - rg 'describe\(|test\(|it\(' packages/ --include '*.test.ts'
@@ -125,6 +126,7 @@ Orchestrator parses agent output. Rank tasks:
 - Features unrelated to actor model
 - Test coverage for coverage sake
 - Barrel re-exports (user prefers multiple export files, not single barrel index)
+- Code already in shared utils (check utils.ts, helpers.ts, shared/ first)
 
 ### Phase 2: Execute (iteration_count iterations)
 
@@ -153,6 +155,7 @@ READ ONLY WHAT YOU NEED. Low context environment.
 - Carry context forward only what matters
 
 Implement this change following [self-improvement-worker](../self-improvement-worker/SKILL.md) skill instructions.
+ALWAYS run 'vp check --fix' before committing. This catches lint/format issues automatically.
 Return: success/failure, commit hash if successful, error if failed."
 )
 ```
@@ -320,6 +323,7 @@ Batch if ALL conditions true:
 | "Fix unused imports in 8 test files"        | Single worker | Mechanical, no logic changes |
 | "Update all component styles for dark mode" | Single worker | CSS-only changes, same theme |
 | "Add timer display to 3 components"         | Single worker | Same feature, same API       |
+| "Fix README + TESTING-LLM.md docs"          | Single worker | Docs-only, same pattern      |
 
 ### Examples of Bad Batches (Serialize Instead)
 
