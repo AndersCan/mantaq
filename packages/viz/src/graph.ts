@@ -67,12 +67,16 @@ function buildEffectEdges(
   return edges;
 }
 
-export function buildGraph(actor: AnyActor, internalIds?: Set<string>): ActorGraph {
+export function buildGraph(
+  actor: AnyActor,
+  internalIds?: Set<string>,
+  sampleContexts?: Record<string, Record<string, unknown>>,
+): ActorGraph {
   if (!actor) {
     return { nodes: [], edges: [] };
   }
   try {
-    const base = buildGraphBase(actor, { internalIds });
+    const base = buildGraphBase(actor, { internalIds, sampleContexts });
 
     let pendingTimers: Array<{ id: number; ms: number }> | undefined;
     const clock = actor.clock as {
