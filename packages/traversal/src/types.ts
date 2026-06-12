@@ -15,6 +15,7 @@ export interface GraphEdge {
   isInternal?: boolean;
   isUndetermined?: boolean;
   payload?: { action?: string };
+  contexts?: string[];
 }
 
 export interface ActorGraph {
