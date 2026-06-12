@@ -29,6 +29,7 @@ export class RealClock implements Clock {
   }
 
   setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    // @types/node makes setTimeout return NodeJS.Timeout, not number — cast needed for cross-platform Clock interface
     const id = globalThis.setTimeout(cb, ms) as unknown as number;
     if (options?.signal) {
       options.signal.addEventListener("abort", () => globalThis.clearTimeout(id), { once: true });
@@ -41,6 +42,7 @@ export class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    // @types/node makes setInterval return NodeJS.Timeout, not number — cast needed for cross-platform Clock interface
     const id = globalThis.setInterval(cb, ms) as unknown as number;
     if (options?.signal) {
       options.signal.addEventListener("abort", () => globalThis.clearInterval(id), { once: true });

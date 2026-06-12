@@ -1,9 +1,10 @@
 import { html, render } from "lit-html";
 import { event } from "@mantaq/core";
-import type { AnyActor } from "@mantaq/core";
+import type { AnyActor, AnyEventRef } from "@mantaq/core";
 import { buildGraph } from "../graph.ts";
 import { highlightTransition } from "../x6/sync.ts";
 import { renderActorFlow } from "./actor-flow.ts";
+import type { ContextViewer } from "./context-viewer.ts";
 import "./context-viewer.ts";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import type { LayoutOptions } from "../layout.ts";
@@ -78,7 +79,7 @@ export class MantaqViz extends HTMLElement {
             this.#renderAll();
             return;
           }
-          this.#actor?.send(event(eventName)() as any);
+          this.#actor?.send(event(eventName)() as AnyEventRef);
           if (edgeId) highlightTransition(this.#flow!.graph, edgeId);
           this.#renderAll();
         },
@@ -323,7 +324,7 @@ export class MantaqViz extends HTMLElement {
 
     this.#syncGraph();
 
-    const ctxRoot = this.querySelector("#context-root") as any;
+    const ctxRoot = this.querySelector<ContextViewer>("#context-root");
     if (ctxRoot) {
       ctxRoot.actor = this.#actor;
       ctxRoot.addEventListener("context-edit", () => this.#renderAll());
@@ -365,7 +366,7 @@ export class MantaqViz extends HTMLElement {
           (name) => html`
             <button
               @click=${() => {
-                this.#actor?.send(event(name)() as any);
+                this.#actor?.send(event(name)() as AnyEventRef);
                 this.#renderAll();
               }}
             >
