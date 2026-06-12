@@ -232,4 +232,131 @@ describe("buildGraph", () => {
     graph = buildGraph(actor);
     expect(graph.nodes.find((n) => n.isActive)?.label).toBe("active");
   });
+
+  test("sampleContext (backward compat) produces single-context edges", () => {
+    const actor = createFlatActor();
+    const graph = buildGraph(actor, { sampleContext: { x: 1 } });
+    const goEdge = graph.edges.find((e) => e.label === "GO");
+    expect(goEdge!.contexts).toEqual(["default"]);
+  });
+});
+
+describe("buildGraph with sampleContexts", () => {
+  function createContextBranchActor() {
+    const idle = state("idle")();
+    const active = state("active")();
+    const blocked = state("blocked")();
+    const go = event("GO")();
+
+    return new Actor({
+      inputs: [go],
+      outputs: [],
+      internal: [],
+      states: [idle, active, blocked],
+      initial: idle,
+      context: {} as { ready: boolean },
+      effects: {},
+      transitions: {
+        idle: {
+          GO: (_event, { context }) =>
+            (context as { ready: boolean }).ready ? { state: active } : { state: blocked },
+        },
+      },
+    });
+  }
+
+  test("single context produces one edge", () => {
+    const actor = createContextBranchActor();
+    const graph = buildGraph(actor, {
+      sampleContexts: { ready: { ready: true } },
+    });
+
+    const goEdges = graph.edges.filter((e) => e.label === "GO");
+    expect(goEdges.length).toBe(1);
+    expect(goEdges[0].target).toContain("active");
+    expect(goEdges[0].contexts).toEqual(["ready"]);
+  });
+
+  test("two contexts produce two edges for same event", () => {
+    const actor = createContextBranchActor();
+    const graph = buildGraph(actor, {
+      sampleContexts: {
+        ready: { ready: true },
+        notReady: { ready: false },
+      },
+    });
+
+    const goEdges = graph.edges.filter((e) => e.label === "GO");
+    expect(goEdges.length).toBe(2);
+
+    const activeEdge = goEdges.find((e) => e.target.includes("active"));
+    const blockedEdge = goEdges.find((e) => e.target.includes("blocked"));
+    expect(activeEdge).toBeDefined();
+    expect(blockedEdge).toBeDefined();
+    expect(activeEdge!.contexts).toEqual(["ready"]);
+    expect(blockedEdge!.contexts).toEqual(["notReady"]);
+  });
+
+  test("same target from multiple contexts merges into one edge", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [],
+      internal: [],
+      states: [idle, active],
+      initial: idle,
+      context: {} as { unused: string },
+      effects: {},
+      transitions: {
+        idle: { GO: () => ({ state: active }) },
+      },
+    });
+
+    const graph = buildGraph(actor, {
+      sampleContexts: {
+        a: { unused: "a" },
+        b: { unused: "b" },
+        c: { unused: "c" },
+      },
+    });
+
+    const goEdges = graph.edges.filter((e) => e.label === "GO");
+    expect(goEdges.length).toBe(1);
+    expect(goEdges[0].contexts).toEqual(["a", "b", "c"]);
+  });
+
+  test("undetermined edges track contexts too", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [],
+      internal: [],
+      states: [idle],
+      initial: idle,
+      context: {} as { x: number },
+      effects: {},
+      transitions: {
+        idle: {
+          GO: (_event, { context }) => ((context as { x: number }).x > 10 ? {} : {}),
+        },
+      },
+    });
+
+    const graph = buildGraph(actor, {
+      sampleContexts: {
+        big: { x: 100 },
+        small: { x: 1 },
+      },
+    });
+
+    const goEdges = graph.edges.filter((e) => e.label === "GO");
+    expect(goEdges.length).toBe(1);
+    expect(goEdges[0].isUndetermined).toBe(true);
+    expect(goEdges[0].contexts).toEqual(["big", "small"]);
+  });
 });

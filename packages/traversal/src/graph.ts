@@ -49,12 +49,13 @@ function buildEdgesFromTransitions(
   pathPrefix: string,
   actor: AnyActor,
   internalIds?: Set<string>,
-  sampleContext?: Record<string, unknown>,
+  namedContexts?: Record<string, Record<string, unknown>>,
 ): GraphEdge[] {
   const edges: GraphEdge[] = [];
   if (!transitions) return edges;
 
-  const ctx = sampleContext ?? { ...actor.context };
+  const contexts = namedContexts ?? { default: { ...actor.context } };
+  const contextNames = Object.keys(contexts);
 
   const anyTransitions = transitions["Any"] as
     | Record<string, ((...args: unknown[]) => unknown) | undefined>
@@ -63,6 +64,7 @@ function buildEdgesFromTransitions(
   function invokeHandler(
     handler: (...args: unknown[]) => unknown,
     eventId: string,
+    ctx: Record<string, unknown>,
   ): { targetName?: string; emitNames: string[] } {
     let targetName: string | undefined;
     let emitNames: string[] = [];
@@ -81,6 +83,38 @@ function buildEdgesFromTransitions(
     return { targetName, emitNames };
   }
 
+  function upsertEdge(
+    edgeMap: Map<string, GraphEdge>,
+    sourceId: string,
+    eventId: string,
+    targetName: string | undefined,
+    emitNames: string[],
+    ctxName: string,
+  ): void {
+    const undetermined = !targetName;
+    const targetId = targetName
+      ? nodeId(pathPrefix, targetName)
+      : `${sourceId}-undetermined-${eventId}`;
+    const edgeId = `${sourceId}-${eventId}-${targetId}`;
+
+    const existing = edgeMap.get(edgeId);
+    if (existing) {
+      existing.contexts!.push(ctxName);
+    } else {
+      edgeMap.set(edgeId, {
+        id: edgeId,
+        source: sourceId,
+        target: targetId,
+        label: eventId,
+        isActive: activeSet.has(sourceId),
+        isInternal: internalIds?.has(eventId),
+        isUndetermined: undetermined,
+        contexts: [ctxName],
+        ...(emitNames.length > 0 && { payload: { action: `emit(${emitNames.join(", ")})` } }),
+      });
+    }
+  }
+
   for (const stateRef of states) {
     const sourceId = nodeId(pathPrefix, stateRef.name);
     const stateTransitions = transitions[stateRef.name] as
@@ -88,29 +122,18 @@ function buildEdgesFromTransitions(
       | undefined;
 
     const stateTransitionedEvents = new Set<string>();
+    const edgeMap = new Map<string, GraphEdge>();
 
     if (stateTransitions) {
       for (const [eventId, handler] of Object.entries(stateTransitions)) {
         if (typeof handler !== "function") continue;
 
-        const { targetName, emitNames } = invokeHandler(handler, eventId);
-        if (targetName) stateTransitionedEvents.add(eventId);
-
-        const undetermined = !targetName;
-        const targetId = targetName
-          ? nodeId(pathPrefix, targetName)
-          : `${sourceId}-undetermined-${eventId}`;
-
-        edges.push({
-          id: `${sourceId}-${eventId}-${targetId}`,
-          source: sourceId,
-          target: targetId,
-          label: eventId,
-          isActive: activeSet.has(sourceId),
-          isInternal: internalIds?.has(eventId),
-          isUndetermined: undetermined,
-          ...(emitNames.length > 0 && { payload: { action: `emit(${emitNames.join(", ")})` } }),
-        });
+        for (const ctxName of contextNames) {
+          const ctx = contexts[ctxName];
+          const { targetName, emitNames } = invokeHandler(handler, eventId, ctx);
+          if (targetName) stateTransitionedEvents.add(eventId);
+          upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName);
+        }
       }
     }
 
@@ -119,25 +142,15 @@ function buildEdgesFromTransitions(
         if (typeof handler !== "function") continue;
         if (stateTransitionedEvents.has(eventId)) continue;
 
-        const { targetName, emitNames } = invokeHandler(handler, eventId);
-
-        const undetermined = !targetName;
-        const targetId = targetName
-          ? nodeId(pathPrefix, targetName)
-          : `${sourceId}-undetermined-${eventId}`;
-
-        edges.push({
-          id: `${sourceId}-${eventId}-${targetId}`,
-          source: sourceId,
-          target: targetId,
-          label: eventId,
-          isActive: activeSet.has(sourceId),
-          isInternal: internalIds?.has(eventId),
-          isUndetermined: undetermined,
-          ...(emitNames.length > 0 && { payload: { action: `emit(${emitNames.join(", ")})` } }),
-        });
+        for (const ctxName of contextNames) {
+          const ctx = contexts[ctxName];
+          const { targetName, emitNames } = invokeHandler(handler, eventId, ctx);
+          upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName);
+        }
       }
     }
+
+    edges.push(...edgeMap.values());
   }
 
   return edges;
@@ -148,7 +161,7 @@ function buildForActor(
   pathPrefix: string,
   activeSet: Set<string>,
   internalIds?: Set<string>,
-  sampleContext?: Record<string, unknown>,
+  namedContexts?: Record<string, Record<string, unknown>>,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   if (!actor) return { nodes: [], edges: [] };
   const states = (actor.options?.states ?? []) as Array<{ name: string; isFinal: boolean }>;
@@ -160,7 +173,7 @@ function buildForActor(
     pathPrefix,
     actor,
     internalIds,
-    sampleContext,
+    namedContexts,
   );
 
   if (actor.regions) {
@@ -170,7 +183,7 @@ function buildForActor(
         nodeId(pathPrefix, regionName),
         activeSet,
         internalIds,
-        sampleContext,
+        namedContexts,
       );
       nodes.push(...child.nodes);
       edges.push(...child.edges);
@@ -201,7 +214,11 @@ function buildForActor(
 
 export function buildGraph(
   actor: AnyActor,
-  options?: { internalIds?: Set<string>; sampleContext?: Record<string, unknown> },
+  options?: {
+    internalIds?: Set<string>;
+    sampleContext?: Record<string, unknown>;
+    sampleContexts?: Record<string, Record<string, unknown>>;
+  },
 ): ActorGraph {
   if (!actor) {
     return { nodes: [], edges: [] };
@@ -211,12 +228,16 @@ export function buildGraph(
     const activeSet = new Set<string>();
     collectActiveStates(snapshot, "", activeSet);
 
+    const namedContexts =
+      options?.sampleContexts ??
+      (options?.sampleContext ? { default: options.sampleContext } : undefined);
+
     const { nodes, edges } = buildForActor(
       actor,
       "",
       activeSet,
       options?.internalIds,
-      options?.sampleContext,
+      namedContexts,
     );
 
     const initialName = (actor.options as { initial?: { name?: string } })?.initial?.name;
