@@ -26,6 +26,7 @@ export class EventRef<const T extends string, Payload = unknown> {
 
   create(payload: Payload): Payload & { id: T } {
     if (payload === null || (typeof payload !== "object" && typeof payload !== "function")) {
+      // Primitive payloads are wrapped as { id, value } at runtime; the intersection type can't be expressed statically
       return { id: this.id, value: payload } as unknown as Payload & { id: T };
     }
     return { ...(payload as Record<string, unknown>), id: this.id } as Payload & { id: T };

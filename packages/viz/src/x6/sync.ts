@@ -45,7 +45,7 @@ export function syncNodes(
         y: cell.getPosition().y,
       };
       cell.setPosition(pos.x, pos.y);
-      cell.setAttrs(nodeAttrs(node) as any);
+      cell.setAttrs(nodeAttrs(node));
       cell.attr("text/text", node.label);
       cell.setData({ tooltip }, { overwrite: true });
     } else {
@@ -58,7 +58,7 @@ export function syncNodes(
         width: node.isInitial ? INITIAL_NODE_SIZE : 160,
         height: node.isInitial ? INITIAL_NODE_SIZE : 60,
         label: node.isInitial ? "" : node.label,
-        attrs: nodeAttrs(node) as any,
+        attrs: nodeAttrs(node),
         data: { tooltip },
       });
       changed = true;

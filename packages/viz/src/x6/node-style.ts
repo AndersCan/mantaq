@@ -1,6 +1,7 @@
 import type { GraphNode } from "../graph.ts";
 
 export interface NodeAttrs {
+  [key: string]: Record<string, string | number | boolean | null | undefined>;
   body: {
     fill: string;
     stroke: string;
