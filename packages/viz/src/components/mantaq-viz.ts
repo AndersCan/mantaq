@@ -20,6 +20,8 @@ export class MantaqViz extends HTMLElement {
   #ranksep = RANKSEP_DEFAULT;
   #router: "normal" | "orth" | "manhattan" | "metro" | "er" = "normal";
   #settingsOpen = false;
+  #sampleContexts: Record<string, Record<string, unknown>> | null = null;
+  #activeContext: string | null = null;
 
   set actor(a: AnyActor | null) {
     this.#actor = a;
@@ -28,6 +30,25 @@ export class MantaqViz extends HTMLElement {
 
   get actor(): AnyActor | null {
     return this.#actor;
+  }
+
+  set sampleContexts(value: Record<string, Record<string, unknown>> | null) {
+    this.#sampleContexts = value;
+    this.#activeContext = value ? (Object.keys(value)[0] ?? null) : null;
+    if (this.isConnected) this.#renderAll();
+  }
+
+  get sampleContexts(): Record<string, Record<string, unknown>> | null {
+    return this.#sampleContexts;
+  }
+
+  set activeContext(name: string | null) {
+    this.#activeContext = name;
+    if (this.isConnected) this.#renderAll();
+  }
+
+  get activeContext(): string | null {
+    return this.#activeContext;
   }
 
   connectedCallback() {
@@ -61,7 +82,11 @@ export class MantaqViz extends HTMLElement {
   #syncGraph() {
     const graphEl = this.querySelector<HTMLDivElement>("#graph-root");
     if (!graphEl) return;
-    const graph = buildGraph(this.#actor!, this.#internalIds());
+    const sampleContexts =
+      this.#activeContext && this.#sampleContexts
+        ? { [this.#activeContext]: this.#sampleContexts[this.#activeContext] }
+        : undefined;
+    const graph = buildGraph(this.#actor!, this.#internalIds(), sampleContexts);
     if (this.#flow) {
       this.#flow.update(graph, this.#layoutOptions());
     } else {
@@ -257,6 +282,27 @@ export class MantaqViz extends HTMLElement {
             ${this.#settingsOpen
               ? html`
                   <div class="settings" @click=${(e: Event) => e.stopPropagation()}>
+                    ${this.#sampleContexts
+                      ? html`
+                          <label>
+                            Context
+                            <select
+                              @change=${(e: Event) => {
+                                this.#activeContext = (e.target as HTMLSelectElement).value || null;
+                                this.#renderAll();
+                              }}
+                            >
+                              ${Object.keys(this.#sampleContexts).map(
+                                (name) => html`
+                                  <option value=${name} ?selected=${this.#activeContext === name}>
+                                    ${name}
+                                  </option>
+                                `,
+                              )}
+                            </select>
+                          </label>
+                        `
+                      : ""}
                     <label>
                       Direction
                       <select
