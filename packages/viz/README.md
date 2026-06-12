@@ -98,15 +98,6 @@ interface LayoutOptions {
 - **Tooltips** on nodes and edges showing state/event details
 - **Settings panel** — direction (LR/TB), router (normal/orth/manhattan/metro/er), edge length
 
-### Keyboard Shortcuts
-
-| Key       | Action          |
-| --------- | --------------- |
-| `+` / `=` | Zoom in         |
-| `-`       | Zoom out        |
-| `0`       | Reset view      |
-| `F`       | Fit to viewport |
-
 ## Development
 
 ```bash
