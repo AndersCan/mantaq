@@ -4,6 +4,7 @@ import type { AnyActor } from "@mantaq/core";
 import { buildGraph } from "../graph.ts";
 import { highlightTransition } from "../x6/sync.ts";
 import { renderActorFlow } from "./actor-flow.ts";
+import "./context-viewer.ts";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import type { LayoutOptions } from "../layout.ts";
 
@@ -228,6 +229,11 @@ export class MantaqViz extends HTMLElement {
             height: 400px;
             position: relative;
           }
+          .ctx-wrap {
+            border-top: 1px solid #e2e8f0;
+            max-height: 300px;
+            overflow-y: auto;
+          }
         </style>
         <div class="tb">
           <div class="tb-left">
@@ -310,11 +316,18 @@ export class MantaqViz extends HTMLElement {
           </div>
         </div>
         <div class="graph-wrap" id="graph-root"></div>
+        <div class="ctx-wrap" id="context-root"></div>
       `,
       this,
     );
 
     this.#syncGraph();
+
+    const ctxRoot = this.querySelector("#context-root") as any;
+    if (ctxRoot) {
+      ctxRoot.actor = this.#actor;
+      ctxRoot.addEventListener("context-edit", () => this.#renderAll());
+    }
   }
 
   #currentState(): string {
