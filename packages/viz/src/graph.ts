@@ -257,7 +257,8 @@ export function buildGraph(actor: AnyActor, internalIds?: Set<string>): ActorGra
       nodes,
       edges,
     };
-  } catch {
+  } catch (e) {
+    console.error("[mantaq/viz] buildGraph failed:", e);
     return { nodes: [], edges: [] };
   }
 }

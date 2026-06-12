@@ -1,9 +1,5 @@
 import type { EffectInput, AnyEventRef } from "@mantaq/core";
-
-const IS_DEV =
-  typeof process === "undefined" ||
-  !process.env?.NODE_ENV ||
-  process.env.NODE_ENV === "development";
+import { IS_DEV } from "@mantaq/core";
 
 type EmitEvent<
   Inputs extends AnyEventRef[],

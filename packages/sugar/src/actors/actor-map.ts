@@ -1,10 +1,6 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
+import { IS_DEV } from "@mantaq/core";
 import type { SendableEvent, SendableMap } from "../transitions/broadcast.ts";
-
-const IS_DEV =
-  typeof process === "undefined" ||
-  !process.env?.NODE_ENV ||
-  process.env.NODE_ENV === "development";
 
 export class ActorMap implements SendableMap<SendableEvent> {
   #actors = new Map<string, AnyActor>();

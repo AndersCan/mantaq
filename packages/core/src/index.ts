@@ -4,3 +4,4 @@ export { state, StateRef } from "./state.ts";
 export type { AnyStateRef } from "./state.ts";
 export { event, EventRef } from "./event.ts";
 export type { AnyEventRef } from "./event.ts";
+export { IS_DEV } from "./utils.ts";

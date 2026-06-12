@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vite-plus/test";
+import { describe, test, expect } from "vite-plus/test";
 import { Actor, state, event } from "@mantaq/core";
 import { buildGraph } from "../src/graph.ts";
 
@@ -63,7 +63,7 @@ function createWithRegions() {
 }
 
 describe("integration: actor -> graph", () => {
-  it("builds graph from traffic light actor", () => {
+  test("builds graph from traffic light actor", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
 
@@ -76,7 +76,7 @@ describe("integration: actor -> graph", () => {
     expect(labels).toContain("red");
   });
 
-  it("preserves active state", () => {
+  test("preserves active state", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
 
@@ -87,7 +87,7 @@ describe("integration: actor -> graph", () => {
     expect(activeNodes[0].label).toBe("green");
   });
 
-  it("graph updates after transition", () => {
+  test("graph updates after transition", () => {
     const actor = createTrafficLight();
     let graph = buildGraph(actor);
 
@@ -102,7 +102,7 @@ describe("integration: actor -> graph", () => {
     expect(active!.label).toBe("yellow");
   });
 
-  it("full cycle: green -> yellow -> red -> green", () => {
+  test("full cycle: green -> yellow -> red -> green", () => {
     const actor = createTrafficLight();
     const next = event("NEXT")();
 
@@ -122,7 +122,7 @@ describe("integration: actor -> graph", () => {
     expect(graph.nodes.find((n) => n.isActive)!.label).toBe("green");
   });
 
-  it("handles region actors", () => {
+  test("handles region actors", () => {
     const actor = createWithRegions();
     const graph = buildGraph(actor);
 
@@ -132,7 +132,7 @@ describe("integration: actor -> graph", () => {
     expect(labels).toContain("subA");
   });
 
-  it("node IDs are unique across the graph", () => {
+  test("node IDs are unique across the graph", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
 
@@ -140,7 +140,7 @@ describe("integration: actor -> graph", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("edge source/target reference valid node IDs", () => {
+  test("edge source/target reference valid node IDs", () => {
     const actor = createTrafficLight();
     const graph = buildGraph(actor);
 

@@ -72,47 +72,33 @@ function effectLabel(edge: GraphEdge): string {
 }
 
 function labelColor(edge: GraphEdge): string {
-  return isUndetermined(edge)
-    ? UNDETERMINED_RED
-    : isEffect(edge)
-      ? EFFECT_AMBER
-      : edge.isActive
-        ? "#0f172a"
-        : INACTIVE_GRAY;
+  if (isUndetermined(edge)) return UNDETERMINED_RED;
+  if (isEffect(edge)) return EFFECT_AMBER;
+  return edge.isActive ? "#0f172a" : INACTIVE_GRAY;
 }
 
 function labelFill(edge: GraphEdge): string {
-  return isUndetermined(edge)
-    ? UNDETERMINED_FILL
-    : isEffect(edge)
-      ? EFFECT_FILL
-      : edge.isActive
-        ? ACTIVE_LABEL_FILL
-        : INACTIVE_LABEL_FILL;
+  if (isUndetermined(edge)) return UNDETERMINED_FILL;
+  if (isEffect(edge)) return EFFECT_FILL;
+  return edge.isActive ? ACTIVE_LABEL_FILL : INACTIVE_LABEL_FILL;
 }
 
 function labelStroke(edge: GraphEdge): string {
-  return isUndetermined(edge)
-    ? UNDETERMINED_RED
-    : isEffect(edge)
-      ? EFFECT_STROKE
-      : edge.isActive
-        ? ACTIVE_LABEL_STROKE
-        : INACTIVE_LABEL_STROKE;
+  if (isUndetermined(edge)) return UNDETERMINED_RED;
+  if (isEffect(edge)) return EFFECT_STROKE;
+  return edge.isActive ? ACTIVE_LABEL_STROKE : INACTIVE_LABEL_STROKE;
 }
 
 function lineColor(edge: GraphEdge): string {
-  return isUndetermined(edge)
-    ? UNDETERMINED_RED
-    : isEffect(edge)
-      ? EFFECT_AMBER
-      : edge.isActive
-        ? ACTIVE_BLUE
-        : INACTIVE_GRAY;
+  if (isUndetermined(edge)) return UNDETERMINED_RED;
+  if (isEffect(edge)) return EFFECT_AMBER;
+  return edge.isActive ? ACTIVE_BLUE : INACTIVE_GRAY;
 }
 
 function lineWidth(edge: GraphEdge): number {
-  return isUndetermined(edge) ? 1.5 : isEffect(edge) ? 1.5 : edge.isActive ? 2 : 1;
+  if (isUndetermined(edge)) return 1.5;
+  if (isEffect(edge)) return 1.5;
+  return edge.isActive ? 2 : 1;
 }
 
 function lineDash(edge: GraphEdge): number | undefined {
@@ -123,11 +109,10 @@ function lineDash(edge: GraphEdge): number | undefined {
 }
 
 function marchingStyle(edge: GraphEdge): Record<string, unknown> | undefined {
-  return isUndetermined(edge)
-    ? { animation: "ant-march 60s infinite linear" }
-    : isEffect(edge)
-      ? { animation: "ant-march 60s infinite linear" }
-      : undefined;
+  if (isUndetermined(edge) || isEffect(edge)) {
+    return { animation: "ant-march 60s infinite linear" };
+  }
+  return undefined;
 }
 
 export function edgeLabel(edge: GraphEdge): EdgeLabelAttrs {

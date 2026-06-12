@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vite-plus/test";
+import { describe, test, expect } from "vite-plus/test";
 import { Actor, state, event } from "@mantaq/core";
 import "../src/components/context-viewer.ts";
 
@@ -34,11 +34,11 @@ function click(el: Element) {
 }
 
 describe("ContextViewer", () => {
-  it("custom element is registered", () => {
+  test("custom element is registered", () => {
     expect(customElements.get("mantaq-context-viewer")).toBeDefined();
   });
 
-  it("renders primitive fields", () => {
+  test("renders primitive fields", () => {
     const { el } = mountViewer({ count: 42, name: "hello", active: true });
 
     expect(el.textContent).toContain("count");
@@ -49,7 +49,7 @@ describe("ContextViewer", () => {
     expect(el.textContent).toContain("true");
   });
 
-  it("shows type badges", () => {
+  test("shows type badges", () => {
     const { el } = mountViewer({ count: 42, name: "hello", active: true });
 
     const badges = el.querySelectorAll(".ctx-type");
@@ -59,7 +59,7 @@ describe("ContextViewer", () => {
     expect(texts).toContain("bool");
   });
 
-  it("renders nested object as collapsible", () => {
+  test("renders nested object as collapsible", () => {
     const { el } = mountViewer({ user: { name: "Alice" } });
 
     expect(el.textContent).toContain("user");
@@ -69,7 +69,7 @@ describe("ContextViewer", () => {
     expect(chevron).toBeDefined();
   });
 
-  it("expands nested object on chevron click", () => {
+  test("expands nested object on chevron click", () => {
     const { el } = mountViewer({ user: { name: "Alice" } });
 
     const chevron = el.querySelector(".ctx-chevron") as HTMLElement;
@@ -79,7 +79,7 @@ describe("ContextViewer", () => {
     expect(el.textContent).toContain("Alice");
   });
 
-  it("collapses expanded object on second chevron click", () => {
+  test("collapses expanded object on second chevron click", () => {
     const { el } = mountViewer({ user: { name: "Alice" } });
 
     const chevron = el.querySelector(".ctx-chevron") as HTMLElement;
@@ -90,7 +90,7 @@ describe("ContextViewer", () => {
     expect(body?.textContent).not.toContain("Alice");
   });
 
-  it("enters edit mode on value click", () => {
+  test("enters edit mode on value click", () => {
     const { el } = mountViewer({ name: "hello" });
 
     const value = el.querySelector(".ctx-value") as HTMLElement;
@@ -101,7 +101,7 @@ describe("ContextViewer", () => {
     expect(input.value).toBe("hello");
   });
 
-  it("commits string edit on Enter", () => {
+  test("commits string edit on Enter", () => {
     const { el, actor } = mountViewer({ name: "hello" });
 
     const value = el.querySelector(".ctx-value") as HTMLElement;
@@ -116,7 +116,7 @@ describe("ContextViewer", () => {
     expect(el.querySelector("input")).toBeNull();
   });
 
-  it("commits number edit on checkmark click", () => {
+  test("commits number edit on checkmark click", () => {
     const { el, actor } = mountViewer({ count: 1 });
 
     const rows = el.querySelectorAll(".ctx-row");
@@ -134,7 +134,7 @@ describe("ContextViewer", () => {
     expect(el.querySelector("input")).toBeNull();
   });
 
-  it("toggles boolean on click", () => {
+  test("toggles boolean on click", () => {
     const { el, actor } = mountViewer({ active: true });
 
     const value = el.querySelector(".ctx-value") as HTMLElement;
@@ -146,7 +146,7 @@ describe("ContextViewer", () => {
     expect((actor.context as any).active).toBe(false);
   });
 
-  it("cancels edit on Escape", () => {
+  test("cancels edit on Escape", () => {
     const { el, actor } = mountViewer({ name: "hello" });
 
     const value = el.querySelector(".ctx-value") as HTMLElement;
@@ -161,7 +161,7 @@ describe("ContextViewer", () => {
     expect(el.querySelector("input")).toBeNull();
   });
 
-  it("dispatches context-edit event on commit", () => {
+  test("dispatches context-edit event on commit", () => {
     const { el } = mountViewer({ name: "hello" });
 
     let eventDetail: unknown = null;
@@ -180,13 +180,13 @@ describe("ContextViewer", () => {
     expect(eventDetail).toEqual({ path: ["name"], value: "world" });
   });
 
-  it("shows empty state for empty context", () => {
+  test("shows empty state for empty context", () => {
     const { el } = mountViewer({});
 
     expect(el.textContent).toContain("No context fields");
   });
 
-  it("skips functions and null values", () => {
+  test("skips functions and null values", () => {
     const { el } = mountViewer({
       name: "hello",
       fn: () => {},
