@@ -52,7 +52,7 @@ Every PR created must have auto-merge enabled: `gh pr merge $PR --auto --merge`
 ### Phase 0: Setup
 
 ```
-rtk git checkout wip && rtk git pull
+rtk git checkout wip && rtk git pull || rtk git checkout main
 git checkout -b self-improvement/<short-description>
 ```
 
@@ -124,6 +124,7 @@ Orchestrator parses agent output. Rank tasks:
 - Single-line trivial changes
 - Features unrelated to actor model
 - Test coverage for coverage sake
+- Barrel re-exports (user prefers multiple export files, not single barrel index)
 
 ### Phase 2: Execute (iteration_count iterations)
 
@@ -251,6 +252,7 @@ gh pr merge $PR --auto --merge
 - **Test file imports drift.** Workers add imports to test files then don't clean up. Run `vp check` before committing to catch `TS6133` unused variable errors.
 - **`readonly` arrays in store subscriptions.** Store returns `readonly T[]`, but component fields expect `T[]`. Use `readonly` on component field or `as T[]` cast. Fix in registry function signature, not component.
 - **Lint-staged stash conflicts.** When `vp check --fix` modifies files in staged set, git stash may fail with "already exists in index". Use `git stash drop` to clean up, then retry commit.
+- **Genuinely needed type casts.** Some `as unknown as` casts are TypeScript limitations (e.g. `setTimeout` returning `NodeJS.Timeout` not `number`, branded types for primitives). Workers should keep these with explanatory comments rather than force removal. Check if cast is type system limitation before flagging.
 
 ## Handling Merge Conflicts Between Parallel Workers
 
