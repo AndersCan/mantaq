@@ -10,7 +10,11 @@ export interface Snapshot {
 }
 
 export interface Clock {
-  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
+  setTimeout(
+    ms: number,
+    cb: () => void,
+    options?: { signal?: AbortSignal; eventName?: string },
+  ): number;
   clearTimeout(id: number): void;
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
   clearInterval(id: number): void;
@@ -24,7 +28,11 @@ export class RealClock implements Clock {
     return Date.now() - this.#start;
   }
 
-  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+  setTimeout(
+    ms: number,
+    cb: () => void,
+    options?: { signal?: AbortSignal; eventName?: string },
+  ): number {
     // @types/node makes setTimeout return NodeJS.Timeout, not number — cast needed for cross-platform Clock interface
     const id = globalThis.setTimeout(cb, ms) as unknown as number;
     if (options?.signal) {
@@ -55,7 +63,13 @@ export class VirtualClock implements Clock {
   #now = 0;
   #timers: Map<
     number,
-    { deadline: number; cb: () => void; signal?: AbortSignal; onAbort?: () => void }
+    {
+      deadline: number;
+      cb: () => void;
+      signal?: AbortSignal;
+      onAbort?: () => void;
+      eventName?: string;
+    }
   > = new Map();
   #intervals: Map<
     number,
@@ -90,12 +104,22 @@ export class VirtualClock implements Clock {
     }
   }
 
-  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+  setTimeout(
+    ms: number,
+    cb: () => void,
+    options?: { signal?: AbortSignal; eventName?: string },
+  ): number {
     const signal = options?.signal;
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
     const onAbort = this.#trackAbort(signal, id, this.#timers);
-    this.#timers.set(id, { deadline: this.#now + ms, cb, signal, onAbort });
+    this.#timers.set(id, {
+      deadline: this.#now + ms,
+      cb,
+      signal,
+      onAbort,
+      eventName: options?.eventName,
+    });
     return id;
   }
 
@@ -193,10 +217,10 @@ export class VirtualClock implements Clock {
     return this.#timers.size > 0 || this.#intervals.size > 0;
   }
 
-  pendingTimers(): Array<{ id: number; deadline: number; ms: number }> {
-    const result: Array<{ id: number; deadline: number; ms: number }> = [];
+  pendingTimers(): Array<{ id: number; deadline: number; ms: number; eventName?: string }> {
+    const result: Array<{ id: number; deadline: number; ms: number; eventName?: string }> = [];
     for (const [id, t] of this.#timers) {
-      result.push({ id, deadline: t.deadline, ms: t.deadline - this.#now });
+      result.push({ id, deadline: t.deadline, ms: t.deadline - this.#now, eventName: t.eventName });
     }
     return result;
   }

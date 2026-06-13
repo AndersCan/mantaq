@@ -59,10 +59,8 @@ export function syncNodes(
     const cell = graph.getCellById(node.id);
     const tooltip = nodeTooltip(node);
     if (cell?.isNode()) {
-      const pos = movedPositions.get(node.id) ?? {
-        x: cell.getPosition().x,
-        y: cell.getPosition().y,
-      };
+      const pos = movedPositions.get(node.id) ??
+        positions.get(node.id) ?? { x: cell.getPosition().x, y: cell.getPosition().y };
       cell.setPosition(pos.x, pos.y);
       cell.setAttrs(nodeAttrs(node));
       cell.attr("text/text", node.label);

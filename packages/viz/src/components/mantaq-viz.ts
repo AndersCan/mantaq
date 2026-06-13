@@ -52,12 +52,12 @@ export class MantaqViz extends HTMLElement {
   }
 
   connectedCallback() {
-    document.addEventListener("click", this);
+    this.addEventListener("click", this);
     if (this.#actor) this.#renderAll();
   }
 
   disconnectedCallback() {
-    document.removeEventListener("click", this);
+    this.removeEventListener("click", this);
     this.#flow?.destroy();
     this.#flow = null;
     render("", this);
@@ -252,8 +252,44 @@ export class MantaqViz extends HTMLElement {
             text-align: right;
           }
           .graph-wrap {
-            height: 400px;
             position: relative;
+            height: 400px;
+          }
+          #graph-root {
+            width: 100%;
+            height: 100%;
+          }
+          .zoom-ctrl {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            display: flex;
+            gap: 1px;
+            z-index: 10;
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            overflow: hidden;
+          }
+          .zoom-ctrl button {
+            font-family: inherit;
+            font-size: 1rem;
+            width: 32px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            color: #e2e8f0;
+            cursor: pointer;
+            padding: 0;
+          }
+          .zoom-ctrl button:hover {
+            background: #334155;
+          }
+          .zoom-ctrl button:active {
+            background: #475569;
           }
           .ctx-wrap {
             border-top: 1px solid #e2e8f0;
@@ -362,7 +398,14 @@ export class MantaqViz extends HTMLElement {
               : ""}
           </div>
         </div>
-        <div class="graph-wrap" id="graph-root"></div>
+        <div class="graph-wrap">
+          <div id="graph-root"></div>
+          <div class="zoom-ctrl">
+            <button @click=${() => this.#zoomBy(1.25)} title="Zoom in">+</button>
+            <button @click=${() => this.#zoomBy(1 / 1.25)} title="Zoom out">−</button>
+            <button @click=${() => this.#flow?.graph.zoomTo(1)} title="Reset zoom">1:1</button>
+          </div>
+        </div>
         <div class="ctx-wrap" id="context-root"></div>
       `,
       this,
@@ -381,6 +424,15 @@ export class MantaqViz extends HTMLElement {
     if (!this.#actor) return "—";
     const snap = this.#actor.snapshot();
     return snap.path?.[snap.path.length - 1] ?? "—";
+  }
+
+  #zoomBy(factor: number): void {
+    const g = this.#flow?.graph;
+    if (!g) return;
+    const MIN = 0.2;
+    const MAX = 4;
+    const next = Math.max(MIN, Math.min(MAX, g.zoom() * factor));
+    g.zoomTo(next);
   }
 
   #getAvailableEvents(graph: ActorGraph): string[] {
