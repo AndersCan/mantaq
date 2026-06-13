@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vite-plus/test";
 import { buildGraph } from "../src/graph.ts";
-import { Actor, state, event } from "@mantaq/core";
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
 
 function createSimpleActor() {
   const idle = state("idle")();
@@ -186,6 +186,41 @@ describe("buildGraph", () => {
     expect(graph.nodes.length).toBe(2);
     expect(graph.edges.length).toBe(1);
     expect(graph.edges[0].label).toBe("");
+  });
+});
+
+describe("buildGraph with effect timers", () => {
+  test("pendingTimers exposes eventName from clock", () => {
+    const clock = new VirtualClock();
+    const idle = state("idle")();
+    const working = state("working")();
+    const timeout = event("WORK_TIMEOUT")();
+
+    const actor = new Actor({
+      inputs: [event("START")()],
+      outputs: [],
+      internal: [timeout],
+      states: [idle, working],
+      initial: idle,
+      context: {} as {},
+      clock,
+      effects: {
+        working: [
+          ({ signal, clock: c }) => {
+            const id = c.setTimeout(4000, () => {}, { signal, eventName: "WORK_TIMEOUT" });
+            signal.addEventListener("abort", () => c.clearTimeout(id));
+          },
+        ],
+      },
+      transitions: {
+        idle: { START: () => ({ state: working }) },
+        working: { WORK_TIMEOUT: () => ({ state: idle }) },
+      },
+    });
+
+    actor.send(event("START")());
+    const pending = (actor.clock as VirtualClock).pendingTimers();
+    expect(pending[0]?.eventName).toBe("WORK_TIMEOUT");
   });
 });
 

@@ -295,4 +295,18 @@ describe("VirtualClock", () => {
     clock.advance(0);
     expect(clock.now()).toBe(0);
   });
+
+  test("pendingTimers() exposes eventName per timer", () => {
+    const clock = new VirtualClock();
+    clock.setTimeout(100, () => {}, { eventName: "WORK_TIMEOUT" });
+    clock.setTimeout(200, () => {});
+
+    const timers = clock.pendingTimers();
+    expect(timers).toHaveLength(2);
+
+    const labeled = timers.find((t) => t.ms === 100);
+    const unlabeled = timers.find((t) => t.ms === 200);
+    expect(labeled?.eventName).toBe("WORK_TIMEOUT");
+    expect(unlabeled?.eventName).toBeUndefined();
+  });
 });
