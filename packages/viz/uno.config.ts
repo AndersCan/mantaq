@@ -42,6 +42,28 @@ export default defineConfig({
     "viz-bg": "bg-[var(--viz-bg,#fafafa)]",
     "viz-node":
       "bg-[var(--viz-node-bg,#ffffff)] border border-[var(--viz-node-border,#d1d5db)] rounded-md",
+    "viz-dark": "bg-slate-800 text-slate-300 font-mono",
+    "viz-darker": "bg-slate-900 text-slate-300 font-mono",
+    "viz-card": "px-3 py-2 bg-slate-800 border-b border-slate-700",
+    "viz-toolbar":
+      "flex items-center justify-end px-4 py-2 bg-slate-900 border-b border-slate-800 gap-2 relative",
+    "viz-gear":
+      "text-base px-2.5 h-7 inline-flex items-center justify-center border border-slate-600 rounded bg-transparent text-slate-400 cursor-pointer appearance-none hover:bg-slate-700 hover:text-slate-200",
+    "viz-gear-open": "bg-slate-700 border-blue-500 text-blue-500",
+    "viz-settings":
+      "absolute top-full right-0 mt-1 bg-slate-800 border border-slate-600 rounded-md p-3 z-10 min-w-45 flex flex-col gap-2.5",
+    "viz-settings-label": "flex items-center justify-between text-sm text-slate-400 gap-2",
+    "viz-settings-select":
+      "font-inherit text-sm px-1.5 py-0.5 border border-slate-600 rounded bg-slate-900 text-slate-200",
+    "viz-event-btn":
+      "font-inherit text-sm px-2.5 h-7 inline-flex items-center rounded cursor-pointer whitespace-nowrap font-600 appearance-none",
+    "viz-event-primary": "bg-blue-700 border border-blue-500 text-slate-200 hover:bg-blue-600",
+    "viz-event-edge":
+      "bg-transparent border border-slate-600 text-slate-400 hover:bg-slate-800 hover:text-slate-200",
+    "viz-event-internal":
+      "bg-transparent border border-slate-700 text-slate-500 cursor-default font-400 text-xs",
+    "viz-zoom-btn":
+      "font-inherit text-base w-8 h-7.5 inline-flex items-center justify-center border-none bg-transparent text-slate-200 cursor-pointer p-0 hover:bg-slate-700 active:bg-slate-600",
   },
   theme: {
     colors: {
