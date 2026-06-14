@@ -19,7 +19,9 @@ export interface TransitionPayload {
   meta?: Record<string, unknown>;
 }
 
-export interface GraphNode extends BaseGraphNode {}
+export interface GraphNode extends BaseGraphNode {
+  effects?: string[];
+}
 
 export interface GraphEdge extends BaseGraphEdge {
   effectLabel?: string;
@@ -38,6 +40,19 @@ export function buildGraph(
   }
   try {
     const base = buildGraphBase(actor, { internalIds, sampleContexts });
+
+    const effectMap = new Map<string, string[]>();
+    for (const edge of base.edges) {
+      if (edge.isInternal && edge.source === edge.target && edge.label.startsWith("effect:")) {
+        const existing = effectMap.get(edge.source);
+        const effectName = edge.label.replace("effect:", "");
+        if (existing) {
+          existing.push(effectName);
+        } else {
+          effectMap.set(edge.source, [effectName]);
+        }
+      }
+    }
 
     const pendingTimers = (
       actor.clock as {
@@ -69,8 +84,13 @@ export function buildGraph(
         return e;
       });
 
+    const nodes: GraphNode[] = base.nodes.map((n) => ({
+      ...n,
+      effects: effectMap.get(n.id),
+    }));
+
     return {
-      nodes: base.nodes,
+      nodes,
       edges: filteredEdges as GraphEdge[],
     };
   } catch (e) {
