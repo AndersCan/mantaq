@@ -1,14 +1,24 @@
 import type { GraphNode } from "../graph.ts";
 
+export interface NodeBodyAttrs {
+  fill: string;
+  stroke: string;
+  strokeWidth?: number;
+  rx?: number;
+  ry?: number;
+  fillOpacity?: number;
+  strokeOpacity?: number;
+}
+
+export interface NodeTextAttrs {
+  fill?: string;
+  fillOpacity?: number;
+  fontWeight?: string;
+}
+
 export interface NodeAttrs {
-  [key: string]: Record<string, string | number | boolean | null | undefined>;
-  body: {
-    fill: string;
-    stroke: string;
-    strokeWidth?: number;
-    rx?: number;
-    ry?: number;
-  };
+  body: NodeBodyAttrs;
+  text?: NodeTextAttrs;
 }
 
 const FINAL_COLOR = "#059669";
@@ -28,13 +38,23 @@ export function nodeAttrs(node: GraphNode): NodeAttrs {
     return { body: { fill: INITIAL_FILL, stroke: "none" } };
   }
 
+  const isActive = node.isActive;
+  const isFinal = node.isFinal;
+
   return {
     body: {
-      stroke: node.isFinal ? FINAL_COLOR : node.isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
-      strokeWidth: node.isFinal ? 2.5 : node.isActive ? 2 : 1,
-      fill: node.isActive ? ACTIVE_FILL : INACTIVE_FILL,
+      stroke: isFinal ? FINAL_COLOR : isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
+      strokeWidth: isFinal ? 2.5 : isActive ? 2.5 : 1,
+      fill: isActive ? ACTIVE_FILL : INACTIVE_FILL,
+      fillOpacity: isActive ? 1 : 0.5,
+      strokeOpacity: isActive ? 1 : 0.4,
       rx: 8,
       ry: 8,
+    },
+    text: {
+      fill: isActive ? "#0f172a" : "#64748b",
+      fillOpacity: isActive ? 1 : 0.5,
+      fontWeight: isActive ? "600" : "400",
     },
   };
 }

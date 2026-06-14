@@ -4,13 +4,13 @@ const EFFECT_AMBER = "#d97706";
 const EFFECT_FILL = "#fffbeb";
 const EFFECT_STROKE = "#fbbf24";
 const ACTIVE_BLUE = "#3b82f6";
-const ACTIVE_LABEL_FILL = "#e2e8f0";
-const ACTIVE_LABEL_STROKE = "#94a3b8";
+const ACTIVE_LABEL_FILL = "#dbeafe";
+const ACTIVE_LABEL_STROKE = "#3b82f6";
 const UNDETERMINED_RED = "#ef4444";
 const UNDETERMINED_FILL = "#fef2f2";
-const INACTIVE_GRAY = "#94a3b8";
-const INACTIVE_LABEL_FILL = "#f1f5f9";
-const INACTIVE_LABEL_STROKE = "#cbd5e1";
+const INACTIVE_GRAY = "#cbd5e1";
+const INACTIVE_LABEL_FILL = "#f8fafc";
+const INACTIVE_LABEL_STROKE = "#e2e8f0";
 
 function isEffectTriggered(edge: GraphEdge): boolean {
   return !!edge.isEffectTriggered;
@@ -45,6 +45,7 @@ export interface EdgeLineAttrs {
   stroke: string;
   strokeWidth: number;
   strokeDasharray?: number;
+  strokeOpacity?: number;
   targetMarker: { name: string; size: number };
   cursor: string;
   style?: Record<string, unknown>;
@@ -70,7 +71,7 @@ function isUndetermined(edge: GraphEdge): boolean {
 function labelColor(edge: GraphEdge): string {
   if (isUndetermined(edge)) return UNDETERMINED_RED;
   if (isEffectTriggered(edge)) return EFFECT_AMBER;
-  return edge.isActive ? "#0f172a" : INACTIVE_GRAY;
+  return edge.isActive ? "#0f172a" : "#94a3b8";
 }
 
 function labelFill(edge: GraphEdge): string {
@@ -94,14 +95,19 @@ function lineColor(edge: GraphEdge): string {
 function lineWidth(edge: GraphEdge): number {
   if (isUndetermined(edge)) return 1.5;
   if (isEffectTriggered(edge)) return 1.5;
-  return edge.isActive ? 2 : 1;
+  return edge.isActive ? 2.5 : 1;
 }
 
 function lineDash(edge: GraphEdge): number | undefined {
   if (isUndetermined(edge)) return 5;
   if (isEffectTriggered(edge)) return 5;
-  if (!edge.isActive) return 3;
+  if (!edge.isActive) return 4;
   return undefined;
+}
+
+function lineOpacity(edge: GraphEdge): number {
+  if (isUndetermined(edge)) return 1;
+  return edge.isActive ? 1 : 0.35;
 }
 
 function marchingStyle(edge: GraphEdge): Record<string, unknown> | undefined {
@@ -144,6 +150,7 @@ export function edgeLine(edge: GraphEdge): EdgeLineAttrs {
     stroke: lineColor(edge),
     strokeWidth: lineWidth(edge),
     strokeDasharray: lineDash(edge),
+    strokeOpacity: lineOpacity(edge),
     targetMarker: { name: "classic", size: 8 },
     cursor: "pointer",
     ...marchingStyle(edge),

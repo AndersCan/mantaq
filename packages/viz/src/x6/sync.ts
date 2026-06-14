@@ -62,7 +62,7 @@ export function syncNodes(
       const pos = movedPositions.get(node.id) ??
         positions.get(node.id) ?? { x: cell.getPosition().x, y: cell.getPosition().y };
       cell.setPosition(pos.x, pos.y);
-      cell.setAttrs(nodeAttrs(node));
+      cell.setAttrs(nodeAttrs(node) as never);
       cell.attr("text/text", node.label);
       cell.setData({ tooltip }, { overwrite: true });
     } else {
@@ -75,9 +75,9 @@ export function syncNodes(
         width: node.isInitial ? INITIAL_NODE_SIZE : 160,
         height: node.isInitial ? INITIAL_NODE_SIZE : 60,
         label: node.isInitial ? "" : node.label,
-        attrs: nodeAttrs(node),
+        attrs: nodeAttrs(node) as never,
         data: { tooltip },
-      });
+      } as never);
       changed = true;
     }
   }
@@ -109,6 +109,7 @@ export function syncEdges(graph: X6Graph, edges: ActorGraph["edges"], routerName
       cell.attr("line/stroke", line.stroke);
       cell.attr("line/strokeWidth", line.strokeWidth);
       cell.attr("line/strokeDasharray", line.strokeDasharray);
+      cell.attr("line/strokeOpacity", line.strokeOpacity);
       cell.attr("line/targetMarker", line.targetMarker);
       cell.attr("line/cursor", line.cursor);
     } else {
