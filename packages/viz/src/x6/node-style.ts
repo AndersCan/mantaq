@@ -65,7 +65,6 @@ export function nodeMarkup(): Array<{ tagName: string; selector: string }> {
   return [
     { tagName: "rect", selector: "body" },
     { tagName: "text", selector: "label" },
-    { tagName: "g", selector: "badgeGroup" },
     { tagName: "circle", selector: "badgeCircle" },
     { tagName: "text", selector: "badgeText" },
   ];
@@ -75,21 +74,18 @@ export function badgeAttrs(node: GraphNode): Record<string, unknown> {
   const effectCount = node.effects?.length ?? 0;
   if (effectCount === 0 || node.isInitial) {
     return {
-      badgeGroup: { display: "none" },
       badgeCircle: { r: 0 },
       badgeText: { text: "" },
     };
   }
   return {
-    badgeGroup: {
+    badgeCircle: {
+      r: 8,
       ref: "body",
       refX: "100%",
       refY: 0,
       refDx: -4,
       refDy: 4,
-    },
-    badgeCircle: {
-      r: 8,
       cx: 0,
       cy: 0,
       fill: EFFECT_BADGE_FILL,
@@ -97,6 +93,11 @@ export function badgeAttrs(node: GraphNode): Record<string, unknown> {
       strokeWidth: 1,
     },
     badgeText: {
+      ref: "body",
+      refX: "100%",
+      refY: 0,
+      refDx: -4,
+      refDy: 4,
       text: `${effectCount}`,
       fill: "#ffffff",
       fontSize: 9,

@@ -67,16 +67,10 @@ export function syncNodes(
       const badge = badgeAttrs(node);
       const bc = badge.badgeCircle as { r: number; fill: string; stroke: string };
       const bt = badge.badgeText as { text: string };
-      const bg = badge.badgeGroup as { display?: string };
       cell.attr("badgeCircle/r", bc.r);
       cell.attr("badgeCircle/fill", bc.fill);
       cell.attr("badgeCircle/stroke", bc.stroke);
       cell.attr("badgeText/text", bt.text);
-      if (bg?.display === "none") {
-        cell.attr("badgeGroup/display", "none");
-      } else {
-        cell.attr("badgeGroup/display", "block");
-      }
       cell.setData({ tooltip }, { overwrite: true });
     } else {
       const pos = movedPositions.get(node.id) ?? positions.get(node.id) ?? { x: 0, y: 0 };
