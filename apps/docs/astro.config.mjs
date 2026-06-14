@@ -7,6 +7,9 @@ import remarkGfm from "remark-gfm";
 export default defineConfig({
   site: "https://anderscan.github.io",
   base: "/mantaq",
+  devToolbar: {
+    enabled: false,
+  },
   markdown: {
     remarkPlugins: [remarkGfm],
   },

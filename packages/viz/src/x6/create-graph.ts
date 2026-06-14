@@ -11,7 +11,7 @@ export function createGraph(opts: X6GraphOptions): Graph {
   return new Graph({
     container: opts.container,
     panning: opts.panning ?? true,
-    mousewheel: opts.mousewheel ?? true,
+    mousewheel: false,
     background: { color: opts.background ?? "#f8fafc" },
     grid: false,
   });

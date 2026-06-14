@@ -1,5 +1,8 @@
 import type { GraphEdge } from "../graph.ts";
 
+const EFFECT_AMBER = "#d97706";
+const EFFECT_FILL = "#fffbeb";
+const EFFECT_STROKE = "#fbbf24";
 const ACTIVE_BLUE = "#3b82f6";
 const ACTIVE_LABEL_FILL = "#e2e8f0";
 const ACTIVE_LABEL_STROKE = "#94a3b8";
@@ -8,6 +11,10 @@ const UNDETERMINED_FILL = "#fef2f2";
 const INACTIVE_GRAY = "#94a3b8";
 const INACTIVE_LABEL_FILL = "#f1f5f9";
 const INACTIVE_LABEL_STROKE = "#cbd5e1";
+
+function isEffectTriggered(edge: GraphEdge): boolean {
+  return !!edge.isEffectTriggered;
+}
 
 export interface EdgeLabelAttrs {
   position: { distance: number };
@@ -62,37 +69,43 @@ function isUndetermined(edge: GraphEdge): boolean {
 
 function labelColor(edge: GraphEdge): string {
   if (isUndetermined(edge)) return UNDETERMINED_RED;
+  if (isEffectTriggered(edge)) return EFFECT_AMBER;
   return edge.isActive ? "#0f172a" : INACTIVE_GRAY;
 }
 
 function labelFill(edge: GraphEdge): string {
   if (isUndetermined(edge)) return UNDETERMINED_FILL;
+  if (isEffectTriggered(edge)) return EFFECT_FILL;
   return edge.isActive ? ACTIVE_LABEL_FILL : INACTIVE_LABEL_FILL;
 }
 
 function labelStroke(edge: GraphEdge): string {
   if (isUndetermined(edge)) return UNDETERMINED_RED;
+  if (isEffectTriggered(edge)) return EFFECT_STROKE;
   return edge.isActive ? ACTIVE_LABEL_STROKE : INACTIVE_LABEL_STROKE;
 }
 
 function lineColor(edge: GraphEdge): string {
   if (isUndetermined(edge)) return UNDETERMINED_RED;
+  if (isEffectTriggered(edge)) return EFFECT_AMBER;
   return edge.isActive ? ACTIVE_BLUE : INACTIVE_GRAY;
 }
 
 function lineWidth(edge: GraphEdge): number {
   if (isUndetermined(edge)) return 1.5;
+  if (isEffectTriggered(edge)) return 1.5;
   return edge.isActive ? 2 : 1;
 }
 
 function lineDash(edge: GraphEdge): number | undefined {
   if (isUndetermined(edge)) return 5;
+  if (isEffectTriggered(edge)) return 5;
   if (!edge.isActive) return 3;
   return undefined;
 }
 
 function marchingStyle(edge: GraphEdge): Record<string, unknown> | undefined {
-  if (isUndetermined(edge)) {
+  if (isUndetermined(edge) || isEffectTriggered(edge)) {
     return { animation: "ant-march 60s infinite linear" };
   }
   return undefined;

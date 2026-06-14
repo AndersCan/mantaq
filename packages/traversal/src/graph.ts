@@ -15,9 +15,9 @@ export function collectActiveStates(
   const fullId = nodeId(prefix, currentName);
   activeSet.add(fullId);
 
-  if (snapshot.regions) {
-    for (const [, regionSnap] of Object.entries(snapshot.regions)) {
-      collectActiveStates(regionSnap, fullId, activeSet);
+  if (snapshot.regions && !snapshot.done) {
+    for (const [regionName, regionSnap] of Object.entries(snapshot.regions)) {
+      collectActiveStates(regionSnap, regionName, activeSet);
     }
   }
 }

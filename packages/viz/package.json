@@ -8,7 +8,7 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
+    ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -16,7 +16,8 @@
   },
   "scripts": {
     "build": "vp pack",
-    "dev": "vp pack --watch",
+    "build:watch": "vp pack --watch",
+    "dev": "vp dev dev",
     "test": "vp test",
     "check": "vp check",
     "mutation": "stryker run",
