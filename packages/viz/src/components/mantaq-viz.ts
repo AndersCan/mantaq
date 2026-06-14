@@ -79,6 +79,14 @@ export class MantaqViz extends HTMLElement {
     return new Set(internal?.map((e) => e.id) ?? []);
   }
 
+  #resolveEdgeActor(edgeId: string | undefined): AnyActor | null {
+    if (!edgeId || !this.#actor) return this.#actor;
+    const dot = edgeId.indexOf(".");
+    if (dot === -1) return this.#actor;
+    const regionName = edgeId.substring(0, dot);
+    return (this.#actor.regions as Record<string, AnyActor>)[regionName] ?? this.#actor;
+  }
+
   #syncGraph() {
     const graphEl = this.querySelector<HTMLDivElement>("#graph-root");
     if (!graphEl) return;
@@ -104,7 +112,8 @@ export class MantaqViz extends HTMLElement {
             this.#renderAll();
             return;
           }
-          this.#actor?.send(event(eventName)() as AnyEventRef);
+          const target = this.#resolveEdgeActor(edgeId);
+          target?.send(event(eventName)() as AnyEventRef);
           if (edgeId) highlightTransition(this.#flow!.graph, edgeId);
           this.#renderAll();
         },

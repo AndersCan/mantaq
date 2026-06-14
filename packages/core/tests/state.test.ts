@@ -13,12 +13,13 @@ test("state name is a string literal type", () => {
   expect(s.name).toBe("myState");
 });
 
-test("final() marks state as final and returns self", () => {
+test("final() marks state as final and returns a new ref", () => {
   const s = state("done")();
   expect(s.isFinal).toBe(false);
   const result = s.final();
-  expect(s.isFinal).toBe(true);
-  expect(result).toBe(s);
+  expect(result.isFinal).toBe(true);
+  expect(result).not.toBe(s);
+  expect(s.isFinal).toBe(false);
 });
 
 test("regions() configures multiple regions and returns self", () => {

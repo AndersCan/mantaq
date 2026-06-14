@@ -275,13 +275,20 @@ export interface AnyActor {
 
 export type InternalActor = AnyActor;
 
+type NonFinalStateName<S extends { name: string; isFinal: boolean }> = S extends {
+  isFinal: false;
+}
+  ? S["name"]
+  : never;
+type NonFinalStateNames<S extends AnyStateRef[]> = NonFinalStateName<S[number]>;
+
 export class Actor<
   const Inputs extends AnyEventRef[],
   const Outputs extends AnyEventRef[],
   const Internal extends AnyEventRef[],
   const States extends AnyStateRef[],
   const InternalNames extends Internal[number]["id"],
-  const StateNames extends States[number]["name"],
+  const StateNames extends NonFinalStateNames<States>,
   const ActorContext,
 > {
   state: States[number];
@@ -295,6 +302,7 @@ export class Actor<
   #outputHandler: ((event: InternalEvent) => void) | null = null;
   #processing = false;
   #internalIds: Set<string> = new Set();
+  #inputIds: Set<string> = new Set();
   #internalBudget: number;
   #internalCount = 0;
   #subscribers: Set<(snapshot: Snapshot) => void> = new Set();
@@ -349,7 +357,7 @@ export class Actor<
           [Id in Inputs[number]["id"] | InternalNames]: (
             event: ById<Inputs[number] | Internal[number], Id>,
             options: { context: ActorContext; actor: AnyActor },
-          ) => TransitionResult;
+          ) => TransitionResult<InternalNames | Outputs[number]["id"]>;
         }>
       >
     >;
@@ -374,7 +382,7 @@ export class Actor<
           [Id in Inputs[number]["id"] | InternalNames]: (
             event: ById<Inputs[number] | Internal[number], Id>,
             options: { context: ActorContext; actor: AnyActor },
-          ) => TransitionResult;
+          ) => TransitionResult<InternalNames | Outputs[number]["id"]>;
         }>
       >
     >;
@@ -388,6 +396,7 @@ export class Actor<
       effects: options.effects ?? ({} as typeof this.options.effects),
     });
     this.#internalIds = new Set(this.options.internal.map((e) => e.id));
+    this.#inputIds = new Set(this.options.inputs.map((e) => e.id));
     this.#internalBudget = options.internalBudget ?? 10000;
     this.clock = options.clock ?? new RealClock();
     if (this.clock instanceof VirtualClock) {
@@ -460,6 +469,12 @@ export class Actor<
   }
 
   send(event: CreatedOf<Inputs[number]> | CreatedOf<Internal[number]>): void {
+    if (this.state.isFinal) {
+      console.warn(
+        `[Actor] cannot send "${event.id}" — current state "${this.state.name}" is final.`,
+      );
+      return;
+    }
     const transitions = this.options.transitions as Record<
       string,
       Record<string, TransitionHandler<ActorContext> | undefined>
@@ -592,6 +607,8 @@ export class Actor<
       this.#internalCount++;
       if (this.#internalIds.has(event.id)) {
         this.send(event as CreatedOf<Internal[number]>);
+      } else if (this.#inputIds.has(event.id)) {
+        this.send(event as CreatedOf<Inputs[number]>);
       } else if (this.#outputHandler) {
         this.#outputHandler(event);
       }
@@ -633,15 +650,15 @@ type CreatedEvent<E> = E extends EventRef<infer Id, infer P> ? P & { id: Id } : 
 
 type ById<T extends { id: string }, K extends T["id"]> = CreatedEvent<Extract<T, { id: K }>>;
 
-type TransitionHandler<AC> = (
+type TransitionHandler<AC, AllowedEmit extends string = string> = (
   event: AnyEventRef | InternalEvent,
   options: { context: AC; actor: AnyActor },
-) => TransitionResult;
+) => TransitionResult<AllowedEmit>;
 
-type TransitionResult = {
+type TransitionResult<AllowedEmit extends string = string> = {
   state?: AnyStateRef | { state: AnyStateRef; payload?: unknown };
   payload?: unknown;
-  emit?: Array<{ id: string }>;
+  emit?: Array<{ id: AllowedEmit }>;
 };
 
 type InitialState<S> =
