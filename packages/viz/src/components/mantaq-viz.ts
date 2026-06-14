@@ -6,6 +6,8 @@ import { highlightTransition } from "../x6/sync.ts";
 import { renderActorFlow } from "./actor-flow.ts";
 import type { ContextViewer } from "./context-viewer.ts";
 import "./context-viewer.ts";
+import { TransitionTimeline } from "./transition-timeline.ts";
+import "./transition-timeline.ts";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import type { LayoutOptions } from "../layout.ts";
 
@@ -426,6 +428,10 @@ export class MantaqViz extends HTMLElement {
             max-height: 300px;
             overflow-y: auto;
           }
+          transition-timeline {
+            display: block;
+            border-top: 1px solid #1e293b;
+          }
         </style>
         <div class="identity-card">
           <div class="identity-row">
@@ -560,6 +566,7 @@ export class MantaqViz extends HTMLElement {
           </div>
         </div>
         <div class="event-palette" id="palette-root"></div>
+        <transition-timeline id="timeline-root"></transition-timeline>
         <div class="ctx-wrap" id="context-root"></div>
       `,
       this,
@@ -575,6 +582,12 @@ export class MantaqViz extends HTMLElement {
     if (ctxRoot) {
       ctxRoot.actor = this.#actor;
       ctxRoot.addEventListener("context-edit", () => this.#renderAll());
+    }
+
+    const timelineRoot =
+      this.querySelector<InstanceType<typeof TransitionTimeline>>("#timeline-root");
+    if (timelineRoot) {
+      timelineRoot.actor = this.#actor;
     }
   }
 

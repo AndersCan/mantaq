@@ -2,7 +2,7 @@ import type { Graph as X6Graph } from "@antv/x6";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import { computeNodePositions } from "../layout.ts";
 import type { LayoutOptions } from "../layout.ts";
-import { nodeAttrs, nodeTooltip } from "./node-style.ts";
+import { nodeAttrs, nodeTooltip, badgeAttrs } from "./node-style.ts";
 import { edgeConfig, edgeLine } from "./edge-style.ts";
 
 const INITIAL_NODE_SIZE = 20;
@@ -64,18 +64,34 @@ export function syncNodes(
       cell.setPosition(pos.x, pos.y);
       cell.setAttrs(nodeAttrs(node) as never);
       cell.attr("text/text", node.label);
+      const badge = badgeAttrs(node);
+      if (badge.badgeCircle) {
+        const bc = badge.badgeCircle as { r: number; fill: string; stroke: string };
+        const bt = badge.badgeText as { text: string };
+        cell.attr("badgeCircle/r", bc.r);
+        cell.attr("badgeCircle/fill", bc.fill);
+        cell.attr("badgeCircle/stroke", bc.stroke);
+        cell.attr("badgeText/text", bt.text);
+      } else {
+        cell.attr("badgeCircle/r", 0);
+        cell.attr("badgeText/text", "");
+      }
       cell.setData({ tooltip }, { overwrite: true });
     } else {
       const pos = movedPositions.get(node.id) ?? positions.get(node.id) ?? { x: 0, y: 0 };
+      const isInitial = node.isInitial;
       graph.addNode({
         id: node.id,
-        shape: node.isInitial ? "circle" : "rect",
+        shape: isInitial ? "circle" : "mantaq-state",
         x: pos.x,
         y: pos.y,
-        width: node.isInitial ? INITIAL_NODE_SIZE : 160,
-        height: node.isInitial ? INITIAL_NODE_SIZE : 60,
-        label: node.isInitial ? "" : node.label,
-        attrs: nodeAttrs(node) as never,
+        width: isInitial ? INITIAL_NODE_SIZE : 160,
+        height: isInitial ? INITIAL_NODE_SIZE : 60,
+        label: isInitial ? "" : node.label,
+        attrs: {
+          ...nodeAttrs(node),
+          ...badgeAttrs(node),
+        } as never,
         data: { tooltip },
       } as never);
       changed = true;
