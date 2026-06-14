@@ -10,29 +10,15 @@ export interface NodeBodyAttrs {
   strokeOpacity?: number;
 }
 
-export interface NodeTextAttrs {
+export interface NodeLabelAttrs {
   fill?: string;
   fillOpacity?: number;
   fontWeight?: string;
 }
 
-export interface NodeBadgeAttrs {
-  circle: {
-    fill: string;
-    stroke: string;
-    display?: string;
-  };
-  text: {
-    fill: string;
-    text: string;
-    display?: string;
-  };
-}
-
 export interface NodeAttrs {
   body: NodeBodyAttrs;
-  text?: NodeTextAttrs;
-  badge?: NodeBadgeAttrs;
+  label?: NodeLabelAttrs;
 }
 
 const FINAL_COLOR = "#059669";
@@ -56,7 +42,6 @@ export function nodeAttrs(node: GraphNode): NodeAttrs {
 
   const isActive = node.isActive;
   const isFinal = node.isFinal;
-  const effectCount = node.effects?.length ?? 0;
 
   return {
     body: {
@@ -68,22 +53,10 @@ export function nodeAttrs(node: GraphNode): NodeAttrs {
       rx: 8,
       ry: 8,
     },
-    text: {
+    label: {
       fill: isActive ? "#0f172a" : "#64748b",
       fillOpacity: isActive ? 1 : 0.5,
       fontWeight: isActive ? "600" : "400",
-    },
-    badge: {
-      circle: {
-        fill: EFFECT_BADGE_FILL,
-        stroke: EFFECT_BADGE_STROKE,
-        display: effectCount > 0 ? "block" : "none",
-      },
-      text: {
-        fill: "#ffffff",
-        text: effectCount > 0 ? `${effectCount}` : "",
-        display: effectCount > 0 ? "block" : "none",
-      },
     },
   };
 }
@@ -101,7 +74,11 @@ export function nodeMarkup(): Array<{ tagName: string; selector: string }> {
 export function badgeAttrs(node: GraphNode): Record<string, unknown> {
   const effectCount = node.effects?.length ?? 0;
   if (effectCount === 0 || node.isInitial) {
-    return {};
+    return {
+      badgeGroup: { display: "none" },
+      badgeCircle: { r: 0 },
+      badgeText: { text: "" },
+    };
   }
   return {
     badgeGroup: {
