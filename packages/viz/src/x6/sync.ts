@@ -123,6 +123,7 @@ export function syncEdges(graph: X6Graph, edges: ActorGraph["edges"], routerName
       cell.attr("line/strokeOpacity", line.strokeOpacity);
       cell.attr("line/targetMarker", line.targetMarker);
       cell.attr("line/cursor", line.cursor);
+      (cell as { attr: (path: string, val: unknown) => void }).attr("line/style", line.style ?? {});
     } else {
       graph.addEdge(edgeConfig(edge, routerName));
       changed = true;
