@@ -166,30 +166,24 @@ export class MantaqViz extends HTMLElement {
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
           }
           .identity-card {
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 0.75rem;
             background: #1e293b;
             border-bottom: 1px solid #334155;
           }
-          .identity-row {
+          .identity-header {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-          }
-          .identity-left {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
           }
           .lifecycle-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             flex-shrink: 0;
           }
           .lifecycle-dot.running {
             background: #22c55e;
-            box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+            box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
           }
           .lifecycle-dot.idle {
             background: #94a3b8;
@@ -200,36 +194,34 @@ export class MantaqViz extends HTMLElement {
           }
           .lifecycle-dot.error {
             background: #ef4444;
-            box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+            box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
           }
           .actor-name {
-            font-size: 1rem;
+            font-size: 0.85rem;
             font-weight: 700;
             color: #e2e8f0;
           }
           .stats-bar {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             color: #94a3b8;
+            margin-top: 0.15rem;
           }
           .stats-bar .sep {
             color: #475569;
-            margin: 0 0.15rem;
+            margin: 0 0.1rem;
           }
           .stats-bar .val {
             color: #cbd5e1;
             font-weight: 600;
           }
-          .identity-right {
+          .identity-detail {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            margin-left: auto;
+            gap: 0.75rem;
+            margin-top: 0.2rem;
+            font-size: 0.7rem;
           }
           .current-state {
-            font-size: 0.85rem;
             color: #94a3b8;
           }
           .current-state span {
@@ -237,7 +229,6 @@ export class MantaqViz extends HTMLElement {
             font-weight: 700;
           }
           .context-preview {
-            font-size: 0.75rem;
             color: #64748b;
           }
           .context-preview span {
@@ -434,38 +425,36 @@ export class MantaqViz extends HTMLElement {
           }
         </style>
         <div class="identity-card">
-          <div class="identity-row">
-            <div class="identity-left">
-              <div class="lifecycle-dot ${lifecycle}"></div>
-              <span class="actor-name">${this.#name}</span>
-              <span class="stats-bar">
-                <span class="val">${stats.states}</span> states
-                <span class="sep">·</span>
-                <span class="val">${stats.events}</span> events
-                ${stats.effects > 0
-                  ? html`
-                      <span class="sep">·</span>
-                      <span class="val">${stats.effects}</span> effects
-                    `
-                  : ""}
-                ${stats.regions > 0
-                  ? html`
-                      <span class="sep">·</span>
-                      <span class="val">${stats.regions}</span> regions
-                    `
-                  : ""}
-              </span>
-            </div>
-            <div class="identity-right">
-              <span class="current-state">State: <span>${this.#currentState()}</span></span>
-              ${contextFields.length > 0
-                ? html`
-                    <span class="context-preview">
-                      { <span>${contextFields.join(", ")}</span> }
-                    </span>
-                  `
-                : ""}
-            </div>
+          <div class="identity-header">
+            <div class="lifecycle-dot ${lifecycle}"></div>
+            <span class="actor-name">${this.#name}</span>
+          </div>
+          <div class="stats-bar">
+            <span class="val">${stats.states}</span> states
+            <span class="sep">·</span>
+            <span class="val">${stats.events}</span> events
+            ${stats.effects > 0
+              ? html`
+                  <span class="sep">·</span>
+                  <span class="val">${stats.effects}</span> effects
+                `
+              : ""}
+            ${stats.regions > 0
+              ? html`
+                  <span class="sep">·</span>
+                  <span class="val">${stats.regions}</span> regions
+                `
+              : ""}
+          </div>
+          <div class="identity-detail">
+            <span class="current-state">Current: <span>${this.#currentState()}</span></span>
+            ${contextFields.length > 0
+              ? html`
+                  <span class="context-preview">
+                    { <span>${contextFields.join(", ")}</span> }
+                  </span>
+                `
+              : ""}
           </div>
         </div>
         <div class="toolbar">

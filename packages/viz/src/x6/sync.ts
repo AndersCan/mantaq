@@ -63,18 +63,19 @@ export function syncNodes(
         positions.get(node.id) ?? { x: cell.getPosition().x, y: cell.getPosition().y };
       cell.setPosition(pos.x, pos.y);
       cell.setAttrs(nodeAttrs(node) as never);
-      cell.attr("text/text", node.label);
+      cell.attr("label/text", node.label);
       const badge = badgeAttrs(node);
-      if (badge.badgeCircle) {
-        const bc = badge.badgeCircle as { r: number; fill: string; stroke: string };
-        const bt = badge.badgeText as { text: string };
-        cell.attr("badgeCircle/r", bc.r);
-        cell.attr("badgeCircle/fill", bc.fill);
-        cell.attr("badgeCircle/stroke", bc.stroke);
-        cell.attr("badgeText/text", bt.text);
+      const bc = badge.badgeCircle as { r: number; fill: string; stroke: string };
+      const bt = badge.badgeText as { text: string };
+      const bg = badge.badgeGroup as { display?: string };
+      cell.attr("badgeCircle/r", bc.r);
+      cell.attr("badgeCircle/fill", bc.fill);
+      cell.attr("badgeCircle/stroke", bc.stroke);
+      cell.attr("badgeText/text", bt.text);
+      if (bg?.display === "none") {
+        cell.attr("badgeGroup/display", "none");
       } else {
-        cell.attr("badgeCircle/r", 0);
-        cell.attr("badgeText/text", "");
+        cell.attr("badgeGroup/display", "block");
       }
       cell.setData({ tooltip }, { overwrite: true });
     } else {
