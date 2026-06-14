@@ -4,6 +4,7 @@ import type { LayoutOptions } from "../layout.ts";
 import type { Graph as X6Graph } from "@antv/x6";
 import { createGraph } from "../x6/create-graph.ts";
 import { syncGraph } from "../x6/sync.ts";
+import sharedStyles from "../styles.css?inline";
 
 export interface ActorFlowInstance {
   graph: X6Graph;
@@ -24,31 +25,13 @@ export function renderActorFlow(
   render(
     html`
       <style>
-        .x6-graph-svg {
+        ${sharedStyles} .x6-graph-svg {
           display: block;
           width: 100%;
           height: 100%;
         }
-        @keyframes ant-march {
-          to {
-            stroke-dashoffset: -1000;
-          }
-        }
-        .x6-graph-tooltip {
-          position: absolute;
-          background: #1e293b;
-          color: #e2e8f0;
-          padding: 8px 12px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-family: monospace;
-          pointer-events: none;
-          z-index: 100;
-          white-space: pre-line;
-          display: none;
-        }
       </style>
-      <div class="actor-flow" style="width:100%;height:100%;min-height:300px"></div>
+      <div class="actor-flow w-full h-full min-h-75"></div>
     `,
     parent,
   );
@@ -58,7 +41,8 @@ export function renderActorFlow(
   const movedPositions = new Map<string, { x: number; y: number }>();
 
   const tooltipEl = document.createElement("div");
-  tooltipEl.className = "x6-graph-tooltip";
+  tooltipEl.className =
+    "absolute bg-slate-800 text-slate-200 px-3 py-2 rounded text-xs font-mono pointer-events-none z-100 whitespace-pre-line hidden";
   container.appendChild(tooltipEl);
 
   setupTooltip(g, container, tooltipEl);

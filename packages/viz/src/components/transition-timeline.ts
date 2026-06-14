@@ -2,6 +2,7 @@ import { html, render } from "lit-html";
 import type { AnyActor } from "@mantaq/core";
 import { instrument } from "@mantaq/traversal";
 import type { InstrumentedActor, TransitionRecord } from "@mantaq/traversal";
+import sharedStyles from "../styles.css?inline";
 
 interface TimelineEntry {
   event: string;
@@ -94,143 +95,22 @@ export class TransitionTimeline extends HTMLElement {
     render(
       html`
         <style>
-          :host {
+          ${sharedStyles} :host {
             display: block;
             border-top: 1px solid #1e293b;
             background: #0f172a;
           }
-          .timeline-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.3rem 0.75rem;
-            border-bottom: 1px solid #1e293b;
-          }
-          .timeline-title {
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #64748b;
-            font-weight: 600;
-          }
-          .timeline-actions {
-            display: flex;
-            gap: 0.3rem;
-          }
-          .timeline-btn {
-            font-family: inherit;
-            font-size: 0.6rem;
-            padding: 0.1rem 0.4rem;
-            border: 1px solid #334155;
-            border-radius: 3px;
-            background: transparent;
-            color: #94a3b8;
-            cursor: pointer;
-          }
-          .timeline-btn:hover {
-            background: #1e293b;
-            color: #e2e8f0;
-          }
-          .timeline-track {
-            display: flex;
-            align-items: center;
-            overflow-x: auto;
-            padding: 0.4rem 0.75rem;
-            gap: 0;
-            scrollbar-width: thin;
-            scrollbar-color: #334155 #0f172a;
-          }
-          .timeline-track::-webkit-scrollbar {
-            height: 3px;
-          }
-          .timeline-track::-webkit-scrollbar-track {
-            background: #0f172a;
-          }
-          .timeline-track::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 2px;
-          }
-          .timeline-empty {
-            padding: 0.4rem 0.75rem;
-            font-size: 0.65rem;
-            color: #475569;
-            font-style: italic;
-          }
-          .tl-node {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-shrink: 0;
-          }
-          .tl-state {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            padding: 0.2rem 0.4rem;
-            border-radius: 3px;
-            cursor: default;
-          }
-          .tl-state.active {
-            background: #1e293b;
-          }
-          .tl-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            border: 1.5px solid #64748b;
-            background: transparent;
-            flex-shrink: 0;
-          }
-          .tl-dot.active {
-            background: #3b82f6;
-            border-color: #3b82f6;
-          }
-          .tl-state-name {
-            font-size: 0.65rem;
-            color: #94a3b8;
-            white-space: nowrap;
-          }
-          .tl-state.active .tl-state-name {
-            color: #e2e8f0;
-            font-weight: 600;
-          }
-          .tl-transition {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-shrink: 0;
-            padding: 0 0.2rem;
-            cursor: pointer;
-            border-radius: 3px;
-          }
-          .tl-transition:hover {
-            background: #1e293b;
-          }
-          .tl-transition.selected {
-            background: #1e293b;
-            outline: 1px solid #3b82f6;
-          }
-          .tl-event-name {
-            font-size: 0.6rem;
-            font-weight: 600;
-            color: #60a5fa;
-            white-space: nowrap;
-          }
-          .tl-arrow {
-            font-size: 0.55rem;
-            color: #475569;
-          }
-          .tl-time {
-            font-size: 0.5rem;
-            color: #475569;
-            white-space: nowrap;
-          }
         </style>
-        <div class="timeline-header">
-          <span class="timeline-title">Timeline</span>
-          <div class="timeline-actions">
+        <div class="flex items-center justify-between px-3 py-1.5 border-b border-slate-800">
+          <span class="text-xs uppercase tracking-wider text-slate-500 font-semibold"
+            >Timeline</span
+          >
+          <div class="flex gap-1">
             ${hasEntries
-              ? html`<button class="timeline-btn" @click=${() => this.#clearHistory()}>
+              ? html`<button
+                  class="font-inherit text-xs px-1.5 py-0.5 border border-slate-700 rounded bg-transparent text-slate-400 cursor-pointer hover:bg-slate-800 hover:text-slate-200"
+                  @click=${() => this.#clearHistory()}
+                >
                   clear
                 </button>`
               : ""}
@@ -238,34 +118,56 @@ export class TransitionTimeline extends HTMLElement {
         </div>
         ${hasEntries
           ? html`
-              <div class="timeline-track">
+              <div
+                class="flex items-center overflow-x-auto px-3 py-1.5 gap-0 viz-scrollbar scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900"
+              >
                 ${this.#entries.map(
                   (entry, i) => html`
                     ${i > 0
                       ? html`
                           <div
-                            class="tl-transition ${this.#selectedIndex === i ? "selected" : ""}"
+                            class="flex flex-col items-center flex-shrink-0 px-0.5 cursor-pointer rounded ${this.#selectedIndex ===
+                            i
+                              ? "bg-slate-800 outline outline-1 outline-blue-500"
+                              : "hover:bg-slate-800"}"
                             @click=${() => this.#selectEntry(i)}
                           >
-                            <span class="tl-event-name">${entry.event}</span>
-                            <span class="tl-arrow">→</span>
-                            <span class="tl-time">${entry.timestamp}ms</span>
+                            <span class="text-xs font-semibold text-blue-400 whitespace-nowrap"
+                              >${entry.event}</span
+                            >
+                            <span class="text-xs text-slate-600">→</span>
+                            <span class="text-xs text-slate-600 whitespace-nowrap"
+                              >${entry.timestamp}ms</span
+                            >
                           </div>
                         `
                       : ""}
-                    <div class="tl-node">
-                      <div class="tl-state ${i === this.#entries.length - 1 ? "active" : ""}">
+                    <div class="flex flex-col items-center flex-shrink-0">
+                      <div
+                        class="flex items-center gap-1 px-1.5 py-0.5 rounded ${i ===
+                        this.#entries.length - 1
+                          ? "bg-slate-800"
+                          : ""}"
+                      >
                         <span
-                          class="tl-dot ${i === this.#entries.length - 1 ? "active" : ""}"
+                          class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${i ===
+                          this.#entries.length - 1
+                            ? "bg-blue-500 border border-blue-500"
+                            : "border-1.5 border-slate-500 bg-transparent"}"
                         ></span>
-                        <span class="tl-state-name">${i === 0 ? entry.from : entry.to}</span>
+                        <span
+                          class="text-xs whitespace-nowrap ${i === this.#entries.length - 1
+                            ? "text-slate-200 font-semibold"
+                            : "text-slate-400"}"
+                          >${i === 0 ? entry.from : entry.to}</span
+                        >
                       </div>
                     </div>
                   `,
                 )}
               </div>
             `
-          : html`<div class="timeline-empty">No transitions yet</div>`}
+          : html`<div class="px-3 py-1.5 text-xs text-slate-600 italic">No transitions yet</div>`}
       `,
       this,
     );
