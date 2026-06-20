@@ -42,6 +42,111 @@ function buildNodesFromStates(
   });
 }
 
+function invokeHandler(
+  handler: (...args: unknown[]) => unknown,
+  eventId: string,
+  ctx: Record<string, unknown>,
+  actor: AnyActor,
+): { targetName?: string; emitNames: string[] } {
+  let targetName: string | undefined;
+  let emitNames: string[] = [];
+  try {
+    const syntheticEvent = { id: eventId } as Record<string, unknown>;
+    const result = handler(syntheticEvent, { context: ctx, actor }) as
+      | { state?: { name?: string }; emit?: Array<{ id?: string }> }
+      | undefined;
+    targetName = result?.state?.name;
+    if (result?.emit) {
+      emitNames = result.emit.map((e) => e.id).filter(Boolean) as string[];
+    }
+  } catch {
+    targetName = undefined;
+  }
+  return { targetName, emitNames };
+}
+
+function upsertEdge(
+  edgeMap: Map<string, GraphEdge>,
+  sourceId: string,
+  eventId: string,
+  targetName: string | undefined,
+  emitNames: string[],
+  ctxName: string,
+  pathPrefix: string,
+  activeSet: Set<string>,
+  internalIds?: Set<string>,
+): void {
+  const undetermined = !targetName;
+  const targetId = targetName
+    ? nodeId(pathPrefix, targetName)
+    : `${sourceId}-undetermined-${eventId}`;
+  const edgeId = `${sourceId}-${eventId}-${targetId}`;
+
+  const existing = edgeMap.get(edgeId);
+  if (existing) {
+    existing.contexts!.push(ctxName);
+  } else {
+    edgeMap.set(edgeId, {
+      id: edgeId,
+      source: sourceId,
+      target: targetId,
+      label: eventId,
+      isActive: activeSet.has(sourceId),
+      isInternal: internalIds?.has(eventId),
+      isUndetermined: undetermined,
+      contexts: [ctxName],
+      ...(emitNames.length > 0 && { payload: { action: `emit(${emitNames.join(", ")})` } }),
+    });
+  }
+}
+
+function processStateTransitions(
+  stateTransitions: Record<string, ((...args: unknown[]) => unknown) | undefined>,
+  edgeMap: Map<string, GraphEdge>,
+  sourceId: string,
+  contextNames: string[],
+  contexts: Record<string, Record<string, unknown>>,
+  actor: AnyActor,
+  pathPrefix: string,
+  activeSet: Set<string>,
+  internalIds?: Set<string>,
+): Set<string> {
+  const stateTransitionedEvents = new Set<string>();
+  for (const [eventId, handler] of Object.entries(stateTransitions)) {
+    if (typeof handler !== "function") continue;
+    for (const ctxName of contextNames) {
+      const ctx = contexts[ctxName];
+      const { targetName, emitNames } = invokeHandler(handler, eventId, ctx, actor);
+      if (targetName) stateTransitionedEvents.add(eventId);
+      upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName, pathPrefix, activeSet, internalIds);
+    }
+  }
+  return stateTransitionedEvents;
+}
+
+function mergeAnyTransitions(
+  anyTransitions: Record<string, ((...args: unknown[]) => unknown) | undefined>,
+  stateTransitionedEvents: Set<string>,
+  edgeMap: Map<string, GraphEdge>,
+  sourceId: string,
+  contextNames: string[],
+  contexts: Record<string, Record<string, unknown>>,
+  actor: AnyActor,
+  pathPrefix: string,
+  activeSet: Set<string>,
+  internalIds?: Set<string>,
+): void {
+  for (const [eventId, handler] of Object.entries(anyTransitions)) {
+    if (typeof handler !== "function") continue;
+    if (stateTransitionedEvents.has(eventId)) continue;
+    for (const ctxName of contextNames) {
+      const ctx = contexts[ctxName];
+      const { targetName, emitNames } = invokeHandler(handler, eventId, ctx, actor);
+      upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName, pathPrefix, activeSet, internalIds);
+    }
+  }
+}
+
 function buildEdgesFromTransitions(
   states: Array<{ name: string }>,
   transitions: Record<string, Record<string, unknown>> | undefined,
@@ -61,93 +166,41 @@ function buildEdgesFromTransitions(
     | Record<string, ((...args: unknown[]) => unknown) | undefined>
     | undefined;
 
-  function invokeHandler(
-    handler: (...args: unknown[]) => unknown,
-    eventId: string,
-    ctx: Record<string, unknown>,
-  ): { targetName?: string; emitNames: string[] } {
-    let targetName: string | undefined;
-    let emitNames: string[] = [];
-    try {
-      const syntheticEvent = { id: eventId } as Record<string, unknown>;
-      const result = handler(syntheticEvent, { context: ctx, actor }) as
-        | { state?: { name?: string }; emit?: Array<{ id?: string }> }
-        | undefined;
-      targetName = result?.state?.name;
-      if (result?.emit) {
-        emitNames = result.emit.map((e) => e.id).filter(Boolean) as string[];
-      }
-    } catch {
-      targetName = undefined;
-    }
-    return { targetName, emitNames };
-  }
-
-  function upsertEdge(
-    edgeMap: Map<string, GraphEdge>,
-    sourceId: string,
-    eventId: string,
-    targetName: string | undefined,
-    emitNames: string[],
-    ctxName: string,
-  ): void {
-    const undetermined = !targetName;
-    const targetId = targetName
-      ? nodeId(pathPrefix, targetName)
-      : `${sourceId}-undetermined-${eventId}`;
-    const edgeId = `${sourceId}-${eventId}-${targetId}`;
-
-    const existing = edgeMap.get(edgeId);
-    if (existing) {
-      existing.contexts!.push(ctxName);
-    } else {
-      edgeMap.set(edgeId, {
-        id: edgeId,
-        source: sourceId,
-        target: targetId,
-        label: eventId,
-        isActive: activeSet.has(sourceId),
-        isInternal: internalIds?.has(eventId),
-        isUndetermined: undetermined,
-        contexts: [ctxName],
-        ...(emitNames.length > 0 && { payload: { action: `emit(${emitNames.join(", ")})` } }),
-      });
-    }
-  }
-
   for (const stateRef of states) {
     const sourceId = nodeId(pathPrefix, stateRef.name);
     const stateTransitions = transitions[stateRef.name] as
       | Record<string, ((...args: unknown[]) => unknown) | undefined>
       | undefined;
 
-    const stateTransitionedEvents = new Set<string>();
     const edgeMap = new Map<string, GraphEdge>();
 
-    if (stateTransitions) {
-      for (const [eventId, handler] of Object.entries(stateTransitions)) {
-        if (typeof handler !== "function") continue;
-
-        for (const ctxName of contextNames) {
-          const ctx = contexts[ctxName];
-          const { targetName, emitNames } = invokeHandler(handler, eventId, ctx);
-          if (targetName) stateTransitionedEvents.add(eventId);
-          upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName);
-        }
-      }
-    }
+    const stateTransitionedEvents = stateTransitions
+      ? processStateTransitions(
+          stateTransitions,
+          edgeMap,
+          sourceId,
+          contextNames,
+          contexts,
+          actor,
+          pathPrefix,
+          activeSet,
+          internalIds,
+        )
+      : new Set<string>();
 
     if (anyTransitions) {
-      for (const [eventId, handler] of Object.entries(anyTransitions)) {
-        if (typeof handler !== "function") continue;
-        if (stateTransitionedEvents.has(eventId)) continue;
-
-        for (const ctxName of contextNames) {
-          const ctx = contexts[ctxName];
-          const { targetName, emitNames } = invokeHandler(handler, eventId, ctx);
-          upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName);
-        }
-      }
+      mergeAnyTransitions(
+        anyTransitions,
+        stateTransitionedEvents,
+        edgeMap,
+        sourceId,
+        contextNames,
+        contexts,
+        actor,
+        pathPrefix,
+        activeSet,
+        internalIds,
+      );
     }
 
     edges.push(...edgeMap.values());
@@ -156,17 +209,24 @@ function buildEdgesFromTransitions(
   return edges;
 }
 
-function buildForActor(
+function addNodesForActor(
+  actor: AnyActor,
+  pathPrefix: string,
+  activeSet: Set<string>,
+): GraphNode[] {
+  const states = (actor.options?.states ?? []) as Array<{ name: string; isFinal: boolean }>;
+  return buildNodesFromStates(states, activeSet, pathPrefix);
+}
+
+function addEdgesForActor(
   actor: AnyActor,
   pathPrefix: string,
   activeSet: Set<string>,
   internalIds?: Set<string>,
   namedContexts?: Record<string, Record<string, unknown>>,
-): { nodes: GraphNode[]; edges: GraphEdge[] } {
-  if (!actor) return { nodes: [], edges: [] };
+): GraphEdge[] {
   const states = (actor.options?.states ?? []) as Array<{ name: string; isFinal: boolean }>;
-  const nodes = buildNodesFromStates(states, activeSet, pathPrefix);
-  const edges = buildEdgesFromTransitions(
+  return buildEdgesFromTransitions(
     states,
     actor.options?.transitions as Record<string, Record<string, unknown>> | undefined,
     activeSet,
@@ -175,7 +235,17 @@ function buildForActor(
     internalIds,
     namedContexts,
   );
+}
 
+function recurseRegions(
+  actor: AnyActor,
+  pathPrefix: string,
+  activeSet: Set<string>,
+  internalIds?: Set<string>,
+  namedContexts?: Record<string, Record<string, unknown>>,
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const nodes: GraphNode[] = [];
+  const edges: GraphEdge[] = [];
   if (actor.regions) {
     for (const [regionName, childActor] of Object.entries(actor.regions)) {
       const child = buildForActor(
@@ -189,7 +259,15 @@ function buildForActor(
       edges.push(...child.edges);
     }
   }
+  return { nodes, edges };
+}
 
+function addEffectSelfLoops(
+  actor: AnyActor,
+  pathPrefix: string,
+  activeSet: Set<string>,
+): GraphEdge[] {
+  const edges: GraphEdge[] = [];
   const effects = (actor.options as Record<string, unknown> | undefined)?.effects as
     | Record<string, unknown[]>
     | undefined;
@@ -208,7 +286,23 @@ function buildForActor(
       }
     }
   }
+  return edges;
+}
 
+function buildForActor(
+  actor: AnyActor,
+  pathPrefix: string,
+  activeSet: Set<string>,
+  internalIds?: Set<string>,
+  namedContexts?: Record<string, Record<string, unknown>>,
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  if (!actor) return { nodes: [], edges: [] };
+  const nodes = addNodesForActor(actor, pathPrefix, activeSet);
+  const edges = addEdgesForActor(actor, pathPrefix, activeSet, internalIds, namedContexts);
+  const region = recurseRegions(actor, pathPrefix, activeSet, internalIds, namedContexts);
+  nodes.push(...region.nodes);
+  edges.push(...region.edges);
+  edges.push(...addEffectSelfLoops(actor, pathPrefix, activeSet));
   return { nodes, edges };
 }
 
