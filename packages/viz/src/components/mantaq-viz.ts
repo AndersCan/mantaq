@@ -147,14 +147,6 @@ export class MantaqViz extends HTMLElement {
     const lifecycle = this.#lifecycleStatus();
     const contextFields = this.#contextPreview();
 
-    const dotCls = {
-      running:
-        "w-2 h-2 rounded-full flex-shrink-0 bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]",
-      idle: "w-2 h-2 rounded-full flex-shrink-0 bg-slate-400",
-      done: "w-2 h-2 rounded-full flex-shrink-0 bg-transparent border-2 border-slate-500",
-      error: "w-2 h-2 rounded-full flex-shrink-0 bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]",
-    };
-
     render(
       html`
         <style>
@@ -166,41 +158,7 @@ export class MantaqViz extends HTMLElement {
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
           }
         </style>
-        <div class="viz-card">
-          <div class="flex items-center gap-1.5">
-            <div class="${dotCls[lifecycle]}"></div>
-            <span class="text-sm font-bold text-slate-200">${this.#name}</span>
-          </div>
-          <div class="text-xs text-slate-400 mt-0.5">
-            <span class="text-slate-300 font-semibold">${stats.states}</span> states
-            <span class="text-slate-600 mx-0.5">·</span>
-            <span class="text-slate-300 font-semibold">${stats.events}</span> events
-            ${stats.effects > 0
-              ? html`
-                  <span class="text-slate-600 mx-0.5">·</span>
-                  <span class="text-slate-300 font-semibold">${stats.effects}</span> effects
-                `
-              : ""}
-            ${stats.regions > 0
-              ? html`
-                  <span class="text-slate-600 mx-0.5">·</span>
-                  <span class="text-slate-300 font-semibold">${stats.regions}</span> regions
-                `
-              : ""}
-          </div>
-          <div class="flex items-center gap-3 mt-0.5 text-xs">
-            <span class="text-slate-400"
-              >Current: <span class="text-blue-400 font-bold">${this.#currentState()}</span></span
-            >
-            ${contextFields.length > 0
-              ? html`
-                  <span class="text-slate-500">
-                    { <span class="text-slate-400">${contextFields.join(", ")}</span> }
-                  </span>
-                `
-              : ""}
-          </div>
-        </div>
+        ${this.#renderHeader(stats, lifecycle, contextFields)}
         <div class="viz-toolbar">
           <button
             class="viz-gear ${this.#settingsOpen ? "viz-gear-open" : ""}"
@@ -212,116 +170,13 @@ export class MantaqViz extends HTMLElement {
           >
             ⚙
           </button>
-          ${this.#settingsOpen
-            ? html`
-                <div class="viz-settings" @click=${(e: Event) => e.stopPropagation()}>
-                  ${this.#sampleContexts
-                    ? html`
-                        <label class="viz-settings-label">
-                          Context
-                          <select
-                            class="viz-settings-select"
-                            @change=${(e: Event) => {
-                              this.#activeContext = (e.target as HTMLSelectElement).value || null;
-                              this.#renderAll();
-                            }}
-                          >
-                            ${Object.keys(this.#sampleContexts).map(
-                              (name) => html`
-                                <option value=${name} ?selected=${this.#activeContext === name}>
-                                  ${name}
-                                </option>
-                              `,
-                            )}
-                          </select>
-                        </label>
-                      `
-                    : ""}
-                  <label class="viz-settings-label">
-                    Direction
-                    <select
-                      class="viz-settings-select"
-                      @change=${(e: Event) => {
-                        this.#direction = (e.target as HTMLSelectElement).value as "TB" | "LR";
-                        this.#renderAll();
-                      }}
-                    >
-                      <option value="TB" ?selected=${this.#direction === "TB"}>Top→Bottom</option>
-                      <option value="LR" ?selected=${this.#direction === "LR"}>Left→Right</option>
-                    </select>
-                  </label>
-                  <label class="viz-settings-label">
-                    Router
-                    <select
-                      class="viz-settings-select"
-                      @change=${(e: Event) => {
-                        this.#router = (e.target as HTMLSelectElement).value as
-                          | "normal"
-                          | "orth"
-                          | "manhattan"
-                          | "metro"
-                          | "er";
-                        this.#renderAll();
-                      }}
-                    >
-                      <option value="normal" ?selected=${this.#router === "normal"}>Normal</option>
-                      <option value="orth" ?selected=${this.#router === "orth"}>Orthogonal</option>
-                      <option value="manhattan" ?selected=${this.#router === "manhattan"}>
-                        Manhattan
-                      </option>
-                      <option value="metro" ?selected=${this.#router === "metro"}>Metro</option>
-                      <option value="er" ?selected=${this.#router === "er"}>ER</option>
-                    </select>
-                  </label>
-                  <label class="viz-settings-label">
-                    Edge length
-                    <span class="flex items-center gap-1">
-                      <input
-                        type="range"
-                        class="w-30"
-                        min=${RANKSEP_MIN}
-                        max=${RANKSEP_MAX}
-                        value=${this.#ranksep}
-                        @input=${(e: Event) => {
-                          this.#ranksep = Number((e.target as HTMLInputElement).value);
-                          this.#renderAll();
-                        }}
-                      />
-                      <span class="text-xs text-slate-200 min-w-5 text-right"
-                        >${this.#ranksep}</span
-                      >
-                    </span>
-                  </label>
-                </div>
-              `
-            : ""}
+          ${this.#settingsOpen ? this.#renderSettingsPanel() : ""}
         </div>
         <div class="relative h-100">
           <div id="graph-root" class="w-full h-full"></div>
-          <div
-            class="absolute bottom-2 left-2 flex gap-px z-10 bg-slate-800 border border-slate-600 rounded-md overflow-hidden"
-          >
-            <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1.25)} title="Zoom in">
-              +
-            </button>
-            <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1 / 1.25)} title="Zoom out">
-              −
-            </button>
-            <button
-              class="viz-zoom-btn"
-              @click=${() => this.#flow?.graph.zoomTo(1)}
-              title="Reset zoom"
-            >
-              1:1
-            </button>
-          </div>
+          ${this.#renderZoomControls()}
         </div>
-        <div class="bg-slate-900 border-t border-slate-800" id="palette-root"></div>
-        <transition-timeline id="timeline-root"></transition-timeline>
-        <div
-          class="border-t border-gray-200 max-h-75 overflow-y-auto viz-scrollbar-light"
-          id="context-root"
-        ></div>
+        ${this.#renderPalette()} ${this.#renderSubcomponents()}
       `,
       this,
     );
@@ -343,6 +198,168 @@ export class MantaqViz extends HTMLElement {
     if (timelineRoot) {
       timelineRoot.actor = this.#actor;
     }
+  }
+
+  #renderHeader(
+    stats: { states: number; events: number; effects: number; regions: number },
+    lifecycle: "running" | "idle" | "done" | "error",
+    contextFields: string[],
+  ) {
+    const dotCls = {
+      running:
+        "w-2 h-2 rounded-full flex-shrink-0 bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]",
+      idle: "w-2 h-2 rounded-full flex-shrink-0 bg-slate-400",
+      done: "w-2 h-2 rounded-full flex-shrink-0 bg-transparent border-2 border-slate-500",
+      error: "w-2 h-2 rounded-full flex-shrink-0 bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]",
+    };
+
+    return html`
+      <div class="viz-card">
+        <div class="flex items-center gap-1.5">
+          <div class="${dotCls[lifecycle]}"></div>
+          <span class="text-sm font-bold text-slate-200">${this.#name}</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-0.5">
+          <span class="text-slate-300 font-semibold">${stats.states}</span> states
+          <span class="text-slate-600 mx-0.5">·</span>
+          <span class="text-slate-300 font-semibold">${stats.events}</span> events
+          ${stats.effects > 0
+            ? html`
+                <span class="text-slate-600 mx-0.5">·</span>
+                <span class="text-slate-300 font-semibold">${stats.effects}</span> effects
+              `
+            : ""}
+          ${stats.regions > 0
+            ? html`
+                <span class="text-slate-600 mx-0.5">·</span>
+                <span class="text-slate-300 font-semibold">${stats.regions}</span> regions
+              `
+            : ""}
+        </div>
+        <div class="flex items-center gap-3 mt-0.5 text-xs">
+          <span class="text-slate-400"
+            >Current: <span class="text-blue-400 font-bold">${this.#currentState()}</span></span
+          >
+          ${contextFields.length > 0
+            ? html`
+                <span class="text-slate-500">
+                  { <span class="text-slate-400">${contextFields.join(", ")}</span> }
+                </span>
+              `
+            : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  #renderSettingsPanel() {
+    return html`
+      <div class="viz-settings" @click=${(e: Event) => e.stopPropagation()}>
+        ${this.#sampleContexts
+          ? html`
+              <label class="viz-settings-label">
+                Context
+                <select
+                  class="viz-settings-select"
+                  @change=${(e: Event) => {
+                    this.#activeContext = (e.target as HTMLSelectElement).value || null;
+                    this.#renderAll();
+                  }}
+                >
+                  ${Object.keys(this.#sampleContexts).map(
+                    (name) => html`
+                      <option value=${name} ?selected=${this.#activeContext === name}>
+                        ${name}
+                      </option>
+                    `,
+                  )}
+                </select>
+              </label>
+            `
+          : ""}
+        <label class="viz-settings-label">
+          Direction
+          <select
+            class="viz-settings-select"
+            @change=${(e: Event) => {
+              this.#direction = (e.target as HTMLSelectElement).value as "TB" | "LR";
+              this.#renderAll();
+            }}
+          >
+            <option value="TB" ?selected=${this.#direction === "TB"}>Top→Bottom</option>
+            <option value="LR" ?selected=${this.#direction === "LR"}>Left→Right</option>
+          </select>
+        </label>
+        <label class="viz-settings-label">
+          Router
+          <select
+            class="viz-settings-select"
+            @change=${(e: Event) => {
+              this.#router = (e.target as HTMLSelectElement).value as
+                | "normal"
+                | "orth"
+                | "manhattan"
+                | "metro"
+                | "er";
+              this.#renderAll();
+            }}
+          >
+            <option value="normal" ?selected=${this.#router === "normal"}>Normal</option>
+            <option value="orth" ?selected=${this.#router === "orth"}>Orthogonal</option>
+            <option value="manhattan" ?selected=${this.#router === "manhattan"}>Manhattan</option>
+            <option value="metro" ?selected=${this.#router === "metro"}>Metro</option>
+            <option value="er" ?selected=${this.#router === "er"}>ER</option>
+          </select>
+        </label>
+        <label class="viz-settings-label">
+          Edge length
+          <span class="flex items-center gap-1">
+            <input
+              type="range"
+              class="w-30"
+              min=${RANKSEP_MIN}
+              max=${RANKSEP_MAX}
+              value=${this.#ranksep}
+              @input=${(e: Event) => {
+                this.#ranksep = Number((e.target as HTMLInputElement).value);
+                this.#renderAll();
+              }}
+            />
+            <span class="text-xs text-slate-200 min-w-5 text-right">${this.#ranksep}</span>
+          </span>
+        </label>
+      </div>
+    `;
+  }
+
+  #renderZoomControls() {
+    return html`
+      <div
+        class="absolute bottom-2 left-2 flex gap-px z-10 bg-slate-800 border border-slate-600 rounded-md overflow-hidden"
+      >
+        <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1.25)} title="Zoom in">+</button>
+        <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1 / 1.25)} title="Zoom out">
+          −
+        </button>
+        <button class="viz-zoom-btn" @click=${() => this.#flow?.graph.zoomTo(1)} title="Reset zoom">
+          1:1
+        </button>
+      </div>
+    `;
+  }
+
+  #renderPalette() {
+    return html`<div class="bg-slate-900 border-t border-slate-800" id="palette-root"></div>`;
+  }
+
+  #renderSubcomponents() {
+    return html`
+      <transition-timeline id="timeline-root"></transition-timeline>
+      <div
+        class="border-t border-gray-200 max-h-75 overflow-y-auto viz-scrollbar-light"
+        id="context-root"
+      ></div>
+    `;
   }
 
   #currentState(): string {
@@ -386,9 +403,8 @@ export class MantaqViz extends HTMLElement {
 
   #categorizeEvents(graph: ActorGraph): EventCategory[] {
     if (!this.#actor) return [];
-    const transitions = this.#actor.options?.transitions as
-      | Record<string, Record<string, unknown>>
-      | undefined;
+    const opts = this.#actor.options as { transitions?: Record<string, Record<string, unknown>> };
+    const transitions = opts.transitions;
     if (!transitions) return [];
 
     const activeNames = graph.nodes
