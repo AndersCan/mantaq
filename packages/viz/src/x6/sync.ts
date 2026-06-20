@@ -7,22 +7,37 @@ import { edgeConfig, edgeLine } from "./edge-style.ts";
 
 const INITIAL_NODE_SIZE = 20;
 
-let highlightTimeout: ReturnType<typeof setTimeout> | undefined;
-const disposedGraphs = new WeakSet<X6Graph>();
+interface GraphSyncState {
+  highlightTimeout: ReturnType<typeof setTimeout> | undefined;
+  disposed: boolean;
+}
+
+const graphStates = new WeakMap<X6Graph, GraphSyncState>();
+
+function getGraphState(graph: X6Graph): GraphSyncState {
+  let state = graphStates.get(graph);
+  if (!state) {
+    state = { highlightTimeout: undefined, disposed: false };
+    graphStates.set(graph, state);
+  }
+  return state;
+}
 
 export function highlightTransition(graph: X6Graph, edgeId: string): void {
   const cell = graph.getCellById(edgeId);
   if (!cell?.isEdge()) return;
 
-  if (highlightTimeout !== undefined) clearTimeout(highlightTimeout);
+  const state = getGraphState(graph);
 
-  if (!disposedGraphs.has(graph)) {
+  if (state.highlightTimeout !== undefined) clearTimeout(state.highlightTimeout);
+
+  if (!state.disposed) {
     graph.on(
       "dispose",
       () => {
-        if (highlightTimeout !== undefined) clearTimeout(highlightTimeout);
-        highlightTimeout = undefined;
-        disposedGraphs.add(graph);
+        if (state.highlightTimeout !== undefined) clearTimeout(state.highlightTimeout);
+        state.highlightTimeout = undefined;
+        state.disposed = true;
       },
       { once: true },
     );
@@ -34,9 +49,9 @@ export function highlightTransition(graph: X6Graph, edgeId: string): void {
   cell.attr("line/stroke", "#22c55e");
   cell.attr("line/strokeWidth", 4);
 
-  highlightTimeout = setTimeout(() => {
-    highlightTimeout = undefined;
-    if (disposedGraphs.has(graph)) return;
+  state.highlightTimeout = setTimeout(() => {
+    state.highlightTimeout = undefined;
+    if (state.disposed) return;
     cell.attr("line/stroke", originalStroke);
     cell.attr("line/strokeWidth", originalStrokeWidth);
   }, 600);
