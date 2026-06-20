@@ -22,6 +22,8 @@ interface EventCategory {
   isInternal: boolean;
 }
 
+// FIXME: MantaqViz holds 9 configurable fields (#actor/#name/#direction/#ranksep/#router/#settingsOpen/#sampleContexts/#activeContext + #flow) — collapse layout+view fields (#direction/#ranksep/#router) into a LayoutConfig object prop; collapse view fields (#sampleContexts/#activeContext/#settingsOpen) into a ViewConfig object prop. Reduces prop surface 9→3.
+// FIXME: MantaqViz mixes rendering + graph sync (#syncGraph) + event palette (#renderEventPalette) + zoom (#zoomBy) + settings state + lifecycle — extract GraphSyncController (owns #flow + #syncGraph) and SettingsController (owns #settingsOpen + panel state) into separate modules; component keeps only composition + lit bindings.
 export class MantaqViz extends HTMLElement {
   #actor: AnyActor | null = null;
   #name: string = "Actor";
