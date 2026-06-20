@@ -2,8 +2,7 @@ import { html, render } from "lit-html";
 import { event } from "@mantaq/core";
 import type { AnyActor, AnyEventRef } from "@mantaq/core";
 import { buildGraph } from "../graph.ts";
-import { highlightTransition } from "../x6/sync.ts";
-import { renderActorFlow } from "./actor-flow.ts";
+import { GraphSyncController } from "../controllers/graph-sync-controller.ts";
 import type { ContextViewer } from "./context-viewer.ts";
 import "./context-viewer.ts";
 import { TransitionTimeline } from "./transition-timeline.ts";
@@ -23,11 +22,18 @@ interface EventCategory {
 }
 
 // FIXME: MantaqViz holds 9 configurable fields (#actor/#name/#direction/#ranksep/#router/#settingsOpen/#sampleContexts/#activeContext + #flow) — collapse layout+view fields (#direction/#ranksep/#router) into a LayoutConfig object prop; collapse view fields (#sampleContexts/#activeContext/#settingsOpen) into a ViewConfig object prop. Reduces prop surface 9→3.
-// FIXME: MantaqViz mixes rendering + graph sync (#syncGraph) + event palette (#renderEventPalette) + zoom (#zoomBy) + settings state + lifecycle — extract GraphSyncController (owns #flow + #syncGraph) and SettingsController (owns #settingsOpen + panel state) into separate modules; component keeps only composition + lit bindings.
 export class MantaqViz extends HTMLElement {
   #actor: AnyActor | null = null;
   #name: string = "Actor";
-  #flow: ReturnType<typeof renderActorFlow> | null = null;
+  #sync = new GraphSyncController({
+    getActor: () => this.#actor,
+    getGraphEl: () => this.querySelector<HTMLDivElement>("#graph-root"),
+    getLayoutOptions: () => this.#layoutOptions(),
+    getSampleContexts: () => this.#sampleContexts,
+    getActiveContext: () => this.#activeContext,
+    getInternalIds: () => this.#internalIds(),
+    onRerender: () => this.#renderAll(),
+  });
   #direction: "TB" | "LR" = "LR";
   #ranksep = RANKSEP_DEFAULT;
   #router: "normal" | "orth" | "manhattan" | "metro" | "er" = "normal";
@@ -79,8 +85,7 @@ export class MantaqViz extends HTMLElement {
 
   disconnectedCallback() {
     this.removeEventListener("click", this);
-    this.#flow?.destroy();
-    this.#flow = null;
+    this.#sync.destroy();
     render("", this);
   }
 
@@ -98,39 +103,6 @@ export class MantaqViz extends HTMLElement {
   #internalIds(): Set<string> {
     const internal = (this.#actor?.options as { internal?: Array<{ id: string }> })?.internal;
     return new Set(internal?.map((e) => e.id) ?? []);
-  }
-
-  #syncGraph() {
-    const graphEl = this.querySelector<HTMLDivElement>("#graph-root");
-    if (!graphEl || !this.#actor) return;
-    const sampleContexts =
-      this.#activeContext && this.#sampleContexts
-        ? { [this.#activeContext]: this.#sampleContexts[this.#activeContext] }
-        : undefined;
-    const graph = buildGraph(this.#actor, this.#internalIds(), sampleContexts);
-    if (this.#flow) {
-      this.#flow.update(graph, this.#layoutOptions());
-    } else {
-      this.#flow = renderActorFlow(graphEl, {
-        graph,
-        layoutOptions: this.#layoutOptions(),
-        onEdgeClick: (eventName, edgeId) => {
-          if (eventName.startsWith("__EFFECT__")) {
-            const timerMs = Number(eventName.replace("__EFFECT__", ""));
-            const clock = this.#actor?.clock as { advance?: (ms: number) => void };
-            if (typeof clock.advance === "function") {
-              clock.advance(timerMs);
-            }
-            if (edgeId) highlightTransition(this.#flow!.graph, edgeId);
-            this.#renderAll();
-            return;
-          }
-          this.#actor?.send(event(eventName)() as AnyEventRef);
-          if (edgeId) highlightTransition(this.#flow!.graph, edgeId);
-          this.#renderAll();
-        },
-      });
-    }
   }
 
   #renderAll() {
@@ -311,7 +283,7 @@ export class MantaqViz extends HTMLElement {
             </button>
             <button
               class="viz-zoom-btn"
-              @click=${() => this.#flow?.graph.zoomTo(1)}
+              @click=${() => this.#sync.graph?.zoomTo(1)}
               title="Reset zoom"
             >
               1:1
@@ -328,7 +300,7 @@ export class MantaqViz extends HTMLElement {
       this,
     );
 
-    this.#syncGraph();
+    this.#sync.sync();
 
     if (graph) {
       this.#renderEventPalette(graph);
@@ -432,7 +404,7 @@ export class MantaqViz extends HTMLElement {
   }
 
   #zoomBy(factor: number): void {
-    const g = this.#flow?.graph;
+    const g = this.#sync.graph;
     if (!g) return;
     const MIN = 0.2;
     const MAX = 4;
