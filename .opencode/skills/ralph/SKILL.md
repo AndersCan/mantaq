@@ -76,14 +76,6 @@ git pull origin ralph/improvements || true
 
 Branch persists across runs. No new branches.
 
-WIP PRE-FLIGHT (run before any work):
-```
-git status --short
-```
-Uncommitted files present → tree has WIP (in-flight refactor by another worker/user). Pass WIP list to workers. Workers MUST stage only own files (never `git add -A`). Orchestrator skips targets inside WIP files — not ralph's to fix mid-flight. Tag such findings `WIP-AFFECTED`.
-
-Caller may override branch (e.g. "use current branch, stack here"). Honor it. Skip fetch/checkout if told. Stack commits on caller's branch.
-
 Optional rebase on main (stay fresh). Skip if conflicts:
 
 ```
@@ -92,15 +84,15 @@ git rebase main || git rebase --abort
 
 ### Phase 1: Discover (AGENT-DRIVEN)
 
-Do NOT run rg/grep yourself. Spawn explore. Orchestrator stays lean.
+Do NOT run rg/grep yourself. Spawn worker. Orchestrator stays lean. (worker = cheap, fast, handles discovery fine. explore agent expensive — avoid.)
 
-Step 1a: Spawn single explore for full discovery.
+Step 1a: Spawn single worker for full discovery.
 
 ```
 Task(
-  subagent_type: "explore",
-  description: "Discover ralph deep work",
-  prompt: "Scan codebase for deep improvement work. Return ONLY line-list summary. No file contents.
+  subagent_type: "worker",
+  description: "Ralph: discover deep work",
+  prompt: "DISCOVERY ONLY. Do NOT edit/commit anything. Scan codebase for deep improvement work. Return ONLY line-list summary. No file contents.
 
 PRIORITY 1 — existing FIXMEs (loop's backlog, highest):
 - rg '// FIXME:' packages/ apps/ --include '*.ts' --include '*.tsx'
@@ -224,7 +216,7 @@ CHECK before commit:
 - Max 3 fix attempts. Still failing → return failure.
 
 COMMIT:
-- git add <specific files you touched>   # NEVER `git add -A`. Tree may hold WIP from other workers/user — `-A` sweeps it into your commit.
+- git add -A
 - git commit -m 'improve: <short-desc>'
 - Do NOT push. Do NOT create PR.
 
@@ -256,10 +248,6 @@ Found issue, no time this run? Add at location:
 ```
 
 Next run picks up. Non-negotiable: found-but-skipped MUST get FIXME.
-
-CARVE-OUT — deliberate "not worth fixing" (coupling cost > dedup benefit, or TS limitation) = design decision, NOT found-but-not-fixed. No FIXME. Only FIXME for "should fix, ran out of time."
-
-POST-WORKER DEPOSIT: after all workers finish, orchestrator scans flagged findings NOT addressed this run. For each real "should fix" finding → deposit `// FIXME: <specific desc>` at location. Seeds next run. Do NOT skip this step — self-perpetuating loop breaks otherwise.
 
 Step 2f: Handle results.
 
@@ -295,7 +283,7 @@ Questions:
 Apply concrete fixes based on Part A:
 
 - Worker failed task type repeatedly → clarify prompt for that category, or move to orchestrator-only list
-- False positives from explore → tighten explore search criteria
+- False positives from worker discovery → tighten search criteria
 - Worker too slow on X → add "do directly" rule for X
 - Worker guessed wrong on Y → add spec detail to worker prompt template
 - Category never picked → demote or remove
@@ -333,13 +321,13 @@ Whole point: expensive model orchestrates, fast cheap model executes.
 
 - **Orchestrator (you)**: think, plan, decide design, review logs, improve skill. Minimal tool calls.
 - **@worker (mimo-v2.5)**: fast execution. ~50x cheaper. Not dumb — handles splits, refactors, new helpers when given clear spec.
-- **explore agent**: discovery only. Read-only.
+- **worker agent**: execution + discovery. Cheap, fast. Used for both.
 
 Rules:
 
-1. Never rg/grep yourself. Delegate to explore.
-2. Never read full files in orchestrator. Read minimal snippets. Workers read fresh.
-3. Batch discovery into ONE explore call.
+1. Never rg/grep yourself. Delegate to worker.
+2. Read minimal snippets in orchestrator. Workers read fresh.
+3. Batch discovery into ONE worker call.
 4. Batch small cuts into single worker call.
 5. Default: delegate to @worker. Only keep in orchestrator if worker would guess wrong on design.
 6. Give worker clear spec: target file + line + what changes + expected result. Worker figures out how.
@@ -359,15 +347,13 @@ Rules:
 - Re-reading files from previous iterations — carry forward.
 - Repeating same category consecutively — diversify.
 - Padding with trivial tasks when real work runs out — stop early, be honest.
-- Orchestrator running rg/grep — delegate to explore.
+- Orchestrator running rg/grep — delegate to worker.
 - Reading full files in orchestrator — line refs only.
 - Spawning workers for trivial edits — do directly.
 - Delegating reasoning to @worker — worker handles more than you think. Only keep API design, architecture, cross-file bug root-causing in orchestrator.
 - Force-removing justified type casts — TS limitations keep + comment.
 - Skipping FIXME deposition — found-but-not-fixed MUST leave FIXME. Self-perpetuating loop breaks otherwise.
 - Vague FIXMEs — `// FIXME: refactor this` useless. Be specific.
-- `git add -A` in WIP tree — sweeps other workers' uncommitted work into your commit. Always stage specific files.
-- Skipping viz verification on behavior-affecting changes (sync state, palette wiring, edge rendering, prop flow). "Code looks right" ≠ renders right. Run agent-browser-viz.
 
 ## Orchestration Tips
 
