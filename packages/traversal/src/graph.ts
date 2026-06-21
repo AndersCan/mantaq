@@ -118,7 +118,17 @@ function processStateTransitions(
       const ctx = contexts[ctxName];
       const { targetName, emitNames } = invokeHandler(handler, eventId, ctx, actor);
       if (targetName) stateTransitionedEvents.add(eventId);
-      upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName, pathPrefix, activeSet, internalIds);
+      upsertEdge(
+        edgeMap,
+        sourceId,
+        eventId,
+        targetName,
+        emitNames,
+        ctxName,
+        pathPrefix,
+        activeSet,
+        internalIds,
+      );
     }
   }
   return stateTransitionedEvents;
@@ -142,7 +152,17 @@ function mergeAnyTransitions(
     for (const ctxName of contextNames) {
       const ctx = contexts[ctxName];
       const { targetName, emitNames } = invokeHandler(handler, eventId, ctx, actor);
-      upsertEdge(edgeMap, sourceId, eventId, targetName, emitNames, ctxName, pathPrefix, activeSet, internalIds);
+      upsertEdge(
+        edgeMap,
+        sourceId,
+        eventId,
+        targetName,
+        emitNames,
+        ctxName,
+        pathPrefix,
+        activeSet,
+        internalIds,
+      );
     }
   }
 }
@@ -306,6 +326,28 @@ function buildForActor(
   return { nodes, edges };
 }
 
+function addInitialNode(actor: AnyActor, nodes: GraphNode[], edges: GraphEdge[]): void {
+  // AnyActor.options type lacks `initial` field — cast required (see actor-internal.ts)
+  const initialName = (actor.options as { initial?: { name?: string } })?.initial?.name;
+  if (!initialName) return;
+  const initNodeId = nodeId("", INITIAL_NODE_ID);
+  const targetId = nodeId("", initialName);
+  nodes.push({
+    id: initNodeId,
+    label: "",
+    isActive: false,
+    isFinal: false,
+    isInitial: true,
+  });
+  edges.push({
+    id: `${initNodeId}->${targetId}`,
+    source: initNodeId,
+    target: targetId,
+    label: "",
+    isActive: true,
+  });
+}
+
 export function buildGraph(
   actor: AnyActor,
   options?: {
@@ -314,9 +356,7 @@ export function buildGraph(
     sampleContexts?: Record<string, Record<string, unknown>>;
   },
 ): ActorGraph {
-  if (!actor) {
-    return { nodes: [], edges: [] };
-  }
+  if (!actor) return { nodes: [], edges: [] };
   try {
     const snapshot = actor.snapshot();
     const activeSet = new Set<string>();
@@ -334,26 +374,7 @@ export function buildGraph(
       namedContexts,
     );
 
-    const initialName = (actor.options as { initial?: { name?: string } })?.initial?.name;
-    if (initialName) {
-      const initNodeId = nodeId("", INITIAL_NODE_ID);
-      const targetId = nodeId("", initialName);
-      nodes.push({
-        id: initNodeId,
-        label: "",
-        isActive: false,
-        isFinal: false,
-        isInitial: true,
-      });
-      edges.push({
-        id: `${initNodeId}->${targetId}`,
-        source: initNodeId,
-        target: targetId,
-        label: "",
-        isActive: true,
-      });
-    }
-
+    addInitialNode(actor, nodes, edges);
     return { nodes, edges };
   } catch (e) {
     console.error("[mantaq/traversal] buildGraph failed:", e);
