@@ -1,4 +1,4 @@
-import type { Graph as X6Graph } from "@antv/x6";
+import type { Graph as X6Graph, ComplexAttrValue } from "@antv/x6";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import { computeNodePositions } from "../layout.ts";
 import type { LayoutOptions } from "../layout.ts";
@@ -77,11 +77,11 @@ export function syncNodes(
       const pos = movedPositions.get(node.id) ??
         positions.get(node.id) ?? { x: cell.getPosition().x, y: cell.getPosition().y };
       cell.setPosition(pos.x, pos.y);
-      cell.setAttrs(nodeAttrs(node) as never);
+      cell.setAttrs(nodeAttrs(node));
       cell.attr("label/text", node.label);
       const badge = badgeAttrs(node);
-      const bc = badge.badgeCircle as { r: number; fill: string; stroke: string };
-      const bt = badge.badgeText as { text: string };
+      const bc = badge.badgeCircle;
+      const bt = badge.badgeText;
       cell.attr("badgeCircle/r", bc.r);
       cell.attr("badgeCircle/fill", bc.fill);
       cell.attr("badgeCircle/stroke", bc.stroke);
@@ -101,9 +101,9 @@ export function syncNodes(
         attrs: {
           ...nodeAttrs(node),
           ...badgeAttrs(node),
-        } as never,
+        },
         data: { tooltip },
-      } as never);
+      });
       changed = true;
     }
   }
@@ -138,7 +138,7 @@ export function syncEdges(graph: X6Graph, edges: ActorGraph["edges"], routerName
       cell.attr("line/strokeOpacity", line.strokeOpacity);
       cell.attr("line/targetMarker", line.targetMarker);
       cell.attr("line/cursor", line.cursor);
-      (cell as { attr: (path: string, val: unknown) => void }).attr("line/style", line.style ?? {});
+      cell.attr("line/style", (line.style ?? {}) as ComplexAttrValue);
     } else {
       graph.addEdge(edgeConfig(edge, routerName));
       changed = true;

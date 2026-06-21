@@ -1,6 +1,6 @@
 import type { GraphNode } from "../graph.ts";
 
-export interface NodeBodyAttrs {
+export type NodeBodyAttrs = {
   fill: string;
   stroke: string;
   strokeWidth?: number;
@@ -8,18 +8,18 @@ export interface NodeBodyAttrs {
   ry?: number;
   fillOpacity?: number;
   strokeOpacity?: number;
-}
+};
 
-export interface NodeLabelAttrs {
+export type NodeLabelAttrs = {
   fill?: string;
   fillOpacity?: number;
   fontWeight?: string;
-}
+};
 
-export interface NodeAttrs {
+export type NodeAttrs = {
   body: NodeBodyAttrs;
   label?: NodeLabelAttrs;
-}
+};
 
 const FINAL_COLOR = "#059669";
 const ACTIVE_COLOR = "#3b82f6";
@@ -70,7 +70,38 @@ export function nodeMarkup(): Array<{ tagName: string; selector: string }> {
   ];
 }
 
-export function badgeAttrs(node: GraphNode): Record<string, unknown> {
+export interface BadgeAttrs {
+  badgeCircle: {
+    r: number;
+    ref?: string;
+    refX?: string | number;
+    refY?: string | number;
+    refDx?: number;
+    refDy?: number;
+    cx?: number;
+    cy?: number;
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+  };
+  badgeText: {
+    ref?: string;
+    refX?: string | number;
+    refY?: string | number;
+    refDx?: number;
+    refDy?: number;
+    text: string;
+    fill?: string;
+    fontSize?: number;
+    fontWeight?: string;
+    textAnchor?: string;
+    textVerticalAnchor?: string;
+    x?: number;
+    y?: number;
+  };
+}
+
+export function badgeAttrs(node: GraphNode): BadgeAttrs {
   const effectCount = node.effects?.length ?? 0;
   if (effectCount === 0 || node.isInitial) {
     return {
