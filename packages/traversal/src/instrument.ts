@@ -1,5 +1,4 @@
-import type { AnyActor, Snapshot } from "@mantaq/core";
-type InternalEvent = { id: string } & Record<string, unknown>;
+import type { AnyActor, Snapshot, InternalEvent } from "@mantaq/core";
 import { History } from "./history.ts";
 
 export interface InstrumentedActor {

@@ -3,5 +3,5 @@ export type { Snapshot, Clock, EffectFn, EffectInput, AnyActor } from "./actor.t
 export { state, StateRef } from "./state.ts";
 export type { AnyStateRef } from "./state.ts";
 export { event, EventRef } from "./event.ts";
-export type { AnyEventRef } from "./event.ts";
+export type { AnyEventRef, InternalEvent } from "./event.ts";
 export { IS_DEV } from "./utils.ts";
