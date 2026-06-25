@@ -169,16 +169,19 @@ const orderActor = new Actor({
 
 const workflowViz = document.querySelector<MantaqViz>("#workflow");
 if (!workflowViz) throw new Error("workflow viz element not found");
-workflowViz.name = "Workflow";
-workflowViz.sampleContexts = {
-  default: { attempts: 0, reviewer: "alice" },
-  retry: { attempts: 3, reviewer: "bob" },
+workflowViz.viewConfig = {
+  name: "Workflow",
+  sampleContexts: {
+    default: { attempts: 0, reviewer: "alice" },
+    retry: { attempts: 3, reviewer: "bob" },
+  },
+  activeContext: "default",
 };
 workflowViz.actor = createWorkflowActor();
 
 const orderViz = document.querySelector<MantaqViz>("#orders");
 if (!orderViz) throw new Error("orders viz element not found");
-orderViz.name = "Order Processing";
+orderViz.viewConfig = { name: "Order Processing", sampleContexts: null, activeContext: null };
 orderViz.actor = orderActor;
 
 Object.assign(globalThis, { orderActor, orderClock, paymentRegion, shippingRegion });

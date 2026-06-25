@@ -21,25 +21,44 @@ interface EventCategory {
   isInternal: boolean;
 }
 
-// FIXME: MantaqViz holds 9 configurable fields (#actor/#name/#direction/#ranksep/#router/#settingsOpen/#sampleContexts/#activeContext + #flow) — collapse layout+view fields (#direction/#ranksep/#router) into a LayoutConfig object prop; collapse view fields (#sampleContexts/#activeContext/#settingsOpen) into a ViewConfig object prop. Reduces prop surface 9→3.
+export interface LayoutConfig {
+  direction: "TB" | "LR";
+  ranksep: number;
+  router: "normal" | "orth" | "manhattan" | "metro" | "er";
+}
+
+export interface ViewConfig {
+  name: string;
+  sampleContexts: Record<string, Record<string, unknown>> | null;
+  activeContext: string | null;
+}
+
+const LAYOUT_DEFAULTS: LayoutConfig = {
+  direction: "LR",
+  ranksep: RANKSEP_DEFAULT,
+  router: "normal",
+};
+
+const VIEW_DEFAULTS: ViewConfig = {
+  name: "Actor",
+  sampleContexts: null,
+  activeContext: null,
+};
+
 export class MantaqViz extends HTMLElement {
   #actor: AnyActor | null = null;
-  #name: string = "Actor";
+  #layoutConfig: LayoutConfig = { ...LAYOUT_DEFAULTS };
+  #viewConfig: ViewConfig = { ...VIEW_DEFAULTS };
+  #settingsOpen = false;
   #sync = new GraphSyncController({
     getActor: () => this.#actor,
     getGraphEl: () => this.querySelector<HTMLDivElement>("#graph-root"),
     getLayoutOptions: () => this.#layoutOptions(),
-    getSampleContexts: () => this.#sampleContexts,
-    getActiveContext: () => this.#activeContext,
+    getSampleContexts: () => this.#viewConfig.sampleContexts,
+    getActiveContext: () => this.#viewConfig.activeContext,
     getInternalIds: () => this.#internalIds(),
     onRerender: () => this.#renderAll(),
   });
-  #direction: "TB" | "LR" = "LR";
-  #ranksep = RANKSEP_DEFAULT;
-  #router: "normal" | "orth" | "manhattan" | "metro" | "er" = "normal";
-  #settingsOpen = false;
-  #sampleContexts: Record<string, Record<string, unknown>> | null = null;
-  #activeContext: string | null = null;
 
   set actor(a: AnyActor | null) {
     this.#actor = a;
@@ -50,32 +69,22 @@ export class MantaqViz extends HTMLElement {
     return this.#actor;
   }
 
-  set name(n: string) {
-    this.#name = n;
+  set layoutConfig(value: LayoutConfig) {
+    this.#layoutConfig = value;
     if (this.isConnected) this.#renderAll();
   }
 
-  get name(): string {
-    return this.#name;
+  get layoutConfig(): LayoutConfig {
+    return this.#layoutConfig;
   }
 
-  set sampleContexts(value: Record<string, Record<string, unknown>> | null) {
-    this.#sampleContexts = value;
-    this.#activeContext = value ? (Object.keys(value)[0] ?? null) : null;
+  set viewConfig(value: ViewConfig) {
+    this.#viewConfig = value;
     if (this.isConnected) this.#renderAll();
   }
 
-  get sampleContexts(): Record<string, Record<string, unknown>> | null {
-    return this.#sampleContexts;
-  }
-
-  set activeContext(name: string | null) {
-    this.#activeContext = name;
-    if (this.isConnected) this.#renderAll();
-  }
-
-  get activeContext(): string | null {
-    return this.#activeContext;
+  get viewConfig(): ViewConfig {
+    return this.#viewConfig;
   }
 
   connectedCallback() {
@@ -97,7 +106,11 @@ export class MantaqViz extends HTMLElement {
   }
 
   #layoutOptions(): LayoutOptions {
-    return { direction: this.#direction, ranksep: this.#ranksep, router: this.#router };
+    return {
+      direction: this.#layoutConfig.direction,
+      ranksep: this.#layoutConfig.ranksep,
+      router: this.#layoutConfig.router,
+    };
   }
 
   #internalIds(): Set<string> {
@@ -110,8 +123,11 @@ export class MantaqViz extends HTMLElement {
       ? buildGraph(
           this.#actor,
           this.#internalIds(),
-          this.#activeContext && this.#sampleContexts
-            ? { [this.#activeContext]: this.#sampleContexts[this.#activeContext] }
+          this.#viewConfig.activeContext && this.#viewConfig.sampleContexts
+            ? {
+                [this.#viewConfig.activeContext]:
+                  this.#viewConfig.sampleContexts[this.#viewConfig.activeContext],
+              }
             : undefined,
         )
       : null;
@@ -140,156 +156,8 @@ export class MantaqViz extends HTMLElement {
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
           }
         </style>
-        <div class="viz-card">
-          <div class="flex items-center gap-1.5">
-            <div class="${dotCls[lifecycle]}"></div>
-            <span class="text-sm font-bold text-slate-200">${this.#name}</span>
-          </div>
-          <div class="text-xs text-slate-400 mt-0.5">
-            <span class="text-slate-300 font-semibold">${stats.states}</span> states
-            <span class="text-slate-600 mx-0.5">·</span>
-            <span class="text-slate-300 font-semibold">${stats.events}</span> events
-            ${stats.effects > 0
-              ? html`
-                  <span class="text-slate-600 mx-0.5">·</span>
-                  <span class="text-slate-300 font-semibold">${stats.effects}</span> effects
-                `
-              : ""}
-            ${stats.regions > 0
-              ? html`
-                  <span class="text-slate-600 mx-0.5">·</span>
-                  <span class="text-slate-300 font-semibold">${stats.regions}</span> regions
-                `
-              : ""}
-          </div>
-          <div class="flex items-center gap-3 mt-0.5 text-xs">
-            <span class="text-slate-400"
-              >Current: <span class="text-blue-400 font-bold">${this.#currentState()}</span></span
-            >
-            ${contextFields.length > 0
-              ? html`
-                  <span class="text-slate-500">
-                    { <span class="text-slate-400">${contextFields.join(", ")}</span> }
-                  </span>
-                `
-              : ""}
-          </div>
-        </div>
-        <div class="viz-toolbar">
-          <button
-            class="viz-gear ${this.#settingsOpen ? "viz-gear-open" : ""}"
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              this.#settingsOpen = !this.#settingsOpen;
-              this.#renderAll();
-            }}
-          >
-            ⚙
-          </button>
-          ${this.#settingsOpen
-            ? html`
-                <div class="viz-settings" @click=${(e: Event) => e.stopPropagation()}>
-                  ${this.#sampleContexts
-                    ? html`
-                        <label class="viz-settings-label">
-                          Context
-                          <select
-                            class="viz-settings-select"
-                            @change=${(e: Event) => {
-                              this.#activeContext = (e.target as HTMLSelectElement).value || null;
-                              this.#renderAll();
-                            }}
-                          >
-                            ${Object.keys(this.#sampleContexts).map(
-                              (name) => html`
-                                <option value=${name} ?selected=${this.#activeContext === name}>
-                                  ${name}
-                                </option>
-                              `,
-                            )}
-                          </select>
-                        </label>
-                      `
-                    : ""}
-                  <label class="viz-settings-label">
-                    Direction
-                    <select
-                      class="viz-settings-select"
-                      @change=${(e: Event) => {
-                        this.#direction = (e.target as HTMLSelectElement).value as "TB" | "LR";
-                        this.#renderAll();
-                      }}
-                    >
-                      <option value="TB" ?selected=${this.#direction === "TB"}>Top→Bottom</option>
-                      <option value="LR" ?selected=${this.#direction === "LR"}>Left→Right</option>
-                    </select>
-                  </label>
-                  <label class="viz-settings-label">
-                    Router
-                    <select
-                      class="viz-settings-select"
-                      @change=${(e: Event) => {
-                        this.#router = (e.target as HTMLSelectElement).value as
-                          | "normal"
-                          | "orth"
-                          | "manhattan"
-                          | "metro"
-                          | "er";
-                        this.#renderAll();
-                      }}
-                    >
-                      <option value="normal" ?selected=${this.#router === "normal"}>Normal</option>
-                      <option value="orth" ?selected=${this.#router === "orth"}>Orthogonal</option>
-                      <option value="manhattan" ?selected=${this.#router === "manhattan"}>
-                        Manhattan
-                      </option>
-                      <option value="metro" ?selected=${this.#router === "metro"}>Metro</option>
-                      <option value="er" ?selected=${this.#router === "er"}>ER</option>
-                    </select>
-                  </label>
-                  <label class="viz-settings-label">
-                    Edge length
-                    <span class="flex items-center gap-1">
-                      <input
-                        type="range"
-                        class="w-30"
-                        min=${RANKSEP_MIN}
-                        max=${RANKSEP_MAX}
-                        value=${this.#ranksep}
-                        @input=${(e: Event) => {
-                          this.#ranksep = Number((e.target as HTMLInputElement).value);
-                          this.#renderAll();
-                        }}
-                      />
-                      <span class="text-xs text-slate-200 min-w-5 text-right"
-                        >${this.#ranksep}</span
-                      >
-                    </span>
-                  </label>
-                </div>
-              `
-            : ""}
-        </div>
-        <div class="relative h-100">
-          <div id="graph-root" class="w-full h-full"></div>
-          <div
-            class="absolute bottom-2 left-2 flex gap-px z-10 bg-slate-800 border border-slate-600 rounded-md overflow-hidden"
-          >
-            <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1.25)} title="Zoom in">
-              +
-            </button>
-            <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1 / 1.25)} title="Zoom out">
-              −
-            </button>
-            <button
-              class="viz-zoom-btn"
-              @click=${() => this.#sync.graph?.zoomTo(1)}
-              title="Reset zoom"
-            >
-              1:1
-            </button>
-          </div>
-        </div>
+        ${this.#renderStats(lifecycle, stats, contextFields, dotCls)} ${this.#renderControls()}
+        ${this.#renderGraph()}
         <div class="bg-slate-900 border-t border-slate-800" id="palette-root"></div>
         <transition-timeline id="timeline-root"></transition-timeline>
         <div
@@ -317,6 +185,184 @@ export class MantaqViz extends HTMLElement {
     if (timelineRoot) {
       timelineRoot.actor = this.#actor;
     }
+  }
+
+  #renderStats(
+    lifecycle: "running" | "idle" | "done" | "error",
+    stats: { states: number; events: number; effects: number; regions: number },
+    contextFields: string[],
+    dotCls: Record<string, string>,
+  ) {
+    return html`
+      <div class="viz-card">
+        <div class="flex items-center gap-1.5">
+          <div class="${dotCls[lifecycle]}"></div>
+          <span class="text-sm font-bold text-slate-200">${this.#viewConfig.name}</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-0.5">
+          <span class="text-slate-300 font-semibold">${stats.states}</span> states
+          <span class="text-slate-600 mx-0.5">·</span>
+          <span class="text-slate-300 font-semibold">${stats.events}</span> events
+          ${stats.effects > 0
+            ? html`
+                <span class="text-slate-600 mx-0.5">·</span>
+                <span class="text-slate-300 font-semibold">${stats.effects}</span> effects
+              `
+            : ""}
+          ${stats.regions > 0
+            ? html`
+                <span class="text-slate-600 mx-0.5">·</span>
+                <span class="text-slate-300 font-semibold">${stats.regions}</span> regions
+              `
+            : ""}
+        </div>
+        <div class="flex items-center gap-3 mt-0.5 text-xs">
+          <span class="text-slate-400"
+            >Current: <span class="text-blue-400 font-bold">${this.#currentState()}</span></span
+          >
+          ${contextFields.length > 0
+            ? html`
+                <span class="text-slate-500">
+                  { <span class="text-slate-400">${contextFields.join(", ")}</span> }
+                </span>
+              `
+            : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  #renderControls() {
+    return html`
+      <div class="viz-toolbar">
+        <button
+          class="viz-gear ${this.#settingsOpen ? "viz-gear-open" : ""}"
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            this.#settingsOpen = !this.#settingsOpen;
+            this.#renderAll();
+          }}
+        >
+          ⚙
+        </button>
+        ${this.#settingsOpen ? this.#renderSettings() : ""}
+      </div>
+    `;
+  }
+
+  #renderSettings() {
+    const lc = this.#layoutConfig;
+    const vc = this.#viewConfig;
+    return html`
+      <div class="viz-settings" @click=${(e: Event) => e.stopPropagation()}>
+        ${vc.sampleContexts
+          ? html`
+              <label class="viz-settings-label">
+                Context
+                <select
+                  class="viz-settings-select"
+                  @change=${(e: Event) => {
+                    this.#viewConfig = {
+                      ...vc,
+                      activeContext: (e.target as HTMLSelectElement).value || null,
+                    };
+                    this.#renderAll();
+                  }}
+                >
+                  ${Object.keys(vc.sampleContexts).map(
+                    (name) => html`
+                      <option value=${name} ?selected=${vc.activeContext === name}>${name}</option>
+                    `,
+                  )}
+                </select>
+              </label>
+            `
+          : ""}
+        <label class="viz-settings-label">
+          Direction
+          <select
+            class="viz-settings-select"
+            @change=${(e: Event) => {
+              this.#layoutConfig = {
+                ...lc,
+                direction: (e.target as HTMLSelectElement).value as "TB" | "LR",
+              };
+              this.#renderAll();
+            }}
+          >
+            <option value="TB" ?selected=${lc.direction === "TB"}>Top→Bottom</option>
+            <option value="LR" ?selected=${lc.direction === "LR"}>Left→Right</option>
+          </select>
+        </label>
+        <label class="viz-settings-label">
+          Router
+          <select
+            class="viz-settings-select"
+            @change=${(e: Event) => {
+              this.#layoutConfig = {
+                ...lc,
+                router: (e.target as HTMLSelectElement).value as
+                  | "normal"
+                  | "orth"
+                  | "manhattan"
+                  | "metro"
+                  | "er",
+              };
+              this.#renderAll();
+            }}
+          >
+            <option value="normal" ?selected=${lc.router === "normal"}>Normal</option>
+            <option value="orth" ?selected=${lc.router === "orth"}>Orthogonal</option>
+            <option value="manhattan" ?selected=${lc.router === "manhattan"}>Manhattan</option>
+            <option value="metro" ?selected=${lc.router === "metro"}>Metro</option>
+            <option value="er" ?selected=${lc.router === "er"}>ER</option>
+          </select>
+        </label>
+        <label class="viz-settings-label">
+          Edge length
+          <span class="flex items-center gap-1">
+            <input
+              type="range"
+              class="w-30"
+              min=${RANKSEP_MIN}
+              max=${RANKSEP_MAX}
+              value=${lc.ranksep}
+              @input=${(e: Event) => {
+                this.#layoutConfig = {
+                  ...lc,
+                  ranksep: Number((e.target as HTMLInputElement).value),
+                };
+                this.#renderAll();
+              }}
+            />
+            <span class="text-xs text-slate-200 min-w-5 text-right">${lc.ranksep}</span>
+          </span>
+        </label>
+      </div>
+    `;
+  }
+
+  #renderGraph() {
+    return html`
+      <div class="relative h-100">
+        <div id="graph-root" class="w-full h-full"></div>
+        <div
+          class="absolute bottom-2 left-2 flex gap-px z-10 bg-slate-800 border border-slate-600 rounded-md overflow-hidden"
+        >
+          <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1.25)} title="Zoom in">+</button>
+          <button class="viz-zoom-btn" @click=${() => this.#zoomBy(1 / 1.25)} title="Zoom out">
+            −
+          </button>
+          <button
+            class="viz-zoom-btn"
+            @click=${() => this.#sync.graph?.zoomTo(1)}
+            title="Reset zoom"
+          >
+            1:1
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   #currentState(): string {
