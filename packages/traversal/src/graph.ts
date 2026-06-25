@@ -1,5 +1,13 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
-import type { ActorGraph, GraphNode, GraphEdge } from "./types.ts";
+import type {
+  ActorGraph,
+  GraphNode,
+  GraphEdge,
+  SyntheticEvent,
+  StateDef,
+  TransitionHandler,
+  TransitionDispatchMap,
+} from "./types.ts";
 
 export const INITIAL_NODE_ID = "__initial__";
 
@@ -27,7 +35,7 @@ function nodeId(prefix: string, name: string): string {
 }
 
 function buildNodesFromStates(
-  states: Array<{ name: string; isFinal: boolean }>,
+  states: ReadonlyArray<StateDef>,
   activeSet: Set<string>,
   pathPrefix: string,
 ): GraphNode[] {
@@ -43,7 +51,7 @@ function buildNodesFromStates(
 }
 
 function invokeHandler(
-  handler: (...args: unknown[]) => unknown,
+  handler: TransitionHandler,
   eventId: string,
   ctx: Record<string, unknown>,
   actor: AnyActor,
@@ -51,13 +59,11 @@ function invokeHandler(
   let targetName: string | undefined;
   let emitNames: string[] = [];
   try {
-    const syntheticEvent = { id: eventId } as Record<string, unknown>;
-    const result = handler(syntheticEvent, { context: ctx, actor }) as
-      | { state?: { name?: string }; emit?: Array<{ id?: string }> }
-      | undefined;
+    const syntheticEvent: SyntheticEvent = { id: eventId };
+    const result = handler(syntheticEvent, { context: ctx, actor });
     targetName = result?.state?.name;
     if (result?.emit) {
-      emitNames = result.emit.map((e) => e.id).filter(Boolean) as string[];
+      emitNames = result.emit.map((e) => e.id).filter((id): id is string => Boolean(id));
     }
   } catch {
     targetName = undefined;
@@ -101,7 +107,7 @@ function upsertEdge(
 }
 
 function processStateTransitions(
-  stateTransitions: Record<string, ((...args: unknown[]) => unknown) | undefined>,
+  stateTransitions: Record<string, TransitionHandler | undefined>,
   edgeMap: Map<string, GraphEdge>,
   sourceId: string,
   contextNames: string[],
@@ -135,7 +141,7 @@ function processStateTransitions(
 }
 
 function mergeAnyTransitions(
-  anyTransitions: Record<string, ((...args: unknown[]) => unknown) | undefined>,
+  anyTransitions: Record<string, TransitionHandler | undefined>,
   stateTransitionedEvents: Set<string>,
   edgeMap: Map<string, GraphEdge>,
   sourceId: string,
@@ -168,8 +174,8 @@ function mergeAnyTransitions(
 }
 
 function buildEdgesFromTransitions(
-  states: Array<{ name: string }>,
-  transitions: Record<string, Record<string, unknown>> | undefined,
+  states: ReadonlyArray<{ name: string }>,
+  transitions: TransitionDispatchMap | undefined,
   activeSet: Set<string>,
   pathPrefix: string,
   actor: AnyActor,
@@ -182,15 +188,11 @@ function buildEdgesFromTransitions(
   const contexts = namedContexts ?? { default: { ...actor.context } };
   const contextNames = Object.keys(contexts);
 
-  const anyTransitions = transitions["Any"] as
-    | Record<string, ((...args: unknown[]) => unknown) | undefined>
-    | undefined;
+  const anyTransitions = transitions["Any"];
 
   for (const stateRef of states) {
     const sourceId = nodeId(pathPrefix, stateRef.name);
-    const stateTransitions = transitions[stateRef.name] as
-      | Record<string, ((...args: unknown[]) => unknown) | undefined>
-      | undefined;
+    const stateTransitions = transitions[stateRef.name];
 
     const edgeMap = new Map<string, GraphEdge>();
 
@@ -234,7 +236,7 @@ function addNodesForActor(
   pathPrefix: string,
   activeSet: Set<string>,
 ): GraphNode[] {
-  const states = (actor.options?.states ?? []) as Array<{ name: string; isFinal: boolean }>;
+  const states = (actor.options?.states ?? []) as ReadonlyArray<StateDef>;
   return buildNodesFromStates(states, activeSet, pathPrefix);
 }
 
@@ -245,10 +247,11 @@ function addEdgesForActor(
   internalIds?: Set<string>,
   namedContexts?: Record<string, Record<string, unknown>>,
 ): GraphEdge[] {
-  const states = (actor.options?.states ?? []) as Array<{ name: string; isFinal: boolean }>;
+  const states = (actor.options?.states ?? []) as ReadonlyArray<StateDef>;
   return buildEdgesFromTransitions(
     states,
-    actor.options?.transitions as Record<string, Record<string, unknown>> | undefined,
+    // AnyActor.options.types transitions values as unknown — actual type is handler functions (TransitionDispatch in actor.ts)
+    actor.options?.transitions as TransitionDispatchMap | undefined,
     activeSet,
     pathPrefix,
     actor,
@@ -288,9 +291,7 @@ function addEffectSelfLoops(
   activeSet: Set<string>,
 ): GraphEdge[] {
   const edges: GraphEdge[] = [];
-  const effects = (actor.options as Record<string, unknown> | undefined)?.effects as
-    | Record<string, unknown[]>
-    | undefined;
+  const effects = actor.options?.effects;
   if (effects) {
     for (const [stateName, fns] of Object.entries(effects)) {
       if (Array.isArray(fns) && fns.length > 0) {
