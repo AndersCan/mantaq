@@ -1,9 +1,9 @@
 import type { ActorGraph } from "./types.ts";
 
-function buildAdjacency(
-  graph: ActorGraph,
-): Record<string, Array<{ target: string; label: string }>> {
-  const adj: Record<string, Array<{ target: string; label: string }>> = {};
+type AdjacencyMap = Record<string, Array<{ target: string; label: string }>>;
+
+function buildAdjacency(graph: ActorGraph): AdjacencyMap {
+  const adj: AdjacencyMap = {};
   for (const node of graph.nodes) {
     adj[node.id] = [];
   }
@@ -15,22 +15,31 @@ function buildAdjacency(
   return adj;
 }
 
-export function reachable(graph: ActorGraph, fromId: string, toId: string): boolean {
-  const adj = buildAdjacency(graph);
+function bfsWalk(
+  adj: AdjacencyMap,
+  start: string,
+  visit: (node: string) => boolean,
+): Record<string, boolean> {
   const visited: Record<string, boolean> = {};
-  const queue = [fromId];
+  const queue = [start];
   while (queue.length > 0) {
     const current = queue.shift()!;
-    if (current === toId) return true;
     if (visited[current]) continue;
     visited[current] = true;
+    if (visit(current)) break;
     const neighbors = adj[current] || [];
     for (let i = 0; i < neighbors.length; i++) {
       const target = neighbors[i].target;
       if (!visited[target]) queue.push(target);
     }
   }
-  return false;
+  return visited;
+}
+
+export function reachable(graph: ActorGraph, fromId: string, toId: string): boolean {
+  const adj = buildAdjacency(graph);
+  const visited = bfsWalk(adj, fromId, (node) => node === toId);
+  return visited[toId] === true;
 }
 
 export function allPaths(graph: ActorGraph, fromId: string, toId: string): string[][] {
@@ -58,6 +67,7 @@ export function allPaths(graph: ActorGraph, fromId: string, toId: string): strin
   return results;
 }
 
+// FIXME: dfsWalk dedup for allPaths/findCycles — path-tracking diverges, needs param
 export function findCycles(graph: ActorGraph): string[][] {
   const adj = buildAdjacency(graph);
   const cycles: string[][] = [];
@@ -93,18 +103,7 @@ export function findCycles(graph: ActorGraph): string[][] {
 
 export function unreachableNodes(graph: ActorGraph, fromId: string): string[] {
   const adj = buildAdjacency(graph);
-  const visited: Record<string, boolean> = {};
-  const queue = [fromId];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited[current]) continue;
-    visited[current] = true;
-    const neighbors = adj[current] || [];
-    for (let i = 0; i < neighbors.length; i++) {
-      const target = neighbors[i].target;
-      if (!visited[target]) queue.push(target);
-    }
-  }
+  const visited = bfsWalk(adj, fromId, () => false);
   const result: string[] = [];
   for (const node of graph.nodes) {
     if (!visited[node.id]) result.push(node.id);
