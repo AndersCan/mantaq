@@ -16,7 +16,6 @@ function createTestActor() {
     states: [idle, active, done],
     initial: idle,
     context: {} as {},
-    effects: {},
     transitions: {
       idle: { GO: () => ({ state: active }) },
       active: { FINISH: () => ({ state: done }) },
@@ -30,7 +29,7 @@ describe("instrument", () => {
     const inst = instrument(actor);
 
     const go = event("GO")();
-    inst.send(go);
+    inst.send(go.create());
 
     const visits = inst.history.stateVisits();
     expect(visits.length).toBe(2);
@@ -43,7 +42,7 @@ describe("instrument", () => {
     const inst = instrument(actor);
 
     const go = event("GO")();
-    inst.send(go);
+    inst.send(go.create());
 
     const transitions = inst.history.transitions();
     expect(transitions.length).toBe(1);
@@ -59,7 +58,7 @@ describe("instrument", () => {
     expect(inst.state.name).toBe("idle");
 
     const go = event("GO")();
-    inst.send(go);
+    inst.send(go.create());
 
     expect(inst.state.name).toBe("active");
   });
@@ -75,8 +74,6 @@ describe("instrument", () => {
       states: [idle],
       initial: idle,
       context: { count: 42 } as { count: number },
-      effects: {},
-      transitions: {},
     });
 
     const inst = instrument(actor);
@@ -99,11 +96,11 @@ describe("instrument", () => {
     const go = event("GO")();
     const finish = event("FINISH")();
 
-    inst.send(go);
+    inst.send(go.create());
     expect(inst.history.entries().length).toBeGreaterThan(0);
 
     const countAfterFirst = inst.history.entries().length;
-    inst.send(finish);
+    inst.send(finish.create());
     expect(inst.history.entries().length).toBeGreaterThan(countAfterFirst);
 
     const transitions = inst.history.transitions();
@@ -117,7 +114,7 @@ describe("instrument", () => {
     const inst = instrument(actor);
 
     const go = event("GO")();
-    inst.send(go);
+    inst.send(go.create());
 
     const sends = inst.history.sends();
     expect(sends.length).toBe(1);

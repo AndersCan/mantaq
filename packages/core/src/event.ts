@@ -1,21 +1,20 @@
 export function event<const T extends string>(id: T) {
-  return <Payload>() => {
-    return new EventRef<T, Payload>(id);
-  };
+  return <Payload extends object | void = void>() => new EventRef<T, Payload>(id);
 }
 
-export type AnyEventRef = EventRef<string>;
-
+export type AnyEventRef = EventRef<string, object | void>;
 export type InternalEvent = { id: string } & Record<string, unknown>;
 
-export class EventRef<const T extends string, Payload = unknown> {
-  id: T;
+export type CreatedOfEvent<Id extends string, P> = P extends void ? { id: Id } : P & { id: Id };
+
+export class EventRef<const T extends string, Payload extends object | void = void> {
+  readonly id: T;
 
   constructor(id: T) {
     this.id = id;
   }
 
-  is(anyEvent: unknown): anyEvent is Payload & { id: T } {
+  is(anyEvent: unknown): anyEvent is CreatedOfEvent<T, Payload> {
     return (
       !!anyEvent &&
       typeof anyEvent === "object" &&
@@ -24,11 +23,10 @@ export class EventRef<const T extends string, Payload = unknown> {
     );
   }
 
-  create(payload: Payload): Payload & { id: T } {
-    if (payload === null || (typeof payload !== "object" && typeof payload !== "function")) {
-      // Primitive payloads are wrapped as { id, value } at runtime; the intersection type can't be expressed statically
-      return { id: this.id, value: payload } as unknown as Payload & { id: T };
+  create(payload: Payload): CreatedOfEvent<T, Payload> {
+    if (payload === undefined) {
+      return { id: this.id } as CreatedOfEvent<T, Payload>;
     }
-    return { ...(payload as Record<string, unknown>), id: this.id } as Payload & { id: T };
+    return { ...(payload as object), id: this.id } as CreatedOfEvent<T, Payload>;
   }
 }

@@ -20,34 +20,36 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock } from "@mantaq/core";
-import { state, event } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
+import { event } from "@mantaq/core";
+import { matches, states, events } from "@mantaq/sugar";
 
 // ── Connection States ────────────────────────────────────────────────
 
+const s = states(
+  "disconnected",
+  "connecting",
+  "connected",
+  "reconnecting",
+  "failed",
+  "unknown",
+  "healthy",
+  "degraded",
+);
 const connectionStates = {
-  disconnected: state("disconnected")(),
-  connecting: state("connecting")(),
-  connected: state("connected")(),
-  reconnecting: state("reconnecting")(),
-  failed: state("failed")().final(),
+  disconnected: s.disconnected,
+  connecting: s.connecting,
+  connected: s.connected,
+  reconnecting: s.reconnecting,
+  failed: s.failed.final(),
 };
-
-const healthStates = {
-  unknown: state("unknown")(),
-  healthy: state("healthy")(),
-  degraded: state("degraded")(),
-};
+const healthStates = { unknown: s.unknown, healthy: s.healthy, degraded: s.degraded };
 
 // ── Events ───────────────────────────────────────────────────────────
 
 const connectEvent = event("CONNECT")<{ url: string }>();
-const disconnectEvent = event("DISCONNECT")();
-const connectionEstablished = event("CONNECTION_ESTABLISHED")();
 const connectionFailed = event("CONNECTION_FAILED")<{ error: string }>();
 const healthCheckResult = event("HEALTH_CHECK_RESULT")<{ healthy: boolean }>();
-const retryEvent = event("RETRY")();
-const timeoutEvent = event("TIMEOUT")();
+const e = events("DISCONNECT", "CONNECTION_ESTABLISHED", "RETRY", "TIMEOUT");
 
 // ── Context ──────────────────────────────────────────────────────────
 
@@ -73,7 +75,6 @@ function createConnectionManager(clock?: VirtualClock) {
     states: [healthStates.unknown, healthStates.healthy, healthStates.degraded],
     initial: healthStates.unknown,
     context: {} as {},
-    effects: {},
     transitions: {
       unknown: {
         HEALTH_CHECK_RESULT: (event) => ({
@@ -95,9 +96,9 @@ function createConnectionManager(clock?: VirtualClock) {
 
   // Main connection manager
   const actor = new Actor({
-    inputs: [connectEvent, disconnectEvent, retryEvent],
+    inputs: [connectEvent, e.DISCONNECT, e.RETRY],
     outputs: [],
-    internal: [connectionEstablished, connectionFailed, healthCheckResult, timeoutEvent],
+    internal: [e.CONNECTION_ESTABLISHED, connectionFailed, healthCheckResult, e.TIMEOUT],
     states: [
       connectionStates.disconnected,
       connectionStates.connecting,
@@ -113,11 +114,14 @@ function createConnectionManager(clock?: VirtualClock) {
       backoffMs: 1000,
       healthScore: 100,
     } as ConnectionContext,
+    regions: {
+      health: healthMonitor,
+    },
     effects: {
       connecting: [
         ({ signal, clock, emit }) => {
           const id = clock.setTimeout(2000, () => {
-            emit(connectionEstablished.create(undefined));
+            emit(e.CONNECTION_ESTABLISHED.create());
           });
           signal.addEventListener("abort", () => clock.clearTimeout(id));
         },
@@ -127,14 +131,11 @@ function createConnectionManager(clock?: VirtualClock) {
           const ctx = context as ConnectionContext;
           const delay = ctx.backoffMs * Math.pow(2, ctx.retryCount);
           const id = clock.setTimeout(delay, () => {
-            emit(connectionEstablished.create(undefined));
+            emit(e.CONNECTION_ESTABLISHED.create());
           });
           signal.addEventListener("abort", () => clock.clearTimeout(id));
         },
       ],
-    },
-    regions: {
-      health: healthMonitor,
     },
     transitions: {
       disconnected: {
@@ -163,7 +164,9 @@ function createConnectionManager(clock?: VirtualClock) {
         },
       },
       connected: {
-        DISCONNECT: () => ({ state: connectionStates.disconnected }),
+        DISCONNECT: () => ({
+          state: connectionStates.disconnected,
+        }),
         HEALTH_CHECK_RESULT: (event, { context, actor }) => {
           // Forward to health region
           actor.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
@@ -261,7 +264,7 @@ describe("connection manager actor", () => {
     actor.send(connectionFailed.create({ error: "Error 2" }));
     expect(actor.context.retryCount).toBe(2);
 
-    actor.send(connectionEstablished.create(undefined));
+    actor.send(e.CONNECTION_ESTABLISHED.create());
     expect(matches(actor, "connected")).toBe(true);
     expect(actor.context.retryCount).toBe(0);
   });
@@ -273,7 +276,7 @@ describe("connection manager actor", () => {
     clock.advance(2000);
     expect(matches(actor, "connected")).toBe(true);
 
-    actor.send(disconnectEvent);
+    actor.send(e.DISCONNECT.create());
     expect(matches(actor, "disconnected")).toBe(true);
   });
 

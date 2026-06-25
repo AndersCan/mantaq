@@ -39,28 +39,20 @@ describe("broadcast", () => {
     const map = new ActorMap();
     const a1 = new Actor({
       inputs: [toggle],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: { off: { toggle: () => ({ state: on }) } },
     });
     const a2 = new Actor({
       inputs: [toggle],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: { off: { toggle: () => ({ state: on }) } },
     });
     map.spawn("a", () => a1);
     map.spawn("b", () => a2);
 
-    broadcast(map, toggle.create({}));
+    broadcast(map, toggle.create());
 
     expect(matches(a1, "on")).toBe(true);
     expect(matches(a2, "on")).toBe(true);
@@ -79,12 +71,8 @@ describe("broadcast", () => {
     const map = new ActorMap();
     const a1 = new Actor({
       inputs: [toggle, reset],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: {
         off: { toggle: () => ({ state: on }) },
         on: { reset: () => ({ state: off }) },
@@ -92,12 +80,8 @@ describe("broadcast", () => {
     });
     const a2 = new Actor({
       inputs: [toggle, reset],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [off, on],
       initial: on,
-      effects: {},
       transitions: {
         off: { toggle: () => ({ state: on }) },
         on: { reset: () => ({ state: off }) },
@@ -106,11 +90,11 @@ describe("broadcast", () => {
     map.spawn("a", () => a1);
     map.spawn("b", () => a2);
 
-    broadcast(map, toggle.create({}));
+    broadcast(map, toggle.create());
     expect(matches(a1, "on")).toBe(true);
     expect(matches(a2, "on")).toBe(true);
 
-    broadcast(map, reset.create({}));
+    broadcast(map, reset.create());
     expect(matches(a1, "off")).toBe(true);
     expect(matches(a2, "off")).toBe(true);
   });
@@ -122,28 +106,20 @@ describe("broadcast", () => {
     const map = new ActorMap();
     const a1 = new Actor({
       inputs: [toggle],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: { off: { toggle: () => ({ state: on }) } },
     });
     const a2 = new Actor({
       inputs: [],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: {},
     });
     map.spawn("a", () => a1);
     map.spawn("b", () => a2);
 
-    expect(() => broadcast(map, toggle.create({}))).not.toThrow();
+    expect(() => broadcast(map, toggle.create())).not.toThrow();
     expect(matches(a1, "on")).toBe(true);
     expect(matches(a2, "off")).toBe(true);
   });
@@ -162,12 +138,8 @@ describe("broadcast", () => {
     const child = new Actor({
       clock,
       inputs: [pong],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [childOff, childOn],
       initial: childOff,
-      effects: {},
       transitions: { childOff: { pong: () => ({ state: childOn }) } },
     });
     map.spawn("child", () => child);
@@ -175,23 +147,19 @@ describe("broadcast", () => {
     const parent = new Actor({
       clock,
       inputs: [ping],
-      outputs: [],
-      internal: [],
-      context: {},
       states: [idle, done],
       initial: idle,
-      effects: {},
       transitions: {
         idle: {
           ping: () => {
-            broadcast(map, pong.create({}));
+            broadcast(map, pong.create());
             return { state: done };
           },
         },
       },
     });
 
-    parent.send(ping.create({}));
+    parent.send(ping.create());
 
     expect(matches(parent, "done")).toBe(true);
     expect(matches(child, "childOn")).toBe(true);

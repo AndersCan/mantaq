@@ -21,7 +21,6 @@ describe("ActorMap mutation tests", () => {
       context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: {
         off: { toggle: () => ({ state: on, emit: [output.create({ from: id })] }) },
         on: { toggle: () => ({ state: off }) },
@@ -72,14 +71,14 @@ describe("ActorMap mutation tests", () => {
     const map = new ActorMap();
     const { actor: oldActor, toggle: oldToggle } = makeActor("old");
     map.spawn("a", () => oldActor);
-    map.send("a", oldToggle);
+    map.send("a", oldToggle.create());
     expect(matches(oldActor, "on")).toBe(true);
 
     const { actor: newActor, toggle: newToggle } = makeActor("new");
     map.spawn("a", () => newActor);
 
     expect(matches(newActor, "off")).toBe(true);
-    map.send("a", newToggle);
+    map.send("a", newToggle.create());
     expect(matches(newActor, "on")).toBe(true);
   });
 
@@ -107,11 +106,13 @@ describe("ActorMap mutation tests", () => {
               },
             ],
           },
-          transitions: { off1: { toggle1: () => ({ state: on1 }) } },
+          transitions: {
+            off1: { toggle1: () => ({ state: on1 }) },
+          },
         }),
     );
 
-    map.send("a", toggle1.create({}));
+    map.send("a", toggle1.create());
     expect(effectCount).toBe(1);
 
     effectCount = 0;
@@ -135,11 +136,13 @@ describe("ActorMap mutation tests", () => {
               },
             ],
           },
-          transitions: { off2: { toggle2: () => ({ state: on2 }) } },
+          transitions: {
+            off2: { toggle2: () => ({ state: on2 }) },
+          },
         }),
     );
 
-    map.send("a", toggle2.create({}));
+    map.send("a", toggle2.create());
     expect(effectCount).toBe(10);
   });
 

@@ -17,7 +17,6 @@ describe("ActorMap", () => {
       context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: {
         off: { toggle: () => ({ state: on, emit: [output.create({ from: id })] }) },
         on: { toggle: () => ({ state: off }) },
@@ -45,7 +44,7 @@ describe("ActorMap", () => {
     const { actor, toggle } = makeActor("a");
     map.spawn("a", () => actor);
     expect(matches(actor, "off")).toBe(true);
-    map.send("a", toggle);
+    map.send("a", toggle.create());
     expect(matches(actor, "on")).toBe(true);
   });
 
@@ -127,7 +126,7 @@ describe("ActorMap", () => {
       return a;
     });
 
-    map.send("a", toggle.create({}));
+    map.send("a", toggle.create());
     expect(effectRan).toBe(true);
 
     effectRan = false;
@@ -181,7 +180,7 @@ describe("ActorMap", () => {
     const { actor: a2 } = makeActor("b");
     map.spawn("a", () => a1);
     map.spawn("b", () => a2);
-    broadcast(map, toggle.create({}));
+    broadcast(map, toggle.create());
     expect(matches(a1, "on")).toBe(true);
     expect(matches(a2, "on")).toBe(true);
   });
@@ -192,6 +191,7 @@ describe("ActorMap", () => {
     const childOn = state("childOn")();
     const parentOff = state("parentOff")();
     const parentDone = state("parentDone")();
+    const go = event("go")();
 
     const parent = new Actor({
       inputs: [childOutput],
@@ -200,11 +200,8 @@ describe("ActorMap", () => {
       context: {},
       states: [parentOff, parentDone],
       initial: parentOff,
-      effects: {},
       transitions: {
-        parentOff: {
-          childOutput: () => ({ state: parentDone }),
-        },
+        parentOff: { childOutput: () => ({ state: parentDone }) },
       },
     });
 
@@ -213,13 +210,12 @@ describe("ActorMap", () => {
       "child",
       () =>
         new Actor({
-          inputs: [],
+          inputs: [go],
           outputs: [childOutput],
           internal: [],
           context: {},
           states: [childOff, childOn],
           initial: childOff,
-          effects: {},
           transitions: {
             childOff: {
               go: () => ({
@@ -231,7 +227,7 @@ describe("ActorMap", () => {
         }),
     );
 
-    map.send("child", { id: "go" });
+    map.send("child", go.create());
     expect(matches(parent, "parentDone")).toBe(true);
   });
 });

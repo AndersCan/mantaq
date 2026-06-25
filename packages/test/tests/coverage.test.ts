@@ -3,11 +3,16 @@ import { Actor, event, state } from "@mantaq/core";
 import { buildGraph, History } from "@mantaq/traversal";
 import { computeCoverage } from "../src/coverage.ts";
 
-function makeActor(effects?: Record<string, Array<(...args: unknown[]) => void>>) {
+function makeActor(effects?: Record<string, (...args: unknown[]) => void>) {
   const go = event("GO")();
   const stop = event("STOP")();
   const a = state("a")();
   const b = state("b")();
+
+  const effectsObj = {
+    ...(effects?.a ? { a: [effects.a] } : {}),
+    ...(effects?.b ? { b: [effects.b] } : {}),
+  };
 
   return new Actor({
     inputs: [go, stop],
@@ -16,11 +21,11 @@ function makeActor(effects?: Record<string, Array<(...args: unknown[]) => void>>
     context: {},
     states: [a, b],
     initial: a,
-    effects: effects ?? {},
     transitions: {
       a: { GO: () => ({ state: b }) },
       b: { STOP: () => ({ state: a }) },
     },
+    effects: Object.keys(effectsObj).length > 0 ? effectsObj : undefined,
   });
 }
 
@@ -97,7 +102,7 @@ describe("computeCoverage", () => {
 
   test("effects coverage", () => {
     const effectFn = () => {};
-    const actor = makeActor({ a: [effectFn] });
+    const actor = makeActor({ a: effectFn });
     const graph = buildGraph(actor);
     const history = new History();
 
@@ -110,7 +115,7 @@ describe("computeCoverage", () => {
 
   test("effects never ran → unexecuted list", () => {
     const effectFn = () => {};
-    const actor = makeActor({ a: [effectFn], b: [effectFn] });
+    const actor = makeActor({ a: effectFn, b: effectFn });
     const graph = buildGraph(actor);
     const history = new History();
 
