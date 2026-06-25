@@ -2,6 +2,13 @@ import type { HistoryEntry, StateVisit, TransitionRecord, EffectRecord } from ".
 
 const entriesMap = new WeakMap<History, HistoryEntry[]>();
 
+function entriesOfType(
+  entries: readonly HistoryEntry[],
+  type: HistoryEntry["type"],
+): HistoryEntry["data"][] {
+  return entries.filter((e) => e.type === type).map((e) => e.data);
+}
+
 export class History {
   constructor() {
     entriesMap.set(this, []);
@@ -16,42 +23,22 @@ export class History {
   }
 
   stateVisits(): StateVisit[] {
-    return entriesMap
-      .get(this)!
-      .filter(
-        (e): e is HistoryEntry & { type: "state_visit"; data: StateVisit } =>
-          e.type === "state_visit",
-      )
-      .map((e) => e.data);
+    return entriesOfType(entriesMap.get(this)!, "state_visit") as StateVisit[];
   }
 
   transitions(): TransitionRecord[] {
-    return entriesMap
-      .get(this)!
-      .filter(
-        (e): e is HistoryEntry & { type: "transition"; data: TransitionRecord } =>
-          e.type === "transition",
-      )
-      .map((e) => e.data);
+    return entriesOfType(entriesMap.get(this)!, "transition") as TransitionRecord[];
   }
 
   effects(): EffectRecord[] {
-    return entriesMap
-      .get(this)!
-      .filter(
-        (e): e is HistoryEntry & { type: "effect"; data: EffectRecord } => e.type === "effect",
-      )
-      .map((e) => e.data);
+    return entriesOfType(entriesMap.get(this)!, "effect") as EffectRecord[];
   }
 
   sends(): Array<{ event: string; timestamp: number }> {
-    return entriesMap
-      .get(this)!
-      .filter(
-        (e): e is HistoryEntry & { type: "send"; data: { event: string; timestamp: number } } =>
-          e.type === "send",
-      )
-      .map((e) => e.data);
+    return entriesOfType(entriesMap.get(this)!, "send") as Array<{
+      event: string;
+      timestamp: number;
+    }>;
   }
 
   visitedStates(): Set<string> {
