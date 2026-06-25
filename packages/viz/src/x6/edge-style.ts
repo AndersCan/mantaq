@@ -12,10 +12,6 @@ const INACTIVE_GRAY = "#cbd5e1";
 const INACTIVE_LABEL_FILL = "#f8fafc";
 const INACTIVE_LABEL_STROKE = "#e2e8f0";
 
-function isEffectTriggered(edge: GraphEdge): boolean {
-  return !!edge.isEffectTriggered;
-}
-
 export interface EdgeLabelAttrs {
   position: { distance: number };
   attrs: {
@@ -64,60 +60,68 @@ export interface EdgeConfig {
   attrs: { line: EdgeLineAttrs };
 }
 
-function isUndetermined(edge: GraphEdge): boolean {
-  return !!edge.isUndetermined;
+export interface EdgeTheme {
+  labelColor: string;
+  labelFill: string;
+  labelStroke: string;
+  lineColor: string;
+  lineWidth: number;
+  lineDash: number | undefined;
+  lineOpacity: number;
+  marchingStyle: Record<string, unknown> | undefined;
 }
 
-function labelColor(edge: GraphEdge): string {
-  if (isUndetermined(edge)) return UNDETERMINED_RED;
-  if (isEffectTriggered(edge)) return EFFECT_AMBER;
-  return edge.isActive ? "#0f172a" : "#94a3b8";
-}
-
-function labelFill(edge: GraphEdge): string {
-  if (isUndetermined(edge)) return UNDETERMINED_FILL;
-  if (isEffectTriggered(edge)) return EFFECT_FILL;
-  return edge.isActive ? ACTIVE_LABEL_FILL : INACTIVE_LABEL_FILL;
-}
-
-function labelStroke(edge: GraphEdge): string {
-  if (isUndetermined(edge)) return UNDETERMINED_RED;
-  if (isEffectTriggered(edge)) return EFFECT_STROKE;
-  return edge.isActive ? ACTIVE_LABEL_STROKE : INACTIVE_LABEL_STROKE;
-}
-
-function lineColor(edge: GraphEdge): string {
-  if (isUndetermined(edge)) return UNDETERMINED_RED;
-  if (isEffectTriggered(edge)) return EFFECT_AMBER;
-  return edge.isActive ? ACTIVE_BLUE : INACTIVE_GRAY;
-}
-
-function lineWidth(edge: GraphEdge): number {
-  if (isUndetermined(edge)) return 1.5;
-  if (isEffectTriggered(edge)) return 1.5;
-  return edge.isActive ? 2.5 : 1;
-}
-
-function lineDash(edge: GraphEdge): number | undefined {
-  if (isUndetermined(edge)) return 5;
-  if (isEffectTriggered(edge)) return 5;
-  if (!edge.isActive) return 4;
-  return undefined;
-}
-
-function lineOpacity(edge: GraphEdge): number {
-  if (isUndetermined(edge)) return 1;
-  return edge.isActive ? 1 : 0.35;
-}
-
-function marchingStyle(edge: GraphEdge): Record<string, unknown> | undefined {
-  if (isUndetermined(edge) || isEffectTriggered(edge)) {
-    return { animation: "ant-march 60s infinite linear" };
+export function edgeTheme(edge: GraphEdge): EdgeTheme {
+  if (edge.isUndetermined) {
+    return {
+      labelColor: UNDETERMINED_RED,
+      labelFill: UNDETERMINED_FILL,
+      labelStroke: UNDETERMINED_RED,
+      lineColor: UNDETERMINED_RED,
+      lineWidth: 1.5,
+      lineDash: 5,
+      lineOpacity: 1,
+      marchingStyle: { animation: "ant-march 60s infinite linear" },
+    };
   }
-  return undefined;
+  if (edge.isEffectTriggered) {
+    return {
+      labelColor: EFFECT_AMBER,
+      labelFill: EFFECT_FILL,
+      labelStroke: EFFECT_STROKE,
+      lineColor: EFFECT_AMBER,
+      lineWidth: 1.5,
+      lineDash: 5,
+      lineOpacity: 1,
+      marchingStyle: { animation: "ant-march 60s infinite linear" },
+    };
+  }
+  if (edge.isActive) {
+    return {
+      labelColor: "#0f172a",
+      labelFill: ACTIVE_LABEL_FILL,
+      labelStroke: ACTIVE_LABEL_STROKE,
+      lineColor: ACTIVE_BLUE,
+      lineWidth: 2.5,
+      lineDash: undefined,
+      lineOpacity: 1,
+      marchingStyle: undefined,
+    };
+  }
+  return {
+    labelColor: "#94a3b8",
+    labelFill: INACTIVE_LABEL_FILL,
+    labelStroke: INACTIVE_LABEL_STROKE,
+    lineColor: INACTIVE_GRAY,
+    lineWidth: 1,
+    lineDash: 4,
+    lineOpacity: 0.35,
+    marchingStyle: undefined,
+  };
 }
 
 export function edgeLabel(edge: GraphEdge): EdgeLabelAttrs {
+  const t = edgeTheme(edge);
   const text = edge.label;
   return {
     position: { distance: 0.4 },
@@ -125,13 +129,13 @@ export function edgeLabel(edge: GraphEdge): EdgeLabelAttrs {
       label: {
         text,
         fontSize: 12,
-        fill: labelColor(edge),
+        fill: t.labelColor,
         fontWeight: "600",
         cursor: "pointer",
       },
       body: {
-        fill: labelFill(edge),
-        stroke: labelStroke(edge),
+        fill: t.labelFill,
+        stroke: t.labelStroke,
         strokeWidth: 1,
         rx: 4,
         ry: 4,
@@ -146,14 +150,15 @@ export function edgeLabel(edge: GraphEdge): EdgeLabelAttrs {
 }
 
 export function edgeLine(edge: GraphEdge): EdgeLineAttrs {
+  const t = edgeTheme(edge);
   return {
-    stroke: lineColor(edge),
-    strokeWidth: lineWidth(edge),
-    strokeDasharray: lineDash(edge),
-    strokeOpacity: lineOpacity(edge),
+    stroke: t.lineColor,
+    strokeWidth: t.lineWidth,
+    strokeDasharray: t.lineDash,
+    strokeOpacity: t.lineOpacity,
     targetMarker: { name: "classic", size: 8 },
     cursor: "pointer",
-    ...marchingStyle(edge),
+    ...t.marchingStyle,
   };
 }
 
@@ -163,7 +168,7 @@ export function edgeTooltip(edge: GraphEdge): string {
     parts.push(`${edge.source} → ${edge.target}`);
   }
   parts.push(`Internal: ${edge.isInternal ? "yes" : "no"}`);
-  if (isUndetermined(edge)) {
+  if (edge.isUndetermined) {
     parts.push("Target: undetermined");
   }
   return parts.join("\n");
@@ -173,7 +178,7 @@ export function edgeData(edge: GraphEdge): Record<string, unknown> {
   return {
     isActive: edge.isActive,
     eventId: edge.label,
-    isUndetermined: isUndetermined(edge),
+    isUndetermined: edge.isUndetermined,
     timerMs: edge.timerMs,
     tooltip: edgeTooltip(edge),
   };
