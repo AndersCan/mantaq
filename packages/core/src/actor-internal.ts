@@ -15,12 +15,12 @@ export interface AnyActor {
   send(event: AnyEventRef | InternalEvent): void;
   snapshot(): Snapshot;
   on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
-  on(event: "error", fn: (error: unknown) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
   context?: Record<string, unknown>;
   options?: {
     transitions?: Record<string, Record<string, unknown>>;
+    effects?: Record<string, unknown[]>;
     states?: ReadonlyArray<{ name: string; isFinal: boolean }>;
   };
   __children: Map<string, AnyActor>;

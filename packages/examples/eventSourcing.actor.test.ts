@@ -136,55 +136,57 @@ function createAccountAggregate(clock?: VirtualClock) {
     initial: activeState,
     clock: c,
     context: { events: [], balance: 0, version: 0 } as AccountContext,
-    transitions: {
-      active: {
-        OPEN_ACCOUNT: (evt, { context }) => {
-          const domainEvent: AccountEvent = {
-            type: "ACCOUNT_OPENED",
-            accountId: evt.accountId,
-            initialBalance: evt.initialBalance,
-            at: c.now(),
-          };
-          context.events.push(domainEvent);
-          context.balance += evt.initialBalance;
-          context.version++;
-          return { emit: [eventStoredEvt.create({ event: domainEvent })] };
-        },
-        DEPOSIT: (evt, { context }) => {
-          if (evt.amount <= 0) return {};
-          const domainEvent: AccountEvent = {
-            type: "MONEY_DEPOSITED",
-            amount: evt.amount,
-            at: c.now(),
-          };
-          context.events.push(domainEvent);
-          context.balance += evt.amount;
-          context.version++;
-          return { emit: [eventStoredEvt.create({ event: domainEvent })] };
-        },
-        WITHDRAW: (evt, { context }) => {
-          if (evt.amount <= 0 || evt.amount > context.balance) return {};
-          const domainEvent: AccountEvent = {
-            type: "MONEY_WITHDRAWN",
-            amount: evt.amount,
-            at: c.now(),
-          };
-          context.events.push(domainEvent);
-          context.balance -= evt.amount;
-          context.version++;
-          return { emit: [eventStoredEvt.create({ event: domainEvent })] };
-        },
-        CLOSE_ACCOUNT: (evt, { context }) => {
-          const domainEvent: AccountEvent = {
-            type: "ACCOUNT_CLOSED",
-            reason: evt.reason,
-            at: c.now(),
-          };
-          context.events.push(domainEvent);
-          context.version++;
-          return { state: closedState, emit: [eventStoredEvt.create({ event: domainEvent })] };
-        },
-      },
+    setup: (m) => {
+      m.on(activeState, openAccountCmd, (evt, opts) => {
+        const context = opts!.context;
+        const domainEvent: AccountEvent = {
+          type: "ACCOUNT_OPENED",
+          accountId: evt.accountId,
+          initialBalance: evt.initialBalance,
+          at: c.now(),
+        };
+        context.events.push(domainEvent);
+        context.balance += evt.initialBalance;
+        context.version++;
+        return { emit: [eventStoredEvt.create({ event: domainEvent })] };
+      });
+      m.on(activeState, depositCmd, (evt, opts) => {
+        const context = opts!.context;
+        if (evt.amount <= 0) return {};
+        const domainEvent: AccountEvent = {
+          type: "MONEY_DEPOSITED",
+          amount: evt.amount,
+          at: c.now(),
+        };
+        context.events.push(domainEvent);
+        context.balance += evt.amount;
+        context.version++;
+        return { emit: [eventStoredEvt.create({ event: domainEvent })] };
+      });
+      m.on(activeState, withdrawCmd, (evt, opts) => {
+        const context = opts!.context;
+        if (evt.amount <= 0 || evt.amount > context.balance) return {};
+        const domainEvent: AccountEvent = {
+          type: "MONEY_WITHDRAWN",
+          amount: evt.amount,
+          at: c.now(),
+        };
+        context.events.push(domainEvent);
+        context.balance -= evt.amount;
+        context.version++;
+        return { emit: [eventStoredEvt.create({ event: domainEvent })] };
+      });
+      m.on(activeState, closeAccountCmd, (evt, opts) => {
+        const context = opts!.context;
+        const domainEvent: AccountEvent = {
+          type: "ACCOUNT_CLOSED",
+          reason: evt.reason,
+          at: c.now(),
+        };
+        context.events.push(domainEvent);
+        context.version++;
+        return { state: closedState, emit: [eventStoredEvt.create({ event: domainEvent })] };
+      });
     },
   });
 
@@ -210,16 +212,15 @@ function createBalanceProjection(clock?: VirtualClock) {
     initial: trackingState,
     clock: c,
     context: { balance: 0, lastVersion: 0, accountEvents: [] } as BalanceProjectionContext,
-    transitions: {
-      tracking: {
-        EVENT_STORED: (evt, { context }) => {
-          context.accountEvents.push(evt.event);
-          const { balance } = foldEvents(context.accountEvents);
-          context.balance = balance;
-          context.lastVersion = context.accountEvents.length;
-          return {};
-        },
-      },
+    setup: (m) => {
+      m.on(trackingState, eventStoredEvt, (evt, opts) => {
+        const context = opts!.context;
+        context.accountEvents.push(evt.event);
+        const { balance } = foldEvents(context.accountEvents);
+        context.balance = balance;
+        context.lastVersion = context.accountEvents.length;
+        return {};
+      });
     },
   });
 

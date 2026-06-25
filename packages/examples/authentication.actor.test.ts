@@ -101,53 +101,39 @@ function createAuthActor(clock?: VirtualClock) {
     initial: s.checkingAuth,
     clock: c,
     context: {} as AuthContext,
-    effects: {
-      checkingAuth: [monitorAuthStateEffect],
-      loggedIn: [monitorAuthStateEffect],
-      signingIn: [signInWithPhoneEffect],
-      signingOut: [signingOutEffect],
-    },
-    transitions: {
-      Any: { MONITOR_TICK: () => ({}) },
-      checkingAuth: {
-        SIGN_IN: (event, { context }) => {
-          context.phoneNumber = event.phoneNumber;
-          return { state: s.signingIn };
-        },
-      },
-      loggedOut: {
-        SIGN_IN: (event, { context }) => {
-          context.phoneNumber = event.phoneNumber;
-          return { state: s.signingIn };
-        },
-      },
-      signingIn: {
-        SIGN_IN_DONE: (event, { context }) => {
-          context.user = event.user;
-          return { state: s.loggedIn };
-        },
-        SIGN_IN_ERROR: (event, { context }) => {
-          context.error = event.error;
-          return { state: s.signInError };
-        },
-      },
-      loggedIn: {
-        SIGN_OUT: (_event, { context }) => {
-          context.user = undefined;
-          context.phoneNumber = undefined;
-          return { state: s.signingOut };
-        },
-      },
-      signingOut: {
-        SIGNING_OUT_DONE: () => ({ state: s.loggedOut }),
-      },
-      signInError: {
-        RETRY: () => ({ state: s.signingIn }),
-        SIGN_IN: (event, { context }) => {
-          context.phoneNumber = event.phoneNumber;
-          return { state: s.signingIn };
-        },
-      },
+    setup: (m) => {
+      m.effect(s.checkingAuth, monitorAuthStateEffect);
+      m.effect(s.loggedIn, monitorAuthStateEffect);
+      m.effect(s.signingIn, signInWithPhoneEffect);
+      m.effect(s.signingOut, signingOutEffect);
+      m.onAny(e.MONITOR_TICK, () => ({}));
+      m.on(s.checkingAuth, signInEvent, (event, opts) => {
+        opts!.context.phoneNumber = event.phoneNumber;
+        return { state: s.signingIn };
+      });
+      m.on(s.loggedOut, signInEvent, (event, opts) => {
+        opts!.context.phoneNumber = event.phoneNumber;
+        return { state: s.signingIn };
+      });
+      m.on(s.signingIn, signInDoneEvent, (event, opts) => {
+        opts!.context.user = event.user;
+        return { state: s.loggedIn };
+      });
+      m.on(s.signingIn, signInErrorEvent, (event, opts) => {
+        opts!.context.error = event.error;
+        return { state: s.signInError };
+      });
+      m.on(s.loggedIn, e.SIGN_OUT, (_event, opts) => {
+        opts!.context.user = undefined;
+        opts!.context.phoneNumber = undefined;
+        return { state: s.signingOut };
+      });
+      m.on(s.signingOut, e.SIGNING_OUT_DONE, () => ({ state: s.loggedOut }));
+      m.on(s.signInError, e.RETRY, () => ({ state: s.signingIn }));
+      m.on(s.signInError, signInEvent, (event, opts) => {
+        opts!.context.phoneNumber = event.phoneNumber;
+        return { state: s.signingIn };
+      });
     },
   });
 

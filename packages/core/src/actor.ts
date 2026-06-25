@@ -1,7 +1,6 @@
 import { StateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
-import type { AnyEventRef, EventRef, InternalEvent } from "./event.ts";
-import { IS_DEV } from "./utils.ts";
+import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
 import { RealClock } from "./real-clock.ts";
 import { VirtualClock } from "./virtual-clock.ts";
 import type { Clock } from "./clock.ts";
@@ -13,6 +12,8 @@ import { buildSnapshot } from "./snapshot.ts";
 import { runEffects } from "./effects.ts";
 import { parseTarget } from "./dispatch.ts";
 import type { EffectFn, TransitionResult } from "./actor-types.ts";
+import { ActorBuilder } from "./builder.ts";
+import type { SetupFn } from "./builder.ts";
 
 export { RealClock, VirtualClock };
 export type { Clock, Snapshot, AnyActor };
@@ -23,6 +24,19 @@ type CreatedOf<E extends AnyEventRef> =
 type StateNameOf<S extends AnyStateRef> = S extends StateRef<infer N, any, any> ? N : never;
 type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, any> ? Id : never;
 
+type CreatedForId<Refs extends readonly AnyEventRef[], Id extends string> =
+  Extract<Refs[number], { id: Id }> extends infer R
+    ? R extends EventRef<Id, infer P>
+      ? CreatedOfEvent<Id, P>
+      : never
+    : never;
+
+type HandlerEvent<
+  Inputs extends readonly AnyEventRef[],
+  Internal extends readonly AnyEventRef[],
+  Id extends string,
+> = CreatedForId<Inputs, Id> | CreatedForId<Internal, Id>;
+
 export type TransitionMap<
   States extends readonly AnyStateRef[],
   Inputs extends readonly AnyEventRef[],
@@ -31,8 +45,8 @@ export type TransitionMap<
   ActorContext,
 > = {
   [S in StateNameOf<States[number]> | "Any"]?: {
-    [E in EventIdOf<Inputs[number]> | EventIdOf<Internal[number]> | string]?: (
-      event: InternalEvent,
+    [E in EventIdOf<Inputs[number]> | EventIdOf<Internal[number]>]?: (
+      event: HandlerEvent<Inputs, Internal, E>,
       options: { context: ActorContext; actor: AnyActor },
     ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>;
   };
@@ -60,7 +74,7 @@ export interface ActorOptions<
   Inputs extends readonly AnyEventRef[],
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
-  ActorContext,
+  ActorContext = Record<string, unknown>,
 > {
   inputs: Inputs;
   outputs?: Outputs;
@@ -70,22 +84,41 @@ export interface ActorOptions<
   initial: InitialState<States[number]>;
   clock?: Clock;
   internalBudget?: number;
-  effects?: EffectsMap<States, ActorContext>;
+  setup: SetupFn<States, Inputs, Internal, Outputs, ActorContext>;
+  regions?: Record<string, AnyActor>;
+}
+
+export interface InternalActorOptions<
+  States extends readonly AnyStateRef[],
+  Inputs extends readonly AnyEventRef[],
+  Internal extends readonly AnyEventRef[],
+  Outputs extends readonly AnyEventRef[],
+  ActorContext = Record<string, unknown>,
+> {
+  inputs: Inputs;
+  outputs?: Outputs;
+  internal?: Internal;
+  states: States;
+  context?: ActorContext;
+  initial: InitialState<States[number]>;
+  clock?: Clock;
+  internalBudget?: number;
   transitions: TransitionMap<States, Inputs, Internal, Outputs, ActorContext>;
+  effects: EffectsMap<States, ActorContext>;
   regions?: Record<string, AnyActor>;
 }
 
 export class Actor<
   const States extends readonly AnyStateRef[],
   const Inputs extends readonly AnyEventRef[],
-  const Internal extends readonly AnyEventRef[],
-  const Outputs extends readonly AnyEventRef[],
-  ActorContext,
+  const Internal extends readonly AnyEventRef[] = readonly [],
+  const Outputs extends readonly AnyEventRef[] = readonly AnyEventRef[],
+  ActorContext = Record<string, unknown>,
 > {
   state: States[number];
   readonly clock: Clock;
   #context: ActorContext;
-  #options: ActorOptions<States, Inputs, Internal, Outputs, ActorContext>;
+  #options: InternalActorOptions<States, Inputs, Internal, Outputs, ActorContext>;
   #regions: Record<string, AnyActor> = {};
   #children = new Map<string, AnyActor>();
   #queue = new InternalQueue();
@@ -95,6 +128,7 @@ export class Actor<
   #internalIds: Set<string>;
   #inputIds: Set<string>;
   #internalBudget: number;
+  #draining = false;
 
   get context(): ActorContext {
     return this.#context;
@@ -104,12 +138,27 @@ export class Actor<
     return this.#regions;
   }
 
-  get options(): ActorOptions<States, Inputs, Internal, Outputs, ActorContext> {
+  get options(): InternalActorOptions<States, Inputs, Internal, Outputs, ActorContext> {
     return this.#options;
   }
 
   constructor(options: ActorOptions<States, Inputs, Internal, Outputs, ActorContext>) {
-    this.#options = options;
+    const builder = new ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>();
+    options.setup(builder);
+    const built = builder.build();
+
+    this.#options = {
+      ...options,
+      transitions: built.transitions as TransitionMap<
+        States,
+        Inputs,
+        Internal,
+        Outputs,
+        ActorContext
+      >,
+      effects: built.effects as EffectsMap<States, ActorContext>,
+    };
+
     const internal = options.internal ?? ([] as unknown as Internal);
     this.#internalIds = new Set(internal.map((e) => e.id));
     this.#inputIds = new Set(options.inputs.map((e) => e.id));
@@ -118,13 +167,11 @@ export class Actor<
     this.clock.setDrain?.(() => this.#drainInternal());
 
     const initState = resolveInitial(options.initial);
-    if (IS_DEV) {
-      const stateNames = new Set(options.states.map((s) => s.name));
-      if (!stateNames.has(initState.name)) {
-        console.warn(
-          `[Actor] initial state "${initState.name}" not found in declared states [${[...stateNames].join(", ")}]`,
-        );
-      }
+    const stateNames = new Set(options.states.map((s) => s.name));
+    if (!stateNames.has(initState.name)) {
+      console.warn(
+        `[Actor] initial state "${initState.name}" not found in declared states [${[...stateNames].join(", ")}]`,
+      );
     }
     this.state = initState;
     this.#context = (options.context ?? {}) as ActorContext;
@@ -142,22 +189,13 @@ export class Actor<
   }
 
   on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
-  on(event: "error", fn: (error: unknown) => void): () => void;
   on(event: "done", fn: () => void): () => void;
-  on(
-    event: "change" | "error" | "done",
-    fn: ((snapshot: Snapshot) => void) | ((error: unknown) => void) | (() => void),
-  ): () => void {
+  on(event: "change" | "done", fn: ((snapshot: Snapshot) => void) | (() => void)): () => void {
     if (event === "change") {
       const cb = fn as (snapshot: Snapshot) => void;
       this.#subs.change.add(cb);
       cb(this.snapshot());
       return () => this.#subs.change.delete(cb);
-    }
-    if (event === "error") {
-      const cb = fn as (error: unknown) => void;
-      this.#subs.error.add(cb);
-      return () => this.#subs.error.delete(cb);
     }
     const cb = fn as () => void;
     this.#subs.done.add(cb);
@@ -168,13 +206,12 @@ export class Actor<
     return this.#queue.settled();
   }
 
-  send(event: CreatedOf<Inputs[number]> | CreatedOf<Internal[number]>): void {
-    if (this.state.isFinal) {
-      console.warn(
-        `[Actor] cannot send "${event.id}" — current state "${this.state.name}" is final.`,
-      );
-      return;
-    }
+  send(event: CreatedOf<Inputs[number]>): void {
+    this.#dispatch(event);
+  }
+
+  #dispatch(event: InternalEvent): void {
+    if (this.state.isFinal) return;
     const transitions = this.#options.transitions as unknown as TransitionDispatch<ActorContext>;
     const stateTransition = transitions[this.state.name]?.[event.id];
     const anyTransition = transitions["Any"]?.[event.id];
@@ -204,7 +241,7 @@ export class Actor<
 
     if (anyEmitted || this.#queue.length > 0) {
       this.#drainInternal();
-    } else if (IS_DEV && !stateTransition && !anyTransition) {
+    } else if (!stateTransition && !anyTransition) {
       console.warn(
         `[Actor] no transition for event "${event.id}" in state "${this.state.name}". Event dropped.`,
       );
@@ -269,34 +306,41 @@ export class Actor<
         this.#drainInternal();
       },
       clock: this.clock,
-      onError: (err) => this.#subs.emitError(err),
     });
     this.#effectAbort = abort;
   }
 
   #drainInternal(): void {
-    const budget = this.#internalBudget;
-    let count = 0;
-    this.#queue.processCancellable((event) => {
-      if (count >= budget) {
-        this.#subs.emitError(
-          new Error(
-            `[Actor] internal event budget (${budget}) exceeded — possible emit loop. Actor halting.`,
-          ),
-        );
-        this.__abortEffects();
-        return false;
-      }
-      count++;
-      if (this.#internalIds.has(event.id)) {
-        this.send(event as CreatedOf<Internal[number]>);
-      } else if (this.#inputIds.has(event.id)) {
-        this.send(event as CreatedOf<Inputs[number]>);
-      } else if (this.#outputHandler) {
-        this.#outputHandler(event);
-      }
-      return true;
-    });
+    if (this.#draining) return;
+    this.#draining = true;
+    let budgetExceeded = false;
+    try {
+      const budget = this.#internalBudget;
+      let count = 0;
+      this.#queue.processCancellable((event) => {
+        if (count >= budget) {
+          budgetExceeded = true;
+          this.__abortEffects();
+          return false;
+        }
+        count++;
+        if (this.#internalIds.has(event.id)) {
+          this.#dispatch(event);
+        } else if (this.#inputIds.has(event.id)) {
+          this.#dispatch(event);
+        } else if (this.#outputHandler) {
+          this.#outputHandler(event);
+        }
+        return true;
+      });
+    } finally {
+      this.#draining = false;
+    }
+    if (budgetExceeded) {
+      console.warn(
+        `[Actor] internal event budget (${this.#internalBudget}) exceeded — possible emit loop. Actor halting.`,
+      );
+    }
   }
 }
 

@@ -9,11 +9,6 @@ function makeActor(effects?: Record<string, (...args: unknown[]) => void>) {
   const a = state("a")();
   const b = state("b")();
 
-  const effectsObj = {
-    ...(effects?.a ? { a: [effects.a] } : {}),
-    ...(effects?.b ? { b: [effects.b] } : {}),
-  };
-
   return new Actor({
     inputs: [go, stop],
     outputs: [],
@@ -21,11 +16,12 @@ function makeActor(effects?: Record<string, (...args: unknown[]) => void>) {
     context: {},
     states: [a, b],
     initial: a,
-    transitions: {
-      a: { GO: () => ({ state: b }) },
-      b: { STOP: () => ({ state: a }) },
+    setup: (m) => {
+      m.on(a, go, () => ({ state: b }));
+      m.on(b, stop, () => ({ state: a }));
+      if (effects?.a) m.effect(a, effects.a as any);
+      if (effects?.b) m.effect(b, effects.b as any);
     },
-    effects: Object.keys(effectsObj).length > 0 ? effectsObj : undefined,
   });
 }
 

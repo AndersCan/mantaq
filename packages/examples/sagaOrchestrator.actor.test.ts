@@ -108,130 +108,106 @@ function createSagaActor(clock?: VirtualClock) {
     initial: s.idle,
     clock: c,
     context: { completedSteps: [] } as SagaContext,
-    effects: {
-      reservingInventory: [
-        (input) => {
-          withTimeout(100, input, () =>
-            INVENTORY_RESERVED.create({
-              result: { reservationId: `RES-${input.context.order?.orderId ?? "unknown"}` },
-            }),
-          );
-        },
-      ],
-      processingPayment: [
-        (input) => {
-          withTimeout(200, input, () =>
-            PAYMENT_PROCESSED.create({
-              result: { transactionId: `TXN-${input.context.order?.orderId ?? "unknown"}` },
-            }),
-          );
-        },
-      ],
-      creatingShipment: [
-        (input) => {
-          withTimeout(150, input, () =>
-            SHIPMENT_CREATED.create({
-              result: { trackingNumber: `TRK-${input.context.order?.orderId ?? "unknown"}` },
-            }),
-          );
-        },
-      ],
-      notifying: [
-        (input) => {
-          withTimeout(50, input, () => NOTIFICATION_SENT.create(undefined));
-        },
-      ],
-      compensatingRefund: [
-        (input) => {
-          withTimeout(100, input, () => REFUND_DONE.create(undefined));
-        },
-      ],
-      compensatingRelease: [
-        (input) => {
-          withTimeout(80, input, () => RELEASE_DONE.create(undefined));
-        },
-      ],
-    },
-    transitions: {
-      Any: {
-        CANCEL: (_event, { context }) => {
-          if (context.completedSteps.includes("inventory")) {
-            context.error = "Cancelled by user";
-            return { state: s.compensatingRelease };
-          }
-          return { state: failed };
-        },
-      },
-      idle: {
-        START: (event, { context }) => {
-          context.order = event.order;
-          return { state: s.reservingInventory };
-        },
-      },
-      reservingInventory: {
-        INVENTORY_RESERVED: (event, { context }) => {
-          context.reservationId = event.result.reservationId;
-          context.completedSteps.push("inventory");
-          return { state: s.processingPayment };
-        },
-        INVENTORY_FAILED: (event, { context }) => {
-          context.error = event.error;
-          return { state: failed };
-        },
-      },
-      processingPayment: {
-        PAYMENT_PROCESSED: (event, { context }) => {
-          context.transactionId = event.result.transactionId;
-          context.completedSteps.push("payment");
-          return { state: s.creatingShipment };
-        },
-        PAYMENT_FAILED: (event, { context }) => {
-          context.error = event.error;
-          context.completedSteps.push("payment_failed");
-          return { state: s.compensatingRefund };
-        },
-      },
-      creatingShipment: {
-        SHIPMENT_CREATED: (event, { context }) => {
-          context.trackingNumber = event.result.trackingNumber;
-          context.completedSteps.push("shipment");
-          return { state: s.notifying };
-        },
-        SHIPMENT_FAILED: (event, { context }) => {
-          context.error = event.error;
-          return { state: s.compensatingRefund };
-        },
-      },
-      notifying: {
-        NOTIFICATION_SENT: () => ({ state: completed }),
-        NOTIFICATION_FAILED: (_event, { context }) => {
-          context.error = "Notification failed";
-          return { state: completed };
-        },
-      },
-      compensatingRefund: {
-        REFUND_DONE: (_event, { context }) => {
-          context.completedSteps.push("refunded");
-          if (context.completedSteps.includes("inventory")) {
-            return { state: s.compensatingRelease };
-          }
-          return { state: failed };
-        },
-        REFUND_FAILED: (event, { context }) => {
-          context.error = `Refund failed: ${event.error}`;
-          return { state: failed };
-        },
-      },
-      compensatingRelease: {
-        RELEASE_DONE: (_event, { context }) => {
-          context.completedSteps.push("released");
-          return { state: failed };
-        },
-        RELEASE_FAILED: (event, { context }) => {
-          context.error = `Release failed: ${event.error}`;
-          return { state: failed };
-        },
-      },
+    setup: (m) => {
+      m.effect(s.reservingInventory, (input) => {
+        withTimeout(100, input, () =>
+          INVENTORY_RESERVED.create({
+            result: { reservationId: `RES-${input.context.order?.orderId ?? "unknown"}` },
+          }),
+        );
+      });
+      m.effect(s.processingPayment, (input) => {
+        withTimeout(200, input, () =>
+          PAYMENT_PROCESSED.create({
+            result: { transactionId: `TXN-${input.context.order?.orderId ?? "unknown"}` },
+          }),
+        );
+      });
+      m.effect(s.creatingShipment, (input) => {
+        withTimeout(150, input, () =>
+          SHIPMENT_CREATED.create({
+            result: { trackingNumber: `TRK-${input.context.order?.orderId ?? "unknown"}` },
+          }),
+        );
+      });
+      m.effect(s.notifying, (input) => {
+        withTimeout(50, input, () => NOTIFICATION_SENT.create(undefined));
+      });
+      m.effect(s.compensatingRefund, (input) => {
+        withTimeout(100, input, () => REFUND_DONE.create(undefined));
+      });
+      m.effect(s.compensatingRelease, (input) => {
+        withTimeout(80, input, () => RELEASE_DONE.create(undefined));
+      });
+      m.onAny(CANCEL, (_event, opts) => {
+        const context = opts!.context;
+        if (context.completedSteps.includes("inventory")) {
+          context.error = "Cancelled by user";
+          return { state: s.compensatingRelease };
+        }
+        return { state: failed };
+      });
+      m.on(s.idle, START, (event, opts) => {
+        opts!.context.order = event.order;
+        return { state: s.reservingInventory };
+      });
+      m.on(s.reservingInventory, INVENTORY_RESERVED, (event, opts) => {
+        const context = opts!.context;
+        context.reservationId = event.result.reservationId;
+        context.completedSteps.push("inventory");
+        return { state: s.processingPayment };
+      });
+      m.on(s.reservingInventory, INVENTORY_FAILED, (event, opts) => {
+        opts!.context.error = event.error;
+        return { state: failed };
+      });
+      m.on(s.processingPayment, PAYMENT_PROCESSED, (event, opts) => {
+        const context = opts!.context;
+        context.transactionId = event.result.transactionId;
+        context.completedSteps.push("payment");
+        return { state: s.creatingShipment };
+      });
+      m.on(s.processingPayment, PAYMENT_FAILED, (event, opts) => {
+        const context = opts!.context;
+        context.error = event.error;
+        context.completedSteps.push("payment_failed");
+        return { state: s.compensatingRefund };
+      });
+      m.on(s.creatingShipment, SHIPMENT_CREATED, (event, opts) => {
+        const context = opts!.context;
+        context.trackingNumber = event.result.trackingNumber;
+        context.completedSteps.push("shipment");
+        return { state: s.notifying };
+      });
+      m.on(s.creatingShipment, SHIPMENT_FAILED, (event, opts) => {
+        opts!.context.error = event.error;
+        return { state: s.compensatingRefund };
+      });
+      m.on(s.notifying, NOTIFICATION_SENT, () => ({ state: completed }));
+      m.on(s.notifying, NOTIFICATION_FAILED, (_event, opts) => {
+        opts!.context.error = "Notification failed";
+        return { state: completed };
+      });
+      m.on(s.compensatingRefund, REFUND_DONE, (_event, opts) => {
+        const context = opts!.context;
+        context.completedSteps.push("refunded");
+        if (context.completedSteps.includes("inventory")) {
+          return { state: s.compensatingRelease };
+        }
+        return { state: failed };
+      });
+      m.on(s.compensatingRefund, REFUND_FAILED, (event, opts) => {
+        opts!.context.error = `Refund failed: ${event.error}`;
+        return { state: failed };
+      });
+      m.on(s.compensatingRelease, RELEASE_DONE, (_event, opts) => {
+        opts!.context.completedSteps.push("released");
+        return { state: failed };
+      });
+      m.on(s.compensatingRelease, RELEASE_FAILED, (event, opts) => {
+        opts!.context.error = `Release failed: ${event.error}`;
+        return { state: failed };
+      });
     },
   });
 
@@ -286,7 +262,8 @@ describe("saga orchestrator actor", () => {
     clock.advance(100);
     expect(matches(actor, "processingPayment")).toBe(true);
 
-    actor.send(PAYMENT_FAILED.create({ error: "Card declined" }));
+    actor.__pushInternal(PAYMENT_FAILED.create({ error: "Card declined" }));
+    actor.__drainInternal();
     expect(matches(actor, "compensatingRefund")).toBe(true);
     expect(actor.context.error).toBe("Card declined");
 
@@ -312,7 +289,8 @@ describe("saga orchestrator actor", () => {
     clock.advance(200);
     expect(matches(actor, "creatingShipment")).toBe(true);
 
-    actor.send(SHIPMENT_FAILED.create({ error: "Carrier unavailable" }));
+    actor.__pushInternal(SHIPMENT_FAILED.create({ error: "Carrier unavailable" }));
+    actor.__drainInternal();
     expect(matches(actor, "compensatingRefund")).toBe(true);
 
     clock.advance(100);
@@ -332,7 +310,8 @@ describe("saga orchestrator actor", () => {
     );
     expect(matches(actor, "reservingInventory")).toBe(true);
 
-    actor.send(INVENTORY_FAILED.create({ error: "Out of stock" }));
+    actor.__pushInternal(INVENTORY_FAILED.create({ error: "Out of stock" }));
+    actor.__drainInternal();
     expect(matches(actor, "failed")).toBe(true);
     expect(actor.context.error).toBe("Out of stock");
     expect(actor.context.completedSteps).toEqual([]);
@@ -393,7 +372,8 @@ describe("saga orchestrator actor", () => {
     );
     expect(matches(actor, "reservingInventory")).toBe(true);
 
-    actor.send(INVENTORY_FAILED.create({ error: "Forced" }));
+    actor.__pushInternal(INVENTORY_FAILED.create({ error: "Forced" }));
+    actor.__drainInternal();
     expect(matches(actor, "failed")).toBe(true);
 
     clock.advance(100);
@@ -463,7 +443,8 @@ describe("saga orchestrator actor", () => {
     clock.advance(150);
     expect(matches(actor, "notifying")).toBe(true);
 
-    actor.send(NOTIFICATION_FAILED.create({ error: "Email bounce" }));
+    actor.__pushInternal(NOTIFICATION_FAILED.create({ error: "Email bounce" }));
+    actor.__drainInternal();
     expect(matches(actor, "completed")).toBe(true);
     expect(actor.context.error).toBe("Notification failed");
     expect(actor.snapshot().done).toBe(true);

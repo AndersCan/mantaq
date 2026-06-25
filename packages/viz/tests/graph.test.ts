@@ -17,9 +17,9 @@ function createSimpleActor() {
     states: [idle, loading, done],
     initial: idle,
     context: {} as {},
-    transitions: {
-      idle: { FETCH: () => ({ state: loading }) },
-      loading: { SUCCESS: () => ({ state: done }) },
+    setup: (m) => {
+      m.on(idle, fetch, () => ({ state: loading }));
+      m.on(loading, success, () => ({ state: done }));
     },
   });
 }
@@ -35,8 +35,8 @@ function createSelfLoopActor() {
     states: [active],
     initial: active,
     context: {} as {},
-    transitions: {
-      active: { PING: () => ({ state: active }) },
+    setup: (m) => {
+      m.on(active, ping, () => ({ state: active }));
     },
   });
 }
@@ -57,10 +57,10 @@ function createThreeStateActor() {
     states: [a, b, c],
     initial: a,
     context: {} as {},
-    transitions: {
-      a: { GO: () => ({ state: b }) },
-      b: { NEXT: () => ({ state: c }) },
-      c: { BACK: () => ({ state: a }) },
+    setup: (m) => {
+      m.on(a, go, () => ({ state: b }));
+      m.on(b, next, () => ({ state: c }));
+      m.on(c, back, () => ({ state: a }));
     },
   });
 }
@@ -175,7 +175,7 @@ describe("buildGraph", () => {
       states: [idle],
       initial: idle,
       context: {} as {},
-      transitions: {},
+      setup: () => {},
     });
 
     const graph = buildGraph(actor);
@@ -201,20 +201,16 @@ describe("buildGraph with effect timers", () => {
       initial: idle,
       context: {} as {},
       clock,
-      transitions: {
-        idle: { START: () => ({ state: working }) },
-        working: { WORK_TIMEOUT: () => ({ state: idle }) },
-      },
-      effects: {
-        working: [
-          ({ signal, clock: c }) => {
-            const id = c.setTimeout(4000, () => {}, {
-              signal,
-              eventName: "WORK_TIMEOUT",
-            });
-            signal.addEventListener("abort", () => c.clearTimeout(id));
-          },
-        ],
+      setup: (m) => {
+        m.on(idle, start, () => ({ state: working }));
+        m.on(working, timeout, () => ({ state: idle }));
+        m.effect(working, ({ signal, clock: c }) => {
+          const id = c.setTimeout(4000, () => {}, {
+            signal,
+            eventName: "WORK_TIMEOUT",
+          });
+          signal.addEventListener("abort", () => c.clearTimeout(id));
+        });
       },
     });
 
@@ -237,9 +233,9 @@ describe("buildGraph with regions", () => {
       states: [subA, subB],
       initial: subA,
       context: {} as {},
-      transitions: {
-        subA: { TOGGLE: () => ({ state: subB }) },
-        subB: { TOGGLE: () => ({ state: subA }) },
+      setup: (m) => {
+        m.on(subA, toggle, () => ({ state: subB }));
+        m.on(subB, toggle, () => ({ state: subA }));
       },
     });
 
@@ -254,8 +250,8 @@ describe("buildGraph with regions", () => {
       initial: parent,
       context: {} as {},
       regions: { child: region },
-      transitions: {
-        parent: { START: () => ({ state: parent }) },
+      setup: (m) => {
+        m.on(parent, start, () => ({ state: parent }));
       },
     });
 

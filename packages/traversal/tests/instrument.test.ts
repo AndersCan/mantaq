@@ -16,9 +16,9 @@ function createTestActor() {
     states: [idle, active, done],
     initial: idle,
     context: {} as {},
-    transitions: {
-      idle: { GO: () => ({ state: active }) },
-      active: { FINISH: () => ({ state: done }) },
+    setup: (m) => {
+      m.on(idle, go, () => ({ state: active }));
+      m.on(active, finish, () => ({ state: done }));
     },
   });
 }
@@ -74,6 +74,7 @@ describe("instrument", () => {
       states: [idle],
       initial: idle,
       context: { count: 42 } as { count: number },
+      setup: () => {},
     });
 
     const inst = instrument(actor);

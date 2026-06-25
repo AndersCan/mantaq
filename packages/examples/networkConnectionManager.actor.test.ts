@@ -75,22 +75,16 @@ function createConnectionManager(clock?: VirtualClock) {
     states: [healthStates.unknown, healthStates.healthy, healthStates.degraded],
     initial: healthStates.unknown,
     context: {} as {},
-    transitions: {
-      unknown: {
-        HEALTH_CHECK_RESULT: (event) => ({
-          state: event.healthy ? healthStates.healthy : healthStates.degraded,
-        }),
-      },
-      healthy: {
-        HEALTH_CHECK_RESULT: (event) => ({
-          state: event.healthy ? healthStates.healthy : healthStates.degraded,
-        }),
-      },
-      degraded: {
-        HEALTH_CHECK_RESULT: (event) => ({
-          state: event.healthy ? healthStates.healthy : healthStates.degraded,
-        }),
-      },
+    setup: (m) => {
+      m.on(healthStates.unknown, healthCheckResult, (event) => ({
+        state: event.healthy ? healthStates.healthy : healthStates.degraded,
+      }));
+      m.on(healthStates.healthy, healthCheckResult, (event) => ({
+        state: event.healthy ? healthStates.healthy : healthStates.degraded,
+      }));
+      m.on(healthStates.degraded, healthCheckResult, (event) => ({
+        state: event.healthy ? healthStates.healthy : healthStates.degraded,
+      }));
     },
   });
 
@@ -117,86 +111,68 @@ function createConnectionManager(clock?: VirtualClock) {
     regions: {
       health: healthMonitor,
     },
-    effects: {
-      connecting: [
-        ({ signal, clock, emit }) => {
-          const id = clock.setTimeout(2000, () => {
-            emit(e.CONNECTION_ESTABLISHED.create());
-          });
-          signal.addEventListener("abort", () => clock.clearTimeout(id));
-        },
-      ],
-      reconnecting: [
-        ({ signal, clock, emit, context }) => {
-          const ctx = context as ConnectionContext;
-          const delay = ctx.backoffMs * Math.pow(2, ctx.retryCount);
-          const id = clock.setTimeout(delay, () => {
-            emit(e.CONNECTION_ESTABLISHED.create());
-          });
-          signal.addEventListener("abort", () => clock.clearTimeout(id));
-        },
-      ],
-    },
-    transitions: {
-      disconnected: {
-        CONNECT: (event, { context }) => {
-          const ctx = context as ConnectionContext;
-          ctx.url = event.url;
+    setup: (m) => {
+      m.effect(connectionStates.connecting, ({ signal, clock, emit }) => {
+        const id = clock.setTimeout(2000, () => {
+          emit(e.CONNECTION_ESTABLISHED.create());
+        });
+        signal.addEventListener("abort", () => clock.clearTimeout(id));
+      });
+      m.effect(connectionStates.reconnecting, ({ signal, clock, emit, context }) => {
+        const ctx = context as ConnectionContext;
+        const delay = ctx.backoffMs * Math.pow(2, ctx.retryCount);
+        const id = clock.setTimeout(delay, () => {
+          emit(e.CONNECTION_ESTABLISHED.create());
+        });
+        signal.addEventListener("abort", () => clock.clearTimeout(id));
+      });
+      m.on(connectionStates.disconnected, connectEvent, (event, opts) => {
+        const ctx = opts!.context;
+        ctx.url = event.url;
+        ctx.retryCount = 0;
+        ctx.lastError = undefined;
+        return { state: connectionStates.connecting };
+      });
+      m.on(connectionStates.connecting, e.CONNECTION_ESTABLISHED, (_event, opts) => {
+        opts!.context.retryCount = 0;
+        return { state: connectionStates.connected };
+      });
+      m.on(connectionStates.connecting, connectionFailed, (event, opts) => {
+        const ctx = opts!.context;
+        ctx.lastError = event.error;
+        ctx.retryCount++;
+        if (ctx.retryCount >= ctx.maxRetries) {
+          return { state: connectionStates.failed };
+        }
+        return { state: connectionStates.reconnecting };
+      });
+      m.on(connectionStates.connected, e.DISCONNECT, () => ({
+        state: connectionStates.disconnected,
+      }));
+      m.on(connectionStates.connected, healthCheckResult, (event, opts) => {
+        actor.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
+        const ctx = opts!.context;
+        if (!event.healthy) {
+          ctx.lastError = "Health check failed";
           ctx.retryCount = 0;
-          ctx.lastError = undefined;
-          return { state: connectionStates.connecting };
-        },
-      },
-      connecting: {
-        CONNECTION_ESTABLISHED: (_event, { context }) => {
-          const ctx = context as ConnectionContext;
-          ctx.retryCount = 0;
-          return { state: connectionStates.connected };
-        },
-        CONNECTION_FAILED: (event, { context }) => {
-          const ctx = context as ConnectionContext;
-          ctx.lastError = event.error;
-          ctx.retryCount++;
-          if (ctx.retryCount >= ctx.maxRetries) {
-            return { state: connectionStates.failed };
-          }
           return { state: connectionStates.reconnecting };
-        },
-      },
-      connected: {
-        DISCONNECT: () => ({
-          state: connectionStates.disconnected,
-        }),
-        HEALTH_CHECK_RESULT: (event, { context, actor }) => {
-          // Forward to health region
-          actor.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
-          // Guard: if unhealthy, trigger reconnect
-          const ctx = context as ConnectionContext;
-          if (!event.healthy) {
-            ctx.lastError = "Health check failed";
-            ctx.retryCount = 0;
-            return { state: connectionStates.reconnecting };
-          }
-          return {};
-        },
-      },
-      reconnecting: {
-        CONNECTION_ESTABLISHED: (_event, { context }) => {
-          const ctx = context as ConnectionContext;
-          ctx.retryCount = 0;
-          return { state: connectionStates.connected };
-        },
-        CONNECTION_FAILED: (event, { context }) => {
-          const ctx = context as ConnectionContext;
-          ctx.lastError = event.error;
-          ctx.retryCount++;
-          if (ctx.retryCount >= ctx.maxRetries) {
-            return { state: connectionStates.failed };
-          }
-          return {};
-        },
-        RETRY: () => ({}), // trigger re-entry to restart effect
-      },
+        }
+        return {};
+      });
+      m.on(connectionStates.reconnecting, e.CONNECTION_ESTABLISHED, (_event, opts) => {
+        opts!.context.retryCount = 0;
+        return { state: connectionStates.connected };
+      });
+      m.on(connectionStates.reconnecting, connectionFailed, (event, opts) => {
+        const ctx = opts!.context;
+        ctx.lastError = event.error;
+        ctx.retryCount++;
+        if (ctx.retryCount >= ctx.maxRetries) {
+          return { state: connectionStates.failed };
+        }
+        return {};
+      });
+      m.on(connectionStates.reconnecting, e.RETRY, () => ({}));
     },
   });
 
@@ -231,7 +207,8 @@ describe("connection manager actor", () => {
     actor.send(connectEvent.create({ url: "ws://example.com" }));
     expect(matches(actor, "connecting")).toBe(true);
 
-    actor.send(connectionFailed.create({ error: "ECONNREFUSED" }));
+    actor.__pushInternal(connectionFailed.create({ error: "ECONNREFUSED" }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.lastError).toBe("ECONNREFUSED");
     expect(actor.context.retryCount).toBe(1);
@@ -243,15 +220,18 @@ describe("connection manager actor", () => {
     actor.send(connectEvent.create({ url: "ws://example.com" }));
 
     // 3 failures
-    actor.send(connectionFailed.create({ error: "Error 1" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Error 1" }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
 
-    actor.send(connectionFailed.create({ error: "Error 2" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Error 2" }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(2);
 
-    actor.send(connectionFailed.create({ error: "Error 3" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Error 3" }));
+    actor.__drainInternal();
     expect(matches(actor, "failed")).toBe(true);
     expect(actor.context.retryCount).toBe(3);
   });
@@ -260,11 +240,14 @@ describe("connection manager actor", () => {
     const { actor } = createConnectionManager();
 
     actor.send(connectEvent.create({ url: "ws://example.com" }));
-    actor.send(connectionFailed.create({ error: "Error 1" }));
-    actor.send(connectionFailed.create({ error: "Error 2" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Error 1" }));
+    actor.__drainInternal();
+    actor.__pushInternal(connectionFailed.create({ error: "Error 2" }));
+    actor.__drainInternal();
     expect(actor.context.retryCount).toBe(2);
 
-    actor.send(e.CONNECTION_ESTABLISHED.create());
+    actor.__pushInternal(e.CONNECTION_ESTABLISHED.create());
+    actor.__drainInternal();
     expect(matches(actor, "connected")).toBe(true);
     expect(actor.context.retryCount).toBe(0);
   });
@@ -287,7 +270,8 @@ describe("connection manager actor", () => {
     clock.advance(2000);
     expect(matches(actor, "connected")).toBe(true);
 
-    actor.send(healthCheckResult.create({ healthy: false }));
+    actor.__pushInternal(healthCheckResult.create({ healthy: false }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.lastError).toBe("Health check failed");
   });
@@ -298,7 +282,8 @@ describe("connection manager actor", () => {
     actor.send(connectEvent.create({ url: "ws://example.com" }));
     clock.advance(2000);
 
-    actor.send(healthCheckResult.create({ healthy: true }));
+    actor.__pushInternal(healthCheckResult.create({ healthy: true }));
+    actor.__drainInternal();
     expect(matches(actor, "connected")).toBe(true);
     expect(matches(actor, "connected.health.healthy")).toBe(true);
   });
@@ -311,10 +296,12 @@ describe("connection manager actor", () => {
     actor.send(connectEvent.create({ url: "ws://example.com" }));
     clock.advance(2000);
 
-    actor.send(healthCheckResult.create({ healthy: true }));
+    actor.__pushInternal(healthCheckResult.create({ healthy: true }));
+    actor.__drainInternal();
     expect(matches(actor, "connected.health.healthy")).toBe(true);
 
-    actor.send(healthCheckResult.create({ healthy: false }));
+    actor.__pushInternal(healthCheckResult.create({ healthy: false }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting.health.degraded")).toBe(true);
   });
 
@@ -341,7 +328,8 @@ describe("connection manager actor", () => {
 
     // Guard: only reconnect if unhealthy
     // Must manually check state in transition handler
-    actor.send(healthCheckResult.create({ healthy: true }));
+    actor.__pushInternal(healthCheckResult.create({ healthy: true }));
+    actor.__drainInternal();
     expect(matches(actor, "connected")).toBe(true);
 
     // Without manual check, would need:

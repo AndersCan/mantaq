@@ -27,30 +27,23 @@ function createWorkflowActor() {
     initial: idling,
     context: { attempts: 0, reviewer: "alice" },
     clock,
-    effects: {
-      working: [
-        ({ clock, signal, emit }) => {
-          clock.setTimeout(
-            4000,
-            () => {
-              emit(WORK_TIMEOUT.create(undefined));
-            },
-            { signal, eventName: "WORK_TIMEOUT" },
-          );
-        },
-      ],
-    },
-    transitions: {
-      idling: { START: () => ({ state: working }) },
-      working: {
-        FINISH: () => ({ state: reviewing }),
-        WORK_TIMEOUT: () => ({ state: failed }),
-      },
-      reviewing: {
-        APPROVE: () => ({ state: completed }),
-        REJECT: () => ({ state: failed }),
-      },
-      failed: { RETRY: () => ({ state: working }), RESET: () => ({ state: idling }) },
+    setup: (m) => {
+      m.on(idling, START, () => ({ state: working }));
+      m.on(working, FINISH, () => ({ state: reviewing }));
+      m.on(working, WORK_TIMEOUT, () => ({ state: failed }));
+      m.on(reviewing, APPROVE, () => ({ state: completed }));
+      m.on(reviewing, REJECT, () => ({ state: failed }));
+      m.on(failed, RETRY, () => ({ state: working }));
+      m.on(failed, RESET, () => ({ state: idling }));
+      m.effect(working, ({ clock, signal, emit }) => {
+        clock.setTimeout(
+          4000,
+          () => {
+            emit(WORK_TIMEOUT.create(undefined));
+          },
+          { signal, eventName: "WORK_TIMEOUT" },
+        );
+      });
     },
   });
 }
@@ -88,25 +81,19 @@ const paymentRegion = new Actor({
   initial: payIdle,
   context: {} as {},
   clock: orderClock,
-  effects: {
-    pending: [
-      ({ clock, signal, emit }) => {
-        clock.setTimeout(
-          3000,
-          () => {
-            emit(PAY.create(undefined));
-          },
-          { signal, eventName: "PAY" },
-        );
-      },
-    ],
-  },
-  transitions: {
-    idle: { SUBMIT_ORDER: () => ({ state: payPending }) },
-    pending: {
-      PAY: () => ({ state: payPaid, emit: [PAYMENT_DONE.create(undefined)] }),
-      REFUND: () => ({ state: payRefunded }),
-    },
+  setup: (m) => {
+    m.on(payIdle, SUBMIT_ORDER, () => ({ state: payPending }));
+    m.on(payPending, PAY, () => ({ state: payPaid, emit: [PAYMENT_DONE.create(undefined)] }));
+    m.on(payPending, REFUND, () => ({ state: payRefunded }));
+    m.effect(payPending, ({ clock, signal, emit }) => {
+      clock.setTimeout(
+        3000,
+        () => {
+          emit(PAY.create(undefined));
+        },
+        { signal, eventName: "PAY" },
+      );
+    });
   },
 });
 
@@ -118,34 +105,31 @@ const shippingRegion = new Actor({
   initial: shipIdle,
   context: {} as {},
   clock: orderClock,
-  effects: {
-    packing: [
-      ({ clock, signal, emit }) => {
-        clock.setTimeout(
-          2000,
-          () => {
-            emit(SHIP.create(undefined));
-          },
-          { signal, eventName: "SHIP" },
-        );
-      },
-    ],
-    shipped: [
-      ({ clock, signal, emit }) => {
-        clock.setTimeout(
-          2000,
-          () => {
-            emit(DELIVER.create(undefined));
-          },
-          { signal, eventName: "DELIVER" },
-        );
-      },
-    ],
-  },
-  transitions: {
-    idle: { SUBMIT_ORDER: () => ({ state: shipPacking }) },
-    packing: { SHIP: () => ({ state: shipShipped }) },
-    shipped: { DELIVER: () => ({ state: shipDelivered, emit: [SHIPPING_DONE.create(undefined)] }) },
+  setup: (m) => {
+    m.on(shipIdle, SUBMIT_ORDER, () => ({ state: shipPacking }));
+    m.on(shipPacking, SHIP, () => ({ state: shipShipped }));
+    m.on(shipShipped, DELIVER, () => ({
+      state: shipDelivered,
+      emit: [SHIPPING_DONE.create(undefined)],
+    }));
+    m.effect(shipPacking, ({ clock, signal, emit }) => {
+      clock.setTimeout(
+        2000,
+        () => {
+          emit(SHIP.create(undefined));
+        },
+        { signal, eventName: "SHIP" },
+      );
+    });
+    m.effect(shipShipped, ({ clock, signal, emit }) => {
+      clock.setTimeout(
+        2000,
+        () => {
+          emit(DELIVER.create(undefined));
+        },
+        { signal, eventName: "DELIVER" },
+      );
+    });
   },
 });
 
@@ -157,37 +141,29 @@ const orderActor = new Actor({
   initial: orderIdle,
   context: { orderId: "" },
   clock: orderClock,
-  effects: {
-    placed: [
-      () => {
-        paymentRegion.send(SUBMIT_ORDER);
-        shippingRegion.send(SUBMIT_ORDER);
-      },
-    ],
-  },
   regions: {
     payment: paymentRegion,
     shipping: shippingRegion,
   },
-  transitions: {
-    idle: {
-      SUBMIT_ORDER: () => ({ state: orderPlaced }),
-    },
-    placed: {
-      REFUND: () => ({ state: orderFulfilled }),
-      PAYMENT_DONE: (_event, { actor }) => {
-        if (actor.regions.payment.state.isFinal && actor.regions.shipping.state.isFinal) {
-          return { state: orderFulfilled };
-        }
-        return {};
-      },
-      SHIPPING_DONE: (_event, { actor }) => {
-        if (actor.regions.payment.state.isFinal && actor.regions.shipping.state.isFinal) {
-          return { state: orderFulfilled };
-        }
-        return {};
-      },
-    },
+  setup: (m) => {
+    m.on(orderIdle, SUBMIT_ORDER, () => ({ state: orderPlaced }));
+    m.on(orderPlaced, REFUND, () => ({ state: orderFulfilled }));
+    m.on(orderPlaced, PAYMENT_DONE, (_event, { actor }) => {
+      if (actor.regions.payment.state.isFinal && actor.regions.shipping.state.isFinal) {
+        return { state: orderFulfilled };
+      }
+      return {};
+    });
+    m.on(orderPlaced, SHIPPING_DONE, (_event, { actor }) => {
+      if (actor.regions.payment.state.isFinal && actor.regions.shipping.state.isFinal) {
+        return { state: orderFulfilled };
+      }
+      return {};
+    });
+    m.effect(orderPlaced, () => {
+      paymentRegion.send(SUBMIT_ORDER);
+      shippingRegion.send(SUBMIT_ORDER);
+    });
   },
 });
 

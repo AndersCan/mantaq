@@ -1,5 +1,5 @@
 import { expect, test, describe, vi, afterEach, beforeEach } from "vite-plus/test";
-import { VirtualClock, EventRef } from "@mantaq/core";
+import { VirtualClock } from "@mantaq/core";
 import type { withTimeout as WithTimeoutFn } from "../src/effects/timeout.ts";
 
 function makeInput(clock: VirtualClock) {
@@ -7,7 +7,7 @@ function makeInput(clock: VirtualClock) {
   return {
     signal: abort.signal,
     state: { name: "", payload: undefined },
-    event: new EventRef(""),
+    event: { id: "" },
     context: undefined,
     emit: (_e: { id: string; [key: string]: unknown }) => {},
     clock,

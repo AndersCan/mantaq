@@ -21,7 +21,8 @@
  */
 
 import { describe, it, expect } from "vite-plus/test";
-import { Actor, VirtualClock, EffectInput } from "@mantaq/core";
+import { Actor, VirtualClock } from "@mantaq/core";
+import type { EffectInput } from "@mantaq/core";
 import { event } from "@mantaq/core";
 import { matches, states, events } from "@mantaq/sugar";
 
@@ -68,16 +69,10 @@ function createCharacter(clock?: VirtualClock) {
     states: [movementStates.idle, movementStates.running, movementStates.sprinting],
     initial: movementStates.idle,
     context: {} as {},
-    transitions: {
-      idle: {
-        START_SPRINT: () => ({ state: movementStates.sprinting }),
-      },
-      running: {
-        START_SPRINT: () => ({ state: movementStates.sprinting }),
-      },
-      sprinting: {
-        STOP_SPRINT: () => ({ state: movementStates.running }),
-      },
+    setup: (m) => {
+      m.on(movementStates.idle, e.START_SPRINT, () => ({ state: movementStates.sprinting }));
+      m.on(movementStates.running, e.START_SPRINT, () => ({ state: movementStates.sprinting }));
+      m.on(movementStates.sprinting, e.STOP_SPRINT, () => ({ state: movementStates.running }));
     },
   });
 
@@ -103,61 +98,52 @@ function createCharacter(clock?: VirtualClock) {
     regions: {
       movement: movementRegion,
     },
-    effects: {
-      alive: [
-        ({ signal, clock, emit }: EffectInput<CharacterContext>) => {
-          const id = clock.setInterval(500, () => {
-            emit(e.REGEN.create(undefined));
+    setup: (m) => {
+      m.effect(lifeStates.alive, ({ signal, clock, emit }: EffectInput<CharacterContext>) => {
+        const id = clock.setInterval(500, () => {
+          emit(e.REGEN.create(undefined));
+        });
+        signal.addEventListener("abort", () => clock.clearInterval(id));
+      });
+      m.on(lifeStates.alive, e.START_SPRINT, (_event, opts) => {
+        const context = opts!.context;
+        if (context.stamina <= 0) return {};
+        context.stamina = Math.max(0, context.stamina - 20);
+        actor.regions.movement.send(e.START_SPRINT.create());
+        return {};
+      });
+      m.on(lifeStates.alive, e.STOP_SPRINT, () => {
+        actor.regions.movement.send(e.STOP_SPRINT.create());
+        return {};
+      });
+      m.on(lifeStates.alive, e.ATTACK, (_event, opts) => {
+        const context = opts!.context;
+        if (context.health <= 0) return {};
+        if (context.combatState !== "idle") return {};
+        context.combatState = "attacking";
+        c.setTimeout(500, () => {
+          context.combatState = "cooldown";
+          c.setTimeout(context.attackCooldownMs, () => {
+            context.combatState = "idle";
           });
-          signal.addEventListener("abort", () => clock.clearInterval(id));
-        },
-      ],
-    },
-    transitions: {
-      alive: {
-        START_SPRINT: (_event: any, { context }: any) => {
-          const ctx = context as CharacterContext;
-          if (ctx.stamina <= 0) return {};
-          ctx.stamina = Math.max(0, ctx.stamina - 20);
-          actor.regions.movement.send(e.START_SPRINT.create());
-          return {};
-        },
-        STOP_SPRINT: (_event: any, { actor: a }: any) => {
-          a.regions.movement.send(e.STOP_SPRINT.create());
-          return {};
-        },
-        ATTACK: (_event: any, { context }: any) => {
-          const ctx = context as CharacterContext;
-          if (ctx.health <= 0) return {};
-          if (ctx.combatState !== "idle") return {};
-          ctx.combatState = "attacking";
-          // Set up attack timer → ATTACK_DONE → cooldown timer → COOLDOWN_DONE
-          c.setTimeout(500, () => {
-            ctx.combatState = "cooldown";
-            c.setTimeout(ctx.attackCooldownMs, () => {
-              ctx.combatState = "idle";
-            });
-          });
-          return {};
-        },
-      },
-      Any: {
-        TAKE_DAMAGE: (event: any, { context }: any) => {
-          const ctx = context as CharacterContext;
-          ctx.health = Math.max(0, ctx.health - (event as any).amount);
-          if (ctx.health <= 0) {
-            ctx.combatState = "idle";
-            return { state: lifeStates.dead };
-          }
-          return {};
-        },
-        REGEN: (_event: any, { context }: any) => {
-          const ctx = context as CharacterContext;
-          ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + ctx.staminaRegenRate);
-          ctx.health = Math.min(ctx.maxHealth, ctx.health + ctx.healthRegenRate);
-          return {};
-        },
-      },
+        });
+        return {};
+      });
+      m.onAny(takeDamageEvent, (event, opts) => {
+        const context = opts!.context;
+        context.health = Math.max(0, context.health - event.amount);
+        if (context.health <= 0) {
+          context.combatState = "idle";
+          return { state: lifeStates.dead };
+        }
+        return {};
+      });
+      m.onAny(e.REGEN, (_event, opts) => {
+        const context = opts!.context;
+        context.stamina = Math.min(context.maxStamina, context.stamina + context.staminaRegenRate);
+        context.health = Math.min(context.maxHealth, context.health + context.healthRegenRate);
+        return {};
+      });
     },
   });
 

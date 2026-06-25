@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { VirtualClock, EventRef } from "@mantaq/core";
+import { VirtualClock } from "@mantaq/core";
 import { withTimeout } from "../src/effects/timeout.ts";
 
 describe("withTimeout", () => {
@@ -13,7 +13,7 @@ describe("withTimeout", () => {
       {
         signal: abort.signal,
         state: { name: "", payload: undefined },
-        event: new EventRef(""),
+        event: { id: "" },
         context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
@@ -38,7 +38,7 @@ describe("withTimeout", () => {
       {
         signal: abort.signal,
         state: { name: "", payload: undefined },
-        event: new EventRef(""),
+        event: { id: "" },
         context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
@@ -62,7 +62,7 @@ describe("withTimeout", () => {
       {
         signal: abort.signal,
         state: { name: "", payload: undefined },
-        event: new EventRef(""),
+        event: { id: "" },
         context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
@@ -84,7 +84,7 @@ describe("withTimeout", () => {
       {
         signal: abort.signal,
         state: { name: "", payload: undefined },
-        event: new EventRef(""),
+        event: { id: "" },
         context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
@@ -106,7 +106,7 @@ describe("withTimeout", () => {
       {
         signal: abort.signal,
         state: { name: "", payload: undefined },
-        event: new EventRef(""),
+        event: { id: "" },
         context: undefined,
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
