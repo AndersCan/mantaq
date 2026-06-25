@@ -173,6 +173,50 @@ function mergeAnyTransitions(
   }
 }
 
+function collectTransitionsForState(
+  stateTransitions: Record<string, TransitionHandler | undefined> | undefined,
+  anyTransitions: Record<string, TransitionHandler | undefined> | undefined,
+  sourceId: string,
+  contextNames: string[],
+  contexts: Record<string, Record<string, unknown>>,
+  actor: AnyActor,
+  pathPrefix: string,
+  activeSet: Set<string>,
+  internalIds?: Set<string>,
+): Map<string, GraphEdge> {
+  const edgeMap = new Map<string, GraphEdge>();
+  const stateTransitionedEvents = stateTransitions
+    ? processStateTransitions(
+        stateTransitions,
+        edgeMap,
+        sourceId,
+        contextNames,
+        contexts,
+        actor,
+        pathPrefix,
+        activeSet,
+        internalIds,
+      )
+    : new Set<string>();
+
+  if (anyTransitions) {
+    mergeAnyTransitions(
+      anyTransitions,
+      stateTransitionedEvents,
+      edgeMap,
+      sourceId,
+      contextNames,
+      contexts,
+      actor,
+      pathPrefix,
+      activeSet,
+      internalIds,
+    );
+  }
+
+  return edgeMap;
+}
+
 function buildEdgesFromTransitions(
   states: ReadonlyArray<{ name: string }>,
   transitions: TransitionDispatchMap | undefined,
@@ -182,49 +226,26 @@ function buildEdgesFromTransitions(
   internalIds?: Set<string>,
   namedContexts?: Record<string, Record<string, unknown>>,
 ): GraphEdge[] {
-  const edges: GraphEdge[] = [];
-  if (!transitions) return edges;
+  if (!transitions) return [];
 
   const contexts = namedContexts ?? { default: { ...actor.context } };
   const contextNames = Object.keys(contexts);
-
   const anyTransitions = transitions["Any"];
+  const edges: GraphEdge[] = [];
 
   for (const stateRef of states) {
     const sourceId = nodeId(pathPrefix, stateRef.name);
-    const stateTransitions = transitions[stateRef.name];
-
-    const edgeMap = new Map<string, GraphEdge>();
-
-    const stateTransitionedEvents = stateTransitions
-      ? processStateTransitions(
-          stateTransitions,
-          edgeMap,
-          sourceId,
-          contextNames,
-          contexts,
-          actor,
-          pathPrefix,
-          activeSet,
-          internalIds,
-        )
-      : new Set<string>();
-
-    if (anyTransitions) {
-      mergeAnyTransitions(
-        anyTransitions,
-        stateTransitionedEvents,
-        edgeMap,
-        sourceId,
-        contextNames,
-        contexts,
-        actor,
-        pathPrefix,
-        activeSet,
-        internalIds,
-      );
-    }
-
+    const edgeMap = collectTransitionsForState(
+      transitions[stateRef.name],
+      anyTransitions,
+      sourceId,
+      contextNames,
+      contexts,
+      actor,
+      pathPrefix,
+      activeSet,
+      internalIds,
+    );
     edges.push(...edgeMap.values());
   }
 
@@ -349,6 +370,22 @@ function addInitialNode(actor: AnyActor, nodes: GraphNode[], edges: GraphEdge[])
   });
 }
 
+function collectActorsFromSnapshot(snapshot: Snapshot): Set<string> {
+  const activeSet = new Set<string>();
+  collectActiveStates(snapshot, "", activeSet);
+  return activeSet;
+}
+
+function collectNamedContexts(options?: {
+  sampleContext?: Record<string, unknown>;
+  sampleContexts?: Record<string, Record<string, unknown>>;
+}): Record<string, Record<string, unknown>> | undefined {
+  return (
+    options?.sampleContexts ??
+    (options?.sampleContext ? { default: options.sampleContext } : undefined)
+  );
+}
+
 export function buildGraph(
   actor: AnyActor,
   options?: {
@@ -359,13 +396,8 @@ export function buildGraph(
 ): ActorGraph {
   if (!actor) return { nodes: [], edges: [] };
   try {
-    const snapshot = actor.snapshot();
-    const activeSet = new Set<string>();
-    collectActiveStates(snapshot, "", activeSet);
-
-    const namedContexts =
-      options?.sampleContexts ??
-      (options?.sampleContext ? { default: options.sampleContext } : undefined);
+    const activeSet = collectActorsFromSnapshot(actor.snapshot());
+    const namedContexts = collectNamedContexts(options);
 
     const { nodes, edges } = buildForActor(
       actor,
