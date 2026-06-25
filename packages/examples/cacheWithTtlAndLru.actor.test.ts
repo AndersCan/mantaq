@@ -17,7 +17,7 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock, event } from "@mantaq/core";
-import { matches, states } from "@mantaq/sugar";
+import { matches, states, events } from "@mantaq/sugar";
 
 // ── Types ────────────────────────────────────────────────────────────
 interface CacheEntry {
@@ -45,13 +45,11 @@ const tierStates = states("l1", "l2");
 const putEvent = event("PUT")<{ key: string; value: unknown; ttlMs?: number }>();
 const getEvent = event("GET")<{ key: string }>();
 const deleteEvent = event("DELETE")<{ key: string }>();
-const purgeEvent = event("PURGE")();
 const setCapacityEvent = event("SET_CAPACITY")<{ capacity: number }>();
 
 // ── Internal events ──────────────────────────────────────────────────
-const purgeDoneEvent = event("PURGE_DONE")();
-const evictionDoneEvent = event("EVICTION_DONE")();
 const ttlExpiredEvent = event("TTL_EXPIRED")<{ key: string }>();
+const e = events("PURGE", "PURGE_DONE", "EVICTION_DONE");
 
 // ── Actor factory ────────────────────────────────────────────────────
 function createCacheActor(capacity = 3, clock?: VirtualClock) {
@@ -64,11 +62,7 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     states: [tierStates.l1, tierStates.l2],
     initial: tierStates.l1,
     context: {} as {},
-    effects: {},
-    transitions: {
-      l1: {},
-      l2: {},
-    },
+    transitions: {},
   });
 
   const ctx: CacheContext = {
@@ -82,9 +76,9 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
   };
 
   const actor = new Actor({
-    inputs: [putEvent, getEvent, deleteEvent, purgeEvent, setCapacityEvent],
+    inputs: [putEvent, getEvent, deleteEvent, e.PURGE, setCapacityEvent],
     outputs: [],
-    internal: [purgeDoneEvent, evictionDoneEvent, ttlExpiredEvent],
+    internal: [e.PURGE_DONE, e.EVICTION_DONE, ttlExpiredEvent],
     states: [cacheStates.ready, cacheStates.purging, cacheStates.full],
     initial: cacheStates.ready,
     clock: c,
@@ -105,7 +99,7 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
             input.context.accessOrder = input.context.accessOrder.filter((k) => k !== key);
             input.context.expires++;
           }
-          input.emit(purgeDoneEvent.create(undefined));
+          input.emit(e.PURGE_DONE.create(undefined));
         },
       ],
       full: [
@@ -117,7 +111,7 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
               input.context.evictions++;
             }
           }
-          input.emit(evictionDoneEvent.create(undefined));
+          input.emit(e.EVICTION_DONE.create(undefined));
         },
       ],
     },
@@ -296,7 +290,7 @@ describe("cache with TTL and LRU eviction", () => {
     actor.send(putEvent.create({ key: "b", value: 2 }));
     clock.advance(600);
 
-    actor.send(purgeEvent);
+    actor.send(e.PURGE.create());
     expect(matches(actor, "ready")).toBe(true);
     expect(ctx.expires).toBe(1);
     expect(ctx.entries.size).toBe(1);

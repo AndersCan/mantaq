@@ -115,10 +115,9 @@ describe("sugar re-exports", () => {
         context: {},
         states: [off, on],
         initial: off,
-        effects: {},
-        transitions: {
-          off: { toggle: () => ({ state: on }) },
-          on: { toggle: () => ({ state: off }) },
+        setup: (m) => {
+          m.on(off, toggle, () => ({ state: on }));
+          m.on(on, toggle, () => ({ state: off }));
         },
       });
       map.spawn("a", () => actor);

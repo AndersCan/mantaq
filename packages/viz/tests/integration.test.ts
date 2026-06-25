@@ -16,7 +16,6 @@ function createTrafficLight() {
     states: [green, yellow, red],
     initial: green,
     context: {} as {},
-    effects: {},
     transitions: {
       green: { NEXT: () => ({ state: yellow }) },
       yellow: { NEXT: () => ({ state: red }) },
@@ -37,7 +36,6 @@ function createWithRegions() {
     states: [subA, subB],
     initial: subA,
     context: {} as {},
-    effects: {},
     transitions: {
       subA: { TOGGLE: () => ({ state: subB }) },
       subB: { TOGGLE: () => ({ state: subA }) },
@@ -54,7 +52,6 @@ function createWithRegions() {
     states: [parent],
     initial: parent,
     context: {} as {},
-    effects: {},
     regions: { child },
     transitions: {
       parent: { START: () => ({ state: parent }) },
@@ -95,7 +92,7 @@ describe("integration: actor -> graph", () => {
     expect(active!.label).toBe("green");
 
     const next = event("NEXT")();
-    actor.send(next);
+    actor.send(next.create());
 
     graph = buildGraph(actor);
     active = graph.nodes.find((n) => n.isActive);
@@ -109,15 +106,15 @@ describe("integration: actor -> graph", () => {
     let graph = buildGraph(actor);
     expect(graph.nodes.find((n) => n.isActive)!.label).toBe("green");
 
-    actor.send(next);
+    actor.send(next.create());
     graph = buildGraph(actor);
     expect(graph.nodes.find((n) => n.isActive)!.label).toBe("yellow");
 
-    actor.send(next);
+    actor.send(next.create());
     graph = buildGraph(actor);
     expect(graph.nodes.find((n) => n.isActive)!.label).toBe("red");
 
-    actor.send(next);
+    actor.send(next.create());
     graph = buildGraph(actor);
     expect(graph.nodes.find((n) => n.isActive)!.label).toBe("green");
   });

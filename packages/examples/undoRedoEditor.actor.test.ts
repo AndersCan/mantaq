@@ -32,9 +32,8 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock } from "@mantaq/core";
-import { state } from "@mantaq/core";
 import { event } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
+import { matches, states, events } from "@mantaq/sugar";
 
 // ── Types ────────────────────────────────────────────────────────────
 interface TextBuffer {
@@ -55,18 +54,15 @@ interface EditorContext {
 }
 
 // ── States ───────────────────────────────────────────────────────────
-const idleState = state("idle")();
-const editingState = state("editing")();
+const s = states("idle", "editing");
 
 // ── Events ───────────────────────────────────────────────────────────
 const insertTextEvent = event("INSERT_TEXT")<{ text: string; at: number }>();
 const deleteTextEvent = event("DELETE_TEXT")<{ from: number; to: number }>();
 const replaceTextEvent = event("REPLACE_TEXT")<{ from: number; to: number; text: string }>();
-const undoEvent = event("UNDO")();
-const redoEvent = event("REDO")();
 const checkpointEvent = event("CHECKPOINT")<{ name: string }>();
 const undoToCheckpointEvent = event("UNDO_TO_CHECKPOINT")<{ name: string }>();
-const clearHistoryEvent = event("CLEAR_HISTORY")();
+const e = events("UNDO", "REDO", "CLEAR_HISTORY");
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function snapshotBuffer(buffer: TextBuffer): TextBuffer {
@@ -97,25 +93,24 @@ function createEditorActor(clock?: VirtualClock) {
       insertTextEvent,
       deleteTextEvent,
       replaceTextEvent,
-      undoEvent,
-      redoEvent,
+      e.UNDO,
+      e.REDO,
       checkpointEvent,
       undoToCheckpointEvent,
-      clearHistoryEvent,
+      e.CLEAR_HISTORY,
     ],
     outputs: [],
     internal: [],
-    states: [idleState, editingState],
-    initial: idleState,
+    states: [s.idle, s.editing],
+    initial: s.idle,
     clock: c,
     context: ctx,
-    effects: {},
     transitions: {
       Any: {
         UNDO: (_event, { context }) => {
           const c = context as EditorContext;
           if (c.undoStack.length === 0) {
-            return { state: idleState };
+            return { state: s.idle };
           }
           const entry = c.undoStack.pop()!;
           c.redoStack.push({
@@ -124,14 +119,14 @@ function createEditorActor(clock?: VirtualClock) {
           });
           c.buffer = snapshotBuffer(entry.buffer);
           if (c.undoStack.length === 0) {
-            return { state: idleState };
+            return { state: s.idle };
           }
-          return { state: editingState };
+          return { state: s.editing };
         },
         REDO: (_event, { context }) => {
           const c = context as EditorContext;
           if (c.redoStack.length === 0) {
-            return { state: idleState };
+            return { state: s.idle };
           }
           const entry = c.redoStack.pop()!;
           c.undoStack.push({
@@ -140,15 +135,15 @@ function createEditorActor(clock?: VirtualClock) {
           });
           c.buffer = snapshotBuffer(entry.buffer);
           if (c.redoStack.length === 0) {
-            return { state: idleState };
+            return { state: s.idle };
           }
-          return { state: editingState };
+          return { state: s.editing };
         },
         UNDO_TO_CHECKPOINT: (event, { context }) => {
           const c = context as EditorContext;
-          const targetIndex = c.checkpoints.get(event.name);
+          const targetIndex = c.checkpoints.get((event as any).name);
           if (targetIndex === undefined) {
-            return { state: idleState };
+            return { state: s.idle };
           }
           while (c.undoStack.length > targetIndex) {
             const entry = c.undoStack.pop()!;
@@ -158,7 +153,7 @@ function createEditorActor(clock?: VirtualClock) {
             });
             c.buffer = snapshotBuffer(entry.buffer);
           }
-          return { state: idleState };
+          return { state: s.idle };
         },
         CLEAR_HISTORY: (_event, { context }) => {
           const c = context as EditorContext;
@@ -171,82 +166,88 @@ function createEditorActor(clock?: VirtualClock) {
       idle: {
         INSERT_TEXT: (event, { context }) => {
           const c = context as EditorContext;
+          const e = event as any;
           c.undoStack.push({
             buffer: snapshotBuffer(c.buffer),
-            label: `insert "${event.text}" at ${event.at}`,
+            label: `insert "${e.text}" at ${e.at}`,
           });
           c.redoStack = [];
-          c.buffer.content = insertAt(c.buffer.content, event.at, event.text);
-          c.buffer.cursor = event.at + event.text.length;
-          return { state: editingState };
+          c.buffer.content = insertAt(c.buffer.content, e.at, e.text);
+          c.buffer.cursor = e.at + e.text.length;
+          return { state: s.editing };
         },
         DELETE_TEXT: (event, { context }) => {
           const c = context as EditorContext;
+          const e = event as any;
           c.undoStack.push({
             buffer: snapshotBuffer(c.buffer),
-            label: `delete [${event.from}..${event.to}]`,
+            label: `delete [${e.from}..${e.to}]`,
           });
           c.redoStack = [];
-          c.buffer.content = deleteRange(c.buffer.content, event.from, event.to);
-          c.buffer.cursor = event.from;
-          return { state: editingState };
+          c.buffer.content = deleteRange(c.buffer.content, e.from, e.to);
+          c.buffer.cursor = e.from;
+          return { state: s.editing };
         },
         REPLACE_TEXT: (event, { context }) => {
           const c = context as EditorContext;
+          const e = event as any;
           c.undoStack.push({
             buffer: snapshotBuffer(c.buffer),
-            label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+            label: `replace [${e.from}..${e.to}] with "${e.text}"`,
           });
           c.redoStack = [];
-          const deleted = deleteRange(c.buffer.content, event.from, event.to);
-          c.buffer.content = insertAt(deleted, event.from, event.text);
-          c.buffer.cursor = event.from + event.text.length;
-          return { state: editingState };
+          const deleted = deleteRange(c.buffer.content, e.from, e.to);
+          c.buffer.content = insertAt(deleted, e.from, e.text);
+          c.buffer.cursor = e.from + e.text.length;
+          return { state: s.editing };
         },
         CHECKPOINT: (event, { context }) => {
           const c = context as EditorContext;
-          c.checkpoints.set(event.name, c.undoStack.length);
+          c.checkpoints.set((event as any).name, c.undoStack.length);
           return {};
         },
       },
       editing: {
         INSERT_TEXT: (event, { context }) => {
           const c = context as EditorContext;
+          const e = event as any;
           c.undoStack.push({
             buffer: snapshotBuffer(c.buffer),
-            label: `insert "${event.text}" at ${event.at}`,
+            label: `insert "${e.text}" at ${e.at}`,
           });
           c.redoStack = [];
-          c.buffer.content = insertAt(c.buffer.content, event.at, event.text);
-          c.buffer.cursor = event.at + event.text.length;
+          c.buffer.content = insertAt(c.buffer.content, e.at, e.text);
+          c.buffer.cursor = e.at + e.text.length;
           return {};
         },
         DELETE_TEXT: (event, { context }) => {
           const c = context as EditorContext;
+          const e = event as any;
           c.undoStack.push({
             buffer: snapshotBuffer(c.buffer),
-            label: `delete [${event.from}..${event.to}]`,
+            label: `delete [${e.from}..${e.to}]`,
           });
           c.redoStack = [];
-          c.buffer.content = deleteRange(c.buffer.content, event.from, event.to);
-          c.buffer.cursor = event.from;
+          c.buffer.content = deleteRange(c.buffer.content, e.from, e.to);
+          c.buffer.cursor = e.from;
           return {};
         },
         REPLACE_TEXT: (event, { context }) => {
           const c = context as EditorContext;
+          const e = event as any;
           c.undoStack.push({
             buffer: snapshotBuffer(c.buffer),
-            label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+            label: `replace [${e.from}..${e.to}] with "${e.text}"`,
           });
           c.redoStack = [];
-          const deleted = deleteRange(c.buffer.content, event.from, event.to);
-          c.buffer.content = insertAt(deleted, event.from, event.text);
-          c.buffer.cursor = event.from + event.text.length;
+          const deleted = deleteRange(c.buffer.content, e.from, e.to);
+          c.buffer.content = insertAt(deleted, e.from, e.text);
+          c.buffer.cursor = e.from + e.text.length;
           return {};
         },
         CHECKPOINT: (event, { context }) => {
           const c = context as EditorContext;
-          c.checkpoints.set(event.name, c.undoStack.length);
+          c.checkpoints.set((event as any).name, c.undoStack.length);
           return {};
         },
       },
@@ -293,7 +294,7 @@ describe("undo/redo editor actor", () => {
     actor.send(insertTextEvent.create({ text: " world", at: 5 }));
     expect(ctx.buffer.content).toBe("hello world");
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(matches(actor, "editing")).toBe(true);
     expect(ctx.buffer.content).toBe("hello");
     expect(ctx.undoStack.length).toBe(1);
@@ -303,7 +304,7 @@ describe("undo/redo editor actor", () => {
   it("UNDO from empty stack goes to idle", () => {
     const { actor, ctx } = createEditorActor();
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(matches(actor, "idle")).toBe(true);
     expect(ctx.undoStack.length).toBe(0);
   });
@@ -314,10 +315,10 @@ describe("undo/redo editor actor", () => {
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     expect(ctx.buffer.content).toBe("hello");
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.content).toBe("");
 
-    actor.send(redoEvent);
+    actor.send(e.REDO.create());
     expect(matches(actor, "idle")).toBe(true);
     expect(ctx.buffer.content).toBe("hello");
     expect(ctx.undoStack.length).toBe(1);
@@ -327,7 +328,7 @@ describe("undo/redo editor actor", () => {
   it("REDO from empty stack goes to idle", () => {
     const { actor, ctx } = createEditorActor();
 
-    actor.send(redoEvent);
+    actor.send(e.REDO.create());
     expect(matches(actor, "idle")).toBe(true);
     expect(ctx.redoStack.length).toBe(0);
   });
@@ -336,7 +337,7 @@ describe("undo/redo editor actor", () => {
     const { actor, ctx } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.redoStack.length).toBe(1);
 
     actor.send(insertTextEvent.create({ text: "world", at: 0 }));
@@ -351,7 +352,7 @@ describe("undo/redo editor actor", () => {
     actor.send(deleteTextEvent.create({ from: 2, to: 4 }));
     expect(ctx.buffer.content).toBe("heo");
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.content).toBe("hello");
   });
 
@@ -362,7 +363,7 @@ describe("undo/redo editor actor", () => {
     actor.send(replaceTextEvent.create({ from: 0, to: 5, text: "world" }));
     expect(ctx.buffer.content).toBe("world");
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.content).toBe("hello");
   });
 
@@ -407,7 +408,7 @@ describe("undo/redo editor actor", () => {
     actor.send(checkpointEvent.create({ name: "save1" }));
     expect(ctx.undoStack.length).toBe(1);
 
-    actor.send(clearHistoryEvent);
+    actor.send(e.CLEAR_HISTORY.create());
     expect(ctx.undoStack.length).toBe(0);
     expect(ctx.redoStack.length).toBe(0);
     expect(ctx.checkpoints.size).toBe(0);
@@ -422,10 +423,10 @@ describe("undo/redo editor actor", () => {
     actor.send(insertTextEvent.create({ text: " world", at: 5 }));
     expect(ctx.buffer.cursor).toBe(11);
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.cursor).toBe(5);
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.cursor).toBe(0);
   });
 
@@ -447,21 +448,21 @@ describe("undo/redo editor actor", () => {
     actor.send(insertTextEvent.create({ text: "c", at: 2 }));
     expect(ctx.buffer.content).toBe("abc");
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.content).toBe("ab");
 
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.content).toBe("a");
 
-    actor.send(redoEvent);
+    actor.send(e.REDO.create());
     expect(ctx.buffer.content).toBe("ab");
 
-    actor.send(redoEvent);
+    actor.send(e.REDO.create());
     expect(ctx.buffer.content).toBe("abc");
 
-    actor.send(undoEvent);
-    actor.send(undoEvent);
-    actor.send(undoEvent);
+    actor.send(e.UNDO.create());
+    actor.send(e.UNDO.create());
+    actor.send(e.UNDO.create());
     expect(ctx.buffer.content).toBe("");
     expect(matches(actor, "idle")).toBe(true);
   });

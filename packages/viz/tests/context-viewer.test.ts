@@ -14,9 +14,8 @@ function createActor(ctx: Record<string, unknown>) {
     states: [idle],
     initial: idle,
     context: ctx,
-    effects: {},
-    transitions: {
-      idle: { GO: () => ({ state: idle }) },
+    setup: (m) => {
+      m.on(idle, go, () => ({ state: idle }));
     },
   });
 }

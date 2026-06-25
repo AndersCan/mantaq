@@ -18,9 +18,9 @@
 
 import { describe, it, expect, vi } from "vite-plus/test";
 import { Actor, VirtualClock } from "@mantaq/core";
-import { state, event } from "@mantaq/core";
-import type { EffectInput, AnyEventRef } from "@mantaq/core";
-import { matches, withTimeout } from "@mantaq/sugar";
+import { event } from "@mantaq/core";
+import type { EffectInput } from "@mantaq/core";
+import { matches, withTimeout, states, events } from "@mantaq/sugar";
 
 interface User {
   uid: string;
@@ -29,23 +29,16 @@ interface User {
 }
 
 // ── States ──────────────────────────────────────────────────────────
-const checkingAuthState = state("checkingAuth")();
-const loggedOutState = state("loggedOut")();
-const signingInState = state("signingIn")();
-const loggedInState = state("loggedIn")();
-const signingOutState = state("signingOut")();
-const signInErrorState = state("signInError")();
+const s = states("checkingAuth", "loggedOut", "signingIn", "loggedIn", "signingOut", "signInError");
 
 // ── Input events (external) ─────────────────────────────────────────
 const signInEvent = event("SIGN_IN")<{ phoneNumber: string }>();
-const signOutEvent = event("SIGN_OUT")();
-const retryEvent = event("RETRY")();
 
 // ── Internal events (from effects) ──────────────────────────────────
 const userSignedInEvent = event("USER_SIGNED_IN")<{ user: User }>();
 const signInDoneEvent = event("SIGN_IN_DONE")<{ user: User }>();
 const signInErrorEvent = event("SIGN_IN_ERROR")<{ error: string }>();
-const monitorTickEvent = event("MONITOR_TICK")();
+const e = events("SIGN_OUT", "RETRY", "MONITOR_TICK", "SIGNING_OUT_DONE");
 
 // ── Context ─────────────────────────────────────────────────────────
 type AuthContext = {
@@ -57,118 +50,102 @@ type AuthContext = {
 // ── Effects ─────────────────────────────────────────────────────────
 // monitorAuthState: fromCallback with setInterval — simulated session check
 // Clock only has setTimeout, so we recurse manually
-const monitorAuthStateEffect = [
-  ({ signal, emit, clock }: EffectInput<AnyEventRef[], AnyEventRef[], AuthContext>) => {
-    let id: number;
-    const tick = () => {
-      if (signal.aborted) return;
-      emit(monitorTickEvent.create(undefined));
-      id = clock.setTimeout(5000, tick);
-    };
-    id = clock.setTimeout(5000, tick);
-    signal.addEventListener("abort", () => clock.clearTimeout(id));
-  },
-];
+const monitorAuthStateEffect = (input: EffectInput<AuthContext>) => {
+  let id: number;
+  const tick = () => {
+    if (signal.aborted) return;
+    input.emit(e.MONITOR_TICK.create(undefined));
+    id = input.clock.setTimeout(5000, tick);
+  };
+  const { signal } = input;
+  id = input.clock.setTimeout(5000, tick);
+  signal.addEventListener("abort", () => input.clock.clearTimeout(id));
+};
 
 // signInWithPhone: fromPromise — simulate Firebase phone auth
-const signInWithPhoneEffect = [
-  ({ signal, context, emit, clock }: EffectInput<AnyEventRef[], AnyEventRef[], AuthContext>) => {
-    clock.setTimeout(2000, () => {
-      if (signal.aborted) return;
-      if (Math.random() > 0.1) {
-        const user: User = {
-          uid: `user-${Date.now()}`,
-          email: `user${Date.now()}@example.com`,
-          phone: context.phoneNumber,
-        };
-        emit(signInDoneEvent.create({ user }));
-      } else {
-        emit(signInErrorEvent.create({ error: "Sign in failed" }));
-      }
-    });
-  },
-];
+const signInWithPhoneEffect = (input: EffectInput<AuthContext>) => {
+  input.clock.setTimeout(2000, () => {
+    if (input.signal.aborted) return;
+    if (Math.random() > 0.1) {
+      const user: User = {
+        uid: `user-${Date.now()}`,
+        email: `user${Date.now()}@example.com`,
+        phone: input.context.phoneNumber,
+      };
+      input.emit(signInDoneEvent.create({ user }));
+    } else {
+      input.emit(signInErrorEvent.create({ error: "Sign in failed" }));
+    }
+  });
+};
 
 // signingOut effect: after 500ms → loggedOut (clearUser happens on entry, not here)
-const signingOutEffect = [
-  (input: EffectInput<AnyEventRef[], AnyEventRef[], AuthContext>) =>
-    withTimeout(500, input, () => signingOutDoneEvent.create(undefined)),
-];
-
-const signingOutDoneEvent = event("SIGNING_OUT_DONE")();
+const signingOutEffect = (input: EffectInput<AuthContext>) =>
+  withTimeout(500, input, () => e.SIGNING_OUT_DONE.create(undefined));
 
 // ── Actor factory ───────────────────────────────────────────────────
 function createAuthActor(clock?: VirtualClock) {
   const c = clock ?? new VirtualClock();
 
   const actor = new Actor({
-    inputs: [signInEvent, signOutEvent, retryEvent],
+    inputs: [signInEvent, e.SIGN_OUT, e.RETRY],
     outputs: [],
     internal: [
       userSignedInEvent,
       signInDoneEvent,
       signInErrorEvent,
-      monitorTickEvent,
-      signingOutDoneEvent,
+      e.MONITOR_TICK,
+      e.SIGNING_OUT_DONE,
     ],
-    states: [
-      checkingAuthState,
-      loggedOutState,
-      signingInState,
-      loggedInState,
-      signingOutState,
-      signInErrorState,
-    ],
-    initial: checkingAuthState,
+    states: [s.checkingAuth, s.loggedOut, s.signingIn, s.loggedIn, s.signingOut, s.signInError],
+    initial: s.checkingAuth,
     clock: c,
     context: {} as AuthContext,
     effects: {
-      checkingAuth: monitorAuthStateEffect,
-      loggedIn: monitorAuthStateEffect,
-      signingIn: signInWithPhoneEffect,
-      signingOut: signingOutEffect,
+      checkingAuth: [monitorAuthStateEffect],
+      loggedIn: [monitorAuthStateEffect],
+      signingIn: [signInWithPhoneEffect],
+      signingOut: [signingOutEffect],
     },
     transitions: {
-      Any: {
-        MONITOR_TICK: () => ({}),
-      },
+      Any: { MONITOR_TICK: () => ({}) },
       checkingAuth: {
         SIGN_IN: (event, { context }) => {
           context.phoneNumber = event.phoneNumber;
-          return { state: signingInState };
+          return { state: s.signingIn };
         },
       },
       loggedOut: {
         SIGN_IN: (event, { context }) => {
           context.phoneNumber = event.phoneNumber;
-          return { state: signingInState };
+          return { state: s.signingIn };
         },
       },
       signingIn: {
         SIGN_IN_DONE: (event, { context }) => {
           context.user = event.user;
-          return { state: loggedInState };
+          return { state: s.loggedIn };
         },
         SIGN_IN_ERROR: (event, { context }) => {
           context.error = event.error;
-          return { state: signInErrorState };
+          return { state: s.signInError };
         },
       },
       loggedIn: {
         SIGN_OUT: (_event, { context }) => {
           context.user = undefined;
           context.phoneNumber = undefined;
-          return { state: signingOutState };
+          return { state: s.signingOut };
         },
       },
       signingOut: {
-        SIGNING_OUT_DONE: () => ({ state: loggedOutState }),
+        SIGNING_OUT_DONE: () => ({ state: s.loggedOut }),
       },
       signInError: {
-        RETRY: () => ({ state: signingInState }),
+        RETRY: () => ({ state: s.signingIn }),
         SIGN_IN: (event, { context }) => {
           context.phoneNumber = event.phoneNumber;
-          return { state: signingInState };
+          return { state: s.signingIn };
         },
       },
     },
@@ -223,7 +200,7 @@ describe("auth actor (reimplementation of xstate machine)", () => {
     clock.advance(2000);
     expect(matches(actor, "loggedIn")).toBe(true);
 
-    actor.send(signOutEvent);
+    actor.send(e.SIGN_OUT);
     clock.advance(500);
     expect(matches(actor, "loggedOut")).toBe(true);
 
@@ -244,7 +221,7 @@ describe("auth actor (reimplementation of xstate machine)", () => {
     clock.advance(2000);
     expect(matches(actor, "loggedIn")).toBe(true);
 
-    actor.send(signOutEvent);
+    actor.send(e.SIGN_OUT);
     expect(matches(actor, "signingOut")).toBe(true);
     expect(actor.context.user).toBeUndefined();
     expect(actor.context.phoneNumber).toBeUndefined();
@@ -264,7 +241,7 @@ describe("auth actor (reimplementation of xstate machine)", () => {
     clock.advance(2000);
     expect(matches(actor, "signInError")).toBe(true);
 
-    actor.send(retryEvent);
+    actor.send(e.RETRY);
     expect(matches(actor, "signingIn")).toBe(true);
 
     clock.advance(2000);
@@ -304,7 +281,7 @@ describe("auth actor (reimplementation of xstate machine)", () => {
     clock.advance(2000);
     expect(actor.context.user).toBeDefined();
 
-    actor.send(signOutEvent);
+    actor.send(e.SIGN_OUT);
     expect(actor.context.user).toBeUndefined();
     expect(actor.context.phoneNumber).toBeUndefined();
 
@@ -320,7 +297,7 @@ describe("auth actor (reimplementation of xstate machine)", () => {
     actor.send(signInEvent.create({ phoneNumber: "+1234567890" }));
     clock.advance(2000);
 
-    actor.send(signOutEvent);
+    actor.send(e.SIGN_OUT);
     expect(matches(actor, "signingOut")).toBe(true);
 
     clock.advance(250);

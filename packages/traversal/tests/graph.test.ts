@@ -14,7 +14,6 @@ function createFlatActor() {
     states: [idle, active],
     initial: idle,
     context: {} as {},
-    effects: {},
     transitions: {
       idle: { GO: () => ({ state: active }) },
     },
@@ -33,7 +32,6 @@ function createAnyWildcardActor() {
     states: [idle, active],
     initial: idle,
     context: {} as {},
-    effects: {},
     transitions: {
       Any: { GO: () => ({ state: active }) },
     },
@@ -53,9 +51,11 @@ function createInternalEventActor() {
     states: [idle, active],
     initial: idle,
     context: {} as {},
-    effects: {},
     transitions: {
-      idle: { GO: () => ({ state: active }), PING: () => ({ state: idle }) },
+      idle: {
+        GO: () => ({ state: active }),
+        PING: () => ({ state: idle }),
+      },
     },
   });
 }
@@ -72,7 +72,6 @@ function createFinalStateActor() {
     states: [idle, done],
     initial: idle,
     context: {} as {},
-    effects: {},
     transitions: {
       idle: { FINISH: () => ({ state: done }) },
     },
@@ -91,7 +90,6 @@ function createRegionActor() {
     states: [childA, childB],
     initial: childA,
     context: {} as {},
-    effects: {},
     transitions: {
       childA: { TOGGLE: () => ({ state: childB }) },
     },
@@ -107,7 +105,6 @@ function createRegionActor() {
     states: [parent],
     initial: parent,
     context: {} as {},
-    effects: {},
     regions: { region1: child },
     transitions: {
       parent: { START: () => ({ state: parent }) },
@@ -193,7 +190,6 @@ describe("buildGraph", () => {
       states: [idle],
       initial: idle,
       context: {} as {},
-      effects: {},
       transitions: {
         idle: {
           GO: () => {
@@ -227,7 +223,7 @@ describe("buildGraph", () => {
     expect(graph.nodes.find((n) => n.isActive)?.label).toBe("idle");
 
     const go = event("GO")();
-    actor.send(go);
+    actor.send(go.create());
 
     graph = buildGraph(actor);
     expect(graph.nodes.find((n) => n.isActive)?.label).toBe("active");
@@ -255,7 +251,6 @@ describe("buildGraph with sampleContexts", () => {
       states: [idle, active, blocked],
       initial: idle,
       context: {} as { ready: boolean },
-      effects: {},
       transitions: {
         idle: {
           GO: (_event, { context }) =>
@@ -309,7 +304,6 @@ describe("buildGraph with sampleContexts", () => {
       states: [idle, active],
       initial: idle,
       context: {} as { unused: string },
-      effects: {},
       transitions: {
         idle: { GO: () => ({ state: active }) },
       },
@@ -339,7 +333,6 @@ describe("buildGraph with sampleContexts", () => {
       states: [idle],
       initial: idle,
       context: {} as { x: number },
-      effects: {},
       transitions: {
         idle: {
           GO: (_event, { context }) => ((context as { x: number }).x > 10 ? {} : {}),

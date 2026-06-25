@@ -140,7 +140,6 @@ describe("matches", () => {
       context: {},
       states: [off, on],
       initial: off,
-      effects: {},
       transitions: {
         off: { toggled: () => ({ state: on }) },
         on: { toggled: () => ({ state: off }) },
@@ -150,7 +149,7 @@ describe("matches", () => {
     expect(matches(light, "off")).toBe(true);
     expect(matches(light, "on")).toBe(false);
 
-    light.send(toggle);
+    light.send(toggle.create());
 
     expect(matches(light, "off")).toBe(false);
     expect(matches(light, "on")).toBe(true);

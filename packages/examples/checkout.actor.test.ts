@@ -167,7 +167,7 @@ describe("checkout actor", () => {
     actor.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
     expect(matches(actor, "shippingAddress")).toBe(true);
 
-    actor.send(backEvent);
+    actor.send(backEvent.create());
     expect(matches(actor, "basicInfo")).toBe(true);
   });
 
@@ -178,7 +178,7 @@ describe("checkout actor", () => {
     actor.send(submitShipping.create({ street: "123", city: "C", zip: "12345" }));
     expect(matches(actor, "payment")).toBe(true);
 
-    actor.send(backEvent);
+    actor.send(backEvent.create());
     expect(matches(actor, "shippingAddress")).toBe(true);
   });
 });

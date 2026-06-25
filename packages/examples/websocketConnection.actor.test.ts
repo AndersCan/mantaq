@@ -210,7 +210,7 @@ describe("WebSocket reconnection manager", () => {
     clock.advance(500);
     expect(matches(actor, "connected")).toBe(true);
 
-    actor.send(disconnect);
+    actor.send(disconnect.create());
     expect(matches(actor, "disconnected")).toBe(true);
   });
 
@@ -231,7 +231,7 @@ describe("WebSocket reconnection manager", () => {
 
     expect(matches(actor, "disconnected")).toBe(true);
 
-    actor.send(forceReconnect);
+    actor.send(forceReconnect.create());
     expect(matches(actor, "reconnecting")).toBe(true);
   });
 
@@ -242,7 +242,7 @@ describe("WebSocket reconnection manager", () => {
     clock.advance(500);
     expect(matches(actor, "connected")).toBe(true);
 
-    actor.send(forceReconnect);
+    actor.send(forceReconnect.create());
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(0);
   });
@@ -255,7 +255,7 @@ describe("WebSocket reconnection manager", () => {
     expect(actor.context.retryCount).toBe(1);
 
     // Force reconnect resets retryCount to 0
-    actor.send(forceReconnect);
+    actor.send(forceReconnect.create());
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(0);
 
@@ -271,7 +271,7 @@ describe("WebSocket reconnection manager", () => {
     clock.advance(500);
     expect(matches(actor, "connected")).toBe(true);
 
-    actor.send(disconnect);
+    actor.send(disconnect.create());
     expect(matches(actor, "disconnected")).toBe(true);
 
     actor.send(connect.create({ url: "ws://example.com" }));

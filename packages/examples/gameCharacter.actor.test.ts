@@ -21,33 +21,23 @@
  */
 
 import { describe, it, expect } from "vite-plus/test";
-import { Actor, VirtualClock } from "@mantaq/core";
-import { state, event } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
+import { Actor, VirtualClock, EffectInput } from "@mantaq/core";
+import { event } from "@mantaq/core";
+import { matches, states, events } from "@mantaq/sugar";
 
 // ── States ───────────────────────────────────────────────────────────
 
-const lifeStates = {
-  alive: state("alive")(),
-  dead: state("dead")().final(),
-};
-
-const movementStates = {
-  idle: state("idle")(),
-  running: state("running")(),
-  sprinting: state("sprinting")(),
-};
+const s = states("alive", "dead", "idle", "running", "sprinting");
+const lifeStates = { alive: s.alive, dead: s.dead.final() };
+const movementStates = { idle: s.idle, running: s.running, sprinting: s.sprinting };
 
 // Combat is tracked in context, not as separate region
 // (because effects are tied to parent states, not region states)
 
 // ── Events ───────────────────────────────────────────────────────────
 
-const startSprintEvent = event("START_SPRINT")();
-const stopSprintEvent = event("STOP_SPRINT")();
-const attackEvent = event("ATTACK")();
 const takeDamageEvent = event("TAKE_DAMAGE")<{ amount: number }>();
-const regenEvent = event("REGEN")();
+const e = events("START_SPRINT", "STOP_SPRINT", "ATTACK", "REGEN");
 
 // ── Context ──────────────────────────────────────────────────────────
 
@@ -72,13 +62,12 @@ function createCharacter(clock?: VirtualClock) {
 
   // Movement region
   const movementRegion = new Actor({
-    inputs: [startSprintEvent, stopSprintEvent],
+    inputs: [e.START_SPRINT, e.STOP_SPRINT],
     outputs: [],
     internal: [],
     states: [movementStates.idle, movementStates.running, movementStates.sprinting],
     initial: movementStates.idle,
     context: {} as {},
-    effects: {},
     transitions: {
       idle: {
         START_SPRINT: () => ({ state: movementStates.sprinting }),
@@ -94,9 +83,9 @@ function createCharacter(clock?: VirtualClock) {
 
   // Main character actor — combat state tracked in context
   const actor = new Actor({
-    inputs: [startSprintEvent, stopSprintEvent, attackEvent, takeDamageEvent, regenEvent],
+    inputs: [e.START_SPRINT, e.STOP_SPRINT, e.ATTACK, takeDamageEvent, e.REGEN],
     outputs: [],
-    internal: [regenEvent],
+    internal: [e.REGEN],
     states: [lifeStates.alive, lifeStates.dead],
     initial: lifeStates.alive,
     clock: c,
@@ -111,54 +100,33 @@ function createCharacter(clock?: VirtualClock) {
       healthRegenRate: 5,
       combatState: "idle",
     } as CharacterContext,
+    regions: {
+      movement: movementRegion,
+    },
     effects: {
       alive: [
-        ({ signal, clock, emit }) => {
-          // Periodic regen — only runs once on entry (DX issue: doesn't re-run)
-          // For continuous effects, must use clock.setInterval manually
+        ({ signal, clock, emit }: EffectInput<CharacterContext>) => {
           const id = clock.setInterval(500, () => {
-            emit(regenEvent.create(undefined));
+            emit(e.REGEN.create(undefined));
           });
           signal.addEventListener("abort", () => clock.clearInterval(id));
         },
       ],
     },
-    regions: {
-      movement: movementRegion,
-    },
     transitions: {
-      Any: {
-        TAKE_DAMAGE: (event, { context }) => {
-          const ctx = context as CharacterContext;
-          ctx.health = Math.max(0, ctx.health - event.amount);
-          if (ctx.health <= 0) {
-            ctx.combatState = "idle";
-            return { state: lifeStates.dead };
-          }
-          return {};
-        },
-        REGEN: (_event, { context }) => {
-          const ctx = context as CharacterContext;
-          ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + ctx.staminaRegenRate);
-          ctx.health = Math.min(ctx.maxHealth, ctx.health + ctx.healthRegenRate);
-          return {};
-        },
-      },
       alive: {
-        // Guard: must have stamina to sprint
-        START_SPRINT: (_event, { context, actor }) => {
+        START_SPRINT: (_event: any, { context }: any) => {
           const ctx = context as CharacterContext;
           if (ctx.stamina <= 0) return {};
           ctx.stamina = Math.max(0, ctx.stamina - 20);
-          actor.regions.movement.send(startSprintEvent);
+          actor.regions.movement.send(e.START_SPRINT.create());
           return {};
         },
-        STOP_SPRINT: (_event, { actor }) => {
-          actor.regions.movement.send(stopSprintEvent);
+        STOP_SPRINT: (_event: any, { actor: a }: any) => {
+          a.regions.movement.send(e.STOP_SPRINT.create());
           return {};
         },
-        // Guard: must be alive and not already attacking
-        ATTACK: (_event, { context }) => {
+        ATTACK: (_event: any, { context }: any) => {
           const ctx = context as CharacterContext;
           if (ctx.health <= 0) return {};
           if (ctx.combatState !== "idle") return {};
@@ -170,6 +138,23 @@ function createCharacter(clock?: VirtualClock) {
               ctx.combatState = "idle";
             });
           });
+          return {};
+        },
+      },
+      Any: {
+        TAKE_DAMAGE: (event: any, { context }: any) => {
+          const ctx = context as CharacterContext;
+          ctx.health = Math.max(0, ctx.health - (event as any).amount);
+          if (ctx.health <= 0) {
+            ctx.combatState = "idle";
+            return { state: lifeStates.dead };
+          }
+          return {};
+        },
+        REGEN: (_event: any, { context }: any) => {
+          const ctx = context as CharacterContext;
+          ctx.stamina = Math.min(ctx.maxStamina, ctx.stamina + ctx.staminaRegenRate);
+          ctx.health = Math.min(ctx.maxHealth, ctx.health + ctx.healthRegenRate);
           return {};
         },
       },
@@ -212,7 +197,7 @@ describe("game character actor", () => {
 
   it("sprint consumes stamina", () => {
     const { actor } = createCharacter();
-    actor.send(startSprintEvent);
+    actor.send(e.START_SPRINT.create());
     expect(actor.context.stamina).toBe(80);
     expect(matches(actor, "alive.movement.sprinting")).toBe(true);
   });
@@ -220,30 +205,30 @@ describe("game character actor", () => {
   it("cannot sprint with 0 stamina", () => {
     const { actor } = createCharacter();
     (actor.context as CharacterContext).stamina = 0;
-    actor.send(startSprintEvent);
+    actor.send(e.START_SPRINT.create());
     expect(matches(actor, "alive.movement.idle")).toBe(true);
   });
 
   it("attack transitions to attacking state", () => {
     const { actor } = createCharacter();
-    actor.send(attackEvent);
+    actor.send(e.ATTACK.create());
     expect(actor.context.combatState).toBe("attacking");
   });
 
   it("cannot attack while already attacking", () => {
     const { actor } = createCharacter();
-    actor.send(attackEvent);
+    actor.send(e.ATTACK.create());
     expect(actor.context.combatState).toBe("attacking");
 
     // Second attack ignored (guard: combatState !== "idle")
-    actor.send(attackEvent);
+    actor.send(e.ATTACK.create());
     expect(actor.context.combatState).toBe("attacking");
   });
 
   it("attack → cooldown → idle cycle", () => {
     const { actor, clock } = createCharacter();
 
-    actor.send(attackEvent);
+    actor.send(e.ATTACK.create());
     expect(actor.context.combatState).toBe("attacking");
 
     clock.advance(500); // attack duration
@@ -258,7 +243,7 @@ describe("game character actor", () => {
     (actor.context as CharacterContext).stamina = 50;
     (actor.context as CharacterContext).health = 80;
 
-    actor.send(regenEvent);
+    actor.send(e.REGEN.create());
     expect(actor.context.stamina).toBe(60);
     expect(actor.context.health).toBe(85);
   });
@@ -266,18 +251,18 @@ describe("game character actor", () => {
   it("sprint stop returns to running", () => {
     const { actor } = createCharacter();
 
-    actor.send(startSprintEvent);
+    actor.send(e.START_SPRINT.create());
     expect(matches(actor, "alive.movement.sprinting")).toBe(true);
 
-    actor.send(stopSprintEvent);
+    actor.send(e.STOP_SPRINT.create());
     expect(matches(actor, "alive.movement.running")).toBe(true);
   });
 
   it("regions are independent: sprinting + attacking", () => {
     const { actor } = createCharacter();
 
-    actor.send(startSprintEvent);
-    actor.send(attackEvent);
+    actor.send(e.START_SPRINT.create());
+    actor.send(e.ATTACK.create());
 
     expect(matches(actor, "alive.movement.sprinting")).toBe(true);
     expect(actor.context.combatState).toBe("attacking");
@@ -305,7 +290,7 @@ describe("game character actor", () => {
     // 3. Return {} to prevent transition if guard fails
     // No declarative guard like: when(alive, startSprint, hasStamina, handler)
     (actor.context as CharacterContext).stamina = 0;
-    actor.send(startSprintEvent);
+    actor.send(e.START_SPRINT.create());
     expect(matches(actor, "alive.movement.idle")).toBe(true);
 
     // Without explicit guard, would need:
@@ -329,7 +314,7 @@ describe("game character actor", () => {
     // Must use exact string keys: actor.regions.movement
     // No compile-time check that region exists
     // Typo: actor.regions.movment → runtime undefined, no error
-    actor.regions.movement.send(startSprintEvent);
+    actor.regions.movement.send(e.START_SPRINT.create());
     expect(matches(actor, "alive.movement.sprinting")).toBe(true);
 
     // DX: regions is Record<string, AnyActor> — no type safety
@@ -342,8 +327,8 @@ describe("game character actor", () => {
     // No declarative: `onRegionEnter(combat.attacking, handler)`
     const { actor, clock } = createCharacter();
 
-    actor.send(startSprintEvent);
-    actor.send(attackEvent);
+    actor.send(e.START_SPRINT.create());
+    actor.send(e.ATTACK.create());
 
     // The attack timer is set up via clock.setTimeout in the ATTACK handler,
     // not via an effect on the combat region. This works but:

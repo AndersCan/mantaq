@@ -341,7 +341,7 @@ describe("saga orchestrator actor", () => {
   it("CANCEL from idle → failed (no compensation)", () => {
     const { actor } = createSagaActor();
 
-    actor.send(CANCEL);
+    actor.send(CANCEL.create());
     expect(matches(actor, "failed")).toBe(true);
   });
 
@@ -356,7 +356,7 @@ describe("saga orchestrator actor", () => {
     clock.advance(100);
     expect(matches(actor, "processingPayment")).toBe(true);
 
-    actor.send(CANCEL);
+    actor.send(CANCEL.create());
     expect(matches(actor, "compensatingRelease")).toBe(true);
     expect(actor.context.error).toBe("Cancelled by user");
 
@@ -376,7 +376,7 @@ describe("saga orchestrator actor", () => {
     expect(matches(actor, "processingPayment")).toBe(true);
     expect(actor.context.completedSteps).toContain("inventory");
 
-    actor.send(CANCEL);
+    actor.send(CANCEL.create());
     expect(matches(actor, "compensatingRelease")).toBe(true);
 
     clock.advance(80);

@@ -375,17 +375,17 @@ export class MantaqViz extends HTMLElement {
     const edgeCases = new Set<string>();
     const internal = new Set<string>();
     const internalIds = this.#internalIds();
-    const transitions = this.#actor.__transitions;
+    const transitions = this.#actor.options?.transitions ?? {};
 
     for (const name of activeNames) {
-      const st = transitions.get(name);
+      const st = transitions[name];
       if (!st) continue;
-      for (const k of st.keys()) {
+      for (const k of Object.keys(st)) {
         if (!this.#isInternal(k, internalIds, internal)) primary.add(k);
       }
     }
 
-    for (const k of this.#actor.__anyTransitions.keys()) {
+    for (const k of Object.keys(transitions["Any"] ?? {})) {
       if (primary.has(k) || internal.has(k)) continue;
       if (!this.#isInternal(k, internalIds, internal)) edgeCases.add(k);
     }
