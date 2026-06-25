@@ -1,4 +1,4 @@
-import type { Graph as X6Graph, ComplexAttrValue } from "@antv/x6";
+import type { Graph as X6Graph, Node, ComplexAttrValue } from "@antv/x6";
 import type { ActorGraph, GraphNode } from "../graph.ts";
 import { computeNodePositions } from "../layout.ts";
 import type { LayoutOptions } from "../layout.ts";
@@ -61,56 +61,73 @@ export interface SyncResult {
   structureChanged: boolean;
 }
 
-export function syncNodes(
+function createNode(
   graph: X6Graph,
-  nodes: GraphNode[],
+  node: GraphNode,
   positions: Map<string, { x: number; y: number }>,
   movedPositions: Map<string, { x: number; y: number }>,
+) {
+  const pos = movedPositions.get(node.id) ?? positions.get(node.id) ?? { x: 0, y: 0 };
+  const isInitial = node.isInitial;
+  graph.addNode({
+    id: node.id,
+    shape: isInitial ? "circle" : "mantaq-state",
+    x: pos.x,
+    y: pos.y,
+    width: isInitial ? INITIAL_NODE_SIZE : 160,
+    height: isInitial ? INITIAL_NODE_SIZE : 60,
+    label: isInitial ? "" : node.label,
+    attrs: { ...nodeAttrs(node), ...badgeAttrs(node) },
+    data: { tooltip: nodeTooltip(node) },
+  });
+}
+
+function updateNode(
+  node: GraphNode,
+  cell: Node,
+  positions: Map<string, { x: number; y: number }>,
+  movedPositions: Map<string, { x: number; y: number }>,
+) {
+  const pos = movedPositions.get(node.id) ??
+    positions.get(node.id) ?? { x: cell.getPosition().x, y: cell.getPosition().y };
+  cell.setPosition(pos.x, pos.y);
+  cell.setAttrs(nodeAttrs(node));
+  cell.attr("label/text", node.label);
+  const badge = badgeAttrs(node);
+  cell.attr("badgeCircle/r", badge.badgeCircle.r);
+  cell.attr("badgeCircle/fill", badge.badgeCircle.fill);
+  cell.attr("badgeCircle/stroke", badge.badgeCircle.stroke);
+  cell.attr("badgeText/text", badge.badgeText.text);
+  cell.setData({ tooltip: nodeTooltip(node) }, { overwrite: true });
+}
+
+function syncDiff<T, C extends { id: string }>(
+  items: T[],
+  idOf: (item: T) => string,
+  findCell: (id: string) => C | undefined,
+  getCells: () => C[],
+  handlers: {
+    onCreate: (item: T) => void;
+    onUpdate: (item: T, cell: C) => void;
+    onRemove: (cellId: string) => void;
+  },
 ): boolean {
   let changed = false;
-  const nodeIds = new Set(nodes.map((n) => n.id));
+  const ids = new Set(items.map(idOf));
 
-  for (const node of nodes) {
-    const cell = graph.getCellById(node.id);
-    const tooltip = nodeTooltip(node);
-    if (cell?.isNode()) {
-      const pos = movedPositions.get(node.id) ??
-        positions.get(node.id) ?? { x: cell.getPosition().x, y: cell.getPosition().y };
-      cell.setPosition(pos.x, pos.y);
-      cell.setAttrs(nodeAttrs(node));
-      cell.attr("label/text", node.label);
-      const badge = badgeAttrs(node);
-      const bc = badge.badgeCircle;
-      const bt = badge.badgeText;
-      cell.attr("badgeCircle/r", bc.r);
-      cell.attr("badgeCircle/fill", bc.fill);
-      cell.attr("badgeCircle/stroke", bc.stroke);
-      cell.attr("badgeText/text", bt.text);
-      cell.setData({ tooltip }, { overwrite: true });
+  for (const item of items) {
+    const cell = findCell(idOf(item));
+    if (cell) {
+      handlers.onUpdate(item, cell);
     } else {
-      const pos = movedPositions.get(node.id) ?? positions.get(node.id) ?? { x: 0, y: 0 };
-      const isInitial = node.isInitial;
-      graph.addNode({
-        id: node.id,
-        shape: isInitial ? "circle" : "mantaq-state",
-        x: pos.x,
-        y: pos.y,
-        width: isInitial ? INITIAL_NODE_SIZE : 160,
-        height: isInitial ? INITIAL_NODE_SIZE : 60,
-        label: isInitial ? "" : node.label,
-        attrs: {
-          ...nodeAttrs(node),
-          ...badgeAttrs(node),
-        },
-        data: { tooltip },
-      });
+      handlers.onCreate(item);
       changed = true;
     }
   }
 
-  for (const cell of graph.getNodes()) {
-    if (!nodeIds.has(cell.id)) {
-      graph.removeCell(cell.id);
+  for (const cell of getCells()) {
+    if (!ids.has(cell.id)) {
+      handlers.onRemove(cell.id);
       changed = true;
     }
   }
@@ -118,41 +135,61 @@ export function syncNodes(
   return changed;
 }
 
+export function syncNodes(
+  graph: X6Graph,
+  nodes: GraphNode[],
+  positions: Map<string, { x: number; y: number }>,
+  movedPositions: Map<string, { x: number; y: number }>,
+): boolean {
+  return syncDiff(
+    nodes,
+    (n) => n.id,
+    (id) => {
+      const c = graph.getCellById(id);
+      return c?.isNode() ? c : undefined;
+    },
+    () => graph.getNodes(),
+    {
+      onCreate: (node) => createNode(graph, node, positions, movedPositions),
+      onUpdate: (node, cell) => updateNode(node, cell, positions, movedPositions),
+      onRemove: (cellId) => graph.removeCell(cellId),
+    },
+  );
+}
+
 export function syncEdges(graph: X6Graph, edges: ActorGraph["edges"], routerName: string): boolean {
-  let changed = false;
-  const edgeIds = new Set(edges.map((e) => e.id));
-
-  for (const edge of edges) {
-    const cell = graph.getCellById(edge.id);
-    if (cell?.isEdge()) {
-      const cfg = edgeConfig(edge, routerName);
-      cell.setRouter({ name: routerName });
-      if (cell.getSourceCellId() !== edge.source) cell.setSource({ cell: edge.source });
-      if (cell.getTargetCellId() !== edge.target) cell.setTarget({ cell: edge.target });
-      cell.setData(cfg.data);
-      cell.setLabels(cfg.labels);
-      const line = edgeLine(edge);
-      cell.attr("line/stroke", line.stroke);
-      cell.attr("line/strokeWidth", line.strokeWidth);
-      cell.attr("line/strokeDasharray", line.strokeDasharray);
-      cell.attr("line/strokeOpacity", line.strokeOpacity);
-      cell.attr("line/targetMarker", line.targetMarker);
-      cell.attr("line/cursor", line.cursor);
-      cell.attr("line/style", (line.style ?? {}) as ComplexAttrValue);
-    } else {
-      graph.addEdge(edgeConfig(edge, routerName));
-      changed = true;
-    }
-  }
-
-  for (const cell of graph.getEdges()) {
-    if (!edgeIds.has(cell.id)) {
-      graph.removeCell(cell.id);
-      changed = true;
-    }
-  }
-
-  return changed;
+  return syncDiff(
+    edges,
+    (e) => e.id,
+    (id) => {
+      const cell = graph.getCellById(id);
+      if (cell?.isEdge()) return cell;
+      return undefined;
+    },
+    () => graph.getEdges(),
+    {
+      onCreate: (edge) => {
+        graph.addEdge(edgeConfig(edge, routerName));
+      },
+      onUpdate: (edge, cell) => {
+        const cfg = edgeConfig(edge, routerName);
+        cell.setRouter({ name: routerName });
+        if (cell.getSourceCellId() !== edge.source) cell.setSource({ cell: edge.source });
+        if (cell.getTargetCellId() !== edge.target) cell.setTarget({ cell: edge.target });
+        cell.setData(cfg.data);
+        cell.setLabels(cfg.labels);
+        const line = edgeLine(edge);
+        cell.attr("line/stroke", line.stroke);
+        cell.attr("line/strokeWidth", line.strokeWidth);
+        cell.attr("line/strokeDasharray", line.strokeDasharray);
+        cell.attr("line/strokeOpacity", line.strokeOpacity);
+        cell.attr("line/targetMarker", line.targetMarker);
+        cell.attr("line/cursor", line.cursor);
+        cell.attr("line/style", (line.style ?? {}) as ComplexAttrValue);
+      },
+      onRemove: (cellId) => graph.removeCell(cellId),
+    },
+  );
 }
 
 export function syncGraph(
