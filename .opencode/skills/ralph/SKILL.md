@@ -96,7 +96,8 @@ Task(
 
 PRIORITY 1 — existing FIXMEs (loop's backlog, highest):
 - rg '// FIXME:' packages/ apps/ --include '*.ts' --include '*.tsx'
-- rg '// TODO:' packages/ apps/ --include '*.ts' --include '*.tsx'
+- rg '// TODO:' packages/ apps/ --include '*.ts' --include '*.tsx'.
+- Hindsight confirmed loop closes prior-run FIXMEs at high rate. Prioritize these ONE per iteration until cleared before touching PRIORITY 2. Each closed FIXME = self-perpetuation proof.
 
 PRIORITY 2 — deep work candidates:
 - Long functions: rg -l '' packages/ --include '*.ts' | xargs wc -l | sort -rn | head -30. For each file, find functions >50 lines. Flag.
@@ -208,7 +209,7 @@ RULES:
 - If touching public API: check callers across packages
 - Found issue but not fixing this task? Leave '// FIXME: <specific desc>' at location
 - New sugar helper? Add to packages/sugar/src/, export from index.ts, add test in packages/sugar/tests/
-- Viz change? Verify rendering with agent-browser-viz skill if behavior-affecting
+- Viz change? MANDATORY: load + run agent-browser-viz skill if render path affected (prop shape change, render method split, template restructure). Static glance insufficient. Worker must verify visually OR orchestrator cancels commit.
 
 CHECK before commit:
 - vp check --fix
@@ -350,6 +351,7 @@ Rules:
 - Orchestrator running rg/grep — delegate to worker.
 - Reading full files in orchestrator — line refs only.
 - Spawning workers for trivial edits — do directly.
+- Worker editing files outside task FILES list — workers MUST stay scoped. Out-of-scope file needs work → leave FIXME at location, do NOT edit. Orchestrator assigns separate task. Parallel workers stay file-disjoint.
 - Delegating reasoning to @worker — worker handles more than you think. Only keep API design, architecture, cross-file bug root-causing in orchestrator.
 - Force-removing justified type casts — TS limitations keep + comment.
 - Skipping FIXME deposition — found-but-not-fixed MUST leave FIXME. Self-perpetuating loop breaks otherwise.
