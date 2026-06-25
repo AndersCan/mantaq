@@ -15,9 +15,9 @@ function makeToggle() {
     context: {},
     states: [a, b],
     initial: a,
-    transitions: {
-      a: { GO: () => ({ state: b }) },
-      b: { STOP: () => ({ state: a }) },
+    setup: (m) => {
+      m.on(a, go, () => ({ state: b }));
+      m.on(b, stop, () => ({ state: a }));
     },
   });
 }

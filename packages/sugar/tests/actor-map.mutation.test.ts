@@ -11,7 +11,7 @@ describe("ActorMap mutation tests", () => {
 
   function makeActor(id: string) {
     const toggle = event("toggle")();
-    const output = event("output")();
+    const output = event("output")<{ from: string }>();
     const off = state("off")();
     const on = state("on")();
     const actor = new Actor({
@@ -21,15 +21,15 @@ describe("ActorMap mutation tests", () => {
       context: {},
       states: [off, on],
       initial: off,
-      transitions: {
-        off: { toggle: () => ({ state: on, emit: [output.create({ from: id })] }) },
-        on: { toggle: () => ({ state: off }) },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on, emit: [output.create({ from: id })] }));
+        m.on(on, toggle, () => ({ state: off }));
       },
     });
     return { actor, toggle, output, off, on };
   }
 
-  // ── Default test env (NODE_ENV=test, IS_DEV=false) ──
+  // ── Default test env ──
 
   test("re-spawn calls __abortEffects on old actor", () => {
     const map = new ActorMap();
@@ -43,7 +43,7 @@ describe("ActorMap mutation tests", () => {
     expect(abortSpy).toHaveBeenCalledOnce();
   });
 
-  test("re-spawn does not call console.warn when IS_DEV is false", () => {
+  test("re-spawn calls console.warn unconditionally", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const map = new ActorMap();
 
@@ -51,7 +51,10 @@ describe("ActorMap mutation tests", () => {
     warnSpy.mockClear();
 
     map.spawn("a", () => makeActor("b").actor);
-    expect(warnSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[ActorMap] spawning over existing key "a". Old actor will be aborted.',
+    );
   });
 
   test("after kill, can re-spawn with same key", () => {
@@ -99,15 +102,11 @@ describe("ActorMap mutation tests", () => {
           context: {},
           states: [off1, on1],
           initial: off1,
-          effects: {
-            on1: [
-              () => {
-                effectCount++;
-              },
-            ],
-          },
-          transitions: {
-            off1: { toggle1: () => ({ state: on1 }) },
+          setup: (m) => {
+            m.on(off1, toggle1, () => ({ state: on1 }));
+            m.effect(on1, () => {
+              effectCount++;
+            });
           },
         }),
     );
@@ -129,15 +128,11 @@ describe("ActorMap mutation tests", () => {
           context: {},
           states: [off2, on2],
           initial: off2,
-          effects: {
-            on2: [
-              () => {
-                effectCount += 10;
-              },
-            ],
-          },
-          transitions: {
-            off2: { toggle2: () => ({ state: on2 }) },
+          setup: (m) => {
+            m.on(off2, toggle2, () => ({ state: on2 }));
+            m.effect(on2, () => {
+              effectCount += 10;
+            });
           },
         }),
     );
@@ -146,7 +141,7 @@ describe("ActorMap mutation tests", () => {
     expect(effectCount).toBe(10);
   });
 
-  // ── Dev env (NODE_ENV=development, IS_DEV=true) ──
+  // ── Dev env (NODE_ENV=development) ──
 
   async function loadDevActorMap() {
     vi.resetModules();

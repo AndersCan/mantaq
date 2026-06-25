@@ -13,9 +13,9 @@ describe("API smoke", () => {
       inputs: [start, stop],
       states: [idle, running],
       initial: idle,
-      transitions: {
-        idle: { START: () => ({ state: running }) },
-        running: { STOP: () => ({ state: idle }) },
+      setup: (m) => {
+        m.on(idle, start, () => ({ state: running }));
+        m.on(running, stop, () => ({ state: idle }));
       },
     });
 
@@ -36,8 +36,11 @@ describe("API smoke", () => {
       inputs: [start],
       states: [idle, running],
       initial: { state: idle, payload: { x: 0 } },
-      transitions: {
-        idle: { START: () => ({ state: running }) },
+      setup: (m) => {
+        m.on(idle, start, (event) => {
+          expect(typeof event.url).toBe("string");
+          return { state: running };
+        });
       },
     });
 
@@ -54,7 +57,9 @@ describe("API smoke", () => {
       states: [idle],
       initial: idle,
       clock,
-      transitions: { idle: { PING: () => ({}) } },
+      setup: (m) => {
+        m.on(idle, ping, () => ({}));
+      },
     });
     actor.send(ping.create());
     expect(actor.snapshot().path[0]).toBe("idle");

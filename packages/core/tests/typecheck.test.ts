@@ -10,10 +10,8 @@ describe("API type safety", () => {
       inputs: [clicked],
       states: [idle],
       initial: idle,
-      transitions: {
-        idle: {
-          CLICKED: () => ({ emit: [{ id: "PONG" }] }),
-        },
+      setup: (m) => {
+        m.on(idle, clicked, () => ({ emit: [{ id: "PONG" }] }));
       },
     });
 
@@ -35,9 +33,9 @@ describe("API type safety", () => {
       inputs: [triggered],
       states: [idle, active],
       initial: idle,
-      transitions: {
-        idle: { TRIGGERED: () => ({ state: active }) },
-        Any: { TRIGGERED: () => ({ state: idle }) },
+      setup: (m) => {
+        m.on(idle, triggered, () => ({ state: active }));
+        m.onAny(triggered, () => ({ state: idle }));
       },
     });
 
@@ -55,7 +53,9 @@ describe("API type safety", () => {
       inputs: [complete],
       states: [pending, done],
       initial: pending,
-      transitions: { pending: { COMPLETE: () => ({ state: done }) } },
+      setup: (m) => {
+        m.on(pending, complete, () => ({ state: done }));
+      },
     });
 
     actor.send(complete.create());
@@ -70,13 +70,11 @@ describe("API type safety", () => {
       states: [idle],
       initial: idle,
       context: { count: 0 },
-      transitions: {
-        idle: {
-          TICK: (_e, { context }) => {
-            context.count++;
-            return {};
-          },
-        },
+      setup: (m) => {
+        m.on(idle, tick, (_e, { context }) => {
+          context.count++;
+          return {};
+        });
       },
     });
 

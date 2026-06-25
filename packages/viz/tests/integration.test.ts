@@ -16,10 +16,10 @@ function createTrafficLight() {
     states: [green, yellow, red],
     initial: green,
     context: {} as {},
-    transitions: {
-      green: { NEXT: () => ({ state: yellow }) },
-      yellow: { NEXT: () => ({ state: red }) },
-      red: { NEXT: () => ({ state: green }) },
+    setup: (m) => {
+      m.on(green, next, () => ({ state: yellow }));
+      m.on(yellow, next, () => ({ state: red }));
+      m.on(red, next, () => ({ state: green }));
     },
   });
 }
@@ -36,9 +36,9 @@ function createWithRegions() {
     states: [subA, subB],
     initial: subA,
     context: {} as {},
-    transitions: {
-      subA: { TOGGLE: () => ({ state: subB }) },
-      subB: { TOGGLE: () => ({ state: subA }) },
+    setup: (m) => {
+      m.on(subA, toggle, () => ({ state: subB }));
+      m.on(subB, toggle, () => ({ state: subA }));
     },
   });
 
@@ -53,8 +53,8 @@ function createWithRegions() {
     initial: parent,
     context: {} as {},
     regions: { child },
-    transitions: {
-      parent: { START: () => ({ state: parent }) },
+    setup: (m) => {
+      m.on(parent, start, () => ({ state: parent }));
     },
   });
 }

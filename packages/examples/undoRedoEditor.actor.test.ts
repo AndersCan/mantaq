@@ -105,152 +105,138 @@ function createEditorActor(clock?: VirtualClock) {
     initial: s.idle,
     clock: c,
     context: ctx,
-    transitions: {
-      Any: {
-        UNDO: (_event, { context }) => {
-          const c = context as EditorContext;
-          if (c.undoStack.length === 0) {
-            return { state: s.idle };
-          }
-          const entry = c.undoStack.pop()!;
-          c.redoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: entry.label,
-          });
-          c.buffer = snapshotBuffer(entry.buffer);
-          if (c.undoStack.length === 0) {
-            return { state: s.idle };
-          }
-          return { state: s.editing };
-        },
-        REDO: (_event, { context }) => {
-          const c = context as EditorContext;
-          if (c.redoStack.length === 0) {
-            return { state: s.idle };
-          }
-          const entry = c.redoStack.pop()!;
-          c.undoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: entry.label,
-          });
-          c.buffer = snapshotBuffer(entry.buffer);
-          if (c.redoStack.length === 0) {
-            return { state: s.idle };
-          }
-          return { state: s.editing };
-        },
-        UNDO_TO_CHECKPOINT: (event, { context }) => {
-          const c = context as EditorContext;
-          const targetIndex = c.checkpoints.get((event as any).name);
-          if (targetIndex === undefined) {
-            return { state: s.idle };
-          }
-          while (c.undoStack.length > targetIndex) {
-            const entry = c.undoStack.pop()!;
-            c.redoStack.push({
-              buffer: snapshotBuffer(c.buffer),
-              label: entry.label,
-            });
-            c.buffer = snapshotBuffer(entry.buffer);
-          }
+    setup: (m) => {
+      m.onAny(e.UNDO, (_event, opts) => {
+        const context = opts!.context;
+        if (context.undoStack.length === 0) {
           return { state: s.idle };
-        },
-        CLEAR_HISTORY: (_event, { context }) => {
-          const c = context as EditorContext;
-          c.undoStack = [];
-          c.redoStack = [];
-          c.checkpoints.clear();
-          return {};
-        },
-      },
-      idle: {
-        INSERT_TEXT: (event, { context }) => {
-          const c = context as EditorContext;
-          const e = event as any;
-          c.undoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: `insert "${e.text}" at ${e.at}`,
+        }
+        const entry = context.undoStack.pop()!;
+        context.redoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: entry.label,
+        });
+        context.buffer = snapshotBuffer(entry.buffer);
+        if (context.undoStack.length === 0) {
+          return { state: s.idle };
+        }
+        return { state: s.editing };
+      });
+      m.onAny(e.REDO, (_event, opts) => {
+        const context = opts!.context;
+        if (context.redoStack.length === 0) {
+          return { state: s.idle };
+        }
+        const entry = context.redoStack.pop()!;
+        context.undoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: entry.label,
+        });
+        context.buffer = snapshotBuffer(entry.buffer);
+        if (context.redoStack.length === 0) {
+          return { state: s.idle };
+        }
+        return { state: s.editing };
+      });
+      m.onAny(undoToCheckpointEvent, (event, opts) => {
+        const context = opts!.context;
+        const targetIndex = context.checkpoints.get(event.name);
+        if (targetIndex === undefined) {
+          return { state: s.idle };
+        }
+        while (context.undoStack.length > targetIndex) {
+          const entry = context.undoStack.pop()!;
+          context.redoStack.push({
+            buffer: snapshotBuffer(context.buffer),
+            label: entry.label,
           });
-          c.redoStack = [];
-          c.buffer.content = insertAt(c.buffer.content, e.at, e.text);
-          c.buffer.cursor = e.at + e.text.length;
-          return { state: s.editing };
-        },
-        DELETE_TEXT: (event, { context }) => {
-          const c = context as EditorContext;
-          const e = event as any;
-          c.undoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: `delete [${e.from}..${e.to}]`,
-          });
-          c.redoStack = [];
-          c.buffer.content = deleteRange(c.buffer.content, e.from, e.to);
-          c.buffer.cursor = e.from;
-          return { state: s.editing };
-        },
-        REPLACE_TEXT: (event, { context }) => {
-          const c = context as EditorContext;
-          const e = event as any;
-          c.undoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: `replace [${e.from}..${e.to}] with "${e.text}"`,
-          });
-          c.redoStack = [];
-          const deleted = deleteRange(c.buffer.content, e.from, e.to);
-          c.buffer.content = insertAt(deleted, e.from, e.text);
-          c.buffer.cursor = e.from + e.text.length;
-          return { state: s.editing };
-        },
-        CHECKPOINT: (event, { context }) => {
-          const c = context as EditorContext;
-          c.checkpoints.set((event as any).name, c.undoStack.length);
-          return {};
-        },
-      },
-      editing: {
-        INSERT_TEXT: (event, { context }) => {
-          const c = context as EditorContext;
-          const e = event as any;
-          c.undoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: `insert "${e.text}" at ${e.at}`,
-          });
-          c.redoStack = [];
-          c.buffer.content = insertAt(c.buffer.content, e.at, e.text);
-          c.buffer.cursor = e.at + e.text.length;
-          return {};
-        },
-        DELETE_TEXT: (event, { context }) => {
-          const c = context as EditorContext;
-          const e = event as any;
-          c.undoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: `delete [${e.from}..${e.to}]`,
-          });
-          c.redoStack = [];
-          c.buffer.content = deleteRange(c.buffer.content, e.from, e.to);
-          c.buffer.cursor = e.from;
-          return {};
-        },
-        REPLACE_TEXT: (event, { context }) => {
-          const c = context as EditorContext;
-          const e = event as any;
-          c.undoStack.push({
-            buffer: snapshotBuffer(c.buffer),
-            label: `replace [${e.from}..${e.to}] with "${e.text}"`,
-          });
-          c.redoStack = [];
-          const deleted = deleteRange(c.buffer.content, e.from, e.to);
-          c.buffer.content = insertAt(deleted, e.from, e.text);
-          c.buffer.cursor = e.from + e.text.length;
-          return {};
-        },
-        CHECKPOINT: (event, { context }) => {
-          const c = context as EditorContext;
-          c.checkpoints.set((event as any).name, c.undoStack.length);
-          return {};
-        },
-      },
+          context.buffer = snapshotBuffer(entry.buffer);
+        }
+        return { state: s.idle };
+      });
+      m.onAny(e.CLEAR_HISTORY, (_event, opts) => {
+        const context = opts!.context;
+        context.undoStack = [];
+        context.redoStack = [];
+        context.checkpoints.clear();
+        return {};
+      });
+      m.on(s.idle, insertTextEvent, (event, opts) => {
+        const context = opts!.context;
+        context.undoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: `insert "${event.text}" at ${event.at}`,
+        });
+        context.redoStack = [];
+        context.buffer.content = insertAt(context.buffer.content, event.at, event.text);
+        context.buffer.cursor = event.at + event.text.length;
+        return { state: s.editing };
+      });
+      m.on(s.idle, deleteTextEvent, (event, opts) => {
+        const context = opts!.context;
+        context.undoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: `delete [${event.from}..${event.to}]`,
+        });
+        context.redoStack = [];
+        context.buffer.content = deleteRange(context.buffer.content, event.from, event.to);
+        context.buffer.cursor = event.from;
+        return { state: s.editing };
+      });
+      m.on(s.idle, replaceTextEvent, (event, opts) => {
+        const context = opts!.context;
+        context.undoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+        });
+        context.redoStack = [];
+        const deleted = deleteRange(context.buffer.content, event.from, event.to);
+        context.buffer.content = insertAt(deleted, event.from, event.text);
+        context.buffer.cursor = event.from + event.text.length;
+        return { state: s.editing };
+      });
+      m.on(s.idle, checkpointEvent, (event, opts) => {
+        opts!.context.checkpoints.set(event.name, opts!.context.undoStack.length);
+        return {};
+      });
+      m.on(s.editing, insertTextEvent, (event, opts) => {
+        const context = opts!.context;
+        context.undoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: `insert "${event.text}" at ${event.at}`,
+        });
+        context.redoStack = [];
+        context.buffer.content = insertAt(context.buffer.content, event.at, event.text);
+        context.buffer.cursor = event.at + event.text.length;
+        return {};
+      });
+      m.on(s.editing, deleteTextEvent, (event, opts) => {
+        const context = opts!.context;
+        context.undoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: `delete [${event.from}..${event.to}]`,
+        });
+        context.redoStack = [];
+        context.buffer.content = deleteRange(context.buffer.content, event.from, event.to);
+        context.buffer.cursor = event.from;
+        return {};
+      });
+      m.on(s.editing, replaceTextEvent, (event, opts) => {
+        const context = opts!.context;
+        context.undoStack.push({
+          buffer: snapshotBuffer(context.buffer),
+          label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+        });
+        context.redoStack = [];
+        const deleted = deleteRange(context.buffer.content, event.from, event.to);
+        context.buffer.content = insertAt(deleted, event.from, event.text);
+        context.buffer.cursor = event.from + event.text.length;
+        return {};
+      });
+      m.on(s.editing, checkpointEvent, (event, opts) => {
+        opts!.context.checkpoints.set(event.name, opts!.context.undoStack.length);
+        return {};
+      });
     },
   });
 

@@ -53,10 +53,10 @@ function createAnimationActor(clock?: VirtualClock) {
     states: [brightness.dim, brightness.normal, brightness.bright],
     initial: brightness.normal,
     context: {} as {},
-    transitions: {
-      dim: { SET_BRIGHTNESS: () => ({ state: brightness.normal }) },
-      normal: { SET_BRIGHTNESS: () => ({ state: brightness.bright }) },
-      bright: { SET_BRIGHTNESS: () => ({ state: brightness.normal }) },
+    setup: (m) => {
+      m.on(brightness.dim, setBrightnessRegionEvent, () => ({ state: brightness.normal }));
+      m.on(brightness.normal, setBrightnessRegionEvent, () => ({ state: brightness.bright }));
+      m.on(brightness.bright, setBrightnessRegionEvent, () => ({ state: brightness.normal }));
     },
   });
 
@@ -67,10 +67,10 @@ function createAnimationActor(clock?: VirtualClock) {
     states: [color.blue, color.red, color.green],
     initial: color.blue,
     context: {} as {},
-    transitions: {
-      blue: { CYCLE_COLOR: () => ({ state: color.red }) },
-      red: { CYCLE_COLOR: () => ({ state: color.green }) },
-      green: { CYCLE_COLOR: () => ({ state: color.blue }) },
+    setup: (m) => {
+      m.on(color.blue, regionEvents.CYCLE_COLOR, () => ({ state: color.red }));
+      m.on(color.red, regionEvents.CYCLE_COLOR, () => ({ state: color.green }));
+      m.on(color.green, regionEvents.CYCLE_COLOR, () => ({ state: color.blue }));
     },
   });
 
@@ -81,9 +81,9 @@ function createAnimationActor(clock?: VirtualClock) {
     states: [dashboard.closed, dashboard.open],
     initial: dashboard.closed,
     context: {} as {},
-    transitions: {
-      closed: { TOGGLE_DASHBOARD: () => ({ state: dashboard.open }) },
-      open: { TOGGLE_DASHBOARD: () => ({ state: dashboard.closed }) },
+    setup: (m) => {
+      m.on(dashboard.closed, regionEvents.TOGGLE_DASHBOARD, () => ({ state: dashboard.open }));
+      m.on(dashboard.open, regionEvents.TOGGLE_DASHBOARD, () => ({ state: dashboard.closed }));
     },
   });
 
@@ -94,9 +94,9 @@ function createAnimationActor(clock?: VirtualClock) {
     states: [sidebar.closed, sidebar.open],
     initial: sidebar.closed,
     context: {} as {},
-    transitions: {
-      closed: { TOGGLE_SIDEBAR: () => ({ state: sidebar.open }) },
-      open: { TOGGLE_SIDEBAR: () => ({ state: sidebar.closed }) },
+    setup: (m) => {
+      m.on(sidebar.closed, regionEvents.TOGGLE_SIDEBAR, () => ({ state: sidebar.open }));
+      m.on(sidebar.open, regionEvents.TOGGLE_SIDEBAR, () => ({ state: sidebar.closed }));
     },
   });
 
@@ -121,39 +121,35 @@ function createAnimationActor(clock?: VirtualClock) {
       dashboard: dashboardRegion,
       sidebar: sidebarRegion,
     },
-    effects: {
-      drawerOpening: [(input) => withTimeout(300, input, () => ({ id: "DRAWER_OPEN_DONE" }))],
-      drawerClosing: [(input) => withTimeout(300, input, () => ({ id: "DRAWER_CLOSE_DONE" }))],
-    },
-    transitions: {
-      drawerRoot: {
-        OPEN_DRAWER: () => ({ state: drawer.drawerOpening }),
-        CLOSE_DRAWER: () => ({ state: drawer.drawerClosing }),
-      },
-      drawerOpening: {
-        DRAWER_OPEN_DONE: () => ({ state: drawer.drawerRoot }),
-      },
-      drawerClosing: {
-        DRAWER_CLOSE_DONE: () => ({ state: drawer.drawerRoot }),
-      },
-      Any: {
-        TOGGLE_DASHBOARD: (_event, { actor }) => {
-          actor.regions.dashboard.send(regionEvents.TOGGLE_DASHBOARD.create());
-          return {};
-        },
-        TOGGLE_SIDEBAR: (_event, { actor }) => {
-          actor.regions.sidebar.send(regionEvents.TOGGLE_SIDEBAR.create());
-          return {};
-        },
-        SET_BRIGHTNESS: (event, { actor }) => {
-          actor.regions.brightness.send(setBrightnessRegionEvent.create({ level: event.level }));
-          return {};
-        },
-        CYCLE_COLOR: (_event, { actor }) => {
-          actor.regions.color.send(regionEvents.CYCLE_COLOR.create());
-          return {};
-        },
-      },
+    setup: (m) => {
+      m.effect(drawer.drawerOpening, (input) =>
+        withTimeout(300, input, () => ({ id: "DRAWER_OPEN_DONE" })),
+      );
+      m.effect(drawer.drawerClosing, (input) =>
+        withTimeout(300, input, () => ({ id: "DRAWER_CLOSE_DONE" })),
+      );
+      m.on(drawer.drawerRoot, mainEvents.OPEN_DRAWER, () => ({ state: drawer.drawerOpening }));
+      m.on(drawer.drawerRoot, mainEvents.CLOSE_DRAWER, () => ({ state: drawer.drawerClosing }));
+      m.on(drawer.drawerOpening, doneEvents.DRAWER_OPEN_DONE, () => ({ state: drawer.drawerRoot }));
+      m.on(drawer.drawerClosing, doneEvents.DRAWER_CLOSE_DONE, () => ({
+        state: drawer.drawerRoot,
+      }));
+      m.onAny(mainEvents.TOGGLE_DASHBOARD, () => {
+        actor.regions.dashboard.send(regionEvents.TOGGLE_DASHBOARD.create());
+        return {};
+      });
+      m.onAny(mainEvents.TOGGLE_SIDEBAR, () => {
+        actor.regions.sidebar.send(regionEvents.TOGGLE_SIDEBAR.create());
+        return {};
+      });
+      m.onAny(setBrightnessEvent, (event) => {
+        actor.regions.brightness.send(setBrightnessRegionEvent.create({ level: event.level }));
+        return {};
+      });
+      m.onAny(mainEvents.CYCLE_COLOR, () => {
+        actor.regions.color.send(regionEvents.CYCLE_COLOR.create());
+        return {};
+      });
     },
   });
 

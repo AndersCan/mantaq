@@ -140,9 +140,9 @@ describe("matches", () => {
       context: {},
       states: [off, on],
       initial: off,
-      transitions: {
-        off: { toggled: () => ({ state: on }) },
-        on: { toggled: () => ({ state: off }) },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+        m.on(on, toggle, () => ({ state: off }));
       },
     });
 

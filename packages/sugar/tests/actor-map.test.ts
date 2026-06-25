@@ -7,7 +7,7 @@ import { matches } from "../src/actors/matches.ts";
 describe("ActorMap", () => {
   function makeActor(id: string) {
     const toggle = event("toggle")();
-    const output = event("output")();
+    const output = event("output")<{ from: string }>();
     const off = state("off")();
     const on = state("on")();
     const actor = new Actor({
@@ -17,9 +17,9 @@ describe("ActorMap", () => {
       context: {},
       states: [off, on],
       initial: off,
-      transitions: {
-        off: { toggle: () => ({ state: on, emit: [output.create({ from: id })] }) },
-        on: { toggle: () => ({ state: off }) },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on, emit: [output.create({ from: id })] }));
+        m.on(on, toggle, () => ({ state: off }));
       },
     });
     return { actor, toggle, output, off, on };
@@ -112,15 +112,11 @@ describe("ActorMap", () => {
         clock,
         states: [off, on],
         initial: off,
-        effects: {
-          on: [
-            () => {
-              effectRan = true;
-            },
-          ],
-        },
-        transitions: {
-          off: { toggle: () => ({ state: on }) },
+        setup: (m) => {
+          m.on(off, toggle, () => ({ state: on }));
+          m.effect(on, () => {
+            effectRan = true;
+          });
         },
       });
       return a;
@@ -200,8 +196,8 @@ describe("ActorMap", () => {
       context: {},
       states: [parentOff, parentDone],
       initial: parentOff,
-      transitions: {
-        parentOff: { childOutput: () => ({ state: parentDone }) },
+      setup: (m) => {
+        m.on(parentOff, childOutput, () => ({ state: parentDone }));
       },
     });
 
@@ -216,13 +212,11 @@ describe("ActorMap", () => {
           context: {},
           states: [childOff, childOn],
           initial: childOff,
-          transitions: {
-            childOff: {
-              go: () => ({
-                state: childOn,
-                emit: [childOutput.create({ data: "hello" })],
-              }),
-            },
+          setup: (m) => {
+            m.on(childOff, go, () => ({
+              state: childOn,
+              emit: [childOutput.create({ data: "hello" })],
+            }));
           },
         }),
     );

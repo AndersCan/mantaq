@@ -72,52 +72,42 @@ function createCheckoutActor(clock?: VirtualClock) {
     initial: basicInfoState,
     clock: c,
     context: {} as CheckoutContext,
-    effects: {
-      submitting: [(input) => withTimeout(800, input, () => ({ id: "SUBMITTING_DONE" }))],
-    },
-    transitions: {
-      Any: {
-        BACK: (_event, { context, actor }) => {
-          const s = actor.state.name;
-          if (s === "payment") {
-            delete context.paymentInfo;
-            return { state: shippingAddressState };
-          }
-          if (s === "shippingAddress") {
-            delete context.shippingAddress;
-            return { state: basicInfoState };
-          }
-          if (s === "error") {
-            return { state: paymentState };
-          }
-          return {};
-        },
-      },
-      basicInfo: {
-        SUBMIT_BASIC_INFO: (event, { context }) => {
-          context.basicInfo = { email: event.email, name: event.name };
+    setup: (m) => {
+      m.effect(submittingState, (input) =>
+        withTimeout(800, input, () => ({ id: "SUBMITTING_DONE" })),
+      );
+      m.onAny(backEvent, (_event, opts) => {
+        const s = actor.state.name;
+        if (s === "payment") {
+          delete opts!.context.paymentInfo;
           return { state: shippingAddressState };
-        },
-      },
-      shippingAddress: {
-        SUBMIT_SHIPPING: (event, { context }) => {
-          context.shippingAddress = {
-            street: event.street,
-            city: event.city,
-            zip: event.zip,
-          };
+        }
+        if (s === "shippingAddress") {
+          delete opts!.context.shippingAddress;
+          return { state: basicInfoState };
+        }
+        if (s === "error") {
           return { state: paymentState };
-        },
-      },
-      payment: {
-        SUBMIT_PAYMENT: (event, { context }) => {
-          context.paymentInfo = { cardNumber: event.cardNumber };
-          return { state: submittingState };
-        },
-      },
-      submitting: {
-        SUBMITTING_DONE: () => ({ state: successState }),
-      },
+        }
+        return {};
+      });
+      m.on(basicInfoState, submitBasicInfo, (event, opts) => {
+        opts!.context.basicInfo = { email: event.email, name: event.name };
+        return { state: shippingAddressState };
+      });
+      m.on(shippingAddressState, submitShipping, (event, opts) => {
+        opts!.context.shippingAddress = {
+          street: event.street,
+          city: event.city,
+          zip: event.zip,
+        };
+        return { state: paymentState };
+      });
+      m.on(paymentState, submitPayment, (event, opts) => {
+        opts!.context.paymentInfo = { cardNumber: event.cardNumber };
+        return { state: submittingState };
+      });
+      m.on(submittingState, submittingDoneEvent, () => ({ state: successState }));
     },
   });
   return { actor, clock: c };

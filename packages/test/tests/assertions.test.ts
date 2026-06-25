@@ -28,9 +28,9 @@ function makeActor() {
     context: {},
     states: [a, b],
     initial: a,
-    transitions: {
-      [a.name]: { [go.id]: () => ({ state: b }) },
-      [b.name]: { [stop.id]: () => ({ state: a }) },
+    setup: (m) => {
+      m.on(a, go, () => ({ state: b }));
+      m.on(b, stop, () => ({ state: a }));
     },
   });
 }
@@ -47,13 +47,11 @@ function makeActorWithContext() {
     context: { count: 0 },
     states: [a, b],
     initial: a,
-    transitions: {
-      [a.name]: {
-        [go.id]: (_event, { context }) => {
-          (context as { count: number }).count++;
-          return { state: b };
-        },
-      },
+    setup: (m) => {
+      m.on(a, go, (_event, { context }) => {
+        context.count++;
+        return { state: b };
+      });
     },
   });
 }

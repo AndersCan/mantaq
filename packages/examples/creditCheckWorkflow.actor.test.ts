@@ -113,65 +113,47 @@ function createCreditCheckActor(clock?: VirtualClock) {
     initial: idleState,
     clock: c,
     context: { retryCount: 0 } as CreditCheckContext,
-    effects: {
-      checkingCredit: [checkCreditEffect],
-      processingPayment: [processPaymentEffect],
-      notifyingWarehouse: [notifyWarehouseEffect],
-    },
-    transitions: {
-      Any: {
-        CANCEL: () => ({ state: idleState }),
-      },
-      idle: {
-        START_ORDER: (event, { context }) => {
-          (context as CreditCheckContext).order = (event as any).order;
-          return { state: checkingCreditState };
-        },
-      },
-      checkingCredit: {
-        CREDIT_CHECK_DONE: (event, { context }) => {
-          (context as CreditCheckContext).creditCheckResult = (event as any).result;
-          if ((event as any).result.approved) {
-            return { state: processingPaymentState };
-          }
-          return { state: creditDeniedState };
-        },
-        CREDIT_CHECK_ERROR: () => {
-          return { state: creditCheckFailedState };
-        },
-      },
-      processingPayment: {
-        PAYMENT_DONE: () => {
-          return { state: notifyingWarehouseState };
-        },
-        PAYMENT_ERROR: () => {
-          return { state: paymentFailedState };
-        },
-      },
-      notifyingWarehouse: {
-        NOTIFICATION_DONE: () => {
-          return { state: orderCompleteState };
-        },
-        NOTIFICATION_ERROR: () => {
-          return { state: notificationFailedState };
-        },
-      },
-      creditCheckFailed: {
-        RETRY: (_event, { context }) => {
-          (context as CreditCheckContext).retryCount++;
-          return { state: checkingCreditState };
-        },
-      },
-      paymentFailed: {
-        RETRY: () => {
+    setup: (m) => {
+      m.effect(checkingCreditState, checkCreditEffect);
+      m.effect(processingPaymentState, processPaymentEffect);
+      m.effect(notifyingWarehouseState, notifyWarehouseEffect);
+      m.onAny(cancelEvent, () => ({ state: idleState }));
+      m.on(idleState, startOrderEvent, (event, opts) => {
+        opts!.context.order = event.order;
+        return { state: checkingCreditState };
+      });
+      m.on(checkingCreditState, creditCheckDoneEvent, (event, opts) => {
+        opts!.context.creditCheckResult = event.result;
+        if (event.result.approved) {
           return { state: processingPaymentState };
-        },
-      },
-      notificationFailed: {
-        RETRY: () => {
-          return { state: notifyingWarehouseState };
-        },
-      },
+        }
+        return { state: creditDeniedState };
+      });
+      m.on(checkingCreditState, creditCheckErrorEvent, () => {
+        return { state: creditCheckFailedState };
+      });
+      m.on(processingPaymentState, paymentDoneEvent, () => {
+        return { state: notifyingWarehouseState };
+      });
+      m.on(processingPaymentState, paymentErrorEvent, () => {
+        return { state: paymentFailedState };
+      });
+      m.on(notifyingWarehouseState, notificationDoneEvent, () => {
+        return { state: orderCompleteState };
+      });
+      m.on(notifyingWarehouseState, notificationErrorEvent, () => {
+        return { state: notificationFailedState };
+      });
+      m.on(creditCheckFailedState, retryEvent, (_event, opts) => {
+        opts!.context.retryCount++;
+        return { state: checkingCreditState };
+      });
+      m.on(paymentFailedState, retryEvent, () => {
+        return { state: processingPaymentState };
+      });
+      m.on(notificationFailedState, retryEvent, () => {
+        return { state: notifyingWarehouseState };
+      });
     },
   });
 
@@ -243,7 +225,8 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     expect(matches(actor, "checkingCredit")).toBe(true);
 
     // Simulate error - we need to emit the error event directly
-    actor.send(creditCheckErrorEvent.create({ error: "Network failure" }));
+    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Network failure" }));
+    actor.__drainInternal();
     expect(matches(actor, "creditCheckFailed")).toBe(true);
     expect(actor.context.error).toBeUndefined(); // error not stored in this impl
 
@@ -264,7 +247,8 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
         order: { orderId: "ORD123", amount: 100, customerId: "CUST456" },
       }),
     );
-    actor.send(creditCheckErrorEvent.create({ error: "Network failure" }));
+    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Network failure" }));
+    actor.__drainInternal();
     expect(matches(actor, "creditCheckFailed")).toBe(true);
 
     actor.send(cancelEvent.create());
@@ -283,7 +267,8 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     clock.advance(1000); // credit check done
     expect(matches(actor, "processingPayment")).toBe(true);
 
-    actor.send(paymentErrorEvent.create({ error: "Payment declined" }));
+    actor.__pushInternal(paymentErrorEvent.create({ error: "Payment declined" }));
+    actor.__drainInternal();
     expect(matches(actor, "paymentFailed")).toBe(true);
 
     actor.send(retryEvent.create());
@@ -304,7 +289,8 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
       }),
     );
     clock.advance(1000);
-    actor.send(paymentErrorEvent.create({ error: "Payment declined" }));
+    actor.__pushInternal(paymentErrorEvent.create({ error: "Payment declined" }));
+    actor.__drainInternal();
     expect(matches(actor, "paymentFailed")).toBe(true);
 
     actor.send(cancelEvent.create());
@@ -325,7 +311,8 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     clock.advance(1500); // payment
     expect(matches(actor, "notifyingWarehouse")).toBe(true);
 
-    actor.send(notificationErrorEvent.create({ error: "Warehouse unavailable" }));
+    actor.__pushInternal(notificationErrorEvent.create({ error: "Warehouse unavailable" }));
+    actor.__drainInternal();
     expect(matches(actor, "notificationFailed")).toBe(true);
 
     actor.send(retryEvent.create());
@@ -347,7 +334,8 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     );
     clock.advance(1000);
     clock.advance(1500);
-    actor.send(notificationErrorEvent.create({ error: "Warehouse unavailable" }));
+    actor.__pushInternal(notificationErrorEvent.create({ error: "Warehouse unavailable" }));
+    actor.__drainInternal();
     expect(matches(actor, "notificationFailed")).toBe(true);
 
     actor.send(cancelEvent.create());
@@ -392,7 +380,8 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     expect(matches(actor, "checkingCredit")).toBe(true);
 
     // Abort by sending error event before timeout completes
-    actor.send(creditCheckErrorEvent.create({ error: "Forced error" }));
+    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Forced error" }));
+    actor.__drainInternal();
     expect(matches(actor, "creditCheckFailed")).toBe(true);
 
     // Advancing clock should not affect anything (effect aborted)
@@ -412,12 +401,14 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     );
 
     // First error + retry
-    actor.send(creditCheckErrorEvent.create({ error: "Error 1" }));
+    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Error 1" }));
+    actor.__drainInternal();
     actor.send(retryEvent.create());
     expect(actor.context.retryCount).toBe(1);
 
     // Second error + retry
-    actor.send(creditCheckErrorEvent.create({ error: "Error 2" }));
+    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Error 2" }));
+    actor.__drainInternal();
     actor.send(retryEvent.create());
     expect(actor.context.retryCount).toBe(2);
 

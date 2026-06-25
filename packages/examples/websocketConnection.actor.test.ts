@@ -74,68 +74,56 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
       heartbeatInterval: 5000,
       error: undefined,
     } as WsContext,
-    effects: {
-      connecting: [(input) => withTimeout(500, input, () => ({ id: "CONNECTION_ESTABLISHED" }))],
-      connected: [(input) => withTimeout(5000, input, () => ({ id: "HEARTBEAT_TIMEOUT" }))],
-      reconnecting: [
-        ({ signal, context, emit, clock }) => {
-          const ctx = context as WsContext;
-          if (ctx.retryCount >= ctx.maxRetries) {
-            clock.setTimeout(100, () => {
-              if (signal.aborted) return;
-              emit({ id: "MAX_RETRIES_REACHED" });
-            });
-          } else {
-            const delay = 1000 * Math.pow(2, ctx.retryCount);
-            clock.setTimeout(delay, () => {
-              if (signal.aborted) return;
-              emit({ id: "RECONNECT_TIMEOUT" });
-            });
-          }
-        },
-      ],
-    },
-    transitions: {
-      Any: {
-        DISCONNECT: () => ({ state: disconnectedState }),
-        FORCE_RECONNECT: (_event, { context }) => {
-          context.retryCount = 0;
-          return { state: reconnectingState };
-        },
-      },
-      disconnected: {
-        CONNECT: (event, { context }) => {
-          context.url = event.url;
-          context.retryCount = 0;
-          return { state: connectingState };
-        },
-      },
-      connecting: {
-        CONNECTION_ESTABLISHED: () => ({ state: connectedState }),
-        CONNECTION_FAILED: (event, { context }) => {
-          context.retryCount++;
-          context.error = event.error;
-          return { state: reconnectingState };
-        },
-      },
-      connected: {
-        HEARTBEAT_TIMEOUT: () => ({ state: reconnectingState }),
-      },
-      reconnecting: {
-        CONNECTION_ESTABLISHED: (_event, { context }) => {
-          context.retryCount = 0;
-          return { state: connectedState };
-        },
-        RECONNECT_TIMEOUT: () => ({ state: connectingState }),
-        MAX_RETRIES_REACHED: () => ({ state: permanentlyDisconnectedState }),
-      },
-      permanentlyDisconnected: {
-        CONNECT: (event, { context }) => {
-          context.url = event.url;
-          context.retryCount = 0;
-          return { state: connectingState };
-        },
-      },
+    setup: (m) => {
+      m.effect(connectingState, (input) =>
+        withTimeout(500, input, () => ({ id: "CONNECTION_ESTABLISHED" })),
+      );
+      m.effect(connectedState, (input) =>
+        withTimeout(5000, input, () => ({ id: "HEARTBEAT_TIMEOUT" })),
+      );
+      m.effect(reconnectingState, ({ signal, context, emit, clock }) => {
+        const ctx = context as WsContext;
+        if (ctx.retryCount >= ctx.maxRetries) {
+          clock.setTimeout(100, () => {
+            if (signal.aborted) return;
+            emit({ id: "MAX_RETRIES_REACHED" });
+          });
+        } else {
+          const delay = 1000 * Math.pow(2, ctx.retryCount);
+          clock.setTimeout(delay, () => {
+            if (signal.aborted) return;
+            emit({ id: "RECONNECT_TIMEOUT" });
+          });
+        }
+      });
+      m.onAny(disconnect, () => ({ state: disconnectedState }));
+      m.onAny(forceReconnect, (_event, opts) => {
+        opts!.context.retryCount = 0;
+        return { state: reconnectingState };
+      });
+      m.on(disconnectedState, connect, (event, opts) => {
+        opts!.context.url = event.url;
+        opts!.context.retryCount = 0;
+        return { state: connectingState };
+      });
+      m.on(connectingState, connectionEstablished, () => ({ state: connectedState }));
+      m.on(connectingState, connectionFailed, (event, opts) => {
+        opts!.context.retryCount++;
+        opts!.context.error = event.error;
+        return { state: reconnectingState };
+      });
+      m.on(connectedState, heartbeatTimeout, () => ({ state: reconnectingState }));
+      m.on(reconnectingState, connectionEstablished, (_event, opts) => {
+        opts!.context.retryCount = 0;
+        return { state: connectedState };
+      });
+      m.on(reconnectingState, reconnectTimeout, () => ({ state: connectingState }));
+      m.on(reconnectingState, maxRetriesReached, () => ({ state: permanentlyDisconnectedState }));
+      m.on(permanentlyDisconnectedState, connect, (event, opts) => {
+        opts!.context.url = event.url;
+        opts!.context.retryCount = 0;
+        return { state: connectingState };
+      });
     },
   });
 
@@ -171,7 +159,8 @@ describe("WebSocket reconnection manager", () => {
     clock.advance(200);
     expect(matches(actor, "connecting")).toBe(true);
 
-    actor.send(connectionFailed.create({ error: "Connection refused" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Connection refused" }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
     expect(actor.context.error).toBe("Connection refused");
@@ -185,7 +174,8 @@ describe("WebSocket reconnection manager", () => {
     expect(matches(actor, "connecting")).toBe(true);
 
     // Fail attempt 1
-    actor.send(connectionFailed.create({ error: "Error 1" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Error 1" }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
 
@@ -194,7 +184,8 @@ describe("WebSocket reconnection manager", () => {
     expect(matches(actor, "connecting")).toBe(true);
 
     // Fail attempt 2 → retryCount=2, which equals maxRetries=2
-    actor.send(connectionFailed.create({ error: "Error 2" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Error 2" }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(2);
 
@@ -251,7 +242,8 @@ describe("WebSocket reconnection manager", () => {
     const { actor, clock } = createWsActor();
 
     actor.send(connect.create({ url: "ws://example.com" }));
-    actor.send(connectionFailed.create({ error: "Fail" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Fail" }));
+    actor.__drainInternal();
     expect(actor.context.retryCount).toBe(1);
 
     // Force reconnect resets retryCount to 0
@@ -287,7 +279,8 @@ describe("WebSocket reconnection manager", () => {
 
     // Attempt and fail
     actor.send(connect.create({ url: "ws://example.com" }));
-    actor.send(connectionFailed.create({ error: "Timeout" }));
+    actor.__pushInternal(connectionFailed.create({ error: "Timeout" }));
+    actor.__drainInternal();
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
 

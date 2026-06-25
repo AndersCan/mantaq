@@ -11,7 +11,6 @@ export interface EffectRunnerOptions<ActorContext> {
   context: ActorContext;
   emit: (event: InternalEvent) => void;
   clock: Clock;
-  onError?: (err: unknown) => void;
 }
 
 export function runEffects<ActorContext>(
@@ -23,18 +22,14 @@ export function runEffects<ActorContext>(
 
   const abort = new AbortController();
   for (const effectFn of list) {
-    try {
-      effectFn({
-        signal: abort.signal,
-        state: { name: options.state.name, payload: options.statePayload },
-        event: options.event,
-        context: options.context,
-        emit: options.emit,
-        clock: options.clock,
-      });
-    } catch (err) {
-      options.onError?.(err);
-    }
+    effectFn({
+      signal: abort.signal,
+      state: { name: options.state.name, payload: options.statePayload },
+      event: options.event,
+      context: options.context,
+      emit: options.emit,
+      clock: options.clock,
+    });
   }
   return abort;
 }

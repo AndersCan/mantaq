@@ -14,8 +14,8 @@ function createFlatActor() {
     states: [idle, active],
     initial: idle,
     context: {} as {},
-    transitions: {
-      idle: { GO: () => ({ state: active }) },
+    setup: (m) => {
+      m.on(idle, go, () => ({ state: active }));
     },
   });
 }
@@ -32,8 +32,8 @@ function createAnyWildcardActor() {
     states: [idle, active],
     initial: idle,
     context: {} as {},
-    transitions: {
-      Any: { GO: () => ({ state: active }) },
+    setup: (m) => {
+      m.onAny(go, () => ({ state: active }));
     },
   });
 }
@@ -51,11 +51,9 @@ function createInternalEventActor() {
     states: [idle, active],
     initial: idle,
     context: {} as {},
-    transitions: {
-      idle: {
-        GO: () => ({ state: active }),
-        PING: () => ({ state: idle }),
-      },
+    setup: (m) => {
+      m.on(idle, go, () => ({ state: active }));
+      m.on(idle, ping, () => ({ state: idle }));
     },
   });
 }
@@ -72,8 +70,8 @@ function createFinalStateActor() {
     states: [idle, done],
     initial: idle,
     context: {} as {},
-    transitions: {
-      idle: { FINISH: () => ({ state: done }) },
+    setup: (m) => {
+      m.on(idle, finish, () => ({ state: done }));
     },
   });
 }
@@ -90,8 +88,8 @@ function createRegionActor() {
     states: [childA, childB],
     initial: childA,
     context: {} as {},
-    transitions: {
-      childA: { TOGGLE: () => ({ state: childB }) },
+    setup: (m) => {
+      m.on(childA, toggle, () => ({ state: childB }));
     },
   });
 
@@ -106,8 +104,8 @@ function createRegionActor() {
     initial: parent,
     context: {} as {},
     regions: { region1: child },
-    transitions: {
-      parent: { START: () => ({ state: parent }) },
+    setup: (m) => {
+      m.on(parent, start, () => ({ state: parent }));
     },
   });
 }
@@ -190,12 +188,10 @@ describe("buildGraph", () => {
       states: [idle],
       initial: idle,
       context: {} as {},
-      transitions: {
-        idle: {
-          GO: () => {
-            throw new Error("fail");
-          },
-        },
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("fail");
+        });
       },
     });
 
@@ -251,11 +247,10 @@ describe("buildGraph with sampleContexts", () => {
       states: [idle, active, blocked],
       initial: idle,
       context: {} as { ready: boolean },
-      transitions: {
-        idle: {
-          GO: (_event, { context }) =>
-            (context as { ready: boolean }).ready ? { state: active } : { state: blocked },
-        },
+      setup: (m) => {
+        m.on(idle, go, (_event, { context }) =>
+          context.ready ? { state: active } : { state: blocked },
+        );
       },
     });
   }
@@ -304,8 +299,8 @@ describe("buildGraph with sampleContexts", () => {
       states: [idle, active],
       initial: idle,
       context: {} as { unused: string },
-      transitions: {
-        idle: { GO: () => ({ state: active }) },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
       },
     });
 
@@ -333,10 +328,8 @@ describe("buildGraph with sampleContexts", () => {
       states: [idle],
       initial: idle,
       context: {} as { x: number },
-      transitions: {
-        idle: {
-          GO: (_event, { context }) => ((context as { x: number }).x > 10 ? {} : {}),
-        },
+      setup: (m) => {
+        m.on(idle, go, (_event, { context }) => (context.x > 10 ? {} : {}));
       },
     });
 

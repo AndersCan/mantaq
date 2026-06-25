@@ -62,7 +62,7 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     states: [tierStates.l1, tierStates.l2],
     initial: tierStates.l1,
     context: {} as {},
-    transitions: {},
+    setup: () => {},
   });
 
   const ctx: CacheContext = {
@@ -84,105 +84,98 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     clock: c,
     context: ctx,
     regions: { tier: tierActor },
-    effects: {
-      purging: [
-        (input) => {
-          const now = input.clock.now();
-          const expired: string[] = [];
-          for (const [key, entry] of input.context.entries) {
-            if (entry.expiresAt !== null && entry.expiresAt <= now) {
-              expired.push(key);
-            }
+    setup: (m) => {
+      m.effect(cacheStates.purging, (input) => {
+        const now = input.clock.now();
+        const expired: string[] = [];
+        for (const [key, entry] of input.context.entries) {
+          if (entry.expiresAt !== null && entry.expiresAt <= now) {
+            expired.push(key);
           }
-          for (const key of expired) {
-            input.context.entries.delete(key);
-            input.context.accessOrder = input.context.accessOrder.filter((k) => k !== key);
-            input.context.expires++;
+        }
+        for (const key of expired) {
+          input.context.entries.delete(key);
+          input.context.accessOrder = input.context.accessOrder.filter((k) => k !== key);
+          input.context.expires++;
+        }
+        input.emit(e.PURGE_DONE.create(undefined));
+      });
+      m.effect(cacheStates.full, (input) => {
+        if (input.context.accessOrder.length >= input.context.capacity) {
+          const lruKey = input.context.accessOrder.shift();
+          if (lruKey) {
+            input.context.entries.delete(lruKey);
+            input.context.evictions++;
           }
-          input.emit(e.PURGE_DONE.create(undefined));
-        },
-      ],
-      full: [
-        (input) => {
-          if (input.context.accessOrder.length >= input.context.capacity) {
-            const lruKey = input.context.accessOrder.shift();
-            if (lruKey) {
-              input.context.entries.delete(lruKey);
-              input.context.evictions++;
-            }
-          }
-          input.emit(e.EVICTION_DONE.create(undefined));
-        },
-      ],
-    },
-    transitions: {
-      Any: {
-        GET: (event, { context, actor }) => {
-          const entry = context.entries.get(event.key);
-          if (entry) {
-            const now = actor.clock.now();
-            if (entry.expiresAt !== null && entry.expiresAt <= now) {
-              context.entries.delete(event.key);
-              context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
-              context.expires++;
-              context.misses++;
-              return {};
-            }
-            entry.accessCount++;
-            entry.lastAccessed = now;
+        }
+        input.emit(e.EVICTION_DONE.create(undefined));
+      });
+      m.onAny(getEvent, (event, opts) => {
+        const { context } = opts!;
+        const entry = context.entries.get(event.key);
+        if (entry) {
+          const now = c.now();
+          if (entry.expiresAt !== null && entry.expiresAt <= now) {
+            context.entries.delete(event.key);
             context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
-            context.accessOrder.push(event.key);
-            context.hits++;
+            context.expires++;
+            context.misses++;
             return {};
           }
-          context.misses++;
+          entry.accessCount++;
+          entry.lastAccessed = now;
+          context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
+          context.accessOrder.push(event.key);
+          context.hits++;
           return {};
-        },
-        DELETE: (event, { context }) => {
-          if (context.entries.delete(event.key)) {
-            context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
-          }
-          return {};
-        },
-        PUT: (event, { context, actor }) => {
-          const now = actor.clock.now();
-          const entry: CacheEntry = {
-            value: event.value,
-            expiresAt: event.ttlMs !== undefined ? now + event.ttlMs : null,
-            accessCount: 0,
-            lastAccessed: now,
-          };
-          if (!context.entries.has(event.key)) {
-            context.accessOrder.push(event.key);
-          }
-          context.entries.set(event.key, entry);
-          if (context.entries.size > context.capacity) {
-            return { state: cacheStates.full };
-          }
-          return {};
-        },
-        PURGE: () => ({ state: cacheStates.purging }),
-        SET_CAPACITY: (event, { context }) => {
-          context.capacity = event.capacity;
-          return {};
-        },
-      },
-      purging: {
-        PURGE_DONE: (_event, { context }) => {
-          if (context.entries.size > context.capacity) {
-            return { state: cacheStates.full };
-          }
-          return { state: cacheStates.ready };
-        },
-      },
-      full: {
-        EVICTION_DONE: (_event, { context }) => {
-          if (context.entries.size > context.capacity) {
-            return { state: cacheStates.full };
-          }
-          return { state: cacheStates.ready };
-        },
-      },
+        }
+        context.misses++;
+        return {};
+      });
+      m.onAny(deleteEvent, (event, opts) => {
+        const { context } = opts!;
+        if (context.entries.delete(event.key)) {
+          context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
+        }
+        return {};
+      });
+      m.onAny(putEvent, (event, opts) => {
+        const { context } = opts!;
+        const now = c.now();
+        const entry: CacheEntry = {
+          value: event.value,
+          expiresAt: event.ttlMs !== undefined ? now + event.ttlMs : null,
+          accessCount: 0,
+          lastAccessed: now,
+        };
+        if (!context.entries.has(event.key)) {
+          context.accessOrder.push(event.key);
+        }
+        context.entries.set(event.key, entry);
+        if (context.entries.size > context.capacity) {
+          return { state: cacheStates.full };
+        }
+        return {};
+      });
+      m.onAny(e.PURGE, () => ({ state: cacheStates.purging }));
+      m.onAny(setCapacityEvent, (event, opts) => {
+        opts!.context.capacity = event.capacity;
+        return {};
+      });
+      m.on(cacheStates.purging, e.PURGE_DONE, (_event, opts) => {
+        const { context } = opts!;
+        if (context.entries.size > context.capacity) {
+          return { state: cacheStates.full };
+        }
+        return { state: cacheStates.ready };
+      });
+      m.on(cacheStates.full, e.EVICTION_DONE, (_event, opts) => {
+        const { context } = opts!;
+        if (context.entries.size > context.capacity) {
+          return { state: cacheStates.full };
+        }
+        return { state: cacheStates.ready };
+      });
     },
   });
 

@@ -41,13 +41,17 @@ describe("broadcast", () => {
       inputs: [toggle],
       states: [off, on],
       initial: off,
-      transitions: { off: { toggle: () => ({ state: on }) } },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+      },
     });
     const a2 = new Actor({
       inputs: [toggle],
       states: [off, on],
       initial: off,
-      transitions: { off: { toggle: () => ({ state: on }) } },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+      },
     });
     map.spawn("a", () => a1);
     map.spawn("b", () => a2);
@@ -73,18 +77,18 @@ describe("broadcast", () => {
       inputs: [toggle, reset],
       states: [off, on],
       initial: off,
-      transitions: {
-        off: { toggle: () => ({ state: on }) },
-        on: { reset: () => ({ state: off }) },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+        m.on(on, reset, () => ({ state: off }));
       },
     });
     const a2 = new Actor({
       inputs: [toggle, reset],
       states: [off, on],
       initial: on,
-      transitions: {
-        off: { toggle: () => ({ state: on }) },
-        on: { reset: () => ({ state: off }) },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+        m.on(on, reset, () => ({ state: off }));
       },
     });
     map.spawn("a", () => a1);
@@ -108,13 +112,15 @@ describe("broadcast", () => {
       inputs: [toggle],
       states: [off, on],
       initial: off,
-      transitions: { off: { toggle: () => ({ state: on }) } },
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+      },
     });
     const a2 = new Actor({
       inputs: [],
       states: [off, on],
       initial: off,
-      transitions: {},
+      setup: () => {},
     });
     map.spawn("a", () => a1);
     map.spawn("b", () => a2);
@@ -140,7 +146,9 @@ describe("broadcast", () => {
       inputs: [pong],
       states: [childOff, childOn],
       initial: childOff,
-      transitions: { childOff: { pong: () => ({ state: childOn }) } },
+      setup: (m) => {
+        m.on(childOff, pong, () => ({ state: childOn }));
+      },
     });
     map.spawn("child", () => child);
 
@@ -149,13 +157,11 @@ describe("broadcast", () => {
       inputs: [ping],
       states: [idle, done],
       initial: idle,
-      transitions: {
-        idle: {
-          ping: () => {
-            broadcast(map, pong.create());
-            return { state: done };
-          },
-        },
+      setup: (m) => {
+        m.on(idle, ping, () => {
+          broadcast(map, pong.create());
+          return { state: done };
+        });
       },
     });
 
