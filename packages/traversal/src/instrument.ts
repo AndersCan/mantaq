@@ -21,18 +21,17 @@ export interface InstrumentedActor {
   __abortEffects(): void;
 }
 
-export function instrument(actor: AnyActor): InstrumentedActor {
-  const history = new History();
-  const origSend = actor.send.bind(actor);
-  let prevStateName = actor.state.name;
-  let pendingEventId: string | undefined;
+function wrapWithProxy(
+  actor: AnyActor,
+  hooks: {
+    history: History;
+    origSend: AnyActor["send"];
+    pendingEventId: { value: string | undefined };
+  },
+): InstrumentedActor {
+  const { history, origSend, pendingEventId } = hooks;
 
-  history.append({
-    type: "state_visit",
-    data: { stateName: actor.state.name, timestamp: Date.now() },
-  });
-
-  const wrapped: InstrumentedActor = {
+  return {
     get history() {
       return history;
     },
@@ -62,18 +61,12 @@ export function instrument(actor: AnyActor): InstrumentedActor {
     },
 
     send(event: unknown) {
-      const evt = event as { id?: string };
-      const eventId = evt?.id ?? "unknown";
-      history.append({
-        type: "send",
-        data: { event: eventId, timestamp: Date.now() },
-      });
-
-      pendingEventId = eventId;
+      const { id: eventId } = trackSendEvent(history, event);
+      pendingEventId.value = eventId;
       try {
         origSend(event as Parameters<typeof origSend>[0]);
       } finally {
-        pendingEventId = undefined;
+        pendingEventId.value = undefined;
       }
     },
 
@@ -88,27 +81,50 @@ export function instrument(actor: AnyActor): InstrumentedActor {
     },
     __abortEffects: actor.__abortEffects.bind(actor),
   };
+}
+
+function recordTransition(history: History, from: string, to: string, eventId: string) {
+  history.append({
+    type: "transition",
+    data: { from, event: eventId, to, timestamp: Date.now() },
+  });
+  history.append({
+    type: "state_visit",
+    data: { stateName: to, timestamp: Date.now() },
+  });
+  history.append({
+    type: "effect",
+    data: { stateName: to, timestamp: Date.now() },
+  });
+}
+
+function trackSendEvent(history: History, event: unknown): { id: string } {
+  const evt = event as { id?: string };
+  const eventId = evt?.id ?? "unknown";
+  history.append({
+    type: "send",
+    data: { event: eventId, timestamp: Date.now() },
+  });
+  return { id: eventId };
+}
+
+export function instrument(actor: AnyActor): InstrumentedActor {
+  const history = new History();
+  const origSend = actor.send.bind(actor);
+  let prevStateName = actor.state.name;
+  const pendingEventId = { value: undefined as string | undefined };
+
+  history.append({
+    type: "state_visit",
+    data: { stateName: actor.state.name, timestamp: Date.now() },
+  });
+
+  const wrapped = wrapWithProxy(actor, { history, origSend, pendingEventId });
 
   actor.on("change", () => {
     const currentName = actor.state.name;
     if (currentName !== prevStateName) {
-      history.append({
-        type: "transition",
-        data: {
-          from: prevStateName,
-          event: pendingEventId ?? "unknown",
-          to: currentName,
-          timestamp: Date.now(),
-        },
-      });
-      history.append({
-        type: "state_visit",
-        data: { stateName: currentName, timestamp: Date.now() },
-      });
-      history.append({
-        type: "effect",
-        data: { stateName: currentName, timestamp: Date.now() },
-      });
+      recordTransition(history, prevStateName, currentName, pendingEventId.value ?? "unknown");
       prevStateName = currentName;
     }
   });
