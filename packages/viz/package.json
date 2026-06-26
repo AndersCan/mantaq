@@ -8,7 +8,7 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": "./src/index.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -19,6 +19,7 @@
     "build:watch": "vp pack --watch",
     "dev": "vp dev dev",
     "test": "vp test",
+    "test:browser": "node node_modules/vitest/vitest.mjs run",
     "check": "vp check",
     "mutation": "stryker run",
     "prepublishOnly": "vp run build"
@@ -35,7 +36,10 @@
     "@mantaq/sugar": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "7.0.0-dev.20260509.2",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "jsdom": "^26.1.0",
+    "playwright": "catalog:",
     "typescript": "catalog:",
     "unocss": "catalog:",
     "vite-plus": "catalog:",

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite-plus";
 import UnoCSS from "unocss/vite";
+import { playwright } from "vite-plus/test/browser-playwright";
 
 const unoPlugin = UnoCSS({ mode: "shadow-dom" });
 
@@ -19,6 +20,11 @@ export default defineConfig({
   },
   fmt: {},
   test: {
-    environment: "jsdom",
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      headless: false,
+      instances: [{ browser: "chromium" }],
+    },
   },
-});
+} as any);
