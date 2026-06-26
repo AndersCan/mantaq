@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { describe, test, expect } from "vite-plus/test";
 import { Actor, state, event } from "@mantaq/core";
 import { buildGraph } from "../src/graph.ts";
