@@ -19,14 +19,15 @@
     "dev": "vp pack --watch",
     "test": "vp test",
     "check": "vp check",
-    "prepublishOnly": "vp run build"
+    "prepublishOnly": "vp run build",
+    "coverage": "vp test run --coverage"
   },
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",
     "@stryker-mutator/vitest-runner": "catalog:",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "bumpp": "^12.2.0",
+    "@vitest/coverage-v8": "catalog:",
     "typescript": "^6.0.3",
     "vite": "catalog:",
     "vite-plus": "catalog:",

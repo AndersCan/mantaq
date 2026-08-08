@@ -17,8 +17,7 @@
  */
 
 import { describe, it, expect, vi } from "vite-plus/test";
-import { Actor, VirtualClock } from "@mantaq/core";
-import { event } from "@mantaq/core";
+import { Actor, VirtualClock, event } from "@mantaq/core";
 import type { EffectInput } from "@mantaq/core";
 import { matches, withTimeout, states, events } from "@mantaq/sugar";
 

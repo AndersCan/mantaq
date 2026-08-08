@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run guard && vp run -r test && vp run -r build",
+    "ready": "vp check && vp run guard && vp run knip && vp run -r test && vp run -r build",
     "guard": "node scripts/vision-guard.mjs",
+    "knip": "knip",
+    "coverage": "vp run -r coverage",
     "dev": "vp run docs#dev",
     "prepare": "vp config",
     "mutation:core": "stryker run"
@@ -14,6 +16,7 @@
     "@stryker-mutator/core": "catalog:",
     "@stryker-mutator/vitest-runner": "catalog:",
     "@varlock/bumpy": "catalog:",
+    "knip": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

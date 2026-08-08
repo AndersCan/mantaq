@@ -16,9 +16,7 @@
  */
 
 import { describe, it, expect } from "vite-plus/test";
-import { Actor, VirtualClock } from "@mantaq/core";
-import { state } from "@mantaq/core";
-import { event } from "@mantaq/core";
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
 import { matches, withTimeout } from "@mantaq/sugar";
 
 type BasicInfo = {

@@ -19,14 +19,17 @@
     "dev": "vp pack --watch",
     "test": "vp test",
     "check": "vp check",
-    "prepublishOnly": "vp run build"
+    "prepublishOnly": "vp run build",
+    "coverage": "vp test run --coverage"
   },
   "dependencies": {
-    "@mantaq/core": "workspace:*"
+    "@mantaq/core": "workspace:*",
+    "@mantaq/utils": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitest/coverage-v8": "catalog:",
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"

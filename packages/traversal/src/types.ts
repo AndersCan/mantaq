@@ -6,7 +6,7 @@ export interface SyntheticEvent {
 }
 
 /** Simplified handler return — matches TransitionResult with erased generics */
-export interface HandlerResult {
+interface HandlerResult {
   state?: { name?: string };
   emit?: Array<{ id?: string }>;
 }

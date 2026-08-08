@@ -1,5 +1,4 @@
-import type { History } from "@mantaq/traversal";
-import type { ActorGraph } from "@mantaq/traversal";
+import type { History, ActorGraph } from "@mantaq/traversal";
 import type { AnyActor } from "@mantaq/core";
 
 export function assertAllStatesVisited(graph: ActorGraph, history: History): void {
