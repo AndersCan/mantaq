@@ -112,7 +112,7 @@ export class Actor<
   const States extends readonly AnyStateRef[],
   const Inputs extends readonly AnyEventRef[],
   const Internal extends readonly AnyEventRef[] = readonly [],
-  const Outputs extends readonly AnyEventRef[] = readonly AnyEventRef[],
+  const Outputs extends readonly AnyEventRef[] = readonly [],
   ActorContext = Record<string, unknown>,
 > {
   state: States[number];
