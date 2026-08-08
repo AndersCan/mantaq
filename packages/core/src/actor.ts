@@ -92,6 +92,7 @@ type StepFn<States extends readonly AnyStateRef[], ActorContext> = (
   options: { context: ActorContext; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
 
+// FIXME: Actor class 331 lines, 13 fields — extract state-machine engine (dispatch/transitions/effects) from infrastructure (queue/subs/regions/children/snapshot). Split into StateMachineCore + ActorInfrastructure.
 export class Actor<
   const States extends readonly AnyStateRef[],
   const Inputs extends readonly AnyEventRef[],
@@ -311,9 +312,7 @@ export class Actor<
           return false;
         }
         count++;
-        if (this.#internalIds.has(event.id)) {
-          this.#dispatch(event);
-        } else if (this.#inputIds.has(event.id)) {
+        if (this.#internalIds.has(event.id) || this.#inputIds.has(event.id)) {
           this.#dispatch(event);
         } else if (this.#outputHandler) {
           this.#outputHandler(event);
