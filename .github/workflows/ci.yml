@@ -2,10 +2,12 @@ name: CI
 
 on:
   pull_request:
+    branches: [main, wip]
+  push:
     branches: [wip]
 
 jobs:
-  check:
+  ready:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,5 +16,4 @@ jobs:
           node-version: "24"
           cache: true
       - run: vp install
-      - run: vp check
-      - run: vp test
+      - run: vp run ready
