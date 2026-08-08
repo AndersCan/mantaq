@@ -86,12 +86,16 @@ export class VirtualClock implements Clock {
     return found ? earliest : null;
   }
 
-  #fireTimersAt(deadline: number): void {
+  #collectMatchingIds<T>(map: Map<number, T>, match: (entry: T) => boolean): number[] {
     const ids: number[] = [];
-    for (const [id, t] of this.#timers) {
-      if (t.deadline === deadline) ids.push(id);
+    for (const [id, entry] of map) {
+      if (match(entry)) ids.push(id);
     }
-    for (const id of ids) {
+    return ids;
+  }
+
+  #fireTimersAt(deadline: number): void {
+    for (const id of this.#collectMatchingIds(this.#timers, (t) => t.deadline === deadline)) {
       const timer = this.#timers.get(id);
       if (timer) {
         clearAbort(timer);
@@ -102,11 +106,7 @@ export class VirtualClock implements Clock {
   }
 
   #fireIntervalsAt(deadline: number): void {
-    const ids: number[] = [];
-    for (const [id, t] of this.#intervals) {
-      if (t.next === deadline) ids.push(id);
-    }
-    for (const id of ids) {
+    for (const id of this.#collectMatchingIds(this.#intervals, (t) => t.next === deadline)) {
       const interval = this.#intervals.get(id);
       if (interval) {
         interval.cb();
