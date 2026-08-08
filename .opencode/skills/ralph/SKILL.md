@@ -1,12 +1,12 @@
 ---
 name: ralph
-description: Ralph Wiggum loop. Deep structural improvement. Expensive model thinks, @worker (fast, cheap) executes. Splits long functions, splits multi-responsibility classes, reduces branching, kills type casts, improves DX via sugar, improves viz package, leaves FIXMEs for next run, self-reflects and improves own prompt at end. Use when user wants run self-improvement loop for deep work.
+description: Ralph Wiggum loop. Deep structural improvement. Expensive model thinks, @worker executes. Splits long functions, splits multi-responsibility classes, reduces branching, kills type casts, improves DX via sugar, leaves FIXMEs for next run, self-reflects and improves own prompt at end. Use when user wants run self-improvement loop for deep work.
 allowed-tools: Read Grep Glob Bash Edit Write Task
 ---
 
 # Ralph Wiggum Loop
 
-Expensive model thinks. Fast model executes. ~50x cost savings.
+Expensive model thinks. Fast model executes.
 
 @worker not dumb. Very fast. Delegate more than you think. Only keep reasoning-heavy work in orchestrator.
 
@@ -44,8 +44,7 @@ NOT trivial docs. NOT single-line tweaks. Deep structural work:
 4. **Type safety** — kill `as unknown as X`, `as any`, `@ts-ignore`. Exception: TS limitation (setTimeout, branded types, lib gaps) → keep + explanatory comment.
 5. **LOC reduction** — dedup, dead code, verbose patterns replaceable with stdlib.
 6. **DX via sugar** — inspect `examples/` for painful/verbose patterns. Fix with existing sugar. No sugar for it? Flag need for new sugar helper. Can a core feature move to sugar for better DX? Prefer sugar over raw core in examples. Sugar = ergonomic layer over core.
-7. **Viz package** — improve `packages/viz/`. Rendering bugs, perf, component structure, prop ergonomics, dead code, lit-html usage. Compare viz state vs actor state (use [agent-browser-viz](../agent-browser-viz/SKILL.md) skill to verify).
-8. **Leave FIXMEs** — found but not fixed this run → `// FIXME: <specific desc>` at location. Seeds next run.
+7. **Leave FIXMEs** — found but not fixed this run → `// FIXME: <specific desc>` at location. Seeds next run.
 
 Skip:
 
@@ -84,7 +83,7 @@ git rebase main || git rebase --abort
 
 ### Phase 1: Discover (AGENT-DRIVEN)
 
-Do NOT run rg/grep yourself. Spawn worker. Orchestrator stays lean. (worker = cheap, fast, handles discovery fine. explore agent expensive — avoid.)
+Do NOT run rg/grep yourself. Spawn worker. Orchestrator stays lean. (worker handles discovery fine. skip explore agent.)
 
 Step 1a: Spawn single worker for full discovery.
 
@@ -120,19 +119,12 @@ PRIORITY 5 — DX via sugar:
 - Core feature used heavily in examples but ergonomic only via sugar? Flag 'MOVE TO SUGAR: <feature>'.
 - rg 'import.*@mantaq/core' examples/ — direct core usage in examples. Flag each as sugar opportunity.
 
-PRIORITY 6 — viz package:
-- packages/viz/ structure review. Components >200 lines → split candidates.
-- rg 'as any|as unknown as' packages/viz/ --include '*.ts'
-- Dead components: rg 'customElements.define' packages/viz/ then check usage in dev/ and examples/.
-- Prop ergonomics: components with >5 props → consider config object.
-- Compare viz state vs actor state — flag mismatches (use agent-browser-viz skill to verify if needed).
-
 DEPTH deep adds:
 - gh issue list --limit 20
 - git log --oneline --grep='ralph' -30 — avoid repeating past tasks
 
 RETURN FORMAT (one line per finding):
-<file>:<line> | <priority: FIXME|DEEP|TYPE|LOC|DX|VIZ> | <category: SPLIT|RESPONSIBILITY|BRANCHING|CAST|DEAD|DUP|SUGAR-ADOPT|NEW-SUGAR|MOVE-TO-SUGAR|VIZ-SPLIT|VIZ-PROP|VIZ-DEAD|VIZ-STATE> | <one-line specific description>
+<file>:<line> | <priority: FIXME|DEEP|TYPE|LOC|DX> | <category: SPLIT|RESPONSIBILITY|BRANCHING|CAST|DEAD|DUP|SUGAR-ADOPT|NEW-SUGAR|MOVE-TO-SUGAR> | <one-line specific description>
 
 Skip trivial findings (<10 line edits, doc tweaks, single-line renames). No file contents. Line refs only.
 Verify path exists before flagging."
@@ -148,7 +140,6 @@ Step 1b: Build DAG. Orchestrator parses. Rank:
 5. Type safety
 6. LOC reduction (dead code, dedup)
 7. DX via sugar (examples pain → existing sugar / new sugar / move core to sugar)
-8. Viz package improvements
 
 Batch small cuts in same file → single worker.
 
@@ -181,7 +172,6 @@ Step 2a: Pick executor.
 - Format/lint fixes
 - Sugar adoption in examples (swap raw core import for sugar import)
 - New sugar helper (specify signature + behavior — worker implements, exports, adds test)
-- Viz component splits, prop ergonomics, dead component removal
 
 Default: delegate. Only keep when worker would guess wrong on design.
 
@@ -192,7 +182,7 @@ Task(
   subagent_type: "worker",
   description: "Ralph: <short-desc>",
   prompt: "TASK: <desc>
-CATEGORY: <SPLIT|RESPONSIBILITY|BRANCHING|TYPE|LOC|DX|VIZ|CLEANUP>
+CATEGORY: <SPLIT|RESPONSIBILITY|BRANCHING|TYPE|LOC|DX|CLEANUP>
 BRANCH: ralph/improvements (already checked out)
 
 READ ONLY WHAT YOU NEED. Low context.
@@ -209,7 +199,6 @@ RULES:
 - If touching public API: check callers across packages
 - Found issue but not fixing this task? Leave '// FIXME: <specific desc>' at location
 - New sugar helper? Add to packages/sugar/src/, export from index.ts, add test in packages/sugar/tests/
-- Viz change? MANDATORY: load + run agent-browser-viz skill if render path affected (prop shape change, render method split, template restructure). Static glance insufficient. Worker must verify visually OR orchestrator cancels commit.
 
 CHECK before commit:
 - vp check --fix
@@ -267,7 +256,7 @@ Questions:
 
 - Which tasks succeeded? Failed?
 - @worker handle tasks well? Was task too complex, or prompt bad?
-- Cost ratio acceptable? Did orchestrator do too much itself?
+- Did orchestrator do too much itself?
 - Which categories fail most?
 - FIXMEs added vs fixed ratio? Backlog growing or shrinking?
 - iteration_count right? (5 enough? too many for 30min?)
@@ -276,7 +265,6 @@ Questions:
 - Deep work quality — real structural improvement or surface tweaks?
 - Justified type casts flagged as false positives?
 - DX/sugar findings — real pain or imagined? Examples actually improved?
-- Viz findings — verified rendering or guessed?
 - Worker speed — felt slow anywhere? Where?
 
 **Part B: Improve this SKILL.md.** Loop's own prompt is loop's most important code. Fix it.
@@ -315,24 +303,6 @@ Print summary of commits this run:
 ```
 git log --oneline -<iteration_count*2>
 ```
-
-## Cost Optimization
-
-Whole point: expensive model orchestrates, fast cheap model executes.
-
-- **Orchestrator (you)**: think, plan, decide design, review logs, improve skill. Minimal tool calls.
-- **@worker (mimo-v2.5)**: fast execution. ~50x cheaper. Not dumb — handles splits, refactors, new helpers when given clear spec.
-- **worker agent**: execution + discovery. Cheap, fast. Used for both.
-
-Rules:
-
-1. Never rg/grep yourself. Delegate to worker.
-2. Read minimal snippets in orchestrator. Workers read fresh.
-3. Batch discovery into ONE worker call.
-4. Batch small cuts into single worker call.
-5. Default: delegate to @worker. Only keep in orchestrator if worker would guess wrong on design.
-6. Give worker clear spec: target file + line + what changes + expected result. Worker figures out how.
-7. Trivial <10 line edits → do directly. No worker overhead.
 
 ## Anti-patterns
 
@@ -493,5 +463,4 @@ Delegate to @worker (give clear spec, let worker figure out how):
 - Format/lint fixes
 - Sugar adoption in examples (swap raw core import → sugar import)
 - New sugar helper implementation — spec: signature + behavior + test cases. Worker implements, exports, tests.
-- Viz component splits, prop ergonomics, dead component removal
 - JSDoc addition to existing stable exports
