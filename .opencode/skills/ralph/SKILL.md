@@ -120,7 +120,6 @@ PRIORITY 5 — DX via sugar:
 - rg 'import.*@mantaq/core' examples/ — direct core usage in examples. Flag each as sugar opportunity.
 
 DEPTH deep adds:
-- gh issue list --limit 20
 - git log --oneline --grep='ralph' -30 — avoid repeating past tasks
 
 RETURN FORMAT (one line per finding):
