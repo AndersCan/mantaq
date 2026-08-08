@@ -5,7 +5,6 @@
   "description": "Showcase examples comparing xstate v5 with mantaq actor system.",
   "type": "module",
   "scripts": {
-    "build": "vp pack",
     "test": "vp test",
     "check": "vp check",
     "mutation": "stryker run"
@@ -15,10 +14,10 @@
     "@mantaq/sugar": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^25.6.2",
-    "@typescript/native-preview": "7.0.0-dev.20260509.2",
-    "typescript": "^6.0.3",
-    "vite-plus": "catalog:",
-    "vitest": "catalog:"
+    "@types/node": "^26.2.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "typescript": "^7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

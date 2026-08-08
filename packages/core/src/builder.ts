@@ -3,14 +3,13 @@ import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./eve
 import type { AnyActor } from "./actor-internal.ts";
 import type { EffectFn, TransitionResult } from "./actor-types.ts";
 
+export type TransitionHandler<ActorContext> = (
+  event: InternalEvent,
+  opts: { context: ActorContext; actor: AnyActor },
+) => TransitionResult;
+
 export interface BuiltMaps<ActorContext> {
-  transitions: Record<
-    string,
-    Record<
-      string,
-      (event: InternalEvent, opts: { context: ActorContext; actor: AnyActor }) => TransitionResult
-    >
-  >;
+  transitions: Record<string, Record<string, TransitionHandler<ActorContext>>>;
   effects: Record<string, Array<EffectFn<ActorContext>>>;
 }
 
@@ -34,7 +33,7 @@ export class ActorBuilder<
   ): this {
     const sName = stateRef.name;
     const eId = eventRef.id;
-    (this.#transitions[sName] ??= {})[eId] = fn as any;
+    (this.#transitions[sName] ??= {})[eId] = fn as TransitionHandler<ActorContext>;
     return this;
   }
 
@@ -46,7 +45,7 @@ export class ActorBuilder<
     ) => TransitionResult,
   ): this {
     const eId = eventRef.id;
-    (this.#transitions["Any"] ??= {})[eId] = fn as any;
+    (this.#transitions["Any"] ??= {})[eId] = fn as TransitionHandler<ActorContext>;
     return this;
   }
 

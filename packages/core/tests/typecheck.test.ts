@@ -1,5 +1,6 @@
-import { expect, test, describe } from "vite-plus/test";
+import { expect, expectTypeOf, test, describe } from "vite-plus/test";
 import { Actor, state, event } from "../src/index.ts";
+import type { StateRef } from "../src/index.ts";
 
 describe("API type safety", () => {
   test("emit to output passes typecheck", () => {
@@ -80,5 +81,118 @@ describe("API type safety", () => {
 
     actor.send(tick.create());
     expect(actor.context.count).toBe(1);
+  });
+});
+
+describe("type level contract — type = behavior", () => {
+  test("send accepts exactly the created event of a declared input", () => {
+    const clicked = event("CLICKED")<{ x: number }>();
+    const idle = state("idle")();
+
+    const actor = new Actor({
+      inputs: [clicked],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+
+    expectTypeOf<Parameters<typeof actor.send>[0]>().toEqualTypeOf<
+      { x: number } & { id: "CLICKED" }
+    >();
+    expectTypeOf<ReturnType<typeof clicked.create>>().toEqualTypeOf<
+      { x: number } & { id: "CLICKED" }
+    >();
+  });
+
+  test("state is the declared states union", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+
+    const actor = new Actor({
+      inputs: [],
+      states: [idle, active],
+      initial: idle,
+      setup: () => {},
+    });
+
+    expectTypeOf(actor.state.name).toEqualTypeOf<"idle" | "active">();
+    expectTypeOf(actor.state).toMatchTypeOf<StateRef<string>>();
+  });
+
+  test("handler event carries declared id and payload end to end", () => {
+    const clicked = event("CLICKED")<{ x: number }>();
+    const idle = state("idle")();
+
+    new Actor({
+      inputs: [clicked],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, clicked, (event) => {
+          expectTypeOf(event).toEqualTypeOf<{ x: number } & { id: "CLICKED" }>();
+          return {};
+        });
+      },
+    });
+  });
+
+  test("context flows typed into handlers and effects", () => {
+    const idle = state("idle")();
+    const tick = event("TICK")();
+
+    const actor = new Actor({
+      inputs: [tick],
+      states: [idle],
+      initial: idle,
+      context: { count: 0 },
+      setup: (m) => {
+        m.on(idle, tick, (_e, { context }) => {
+          expectTypeOf(context).toEqualTypeOf<{ count: number }>();
+          return {};
+        });
+        m.effect(idle, ({ context }) => {
+          expectTypeOf(context).toEqualTypeOf<{ count: number }>();
+        });
+      },
+    });
+
+    expectTypeOf(actor.context).toEqualTypeOf<{ count: number }>();
+  });
+
+  test("state payload is typed through create", () => {
+    const ready = state("ready")<{ items: string[] }>();
+
+    const created = ready.create({ items: ["a"] });
+    expectTypeOf(created.payload).toEqualTypeOf<{ items: string[] }>();
+    expectTypeOf(created.state).toMatchTypeOf<StateRef<"ready", { items: string[] }>>();
+  });
+
+  test("final() narrows isFinal to true", () => {
+    const done = state("done")().final();
+    const pending = state("pending")();
+
+    expectTypeOf(done.isFinal).toEqualTypeOf<true>();
+    expectTypeOf(pending.isFinal).toEqualTypeOf<false>();
+  });
+
+  test("wrong usage fails to compile", () => {
+    const clicked = event("CLICKED")<{ x: number }>();
+    const idle = state("idle")();
+
+    const actor = new Actor({
+      inputs: [clicked],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+
+    // @ts-expect-error send takes an event object, not a bare string id
+    actor.send("CLICKED");
+    // @ts-expect-error created event requires the declared payload
+    actor.send({ id: "CLICKED" });
+
+    const ready = state("ready")<{ items: string[] }>();
+    // @ts-expect-error create requires the full payload
+    ready.create({});
   });
 });

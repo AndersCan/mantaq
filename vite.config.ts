@@ -8,7 +8,10 @@ export default defineConfig({
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     ignorePatterns: ["apps/docs/**"],
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+    rules: {
+      "vite-plus/prefer-vite-plus-imports": "error",
+      "typescript/no-explicit-any": "error",
+    },
     options: { typeAware: true, typeCheck: true },
   },
   run: {

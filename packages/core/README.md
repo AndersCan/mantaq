@@ -457,9 +457,7 @@ const parent = new Actor({
 Subscribe to `"error"` to catch effect errors. The callback receives the error object.
 
 ```ts
-const actor = new Actor({
-  /* ... */
-});
+const actor = new Actor({/* ... */});
 
 actor.on("error", (err) => {
   console.error("Effect error:", err);
@@ -618,9 +616,7 @@ parent.on("error", (err) => {
 
 ```ts
 // ❌ child may not exist yet when parent is created
-const child = new Actor({
-  /* ... */
-});
+const child = new Actor({/* ... */});
 child.on("error", (err) => console.error(err));
 
 const parent = new Actor({

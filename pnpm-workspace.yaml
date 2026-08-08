@@ -2,30 +2,30 @@ packages:
   - apps/*
   - packages/*
   - tools/*
+  - "!packages/viz"
 
 catalogMode: prefer
 
 catalog:
-  "@types/node": ^24
-  typescript: ^5
-  vite: npm:@voidzero-dev/vite-plus-core@latest
-  vitest: npm:@voidzero-dev/vite-plus-test@latest
-  vite-plus: latest
+  "@types/node": ^26
+  typescript: ^7
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.8
+  vitest: 4.1.10
+  vite-plus: 0.2.8
   "@stryker-mutator/core": ^9
   "@stryker-mutator/vitest-runner": ^9
-  "@varlock/bumpy": ^1.13.1
-  sharp: ^0.34.5
+  "@varlock/bumpy": ^1.18.1
+  sharp: ^0.35.3
   lit: ^3.3.3
   "@nanostores/lit": ^0.2.3
-  "@vitest/browser": 4.1.8
-  playwright: ^1.61.1
-  "@vitest/browser-playwright": 4.1.8
+  playwright: ^1.62.1
+  "@vitest/browser-playwright": 4.1.10
   remark-gfm: ^4.0.1
-  unocss: ^66.7.0
-  "@dagrejs/dagre": ^3.0.0
+  unocss: ^66.7.5
+  "@dagrejs/dagre": ^3.1.0
   "@antv/x6": ^3.1.7
   tslib: ^2.8.1
-  "@vitest/ui": 4.1.8
+  "@vitest/ui": 4.1.10
 overrides:
   vite: "catalog:"
   vitest: "catalog:"

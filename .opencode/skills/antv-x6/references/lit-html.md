@@ -168,9 +168,9 @@ function cardTemplate(node: any) {
   const { label, status } = node.getData() ?? {};
   return html` <div
     style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-                background:#fff;border-radius:6px;border:2px solid ${status === "done"
-      ? "#52c41a"
-      : "#5F95FF"};"
+                background:#fff;border-radius:6px;border:2px solid ${
+                  status === "done" ? "#52c41a" : "#5F95FF"
+                };"
   >
     ${label}
   </div>`;

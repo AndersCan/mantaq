@@ -1,106 +1,31 @@
-# @mantaq/viz
+# @mantaq/viz (removed)
 
-Actor model state machine visualizer using X6 and Lit web components.
+Actor model state machine visualizer. Source deleted — too buggy to keep. This README documents what was here.
 
-## Installation
+## What it did
 
-```bash
-pnpm add @mantaq/viz
-```
+Rendered an actor's state machine as an interactive graph in the browser. Click edges to fire transitions, see active state highlighted, inspect actor context, play transition timeline. Also had a `<mantaq-viz>` web component with a toolbar, settings panel (layout direction, edge router, ranksep), and tooltips.
 
-## Usage
+## Libraries used
 
-```html
-<mantaq-viz id="viz"></mantaq-viz>
-<script type="module">
-  import "@mantaq/viz";
-  const el = document.getElementById("viz");
-  el.actor = myActor;
-</script>
-```
+- **@antv/x6** (v3) — graph canvas, SVG rendering, node/edge styling, routers, zoom/pan
+- **@dagrejs/dagre** — layered graph layout (TB/LR, node/rank separation)
+- **lit-html** (v3) — DOM rendering for toolbar, context viewer, timeline, settings panel
+- **unocss** — styling (uno.config.ts)
+- **@mantaq/core**, **@mantaq/traversal** — actor API and graph/path building (workspace deps)
+- **vitest** + **@vitest/browser-playwright** — node + browser tests with screenshots
+- **stryker** — mutation testing
 
-## API
+## Structure
 
-### Exports
+- `src/graph.ts` — actor snapshot → nodes/edges (`buildGraph`)
+- `src/layout.ts` — dagre positions (`computeNodePositions`)
+- `src/x6/` — X6 graph creation, sync, node/edge styles (`createGraph`, `syncGraph`)
+- `src/components/` — `mantaq-viz`, `actor-flow`, `context-viewer`, `transition-timeline`, `editor-model`
+- `src/controllers/graph-sync-controller.ts` — kept graph in sync with live actor
+- `dev/` — playground page
+- `tests/` — unit, integration, and browser tests
 
-```ts
-buildGraph(actor, internalIds?) → ActorGraph
-```
+## API surface (gone)
 
-Convert actor snapshot to graph nodes and edges. Optionally pass `internalIds` to mark internal transitions.
-
-```ts
-computeNodePositions(nodes, edges, options?) → Map<string, { x, y }>
-```
-
-Compute dagre layout positions for nodes/edges.
-
-```ts
-renderActorFlow(parent, options) → ActorFlowInstance
-```
-
-Render a full actor flow graph into a container element. Returns instance with `update(graph, layoutOptions?)` and `destroy()` methods.
-
-```ts
-MantaqViz; // custom element <mantaq-viz>
-```
-
-### Types
-
-```ts
-interface GraphNode {
-  id: string;
-  label: string;
-  isActive: boolean;
-  isFinal: boolean;
-  isInitial?: boolean;
-}
-
-interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  label: string;
-  isActive: boolean;
-  isInternal?: boolean;
-  isUndetermined?: boolean;
-  effectLabel?: string;
-  timerMs?: number;
-}
-
-interface ActorGraph {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-}
-
-interface LayoutOptions {
-  direction?: "TB" | "LR";
-  nodeWidth?: number;
-  nodeHeight?: number;
-  nodesep?: number;
-  ranksep?: number;
-  router?: "normal" | "orth" | "manhattan" | "metro" | "er";
-}
-```
-
-## `<mantaq-viz>` Component
-
-### Props
-
-- `el.actor` — set the actor to visualize
-
-### Features
-
-- **Click edges** to trigger transitions (fires the event on the actor)
-- **Effect edges** (amber dashed) — advance timer on click
-- **Undetermined edges** (red dashed) — transitions where target couldn't be resolved
-- **Transition animation** — green flash on the fired edge
-- **Tooltips** on nodes and edges showing state/event details
-- **Settings panel** — direction (LR/TB), router (normal/orth/manhattan/metro/er), edge length
-
-## Development
-
-```bash
-vp test
-vp check
-```
+`buildGraph`, `computeNodePositions`, `renderActorFlow`, `MantaqViz` custom element, `ActorGraph`/`GraphNode`/`GraphEdge`/`LayoutOptions` types.
