@@ -263,6 +263,7 @@ Questions:
 - Context usage — biggest tokens spent?
 - Explore findings accurate? False positives?
 - Deep work quality — real structural improvement or surface tweaks?
+- Abstraction changes — bug surface shrink or just move? Invalid states eliminated or only guarded?
 - Justified type casts flagged as false positives?
 - DX/sugar findings — real pain or imagined? Examples actually improved?
 - Worker speed — felt slow anywhere? Where?
@@ -326,6 +327,8 @@ git log --oneline -<iteration_count*2>
 - Force-removing justified type casts — TS limitations keep + comment.
 - Skipping FIXME deposition — found-but-not-fixed MUST leave FIXME. Self-perpetuating loop breaks otherwise.
 - Vague FIXMEs — `// FIXME: refactor this` useless. Be specific.
+- Defensive runtime assertions where types guarantee — design, don't assert.
+- Non-core polish while core work pending — core first.
 
 ## Orchestration Tips
 
