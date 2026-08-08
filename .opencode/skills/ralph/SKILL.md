@@ -229,11 +229,12 @@ CHECK before commit:
 - Max 3 fix attempts. Still failing → return failure.
 
 COMMIT:
-- git add -A
+- git branch --show-current MUST be ralph/improvements
+- git add <files you changed> — NOT git add -A. Never sweep sibling worker files.
 - git commit -m 'improve: <short-desc>'
 - Do NOT push. Do NOT create PR.
 
-Return: success/failure, commit hash, error if failed, brief changes desc."
+Return: success/failure, commit hash, error if failed, brief changes desc. Report ONLY changes actually in the diff — verify each before claiming."
 )
 ```
 
@@ -350,11 +351,16 @@ git log --oneline -<iteration_count*2>
 - Force-removing justified type casts — TS limitations keep + comment.
 - Skipping FIXME deposition — found-but-not-fixed MUST leave FIXME. Self-perpetuating loop breaks otherwise.
 - Vague FIXMEs — `// FIXME: refactor this` useless. Be specific.
+- `git add -A` sweeping sibling worker files — scope adds to own FILES list. Parallel workers share one worktree.
+- Committing on wrong branch — verify `git branch --show-current` before commit.
+- Trusting worker claims without diff — report "changed X" but diff shows otherwise. Verify.
 
 ## Orchestration Tips
 
 - Check tooling (vp, bumpy) — skip missing. If bumpy unavailable, write `.bumpy/<name>.md` manually.
 - One branch. All runs stack commits.
+- Parallel workers share one worktree — `git add -A` sweeps sibling edits into your commit. Scope adds to own files. Verify branch before commit.
+- Verify worker claims against diff — "removed guard" but diff shows it still there = unreported.
 - Parallel workers: file-level ownership. No overlap.
 - Shared files (index.ts, shared types) → one worker owns.
 - Pre-existing check errors = noise. Only fail on NEW errors your changes introduced.
