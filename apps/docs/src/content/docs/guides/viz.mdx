@@ -3,9 +3,6 @@ title: Viz
 description: Visual state machine graph viewer for actors.
 ---
 
-import VizDemo from "../../../components/VizDemo.astro";
-import VizOrderFlowDemo from "../../../components/VizOrderFlowDemo.astro";
-
 The visualizer renders actor state machines as interactive graph diagrams. States become nodes, transitions become labeled edges. Active states highlight. Supports pan, zoom, direction routing, and settings panel.
 
 ## Installation
@@ -69,56 +66,7 @@ Import the package once. The `<mantaq-viz>` element registers automatically. Set
 
 ## Interactive Demo
 
-This renders a real traffic light actor. Click **NEXT** to advance, **Reset** to return to green.
-
-<VizDemo />
-
-## Comprehensive Example
-
-This example demonstrates most viz features: states, transitions, effects, timers, internal events, and context.
-
-<VizOrderFlowDemo />
-
-### Features Demonstrated
-
-| Feature             | How It's Shown                                                  |
-| ------------------- | --------------------------------------------------------------- |
-| **States**          | idle, processing, shipped, delivered (final), cancelled (final) |
-| **Transitions**     | PLACE_ORDER, SHIP, DELIVER, CANCEL                              |
-| **Final states**    | delivered and cancelled have green borders                      |
-| **Internal events** | CHECK_INVENTORY (dashed edge)                                   |
-| **Effects/timers**  | Processing state has amber effect edge                          |
-| **Context**         | orderId set in PLACE_ORDER transition                           |
-
-### Visual Indicators
-
-- **Blue nodes/edges**: Active state and transitions
-- **Green borders**: Final states (delivered, cancelled)
-- **Amber dashed loops**: Effects/timers (processing)
-- **Gray dashed edges**: Inactive transitions
-
-### Interaction
-
-1. Click **PLACE_ORDER** button to start
-2. Watch the amber effect edge appear during processing
-3. Click **SHIP** to move to shipped state
-4. Click **DELIVER** to complete (green final state)
-5. Use **CANCEL** at any point to cancel
-
-### Settings Panel
-
-Click the gear icon (⚙) to adjust:
-
-- **Direction**: Top→Bottom or Left→Right
-- **Router**: Normal, Orthogonal, Manhattan, Metro, ER
-- **Edge length**: Adjust spacing between nodes
-
-### Keyboard Shortcuts
-
-- `+` or `=`: Zoom in
-- `-`: Zoom out
-- `0`: Reset view
-- `F`: Fit to screen
+> Live demos are parked while `@mantaq/viz` is under rebuild. They return with the package.
 
 ## Known Issues
 

@@ -21,8 +21,8 @@ export type { Clock, Snapshot, AnyActor };
 type CreatedOf<E extends AnyEventRef> =
   E extends EventRef<infer Id, infer P> ? (P extends void ? { id: Id } : P & { id: Id }) : never;
 
-type StateNameOf<S extends AnyStateRef> = S extends StateRef<infer N, any, any> ? N : never;
-type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, any> ? Id : never;
+type StateNameOf<S extends AnyStateRef> = S extends StateRef<infer N, unknown, boolean> ? N : never;
+type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, object | void> ? Id : never;
 
 type CreatedForId<Refs extends readonly AnyEventRef[], Id extends string> =
   Extract<Refs[number], { id: Id }> extends infer R
@@ -103,8 +103,8 @@ export interface InternalActorOptions<
   initial: InitialState<States[number]>;
   clock?: Clock;
   internalBudget?: number;
-  transitions: TransitionMap<States, Inputs, Internal, Outputs, ActorContext>;
-  effects: EffectsMap<States, ActorContext>;
+  transitions: TransitionDispatch<ActorContext>;
+  effects: Record<string, Array<EffectFn<ActorContext>>>;
   regions?: Record<string, AnyActor>;
 }
 
@@ -149,18 +149,11 @@ export class Actor<
 
     this.#options = {
       ...options,
-      transitions: built.transitions as TransitionMap<
-        States,
-        Inputs,
-        Internal,
-        Outputs,
-        ActorContext
-      >,
-      effects: built.effects as EffectsMap<States, ActorContext>,
+      transitions: built.transitions,
+      effects: built.effects,
     };
 
-    const internal = options.internal ?? ([] as unknown as Internal);
-    this.#internalIds = new Set(internal.map((e) => e.id));
+    this.#internalIds = new Set((options.internal ?? []).map((e) => e.id));
     this.#inputIds = new Set(options.inputs.map((e) => e.id));
     this.#internalBudget = options.internalBudget ?? 10_000;
     this.clock = options.clock ?? new RealClock();
@@ -212,7 +205,7 @@ export class Actor<
 
   #dispatch(event: InternalEvent): void {
     if (this.state.isFinal) return;
-    const transitions = this.#options.transitions as unknown as TransitionDispatch<ActorContext>;
+    const transitions = this.#options.transitions;
     const stateTransition = transitions[this.state.name]?.[event.id];
     const anyTransition = transitions["Any"]?.[event.id];
 
@@ -289,8 +282,7 @@ export class Actor<
   }
 
   #runEffects(event: InternalEvent, statePayload: unknown): void {
-    const effects = (this.#options.effects ?? {}) as Record<string, Array<EffectFn<ActorContext>>>;
-    const list = effects[this.state.name];
+    const list = this.#options.effects[this.state.name];
     if (!list || list.length === 0) {
       this.#effectAbort = null;
       return;

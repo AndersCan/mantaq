@@ -2,8 +2,9 @@ import { expect, test, describe } from "vite-plus/test";
 import { Actor, event, state } from "@mantaq/core";
 import { buildGraph, History } from "@mantaq/traversal";
 import { computeCoverage } from "../src/coverage.ts";
+import type { EffectFn } from "@mantaq/core";
 
-function makeActor(effects?: Record<string, (...args: unknown[]) => void>) {
+function makeActor(effects?: Record<string, EffectFn<{}>>) {
   const go = event("GO")();
   const stop = event("STOP")();
   const a = state("a")();
@@ -19,8 +20,8 @@ function makeActor(effects?: Record<string, (...args: unknown[]) => void>) {
     setup: (m) => {
       m.on(a, go, () => ({ state: b }));
       m.on(b, stop, () => ({ state: a }));
-      if (effects?.a) m.effect(a, effects.a as any);
-      if (effects?.b) m.effect(b, effects.b as any);
+      if (effects?.a) m.effect(a, effects.a);
+      if (effects?.b) m.effect(b, effects.b);
     },
   });
 }

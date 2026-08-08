@@ -14,12 +14,14 @@ export class RealClock implements Clock {
   ): number {
     if (options?.signal?.aborted) return -1;
     let onAbort: (() => void) | undefined;
-    const id = globalThis.setTimeout(() => {
-      if (onAbort && options?.signal) {
-        options.signal.removeEventListener("abort", onAbort);
-      }
-      cb();
-    }, ms) as unknown as number;
+    const id = Number(
+      globalThis.setTimeout(() => {
+        if (onAbort && options?.signal) {
+          options.signal.removeEventListener("abort", onAbort);
+        }
+        cb();
+      }, ms),
+    );
     if (options?.signal) {
       onAbort = () => globalThis.clearTimeout(id);
       options.signal.addEventListener("abort", onAbort, { once: true });
@@ -32,7 +34,7 @@ export class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    const id = globalThis.setInterval(cb, ms) as unknown as number;
+    const id = Number(globalThis.setInterval(cb, ms));
     if (options?.signal) {
       const onAbort = () => globalThis.clearInterval(id);
       options.signal.addEventListener("abort", onAbort, { once: true });

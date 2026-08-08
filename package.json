@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build",
+    "ready": "vp check && vp run guard && vp run -r test && vp run -r build",
+    "guard": "node scripts/vision-guard.mjs",
     "dev": "vp run docs#dev",
     "prepare": "vp config"
   },
   "devDependencies": {
     "@varlock/bumpy": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   },
   "engines": {
