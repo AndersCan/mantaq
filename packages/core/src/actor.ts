@@ -92,7 +92,7 @@ type StepFn<States extends readonly AnyStateRef[], ActorContext> = (
   options: { context: ActorContext; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
 
-// FIXME: Actor class 331 lines, 13 fields — extract state-machine engine (dispatch/transitions/effects) from infrastructure (queue/subs/regions/children/snapshot). Split into StateMachineCore + ActorInfrastructure.
+// FIXME: #applyStateStep/#applyAnyStep near-dup — cannot trivially merge. emit-push ORDER differs: state = emit-then-transition, any = transition-then-emit. Ordering is load-bearing (effect emit during transition drains queue mid-apply; see mutation-coverage.test.ts effect-emit cases). Verify ordering irrelevance before unifying. (Class-split into engine+infrastructure rejected — hostile review: stateless engine, mirror host interface, line budget.)
 export class Actor<
   const States extends readonly AnyStateRef[],
   const Inputs extends readonly AnyEventRef[],
@@ -209,20 +209,18 @@ export class Actor<
     const stateTransition = transitions[this.state.name]?.[event.id];
     const anyTransition = transitions["Any"]?.[event.id];
 
-    const transitionApplied = stateTransition
-      ? this.#applyStateStep(event, stateTransition)
-      : false;
-    const anyEmitted = anyTransition
-      ? this.#applyAnyStep(event, anyTransition, !transitionApplied)
-      : false;
-
-    if (anyEmitted || this.#queue.length > 0) {
-      this.#drainInternal();
-    } else if (!stateTransition && !anyTransition) {
+    if (!stateTransition && !anyTransition) {
       console.warn(
         `[Actor] no transition for event "${event.id}" in state "${this.state.name}". Event dropped.`,
       );
+      return;
     }
+
+    const applied = stateTransition ? this.#applyStateStep(event, stateTransition) : false;
+    if (anyTransition) {
+      this.#applyAnyStep(event, anyTransition, !applied);
+    }
+    this.#drainInternal();
   }
 
   #applyStateStep(event: InternalEvent, transition: StepFn<States, ActorContext>): boolean {
@@ -265,7 +263,6 @@ export class Actor<
   }
 
   #applyTransition(event: InternalEvent, step: TransitionResult<States[number], string>): void {
-    if (!step.state) return;
     this.#effectAbort?.abort();
     const resolved = parseTarget<States[number]>(step);
     if (!resolved) return;
