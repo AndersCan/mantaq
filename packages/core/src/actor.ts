@@ -162,6 +162,7 @@ export class Actor<
       );
     }
     this.state = initState;
+    // FIXME: TS can't prove `{} ⊆ generic ActorContext` for `ActorOptions.context ?? {}`
     this.#context = (options.context ?? {}) as ActorContext;
 
     if (options.regions) {
@@ -276,8 +277,8 @@ export class Actor<
   }
 
   #runEffects(event: InternalEvent, statePayload: unknown): void {
-    const list = this.#options.effects[this.state.name];
-    if (!list || list.length === 0) {
+    const list = this.#options.effects[this.state.name] ?? [];
+    if (list.length === 0) {
       this.#effectAbort = null;
       return;
     }

@@ -15,6 +15,46 @@ function buildAdjacency(graph: ActorGraph): AdjacencyMap {
   return adj;
 }
 
+type DfsWalkOptions = {
+  onEnter?: (node: string, path: string[]) => boolean;
+  onBackEdge?: (node: string, path: string[]) => void;
+  backtrackVisited?: boolean;
+};
+
+function dfsWalk(adj: AdjacencyMap, startNodes: string[], options: DfsWalkOptions = {}): void {
+  const visited: Record<string, boolean> = {};
+  const inStack: Record<string, boolean> = {};
+  const path: string[] = [];
+
+  function dfs(node: string): void {
+    if (inStack[node]) {
+      options.onBackEdge?.(node, path);
+      return;
+    }
+    if (visited[node]) return;
+    visited[node] = true;
+    inStack[node] = true;
+    path.push(node);
+    if (options.onEnter?.(node, path)) {
+      path.pop();
+      delete inStack[node];
+      if (options.backtrackVisited) delete visited[node];
+      return;
+    }
+    const neighbors = adj[node] || [];
+    for (let i = 0; i < neighbors.length; i++) {
+      dfs(neighbors[i].target);
+    }
+    path.pop();
+    delete inStack[node];
+    if (options.backtrackVisited) delete visited[node];
+  }
+
+  for (const start of startNodes) {
+    dfs(start);
+  }
+}
+
 function bfsWalk(
   adj: AdjacencyMap,
   start: string,
@@ -45,59 +85,38 @@ export function reachable(graph: ActorGraph, fromId: string, toId: string): bool
 export function allPaths(graph: ActorGraph, fromId: string, toId: string): string[][] {
   const adj = buildAdjacency(graph);
   const results: string[][] = [];
-  const visited: Record<string, boolean> = {};
 
-  function dfs(current: string, path: string[]): void {
-    if (current === toId) {
-      results.push(path.slice());
-      return;
-    }
-    if (visited[current]) return;
-    visited[current] = true;
-    const neighbors = adj[current] || [];
-    for (let i = 0; i < neighbors.length; i++) {
-      path.push(neighbors[i].target);
-      dfs(neighbors[i].target, path);
-      path.pop();
-    }
-    delete visited[current];
-  }
+  dfsWalk(adj, [fromId], {
+    onEnter: (node, path) => {
+      if (node === toId) {
+        results.push(path.slice());
+        return true;
+      }
+      return false;
+    },
+    backtrackVisited: true,
+  });
 
-  dfs(fromId, [fromId]);
   return results;
 }
 
-// FIXME: dfsWalk dedup for allPaths/findCycles — path-tracking diverges, needs param
 export function findCycles(graph: ActorGraph): string[][] {
   const adj = buildAdjacency(graph);
   const cycles: string[][] = [];
-  const visited: Record<string, boolean> = {};
-  const inStack: Record<string, boolean> = {};
-  const path: string[] = [];
 
-  function dfs(node: string): void {
-    if (inStack[node]) {
-      const cycleStart = path.indexOf(node);
-      if (cycleStart !== -1) {
-        cycles.push(path.slice(cycleStart).concat(node));
-      }
-      return;
-    }
-    if (visited[node]) return;
-    visited[node] = true;
-    inStack[node] = true;
-    path.push(node);
-    const neighbors = adj[node] || [];
-    for (let i = 0; i < neighbors.length; i++) {
-      dfs(neighbors[i].target);
-    }
-    path.pop();
-    delete inStack[node];
-  }
+  dfsWalk(
+    adj,
+    graph.nodes.map((n) => n.id),
+    {
+      onBackEdge: (node, path) => {
+        const cycleStart = path.indexOf(node);
+        if (cycleStart !== -1) {
+          cycles.push(path.slice(cycleStart).concat(node));
+        }
+      },
+    },
+  );
 
-  for (const node of graph.nodes) {
-    dfs(node.id);
-  }
   return cycles;
 }
 
