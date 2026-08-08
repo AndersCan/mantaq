@@ -8,7 +8,7 @@ catalogMode: prefer
 
 catalog:
   "@types/node": ^26
-  typescript: ^7
+  typescript: ^6.0.3
   vite: npm:@voidzero-dev/vite-plus-core@0.2.8
   vitest: 4.1.10
   vite-plus: 0.2.8
@@ -29,6 +29,7 @@ catalog:
 overrides:
   vite: "catalog:"
   vitest: "catalog:"
+  typescript: 6.0.3
 peerDependencyRules:
   allowAny:
     - vite
@@ -39,3 +40,8 @@ peerDependencyRules:
 allowBuilds:
   esbuild: true
   sharp: true
+
+packageExtensions:
+  "@stryker-mutator/core":
+    dependencies:
+      typescript: ^6.0.3
