@@ -1,4 +1,5 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
+import { Either } from "@mantaq/utils";
 import type {
   ActorGraph,
   GraphNode,
@@ -10,6 +11,26 @@ import type {
 } from "./types.ts";
 
 export const INITIAL_NODE_ID = "__initial__";
+
+interface GraphTraversal {
+  actor: AnyActor;
+  pathPrefix: string;
+  activeSet: Set<string>;
+  internalIds?: Set<string>;
+  contexts: Record<string, Record<string, unknown>>;
+  contextNames: string[];
+}
+
+interface TransitionPass {
+  edgeMap: Map<string, GraphEdge>;
+  sourceId: string;
+  traversal: GraphTraversal;
+}
+
+interface HandledTransition {
+  targetName?: string;
+  emitNames: string[];
+}
 
 export function collectActiveStates(
   snapshot: Snapshot,
@@ -55,85 +76,68 @@ function invokeHandler(
   eventId: string,
   ctx: Record<string, unknown>,
   actor: AnyActor,
-): { targetName?: string; emitNames: string[] } {
-  let targetName: string | undefined;
-  let emitNames: string[] = [];
-  try {
+): Either<unknown, HandledTransition> {
+  return Either.from(() => {
     const syntheticEvent: SyntheticEvent = { id: eventId };
     const result = handler(syntheticEvent, { context: ctx, actor });
-    targetName = result?.state?.name;
-    if (result?.emit) {
-      emitNames = result.emit.map((e) => e.id).filter((id): id is string => Boolean(id));
-    }
-  } catch {
-    targetName = undefined;
-  }
-  return { targetName, emitNames };
+    return {
+      targetName: result?.state?.name,
+      emitNames: result?.emit?.map((e) => e.id).filter((id): id is string => Boolean(id)) ?? [],
+    };
+  });
 }
 
 function upsertEdge(
-  edgeMap: Map<string, GraphEdge>,
-  sourceId: string,
+  sink: { edgeMap: Map<string, GraphEdge>; sourceId: string; ctxName: string },
+  traversal: GraphTraversal,
   eventId: string,
-  targetName: string | undefined,
-  emitNames: string[],
-  ctxName: string,
-  pathPrefix: string,
-  activeSet: Set<string>,
-  internalIds?: Set<string>,
+  handled: HandledTransition,
 ): void {
-  const undetermined = !targetName;
-  const targetId = targetName
-    ? nodeId(pathPrefix, targetName)
-    : `${sourceId}-undetermined-${eventId}`;
-  const edgeId = `${sourceId}-${eventId}-${targetId}`;
+  const undetermined = !handled.targetName;
+  const targetId = handled.targetName
+    ? nodeId(traversal.pathPrefix, handled.targetName)
+    : `${sink.sourceId}-undetermined-${eventId}`;
+  const edgeId = `${sink.sourceId}-${eventId}-${targetId}`;
 
-  const existing = edgeMap.get(edgeId);
+  const existing = sink.edgeMap.get(edgeId);
   if (existing) {
-    existing.contexts!.push(ctxName);
+    existing.contexts!.push(sink.ctxName);
   } else {
-    edgeMap.set(edgeId, {
+    sink.edgeMap.set(edgeId, {
       id: edgeId,
-      source: sourceId,
+      source: sink.sourceId,
       target: targetId,
       label: eventId,
-      isActive: activeSet.has(sourceId),
-      isInternal: internalIds?.has(eventId),
+      isActive: traversal.activeSet.has(sink.sourceId),
+      isInternal: traversal.internalIds?.has(eventId),
       isUndetermined: undetermined,
-      contexts: [ctxName],
-      ...(emitNames.length > 0 && { payload: { action: `emit(${emitNames.join(", ")})` } }),
+      contexts: [sink.ctxName],
+      ...(handled.emitNames.length > 0 && {
+        payload: { action: `emit(${handled.emitNames.join(", ")})` },
+      }),
     });
   }
 }
 
 function processStateTransitions(
   stateTransitions: Record<string, TransitionHandler | undefined>,
-  edgeMap: Map<string, GraphEdge>,
-  sourceId: string,
-  contextNames: string[],
-  contexts: Record<string, Record<string, unknown>>,
-  actor: AnyActor,
-  pathPrefix: string,
-  activeSet: Set<string>,
-  internalIds?: Set<string>,
+  pass: TransitionPass,
 ): Set<string> {
   const stateTransitionedEvents = new Set<string>();
   for (const [eventId, handler] of Object.entries(stateTransitions)) {
     if (typeof handler !== "function") continue;
-    for (const ctxName of contextNames) {
-      const ctx = contexts[ctxName];
-      const { targetName, emitNames } = invokeHandler(handler, eventId, ctx, actor);
-      if (targetName) stateTransitionedEvents.add(eventId);
+    for (const ctxName of pass.traversal.contextNames) {
+      const ctx = pass.traversal.contexts[ctxName];
+      const handled = Either.getOrElse(
+        invokeHandler(handler, eventId, ctx, pass.traversal.actor),
+        () => ({ targetName: undefined, emitNames: [] }),
+      );
+      if (handled.targetName) stateTransitionedEvents.add(eventId);
       upsertEdge(
-        edgeMap,
-        sourceId,
+        { edgeMap: pass.edgeMap, sourceId: pass.sourceId, ctxName },
+        pass.traversal,
         eventId,
-        targetName,
-        emitNames,
-        ctxName,
-        pathPrefix,
-        activeSet,
-        internalIds,
+        handled,
       );
     }
   }
@@ -143,31 +147,22 @@ function processStateTransitions(
 function mergeAnyTransitions(
   anyTransitions: Record<string, TransitionHandler | undefined>,
   stateTransitionedEvents: Set<string>,
-  edgeMap: Map<string, GraphEdge>,
-  sourceId: string,
-  contextNames: string[],
-  contexts: Record<string, Record<string, unknown>>,
-  actor: AnyActor,
-  pathPrefix: string,
-  activeSet: Set<string>,
-  internalIds?: Set<string>,
+  pass: TransitionPass,
 ): void {
   for (const [eventId, handler] of Object.entries(anyTransitions)) {
     if (typeof handler !== "function") continue;
     if (stateTransitionedEvents.has(eventId)) continue;
-    for (const ctxName of contextNames) {
-      const ctx = contexts[ctxName];
-      const { targetName, emitNames } = invokeHandler(handler, eventId, ctx, actor);
+    for (const ctxName of pass.traversal.contextNames) {
+      const ctx = pass.traversal.contexts[ctxName];
+      const handled = Either.getOrElse(
+        invokeHandler(handler, eventId, ctx, pass.traversal.actor),
+        () => ({ targetName: undefined, emitNames: [] }),
+      );
       upsertEdge(
-        edgeMap,
-        sourceId,
+        { edgeMap: pass.edgeMap, sourceId: pass.sourceId, ctxName },
+        pass.traversal,
         eventId,
-        targetName,
-        emitNames,
-        ctxName,
-        pathPrefix,
-        activeSet,
-        internalIds,
+        handled,
       );
     }
   }
@@ -177,41 +172,16 @@ function collectTransitionsForState(
   stateTransitions: Record<string, TransitionHandler | undefined> | undefined,
   anyTransitions: Record<string, TransitionHandler | undefined> | undefined,
   sourceId: string,
-  contextNames: string[],
-  contexts: Record<string, Record<string, unknown>>,
-  actor: AnyActor,
-  pathPrefix: string,
-  activeSet: Set<string>,
-  internalIds?: Set<string>,
+  traversal: GraphTraversal,
 ): Map<string, GraphEdge> {
   const edgeMap = new Map<string, GraphEdge>();
+  const pass: TransitionPass = { edgeMap, sourceId, traversal };
   const stateTransitionedEvents = stateTransitions
-    ? processStateTransitions(
-        stateTransitions,
-        edgeMap,
-        sourceId,
-        contextNames,
-        contexts,
-        actor,
-        pathPrefix,
-        activeSet,
-        internalIds,
-      )
+    ? processStateTransitions(stateTransitions, pass)
     : new Set<string>();
 
   if (anyTransitions) {
-    mergeAnyTransitions(
-      anyTransitions,
-      stateTransitionedEvents,
-      edgeMap,
-      sourceId,
-      contextNames,
-      contexts,
-      actor,
-      pathPrefix,
-      activeSet,
-      internalIds,
-    );
+    mergeAnyTransitions(anyTransitions, stateTransitionedEvents, pass);
   }
 
   return edgeMap;
@@ -220,31 +190,20 @@ function collectTransitionsForState(
 function buildEdgesFromTransitions(
   states: ReadonlyArray<{ name: string }>,
   transitions: TransitionDispatchMap | undefined,
-  activeSet: Set<string>,
-  pathPrefix: string,
-  actor: AnyActor,
-  internalIds?: Set<string>,
-  namedContexts?: Record<string, Record<string, unknown>>,
+  traversal: GraphTraversal,
 ): GraphEdge[] {
   if (!transitions) return [];
 
-  const contexts = namedContexts ?? { default: { ...actor.context } };
-  const contextNames = Object.keys(contexts);
   const anyTransitions = transitions["Any"];
   const edges: GraphEdge[] = [];
 
   for (const stateRef of states) {
-    const sourceId = nodeId(pathPrefix, stateRef.name);
+    const sourceId = nodeId(traversal.pathPrefix, stateRef.name);
     const edgeMap = collectTransitionsForState(
       transitions[stateRef.name],
       anyTransitions,
       sourceId,
-      contextNames,
-      contexts,
-      actor,
-      pathPrefix,
-      activeSet,
-      internalIds,
+      traversal,
     );
     edges.push(...edgeMap.values());
   }
@@ -261,44 +220,28 @@ function addNodesForActor(
   return buildNodesFromStates(states, activeSet, pathPrefix);
 }
 
-function addEdgesForActor(
-  actor: AnyActor,
-  pathPrefix: string,
-  activeSet: Set<string>,
-  internalIds?: Set<string>,
-  namedContexts?: Record<string, Record<string, unknown>>,
-): GraphEdge[] {
+function addEdgesForActor(actor: AnyActor, traversal: GraphTraversal): GraphEdge[] {
   const states = (actor.options?.states ?? []) as ReadonlyArray<StateDef>;
   return buildEdgesFromTransitions(
     states,
     // AnyActor.options.types transitions values as unknown — actual type is handler functions (TransitionDispatch in actor.ts)
     actor.options?.transitions as TransitionDispatchMap | undefined,
-    activeSet,
-    pathPrefix,
-    actor,
-    internalIds,
-    namedContexts,
+    traversal,
   );
 }
 
 function recurseRegions(
   actor: AnyActor,
-  pathPrefix: string,
-  activeSet: Set<string>,
-  internalIds?: Set<string>,
-  namedContexts?: Record<string, Record<string, unknown>>,
+  traversal: GraphTraversal,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   if (actor.regions) {
     for (const [regionName, childActor] of Object.entries(actor.regions)) {
-      const child = buildForActor(
-        childActor,
-        nodeId(pathPrefix, regionName),
-        activeSet,
-        internalIds,
-        namedContexts,
-      );
+      const child = buildForActor(childActor, {
+        ...traversal,
+        pathPrefix: nodeId(traversal.pathPrefix, regionName),
+      });
       nodes.push(...child.nodes);
       edges.push(...child.edges);
     }
@@ -333,18 +276,15 @@ function addEffectSelfLoops(
 
 function buildForActor(
   actor: AnyActor,
-  pathPrefix: string,
-  activeSet: Set<string>,
-  internalIds?: Set<string>,
-  namedContexts?: Record<string, Record<string, unknown>>,
+  traversal: GraphTraversal,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   if (!actor) return { nodes: [], edges: [] };
-  const nodes = addNodesForActor(actor, pathPrefix, activeSet);
-  const edges = addEdgesForActor(actor, pathPrefix, activeSet, internalIds, namedContexts);
-  const region = recurseRegions(actor, pathPrefix, activeSet, internalIds, namedContexts);
+  const nodes = addNodesForActor(actor, traversal.pathPrefix, traversal.activeSet);
+  const edges = addEdgesForActor(actor, traversal);
+  const region = recurseRegions(actor, traversal);
   nodes.push(...region.nodes);
   edges.push(...region.edges);
-  edges.push(...addEffectSelfLoops(actor, pathPrefix, activeSet));
+  edges.push(...addEffectSelfLoops(actor, traversal.pathPrefix, traversal.activeSet));
   return { nodes, edges };
 }
 
@@ -395,22 +335,29 @@ export function buildGraph(
   },
 ): ActorGraph {
   if (!actor) return { nodes: [], edges: [] };
-  try {
-    const activeSet = collectActorsFromSnapshot(actor.snapshot());
-    const namedContexts = collectNamedContexts(options);
+  return Either.match(
+    Either.from(() => {
+      const activeSet = collectActorsFromSnapshot(actor.snapshot());
+      const namedContexts = collectNamedContexts(options);
+      const contexts = namedContexts ?? { default: { ...actor.context } };
+      const traversal: GraphTraversal = {
+        actor,
+        pathPrefix: "",
+        activeSet,
+        internalIds: options?.internalIds,
+        contexts,
+        contextNames: Object.keys(contexts),
+      };
 
-    const { nodes, edges } = buildForActor(
-      actor,
-      "",
-      activeSet,
-      options?.internalIds,
-      namedContexts,
-    );
+      const { nodes, edges } = buildForActor(actor, traversal);
 
-    addInitialNode(actor, nodes, edges);
-    return { nodes, edges };
-  } catch (e) {
-    console.error("[mantaq/traversal] buildGraph failed:", e);
-    return { nodes: [], edges: [] };
-  }
+      addInitialNode(actor, nodes, edges);
+      return { nodes, edges };
+    }),
+    (error) => {
+      console.error("[mantaq/traversal] buildGraph failed:", error);
+      return { nodes: [], edges: [] };
+    },
+    (result) => result,
+  );
 }

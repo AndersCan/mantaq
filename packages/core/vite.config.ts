@@ -13,5 +13,16 @@ export default defineConfig({
       typeCheck: true,
     },
   },
+  test: {
+    coverage: {
+      reporter: ["text", "text-summary"],
+      thresholds: {
+        statements: 85,
+        branches: 82,
+        functions: 75,
+        lines: 88,
+      },
+    },
+  },
   fmt: {},
 });

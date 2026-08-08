@@ -4,7 +4,7 @@ export function state<const T extends string>(id: T) {
 
 export type AnyStateRef = StateRef<string, unknown, boolean>;
 
-export interface RegionOptions {
+interface RegionOptions {
   initial: string;
   states: Record<string, AnyStateRef>;
 }

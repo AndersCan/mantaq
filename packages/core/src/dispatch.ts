@@ -1,13 +1,6 @@
 import { StateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
-import type { InternalEvent } from "./event.ts";
-import type { AnyActor } from "./actor-internal.ts";
 import type { TransitionResult } from "./actor-types.ts";
-
-export type TransitionFn = (
-  event: InternalEvent,
-  options: { context: unknown; actor: AnyActor },
-) => TransitionResult;
 
 export function parseTarget<S extends AnyStateRef>(
   step: TransitionResult<S, string>,

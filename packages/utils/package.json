@@ -1,0 +1,21 @@
+{
+  "name": "@mantaq/utils",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Private utility library — zero-dependency Either type, [left, right] tuple representation.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "typescript": "^7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

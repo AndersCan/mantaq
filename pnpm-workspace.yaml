@@ -7,25 +7,16 @@ packages:
 catalogMode: prefer
 
 catalog:
-  "@types/node": ^26
-  typescript: ^6.0.3
   vite: npm:@voidzero-dev/vite-plus-core@0.2.8
   vitest: 4.1.10
+  "@vitest/coverage-v8": 4.1.10
   vite-plus: 0.2.8
   "@stryker-mutator/core": ^9
   "@stryker-mutator/vitest-runner": ^9
   "@varlock/bumpy": ^1.18.1
   sharp: ^0.35.3
-  lit: ^3.3.3
-  "@nanostores/lit": ^0.2.3
-  playwright: ^1.62.1
-  "@vitest/browser-playwright": 4.1.10
   remark-gfm: ^4.0.1
-  unocss: ^66.7.5
-  "@dagrejs/dagre": ^3.1.0
-  "@antv/x6": ^3.1.7
-  tslib: ^2.8.1
-  "@vitest/ui": 4.1.10
+  knip: ^6.32.0
 overrides:
   vite: "catalog:"
   vitest: "catalog:"
