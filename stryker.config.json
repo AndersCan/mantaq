@@ -1,0 +1,14 @@
+{
+  "$schema": "./packages/core/node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "mutate": ["packages/core/src/**/*.ts"],
+  "testFiles": ["packages/examples/*.actor.test.ts", "packages/core/tests/**/*.test.ts"],
+  "coverageAnalysis": "perTest",
+  "reporters": ["clear-text", "progress"],
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "vitest": {
+    "dir": "packages/core",
+    "configFile": "packages/core/stryker.vitest.config.ts",
+    "related": false
+  }
+}
