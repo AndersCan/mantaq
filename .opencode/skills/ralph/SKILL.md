@@ -1,6 +1,6 @@
 ---
 name: ralph
-description: Ralph Wiggum loop. Deep structural improvement. Expensive model thinks, @worker executes. Splits long functions, splits multi-responsibility classes, reduces branching, kills type casts, improves DX via sugar, leaves FIXMEs for next run, self-reflects and improves own prompt at end. Use when user wants run self-improvement loop for deep work.
+description: Ralph Wiggum loop. Deep structural improvement. Core first. Refactors and simplifies — good abstractions make bugs impossible. Expensive model thinks, @worker executes. Splits long functions, kills multi-responsibility classes, reduces branching, kills type casts, improves DX via sugar, leaves FIXMEs for next run, self-reflects and improves own prompt at end. Use when user wants run self-improvement loop for deep work.
 allowed-tools: Read Grep Glob Bash Edit Write Task
 ---
 
@@ -15,10 +15,20 @@ Caveman output everywhere. No exceptions. See [AGENTS.md](../../AGENTS.md).
 - Commit messages, PR titles, summaries — ALL caveman
 - Code blocks unchanged. Caveman speak around code, not in code
 
+## North Star
+
+Core first. `packages/core` is the target. Sugar/traversal/utils secondary. Examples = evidence.
+
+Goal: bugs impossible. Not fewer bugs — impossible. Refactor, simplify, build good abstractions.
+
+- **Types are correctness** — "if it typechecks, it runs correct". Push invariants into types (discriminated unions, narrowing, branded types, sealed constructors). Invalid states unrepresentable.
+- **Compiler is oracle** — never silence it. Casts = design failure. Refactor, don't cast.
+- **Simplify** — smallest design that satisfies the type. Every line is a potential bug.
+- **Deterministic** — same input, same trace. No wall clock, no randomness (see `vision.md`).
+
 ## Parameters
 
 - `iteration_count`: default 5 (deep work, slow)
-- `depth`: default deep
 
 ## Time Limit
 
@@ -26,7 +36,7 @@ Caveman output everywhere. No exceptions. See [AGENTS.md](../../AGENTS.md).
 
 ## Codebase Ownership
 
-Codebase owned by THIS loop. Only self-discovered, self-fixable work. No external features. No user requests. No trivial docs (other loops handle).
+Codebase owned by THIS loop. Core first — `packages/core` is the target; sugar/traversal/utils secondary; examples only as DX evidence. Only self-discovered, self-fixable work. No external features. No user requests. No trivial docs (other loops handle).
 
 Backlog = FIXMEs in code. Loop finds FIXME → fixes. Finds issue, no time → leaves FIXME for next run. Self-perpetuating.
 
@@ -36,15 +46,17 @@ FIXME must be SPECIFIC. Next run acts without re-investigation. Good: `// FIXME:
 
 ## Deep Work Focus
 
-NOT trivial docs. NOT single-line tweaks. Deep structural work:
+NOT trivial docs. NOT single-line tweaks. Deep structural work. Core first.
 
-1. **Split long functions** — >50 lines or many branches → split into named helpers. One job per function.
-2. **Split multi-responsibility classes/functions** — one responsibility per unit. Extract. Move to own file if big.
-3. **Reduce branching** — if/else chains → early returns, guard clauses, lookup tables, polymorphism. Kill nested conditionals >3 levels.
-4. **Type safety** — kill `as unknown as X`, `as any`, `@ts-ignore`. Exception: TS limitation (setTimeout, branded types, lib gaps) → keep + explanatory comment.
-5. **LOC reduction** — dedup, dead code, verbose patterns replaceable with stdlib.
-6. **DX via sugar** — inspect `examples/` for painful/verbose patterns. Fix with existing sugar. No sugar for it? Flag need for new sugar helper. Can a core feature move to sugar for better DX? Prefer sugar over raw core in examples. Sugar = ergonomic layer over core.
-7. **Leave FIXMEs** — found but not fixed this run → `// FIXME: <specific desc>` at location. Seeds next run.
+1. **Good abstractions — make bugs impossible** — invalid states unrepresentable. Discriminated unions, narrowing, branded types, indexed access, sealed constructors. No defensive checks where types guarantee. No repeated invariants enforced in two places — design makes them impossible. Highest value work.
+2. **Simplify** — smallest design that satisfies the type. Less code, fewer branches, fewer moving parts. Simplest correct > clever.
+3. **Split long functions** — >50 lines or many branches → split into named helpers. One job per function.
+4. **Split multi-responsibility classes/functions** — one responsibility per unit. Extract. Move to own file if big.
+5. **Reduce branching** — if/else chains → early returns, guard clauses, lookup tables, polymorphism. Kill nested conditionals >3 levels.
+6. **Type safety** — kill `as unknown as X`, `as any`, `@ts-ignore`. Exception: TS limitation (setTimeout, branded types, lib gaps) → keep + explanatory comment.
+7. **LOC reduction** — dedup, dead code, verbose patterns replaceable with stdlib.
+8. **DX via sugar** — inspect `examples/` for painful/verbose patterns. Fix with existing sugar. No sugar for it? Flag need for new sugar helper. Can a core feature move to sugar for better DX? Prefer sugar over raw core in examples. Sugar = ergonomic layer over core.
+9. **Leave FIXMEs** — found but not fixed this run → `// FIXME: <specific desc>` at location. Seeds next run.
 
 Skip:
 
@@ -54,6 +66,8 @@ Skip:
 - Generic utils not used
 - Test coverage for coverage sake
 - Barrel re-exports (user prefers multiple export files)
+- Non-core polish when core work pending — core first
+- Defensive runtime assertions that duplicate type guarantees — redesign, don't assert
 
 ## Core Rule
 
@@ -91,40 +105,47 @@ Step 1a: Spawn single worker for full discovery.
 Task(
   subagent_type: "worker",
   description: "Ralph: discover deep work",
-  prompt: "DISCOVERY ONLY. Do NOT edit/commit anything. Scan codebase for deep improvement work. Return ONLY line-list summary. No file contents.
+  prompt: "DISCOVERY ONLY. Do NOT edit/commit anything. Scan codebase for deep improvement work. Core first — packages/core/src highest value, sugar/traversal/utils secondary. Return ONLY line-list summary. No file contents.
 
 PRIORITY 1 — existing FIXMEs (loop's backlog, highest):
 - rg '// FIXME:' packages/ apps/ --include '*.ts' --include '*.tsx'
-- rg '// TODO:' packages/ apps/ --include '*.ts' --include '*.tsx'.
+- rg '// TODO:' packages/ apps/ --include '*.ts' --include '*.tsx'
 - Hindsight confirmed loop closes prior-run FIXMEs at high rate. Prioritize these ONE per iteration until cleared before touching PRIORITY 2. Each closed FIXME = self-perpetuation proof.
 
-PRIORITY 2 — deep work candidates:
-- Long functions: rg -l '' packages/ --include '*.ts' | xargs wc -l | sort -rn | head -30. For each file, find functions >50 lines. Flag.
-- Multi-responsibility classes: rg 'class ' packages/ --include '*.ts'. Flag classes with >5 methods or mixed concerns (e.g. Parser class also does IO).
+PRIORITY 2 — core refactor candidates (packages/core/src only):
+- Long functions: rg -l '' packages/core/src --include '*.ts' | xargs wc -l | sort -rn | head -30. For each file, find functions >50 lines. Flag.
+- Multi-responsibility classes: rg 'class ' packages/core/src --include '*.ts'. Flag classes with >5 methods or mixed concerns.
 - Multi-responsibility functions: function name suggests multiple verbs (e.g. parseAndValidate, loadAndSave). Flag.
-- Complex branching: rg 'else if|else \{' packages/ --include '*.ts'. Flag files with dense else chains (>3 else if).
-- Nested conditionals: find 3+ level nesting. Flag.
+- Complex branching: rg 'else if|else \{' packages/core/src --include '*.ts'. Flag files with dense else chains (>3 else if).
+- Nested conditionals: find 3+ level nesting in core. Flag.
+- Defensive checks: rg 'if (!|if (=== undefined|null|throw' packages/core/src — flag runtime guards that types could guarantee. Invalid states should be unrepresentable, not asserted against.
 
-PRIORITY 3 — type safety:
+PRIORITY 3 — abstraction candidates (make bugs impossible):
+- Repeated invariants enforced in multiple places → one type/abstraction should own it.
+- Nullable fields that never legitimately null → narrow the type, kill the branch.
+- Unions without discriminant → add one.
+- Same state-shape checked at N call sites → design so impossible.
+
+PRIORITY 4 — type safety:
 - rg 'as any|as unknown as' packages/ apps/ --include '*.ts' --include '*.tsx'
 - rg '@ts-expect|@ts-ignore' packages/ apps/ --include '*.ts' --include '*.tsx'
+- Core escapes outrank sugar escapes.
 
-PRIORITY 4 — LOC reduction:
+PRIORITY 5 — LOC reduction:
 - Dead exports: rg 'export (const|function|class)' packages/ --include '*.ts'. For each, check import usage elsewhere. Flag unused.
 - Duplication: repeated 5+ line blocks across files.
 
-PRIORITY 5 — DX via sugar:
+PRIORITY 6 — DX via sugar (secondary):
 - Inspect examples/ — find verbose/painful usage patterns. Flag spots where sugar could help.
 - For each pain point: check if existing sugar covers it. If yes → examples should use sugar, flag for sugar adoption. If no → flag 'NEW SUGAR NEEDED: <desc>'.
 - Core feature used heavily in examples but ergonomic only via sugar? Flag 'MOVE TO SUGAR: <feature>'.
 - rg 'import.*@mantaq/core' examples/ — direct core usage in examples. Flag each as sugar opportunity.
 
-DEPTH deep adds:
-- gh issue list --limit 20
+PRIORITY 7 — freshness:
 - git log --oneline --grep='ralph' -30 — avoid repeating past tasks
 
 RETURN FORMAT (one line per finding):
-<file>:<line> | <priority: FIXME|DEEP|TYPE|LOC|DX> | <category: SPLIT|RESPONSIBILITY|BRANCHING|CAST|DEAD|DUP|SUGAR-ADOPT|NEW-SUGAR|MOVE-TO-SUGAR> | <one-line specific description>
+<file>:<line> | <priority: FIXME|CORE|ABSTRACTION|TYPE|LOC|DX> | <category: SPLIT|RESPONSIBILITY|BRANCHING|NESTING|DEFENSIVE|INVARIANT|CAST|DEAD|DUP|SUGAR-ADOPT|NEW-SUGAR|MOVE-TO-SUGAR> | <one-line specific description>
 
 Skip trivial findings (<10 line edits, doc tweaks, single-line renames). No file contents. Line refs only.
 Verify path exists before flagging."
@@ -134,18 +155,17 @@ Verify path exists before flagging."
 Step 1b: Build DAG. Orchestrator parses. Rank:
 
 1. Existing FIXMEs (highest — loop's own backlog)
-2. Function splits (usually independent)
-3. Class/function responsibility splits
-4. Branching complexity reduction
-5. Type safety
-6. LOC reduction (dead code, dedup)
-7. DX via sugar (examples pain → existing sugar / new sugar / move core to sugar)
+2. Core refactors — splits, branching, nesting (packages/core first)
+3. Abstraction wins — make bugs impossible (DEFENSIVE/INVARIANT)
+4. Type safety (casts, escapes)
+5. LOC reduction (dead code, dedup)
+6. DX via sugar (examples pain → existing sugar / new sugar / move core to sugar)
 
 Batch small cuts in same file → single worker.
 
 Skip trivial. Verify path exists before flagging.
 
-### Phase 2: Execute (5 iterations)
+### Phase 2: Execute (iteration_count iterations)
 
 For each task in DAG order:
 
@@ -155,15 +175,16 @@ Step 2a: Pick executor.
 
 **Orchestrator-only (needs deep reasoning):**
 
-- API design (naming, public surface decisions)
+- API design (naming, public surface, error types)
 - Bug root-causing across files
-- Architecture decisions (new module? new sugar helper? move core to sugar?)
+- Architecture decisions (new module? new sugar helper? move core to sugar? new package?)
+- Designing new sugar API surface (sugar = ergonomic layer, design matters)
 
 **Delegate to @worker (fast, handles more than you think):**
 
-- Function splits (give target file + line + suggested helper names — worker does the split, updates callers, fixes tests)
-- Class/function responsibility splits (specify what extracts, where it goes — worker executes)
-- Branching refactors (specify replacement pattern — early return / lookup table / guard clauses — worker applies)
+- Function splits — spec: target file + line + suggested helper names + what stays vs moves
+- Class/function responsibility splits — spec: what extracts + target file + new name
+- Branching refactors — spec: replacement pattern (early return / lookup table / guard clauses)
 - Update callers after any refactor
 - Fix tests after refactor
 - Dead code deletion (grep confirmed unused)
@@ -171,7 +192,8 @@ Step 2a: Pick executor.
 - Import cleanup
 - Format/lint fixes
 - Sugar adoption in examples (swap raw core import for sugar import)
-- New sugar helper (specify signature + behavior — worker implements, exports, adds test)
+- New sugar helper — spec: signature + behavior + test cases. Worker implements, exports, tests.
+- JSDoc addition to existing stable exports
 
 Default: delegate. Only keep when worker would guess wrong on design.
 
@@ -182,8 +204,8 @@ Task(
   subagent_type: "worker",
   description: "Ralph: <short-desc>",
   prompt: "TASK: <desc>
-CATEGORY: <SPLIT|RESPONSIBILITY|BRANCHING|TYPE|LOC|DX|CLEANUP>
-BRANCH: ralph/improvements (already checked out)
+CATEGORY: <SPLIT|RESPONSIBILITY|BRANCHING|ABSTRACTION|TYPE|LOC|DX|CLEANUP>
+BRANCH: ralph/improvements (git checkout ralph/improvements first)
 
 READ ONLY WHAT YOU NEED. Low context.
 - grep/glob to find code
@@ -202,6 +224,7 @@ RULES:
 
 CHECK before commit:
 - vp check --fix
+- vp run guard (north star gates: type escapes, export budget, determinism)
 - vp test --reporter agent (if tests for touched area)
 - Max 3 fix attempts. Still failing → return failure.
 
@@ -327,12 +350,10 @@ git log --oneline -<iteration_count*2>
 - Force-removing justified type casts — TS limitations keep + comment.
 - Skipping FIXME deposition — found-but-not-fixed MUST leave FIXME. Self-perpetuating loop breaks otherwise.
 - Vague FIXMEs — `// FIXME: refactor this` useless. Be specific.
-- Defensive runtime assertions where types guarantee — design, don't assert.
-- Non-core polish while core work pending — core first.
 
 ## Orchestration Tips
 
-- Check tooling (vp, gh, bumpy) — skip missing. If bumpy unavailable, write `.bumpy/<name>.md` manually.
+- Check tooling (vp, bumpy) — skip missing. If bumpy unavailable, write `.bumpy/<name>.md` manually.
 - One branch. All runs stack commits.
 - Parallel workers: file-level ownership. No overlap.
 - Shared files (index.ts, shared types) → one worker owns.
@@ -441,29 +462,3 @@ After ALL files:
 3. Check dependencies. Any task depends on another's output → serialize.
 4. Assign to single worker with explicit file list.
 5. Single commit per batch. Not per file.
-
-## When To Do Work Yourself
-
-@worker fast, not dumb. Handles splits, refactors, new helpers when given clear spec. Default: delegate.
-
-Keep in orchestrator (true reasoning, worker would guess wrong):
-
-- API design (naming, public surface, error types)
-- Architecture decisions (new module? new sugar helper? move core to sugar? new package?)
-- Bug root-causing across files
-- Designing new sugar API surface (sugar = ergonomic layer, design matters)
-
-Delegate to @worker (give clear spec, let worker figure out how):
-
-- Function splits — spec: target file + line + suggested helper names + what stays vs moves
-- Class/function responsibility splits — spec: what extracts + target file + new name
-- Branching refactors — spec: replacement pattern (early return / lookup table / guard clauses)
-- Update callers after any refactor
-- Fix tests after refactor
-- Dead code deletion (grep confirmed unused)
-- Type cast removal (pattern verified, not TS limitation)
-- Import cleanup
-- Format/lint fixes
-- Sugar adoption in examples (swap raw core import → sugar import)
-- New sugar helper implementation — spec: signature + behavior + test cases. Worker implements, exports, tests.
-- JSDoc addition to existing stable exports
