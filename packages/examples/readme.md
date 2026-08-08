@@ -19,7 +19,7 @@ Context holds form data. Types ensure you can’t access basicInfo when in payme
 
 Problem: Multiple async calls, retries, polling. Promises nest. Errors cascade. Backend workflows get messy.
 
-Value: Teams use XState in production for backend workflows and critical business logic ￼. XState v5 actors designed for this. Stately docs has 25+ serverless workflow examples.
+Value: Teams use XState in production for backend workflows and critical business logic . XState v5 actors designed for this. Stately docs has 25+ serverless workflow examples.
 
 Real cases:
 
@@ -34,7 +34,7 @@ Setup actors once, invoke multiple times. Error/success paths explicit. No callb
 
 Problem: Coordinating animation timing with state changes. Toggle button: idle → opening → open → closing → closed. Miss timing, animation glitches.
 
-Value: State machine enforces animation sequence. When state is “opening” then openMenu animation called. When animation finishes, state auto-changes from “opening” to “open” ￼.
+Value: State machine enforces animation sequence. When state is “opening” then openMenu animation called. When animation finishes, state auto-changes from “opening” to “open” .
 
 Parallel states handle independent UI parts (lightSwitch on/off + brightness + color all change independently without breaking each other).
 
@@ -44,7 +44,7 @@ Example: Drawer component. 4 valid states only. Transitions trigger GSAP animati
 
 Problem: Auth flows tangled. What if user logs in while app restarting? Session state + UI state + backend sync all mixed.
 
-Value: XState 5 actor reusability makes mobile authentication more straightforward ￼. Firebase observers send events. Machine transitions. Clean separation: signing in → signed in → signing out.
+Value: XState 5 actor reusability makes mobile authentication more straightforward . Firebase observers send events. Machine transitions. Clean separation: signing in → signed in → signing out.
 
 Real example (Firebase + React Native):
 

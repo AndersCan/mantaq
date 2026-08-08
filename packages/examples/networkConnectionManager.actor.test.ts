@@ -19,9 +19,28 @@
  */
 
 import { describe, it, expect } from "vite-plus/test";
-import { Actor, VirtualClock } from "@mantaq/core";
-import { event } from "@mantaq/core";
+import { Actor, VirtualClock, event } from "@mantaq/core";
+import { pushInternal, drainInternal } from "@mantaq/core/internal";
+import type { RegistryError } from "@mantaq/core/internal";
+import { Either } from "@mantaq/utils";
 import { matches, states, events } from "@mantaq/sugar";
+
+function inject(actor: object, event: { id: string }): void {
+  Either.match(
+    pushInternal(actor, event),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+  Either.match(
+    drainInternal(actor),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+}
 
 // ── Connection States ────────────────────────────────────────────────
 
@@ -206,9 +225,7 @@ describe("connection manager actor", () => {
 
     actor.send(connectEvent.create({ url: "ws://example.com" }));
     expect(matches(actor, "connecting")).toBe(true);
-
-    actor.__pushInternal(connectionFailed.create({ error: "ECONNREFUSED" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "ECONNREFUSED" }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.lastError).toBe("ECONNREFUSED");
     expect(actor.context.retryCount).toBe(1);
@@ -220,18 +237,13 @@ describe("connection manager actor", () => {
     actor.send(connectEvent.create({ url: "ws://example.com" }));
 
     // 3 failures
-    actor.__pushInternal(connectionFailed.create({ error: "Error 1" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Error 1" }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
-
-    actor.__pushInternal(connectionFailed.create({ error: "Error 2" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Error 2" }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(2);
-
-    actor.__pushInternal(connectionFailed.create({ error: "Error 3" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Error 3" }));
     expect(matches(actor, "failed")).toBe(true);
     expect(actor.context.retryCount).toBe(3);
   });
@@ -240,14 +252,10 @@ describe("connection manager actor", () => {
     const { actor } = createConnectionManager();
 
     actor.send(connectEvent.create({ url: "ws://example.com" }));
-    actor.__pushInternal(connectionFailed.create({ error: "Error 1" }));
-    actor.__drainInternal();
-    actor.__pushInternal(connectionFailed.create({ error: "Error 2" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Error 1" }));
+    inject(actor, connectionFailed.create({ error: "Error 2" }));
     expect(actor.context.retryCount).toBe(2);
-
-    actor.__pushInternal(e.CONNECTION_ESTABLISHED.create());
-    actor.__drainInternal();
+    inject(actor, e.CONNECTION_ESTABLISHED.create());
     expect(matches(actor, "connected")).toBe(true);
     expect(actor.context.retryCount).toBe(0);
   });
@@ -269,9 +277,7 @@ describe("connection manager actor", () => {
     actor.send(connectEvent.create({ url: "ws://example.com" }));
     clock.advance(2000);
     expect(matches(actor, "connected")).toBe(true);
-
-    actor.__pushInternal(healthCheckResult.create({ healthy: false }));
-    actor.__drainInternal();
+    inject(actor, healthCheckResult.create({ healthy: false }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.lastError).toBe("Health check failed");
   });
@@ -281,9 +287,7 @@ describe("connection manager actor", () => {
 
     actor.send(connectEvent.create({ url: "ws://example.com" }));
     clock.advance(2000);
-
-    actor.__pushInternal(healthCheckResult.create({ healthy: true }));
-    actor.__drainInternal();
+    inject(actor, healthCheckResult.create({ healthy: true }));
     expect(matches(actor, "connected")).toBe(true);
     expect(matches(actor, "connected.health.healthy")).toBe(true);
   });
@@ -295,13 +299,9 @@ describe("connection manager actor", () => {
 
     actor.send(connectEvent.create({ url: "ws://example.com" }));
     clock.advance(2000);
-
-    actor.__pushInternal(healthCheckResult.create({ healthy: true }));
-    actor.__drainInternal();
+    inject(actor, healthCheckResult.create({ healthy: true }));
     expect(matches(actor, "connected.health.healthy")).toBe(true);
-
-    actor.__pushInternal(healthCheckResult.create({ healthy: false }));
-    actor.__drainInternal();
+    inject(actor, healthCheckResult.create({ healthy: false }));
     expect(matches(actor, "reconnecting.health.degraded")).toBe(true);
   });
 
@@ -328,8 +328,7 @@ describe("connection manager actor", () => {
 
     // Guard: only reconnect if unhealthy
     // Must manually check state in transition handler
-    actor.__pushInternal(healthCheckResult.create({ healthy: true }));
-    actor.__drainInternal();
+    inject(actor, healthCheckResult.create({ healthy: true }));
     expect(matches(actor, "connected")).toBe(true);
 
     // Without manual check, would need:

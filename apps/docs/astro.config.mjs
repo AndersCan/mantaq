@@ -35,7 +35,6 @@ export default defineConfig({
             { label: "Effects", slug: "core-concepts/effects" },
             { label: "Context", slug: "core-concepts/context" },
             { label: "Testing", slug: "guides/actor-testing" },
-            { label: "Viz", slug: "guides/viz" },
           ],
         },
         {

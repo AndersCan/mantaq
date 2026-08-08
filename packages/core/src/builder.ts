@@ -5,13 +5,13 @@ import type { EffectFn, TransitionResult } from "./actor-types.ts";
 
 type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, object | void> ? Id : never;
 
-export type TransitionHandler<ActorContext> = (
+type TransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
   opts: { context: ActorContext; actor: AnyActor },
-) => TransitionResult;
+) => TransitionResult<States[number], string>;
 
-export interface BuiltMaps<ActorContext> {
-  transitions: Record<string, Record<string, TransitionHandler<ActorContext>>>;
+export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
+  transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
   effects: Record<string, Array<EffectFn<ActorContext>>>;
 }
 
@@ -22,8 +22,8 @@ export class ActorBuilder<
   Outputs extends readonly AnyEventRef[],
   ActorContext,
 > {
-  #transitions: BuiltMaps<ActorContext>["transitions"] = {};
-  #effects: BuiltMaps<ActorContext>["effects"] = {};
+  #transitions: BuiltMaps<States, ActorContext>["transitions"] = {};
+  #effects: BuiltMaps<States, ActorContext>["effects"] = {};
 
   on<S extends States[number], E extends Inputs[number] | Internal[number]>(
     stateRef: S,
@@ -35,7 +35,10 @@ export class ActorBuilder<
   ): this {
     const sName = stateRef.name;
     const eId = eventRef.id;
-    (this.#transitions[sName] ??= {})[eId] = fn as TransitionHandler<ActorContext>;
+    (this.#transitions[sName] ??= {})[eId] = fn as (
+      event: unknown,
+      opts: { context: ActorContext; actor: AnyActor },
+    ) => TransitionResult<States[number], string>;
     return this;
   }
 
@@ -47,7 +50,10 @@ export class ActorBuilder<
     ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>,
   ): this {
     const eId = eventRef.id;
-    (this.#transitions["Any"] ??= {})[eId] = fn as TransitionHandler<ActorContext>;
+    (this.#transitions["Any"] ??= {})[eId] = fn as (
+      event: unknown,
+      opts: { context: ActorContext; actor: AnyActor },
+    ) => TransitionResult<States[number], string>;
     return this;
   }
 
@@ -56,7 +62,7 @@ export class ActorBuilder<
     return this;
   }
 
-  /** @internal */ build(): BuiltMaps<ActorContext> {
+  /** @internal */ build(): BuiltMaps<States, ActorContext> {
     return { transitions: this.#transitions, effects: this.#effects };
   }
 }

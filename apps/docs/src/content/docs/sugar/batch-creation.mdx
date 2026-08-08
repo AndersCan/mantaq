@@ -67,9 +67,9 @@ const actor = new Actor({
   inputs: [start, finish],
   states: [idle, loading, done],
   initial: idle,
-  transitions: {
-    idle: { START: () => ({ state: loading }) },
-    loading: { FINISH: () => ({ state: done }) },
+  setup: (m) => {
+    m.on(idle, start, () => ({ state: loading }));
+    m.on(loading, finish, () => ({ state: done }));
   },
 });
 ```

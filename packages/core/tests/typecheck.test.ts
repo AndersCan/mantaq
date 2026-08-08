@@ -1,6 +1,10 @@
 import { expect, expectTypeOf, test, describe } from "vite-plus/test";
 import { Actor, state, event } from "../src/index.ts";
 import type { StateRef } from "../src/index.ts";
+import { setOutputHandler, pushInternal, getChildren } from "../src/internal-registry.ts";
+import type { RegistryError } from "../src/internal-registry.ts";
+import type { Either } from "@mantaq/utils";
+import type { AnyActor } from "../src/actor-internal.ts";
 
 describe("API type safety", () => {
   test("emit to output passes typecheck", () => {
@@ -19,9 +23,9 @@ describe("API type safety", () => {
     });
 
     let received: Array<{ id: string }> = [];
-    actor.__outputHandler = (e) => {
+    setOutputHandler(actor, (e) => {
       received.push(e);
-    };
+    });
     actor.send(clicked.create({ x: 3 }));
     expect(received.length).toBe(1);
     expect(received[0].id).toBe("PONG");
@@ -196,6 +200,20 @@ describe("type level contract — type = behavior", () => {
     const ready = state("ready")<{ items: string[] }>();
     // @ts-expect-error create requires the full payload
     ready.create({});
+  });
+
+  test("internal registry returns Either — failure is part of the type flow", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    const internalEvent = event("GO")();
+    const result = pushInternal(actor, internalEvent.create());
+    expectTypeOf(result).toEqualTypeOf<Either<RegistryError, void>>();
+    expectTypeOf(getChildren(actor)).toEqualTypeOf<Either<RegistryError, Map<string, AnyActor>>>();
   });
 });
 

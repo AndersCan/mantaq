@@ -1,6 +1,9 @@
 const TRY_CATCH_MESSAGE =
   "try/catch is banned in library code — handle failures explicitly with Either/Result instead. try/finally for resource cleanup is fine.";
 
+const THROW_MESSAGE =
+  "throw is banned in library code — errors flow as values (Either/Result), not exceptions. Assertion APIs (packages/test/src) are exempt.";
+
 export default {
   rules: {
     "no-try-catch": {
@@ -19,6 +22,24 @@ export default {
             if (node.handler) {
               context.report({ node, messageId: "tryCatch" });
             }
+          },
+        };
+      },
+    },
+    "no-throw": {
+      meta: {
+        type: "problem",
+        docs: {
+          description: "Ban throw in library code — prefer Either/Result.",
+        },
+        messages: {
+          throwStatement: THROW_MESSAGE,
+        },
+      },
+      create(context) {
+        return {
+          ThrowStatement(node) {
+            context.report({ node, messageId: "throwStatement" });
           },
         };
       },

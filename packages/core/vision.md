@@ -6,7 +6,7 @@ Extension of root `vision.md` for core package
 
 The runtime. The primitives. mantaq, minus ergonomics.
 
-core knows only core and nothing of other packages. core stands alone.
+core imports nothing above it. utils — the zero-dependency bottom layer (Either) — is the one exception. core stands alone otherwise.
 
 ## Testable first
 

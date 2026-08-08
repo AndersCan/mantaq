@@ -1,5 +1,6 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, state, event } from "../src/index.ts";
+import { setOutputHandler } from "../src/internal-registry.ts";
 
 describe("Actor dispatch resolution", () => {
   test("state handler wins over Any handler for same event", () => {
@@ -42,7 +43,7 @@ describe("Actor dispatch resolution", () => {
     });
 
     const received: string[] = [];
-    actor.__outputHandler = (e) => received.push(e.id);
+    setOutputHandler(actor, (e) => received.push(e.id));
     actor.send(tick.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(received).toEqual(["OUT"]);

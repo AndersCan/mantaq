@@ -16,18 +16,13 @@ const fetchData = event("FETCH")<{ url: string }>();
 start.id; // "START"
 ```
 
+Payload must be `object | void`. No payload by default.
+
 ## Create instances
 
 ```ts
 start.create(); // { id: "START" }
 fetchData.create({ url: "/api" }); // { id: "FETCH", url: "/api" }
-```
-
-Primitives get wrapped:
-
-```ts
-const toggle = event("TOGGLE")<boolean>();
-toggle.create(true); // { id: "TOGGLE", value: true }
 ```
 
 ## Check identity
@@ -45,14 +40,12 @@ const actor = new Actor({
   inputs: [start, fetchData],
   states: [idle, loading],
   initial: idle,
-  transitions: {
-    idle: {
-      START: () => ({ state: loading }),
-      FETCH: (event, { context }) => {
-        context.url = event.url;
-        return { state: loading };
-      },
-    },
+  setup: (m) => {
+    m.on(idle, start, () => ({ state: loading }));
+    m.on(idle, fetchData, (event, opts) => {
+      opts!.context.url = event.url;
+      return { state: loading };
+    });
   },
 });
 ```
@@ -70,32 +63,28 @@ const actor = new Actor({
   inputs: [login],
   internal: [authDone],
   // ...
-  effects: {
-    authenticating: [
-      ({ emit, signal }) => {
-        authenticate().then((result) => signal.aborted || emit(authDone.create(result)));
-      },
-    ],
+  setup: (m) => {
+    m.effect(authenticating, ({ signal, emit }) => {
+      authenticate().then((result) => {
+        if (!signal.aborted) emit(authDone.create());
+      });
+    });
   },
 });
 ```
 
-## Any transition
+## Any handler
 
-Special key `"Any"`. Intercepts all events.
+`m.onAny` intercepts an event in every state.
 
 ```ts
-transitions: {
-  Any: {
-    CANCEL: (_event, { context }) => {
-      context.cancelled = true;
-      return { state: cancelled };
-    },
-  },
-  idle: {
-    START: () => ({ state: running }),
-  },
-}
+setup: (m) => {
+  m.onAny(cancel, (_event, opts) => {
+    opts!.context.cancelled = true;
+    return { state: cancelled };
+  });
+  m.on(idle, start, () => ({ state: running }));
+},
 ```
 
-State-specific runs first. `Any` runs after.
+State-specific runs first. `onAny` runs after.

@@ -17,13 +17,11 @@ const actor = new Actor({
   states: [idle],
   initial: idle,
   context: { count: 0 } as CounterContext,
-  transitions: {
-    idle: {
-      INCREMENT: (_, { context }) => {
-        context.count++;
-        return {};
-      },
-    },
+  setup: (m) => {
+    m.on(idle, increment, (_event, opts) => {
+      opts!.context.count++;
+      return {};
+    });
   },
 });
 ```
@@ -36,22 +34,18 @@ const actor = new Actor({
 actor.context.count; // 0
 ```
 
-Getter returns `Readonly<T>`. Handlers get mutable reference.
-
 ## Context in transitions
 
 Handler gets context directly.
 
 ```ts
-transitions: {
-  idle: {
-    LOGIN: (event, { context }) => {
-      context.username = event.username;
-      context.attempts++;
-      return { state: authenticating };
-    },
-  },
-}
+setup: (m) => {
+  m.on(idle, login, (event, opts) => {
+    opts!.context.username = event.username;
+    opts!.context.attempts++;
+    return { state: authenticating };
+  });
+},
 ```
 
 ## Context in effects
@@ -59,15 +53,13 @@ transitions: {
 Effects get context too.
 
 ```ts
-effects: {
-  authenticating: [
-    ({ context, emit }) => {
-      authenticate(context.username).then(
-        (result) => emit({ id: "AUTH_DONE", result }),
-      );
-    },
-  ],
-}
+setup: (m) => {
+  m.effect(authenticating, ({ context, emit }) => {
+    authenticate(context.username).then(
+      (result) => emit({ id: "AUTH_DONE", result }),
+    );
+  });
+},
 ```
 
 ## Context in children

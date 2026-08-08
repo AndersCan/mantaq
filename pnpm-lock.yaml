@@ -87,6 +87,10 @@ importers:
         version: 0.2.8(@types/node@26.2.0)(@vitest/coverage-v8@4.1.10)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(esbuild@0.28.1)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0)
 
   packages/core:
+    dependencies:
+      '@mantaq/utils':
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       '@stryker-mutator/core':
         specifier: 'catalog:'
@@ -124,6 +128,9 @@ importers:
       '@mantaq/sugar':
         specifier: workspace:*
         version: link:../sugar
+      '@mantaq/utils':
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       '@types/node':
         specifier: ^26.2.0
@@ -146,6 +153,9 @@ importers:
       '@mantaq/core':
         specifier: workspace:*
         version: link:../core
+      '@mantaq/utils':
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       '@stryker-mutator/core':
         specifier: 'catalog:'

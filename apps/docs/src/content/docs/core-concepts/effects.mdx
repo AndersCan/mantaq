@@ -5,21 +5,21 @@ description: Side effects on state entry.
 
 Effect. Runs on state entry. Gets `EffectInput`. Can emit events.
 
+Register effects in `setup` with `m.effect(state, fn)`.
+
 ## Basic effect
 
 ```ts
 const actor = new Actor({
   // ...
-  effects: {
-    loading: [
-      ({ signal, emit }) => {
-        fetch("/api")
-          .then((res) => res.json())
-          .then((data) => {
-            if (!signal.aborted) emit({ id: "FETCH_DONE", data });
-          });
-      },
-    ],
+  setup: (m) => {
+    m.effect(loading, ({ signal, emit }) => {
+      fetch("/api")
+        .then((res) => res.json())
+        .then((data) => {
+          if (!signal.aborted) emit({ id: "FETCH_DONE", data });
+        });
+    });
   },
 });
 ```
@@ -42,41 +42,42 @@ const actor = new Actor({
 Effect aborts. Actor leaves state.
 
 ```ts
-effects: {
-  loading: [
-    ({ signal, clock }) => {
-      const id = clock.setTimeout(5000, () => {
-        // timeout
-      }, { signal });
-      // No manual clear. AbortSignal handles it.
-    },
-  ],
-}
+setup: (m) => {
+  m.effect(loading, ({ signal, clock }) => {
+    const id = clock.setTimeout(5000, () => {
+      // timeout
+    }, { signal });
+    // No manual clear. AbortSignal handles it.
+  });
+},
 ```
 
 ## Multiple effects
 
-Array. Runs sequential.
+Call `m.effect` multiple times for the same state. Runs in order.
 
 ```ts
-effects: {
-  active: [
-    ({ signal }) => { /* one */ },
-    ({ signal }) => { /* two */ },
-  ],
-}
+setup: (m) => {
+  m.effect(active, ({ signal }) => { /* one */ });
+  m.effect(active, ({ signal }) => { /* two */ });
+},
 ```
 
 ## Error handling
 
-Effect error → `"error"` subscriber.
+Never throw in an effect. Catch errors and emit an internal error event; a
+transition handles it.
 
 ```ts
-actor.on("error", (err) => {
-  console.error("Effect failed:", err);
-});
+setup: (m) => {
+  m.effect(loading, ({ signal, emit }) => {
+    fetch("/api")
+      .then((res) => res.json())
+      .catch((err) => {
+        if (!signal.aborted) emit({ id: "FETCH_FAILED", error: String(err) });
+      });
+  });
+},
 ```
-
-One effect error. Others still run.
 
 Tip: `@mantaq/sugar` provides `withPromise` and `withTimeout` helpers for common effect patterns. See [Sugar](/mantaq/sugar/effect-helpers/).

@@ -34,6 +34,14 @@ export default defineConfig({
         ],
         rules: {
           "mantaq/no-try-catch": "error",
+          "mantaq/no-throw": "error",
+        },
+      },
+      {
+        files: ["packages/test/src/**"],
+        // assertion APIs must throw to fail the test — that is their error flow
+        rules: {
+          "mantaq/no-throw": "off",
         },
       },
       {
@@ -80,17 +88,13 @@ export default defineConfig({
             "error",
             {
               paths: [
-                {
-                  name: "@mantaq/core",
-                  message: "@mantaq/core is the bottom layer and imports no @mantaq packages",
-                },
+                { name: "@mantaq/core", message: "@mantaq/core may not import itself" },
                 { name: "@mantaq/sugar", message: "@mantaq/core may not import @mantaq/sugar" },
                 {
                   name: "@mantaq/traversal",
                   message: "@mantaq/core may not import @mantaq/traversal",
                 },
                 { name: "@mantaq/test", message: "@mantaq/core may not import @mantaq/test" },
-                { name: "@mantaq/utils", message: "@mantaq/core may not import @mantaq/utils" },
               ],
             },
           ],

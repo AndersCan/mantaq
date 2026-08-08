@@ -24,7 +24,8 @@
     "coverage": "vp test run --coverage"
   },
   "dependencies": {
-    "@mantaq/core": "workspace:*"
+    "@mantaq/core": "workspace:*",
+    "@mantaq/utils": "workspace:*"
   },
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",
