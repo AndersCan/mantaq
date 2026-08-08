@@ -47,16 +47,13 @@ const next = event("NEXT")();
 function createTrafficLight() {
   return new Actor({
     inputs: [next],
-    outputs: [],
-    internal: [],
     states: [green, yellow, red],
     initial: green,
-    context: {} as {},
-    effects: {},
-    transitions: {
-      green: { NEXT: () => ({ state: yellow }) },
-      yellow: { NEXT: () => ({ state: red }) },
-      red: { NEXT: () => ({ state: green }) },
+    context: {},
+    setup: (m) => {
+      m.on(green, next, () => ({ state: yellow }));
+      m.on(yellow, next, () => ({ state: red }));
+      m.on(red, next, () => ({ state: green }));
     },
   });
 }
@@ -105,13 +102,13 @@ expect(actor.snapshot().done).toBeFalsy();
 ### Assert Transition Path
 
 ```ts
-actor.send(next);
+actor.send(next.create());
 expect(actor.snapshot().path[0]).toBe("yellow");
 
-actor.send(next);
+actor.send(next.create());
 expect(actor.snapshot().path[0]).toBe("red");
 
-actor.send(next);
+actor.send(next.create());
 expect(actor.snapshot().path[0]).toBe("green"); // cycle back
 ```
 
@@ -124,10 +121,10 @@ type CounterContext = { count: number };
 
 const increment = event("INCREMENT")();
 
-// In transitions:
-// counter: { INCREMENT: (_, { context }) => { context.count++; return {}; } }
+// In setup:
+// m.on(counter, increment, (_event, opts) => { opts!.context.count++; return {}; })
 
-actor.send(increment);
+actor.send(increment.create());
 expect(actor.context.count).toBe(1);
 ```
 
@@ -178,33 +175,23 @@ type AuthContext = { username?: string; attempts: number };
 function createLoginActor() {
   return new Actor({
     inputs: [login, logout, retry],
-    outputs: [],
     internal: [authDone, authFail],
     states: [idle, authenticating, authenticated, error],
     initial: idle,
     context: { attempts: 0 } as AuthContext,
-    effects: {},
-    transitions: {
-      idle: {
-        LOGIN: (event, { context }) => {
-          context.username = event.username;
-          context.attempts++;
-          return { state: authenticating };
-        },
-      },
-      authenticating: {
-        AUTH_DONE: () => ({ state: authenticated }),
-        AUTH_FAIL: () => ({ state: error }),
-      },
-      error: {
-        RETRY: () => ({ state: idle }),
-      },
-      authenticated: {
-        LOGOUT: (_, { context }) => {
-          context.username = undefined;
-          return { state: idle };
-        },
-      },
+    setup: (m) => {
+      m.on(idle, login, (event, opts) => {
+        opts!.context.username = event.username;
+        opts!.context.attempts++;
+        return { state: authenticating };
+      });
+      m.on(authenticating, authDone, () => ({ state: authenticated }));
+      m.on(authenticating, authFail, () => ({ state: error }));
+      m.on(error, retry, () => ({ state: idle }));
+      m.on(authenticated, logout, (_event, opts) => {
+        opts!.context.username = undefined;
+        return { state: idle };
+      });
     },
   });
 }
@@ -221,7 +208,7 @@ describe("login actor", () => {
     actor.send(login.create({ username: "user", password: "pass" }));
     expect(actor.snapshot().path[0]).toBe("authenticating");
 
-    actor.send(authDone);
+    actor.send(authDone.create());
     expect(actor.snapshot().path[0]).toBe("authenticated");
     expect(actor.context.username).toBe("user");
   });
@@ -230,10 +217,10 @@ describe("login actor", () => {
     const actor = createLoginActor();
 
     actor.send(login.create({ username: "user", password: "wrong" }));
-    actor.send(authFail);
+    actor.send(authFail.create());
     expect(actor.snapshot().path[0]).toBe("error");
 
-    actor.send(retry);
+    actor.send(retry.create());
     expect(actor.snapshot().path[0]).toBe("idle");
   });
 
@@ -241,10 +228,10 @@ describe("login actor", () => {
     const actor = createLoginActor();
 
     actor.send(login.create({ username: "user", password: "pass" }));
-    actor.send(authDone);
+    actor.send(authDone.create());
     expect(actor.snapshot().path[0]).toBe("authenticated");
 
-    actor.send(logout);
+    actor.send(logout.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(actor.context.username).toBeUndefined();
   });

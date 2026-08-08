@@ -21,7 +21,27 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { pushInternal, drainInternal } from "@mantaq/core/internal";
+import type { RegistryError } from "@mantaq/core/internal";
+import { Either } from "@mantaq/utils";
 import { matches, states, events, withTimeout } from "@mantaq/sugar";
+
+function inject(actor: object, event: { id: string }): void {
+  Either.match(
+    pushInternal(actor, event),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+  Either.match(
+    drainInternal(actor),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 interface OrderRequest {
@@ -261,9 +281,7 @@ describe("saga orchestrator actor", () => {
     );
     clock.advance(100);
     expect(matches(actor, "processingPayment")).toBe(true);
-
-    actor.__pushInternal(PAYMENT_FAILED.create({ error: "Card declined" }));
-    actor.__drainInternal();
+    inject(actor, PAYMENT_FAILED.create({ error: "Card declined" }));
     expect(matches(actor, "compensatingRefund")).toBe(true);
     expect(actor.context.error).toBe("Card declined");
 
@@ -288,9 +306,7 @@ describe("saga orchestrator actor", () => {
     clock.advance(100);
     clock.advance(200);
     expect(matches(actor, "creatingShipment")).toBe(true);
-
-    actor.__pushInternal(SHIPMENT_FAILED.create({ error: "Carrier unavailable" }));
-    actor.__drainInternal();
+    inject(actor, SHIPMENT_FAILED.create({ error: "Carrier unavailable" }));
     expect(matches(actor, "compensatingRefund")).toBe(true);
 
     clock.advance(100);
@@ -309,9 +325,7 @@ describe("saga orchestrator actor", () => {
       }),
     );
     expect(matches(actor, "reservingInventory")).toBe(true);
-
-    actor.__pushInternal(INVENTORY_FAILED.create({ error: "Out of stock" }));
-    actor.__drainInternal();
+    inject(actor, INVENTORY_FAILED.create({ error: "Out of stock" }));
     expect(matches(actor, "failed")).toBe(true);
     expect(actor.context.error).toBe("Out of stock");
     expect(actor.context.completedSteps).toEqual([]);
@@ -371,9 +385,7 @@ describe("saga orchestrator actor", () => {
       }),
     );
     expect(matches(actor, "reservingInventory")).toBe(true);
-
-    actor.__pushInternal(INVENTORY_FAILED.create({ error: "Forced" }));
-    actor.__drainInternal();
+    inject(actor, INVENTORY_FAILED.create({ error: "Forced" }));
     expect(matches(actor, "failed")).toBe(true);
 
     clock.advance(100);
@@ -442,9 +454,7 @@ describe("saga orchestrator actor", () => {
     clock.advance(200);
     clock.advance(150);
     expect(matches(actor, "notifying")).toBe(true);
-
-    actor.__pushInternal(NOTIFICATION_FAILED.create({ error: "Email bounce" }));
-    actor.__drainInternal();
+    inject(actor, NOTIFICATION_FAILED.create({ error: "Email bounce" }));
     expect(matches(actor, "completed")).toBe(true);
     expect(actor.context.error).toBe("Notification failed");
     expect(actor.snapshot().done).toBe(true);

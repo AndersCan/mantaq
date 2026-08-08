@@ -11,8 +11,14 @@
  *  2. Export surface stays small and internal. Nothing named `Internal*` may
  *     be public (except the allowlist: `InternalEvent` is the public event
  *     contract). Total surface is capped by BUDGET_EXPORTS.
- *  3. Impl size has a ceiling, per file and per package. "Complexity in impl
+ *  3. Every public export is hand-curated: each name must appear in
+ *     packages/core/API.md, the human-written frozen contract. An export that
+ *     is not documented is an unvetted API and fails the guard.
+ *  4. Impl size has a ceiling, per file and per package. "Complexity in impl
  *     is a bug" now has a gradient instead of being taste.
+ *  5. Determinism is a north star: the runtime never reads the wall clock,
+ *     randomness, or performance timers. Only real-clock.ts may. "Same
+ *     inputs, same trace, always."
  *
  * Run with `vp run guard`. Wired into the root `ready` script.
  */
@@ -20,6 +26,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const CORE_SRC = join(import.meta.dirname, "..", "packages", "core", "src");
+const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 
 const BUDGET_TOTAL_LINES = 1100;
 const BUDGET_FILE_LINES = 400;
@@ -34,6 +41,12 @@ const FORBIDDEN = [
 ];
 
 const ALLOWED_INTERNAL_EXPORTS = new Set(["InternalEvent"]);
+
+const NONDETERMINISTIC = [
+  { name: "Date.now", pattern: /Date\.now/g },
+  { name: "Math.random", pattern: /Math\.random/g },
+  { name: "performance.now", pattern: /performance\.now/g },
+];
 
 let failures = 0;
 const fail = (msg) => {
@@ -60,6 +73,15 @@ for (const file of files) {
       fail(`${file}:${lineOf(text, match.index)} forbidden type escape "${name}"`);
     }
   }
+  if (file === CLOCK_FILE) continue;
+  for (const { name, pattern } of NONDETERMINISTIC) {
+    pattern.lastIndex = 0;
+    for (const match of text.matchAll(pattern)) {
+      fail(
+        `${file}:${lineOf(text, match.index)} nondeterministic source "${name}" — determinism is a north star; only real-clock.ts may read the wall clock`,
+      );
+    }
+  }
 }
 
 const indexText = readFileSync(join(CORE_SRC, "index.ts"), "utf8");
@@ -81,6 +103,14 @@ for (const name of exported) {
 }
 if (exported.size > BUDGET_EXPORTS) {
   fail(`export surface ${exported.size} exceeds budget ${BUDGET_EXPORTS}`);
+}
+
+const apiDocPath = join(import.meta.dirname, "..", "packages", "core", "API.md");
+const apiDoc = readFileSync(apiDocPath, "utf8");
+for (const name of exported) {
+  if (!new RegExp(`\\b${name}\\b`).test(apiDoc)) {
+    fail(`public export "${name}" is not documented in packages/core/API.md`);
+  }
 }
 
 let total = 0;

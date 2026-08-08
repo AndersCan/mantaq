@@ -13,7 +13,27 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { pushInternal, drainInternal } from "@mantaq/core/internal";
+import type { RegistryError } from "@mantaq/core/internal";
+import { Either } from "@mantaq/utils";
 import { matches, withTimeout } from "@mantaq/sugar";
+
+function inject(actor: object, event: { id: string }): void {
+  Either.match(
+    pushInternal(actor, event),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+  Either.match(
+    drainInternal(actor),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+}
 
 // ── State refs ──────────────────────────────────────────────────────
 const disconnectedState = state("disconnected")();
@@ -158,9 +178,7 @@ describe("WebSocket reconnection manager", () => {
 
     clock.advance(200);
     expect(matches(actor, "connecting")).toBe(true);
-
-    actor.__pushInternal(connectionFailed.create({ error: "Connection refused" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Connection refused" }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
     expect(actor.context.error).toBe("Connection refused");
@@ -174,8 +192,7 @@ describe("WebSocket reconnection manager", () => {
     expect(matches(actor, "connecting")).toBe(true);
 
     // Fail attempt 1
-    actor.__pushInternal(connectionFailed.create({ error: "Error 1" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Error 1" }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
 
@@ -184,8 +201,7 @@ describe("WebSocket reconnection manager", () => {
     expect(matches(actor, "connecting")).toBe(true);
 
     // Fail attempt 2 → retryCount=2, which equals maxRetries=2
-    actor.__pushInternal(connectionFailed.create({ error: "Error 2" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Error 2" }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(2);
 
@@ -242,8 +258,7 @@ describe("WebSocket reconnection manager", () => {
     const { actor, clock } = createWsActor();
 
     actor.send(connect.create({ url: "ws://example.com" }));
-    actor.__pushInternal(connectionFailed.create({ error: "Fail" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Fail" }));
     expect(actor.context.retryCount).toBe(1);
 
     // Force reconnect resets retryCount to 0
@@ -279,8 +294,7 @@ describe("WebSocket reconnection manager", () => {
 
     // Attempt and fail
     actor.send(connect.create({ url: "ws://example.com" }));
-    actor.__pushInternal(connectionFailed.create({ error: "Timeout" }));
-    actor.__drainInternal();
+    inject(actor, connectionFailed.create({ error: "Timeout" }));
     expect(matches(actor, "reconnecting")).toBe(true);
     expect(actor.context.retryCount).toBe(1);
 

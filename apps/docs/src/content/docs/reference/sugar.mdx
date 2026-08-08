@@ -47,7 +47,7 @@ Batch event creation.
 
 ```ts
 const e = events("fetch", "resolve", "fail");
-e.fetch.create({ url: "/api" }); // { id: "fetch", url: "/api" }
+e.fetch.create(); // { id: "fetch" }
 ```
 
 ---
@@ -145,10 +145,10 @@ Promise → actor events. Checks `signal.aborted`.
 ## `withTimeout(ms, input, eventFn)`
 
 ```ts
-function withTimeout<Inputs, Internal, ActorContext>(
+function withTimeout<ActorContext>(
   ms: number,
-  input: EffectInput<Inputs, Internal, ActorContext>,
-  event: () => EmitEvent<Inputs, Internal, ActorContext>,
+  input: EffectInput<ActorContext>,
+  event: () => InternalEvent,
 ): void;
 ```
 

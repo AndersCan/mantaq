@@ -23,9 +23,4 @@ export interface AnyActor {
     effects?: Record<string, unknown[]>;
     states?: ReadonlyArray<{ name: string; isFinal: boolean }>;
   };
-  __children: Map<string, AnyActor>;
-  __outputHandler: ((event: InternalEvent) => void) | null;
-  __pushInternal(event: InternalEvent): void;
-  __drainInternal(): void;
-  __abortEffects(): void;
 }

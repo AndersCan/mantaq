@@ -1,4 +1,4 @@
-import type { AnyActor, Snapshot, InternalEvent } from "@mantaq/core";
+import type { AnyActor, Snapshot } from "@mantaq/core";
 import { History } from "./history.ts";
 
 export interface InstrumentedActor {
@@ -14,11 +14,6 @@ export interface InstrumentedActor {
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
   options?: AnyActor["options"];
-  __children: Map<string, AnyActor>;
-  __outputHandler: ((event: InternalEvent) => void) | null;
-  __pushInternal(event: InternalEvent): void;
-  __drainInternal(): void;
-  __abortEffects(): void;
 }
 
 function wrapWithProxy(
@@ -50,15 +45,6 @@ function wrapWithProxy(
     get options() {
       return actor.options;
     },
-    get __children() {
-      return actor.__children;
-    },
-    get __outputHandler() {
-      return actor.__outputHandler;
-    },
-    set __outputHandler(fn) {
-      actor.__outputHandler = fn;
-    },
 
     send(event: unknown) {
       const { id: eventId } = trackSendEvent(history, event);
@@ -75,11 +61,6 @@ function wrapWithProxy(
     },
     on: actor.on.bind(actor) as InstrumentedActor["on"],
     settled: actor.settled.bind(actor),
-    __pushInternal: actor.__pushInternal.bind(actor),
-    __drainInternal() {
-      actor.__drainInternal();
-    },
-    __abortEffects: actor.__abortEffects.bind(actor),
   };
 }
 

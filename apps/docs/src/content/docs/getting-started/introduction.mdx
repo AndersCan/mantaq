@@ -21,7 +21,6 @@ Actors. Events. Hierarchical states. Three concepts.
 | --------------- | ------------------------------------------------------------------------ |
 | `@mantaq/core`  | Runtime. `Actor`, `state`, `event`, `VirtualClock`                       |
 | `@mantaq/sugar` | Helpers. `matches`, `states`, `events`, `tag`, `ActorMap`, `withPromise` |
-| `@mantaq/viz`   | Graph viewer. `<mantaq-viz>` web component for interactive visualization |
 
 ## Quick example
 
@@ -38,9 +37,9 @@ const machine = new Actor({
   inputs: [start, stop],
   states: [idle, running],
   initial: idle,
-  transitions: {
-    idle: { START: () => ({ state: running }) },
-    running: { STOP: () => ({ state: idle }) },
+  setup: (m) => {
+    m.on(idle, start, () => ({ state: running }));
+    m.on(running, stop, () => ({ state: idle }));
   },
 });
 

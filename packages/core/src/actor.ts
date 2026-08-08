@@ -1,11 +1,11 @@
 import { StateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
-import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
+import type { AnyEventRef, EventRef, InternalEvent } from "./event.ts";
 import { RealClock } from "./real-clock.ts";
 import { VirtualClock } from "./virtual-clock.ts";
 import type { Clock } from "./clock.ts";
-import type { Snapshot } from "./actor-internal.ts";
-import type { AnyActor } from "./actor-internal.ts";
+import type { Snapshot, AnyActor } from "./actor-internal.ts";
+import { registerActor, setOutputHandler } from "./internal-registry.ts";
 import { InternalQueue } from "./queue.ts";
 import { Subscribers } from "./subscribers.ts";
 import { buildSnapshot } from "./snapshot.ts";
@@ -21,41 +21,6 @@ export type { Clock, Snapshot, AnyActor };
 type CreatedOf<E extends AnyEventRef> =
   E extends EventRef<infer Id, infer P> ? (P extends void ? { id: Id } : P & { id: Id }) : never;
 
-type StateNameOf<S extends AnyStateRef> = S extends StateRef<infer N, unknown, boolean> ? N : never;
-type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, object | void> ? Id : never;
-
-type CreatedForId<Refs extends readonly AnyEventRef[], Id extends string> =
-  Extract<Refs[number], { id: Id }> extends infer R
-    ? R extends EventRef<Id, infer P>
-      ? CreatedOfEvent<Id, P>
-      : never
-    : never;
-
-type HandlerEvent<
-  Inputs extends readonly AnyEventRef[],
-  Internal extends readonly AnyEventRef[],
-  Id extends string,
-> = CreatedForId<Inputs, Id> | CreatedForId<Internal, Id>;
-
-export type TransitionMap<
-  States extends readonly AnyStateRef[],
-  Inputs extends readonly AnyEventRef[],
-  Internal extends readonly AnyEventRef[],
-  Outputs extends readonly AnyEventRef[],
-  ActorContext,
-> = {
-  [S in StateNameOf<States[number]> | "Any"]?: {
-    [E in EventIdOf<Inputs[number]> | EventIdOf<Internal[number]>]?: (
-      event: HandlerEvent<Inputs, Internal, E>,
-      options: { context: ActorContext; actor: AnyActor },
-    ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>;
-  };
-};
-
-export type EffectsMap<States extends readonly AnyStateRef[], ActorContext> = Partial<
-  Record<StateNameOf<States[number]>, Array<EffectFn<ActorContext>>>
->;
-
 type InitialState<S extends AnyStateRef> =
   S extends StateRef<infer _N extends string, infer P>
     ? [unknown] extends [P]
@@ -63,10 +28,12 @@ type InitialState<S extends AnyStateRef> =
       : { state: S; payload: P }
     : never;
 
+function pickState<S extends AnyStateRef>(initial: S | { state: S }): S {
+  return initial instanceof StateRef ? initial : initial.state;
+}
+
 function resolveInitial<S extends AnyStateRef>(initial: InitialState<S>): S {
-  const result =
-    typeof initial === "object" && initial !== null && "state" in initial ? initial.state : initial;
-  return result as S;
+  return pickState<S>(initial);
 }
 
 export interface ActorOptions<
@@ -103,10 +70,27 @@ export interface InternalActorOptions<
   initial: InitialState<States[number]>;
   clock?: Clock;
   internalBudget?: number;
-  transitions: TransitionDispatch<ActorContext>;
+  transitions: TransitionDispatch<States, ActorContext>;
   effects: Record<string, Array<EffectFn<ActorContext>>>;
   regions?: Record<string, AnyActor>;
 }
+
+type TransitionDispatch<States extends readonly AnyStateRef[], ActorContext> = Record<
+  string,
+  Record<
+    string,
+    | ((
+        event: InternalEvent,
+        options: { context: ActorContext; actor: AnyActor },
+      ) => TransitionResult<States[number], string>)
+    | undefined
+  >
+>;
+
+type StepFn<States extends readonly AnyStateRef[], ActorContext> = (
+  event: InternalEvent,
+  options: { context: ActorContext; actor: AnyActor },
+) => TransitionResult<States[number], string>;
 
 export class Actor<
   const States extends readonly AnyStateRef[],
@@ -143,6 +127,17 @@ export class Actor<
   }
 
   constructor(options: ActorOptions<States, Inputs, Internal, Outputs, ActorContext>) {
+    registerActor(this, {
+      children: this.#children,
+      getOutputHandler: () => this.#outputHandler,
+      setOutputHandler: (fn) => {
+        this.#outputHandler = fn;
+      },
+      pushInternal: (event) => this.#pushEvent(event),
+      drainInternal: () => this.#drainInternal(),
+      abortEffects: () => this.#abortEffects(),
+    });
+
     const builder = new ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>();
     options.setup(builder);
     const built = builder.build();
@@ -172,10 +167,13 @@ export class Actor<
     if (options.regions) {
       for (const [key, child] of Object.entries(options.regions)) {
         this.#regions[key] = child;
-        child.__outputHandler = (event) => {
+        const result = setOutputHandler(child, (event) => {
           this.#queue.push(event);
           this.#drainInternal();
-        };
+        });
+        if (result[0] !== undefined) {
+          console.error(result[0].message);
+        }
         this.#children.set(key, child);
       }
     }
@@ -209,28 +207,12 @@ export class Actor<
     const stateTransition = transitions[this.state.name]?.[event.id];
     const anyTransition = transitions["Any"]?.[event.id];
 
-    let transitionApplied = false;
-    let anyEmitted = false;
-
-    if (stateTransition) {
-      const step = stateTransition(event, { context: this.#context, actor: this as AnyActor });
-      if (step.emit) this.#queue.push(...step.emit);
-      if (step.state) {
-        this.#applyTransition(event, step);
-        transitionApplied = true;
-      }
-    }
-
-    if (anyTransition) {
-      const step = anyTransition(event, { context: this.#context, actor: this as AnyActor });
-      if (step.state && !transitionApplied) {
-        this.#applyTransition(event, step);
-      }
-      if (step.emit) {
-        this.#queue.push(...step.emit);
-        anyEmitted = true;
-      }
-    }
+    const transitionApplied = stateTransition
+      ? this.#applyStateStep(event, stateTransition)
+      : false;
+    const anyEmitted = anyTransition
+      ? this.#applyAnyStep(event, anyTransition, !transitionApplied)
+      : false;
 
     if (anyEmitted || this.#queue.length > 0) {
       this.#drainInternal();
@@ -241,39 +223,51 @@ export class Actor<
     }
   }
 
+  #applyStateStep(event: InternalEvent, transition: StepFn<States, ActorContext>): boolean {
+    const step = transition(event, { context: this.#context, actor: this as AnyActor });
+    if (step.emit) this.#queue.push(...step.emit);
+    if (step.state) {
+      this.#applyTransition(event, step);
+      return true;
+    }
+    return false;
+  }
+
+  #applyAnyStep(
+    event: InternalEvent,
+    transition: StepFn<States, ActorContext>,
+    allowTransition: boolean,
+  ): boolean {
+    const step = transition(event, { context: this.#context, actor: this as AnyActor });
+    if (step.state && allowTransition) {
+      this.#applyTransition(event, step);
+    }
+    if (step.emit) {
+      this.#queue.push(...step.emit);
+      return true;
+    }
+    return false;
+  }
+
   snapshot(): Snapshot {
     return buildSnapshot(this.state, this.#regions);
   }
 
-  /** @internal */ get __children(): Map<string, AnyActor> {
-    return this.#children;
-  }
-  /** @internal */ get __outputHandler(): ((event: InternalEvent) => void) | null {
-    return this.#outputHandler;
-  }
-  /** @internal */ set __outputHandler(fn: ((event: InternalEvent) => void) | null) {
-    this.#outputHandler = fn;
-  }
-  /** @internal */ __pushInternal(event: InternalEvent): void {
+  #pushEvent(event: InternalEvent): void {
     this.#queue.push(event);
   }
-  /** @internal */ __drainInternal(): void {
-    this.#drainInternal();
-  }
-  /** @internal */ __abortEffects(): void {
+
+  #abortEffects(): void {
     this.#effectAbort?.abort();
     this.#subs.clear();
   }
 
-  #applyTransition<AllowedState extends AnyStateRef>(
-    event: InternalEvent,
-    step: TransitionResult<AllowedState, string>,
-  ): void {
+  #applyTransition(event: InternalEvent, step: TransitionResult<States[number], string>): void {
     if (!step.state) return;
     this.#effectAbort?.abort();
-    const resolved = parseTarget<AllowedState>(step);
+    const resolved = parseTarget<States[number]>(step);
     if (!resolved) return;
-    this.state = resolved.state as States[number];
+    this.state = resolved.state;
     this.#runEffects(event, resolved.payload);
     this.#subs.emitChange(this.snapshot());
     if (this.state.isFinal) {
@@ -312,7 +306,7 @@ export class Actor<
       this.#queue.processCancellable((event) => {
         if (count >= budget) {
           budgetExceeded = true;
-          this.__abortEffects();
+          this.#abortEffects();
           return false;
         }
         count++;
@@ -335,15 +329,3 @@ export class Actor<
     }
   }
 }
-
-type TransitionDispatch<ActorContext> = Record<
-  string,
-  Record<
-    string,
-    | ((
-        event: InternalEvent,
-        options: { context: ActorContext; actor: AnyActor },
-      ) => TransitionResult)
-    | undefined
-  >
->;

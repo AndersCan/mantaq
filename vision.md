@@ -14,11 +14,24 @@ Core primitives: States + Events, Context, Effects, Regions/Composition, Clock.
 
 ## North Star
 
-**If it typechecks, it runs correct.**
+Three claims. Each is a machine check, not taste. Divergence is a design bug.
 
-Type = behavior. Any divergence between type and runtime is a design bug. Pursue 100% type safety. Nothing stringly typed.
+- **If it typechecks, it runs correct.** Type = behavior. Nothing stringly typed. Any gap between type and runtime is a design bug.
+- **If it runs, it runs deterministic.** Same inputs, same trace, always. The runtime never reads the wall clock, randomness, or environment. One clock, injectable.
+- **If tests pass, behavior is proven.** Virtual clock, mutation-tested. Untestable is unfinished.
 
 This is not aspiration. This is the test of every PR.
+
+## Ecosystem
+
+core and sugar are the runtime. Every package around them must earn its place by serving the ecosystem, not the internals:
+
+- **traversal** — graphs, coverage, history. Behavior proof for testing; later, fuel for visualization.
+- **test** — assertions for actor behavior.
+- **examples** — recipes proven in the real.
+- **utils** — the shared bottom layer. core may import it; nothing else does.
+
+New package, two questions: does it serve the ecosystem (testing, visualization, ergonomics)? Does it obey the package rules? Graphs are the seed — traversal's coverage trees become the viz.
 
 ## Beliefs
 

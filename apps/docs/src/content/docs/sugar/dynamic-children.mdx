@@ -72,27 +72,37 @@ import { ActorMap, broadcast } from "@mantaq/sugar";
 
 const task = event("TASK")<{ jobId: string }>();
 const shutdown = event("SHUTDOWN")();
+const idle = state("idle")();
+const working = state("working")();
 
-function createParent() {
-  const workers = new ActorMap(/* parent actor */);
-
+function createWorker() {
   return new Actor({
-    inputs: [task, shutdown],
-    effects: {
-      active: [
-        ({ event }) => {
-          if (event.id === "TASK") {
-            workers.spawn(event.jobId, () => createWorker(event.jobId));
-            workers.send(event.jobId, task.create(event));
-          }
-          if (event.id === "SHUTDOWN") {
-            broadcast(workers, shutdown);
-          }
-        },
-      ],
+    inputs: [shutdown],
+    states: [idle, working],
+    initial: idle,
+    setup: (m) => {
+      m.on(working, shutdown, () => ({ state: idle }));
     },
   });
 }
+
+const workers = new ActorMap();
+
+const parent = new Actor({
+  inputs: [task, shutdown],
+  states: [idle, working],
+  initial: idle,
+  setup: (m) => {
+    m.onAny(task, (event) => {
+      workers.spawn(event.jobId, createWorker);
+      return {};
+    });
+    m.onAny(shutdown, () => {
+      broadcast(workers, shutdown.create());
+      return {};
+    });
+  },
+});
 ```
 
 Dynamic pool. Spawn on demand. Broadcast shutdown.

@@ -10,5 +10,6 @@
     "dir": "packages/core",
     "configFile": "packages/core/stryker.vitest.config.ts",
     "related": false
-  }
+  },
+  "thresholds": { "high": 80, "low": 75, "break": 70 }
 }

@@ -23,10 +23,12 @@ export class EventRef<const T extends string, Payload extends object | void = vo
     );
   }
 
-  create(payload: Payload): CreatedOfEvent<T, Payload> {
+  create(): Payload extends void ? { id: T } : void;
+  create(payload: Payload): Payload extends void ? { id: T } : Payload & { id: T };
+  create(payload?: Payload): void | { id: T } | (Payload & { id: T }) {
     if (payload === undefined) {
-      return { id: this.id } as CreatedOfEvent<T, Payload>;
+      return { id: this.id };
     }
-    return { ...(payload as object), id: this.id } as CreatedOfEvent<T, Payload>;
+    return { ...payload, id: this.id };
   }
 }

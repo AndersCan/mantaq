@@ -9,6 +9,7 @@
   "type": "module",
   "exports": {
     ".": "./dist/index.mjs",
+    "./internal": "./src/internal-registry.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -21,6 +22,9 @@
     "check": "vp check",
     "prepublishOnly": "vp run build",
     "coverage": "vp test run --coverage"
+  },
+  "dependencies": {
+    "@mantaq/utils": "workspace:*"
   },
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",

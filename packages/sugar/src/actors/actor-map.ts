@@ -1,4 +1,6 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
+import { abortEffects, setOutputHandler } from "@mantaq/core/internal";
+import { Either } from "@mantaq/utils";
 import type { SendableEvent, SendableMap } from "../transitions/broadcast.ts";
 
 export class ActorMap implements SendableMap<SendableEvent> {
@@ -16,9 +18,13 @@ export class ActorMap implements SendableMap<SendableEvent> {
     }
     const child = factory();
     if (this.#parent) {
-      child.__outputHandler = (event) => {
-        this.#parent!.send(event);
-      };
+      Either.match(
+        setOutputHandler(child, (event) => {
+          this.#parent!.send(event);
+        }),
+        (err) => console.error(err.message),
+        () => {},
+      );
     }
     this.#actors.set(key, child);
   }
@@ -28,7 +34,14 @@ export class ActorMap implements SendableMap<SendableEvent> {
   }
 
   kill(key: string): void {
-    this.#actors.get(key)?.__abortEffects();
+    const actor = this.#actors.get(key);
+    if (actor) {
+      Either.match(
+        abortEffects(actor),
+        (err) => console.error(err.message),
+        () => {},
+      );
+    }
     this.#actors.delete(key);
   }
 

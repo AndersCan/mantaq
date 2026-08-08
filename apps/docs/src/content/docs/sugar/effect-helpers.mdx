@@ -5,6 +5,8 @@ description: Promise bridging and timeout helpers for effects.
 
 Effects need patterns. Promise bridging. Timeouts. Sugar provides two.
 
+Register effects in `setup` with `m.effect(state, fn)`.
+
 ## withPromise
 
 Bridge promise to actor events. Abort-safe.
@@ -12,16 +14,14 @@ Bridge promise to actor events. Abort-safe.
 ```ts
 import { withPromise } from "@mantaq/sugar";
 
-effects: {
-  loading: [
-    ({ signal, emit }) => {
-      withPromise(fetch("/api"), signal, emit, {
-        success: (data) => ({ id: "FETCH_DONE", data }),
-        error: (err) => ({ id: "FETCH_ERROR", error: err }),
-      });
-    },
-  ],
-}
+setup: (m) => {
+  m.effect(loading, ({ signal, emit }) => {
+    withPromise(fetch("/api"), signal, emit, {
+      success: (data) => ({ id: "FETCH_DONE", data }),
+      error: (err) => ({ id: "FETCH_ERROR", error: err }),
+    });
+  });
+},
 ```
 
 ### What it does
@@ -34,19 +34,17 @@ effects: {
 Without sugar:
 
 ```ts
-effects: {
-  loading: [
-    ({ signal, emit }) => {
-      fetch("/api")
-        .then((data) => {
-          if (!signal.aborted) emit({ id: "FETCH_DONE", data });
-        })
-        .catch((err) => {
-          if (!signal.aborted) emit({ id: "FETCH_ERROR", error: err });
-        });
-    },
-  ],
-}
+setup: (m) => {
+  m.effect(loading, ({ signal, emit }) => {
+    fetch("/api")
+      .then((data) => {
+        if (!signal.aborted) emit({ id: "FETCH_DONE", data });
+      })
+      .catch((err) => {
+        if (!signal.aborted) emit({ id: "FETCH_ERROR", error: err });
+      });
+  });
+},
 ```
 
 Same logic. More code. Easy to forget abort check.
@@ -69,13 +67,11 @@ Timeout via actor's clock. Abort-safe.
 ```ts
 import { withTimeout } from "@mantaq/sugar";
 
-effects: {
-  idle: [
-    (input) => {
-      withTimeout(5000, input, () => ({ id: "TIMEOUT" }));
-    },
-  ],
-}
+setup: (m) => {
+  m.effect(idle, (input) => {
+    withTimeout(5000, input, () => ({ id: "TIMEOUT" }));
+  });
+},
 ```
 
 ### What it does
@@ -87,15 +83,13 @@ effects: {
 Without sugar:
 
 ```ts
-effects: {
-  idle: [
-    ({ clock, signal, emit }) => {
-      clock.setTimeout(5000, () => {
-        if (!signal.aborted) emit({ id: "TIMEOUT" });
-      }, { signal });
-    },
-  ],
-}
+setup: (m) => {
+  m.effect(idle, ({ clock, signal, emit }) => {
+    clock.setTimeout(5000, () => {
+      if (!signal.aborted) emit({ id: "TIMEOUT" });
+    }, { signal });
+  });
+},
 ```
 
 Sugar handles abort wiring.

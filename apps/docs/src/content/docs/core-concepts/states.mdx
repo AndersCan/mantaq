@@ -31,16 +31,31 @@ Actor enters final state → `"done"` subscribers fire.
 
 ## Hierarchical states (regions)
 
-Sub-states. `.regions()` attaches them.
+Sub-actors. Passed as `regions` to the Actor constructor. Child runs concurrently.
 
 ```ts
-const connected = state("connected")().regions({
-  default: {
-    initial: "idle",
-    states: {
-      idle: state("idle")(),
-      active: state("active")(),
-    },
+const healthMonitor = new Actor({
+  inputs: [healthCheckResult],
+  states: [unknown, healthy, degraded],
+  initial: unknown,
+  setup: (m) => {
+    m.on(unknown, healthCheckResult, (event) => ({
+      state: event.healthy ? healthy : degraded,
+    }));
+  },
+});
+
+const manager = new Actor({
+  inputs: [connect],
+  internal: [healthCheckResult],
+  states: [disconnected, connected],
+  initial: disconnected,
+  regions: { health: healthMonitor }, // child named "health"
+  setup: (m) => {
+    m.on(connected, healthCheckResult, (event) => {
+      manager.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
+      return {};
+    });
   },
 });
 ```
@@ -48,7 +63,7 @@ const connected = state("connected")().regions({
 Snapshot. Nested.
 
 ```ts
-{ path: ["connected"], regions: { default: { path: ["idle"], regions: {} } } }
+// { path: ["connected"], regions: { health: { path: ["healthy"], regions: {} } } }
 ```
 
 ## Parallel states
@@ -56,23 +71,18 @@ Snapshot. Nested.
 Multiple regions. Run same time.
 
 ```ts
-const player = state("player")().regions({
-  playback: {
-    initial: "stopped",
-    states: {
-      stopped: state("stopped")(),
-      playing: state("playing")(),
-    },
-  },
-  audio: {
-    initial: "unmuted",
-    states: {
-      unmuted: state("unmuted")(),
-      muted: state("muted")(),
-    },
+const player = new Actor({
+  inputs: [playToggle, muteToggle],
+  states: [player],
+  initial: player,
+  regions: {
+    playback: playbackActor,
+    audio: audioActor,
   },
 });
 ```
+
+Each region is its own actor. `matches(actor, "player.playback.playing")` checks a specific region's state.
 
 ## Payloads
 

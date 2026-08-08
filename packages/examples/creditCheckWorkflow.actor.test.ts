@@ -15,10 +15,28 @@
 
 import { describe, it, expect, vi } from "vite-plus/test";
 import type { EffectFn } from "@mantaq/core";
-import { Actor, VirtualClock } from "@mantaq/core";
-import { state } from "@mantaq/core";
-import { event } from "@mantaq/core";
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { pushInternal, drainInternal } from "@mantaq/core/internal";
+import type { RegistryError } from "@mantaq/core/internal";
+import { Either } from "@mantaq/utils";
 import { matches, withTimeout } from "@mantaq/sugar";
+
+function inject(actor: object, event: { id: string }): void {
+  Either.match(
+    pushInternal(actor, event),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+  Either.match(
+    drainInternal(actor),
+    (err: RegistryError) => {
+      throw new Error(err.message);
+    },
+    () => {},
+  );
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 interface OrderData {
@@ -225,8 +243,7 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     expect(matches(actor, "checkingCredit")).toBe(true);
 
     // Simulate error - we need to emit the error event directly
-    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Network failure" }));
-    actor.__drainInternal();
+    inject(actor, creditCheckErrorEvent.create({ error: "Network failure" }));
     expect(matches(actor, "creditCheckFailed")).toBe(true);
     expect(actor.context.error).toBeUndefined(); // error not stored in this impl
 
@@ -247,8 +264,7 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
         order: { orderId: "ORD123", amount: 100, customerId: "CUST456" },
       }),
     );
-    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Network failure" }));
-    actor.__drainInternal();
+    inject(actor, creditCheckErrorEvent.create({ error: "Network failure" }));
     expect(matches(actor, "creditCheckFailed")).toBe(true);
 
     actor.send(cancelEvent.create());
@@ -266,9 +282,7 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     );
     clock.advance(1000); // credit check done
     expect(matches(actor, "processingPayment")).toBe(true);
-
-    actor.__pushInternal(paymentErrorEvent.create({ error: "Payment declined" }));
-    actor.__drainInternal();
+    inject(actor, paymentErrorEvent.create({ error: "Payment declined" }));
     expect(matches(actor, "paymentFailed")).toBe(true);
 
     actor.send(retryEvent.create());
@@ -289,8 +303,7 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
       }),
     );
     clock.advance(1000);
-    actor.__pushInternal(paymentErrorEvent.create({ error: "Payment declined" }));
-    actor.__drainInternal();
+    inject(actor, paymentErrorEvent.create({ error: "Payment declined" }));
     expect(matches(actor, "paymentFailed")).toBe(true);
 
     actor.send(cancelEvent.create());
@@ -310,9 +323,7 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     clock.advance(1000); // credit check
     clock.advance(1500); // payment
     expect(matches(actor, "notifyingWarehouse")).toBe(true);
-
-    actor.__pushInternal(notificationErrorEvent.create({ error: "Warehouse unavailable" }));
-    actor.__drainInternal();
+    inject(actor, notificationErrorEvent.create({ error: "Warehouse unavailable" }));
     expect(matches(actor, "notificationFailed")).toBe(true);
 
     actor.send(retryEvent.create());
@@ -334,8 +345,7 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     );
     clock.advance(1000);
     clock.advance(1500);
-    actor.__pushInternal(notificationErrorEvent.create({ error: "Warehouse unavailable" }));
-    actor.__drainInternal();
+    inject(actor, notificationErrorEvent.create({ error: "Warehouse unavailable" }));
     expect(matches(actor, "notificationFailed")).toBe(true);
 
     actor.send(cancelEvent.create());
@@ -380,8 +390,7 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     expect(matches(actor, "checkingCredit")).toBe(true);
 
     // Abort by sending error event before timeout completes
-    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Forced error" }));
-    actor.__drainInternal();
+    inject(actor, creditCheckErrorEvent.create({ error: "Forced error" }));
     expect(matches(actor, "creditCheckFailed")).toBe(true);
 
     // Advancing clock should not affect anything (effect aborted)
@@ -401,14 +410,12 @@ describe("credit check actor (reimplementation of xstate machine)", () => {
     );
 
     // First error + retry
-    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Error 1" }));
-    actor.__drainInternal();
+    inject(actor, creditCheckErrorEvent.create({ error: "Error 1" }));
     actor.send(retryEvent.create());
     expect(actor.context.retryCount).toBe(1);
 
     // Second error + retry
-    actor.__pushInternal(creditCheckErrorEvent.create({ error: "Error 2" }));
-    actor.__drainInternal();
+    inject(actor, creditCheckErrorEvent.create({ error: "Error 2" }));
     actor.send(retryEvent.create());
     expect(actor.context.retryCount).toBe(2);
 

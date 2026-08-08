@@ -21,7 +21,7 @@ npm install @mantaq/core
 | Signal check    | `if (signal.aborted) return`       | Skip abort check in async work         |
 | Regions         | Child outputs in parent `internal` | Forget to declare child outputs        |
 | Snapshot        | Save path + context manually       | Expect `snapshot()` to include context |
-| Any handler     | Universal events only (CANCEL)     | State-specific logic in Any            |
+| Any handler     | Universal events only (CANCEL)     | State-specific logic in `onAny`        |
 
 ## Contents
 
@@ -38,16 +38,16 @@ npm install @mantaq/core
   - [Snapshot & Restore](#snapshot--restore)
   - [Dynamic Children (Regions)](#dynamic-children-regions)
   - [Error Handling](#error-handling)
-    - [Error Event Subscription](#error-event-subscription)
-    - [Effect Error Recovery](#effect-error-recovery)
-    - [Transition Error Handling](#transition-error-handling)
-    - [Nested Error Propagation](#nested-error-propagation)
   - [Any Handler](#any-handler)
   - [Testing with VirtualClock](#testing-with-virtualclock)
 - [Development](#development)
 - [License](#license)
 
 ## Quick Start
+
+Transitions and effects are registered in a `setup` callback. The builder is
+type-safe: targets validate against your declared `states`, `inputs`, and
+`internal` events at compile time.
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
@@ -60,19 +60,20 @@ const actor = new Actor({
   inputs: [toggle],
   states: [idle, active],
   initial: idle,
-  transitions: {
-    idle: { TOGGLE: () => ({ state: active }) },
-    active: { TOGGLE: () => ({ state: idle }) },
+  setup: (m) => {
+    m.on(idle, toggle, () => ({ state: active }));
+    m.on(active, toggle, () => ({ state: idle }));
   },
 });
 
-actor.on("change", (snap) => console.log(snap.path)); // ["idle"]
-actor.send(toggle);
+actor.on("change", (snap) => console.log(snap.path)); // fires immediately: ["idle"]
+actor.send(toggle.create());
+// "change" fires again: ["active"]
 ```
 
 ## Docs
 
-See [mantaq.dev](https://mantaq.dev) for full documentation.
+See [anderscan.github.io/mantaq](https://anderscan.github.io/mantaq) for full documentation.
 
 ## Patterns
 
@@ -87,14 +88,15 @@ interface AuthContext {
 }
 
 const actor = new Actor({
+  inputs: [signInEvent],
+  states: [idleState, signingInState],
+  initial: idleState,
   context: {} as AuthContext,
-  transitions: {
-    idle: {
-      SIGN_IN: (evt, { context }) => {
-        context.phoneNumber = evt.phoneNumber; // ✅ typed
-        return { state: signingInState };
-      },
-    },
+  setup: (m) => {
+    m.on(idleState, signInEvent, (event, opts) => {
+      opts!.context.phoneNumber = event.phoneNumber; // ✅ typed
+      return { state: signingInState };
+    });
   },
 });
 ```
@@ -102,15 +104,13 @@ const actor = new Actor({
 **Anti-pattern — casting in every handler:**
 
 ```ts
-transitions: {
-  idle: {
-    SIGN_IN: (evt, { context }) => {
-      const c = context as AuthContext; // ❌ don't do this
-      c.phoneNumber = evt.phoneNumber;
-      return { state: signingInState };
-    },
-  },
-}
+setup: (m) => {
+  m.on(idleState, signInEvent, (event, opts) => {
+    const c = opts!.context as AuthContext; // ❌ unnecessary — already typed
+    c.phoneNumber = event.phoneNumber;
+    return { state: signingInState };
+  });
+},
 ```
 
 ### Proper Event Typing
@@ -124,20 +124,18 @@ const dataEvent = event("DATA_LOADED")<{ items: string[]; count: number }>();
 
 // Creating events
 actor.send(signInEvent.create({ phoneNumber: "+1234567890" }));
-actor.send(signOutEvent); // no payload, send ref directly
+actor.send(signOutEvent.create()); // no payload
 ```
 
 Handlers receive the correct payload type:
 
 ```ts
-transitions: {
-  idle: {
-    SIGN_IN: (event, { context }) => {
-      event.phoneNumber; // ✅ string
-      return { state: signingInState };
-    },
-  },
-}
+setup: (m) => {
+  m.on(idleState, signInEvent, (event) => {
+    event.phoneNumber; // ✅ string
+    return { state: signingInState };
+  });
+},
 ```
 
 **Anti-pattern — skipping the generic parameter:**
@@ -168,27 +166,27 @@ Effects run when entering a state. The `event` parameter in effects is typed as 
 
 ```ts
 const loadingState = state("loading")<{ url: string }>();
+const loadedState = state("loaded")();
+const fetchEvent = event("FETCH")<{ url: string }>();
+const doneEvent = event("LOADED")();
 
 const actor = new Actor({
-  states: [idleState, loadingState],
+  inputs: [fetchEvent],
+  internal: [doneEvent],
+  states: [idleState, loadingState, loadedState],
   initial: idleState,
-  effects: {
-    loading: [
-      ({ state, emit, clock }) => {
-        // state.payload is typed as unknown — cast to the known type
-        const { url } = state.payload as { url: string };
-        clock.setTimeout(1000, () => {
-          emit({ id: "LOADED", result: url });
-        });
-      },
-    ],
-  },
-  transitions: {
-    idle: {
-      FETCH: (event) => {
-        return { state: loadingState.create({ url: event.url }) };
-      },
-    },
+  setup: (m) => {
+    m.effect(loadingState, ({ state, emit, clock }) => {
+      // state.payload is unknown — cast to the known shape
+      const { url } = state.payload as { url: string };
+      clock.setTimeout(1000, () => {
+        emit(doneEvent.create());
+      });
+    });
+    m.on(idleState, fetchEvent, (event) => {
+      return { state: loadingState.create({ url: event.url }) };
+    });
+    m.on(loadingState, doneEvent, () => ({ state: loadedState }));
   },
 });
 ```
@@ -200,22 +198,18 @@ const actor = new Actor({
 return { state: loadingState.create({ url: event.url }) };
 
 // ⚠️ context — works but shared across all states
-context.url = event.url;
+opts!.context.url = event.url;
 return { state: loadingState };
 ```
 
 **Anti-pattern — depending on `event` in effects:**
 
 ```ts
-effects: {
-  loading: [
-    ({ event, emit }) => {
-      // ❌ event is the union type, not the specific triggering event
-      // event.url doesn't exist on the union
-      emit({ id: "LOADED", result: event.url }); // type error
-    },
-  ],
-}
+m.effect(loadingState, ({ event, emit }) => {
+  // ❌ event is the union type, not the specific triggering event
+  // event.url doesn't exist on the union
+  emit(doneEvent.create()); // fine — but event.url would be a type error
+});
 ```
 
 The `event` parameter exists for convenience (e.g., logging), not for business logic. Use state payload or context to pass data to effects.
@@ -226,7 +220,7 @@ Mantaq uses two event queues: **external** (user-sent) and **internal** (effect-
 
 **External events** are sent via `actor.send()` — they trigger transitions on the current state.
 
-**Internal events** are emitted from effects via `emit()` — they process after the current transition completes.
+**Internal events** are emitted from effects via `emit()` — they are queued and processed after the current transition completes.
 
 ```ts
 const tickEvent = event("TICK")();
@@ -235,20 +229,16 @@ const connectEvent = event("CONNECT")();
 const actor = new Actor({
   inputs: [connectEvent], // external — user triggers
   internal: [tickEvent], // internal — effects emit
-  effects: {
-    idle: [
-      ({ emit, clock }) => {
-        clock.setTimeout(1000, () => {
-          emit(tickEvent.create(undefined)); // goes to internal queue
-        });
-      },
-    ],
-  },
-  transitions: {
-    idle: {
-      CONNECT: () => ({ state: connectedState }), // external handler
-      TICK: () => ({}), // internal handler
-    },
+  states: [idleState, connectedState],
+  initial: idleState,
+  setup: (m) => {
+    m.effect(idleState, ({ emit, clock }) => {
+      clock.setTimeout(1000, () => {
+        emit(tickEvent.create()); // goes to internal queue
+      });
+    });
+    m.on(idleState, connectEvent, () => ({ state: connectedState })); // external handler
+    m.on(idleState, tickEvent, () => ({})); // internal handler
   },
 });
 ```
@@ -272,43 +262,36 @@ Effects run on state entry. They receive typed context, an AbortSignal, and an e
 ```ts
 type MyContext = { retryCount: number; maxRetries: number };
 
+const startEvent = event("START")();
 const doneEvent = event("WORK_DONE")();
 const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
 function createActor() {
   return new Actor({
-    inputs: [],
+    inputs: [startEvent],
     internal: [doneEvent, failedEvent],
     states: [idleState, workingState, doneState, errorState],
     initial: idleState,
     context: { retryCount: 0, maxRetries: 3 } as MyContext,
-    effects: {
-      working: [
-        ({ signal, context, emit, clock }) => {
-          // context is MyContext — typed from Actor generic
-          if (context.retryCount >= context.maxRetries) {
-            emit(failedEvent.create({ error: "Max retries exceeded" }));
-            return;
-          }
+    setup: (m) => {
+      m.effect(workingState, ({ signal, context, emit, clock }) => {
+        // context is MyContext — typed from the constructor generic
+        if (context.retryCount >= context.maxRetries) {
+          emit(failedEvent.create({ error: "Max retries exceeded" }));
+          return;
+        }
 
-          clock.setTimeout(2000, () => {
-            if (signal.aborted) return; // check signal before emitting
-            emit(doneEvent.create(undefined));
-          });
-        },
-      ],
-    },
-    transitions: {
-      idle: {
-        START: () => ({ state: workingState }),
-      },
-      working: {
-        WORK_DONE: () => ({ state: doneState }),
-        WORK_FAILED: (_event, { context }) => {
-          context.retryCount++;
-          return { state: errorState };
-        },
-      },
+        clock.setTimeout(2000, () => {
+          if (signal.aborted) return; // ✅ check signal before emitting
+          emit(doneEvent.create());
+        });
+      });
+      m.on(idleState, startEvent, () => ({ state: workingState }));
+      m.on(workingState, doneEvent, () => ({ state: doneState }));
+      m.on(workingState, failedEvent, (_event, opts) => {
+        opts!.context.retryCount++;
+        return { state: errorState };
+      });
     },
   });
 }
@@ -317,35 +300,27 @@ function createActor() {
 **Anti-pattern — not checking `signal.aborted`:**
 
 ```ts
-effects: {
-  working: [
-    ({ signal, emit, clock }) => {
-      // ❌ if state changes before timeout, this still fires
-      clock.setTimeout(2000, () => {
-        emit(doneEvent.create(undefined));
-      });
-    },
-  ],
-}
+m.effect(workingState, ({ signal, emit, clock }) => {
+  // ❌ if state changes before timeout, this still fires
+  clock.setTimeout(2000, () => {
+    emit(doneEvent.create());
+  });
+});
 ```
 
 ```ts
-effects: {
-  working: [
-    ({ signal, emit, clock }) => {
-      // ✅ guard with abort check
-      clock.setTimeout(2000, () => {
-        if (signal.aborted) return;
-        emit(doneEvent.create(undefined));
-      });
-    },
-  ],
-}
+m.effect(workingState, ({ signal, emit, clock }) => {
+  // ✅ guard with abort check
+  clock.setTimeout(2000, () => {
+    if (signal.aborted) return;
+    emit(doneEvent.create());
+  });
+});
 ```
 
 ### Snapshot & Restore
 
-`actor.snapshot()` returns a serializable `Snapshot`. Use it to save/restore actor state across sessions.
+`actor.snapshot()` returns a serializable `Snapshot` — `{ path, regions, done? }`. It does **not** include context. Use it to save/restore actor state across sessions.
 
 ```ts
 interface SerializedActor {
@@ -388,45 +363,42 @@ const stateData = {
 
 ### Dynamic Children (Regions)
 
-Regions let you compose actors. The parent actor manages child lifecycle; child outputs are routed as internal events.
+Regions let you compose actors. The parent actor manages child lifecycle; child outputs are routed as parent internal events.
 
 ```ts
-const tierActor = new Actor({
-  inputs: [],
-  outputs: [],
-  internal: [],
-  states: [l1State, l2State],
-  initial: l1State,
-  context: {},
-  effects: {},
-  transitions: { l1: {}, l2: {} },
-});
+const healthCheckResult = event("HEALTH_CHECK_RESULT")<{ healthy: boolean }>();
 
-const parent = new Actor({
-  inputs: [],
-  outputs: [],
-  internal: [],
-  states: [readyState, busyState],
-  initial: readyState,
-  context: {} as ParentContext,
-  regions: { tier: tierActor }, // child named "tier"
-  effects: {},
-  transitions: {
-    ready: {
-      SWITCH_TIER: (_event, { actor }) => {
-        // access child via actor.regions
-        return {};
-      },
-    },
+const healthMonitor = new Actor({
+  inputs: [healthCheckResult],
+  states: [unknownState, healthyState, degradedState],
+  initial: unknownState,
+  setup: (m) => {
+    m.on(unknownState, healthCheckResult, (event) => ({
+      state: event.healthy ? healthyState : degradedState,
+    }));
+    m.on(healthyState, healthCheckResult, (event) => ({
+      state: event.healthy ? healthyState : degradedState,
+    }));
   },
 });
 
-// Query child state with dot notation
-matches(parent, "ready.tier.l1"); // ✅
-matches(parent, "ready.tier.l2"); // ✅
+const manager = new Actor({
+  inputs: [connectEvent],
+  internal: [healthCheckResult], // child output must be declared here
+  states: [disconnectedState, connectedState],
+  initial: disconnectedState,
+  regions: { health: healthMonitor }, // child named "health"
+  setup: (m) => {
+    m.on(connectedState, healthCheckResult, (event, opts) => {
+      // access child via actor.regions
+      manager.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
+      return {};
+    });
+  },
+});
 
-// Access child actor instance
-const tierChild = parent.regions["tier"];
+// Query child state with dot notation (matches is from @mantaq/sugar)
+matches(manager, "connected.health.healthy"); // ✅
 ```
 
 **Anti-pattern — child outputs not declared as parent internal events:**
@@ -437,7 +409,7 @@ const child = new Actor({
   // ...
 });
 
-// ❌ parent doesn't declare it as internal — event gets lost
+// ❌ parent doesn't declare it as internal — event gets dropped
 const parent = new Actor({
   internal: [], // missing!
   regions: { child },
@@ -452,225 +424,99 @@ const parent = new Actor({
 
 ### Error Handling
 
-#### Error Event Subscription
+Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. Errors thrown inside a handler or effect have no subscriber — the machine just stops applying it.
 
-Subscribe to `"error"` to catch effect errors. The callback receives the error object.
-
-```ts
-const actor = new Actor({/* ... */});
-
-actor.on("error", (err) => {
-  console.error("Effect error:", err);
-  // send to crash reporting, trigger fallback, etc.
-});
-
-// ✅ subscribe before starting — errors during startup need handlers too
-```
-
-**Anti-pattern — subscribing after error occurs:**
-
-```ts
-actor.send(startEvent); // effect runs, throws
-// ❌ no subscriber yet — error is silently dropped
-actor.on("error", (err) => console.error(err));
-
-// ✅ subscribe first, then send
-actor.on("error", (err) => console.error(err));
-actor.send(startEvent);
-```
-
-#### Effect Error Recovery
-
-Catch errors inside effects and emit recovery events. Never let errors propagate unhandled.
+Catch errors inside effects and emit recovery events:
 
 ```ts
 const doneEvent = event("WORK_DONE")();
 const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
-effects: {
-  working: [
-    ({ signal, emit, clock }) => {
-      clock.setTimeout(100, () => {
-        if (signal.aborted) return;
-        try {
-          const result = riskyOperation();
-          emit(doneEvent.create({ result }));
-        } catch (err) {
-          // ✅ emit error as internal event — lets transition handle it
-          emit(failedEvent.create({ error: String(err) }));
-        }
-      });
-    },
-  ],
-}
-
-transitions: {
-  working: {
-    WORK_DONE: (event) => {
-      return { state: doneState.create({ result: event.result }) };
-    },
-    WORK_FAILED: (event) => {
-      // handle error in transition, not in effect
-      return { state: errorState.create({ error: event.error }) };
-    },
-  },
-}
+setup: (m) => {
+  m.effect(workingState, ({ signal, emit, clock }) => {
+    clock.setTimeout(100, () => {
+      if (signal.aborted) return;
+      try {
+        const result = riskyOperation();
+        emit(doneEvent.create());
+      } catch (err) {
+        // ✅ emit error as internal event — lets transition handle it
+        emit(failedEvent.create({ error: String(err) }));
+      }
+    });
+  });
+  m.on(workingState, doneEvent, () => ({ state: doneState }));
+  m.on(workingState, failedEvent, (event) => {
+    // handle error in transition, not in effect
+    return { state: errorState.create({ error: event.error }) };
+  });
+},
 ```
 
 **Anti-pattern — re-throwing in effects:**
 
 ```ts
-effects: {
-  working: [
-    ({ signal, emit, clock }) => {
-      clock.setTimeout(100, () => {
-        if (signal.aborted) return;
-        try {
-          const result = riskyOperation();
-          emit(doneEvent.create({ result }));
-        } catch (err) {
-          throw err; // ❌ throw in effect goes to error subscriber, not transition
-        }
-      });
-    },
-  ],
-}
-```
-
-#### Transition Error Handling
-
-Never throw from transition handlers. Return error state or store error in context.
-
-```ts
-type MyContext = { error?: string };
-
-transitions: {
-  idle: {
-    SUBMIT: (event, { context }) => {
-      if (!event.data) {
-        // ✅ store error, transition to error state
-        context.error = "missing data";
-        return { state: errorState };
-      }
-      if (!isValid(event.data)) {
-        context.error = "invalid data";
-        return { state: errorState };
-      }
-      return { state: doneState };
-    },
-  },
-  error: {
-    RETRY: (_event, { context }) => {
-      context.error = undefined;
-      return { state: idleState };
-    },
-  },
+try {
+  const result = riskyOperation();
+  emit(doneEvent.create());
+} catch (err) {
+  throw err; // ❌ throw in effect — no handler, machine misbehaves
 }
 ```
 
 **Anti-pattern — throwing in transition handlers:**
 
 ```ts
-transitions: {
-  idle: {
-    SUBMIT: (event) => {
-      if (!event.data) throw new Error("missing data"); // ❌ breaks state machine
-      return { state: doneState };
-    },
-  },
-}
-```
-
-#### Nested Error Propagation
-
-Errors in child regions bubble up to the parent. Subscribe to parent errors to catch child failures.
-
-```ts
-const childEffect = ({ emit }) => {
-  // this will throw
-  throw new Error("child broke");
-};
-
-const child = new Actor({
-  states: [idleState],
-  initial: idleState,
-  effects: { idle: [childEffect] },
-  transitions: { idle: {} },
-});
-
-const parent = new Actor({
-  states: [idleState],
-  initial: idleState,
-  regions: { child },
-  effects: {},
-  transitions: { idle: {} },
-});
-
-// ✅ parent catches child errors
-parent.on("error", (err) => {
-  console.error("Child error bubbled up:", err);
+m.on(idleState, submitEvent, (event) => {
+  if (!event.data) throw new Error("missing data"); // ❌ breaks the machine
+  return { state: doneState };
 });
 ```
 
-**Anti-pattern — only subscribing to child errors:**
+Prefer storing the error in context and transitioning to an error state:
 
 ```ts
-// ❌ child may not exist yet when parent is created
-const child = new Actor({/* ... */});
-child.on("error", (err) => console.error(err));
-
-const parent = new Actor({
-  regions: { child }, // child replaced by parent's lifecycle
-  // ...
+m.on(idleState, submitEvent, (event, opts) => {
+  if (!event.data) {
+    opts!.context.error = "missing data";
+    return { state: errorState };
+  }
+  return { state: doneState };
 });
-// parent's regions own the child — subscribe to parent instead
-
-// ✅ subscribe to parent to catch all child errors
-parent.on("error", (err) => console.error(err));
 ```
 
 ### Any Handler
 
-Use `Any` to intercept events across all states — useful for universal error handling, cleanup, or logging.
+Use `onAny` to intercept events across all states — useful for universal error handling, cleanup, or logging.
 
 ```ts
-import { Any } from "@mantaq/core";
-
-transitions: {
-  Any: {
-    // CANCEL works from any state
-    CANCEL: (_event, { context }) => {
-      context.cancelled = true;
-      return { state: cancelledState };
-    },
-    // LOG every state change
-    STATE_CHANGED: () => ({}), // no-op, but we could log
-  },
+setup: (m) => {
+  // CANCEL works from any state
+  m.onAny(cancelEvent, (_event, opts) => {
+    opts!.context.cancelled = true;
+    return { state: cancelledState };
+  });
   // State-specific handlers still run for their state
-  idle: {
-    START: () => ({ state: runningState }),
-  },
-}
+  m.on(idleState, startEvent, () => ({ state: runningState }));
+},
 ```
 
-**Anti-pattern — using `Any` for everything:**
+**Anti-pattern — using `onAny` for everything:**
 
 ```ts
-// ❌ state-specific logic in Any defeats the purpose
-Any: {
-  SUBMIT_BASIC_INFO: (event, { context }) => {
-    context.basicInfo = event; // wrong — only makes sense in basicInfo state
+setup: (m) => {
+  // ❌ state-specific logic in onAny defeats the purpose
+  m.onAny(submitBasicInfoEvent, (event, opts) => {
+    opts!.context.basicInfo = event; // wrong — only makes sense in basicInfo state
     return { state: shippingAddressState };
-  },
-}
+  });
 
-// ✅ keep state-specific logic in state handlers
-basicInfo: {
-  SUBMIT_BASIC_INFO: (event, { context }) => {
-    context.basicInfo = event;
+  // ✅ keep state-specific logic in state handlers
+  m.on(basicInfoState, submitBasicInfoEvent, (event, opts) => {
+    opts!.context.basicInfo = event;
     return { state: shippingAddressState };
-  },
-}
+  });
+},
 ```
 
 ### Testing with VirtualClock
@@ -680,7 +526,7 @@ basicInfo: {
 #### Basic Usage
 
 ```ts
-import { Actor, VirtualClock } from "@mantaq/core";
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
 
 const clock = new VirtualClock();
 const timer = event("timer")();
@@ -689,18 +535,16 @@ const idle = state("idle")();
 const timedOut = state("timedOut")();
 
 const actor = new Actor({
+  inputs: [],
+  internal: [timer],
   states: [idle, timedOut],
   initial: idle,
   clock,
-  effects: {
-    idle: [
-      ({ emit, clock }) => {
-        clock.setTimeout(5000, () => emit(timer));
-      },
-    ],
-  },
-  transitions: {
-    idle: { timer: () => ({ state: timedOut }) },
+  setup: (m) => {
+    m.effect(idle, ({ emit, clock }) => {
+      clock.setTimeout(5000, () => emit(timer.create()));
+    });
+    m.on(idle, timer, () => ({ state: timedOut }));
   },
 });
 
@@ -726,45 +570,35 @@ expect(actor.state.name).toBe("timedOut");
 
 #### Abort Signal Cleanup
 
-VirtualClock removes timers when the abort signal fires — state exit cleans up automatically.
+The effect's abort signal fires on state exit. Clear timers in an abort listener so they don't fire later.
 
 ```ts
+const cancel = event("cancel")();
 const done = event("done")();
 const loading = state("loading")();
 const success = state("success")();
 
 const actor = new Actor({
+  inputs: [cancel],
+  internal: [done],
   states: [loading, success],
   initial: loading,
   clock,
-  effects: {
-    loading: [
-      ({ signal, emit, clock }) => {
-        const id = clock.setTimeout(5000, () => emit(done));
-        signal.addEventListener("abort", () => clock.clearTimeout(id));
-      },
-    ],
-  },
-  transitions: {
-    loading: { done: () => ({ state: success }) },
+  setup: (m) => {
+    m.effect(loading, ({ signal, clock }) => {
+      const id = clock.setTimeout(5000, () => {
+        /* ... */
+      });
+      signal.addEventListener("abort", () => clock.clearTimeout(id));
+    });
+    m.on(loading, cancel, () => ({ state: success }));
   },
 });
 
-// transition before timer fires — abort signal clears it
-actor.send(event("cancel"));
+// transition to success before the timer fires — abort signal clears it
+actor.send(cancel.create());
 clock.advance(10000);
 expect(clock.hasPending()).toBe(false);
-```
-
-**Anti-pattern — forgetting abort cleanup:**
-
-```ts
-// ❌ timer fires even after state exit
-clock.setTimeout(5000, () => emit(done));
-
-// ✅ clear on abort
-const id = clock.setTimeout(5000, () => emit(done));
-signal.addEventListener("abort", () => clock.clearTimeout(id));
 ```
 
 #### Interval Testing
@@ -778,23 +612,19 @@ let count = 0;
 const active = state("active")();
 
 const actor = new Actor({
+  inputs: [],
+  internal: [tick],
   states: [active],
   initial: active,
   clock,
-  effects: {
-    active: [
-      ({ emit, clock }) => {
-        clock.setInterval(1000, () => emit(tick));
-      },
-    ],
-  },
-  transitions: {
-    active: {
-      tick: () => {
-        count++;
-        return {};
-      },
-    },
+  setup: (m) => {
+    m.effect(active, ({ emit, clock }) => {
+      clock.setInterval(1000, () => emit(tick.create()));
+    });
+    m.on(active, tick, () => {
+      count++;
+      return {};
+    });
   },
 });
 

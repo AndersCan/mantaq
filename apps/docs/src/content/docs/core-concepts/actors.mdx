@@ -9,6 +9,9 @@ Current state. Mutable context. Transition handlers. Effects. Clock. Children.
 
 ## Make actor
 
+Transitions and effects are registered in a `setup` callback. The builder is
+type-safe: a target state or event you didn't declare won't compile.
+
 ```ts
 import { Actor, state, event } from "@mantaq/core";
 
@@ -21,10 +24,8 @@ const actor = new Actor({
   inputs: [activate],
   states: [idle, active],
   initial: idle,
-  transitions: {
-    idle: {
-      ACTIVATE: () => ({ state: active }),
-    },
+  setup: (m) => {
+    m.on(idle, activate, () => ({ state: active }));
   },
 });
 ```
@@ -83,8 +84,17 @@ State tree. Nested for hierarchical actors.
 | `states`         | `StateRef[]`            | All states                           |
 | `initial`        | `StateRef`              | Start state                          |
 | `context`        | `object`                | Mutable context                      |
-| `transitions`    | `object`                | State/event map                      |
-| `effects`        | `object`                | Side effects per state               |
+| `setup`          | `(m) => void`           | Register transitions and effects     |
 | `clock`          | `Clock`                 | Default: `RealClock`                 |
 | `regions`        | `Record<string, Actor>` | Static children                      |
 | `internalBudget` | `number`                | Max internal events (default: 10000) |
+
+### `setup` builder
+
+| Method                   | What                                        |
+| ------------------------ | ------------------------------------------- |
+| `m.on(state, event, fn)` | Transition handler for one state/event pair |
+| `m.onAny(event, fn)`     | Handler for an event in every state         |
+| `m.effect(state, fn)`    | Run `fn` on state entry                     |
+
+Handler returns `{ state }` (with optional `payload` or `emit`) or `{}` to stay in place.

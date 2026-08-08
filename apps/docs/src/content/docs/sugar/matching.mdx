@@ -28,27 +28,28 @@ actor.snapshot().path.join(".") === "connected.default.active";
 
 ## isIn
 
-Recursive search. State anywhere in path.
+Recursive search. State anywhere in the snapshot tree.
 
 ```ts
 import { isIn } from "@mantaq/sugar";
 
-isIn(actor.snapshot(), "default"); // true if "default" in path
+isIn(actor.snapshot(), "active"); // true if "active" is a state on the path
 ```
 
 Useful with hierarchical states:
 
 ```ts
-// path: ["connected", "default", "active"]
+// snapshot: { path: ["connected"], regions: { default: { path: ["active"], regions: {} } } }
 isIn(snapshot, "connected"); // true
-isIn(snapshot, "default"); // true
+isIn(snapshot, "active"); // true
 isIn(snapshot, "idle"); // false
 ```
 
 Without sugar:
 
 ```ts
-actor.snapshot().path.includes("default");
+const snap = actor.snapshot();
+snap.path[0] === "active" || Object.values(snap.regions).some((r) => r.path[0] === "active");
 ```
 
 ## activeLeaves
@@ -118,10 +119,11 @@ matches(actor, "active");
 
 ```ts
 // Before
-actor.snapshot().path.join(".").includes("default");
+const snap = actor.snapshot();
+snap.path[0] === "active" || Object.values(snap.regions).some((r) => r.path[0] === "active");
 
 // After
-isIn(actor.snapshot(), "default");
+isIn(actor.snapshot(), "active");
 ```
 
 ### Group errors

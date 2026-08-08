@@ -31,16 +31,31 @@ describe("ActorMap mutation tests", () => {
 
   // ── Default test env ──
 
-  test("re-spawn calls __abortEffects on old actor", () => {
+  test("re-spawn aborts old actor effects", () => {
     const map = new ActorMap();
-    const oldActor = makeActor("old").actor;
-    const abortSpy = vi.spyOn(oldActor, "__abortEffects");
+    const toggle = event("toggle")();
+    const on = state("on")();
+    const off = state("off")();
+    let signal: AbortSignal | undefined;
+
+    const oldActor = new Actor({
+      inputs: [toggle],
+      states: [off, on],
+      initial: off,
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+        m.effect(on, ({ signal: s }) => {
+          signal = s;
+        });
+      },
+    });
 
     map.spawn("a", () => oldActor);
-    expect(abortSpy).not.toHaveBeenCalled();
+    map.send("a", toggle.create());
+    expect(signal?.aborted).toBe(false);
 
     map.spawn("a", () => makeActor("new").actor);
-    expect(abortSpy).toHaveBeenCalledOnce();
+    expect(signal?.aborted).toBe(true);
   });
 
   test("re-spawn calls console.warn unconditionally", () => {
@@ -187,17 +202,33 @@ describe("ActorMap mutation tests", () => {
     }
   });
 
-  test("re-spawn kills old actor in development mode", async () => {
+  test("re-spawn aborts old actor effects in development mode", async () => {
     const DevActorMap = await loadDevActorMap();
     try {
       const map = new DevActorMap();
-      const oldActor = makeActor("old").actor;
-      const abortSpy = vi.spyOn(oldActor, "__abortEffects");
+      const toggle = event("toggle")();
+      const on = state("on")();
+      const off = state("off")();
+      let signal: AbortSignal | undefined;
+
+      const oldActor = new Actor({
+        inputs: [toggle],
+        states: [off, on],
+        initial: off,
+        setup: (m) => {
+          m.on(off, toggle, () => ({ state: on }));
+          m.effect(on, ({ signal: s }) => {
+            signal = s;
+          });
+        },
+      });
 
       map.spawn("a", () => oldActor);
-      map.spawn("a", () => makeActor("new").actor);
+      map.send("a", toggle.create());
+      expect(signal?.aborted).toBe(false);
 
-      expect(abortSpy).toHaveBeenCalledOnce();
+      map.spawn("a", () => makeActor("new").actor);
+      expect(signal?.aborted).toBe(true);
     } finally {
       cleanupDevMode();
     }

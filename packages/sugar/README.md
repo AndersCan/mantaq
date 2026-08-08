@@ -15,32 +15,34 @@ yarn add @mantaq/sugar
 ## Quick Start
 
 ```ts
-import { states, events, matches, tag } from "@mantaq/sugar";
-import { Actor } from "@mantaq/core";
+import { states, events, matches, withTimeout } from "@mantaq/sugar";
+import { Actor, VirtualClock } from "@mantaq/core";
 
 const s = states("idle", "loading", "success", "error");
 const e = events("fetch", "resolve", "fail");
 
+const clock = new VirtualClock();
+
 const machine = new Actor({
   inputs: [e.fetch],
-  outputs: [],
-  internal: [],
+  internal: [e.resolve, e.fail],
   context: {},
   states: [s.idle, s.loading, s.success, s.error],
   initial: s.idle,
-  effects: {},
-  transitions: {
-    idle: { fetch: () => ({ state: s.loading }) },
-    loading: {
-      resolve: () => ({ state: s.success }),
-      fail: () => ({ state: s.error }),
-    },
-    success: {},
-    error: {},
+  clock,
+  setup: (m) => {
+    m.on(s.idle, e.fetch, () => ({ state: s.loading }));
+    m.effect(s.loading, (input) => withTimeout(2000, input, () => e.resolve.create()));
+    m.on(s.loading, e.resolve, () => ({ state: s.success }));
+    m.on(s.loading, e.fail, () => ({ state: s.error }));
   },
 });
 
+matches(machine, "idle"); // true
+machine.send(e.fetch.create());
 matches(machine, "loading"); // true
+clock.advance(2000);
+matches(machine, "success"); // true
 ```
 
 ## Patterns
@@ -87,12 +89,12 @@ import { events } from "@mantaq/sugar";
 
 const e = events("fetch", "resolve", "fail");
 
-e.fetch.create({ url: "/api" }); // { id: "fetch", url: "/api" }
+e.fetch.create(); // { id: "fetch" }
 e.resolve.is(emittedEvent); // boolean
 
 const actor = new Actor({
   inputs: [e.fetch],
-  outputs: [],
+  internal: [e.resolve],
   // ...
 });
 ```
@@ -140,7 +142,7 @@ matches(actor, "idle.");
 matches(actor, "");
 ```
 
-Path format: `"parentState.regionKey.childState"`. The region key is the key you passed to the state's `.region()` method, not the nested state's name.
+Path format: `"parentState.regionKey.childState"`. The region key is the key you passed to the actor's `regions` option, not the nested state's name.
 
 ### Using `tag()` for state grouping
 
@@ -177,7 +179,7 @@ if (matches(actor, "idle") || matches(actor, "loading")) {
 `ActorMap` manages dynamic children by string key. Always use `ensure()` to avoid duplicate spawns.
 
 ```ts
-import { ActorMap, matches } from "@mantaq/sugar";
+import { ActorMap, isIn } from "@mantaq/sugar";
 
 const map = new ActorMap(parentActor);
 
@@ -189,7 +191,7 @@ map.send("child1", someEvent);
 
 // Snapshot a child
 const snap = map.snapshot("child1");
-if (snap && matches(snap, "active")) {
+if (snap && isIn(snap, "active")) {
   // child is active
 }
 
@@ -260,7 +262,7 @@ Pattern format: `"state.regionKey.state"` or just `"state"` for flat. Empty stri
 Dynamic child actor registry. Spawns, sends to, kills, and snapshots children by string key. Optionally wires child output to a parent actor.
 
 ```ts
-import { ActorMap, matches } from "@mantaq/sugar";
+import { ActorMap, isIn } from "@mantaq/sugar";
 
 const map = new ActorMap(); // or new ActorMap(parentActor)
 
@@ -270,7 +272,11 @@ map.spawn("child2", () => otherActor);
 map.send("child1", someEvent);
 map.kill("child2");
 map.keys(); // ["child1"]
-map.snapshot("child1"); // Snapshot | undefined
+
+const snap = map.snapshot("child1"); // Snapshot | undefined
+if (snap && isIn(snap, "active")) {
+  // child is active
+}
 ```
 
 **`ensure(key, factory)`** — spawn only if key missing:
@@ -338,7 +344,7 @@ Batch-create `EventRef`s as a typed record:
 import { events } from "@mantaq/sugar";
 
 const e = events("click", "submit");
-e.click.create({ x: 1, y: 2 }); // { id: "click", x: 1, y: 2 }
+e.click.create(); // { id: "click" }
 e.click.is(emittedEvent); // boolean
 ```
 
@@ -373,21 +379,21 @@ Starting with `@mantaq/core`? Here's what sugar adds.
 | --------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------- |
 | `state("idle")()` × N                   | `states("idle", "loading")`                  | Single call. Typed record. No missed names.                               |
 | `event("FETCH")()` × N                  | `events("FETCH", "RESOLVE")`                 | Single call. Typed record. Shared source of truth.                        |
-| `isIn(snapshot, "active")`              | `matches(actor, "active")`                   | Works on actor directly. Dot-notation for hierarchies: `"idle.region.a"`. |
+| `snapshot().path.includes("active")`    | `matches(actor, "active")`                   | Works on actor directly. Dot-notation for hierarchies: `"idle.region.a"`. |
 | Manual `.then()/.catch()` + abort check | `withPromise(promise, signal, emit, events)` | Auto abort-aware. No forgotten `signal.aborted` guard.                    |
 | Group states by variable naming         | `tag(stateA, stateB).has(snapshot)`          | Recursive matching. Works through parallel regions.                       |
 
 **Core alone:**
 
 ```ts
-import { state, event, isIn } from "@mantaq/core";
+import { state, event } from "@mantaq/core";
 
 const idle = state("idle")();
 const loading = state("loading")();
 const success = state("success")();
 const failEvent = event("FAIL")();
 
-isIn(actor.snapshot(), "idle"); // flat name only
+actor.snapshot().path.includes("idle"); // flat name only
 ```
 
 **With sugar:**

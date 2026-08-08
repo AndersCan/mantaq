@@ -6,7 +6,7 @@ description: Core API reference.
 ## `state(id)`
 
 ```ts
-function state<const T extends string>(id: T): <Payload>() => StateRef<T, Payload>;
+function state<const T extends string>(id: T): <Payload = unknown>() => StateRef<T, Payload, false>;
 ```
 
 State reference. Two calls. First: id. Second: payload type.
@@ -16,24 +16,27 @@ const idle = state("idle")();
 const withPayload = state("loading")<{ taskId: string }>();
 ```
 
-### `StateRef<T, Payload>`
+### `StateRef<T, Payload, IsFinal>`
 
-| Property            | Type      | What               |
-| ------------------- | --------- | ------------------ |
-| `name`              | `T`       | State id           |
-| `isFinal`           | `boolean` | Terminal state?    |
-| `.final()`          | `this`    | Mark final         |
-| `.regions(options)` | `this`    | Attach sub-regions |
+| Property            | Type                         | What               |
+| ------------------- | ---------------------------- | ------------------ |
+| `name`              | `T`                          | State id           |
+| `isFinal`           | `IsFinal`                    | Terminal state?    |
+| `.final()`          | `StateRef<T, Payload, true>` | Mark final         |
+| `.create(payload)`  | `{ state, payload }`         | Make state entry   |
+| `.regions(options)` | `this`                       | Attach sub-regions |
 
 ---
 
 ## `event(id)`
 
 ```ts
-function event<const T extends string>(id: T): <Payload>() => EventRef<T, Payload>;
+function event<const T extends string>(
+  id: T,
+): <Payload extends object | void = void>() => EventRef<T, Payload>;
 ```
 
-Event reference. Two calls. First: id. Second: payload type.
+Event reference. Two calls. First: id. Second: payload type. Payload must be `object | void`.
 
 ```ts
 const start = event("START")();
@@ -53,10 +56,29 @@ const fetchData = event("FETCH")<{ url: string }>();
 ## `Actor`
 
 ```ts
-class Actor<Inputs, Outputs, Internal, States, ...> {
-  constructor(options: ActorOptions)
-}
+class Actor<
+  const States extends readonly AnyStateRef[],
+  const Inputs extends readonly AnyEventRef[],
+  const Internal extends readonly AnyEventRef[] = readonly [],
+  const Outputs extends readonly AnyEventRef[] = readonly [],
+  ActorContext = Record<string, unknown>,
+>
 ```
+
+### Constructor options
+
+| Option           | Type                        | What                                 |
+| ---------------- | --------------------------- | ------------------------------------ |
+| `inputs`         | `EventRef[]`                | External events accepted             |
+| `outputs`        | `EventRef[]`                | Events to parent                     |
+| `internal`       | `EventRef[]`                | Events from effects/transitions      |
+| `states`         | `StateRef[]`                | All states                           |
+| `initial`        | `StateRef`                  | Start state                          |
+| `context`        | `object`                    | Mutable context                      |
+| `clock`          | `Clock`                     | Default: `RealClock`                 |
+| `setup`          | `(m: ActorBuilder) => void` | Register transitions and effects     |
+| `regions`        | `Record<string, Actor>`     | Static children                      |
+| `internalBudget` | `number`                    | Max internal events (default: 10000) |
 
 ### Methods
 
@@ -65,18 +87,39 @@ class Actor<Inputs, Outputs, Internal, States, ...> {
 | `send(event)`      | `(event) => void`     | Send event    |
 | `snapshot()`       | `() => Snapshot`      | State tree    |
 | `on("change", fn)` | `(fn) => () => void`  | State changes |
-| `on("error", fn)`  | `(fn) => () => void`  | Effect errors |
 | `on("done", fn)`   | `(fn) => () => void`  | Final state   |
 | `settled()`        | `() => Promise<void>` | Queue drained |
 
 ### Properties
 
-| Property  | Type                    | What            |
-| --------- | ----------------------- | --------------- |
-| `state`   | `StateRef`              | Current state   |
-| `context` | `Readonly<T>`           | Current context |
-| `clock`   | `Clock`                 | Clock instance  |
-| `regions` | `Record<string, Actor>` | Children        |
+| Property  | Type                       | What            |
+| --------- | -------------------------- | --------------- |
+| `state`   | `States[number]`           | Current state   |
+| `context` | `ActorContext`             | Current context |
+| `clock`   | `Clock`                    | Clock instance  |
+| `regions` | `Record<string, AnyActor>` | Children        |
+
+---
+
+## `ActorBuilder`
+
+The type-safe registrar passed to `setup`. Targets validate against declared states, inputs, and internal events — an undeclared target fails to compile.
+
+```ts
+setup: (m) => {
+  m.on(idle, start, () => ({ state: running }));
+  m.onAny(cancel, () => ({ state: idle }));
+  m.effect(loading, ({ signal, emit }) => {});
+};
+```
+
+| Method                 | Signature                          | What                    |
+| ---------------------- | ---------------------------------- | ----------------------- |
+| `on(state, event, fn)` | `(stateRef, eventRef, fn) => this` | Transition for one pair |
+| `onAny(event, fn)`     | `(eventRef, fn) => this`           | Handler in every state  |
+| `effect(state, fn)`    | `(stateRef, fn) => this`           | Run `fn` on state entry |
+
+Handler return: `{ state?; payload?; emit? }` or `{}` to stay in place.
 
 ---
 
@@ -86,6 +129,8 @@ class Actor<Inputs, Outputs, Internal, States, ...> {
 class VirtualClock implements Clock {
   advance(ms: number): void;
   hasPending(): boolean;
+  pendingTimers(): Array<{ id: number; deadline: number; ms: number; eventName?: string }>;
+  setDrain(fn: () => void): void;
   now(): number;
   setTimeout(ms, cb, options?): number;
   clearTimeout(id): void;
@@ -130,18 +175,23 @@ interface Snapshot {
 
 ```ts
 interface Clock {
-  setTimeout(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
+  setTimeout(
+    ms: number,
+    cb: () => void,
+    options?: { signal?: AbortSignal; eventName?: string },
+  ): number;
   clearTimeout(id: number): void;
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number;
   clearInterval(id: number): void;
   now(): number;
+  setDrain?(fn: () => void): void;
 }
 ```
 
 ### `EffectInput`
 
 ```ts
-type EffectInput<Inputs, Internal, ActorContext> = {
+type EffectInput<ActorContext> = {
   signal: AbortSignal;
   state: { name: string; payload: unknown };
   event: InternalEvent;
@@ -154,8 +204,31 @@ type EffectInput<Inputs, Internal, ActorContext> = {
 ### `TransitionResult`
 
 ```ts
-type TransitionResult = {
-  state?: StateRef | { state: StateRef; payload?: unknown };
-  emit?: Array<{ id: string }>;
+type TransitionResult<AllowedState = AnyStateRef, AllowedEmit = string> = {
+  state?: AllowedState | { state: AllowedState; payload?: unknown };
+  payload?: unknown;
+  emit?: Array<{ id: AllowedEmit }>;
 };
+```
+
+### `InternalEvent`
+
+```ts
+type InternalEvent = { id: string } & Record<string, unknown>;
+```
+
+### `AnyActor`
+
+```ts
+interface AnyActor {
+  state: AnyStateRef;
+  clock: Clock;
+  regions: Record<string, AnyActor>;
+  context?: Record<string, unknown>;
+  send(event: AnyEventRef | InternalEvent): void;
+  snapshot(): Snapshot;
+  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  on(event: "done", fn: () => void): () => void;
+  settled(): Promise<void>;
+}
 ```
