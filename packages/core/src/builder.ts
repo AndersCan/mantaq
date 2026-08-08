@@ -3,6 +3,8 @@ import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./eve
 import type { AnyActor } from "./actor-internal.ts";
 import type { EffectFn, TransitionResult } from "./actor-types.ts";
 
+type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, object | void> ? Id : never;
+
 export type TransitionHandler<ActorContext> = (
   event: InternalEvent,
   opts: { context: ActorContext; actor: AnyActor },
@@ -17,7 +19,7 @@ export class ActorBuilder<
   States extends readonly AnyStateRef[],
   Inputs extends readonly AnyEventRef[],
   Internal extends readonly AnyEventRef[],
-  _Outputs extends readonly AnyEventRef[],
+  Outputs extends readonly AnyEventRef[],
   ActorContext,
 > {
   #transitions: BuiltMaps<ActorContext>["transitions"] = {};
@@ -29,7 +31,7 @@ export class ActorBuilder<
     fn: (
       event: E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never,
       opts: { context: ActorContext; actor: AnyActor },
-    ) => TransitionResult,
+    ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>,
   ): this {
     const sName = stateRef.name;
     const eId = eventRef.id;
@@ -42,7 +44,7 @@ export class ActorBuilder<
     fn: (
       event: E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never,
       opts: { context: ActorContext; actor: AnyActor },
-    ) => TransitionResult,
+    ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>,
   ): this {
     const eId = eventRef.id;
     (this.#transitions["Any"] ??= {})[eId] = fn as TransitionHandler<ActorContext>;

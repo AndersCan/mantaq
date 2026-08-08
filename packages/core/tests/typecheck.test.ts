@@ -6,13 +6,15 @@ describe("API type safety", () => {
   test("emit to output passes typecheck", () => {
     const idle = state("idle")();
     const clicked = event("CLICKED")<{ x: number }>();
+    const pong = event("PONG")();
 
     const actor = new Actor({
       inputs: [clicked],
+      outputs: [pong],
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, clicked, () => ({ emit: [{ id: "PONG" }] }));
+        m.on(idle, clicked, () => ({ emit: [pong.create()] }));
       },
     });
 
@@ -194,5 +196,51 @@ describe("type level contract — type = behavior", () => {
     const ready = state("ready")<{ items: string[] }>();
     // @ts-expect-error create requires the full payload
     ready.create({});
+  });
+});
+
+describe("transition contract — type = behavior", () => {
+  test("transition target and emit id must be declared", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const alien = state("alien")();
+    const clicked = event("CLICKED")();
+
+    new Actor({
+      inputs: [clicked],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, clicked, () => ({ state: active }));
+        // @ts-expect-error transition target must be a declared state
+        m.on(idle, clicked, () => ({ state: alien }));
+      },
+    });
+
+    new Actor({
+      inputs: [clicked],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        // @ts-expect-error emit id must be a declared output
+        m.on(idle, clicked, () => ({ emit: [{ id: "UNDECLARED_OUT" }] }));
+      },
+    });
+  });
+
+  test("declared output carries through emit", () => {
+    const idle = state("idle")();
+    const clicked = event("CLICKED")<{ x: number }>();
+    const pong = event("PONG")<{ n: number }>();
+
+    new Actor({
+      inputs: [clicked],
+      outputs: [pong],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, clicked, () => ({ emit: [pong.create({ n: 1 })] }));
+      },
+    });
   });
 });
