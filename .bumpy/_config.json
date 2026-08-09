@@ -10,5 +10,6 @@
     "packages/*": {},
     "apps/*": {},
     "tools/*": {}
-  }
+  },
+  "updateInternalDependencies": "patch"
 }
