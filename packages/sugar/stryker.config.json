@@ -7,7 +7,8 @@
   "reporters": ["html", "clear-text", "progress"],
   "plugins": ["@stryker-mutator/vitest-runner"],
   "vitest": {
-    "configFile": "vite.config.ts"
+    "configFile": "stryker.vitest.config.ts",
+    "related": false
   },
   "thresholds": { "high": 95, "low": 92, "break": 90 }
 }
