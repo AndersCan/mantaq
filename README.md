@@ -57,6 +57,7 @@ mantaq/
 │   ├── sugar/       # Convenience helpers
 │   ├── traversal/   # Graph + coverage testing tools
 │   ├── test/        # Test harness
+│   ├── pbt/         # Seeded property-based testing helpers
 │   ├── utils/       # Shared utilities
 │   └── examples/    # Usage examples
 ├── apps/

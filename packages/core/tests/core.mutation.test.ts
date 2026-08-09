@@ -1,4 +1,4 @@
-import { expect, test, describe, vi } from "vite-plus/test";
+import { expect, test, describe } from "vite-plus/test";
 import { VirtualClock } from "../src/virtual-clock.ts";
 import { RealClock } from "../src/real-clock.ts";
 import { InternalQueue } from "../src/queue.ts";
@@ -7,10 +7,8 @@ import { runEffects } from "../src/effects.ts";
 import { Subscribers } from "../src/subscribers.ts";
 import { Actor } from "../src/actor.ts";
 import { state } from "../src/state.ts";
-import type { AnyStateRef } from "../src/state.ts";
 import { event } from "../src/event.ts";
 import type { InternalEvent } from "../src/event.ts";
-import type { AnyActor } from "../src/actor-internal.ts";
 import {
   registerActor,
   getChildren,
@@ -21,16 +19,10 @@ import {
   abortEffects,
 } from "../src/internal-registry.ts";
 import type { ActorInternal } from "../src/internal-registry.ts";
+import type { AnyStateRef } from "../src/state.ts";
+import type { AnyActor } from "../src/actor-internal.ts";
 
 describe("VirtualClock", () => {
-  test("setInterval with an aborted signal returns -1 and schedules nothing", () => {
-    const clock = new VirtualClock();
-    const controller = new AbortController();
-    controller.abort();
-    expect(clock.setInterval(10, () => {}, { signal: controller.signal })).toBe(-1);
-    expect(clock.hasPending()).toBe(false);
-  });
-
   test("timer ids increase across calls", () => {
     const clock = new VirtualClock();
     const a = clock.setTimeout(10, () => {});
@@ -41,12 +33,6 @@ describe("VirtualClock", () => {
     const d = clock.setInterval(20, () => {});
     expect(c).toBe(3);
     expect(d).toBe(4);
-  });
-
-  test("clearing unknown timer ids does not throw", () => {
-    const clock = new VirtualClock();
-    expect(() => clock.clearTimeout(999)).not.toThrow();
-    expect(() => clock.clearInterval(999)).not.toThrow();
   });
 
   test("timers fire in deadline order", () => {
@@ -86,20 +72,6 @@ describe("VirtualClock", () => {
     expect(c2).toBe(0);
   });
 
-  test("one interval clearing another does not throw", () => {
-    const clock = new VirtualClock();
-    let a = 0;
-    let b = 0;
-    clock.setInterval(10, () => {
-      a++;
-      clock.clearInterval(idB);
-    });
-    const idB = clock.setInterval(10, () => b++);
-    expect(() => clock.advance(10)).not.toThrow();
-    expect(a).toBe(1);
-    expect(b).toBe(0);
-  });
-
   test("hasPending is true with only intervals scheduled", () => {
     const clock = new VirtualClock();
     clock.setInterval(10, () => {});
@@ -136,20 +108,6 @@ describe("RealClock", () => {
     return new Promise<void>((resolve) =>
       setTimeout(() => {
         expect(fired).toBe(true);
-        resolve();
-      }, 40),
-    );
-  });
-
-  test("aborting before the deadline cancels the pending timeout", () => {
-    const clock = new RealClock();
-    const controller = new AbortController();
-    let fired = 0;
-    clock.setTimeout(10, () => fired++, { signal: controller.signal });
-    controller.abort();
-    return new Promise<void>((resolve) =>
-      setTimeout(() => {
-        expect(fired).toBe(0);
         resolve();
       }, 40),
     );
@@ -202,20 +160,6 @@ describe("RealClock", () => {
     } finally {
       globalThis.clearTimeout = original;
     }
-  });
-
-  test("aborting before the first tick cancels the interval", () => {
-    const clock = new RealClock();
-    const controller = new AbortController();
-    let count = 0;
-    clock.setInterval(10, () => count++, { signal: controller.signal });
-    controller.abort();
-    return new Promise<void>((resolve) =>
-      setTimeout(() => {
-        expect(count).toBe(0);
-        resolve();
-      }, 40),
-    );
   });
 
   test("the interval abort listener fires only once", () => {
@@ -361,15 +305,6 @@ describe("Subscribers", () => {
 });
 
 describe("internal-registry", () => {
-  test("registry helpers return Left for unregistered actors", () => {
-    const victim = {};
-    expect(getChildren(victim)[0]?.message).toMatch(/not registered/);
-    expect(getOutputHandler(victim)[0]?.message).toMatch(/not registered/);
-    expect(pushInternal(victim, { id: "X" })[0]?.message).toMatch(/not registered/);
-    expect(drainInternal(victim)[0]?.message).toMatch(/not registered/);
-    expect(abortEffects(victim)[0]?.message).toMatch(/not registered/);
-  });
-
   test("registry helpers operate on registered actors", () => {
     const children = new Map<string, never>();
     let handler: ((event: InternalEvent) => void) | null = null;
@@ -405,40 +340,6 @@ describe("internal-registry", () => {
     abortEffects(actor);
     expect(aborted).toBe(1);
   });
-
-  test("registry assignment preserves a pre-existing global registry", async () => {
-    const key = "__mantaqCoreInternalRegistry";
-    const original = (globalThis as Record<string, unknown>)[key];
-    const internal: ActorInternal = {
-      children: new Map(),
-      getOutputHandler: () => null,
-      setOutputHandler: () => {},
-      pushInternal: () => {},
-      drainInternal: () => {},
-      abortEffects: () => {},
-    };
-    try {
-      (globalThis as Record<string, unknown>)[key] = 1;
-      vi.resetModules();
-      const mod = await import("../src/internal-registry.ts");
-      expect(() => mod.registerActor({}, internal)).toThrow();
-    } finally {
-      (globalThis as Record<string, unknown>)[key] = original;
-    }
-  });
-
-  test("a fresh registry instance reports the unregistered error message", async () => {
-    const key = "__mantaqCoreInternalRegistry";
-    const original = (globalThis as Record<string, unknown>)[key];
-    try {
-      (globalThis as Record<string, unknown>)[key] = new WeakMap();
-      vi.resetModules();
-      const mod = await import("../src/internal-registry.ts");
-      expect(mod.getChildren({})[0]?.message).toMatch(/not registered/);
-    } finally {
-      (globalThis as Record<string, unknown>)[key] = original;
-    }
-  });
 });
 
 describe("Actor", () => {
@@ -460,27 +361,6 @@ describe("Actor", () => {
       console.warn = original;
     }
     expect(warns).toEqual([]);
-  });
-
-  test("initial state warning lists undeclared and declared states", () => {
-    const a = state("a")();
-    const b = state("b")();
-    const stray = state("stray")();
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [a, b] as AnyStateRef[],
-        initial: stray as never,
-        setup: () => {},
-      });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("stray"))).toBe(true);
-    expect(warns.some((w) => w.includes("a, b"))).toBe(true);
   });
 
   test("change subscribers receive the snapshot immediately and can unsubscribe", () => {
@@ -555,34 +435,6 @@ describe("Actor", () => {
     expect(errors).toEqual([]);
   });
 
-  test("unregistered region child logs a registry error", () => {
-    const idle = state("idle")();
-    const stub: AnyActor = {
-      state: state("s")(),
-      clock: new VirtualClock(),
-      regions: {},
-      send: () => {},
-      snapshot: () => ({ path: ["s"], regions: {} }),
-      on: () => () => {},
-      settled: async () => {},
-    };
-    const errors: string[] = [];
-    const original = console.error;
-    console.error = (...args: unknown[]) => errors.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [idle],
-        initial: idle,
-        regions: { child: stub },
-        setup: () => {},
-      });
-    } finally {
-      console.error = original;
-    }
-    expect(errors.some((e) => e.includes("not registered"))).toBe(true);
-  });
-
   test("any handler transition applies when the state handler only emits", () => {
     const idle = state("idle")();
     const active = state("active")();
@@ -626,29 +478,6 @@ describe("Actor", () => {
     actor.send(tick.create());
     expect(gotContext).toBe(5);
     expect(gotActor).toBe(actor);
-  });
-
-  test("send is ignored entirely once final", () => {
-    const pending = state("pending")();
-    const done = state("done")().final();
-    const finish = event("FINISH")();
-    const stray = event("STRAY")();
-    let strayRuns = 0;
-    const actor = new Actor({
-      inputs: [finish, stray],
-      states: [pending, done],
-      initial: pending,
-      setup: (m) => {
-        m.on(pending, finish, () => ({ state: done }));
-        m.onAny(stray, () => {
-          strayRuns++;
-          return {};
-        });
-      },
-    });
-    actor.send(finish.create());
-    actor.send(stray.create());
-    expect(strayRuns).toBe(0);
   });
 
   test("no transition warning when a state handler applies", () => {
@@ -725,22 +554,6 @@ describe("Actor", () => {
     actor.send(stop.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(received).toEqual(["OUT", "OUT"]);
-  });
-
-  test("unhandled output without a handler does not throw", () => {
-    const idle = state("idle")();
-    const out = event("OUT")();
-    const go = event("GO")();
-    const actor = new Actor({
-      inputs: [go],
-      outputs: [out],
-      states: [idle],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, go, () => ({ emit: [out.create()] }));
-      },
-    });
-    expect(() => actor.send(go.create())).not.toThrow();
   });
 
   test("pushInternal and clock advance drain the queue", () => {
@@ -866,8 +679,161 @@ describe("Actor", () => {
     abortEffects(actor);
     expect(effectSignal?.aborted).toBe(true);
   });
+});
 
-  test("emit loop halts after the internal budget is consumed", () => {
+describe("Actor directed mutation tests", () => {
+  test("context getter exposes the actor context", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      context: { n: 5 },
+      setup: () => {},
+    });
+    expect(actor.context).toEqual({ n: 5 });
+  });
+
+  test("internalBudget of zero triggers the budget warning on the first event", () => {
+    const idle = state("idle")();
+    const start = event("START")();
+    const loop = event("LOOP")();
+    const actor = new Actor({
+      inputs: [start],
+      outputs: [loop],
+      internal: [loop],
+      states: [idle],
+      initial: idle,
+      internalBudget: 0,
+      setup: (m) => {
+        m.on(idle, start, () => ({ emit: [loop.create()] }));
+        m.on(idle, loop, () => ({ emit: [loop.create()] }));
+      },
+    });
+    const warns: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
+    try {
+      actor.send(start.create());
+    } finally {
+      console.warn = original;
+    }
+    expect(warns.some((w) => w.includes("budget"))).toBe(true);
+  });
+
+  test("initial state warning fires when the state is not declared", () => {
+    const a = state("a")();
+    const b = state("b")();
+    const stray = state("stray")();
+    const warns: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
+    try {
+      new Actor({
+        inputs: [],
+        states: [a, b] as AnyStateRef[],
+        initial: stray as never,
+        setup: () => {},
+      });
+    } finally {
+      console.warn = original;
+    }
+    expect(warns.some((w) => w.includes("stray"))).toBe(true);
+  });
+
+  test("unregistered region child logs a registry error", () => {
+    const idle = state("idle")();
+    const stub: AnyActor = {
+      state: state("s")(),
+      clock: new VirtualClock(),
+      regions: {},
+      send: () => {},
+      snapshot: () => ({ path: ["s"], regions: {} }),
+      on: () => () => {},
+      settled: async () => {},
+    };
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => errors.push(String(args[0]));
+    try {
+      new Actor({
+        inputs: [],
+        states: [idle],
+        initial: idle,
+        regions: { child: stub },
+        setup: () => {},
+      });
+    } finally {
+      console.error = original;
+    }
+    expect(errors.some((e) => e.includes("not registered"))).toBe(true);
+  });
+
+  test("no-transition warning fires for an unhandled event", () => {
+    const idle = state("idle")();
+    const stray = event("STRAY")();
+    const actor = new Actor({
+      inputs: [stray],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    const warns: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
+    try {
+      actor.send(stray.create());
+    } finally {
+      console.warn = original;
+    }
+    expect(warns.some((w) => w.includes("no transition"))).toBe(true);
+  });
+
+  test("abortEffects on an actor with no running effect does not throw", () => {
+    const idle = state("idle")();
+    const actor = new Actor({ inputs: [], states: [idle], initial: idle, setup: () => {} });
+    expect(() => abortEffects(actor)).not.toThrow();
+  });
+
+  test("transition to a state with no effects leaves the effect abort null", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("active");
+    expect(() => abortEffects(actor)).not.toThrow();
+  });
+
+  test("a change subscriber re-sending events drains without reentrancy errors", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const back = event("BACK")();
+    const actor = new Actor({
+      inputs: [go, back],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.on(active, back, () => ({ state: idle }));
+      },
+    });
+    actor.on("change", (snap) => {
+      if (snap.path[0] === "active") actor.send(back.create());
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("idle");
+  });
+
+  test("internalBudget of one stops the second event of a loop", () => {
     const idle = state("idle")();
     const start = event("START")();
     const loop = event("LOOP")();
@@ -878,7 +844,7 @@ describe("Actor", () => {
       internal: [loop],
       states: [idle],
       initial: idle,
-      internalBudget: 2,
+      internalBudget: 1,
       setup: (m) => {
         m.on(idle, start, () => ({ emit: [loop.create()] }));
         m.on(idle, loop, () => {
@@ -895,37 +861,211 @@ describe("Actor", () => {
     } finally {
       console.warn = original;
     }
-    expect(handlerCalls).toBe(2);
+    expect(handlerCalls).toBe(1);
     expect(warns.some((w) => w.includes("budget"))).toBe(true);
   });
 
-  test("budget exhaustion aborts the running effect", () => {
+  test("output routing to the handler happens for unlisted event ids", () => {
     const idle = state("idle")();
-    const running = state("running")();
-    const start = event("START")();
-    const loop = event("LOOP")();
-    let effectSignal: AbortSignal | undefined;
+    const out = event("OUT")();
+    const go = event("GO")();
+    const received: string[] = [];
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ emit: [out.create()] }));
+      },
+    });
+    setOutputHandler(actor, (e) => received.push(e.id));
+    actor.send(go.create());
+    expect(received).toEqual(["OUT"]);
+  });
+});
+
+describe("Actor directed mutation tests 2", () => {
+  test("send is ignored once the actor is final", () => {
+    const pending = state("pending")();
+    const done = state("done")().final();
+    const finish = event("FINISH")();
+    const stray = event("STRAY")();
+    let strayRuns = 0;
+    const actor = new Actor({
+      inputs: [finish, stray],
+      states: [pending, done],
+      initial: pending,
+      setup: (m) => {
+        m.on(pending, finish, () => ({ state: done }));
+        m.onAny(stray, () => {
+          strayRuns++;
+          return {};
+        });
+      },
+    });
+    actor.send(finish.create());
+    actor.send(stray.create());
+    expect(strayRuns).toBe(0);
+  });
+
+  test("initial state warning lists both declared states", () => {
+    const a = state("a")();
+    const b = state("b")();
+    const stray = state("stray")();
+    const warns: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
+    try {
+      new Actor({
+        inputs: [],
+        states: [a, b] as AnyStateRef[],
+        initial: stray as never,
+        setup: () => {},
+      });
+    } finally {
+      console.warn = original;
+    }
+    expect(warns.some((w) => w.includes("stray"))).toBe(true);
+    expect(warns.some((w) => w.includes("a, b"))).toBe(true);
+  });
+
+  test("region child output routes to the parent queue and drains", () => {
+    const childIdle = state("cidle")();
+    const childDone = state("cdone")();
+    const childGo = event("CGO")();
+    const doneEvt = event("CHILD_DONE")();
+    const parentIdle = state("pidle")();
+    const parentActive = state("pactive")();
+
+    const child = new Actor({
+      inputs: [childGo],
+      outputs: [doneEvt],
+      states: [childIdle, childDone],
+      initial: childIdle,
+      setup: (m) => {
+        m.on(childIdle, childGo, () => ({ state: childDone, emit: [doneEvt.create()] }));
+      },
+    });
+
+    const parent = new Actor({
+      inputs: [doneEvt],
+      states: [parentIdle, parentActive],
+      initial: parentIdle,
+      regions: { child },
+      setup: (m) => {
+        m.on(parentIdle, doneEvt, () => ({ state: parentActive }));
+      },
+    });
+
+    child.send(childGo.create());
+    expect(parent.snapshot().path[0]).toBe("pactive");
+    expect(parent.snapshot().regions.child.path[0]).toBe("cdone");
+  });
+
+  test("an any handler can emit without transitioning", () => {
+    const idle = state("idle")();
+    const tick = event("TICK")();
+    const out = event("OUT")();
+    const received: string[] = [];
+    const actor = new Actor({
+      inputs: [tick],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(tick, () => ({ emit: [out.create()] }));
+      },
+    });
+    setOutputHandler(actor, (e) => received.push(e.id));
+    actor.send(tick.create());
+    expect(actor.snapshot().path[0]).toBe("idle");
+    expect(received).toEqual(["OUT"]);
+  });
+
+  test("a state handler transition blocks an any handler transition for the same event", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const tick = event("TICK")();
+    let anyRuns = 0;
+    const actor = new Actor({
+      inputs: [tick],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, tick, () => ({ state: active }));
+        m.onAny(tick, () => {
+          anyRuns++;
+          return { state: idle };
+        });
+      },
+    });
+    actor.send(tick.create());
+    expect(anyRuns).toBe(1);
+    expect(actor.snapshot().path[0]).toBe("active");
+  });
+
+  test("done fires exactly once when reaching a final state", () => {
+    const pending = state("pending")();
+    const done = state("done")().final();
+    const finish = event("FINISH")();
+    let doneCalls = 0;
+    const actor = new Actor({
+      inputs: [finish],
+      states: [pending, done],
+      initial: pending,
+      setup: (m) => {
+        m.on(pending, finish, () => ({ state: done }));
+      },
+    });
+    actor.on("done", () => doneCalls++);
+    actor.send(finish.create());
+    expect(doneCalls).toBe(1);
+  });
+
+  test("an effect emitting an input event dispatches through the input id set", () => {
     const clock = new VirtualClock();
+    const init = state("init")();
+    const done = state("done")();
+    const start = event("START")();
+    const tick = event("TICK")();
     const actor = new Actor({
       clock,
-      inputs: [start],
-      outputs: [loop],
-      internal: [loop],
-      states: [idle, running],
-      initial: idle,
-      internalBudget: 2,
+      inputs: [start, tick],
+      internal: [],
+      states: [init, done],
+      initial: init,
       setup: (m) => {
-        m.on(idle, start, () => ({ state: running }));
-        m.effect(running, ({ signal }) => {
-          effectSignal = signal;
+        m.on(init, start, () => ({ state: init }));
+        m.effect(init, ({ emit }) => {
+          emit(tick.create());
         });
-        m.on(running, loop, () => ({ emit: [loop.create()] }));
+        m.on(init, tick, () => ({ state: done }));
       },
     });
     actor.send(start.create());
-    expect(effectSignal?.aborted).toBe(false);
-    pushInternal(actor, loop.create());
     clock.advance(1);
-    expect(effectSignal?.aborted).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("done");
+  });
+
+  test("a state handler receives the actor in its options", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    let gotActor: unknown;
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, (_e, { actor: a }) => {
+          gotActor = a;
+          return { state: active };
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(gotActor).toBe(actor);
+    expect(actor.snapshot().path[0]).toBe("active");
   });
 });

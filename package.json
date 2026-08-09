@@ -10,7 +10,8 @@
     "coverage": "vp run -r coverage",
     "dev": "vp run docs#dev",
     "prepare": "vp config",
-    "mutation:core": "stryker run"
+    "mutation:core": "stryker run",
+    "mutation:sugar": "cd packages/sugar && stryker run"
   },
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",

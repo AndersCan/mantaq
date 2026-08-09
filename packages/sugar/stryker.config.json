@@ -2,10 +2,12 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
   "mutate": ["src/**/*.ts"],
+  "testFiles": ["tests/*.property.test.ts", "tests/*.mutation.test.ts"],
   "coverageAnalysis": "perTest",
   "reporters": ["html", "clear-text", "progress"],
   "plugins": ["@stryker-mutator/vitest-runner"],
   "vitest": {
     "configFile": "vite.config.ts"
-  }
+  },
+  "thresholds": { "high": 95, "low": 92, "break": 90 }
 }

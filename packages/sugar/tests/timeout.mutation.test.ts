@@ -1,6 +1,7 @@
 import { expect, test, describe, vi, afterEach, beforeEach } from "vite-plus/test";
 import { VirtualClock } from "@mantaq/core";
 import type { withTimeout as WithTimeoutFn } from "../src/effects/timeout.ts";
+import { withTimeout } from "../src/effects/timeout.ts";
 
 function makeInput(clock: VirtualClock) {
   const abort = new AbortController();
@@ -277,5 +278,31 @@ describe("withTimeout mutation tests", () => {
     const clock = new VirtualClock();
     withTimeout(NaN, makeInput(clock), () => ({ id: "t" }));
     expect(spy.mock.calls[0][0]).toContain("Timeout may not fire");
+  });
+});
+
+describe("withTimeout directed mutation tests", () => {
+  test("aborting after scheduling suppresses the emit when the timer fires", () => {
+    const clock = new VirtualClock();
+    const abort = new AbortController();
+    const emitted: Array<{ id: string }> = [];
+    withTimeout(
+      50,
+      { ...makeInput(clock), signal: abort.signal, emit: (e) => emitted.push(e) },
+      () => ({ id: "timeout" }),
+    );
+    abort.abort();
+    clock.advance(200);
+    expect(emitted).toEqual([]);
+  });
+
+  test("fires the emit when the signal is still active at the deadline", () => {
+    const clock = new VirtualClock();
+    const emitted: Array<{ id: string }> = [];
+    withTimeout(50, { ...makeInput(clock), emit: (e) => emitted.push(e) }, () => ({
+      id: "timeout",
+    }));
+    clock.advance(50);
+    expect(emitted).toEqual([{ id: "timeout" }]);
   });
 });

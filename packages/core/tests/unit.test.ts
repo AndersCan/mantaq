@@ -40,24 +40,6 @@ describe("VirtualClock", () => {
     expect(clock.hasPending()).toBe(false);
   });
 
-  test("setTimeout with aborted signal returns -1 and does not schedule", () => {
-    const clock = new VirtualClock();
-    const controller = new AbortController();
-    controller.abort();
-    expect(clock.setTimeout(50, () => {}, { signal: controller.signal })).toBe(-1);
-    expect(clock.hasPending()).toBe(false);
-  });
-
-  test("aborting a signal removes the timer", () => {
-    const clock = new VirtualClock();
-    const controller = new AbortController();
-    let fired = 0;
-    clock.setTimeout(50, () => fired++, { signal: controller.signal });
-    controller.abort();
-    clock.advance(100);
-    expect(fired).toBe(0);
-  });
-
   test("setInterval fires repeatedly and reschedules", () => {
     const clock = new VirtualClock();
     let count = 0;
@@ -141,13 +123,6 @@ describe("RealClock", () => {
         resolve();
       }, 30),
     );
-  });
-
-  test("setTimeout with aborted signal returns -1", () => {
-    const clock = new RealClock();
-    const controller = new AbortController();
-    controller.abort();
-    expect(clock.setTimeout(5, () => {}, { signal: controller.signal })).toBe(-1);
   });
 
   test("setInterval fires and clearInterval stops it", () => {

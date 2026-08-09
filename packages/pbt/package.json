@@ -1,7 +1,7 @@
 {
-  "name": "@mantaq/core",
+  "name": "@mantaq/pbt",
   "version": "0.0.0",
-  "description": "State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock.",
+  "description": "Seeded fast-check property-based testing helpers and shared generators.",
   "license": "MIT",
   "files": [
     "dist"
@@ -9,7 +9,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./internal": "./src/internal-registry.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -17,7 +16,6 @@
   },
   "scripts": {
     "build": "vp pack",
-    "postbuild": "node ../../scripts/ensure-core-internal-export.mjs",
     "dev": "vp pack --watch",
     "test": "vp test",
     "check": "vp check",
@@ -25,18 +23,14 @@
     "coverage": "vp test run --coverage"
   },
   "dependencies": {
-    "@mantaq/utils": "workspace:*"
+    "fast-check": "catalog:"
   },
   "devDependencies": {
-    "@mantaq/pbt": "workspace:*",
-    "@stryker-mutator/core": "catalog:",
-    "@stryker-mutator/vitest-runner": "catalog:",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "^6.0.3",
     "vite": "catalog:",
-    "vite-plus": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   }
 }
