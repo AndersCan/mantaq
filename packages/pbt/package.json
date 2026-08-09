@@ -25,7 +25,8 @@
     "test": "vp test",
     "check": "vp check",
     "prepublishOnly": "vp run build",
-    "coverage": "vp test run --coverage"
+    "coverage": "vp test run --coverage",
+    "prepack": "vp run build"
   },
   "dependencies": {
     "fast-check": "catalog:"

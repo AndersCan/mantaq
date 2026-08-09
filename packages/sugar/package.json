@@ -26,7 +26,8 @@
     "check": "vp check",
     "mutation": "stryker run",
     "prepublishOnly": "vp run build",
-    "coverage": "vp test run --coverage"
+    "coverage": "vp test run --coverage",
+    "prepack": "vp run build"
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",

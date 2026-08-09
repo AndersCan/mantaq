@@ -75,9 +75,10 @@ jobs:
         run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> "$HOME/.npmrc"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # Build must run here — bumpy packs + publishes tarballs directly, so
-      # each package's `prepublishOnly` never fires.
-      - run: vp run -r build
+      # No build step here: bumpy requires a clean tree (vp pack rewrites
+      # package.json exports), and the tree must stay clean for its check.
+      # Each package's `prepack` (vp run build) builds + rewrites exports
+      # during pnpm pack, after the check has passed.
       - run: vp exec bumpy ci release --expect-mode publish
         env:
           GH_TOKEN: ${{ github.token }}
