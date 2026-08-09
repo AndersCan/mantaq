@@ -192,7 +192,7 @@ class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
     fn: Handler,
   ): this;
   onAny<E extends Inputs[number] | Internal[number]>(eventRef: E, fn: Handler): this;
-  effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext>): this;
+  effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext, PayloadOf<S>>): this;
 }
 // Handler = (event, opts: { context: ActorContext; actor: AnyActor }) =>
 //   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ id: string }> }
@@ -248,9 +248,9 @@ type CreatedOfEvent<Id extends string, P> = P extends void ? { id: Id } : P & { 
 Argument to every effect. `signal` ties lifetime to state exit; `emit` sends events back into the machine; `state` is the entered state, `event` caused it.
 
 ```ts
-interface EffectInput<ActorContext> {
+interface EffectInput<ActorContext, Payload = unknown> {
   signal: AbortSignal;
-  state: { name: string; payload: unknown };
+  state: { name: string; payload: Payload };
   event: InternalEvent;
   context: ActorContext;
   emit: (event: InternalEvent) => void;
@@ -258,13 +258,20 @@ interface EffectInput<ActorContext> {
 }
 ```
 
+`Payload` is inferred from the state's declared payload when the effect is registered with
+`m.effect(stateRef, fn)` — `state.payload` is typed, no cast needed. States declared without a
+payload generic (`state("idle")()`) keep `payload: unknown`.
+
 ### EffectFn
 
 An effect function, run on state entry; the signal aborts on state exit or actor halt.
 
 ```ts
-type EffectFn<ActorContext> = (input: EffectInput<ActorContext>) => void;
-m.effect(loading, ({ signal, emit }) => {
+type EffectFn<ActorContext, Payload = unknown> = (
+  input: EffectInput<ActorContext, Payload>,
+) => void;
+m.effect(loading, ({ signal, emit, state }) => {
+  state.payload.url; // typed to loading's payload
   const t = setTimeout(() => emit(done.create()), 1000);
   signal.addEventListener("abort", () => clearTimeout(t));
 });

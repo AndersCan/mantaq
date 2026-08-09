@@ -12,16 +12,18 @@ export type NonFinalStateRef<States extends AnyStateRef[]> = Extract<
   { isFinal: false }
 >;
 
-export interface EffectInput<ActorContext> {
+export interface EffectInput<ActorContext, Payload = unknown> {
   signal: AbortSignal;
-  state: { name: string; payload: unknown };
+  state: { name: string; payload: Payload };
   event: InternalEvent;
   context: ActorContext;
   emit: (event: InternalEvent) => void;
   clock: Clock;
 }
 
-export type EffectFn<ActorContext> = (input: EffectInput<ActorContext>) => void;
+export type EffectFn<ActorContext, Payload = unknown> = (
+  input: EffectInput<ActorContext, Payload>,
+) => void;
 
 export type TransitionResult<
   AllowedState extends AnyStateRef = AnyStateRef,

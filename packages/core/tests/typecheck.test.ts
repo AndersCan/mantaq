@@ -173,6 +173,29 @@ describe("type level contract — type = behavior", () => {
     expectTypeOf(created.state).toMatchTypeOf<StateRef<"ready", { items: string[] }>>();
   });
 
+  test("effect receives the state's declared payload type", () => {
+    const idle = state("idle")();
+    const loading = state("loading")<{ url: string }>();
+
+    new Actor({
+      inputs: [],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.effect(loading, ({ state }) => {
+          expectTypeOf(state.payload).toEqualTypeOf<{ url: string }>();
+          expectTypeOf(state.payload.url).toBeString();
+          // @ts-expect-error payload is the declared shape, not arbitrary keys
+          expectTypeOf(state.payload.nope).toBeUnknown();
+        });
+        // a state without a payload generic keeps payload unknown
+        m.effect(idle, ({ state }) => {
+          expectTypeOf(state.payload).toBeUnknown();
+        });
+      },
+    });
+  });
+
   test("final() narrows isFinal to true", () => {
     const done = state("done")().final();
     const pending = state("pending")();
