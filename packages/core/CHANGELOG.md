@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.3
+
+<sub>2026-08-09</sub>
+
+- _(patch)_
+  Context writes now emit change even when set() receives the same reference — in-place mutation of a class-instance context is detectable by writing through set(). Change detection stays reference-identity; deep comparison of arbitrary context values is not supported.
+
 ## 0.0.2
 
 <sub>2026-08-09</sub>
