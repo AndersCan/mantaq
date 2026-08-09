@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "description": "Graph extraction, traversal algorithms, and runtime tracking for mantaq actors.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/traversal"
+  },
   "files": [
     "dist"
   ],

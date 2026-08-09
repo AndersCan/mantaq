@@ -1,8 +1,13 @@
 {
   "name": "@mantaq/sugar",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Userland sugar for mantaq actors — matches, effect helpers, transition utilities.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/sugar"
+  },
   "files": [
     "dist"
   ],

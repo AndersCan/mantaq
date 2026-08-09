@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "description": "Test harness and assertion utilities for verifying mantaq actor behavior.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/test"
+  },
   "files": [
     "dist"
   ],

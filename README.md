@@ -14,6 +14,12 @@ A TypeScript state machine library built around actors, events, and hierarchical
 ## Getting Started
 
 ```bash
+npm install @mantaq/core
+```
+
+From the repo (development):
+
+```bash
 pnpm install
 vp run ready
 ```
