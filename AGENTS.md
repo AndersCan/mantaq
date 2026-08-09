@@ -67,6 +67,38 @@ Use `skill` tool with name matching the directory. Disk versions supersede syste
 
 <!--SKILLS END-->
 
+<!--TEST TAXONOMY START-->
+
+# Test Taxonomy
+
+Tests split by filename. The split is **what survives a refactor**, not what tests what:
+
+| Suffix               | Purpose                                                      | Feeds stryker? | Refactor story                      |
+| -------------------- | ------------------------------------------------------------ | -------------- | ----------------------------------- |
+| `*.test.ts`          | features, happy paths                                        | no             | stable, hand-edited                 |
+| `*.error.test.ts`    | failure paths: `Left`, warnings, budget, abort, unregistered | no             | stable, hand-edited                 |
+| `*.property.test.ts` | PBT invariants against a reference model                     | **yes**        | regenerable, kept broad not precise |
+| `*.mutation.test.ts` | directed tests for stubborn surviving mutants                | **yes**        | throw away and recreate             |
+
+Property tests are the quantitative engine. fast-check runs them with a pinned seed
+(`MANTAQ_SEED` env var overrides; default in `@mantaq/pbt`), so runs replay identically.
+Shared generators and `runProperty` live in `@mantaq/pbt` (`anyName`, `anyDuration`,
+`anyActorSnapshot`, ...).
+
+## Refactor workflow
+
+1. Refactor impl. `vp test` runs feature + error + property tests (fast qualitative gate).
+2. `stryker run` runs only `*.property.test.ts` + `*.mutation.test.ts` (config `testFiles`).
+3. Score below break? Throw away `*.mutation.test.ts`, re-run, tighten generators or add
+   one directed test per surviving mutant.
+4. Feature and error tests are never edited for mutant-killing.
+
+## Thresholds
+
+Stryker break is 90, low 92, high 95 (root `stryker.config.json`, `packages/sugar/stryker.config.json`).
+
+<!--TEST TAXONOMY END-->
+
 <!--VISION ENFORCEMENT START-->
 
 # North Star Enforcement
@@ -88,6 +120,6 @@ Type-level tests live in `packages/core/tests/typecheck.test.ts` (`expectTypeOf`
 - [ ] Run `vp run guard` — north star gates (part of `vp run ready`).
 - [ ] Never silence the compiler. If a change needs `as any`, `as unknown as`, or `@ts-*`, the design is wrong, not the types. Refactor instead.
 - [ ] `@mantaq/core` stays small. New exports and new impl lines cost budget; measure before adding.
-- [ ] Run `vp run mutation:core` — core mutation score must stay above the break threshold.
+- [ ] Run `vp run mutation:core` and `vp run mutation:sugar` — mutation score must stay above the break threshold (90).
 
 <!--VISION ENFORCEMENT END-->

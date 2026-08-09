@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, afterEach } from "vite-plus/test";
-import { Actor, event, state } from "@mantaq/core";
+import { Actor, event, state, VirtualClock } from "@mantaq/core";
 import { ActorMap } from "../src/actors/actor-map.ts";
 import { matches } from "../src/actors/matches.ts";
 
@@ -232,5 +232,107 @@ describe("ActorMap mutation tests", () => {
     } finally {
       cleanupDevMode();
     }
+  });
+});
+
+describe("ActorMap directed mutation tests", () => {
+  function makeChild(id: string) {
+    const toggle = event("toggle")();
+    const output = event("output")<{ from: string }>();
+    const off = state("off")();
+    const on = state("on")();
+    const actor = new Actor({
+      inputs: [toggle],
+      outputs: [output],
+      internal: [],
+      context: {},
+      states: [off, on],
+      initial: off,
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on, emit: [output.create({ from: id })] }));
+        m.on(on, toggle, () => ({ state: off }));
+      },
+    });
+    return { actor, toggle, output };
+  }
+
+  test("send to a missing key is a no-op", () => {
+    const map = new ActorMap();
+    expect(() => map.send("missing", { id: "x" })).not.toThrow();
+  });
+
+  test("kill of a missing key is a no-op", () => {
+    const map = new ActorMap();
+    expect(() => map.kill("missing")).not.toThrow();
+  });
+
+  test("keys lists spawned keys and size counts them", () => {
+    const map = new ActorMap();
+    map.spawn("a", () => makeChild("a").actor);
+    map.spawn("b", () => makeChild("b").actor);
+    expect(map.keys().sort()).toEqual(["a", "b"]);
+    expect(map.size).toBe(2);
+    expect(map.has("a")).toBe(true);
+    expect(map.has("z")).toBe(false);
+  });
+
+  test("ensure spawns only when the key is missing", () => {
+    const map = new ActorMap();
+    const factory = vi.fn(() => makeChild("a").actor);
+    map.ensure("a", factory);
+    map.ensure("a", factory);
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(map.size).toBe(1);
+  });
+
+  test("snapshot returns the child snapshot and undefined for a missing key", () => {
+    const map = new ActorMap();
+    map.spawn("a", () => makeChild("a").actor);
+    expect(map.snapshot("a")?.path[0]).toBe("off");
+    expect(map.snapshot("missing")).toBeUndefined();
+  });
+
+  test("spawn with a parent wires child output to the parent send", () => {
+    const sent: Array<{ id: string }> = [];
+    const parent = {
+      state: state("parent")(),
+      clock: new VirtualClock(),
+      regions: {},
+      send: (e: unknown) => sent.push(e as { id: string }),
+      snapshot: () => ({ path: ["parent"], regions: {} }),
+      on: () => () => {},
+      settled: async () => {},
+    };
+    const map = new ActorMap(parent as never);
+    const { actor, toggle, output } = makeChild("a");
+    map.spawn("a", () => actor);
+    actor.send(toggle.create());
+    expect(sent).toEqual([output.create({ from: "a" })]);
+  });
+
+  test("spawn with a parent and an unregistered child logs the registry error", () => {
+    const parent = {
+      state: state("parent")(),
+      clock: new VirtualClock(),
+      regions: {},
+      send: () => {},
+      snapshot: () => ({ path: ["parent"], regions: {} }),
+      on: () => () => {},
+      settled: async () => {},
+    };
+    const child = {
+      state: state("c")(),
+      clock: new VirtualClock(),
+      regions: {},
+      send: () => {},
+      snapshot: () => ({ path: ["c"], regions: {} }),
+      on: () => () => {},
+      settled: async () => {},
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const map = new ActorMap(parent as never);
+    map.spawn("a", () => child as never);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 });

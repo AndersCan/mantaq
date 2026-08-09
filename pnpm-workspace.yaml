@@ -13,6 +13,7 @@ catalog:
   "@stryker-mutator/core": ^9
   "@stryker-mutator/vitest-runner": ^9
   "@varlock/bumpy": ^1.18.1
+  "fast-check": ^4.9.0
   sharp: ^0.35.3
   remark-gfm: ^4.0.1
   knip: ^6.32.0

@@ -49,28 +49,6 @@ describe("Actor dispatch resolution", () => {
     expect(received).toEqual(["OUT"]);
   });
 
-  test("unhandled event warns and is dropped", () => {
-    const idle = state("idle")();
-    const stray = event("STRAY")();
-
-    const actor = new Actor({
-      inputs: [stray],
-      states: [idle],
-      initial: idle,
-      setup: () => {},
-    });
-
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(stray.create());
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("no transition"))).toBe(true);
-  });
-
   test("send is ignored once in a final state", () => {
     const pending = state("pending")();
     const done = state("done")().final();
@@ -141,37 +119,6 @@ describe("Actor effects", () => {
 
     actor.send(go.create());
     expect(payload).toEqual({ url: "https://x" });
-  });
-});
-
-describe("Actor internal budget", () => {
-  test("emit loop halts after budget and warns", () => {
-    const idle = state("idle")();
-    const start = event("START")();
-    const loop = event("LOOP")();
-
-    const actor = new Actor({
-      inputs: [start],
-      outputs: [loop],
-      internal: [loop],
-      states: [idle],
-      initial: idle,
-      internalBudget: 2,
-      setup: (m) => {
-        m.on(idle, start, () => ({ emit: [loop.create()] }));
-        m.on(idle, loop, () => ({ emit: [loop.create()] }));
-      },
-    });
-
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(start.create());
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("budget"))).toBe(true);
   });
 });
 

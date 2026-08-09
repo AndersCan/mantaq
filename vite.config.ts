@@ -79,6 +79,7 @@ export default defineConfig({
           "eslint/max-depth": "off",
           "eslint/max-params": "off",
           "eslint/max-nested-callbacks": "off",
+          "eslint/complexity": "off",
         },
       },
       {
@@ -95,6 +96,7 @@ export default defineConfig({
                   message: "@mantaq/core may not import @mantaq/traversal",
                 },
                 { name: "@mantaq/test", message: "@mantaq/core may not import @mantaq/test" },
+                { name: "@mantaq/pbt", message: "@mantaq/core may not import @mantaq/pbt" },
               ],
             },
           ],
@@ -113,6 +115,7 @@ export default defineConfig({
                   message: "@mantaq/sugar may not import @mantaq/traversal",
                 },
                 { name: "@mantaq/test", message: "@mantaq/sugar may not import @mantaq/test" },
+                { name: "@mantaq/pbt", message: "@mantaq/sugar may not import @mantaq/pbt" },
               ],
             },
           ],
@@ -134,6 +137,7 @@ export default defineConfig({
                   message: "@mantaq/traversal imports only @mantaq/core",
                 },
                 { name: "@mantaq/test", message: "@mantaq/traversal may not import @mantaq/test" },
+                { name: "@mantaq/pbt", message: "@mantaq/traversal may not import @mantaq/pbt" },
               ],
             },
           ],
@@ -168,6 +172,41 @@ export default defineConfig({
                   message: "@mantaq/examples may not import @mantaq/traversal",
                 },
                 { name: "@mantaq/test", message: "@mantaq/examples may not import @mantaq/test" },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        files: ["packages/core/tests/**"],
+        rules: {
+          "eslint/no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "@mantaq/core", message: "@mantaq/core may not import itself" },
+                { name: "@mantaq/sugar", message: "@mantaq/core may not import @mantaq/sugar" },
+                {
+                  name: "@mantaq/traversal",
+                  message: "@mantaq/core may not import @mantaq/traversal",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        files: ["packages/sugar/tests/**"],
+        rules: {
+          "eslint/no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "@mantaq/sugar", message: "@mantaq/sugar imports only @mantaq/core" },
+                {
+                  name: "@mantaq/traversal",
+                  message: "@mantaq/sugar may not import @mantaq/traversal",
+                },
               ],
             },
           ],

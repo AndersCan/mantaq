@@ -16,7 +16,6 @@ jobs:
           node-version: "24"
           cache: true
       - run: vp install
+      - run: vp run mutation:core
       - run: vp run ready
       - run: vp run knip
-      - run: vp run coverage
-      - run: vp run mutation:core
