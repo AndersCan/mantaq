@@ -253,4 +253,30 @@ describe("Actor context change detection", () => {
     actor.send(tick.create());
     expect(actor.snapshot().context).toEqual({ n: 2 });
   });
+
+  test("set with the same reference after in-place mutation emits change", () => {
+    class MutableProgress {
+      progress = 1;
+    }
+    const idle = state("idle")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [tick],
+      states: [idle],
+      initial: idle,
+      context: new MutableProgress(),
+      setup: (m) => {
+        m.on(idle, tick, (_e, { context }) => {
+          const c = context.get() as MutableProgress;
+          c.progress += 1;
+          context.set(c); // same reference — the write itself is the signal
+          return {};
+        });
+      },
+    });
+    const seen: number[] = [];
+    actor.on("change", (snap) => seen.push((snap.context as MutableProgress).progress));
+    actor.send(tick.create());
+    expect(seen).toEqual([1, 2]);
+  });
 });
