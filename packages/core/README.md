@@ -177,8 +177,8 @@ const actor = new Actor({
   initial: idleState,
   setup: (m) => {
     m.effect(loadingState, ({ state, emit, clock }) => {
-      // state.payload is unknown — cast to the known shape
-      const { url } = state.payload as { url: string };
+      // state.payload is typed to the state's declared payload: { url: string }
+      const url = state.payload.url;
       clock.setTimeout(1000, () => {
         emit(doneEvent.create());
       });

@@ -1,9 +1,12 @@
-import type { AnyStateRef } from "./state.ts";
+import type { AnyStateRef, StateRef } from "./state.ts";
 import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
 import type { AnyActor } from "./actor-internal.ts";
 import type { EffectFn, TransitionResult } from "./actor-types.ts";
 
 type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, object | void> ? Id : never;
+
+type PayloadOf<S extends AnyStateRef> =
+  S extends StateRef<infer _Name, infer Payload, infer _IsFinal> ? Payload : never;
 
 type TransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
@@ -57,8 +60,8 @@ export class ActorBuilder<
     return this;
   }
 
-  effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext>): this {
-    (this.#effects[stateRef.name] ??= []).push(fn);
+  effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext, PayloadOf<S>>): this {
+    (this.#effects[stateRef.name] ??= []).push(fn as EffectFn<ActorContext>);
     return this;
   }
 
