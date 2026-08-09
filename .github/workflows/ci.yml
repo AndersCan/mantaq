@@ -17,5 +17,6 @@ jobs:
           cache: true
       - run: vp install
       - run: vp run mutation:core
+      - run: vp run mutation:sugar
       - run: vp run ready
       - run: vp run knip
