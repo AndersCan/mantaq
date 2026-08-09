@@ -1,6 +1,6 @@
 ---
 name: ralph
-description: Ralph Wiggum loop. Deep structural improvement. Core first. Refactors and simplifies — good abstractions make bugs impossible. Expensive model thinks, @worker executes. Splits long functions, kills multi-responsibility classes, reduces branching, kills type casts, improves DX via sugar, leaves FIXMEs for next run, self-reflects and improves own prompt at end. Use when user wants run self-improvement loop for deep work.
+description: Ralph Wiggum loop. Deep structural improvement. Core first. Refactors and simplifies — good abstractions make bugs impossible. Expensive model thinks, light subagent use (@worker only for substantial tasks). Splits long functions, kills multi-responsibility classes, reduces branching, kills type casts, improves DX via sugar, leaves FIXMEs for next run, self-reflects and improves own prompt at end. Use when user wants run self-improvement loop for deep work.
 allowed-tools: Read Grep Glob Bash Edit Write Task
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Read Grep Glob Bash Edit Write Task
 
 Expensive model thinks. Fast model executes.
 
-@worker not dumb. Very fast. Delegate more than you think. Only keep reasoning-heavy work in orchestrator.
+Subagent spawns cost tokens. Spend them like money. Default: orchestrator does work directly. Spawn worker ONLY for substantial tasks. @worker not dumb — but each spawn has overhead. Fewer, bigger batches.
 
 Caveman output everywhere. No exceptions. See [AGENTS.md](../../AGENTS.md).
 
@@ -28,7 +28,7 @@ Goal: bugs impossible. Not fewer bugs — impossible. Refactor, simplify, build 
 
 ## Parameters
 
-- `iteration_count`: default 5 (deep work, slow)
+- `iteration_count`: default 2 (deep work, light)
 
 ## Time Limit
 
@@ -97,9 +97,12 @@ git rebase main || git rebase --abort
 
 ### Phase 1: Discover (AGENT-DRIVEN)
 
-Do NOT run rg/grep yourself. Spawn worker. Orchestrator stays lean. (worker handles discovery fine. skip explore agent.)
+Do NOT run rg/grep yourself. Spawn worker ONLY when no backlog exists. One spawn max.
 
-Step 1a: Spawn single worker for full discovery.
+Step 1a: Discovery.
+
+Known FIXME backlog from last run? Skip worker. Orchestrator picks up where left off.
+No backlog? Spawn single worker for full discovery (1 spawn only):
 
 ```
 Task(
@@ -171,31 +174,27 @@ For each task in DAG order:
 
 Step 2a: Pick executor.
 
-@worker not dumb. Very fast. Delegate aggressively. Only keep true reasoning in orchestrator.
+Default: do directly. Spawn worker only when task is substantial — many files, mechanical repetition, or long implementation. Small edits (<50 lines): orchestrator does directly, zero spawns.
 
-**Orchestrator-only (needs deep reasoning):**
-
-- API design (naming, public surface, error types)
-- Bug root-causing across files
-- Architecture decisions (new module? new sugar helper? move core to sugar? new package?)
-- Designing new sugar API surface (sugar = ergonomic layer, design matters)
-
-**Delegate to @worker (fast, handles more than you think):**
+**Spawn @worker only for:**
 
 - Function splits — spec: target file + line + suggested helper names + what stays vs moves
 - Class/function responsibility splits — spec: what extracts + target file + new name
 - Branching refactors — spec: replacement pattern (early return / lookup table / guard clauses)
-- Update callers after any refactor
-- Fix tests after refactor
+- Batch mechanical fixes (same pattern across files — 3+ files)
 - Dead code deletion (grep confirmed unused)
 - Type cast removal (pattern verified, not TS limitation)
-- Import cleanup
-- Format/lint fixes
-- Sugar adoption in examples (swap raw core import for sugar import)
 - New sugar helper — spec: signature + behavior + test cases. Worker implements, exports, tests.
-- JSDoc addition to existing stable exports
 
-Default: delegate. Only keep when worker would guess wrong on design.
+**Orchestrator does directly (no spawn):**
+
+- Small edits (<50 lines)
+- Import cleanup, format/lint fixes
+- Sugar adoption in examples (swap raw core import for sugar import)
+- Update callers after refactor (one file)
+- Fix tests after refactor (small)
+- JSDoc addition to existing stable exports
+- API design, bug root-causing, architecture — reasoning stays here anyway
 
 Step 2b: Spawn @worker.
 
@@ -283,7 +282,7 @@ Questions:
 - Did orchestrator do too much itself?
 - Which categories fail most?
 - FIXMEs added vs fixed ratio? Backlog growing or shrinking?
-- iteration_count right? (5 enough? too many for 30min?)
+- iteration_count right? (2 enough? 30min budget?)
 - Context usage — biggest tokens spent?
 - Explore findings accurate? False positives?
 - Deep work quality — real structural improvement or surface tweaks?
@@ -343,7 +342,7 @@ git log --oneline -<iteration_count*2>
 - Re-reading files from previous iterations — carry forward.
 - Repeating same category consecutively — diversify.
 - Padding with trivial tasks when real work runs out — stop early, be honest.
-- Orchestrator running rg/grep — delegate to worker.
+- Orchestrator running rg/grep — discovery spawn is the one exception. After that, line refs only.
 - Reading full files in orchestrator — line refs only.
 - Spawning workers for trivial edits — do directly.
 - Worker editing files outside task FILES list — workers MUST stay scoped. Out-of-scope file needs work → leave FIXME at location, do NOT edit. Orchestrator assigns separate task. Parallel workers stay file-disjoint.
