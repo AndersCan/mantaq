@@ -134,7 +134,7 @@ if (move.is(evt)) evt.x; // narrowed
 
 ### Context
 
-The handle passed to transition handlers and effects as `{ context }`. `get()` reads the current context value; `set(value)` replaces it wholesale — reference replacement is how context changes are detected. Every mutation goes through `set`; earlier `get()` bindings go stale after a `set`.
+The handle passed to transition handlers and effects as `{ context }`. `get()` reads the current context value; `set(value)` replaces it wholesale and is the write signal — calling `set()` emits a `change` event even when the reference is unchanged (so a class instance mutated in place still signals by being passed to `set`). Context is compared by reference identity, never deep-compared. Earlier `get()` bindings go stale after a `set`.
 
 ```ts
 class Context<T> {

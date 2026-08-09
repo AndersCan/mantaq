@@ -104,8 +104,8 @@ export class Actor<
   readonly clock: Clock;
   #context: ActorContext;
   #contextHandle: Context<ActorContext>;
+  #contextWritten = false;
   #lastState: AnyStateRef;
-  #lastContext: ActorContext;
   #options: InternalActorOptions<States, Inputs, Internal, Outputs, ActorContext>;
   #regions: Record<string, AnyActor> = {};
   #children = new Map<string, AnyActor>();
@@ -168,11 +168,11 @@ export class Actor<
     this.state = initState;
     this.#context = (options.context ?? {}) as ActorContext;
     this.#lastState = initState;
-    this.#lastContext = this.#context;
     this.#contextHandle = new Context<ActorContext>(
       () => this.#context,
       (value: ActorContext) => {
         this.#context = value;
+        this.#contextWritten = true;
       },
     );
     this.#subs.seed(this.snapshot());
@@ -219,9 +219,9 @@ export class Actor<
   }
 
   #emitChangeIfDirty(): void {
-    if (this.state === this.#lastState && this.#context === this.#lastContext) return;
+    if (this.state === this.#lastState && !this.#contextWritten) return;
     this.#lastState = this.state;
-    this.#lastContext = this.#context;
+    this.#contextWritten = false;
     this.#subs.emitChange(this.snapshot());
   }
 
@@ -333,9 +333,7 @@ export class Actor<
           return false;
         }
         count++;
-        if (this.#internalIds.has(event.id)) {
-          this.#dispatch(event);
-        } else if (this.#inputIds.has(event.id)) {
+        if (this.#internalIds.has(event.id) || this.#inputIds.has(event.id)) {
           this.#dispatch(event);
         } else if (this.#outputHandler) {
           this.#outputHandler(event);
