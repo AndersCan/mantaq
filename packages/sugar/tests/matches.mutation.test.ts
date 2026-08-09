@@ -3,7 +3,7 @@ import { matches } from "../src/actors/matches.ts";
 import type { Snapshot } from "@mantaq/core";
 
 function snap(path: string[], regions: Record<string, Snapshot> = {}): Snapshot {
-  return { path, regions };
+  return { path, context: {}, regions };
 }
 
 describe("matches — mutation tests", () => {

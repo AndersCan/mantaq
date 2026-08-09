@@ -5,11 +5,17 @@ export interface InstrumentedActor {
   history: History;
   send(event: unknown): void;
   state: AnyActor["state"];
-  snapshot(): Snapshot;
+  snapshot(): Snapshot<Record<string, unknown>>;
   regions: Record<string, AnyActor>;
   context?: Record<string, unknown>;
   clock: AnyActor["clock"];
-  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  on(
+    event: "change",
+    fn: (
+      snapshot: Snapshot<Record<string, unknown>>,
+      prev: Snapshot<Record<string, unknown>>,
+    ) => void,
+  ): () => void;
   on(event: "error", fn: (error: unknown) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;

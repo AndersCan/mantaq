@@ -54,7 +54,7 @@ export function createTestHarness(actor: AnyActor): TestHarness {
       assertTransitionVisited(instrumented.history, from, event),
     assertTransitionNeverVisited: (from: string, event: string) =>
       assertTransitionNeverVisited(instrumented.history, from, event),
-    assertContextNever: (predicate: (ctx: unknown) => boolean) =>
+    assertContextNever: (predicate: (context: unknown) => boolean) =>
       assertContextNever(instrumented, predicate),
     assertEffectRan: (name: string) => assertEffectRan(instrumented.history, name),
     assertEffectNeverRan: (name: string) => assertEffectNeverRan(instrumented.history, name),

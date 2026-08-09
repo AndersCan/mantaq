@@ -80,7 +80,7 @@ function deleteRange(str: string, from: number, to: number): string {
 function createEditorActor(clock?: VirtualClock) {
   const c = clock ?? new VirtualClock();
 
-  const ctx: EditorContext = {
+  const context: EditorContext = {
     buffer: { content: "", cursor: 0 },
     undoStack: [],
     redoStack: [],
@@ -103,279 +103,351 @@ function createEditorActor(clock?: VirtualClock) {
     states: [s.idle, s.editing],
     initial: s.idle,
     clock: c,
-    context: ctx,
+    context,
     setup: (m) => {
-      m.onAny(e.UNDO, (_event, opts) => {
-        const context = opts!.context;
-        if (context.undoStack.length === 0) {
+      m.onAny(e.UNDO, (_event, { context }) => {
+        const cur = context.get();
+        if (cur.undoStack.length === 0) {
           return { state: s.idle };
         }
-        const entry = context.undoStack.pop()!;
-        context.redoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: entry.label,
+        const undoStack = cur.undoStack.slice(0, -1);
+        const entry = cur.undoStack[undoStack.length]!;
+        const redoStack = [
+          ...cur.redoStack,
+          { buffer: snapshotBuffer(cur.buffer), label: entry.label },
+        ];
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack,
+          buffer: snapshotBuffer(entry.buffer),
         });
-        context.buffer = snapshotBuffer(entry.buffer);
-        if (context.undoStack.length === 0) {
+        if (undoStack.length === 0) {
           return { state: s.idle };
         }
         return { state: s.editing };
       });
-      m.onAny(e.REDO, (_event, opts) => {
-        const context = opts!.context;
-        if (context.redoStack.length === 0) {
+      m.onAny(e.REDO, (_event, { context }) => {
+        const cur = context.get();
+        if (cur.redoStack.length === 0) {
           return { state: s.idle };
         }
-        const entry = context.redoStack.pop()!;
-        context.undoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: entry.label,
+        const redoStack = cur.redoStack.slice(0, -1);
+        const entry = cur.redoStack[redoStack.length]!;
+        const undoStack = [
+          ...cur.undoStack,
+          { buffer: snapshotBuffer(cur.buffer), label: entry.label },
+        ];
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack,
+          buffer: snapshotBuffer(entry.buffer),
         });
-        context.buffer = snapshotBuffer(entry.buffer);
-        if (context.redoStack.length === 0) {
+        if (redoStack.length === 0) {
           return { state: s.idle };
         }
         return { state: s.editing };
       });
-      m.onAny(undoToCheckpointEvent, (event, opts) => {
-        const context = opts!.context;
-        const targetIndex = context.checkpoints.get(event.name);
+      m.onAny(undoToCheckpointEvent, (event, { context }) => {
+        const cur = context.get();
+        const targetIndex = cur.checkpoints.get(event.name);
         if (targetIndex === undefined) {
           return { state: s.idle };
         }
-        while (context.undoStack.length > targetIndex) {
-          const entry = context.undoStack.pop()!;
-          context.redoStack.push({
-            buffer: snapshotBuffer(context.buffer),
-            label: entry.label,
-          });
-          context.buffer = snapshotBuffer(entry.buffer);
+        let undoStack = cur.undoStack;
+        let redoStack = cur.redoStack;
+        let buffer = cur.buffer;
+        while (undoStack.length > targetIndex) {
+          const entry = undoStack[undoStack.length - 1]!;
+          undoStack = undoStack.slice(0, -1);
+          redoStack = [...redoStack, { buffer: snapshotBuffer(buffer), label: entry.label }];
+          buffer = snapshotBuffer(entry.buffer);
         }
+        context.set({ ...cur, undoStack, redoStack, buffer });
         return { state: s.idle };
       });
-      m.onAny(e.CLEAR_HISTORY, (_event, opts) => {
-        const context = opts!.context;
-        context.undoStack = [];
-        context.redoStack = [];
-        context.checkpoints.clear();
+      m.onAny(e.CLEAR_HISTORY, (_event, { context }) => {
+        const cur = context.get();
+        context.set({ ...cur, undoStack: [], redoStack: [], checkpoints: new Map() });
         return {};
       });
-      m.on(s.idle, insertTextEvent, (event, opts) => {
-        const context = opts!.context;
-        context.undoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: `insert "${event.text}" at ${event.at}`,
+      m.on(s.idle, insertTextEvent, (event, { context }) => {
+        const cur = context.get();
+        const undoStack = [
+          ...cur.undoStack,
+          {
+            buffer: snapshotBuffer(cur.buffer),
+            label: `insert "${event.text}" at ${event.at}`,
+          },
+        ];
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack: [],
+          buffer: {
+            content: insertAt(cur.buffer.content, event.at, event.text),
+            cursor: event.at + event.text.length,
+          },
         });
-        context.redoStack = [];
-        context.buffer.content = insertAt(context.buffer.content, event.at, event.text);
-        context.buffer.cursor = event.at + event.text.length;
         return { state: s.editing };
       });
-      m.on(s.idle, deleteTextEvent, (event, opts) => {
-        const context = opts!.context;
-        context.undoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: `delete [${event.from}..${event.to}]`,
+      m.on(s.idle, deleteTextEvent, (event, { context }) => {
+        const cur = context.get();
+        const undoStack = [
+          ...cur.undoStack,
+          {
+            buffer: snapshotBuffer(cur.buffer),
+            label: `delete [${event.from}..${event.to}]`,
+          },
+        ];
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack: [],
+          buffer: {
+            content: deleteRange(cur.buffer.content, event.from, event.to),
+            cursor: event.from,
+          },
         });
-        context.redoStack = [];
-        context.buffer.content = deleteRange(context.buffer.content, event.from, event.to);
-        context.buffer.cursor = event.from;
         return { state: s.editing };
       });
-      m.on(s.idle, replaceTextEvent, (event, opts) => {
-        const context = opts!.context;
-        context.undoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+      m.on(s.idle, replaceTextEvent, (event, { context }) => {
+        const cur = context.get();
+        const undoStack = [
+          ...cur.undoStack,
+          {
+            buffer: snapshotBuffer(cur.buffer),
+            label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+          },
+        ];
+        const deleted = deleteRange(cur.buffer.content, event.from, event.to);
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack: [],
+          buffer: {
+            content: insertAt(deleted, event.from, event.text),
+            cursor: event.from + event.text.length,
+          },
         });
-        context.redoStack = [];
-        const deleted = deleteRange(context.buffer.content, event.from, event.to);
-        context.buffer.content = insertAt(deleted, event.from, event.text);
-        context.buffer.cursor = event.from + event.text.length;
         return { state: s.editing };
       });
-      m.on(s.idle, checkpointEvent, (event, opts) => {
-        opts!.context.checkpoints.set(event.name, opts!.context.undoStack.length);
+      m.on(s.idle, checkpointEvent, (event, { context }) => {
+        const cur = context.get();
+        const checkpoints = new Map(cur.checkpoints);
+        checkpoints.set(event.name, cur.undoStack.length);
+        context.set({ ...cur, checkpoints });
         return {};
       });
-      m.on(s.editing, insertTextEvent, (event, opts) => {
-        const context = opts!.context;
-        context.undoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: `insert "${event.text}" at ${event.at}`,
+      m.on(s.editing, insertTextEvent, (event, { context }) => {
+        const cur = context.get();
+        const undoStack = [
+          ...cur.undoStack,
+          {
+            buffer: snapshotBuffer(cur.buffer),
+            label: `insert "${event.text}" at ${event.at}`,
+          },
+        ];
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack: [],
+          buffer: {
+            content: insertAt(cur.buffer.content, event.at, event.text),
+            cursor: event.at + event.text.length,
+          },
         });
-        context.redoStack = [];
-        context.buffer.content = insertAt(context.buffer.content, event.at, event.text);
-        context.buffer.cursor = event.at + event.text.length;
         return {};
       });
-      m.on(s.editing, deleteTextEvent, (event, opts) => {
-        const context = opts!.context;
-        context.undoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: `delete [${event.from}..${event.to}]`,
+      m.on(s.editing, deleteTextEvent, (event, { context }) => {
+        const cur = context.get();
+        const undoStack = [
+          ...cur.undoStack,
+          {
+            buffer: snapshotBuffer(cur.buffer),
+            label: `delete [${event.from}..${event.to}]`,
+          },
+        ];
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack: [],
+          buffer: {
+            content: deleteRange(cur.buffer.content, event.from, event.to),
+            cursor: event.from,
+          },
         });
-        context.redoStack = [];
-        context.buffer.content = deleteRange(context.buffer.content, event.from, event.to);
-        context.buffer.cursor = event.from;
         return {};
       });
-      m.on(s.editing, replaceTextEvent, (event, opts) => {
-        const context = opts!.context;
-        context.undoStack.push({
-          buffer: snapshotBuffer(context.buffer),
-          label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+      m.on(s.editing, replaceTextEvent, (event, { context }) => {
+        const cur = context.get();
+        const undoStack = [
+          ...cur.undoStack,
+          {
+            buffer: snapshotBuffer(cur.buffer),
+            label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+          },
+        ];
+        const deleted = deleteRange(cur.buffer.content, event.from, event.to);
+        context.set({
+          ...cur,
+          undoStack,
+          redoStack: [],
+          buffer: {
+            content: insertAt(deleted, event.from, event.text),
+            cursor: event.from + event.text.length,
+          },
         });
-        context.redoStack = [];
-        const deleted = deleteRange(context.buffer.content, event.from, event.to);
-        context.buffer.content = insertAt(deleted, event.from, event.text);
-        context.buffer.cursor = event.from + event.text.length;
         return {};
       });
-      m.on(s.editing, checkpointEvent, (event, opts) => {
-        opts!.context.checkpoints.set(event.name, opts!.context.undoStack.length);
+      m.on(s.editing, checkpointEvent, (event, { context }) => {
+        const cur = context.get();
+        const checkpoints = new Map(cur.checkpoints);
+        checkpoints.set(event.name, cur.undoStack.length);
+        context.set({ ...cur, checkpoints });
         return {};
       });
     },
   });
 
-  return { actor, clock: c, ctx };
+  return { actor, clock: c };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
 describe("undo/redo editor actor", () => {
   it("starts idle with empty buffer", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
     expect(matches(actor, "idle")).toBe(true);
-    expect(ctx.buffer.content).toBe("");
-    expect(ctx.undoStack.length).toBe(0);
-    expect(ctx.redoStack.length).toBe(0);
+    expect(actor.context.buffer.content).toBe("");
+    expect(actor.context.undoStack.length).toBe(0);
+    expect(actor.context.redoStack.length).toBe(0);
   });
 
   it("INSERT_TEXT transitions to editing, pushes undo stack", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     expect(matches(actor, "editing")).toBe(true);
-    expect(ctx.buffer.content).toBe("hello");
-    expect(ctx.buffer.cursor).toBe(5);
-    expect(ctx.undoStack.length).toBe(1);
-    expect(ctx.redoStack.length).toBe(0);
+    expect(actor.context.buffer.content).toBe("hello");
+    expect(actor.context.buffer.cursor).toBe(5);
+    expect(actor.context.undoStack.length).toBe(1);
+    expect(actor.context.redoStack.length).toBe(0);
   });
 
   it("multiple INSERT_TEXT operations accumulate on undo stack", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(insertTextEvent.create({ text: " world", at: 5 }));
-    expect(ctx.buffer.content).toBe("hello world");
-    expect(ctx.undoStack.length).toBe(2);
+    expect(actor.context.buffer.content).toBe("hello world");
+    expect(actor.context.undoStack.length).toBe(2);
   });
 
   it("UNDO restores previous buffer state", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(insertTextEvent.create({ text: " world", at: 5 }));
-    expect(ctx.buffer.content).toBe("hello world");
+    expect(actor.context.buffer.content).toBe("hello world");
 
     actor.send(e.UNDO.create());
     expect(matches(actor, "editing")).toBe(true);
-    expect(ctx.buffer.content).toBe("hello");
-    expect(ctx.undoStack.length).toBe(1);
-    expect(ctx.redoStack.length).toBe(1);
+    expect(actor.context.buffer.content).toBe("hello");
+    expect(actor.context.undoStack.length).toBe(1);
+    expect(actor.context.redoStack.length).toBe(1);
   });
 
   it("UNDO from empty stack goes to idle", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(e.UNDO.create());
     expect(matches(actor, "idle")).toBe(true);
-    expect(ctx.undoStack.length).toBe(0);
+    expect(actor.context.undoStack.length).toBe(0);
   });
 
   it("UNDO then REDO restores buffer", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
-    expect(ctx.buffer.content).toBe("hello");
+    expect(actor.context.buffer.content).toBe("hello");
 
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.content).toBe("");
+    expect(actor.context.buffer.content).toBe("");
 
     actor.send(e.REDO.create());
     expect(matches(actor, "idle")).toBe(true);
-    expect(ctx.buffer.content).toBe("hello");
-    expect(ctx.undoStack.length).toBe(1);
-    expect(ctx.redoStack.length).toBe(0);
+    expect(actor.context.buffer.content).toBe("hello");
+    expect(actor.context.undoStack.length).toBe(1);
+    expect(actor.context.redoStack.length).toBe(0);
   });
 
   it("REDO from empty stack goes to idle", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(e.REDO.create());
     expect(matches(actor, "idle")).toBe(true);
-    expect(ctx.redoStack.length).toBe(0);
+    expect(actor.context.redoStack.length).toBe(0);
   });
 
   it("new edit after undo clears redo stack", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(e.UNDO.create());
-    expect(ctx.redoStack.length).toBe(1);
+    expect(actor.context.redoStack.length).toBe(1);
 
     actor.send(insertTextEvent.create({ text: "world", at: 0 }));
-    expect(ctx.redoStack.length).toBe(0);
-    expect(ctx.buffer.content).toBe("world");
+    expect(actor.context.redoStack.length).toBe(0);
+    expect(actor.context.buffer.content).toBe("world");
   });
 
   it("DELETE_TEXT undoes correctly", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(deleteTextEvent.create({ from: 2, to: 4 }));
-    expect(ctx.buffer.content).toBe("heo");
+    expect(actor.context.buffer.content).toBe("heo");
 
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.content).toBe("hello");
+    expect(actor.context.buffer.content).toBe("hello");
   });
 
   it("REPLACE_TEXT undoes correctly", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(replaceTextEvent.create({ from: 0, to: 5, text: "world" }));
-    expect(ctx.buffer.content).toBe("world");
+    expect(actor.context.buffer.content).toBe("world");
 
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.content).toBe("hello");
+    expect(actor.context.buffer.content).toBe("hello");
   });
 
   it("CHECKPOINT saves undo stack position", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(checkpointEvent.create({ name: "before-world" }));
     actor.send(insertTextEvent.create({ text: " world", at: 5 }));
 
-    expect(ctx.checkpoints.get("before-world")).toBe(1);
-    expect(ctx.buffer.content).toBe("hello world");
+    expect(actor.context.checkpoints.get("before-world")).toBe(1);
+    expect(actor.context.buffer.content).toBe("hello world");
   });
 
   it("UNDO_TO_CHECKPOINT undoes all operations since checkpoint", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "a", at: 0 }));
     actor.send(checkpointEvent.create({ name: "start" }));
     actor.send(insertTextEvent.create({ text: "b", at: 1 }));
     actor.send(insertTextEvent.create({ text: "c", at: 2 }));
-    expect(ctx.buffer.content).toBe("abc");
+    expect(actor.context.buffer.content).toBe("abc");
 
     actor.send(undoToCheckpointEvent.create({ name: "start" }));
     expect(matches(actor, "idle")).toBe(true);
-    expect(ctx.buffer.content).toBe("a");
-    expect(ctx.undoStack.length).toBe(1);
+    expect(actor.context.buffer.content).toBe("a");
+    expect(actor.context.undoStack.length).toBe(1);
   });
 
   it("UNDO_TO_CHECKPOINT with unknown name goes to idle", () => {
@@ -387,68 +459,68 @@ describe("undo/redo editor actor", () => {
   });
 
   it("CLEAR_HISTORY resets stacks", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(checkpointEvent.create({ name: "save1" }));
-    expect(ctx.undoStack.length).toBe(1);
+    expect(actor.context.undoStack.length).toBe(1);
 
     actor.send(e.CLEAR_HISTORY.create());
-    expect(ctx.undoStack.length).toBe(0);
-    expect(ctx.redoStack.length).toBe(0);
-    expect(ctx.checkpoints.size).toBe(0);
+    expect(actor.context.undoStack.length).toBe(0);
+    expect(actor.context.redoStack.length).toBe(0);
+    expect(actor.context.checkpoints.size).toBe(0);
   });
 
   it("cursor position tracks correctly across operations", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
-    expect(ctx.buffer.cursor).toBe(5);
+    expect(actor.context.buffer.cursor).toBe(5);
 
     actor.send(insertTextEvent.create({ text: " world", at: 5 }));
-    expect(ctx.buffer.cursor).toBe(11);
+    expect(actor.context.buffer.cursor).toBe(11);
 
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.cursor).toBe(5);
+    expect(actor.context.buffer.cursor).toBe(5);
 
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.cursor).toBe(0);
+    expect(actor.context.buffer.cursor).toBe(0);
   });
 
   it("undo stack label matches operation", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "hello", at: 0 }));
     actor.send(deleteTextEvent.create({ from: 1, to: 3 }));
 
-    expect(ctx.undoStack[0].label).toBe('insert "hello" at 0');
-    expect(ctx.undoStack[1].label).toBe("delete [1..3]");
+    expect(actor.context.undoStack[0].label).toBe('insert "hello" at 0');
+    expect(actor.context.undoStack[1].label).toBe("delete [1..3]");
   });
 
   it("full undo/redo cycle with multiple operations", () => {
-    const { actor, ctx } = createEditorActor();
+    const { actor } = createEditorActor();
 
     actor.send(insertTextEvent.create({ text: "a", at: 0 }));
     actor.send(insertTextEvent.create({ text: "b", at: 1 }));
     actor.send(insertTextEvent.create({ text: "c", at: 2 }));
-    expect(ctx.buffer.content).toBe("abc");
+    expect(actor.context.buffer.content).toBe("abc");
 
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.content).toBe("ab");
+    expect(actor.context.buffer.content).toBe("ab");
 
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.content).toBe("a");
-
-    actor.send(e.REDO.create());
-    expect(ctx.buffer.content).toBe("ab");
+    expect(actor.context.buffer.content).toBe("a");
 
     actor.send(e.REDO.create());
-    expect(ctx.buffer.content).toBe("abc");
+    expect(actor.context.buffer.content).toBe("ab");
+
+    actor.send(e.REDO.create());
+    expect(actor.context.buffer.content).toBe("abc");
 
     actor.send(e.UNDO.create());
     actor.send(e.UNDO.create());
     actor.send(e.UNDO.create());
-    expect(ctx.buffer.content).toBe("");
+    expect(actor.context.buffer.content).toBe("");
     expect(matches(actor, "idle")).toBe(true);
   });
 });

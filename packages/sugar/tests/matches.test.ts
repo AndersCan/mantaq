@@ -3,7 +3,7 @@ import { Actor, type Snapshot, event, state } from "@mantaq/core";
 import { matches } from "../src/actors/matches.ts";
 
 function snap(path: string[], regions: Record<string, Snapshot> = {}): Snapshot {
-  return { path, regions };
+  return { path, context: {}, regions };
 }
 
 describe("matches", () => {

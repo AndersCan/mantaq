@@ -12,6 +12,7 @@ import { buildSnapshot } from "./snapshot.ts";
 import { runEffects } from "./effects.ts";
 import { parseTarget } from "./dispatch.ts";
 import type { EffectFn, TransitionResult } from "./actor-types.ts";
+import { Context } from "./context.ts";
 import { ActorBuilder } from "./builder.ts";
 import type { SetupFn } from "./builder.ts";
 
@@ -81,7 +82,7 @@ type TransitionDispatch<States extends readonly AnyStateRef[], ActorContext> = R
     string,
     | ((
         event: InternalEvent,
-        options: { context: ActorContext; actor: AnyActor },
+        options: { context: Context<ActorContext>; actor: AnyActor },
       ) => TransitionResult<States[number], string>)
     | undefined
   >
@@ -89,7 +90,7 @@ type TransitionDispatch<States extends readonly AnyStateRef[], ActorContext> = R
 
 type StepFn<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
-  options: { context: ActorContext; actor: AnyActor },
+  options: { context: Context<ActorContext>; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
 
 export class Actor<
@@ -102,11 +103,14 @@ export class Actor<
   state: States[number];
   readonly clock: Clock;
   #context: ActorContext;
+  #contextHandle: Context<ActorContext>;
+  #lastState: AnyStateRef;
+  #lastContext: ActorContext;
   #options: InternalActorOptions<States, Inputs, Internal, Outputs, ActorContext>;
   #regions: Record<string, AnyActor> = {};
   #children = new Map<string, AnyActor>();
   #queue = new InternalQueue();
-  #subs = new Subscribers();
+  #subs = new Subscribers<ActorContext>();
   #effectAbort: AbortController | null = null;
   #outputHandler: ((event: InternalEvent) => void) | null = null;
   #internalIds: Set<string>;
@@ -163,6 +167,15 @@ export class Actor<
     }
     this.state = initState;
     this.#context = (options.context ?? {}) as ActorContext;
+    this.#lastState = initState;
+    this.#lastContext = this.#context;
+    this.#contextHandle = new Context<ActorContext>(
+      () => this.#context,
+      (value: ActorContext) => {
+        this.#context = value;
+      },
+    );
+    this.#subs.seed(this.snapshot());
 
     if (options.regions) {
       for (const [key, child] of Object.entries(options.regions)) {
@@ -179,18 +192,21 @@ export class Actor<
     }
   }
 
-  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  on(
+    event: "change",
+    fn: (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void,
+  ): () => void;
   on(event: "done", fn: () => void): () => void;
-  on(event: "change" | "done", fn: ((snapshot: Snapshot) => void) | (() => void)): () => void {
+  on(
+    event: "change" | "done",
+    fn: ((snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void) | (() => void),
+  ): () => void {
     if (event === "change") {
-      const cb = fn as (snapshot: Snapshot) => void;
-      this.#subs.change.add(cb);
-      cb(this.snapshot());
-      return () => this.#subs.change.delete(cb);
+      const cb = fn as (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void;
+      return this.#subs.addChange(cb);
     }
     const cb = fn as () => void;
-    this.#subs.done.add(cb);
-    return () => this.#subs.done.delete(cb);
+    return this.#subs.addDone(cb);
   }
 
   settled(): Promise<void> {
@@ -199,6 +215,14 @@ export class Actor<
 
   send(event: CreatedOf<Inputs[number]>): void {
     this.#dispatch(event);
+    this.#emitChangeIfDirty();
+  }
+
+  #emitChangeIfDirty(): void {
+    if (this.state === this.#lastState && this.#context === this.#lastContext) return;
+    this.#lastState = this.state;
+    this.#lastContext = this.#context;
+    this.#subs.emitChange(this.snapshot());
   }
 
   #dispatch(event: InternalEvent): void {
@@ -224,7 +248,7 @@ export class Actor<
   }
 
   #applyStateStep(event: InternalEvent, transition: StepFn<States, ActorContext>): boolean {
-    const step = transition(event, { context: this.#context, actor: this as AnyActor });
+    const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
     if (step.emit) this.#queue.push(...step.emit);
     if (step.state) {
       this.#applyTransition(event, step);
@@ -238,7 +262,7 @@ export class Actor<
     transition: StepFn<States, ActorContext>,
     allowTransition: boolean,
   ): boolean {
-    const step = transition(event, { context: this.#context, actor: this as AnyActor });
+    const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
     if (step.state && allowTransition) {
       this.#applyTransition(event, step);
     }
@@ -249,8 +273,8 @@ export class Actor<
     return false;
   }
 
-  snapshot(): Snapshot {
-    return buildSnapshot(this.state, this.#regions);
+  snapshot(): Snapshot<ActorContext> {
+    return buildSnapshot(this.state, this.#regions, this.#context);
   }
 
   #pushEvent(event: InternalEvent): void {
@@ -269,7 +293,6 @@ export class Actor<
     if (!resolved) return;
     this.state = resolved.state;
     this.#runEffects(event, resolved.payload);
-    this.#subs.emitChange(this.snapshot());
     if (this.state.isFinal) {
       this.#subs.emitDone();
     }
@@ -286,7 +309,7 @@ export class Actor<
       state: this.state,
       statePayload,
       event,
-      context: this.#context,
+      context: this.#contextHandle,
       emit: (e: InternalEvent) => {
         this.#queue.push(e);
         this.#drainInternal();
@@ -321,6 +344,7 @@ export class Actor<
       });
     } finally {
       this.#draining = false;
+      this.#emitChangeIfDirty();
     }
     if (budgetExceeded) {
       console.warn(

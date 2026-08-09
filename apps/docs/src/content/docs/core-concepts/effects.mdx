@@ -31,7 +31,7 @@ const actor = new Actor({
   signal: AbortSignal;           // abort on state exit
   state: { name: string; payload: unknown };  // current state + payload
   event: InternalEvent;  // trigger event (created instance)
-  context: ActorContext;         // mutable context
+  context: Context<ActorContext>; // handle: get() reads, set() replaces
   emit: (event) => void;        // emit internal event
   clock: Clock;                 // timers
 }

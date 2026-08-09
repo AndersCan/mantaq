@@ -2,13 +2,14 @@ import type { AnyStateRef } from "./state.ts";
 import type { InternalEvent } from "./event.ts";
 import type { Clock } from "./clock.ts";
 import type { EffectFn } from "./actor-types.ts";
+import type { Context } from "./context.ts";
 
 export interface EffectRunnerOptions<ActorContext> {
   effects: Record<string, Array<EffectFn<ActorContext>>>;
   state: AnyStateRef;
   statePayload: unknown;
   event: InternalEvent;
-  context: ActorContext;
+  context: Context<ActorContext>;
   emit: (event: InternalEvent) => void;
   clock: Clock;
 }

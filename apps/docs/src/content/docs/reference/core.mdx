@@ -74,7 +74,7 @@ class Actor<
 | `internal`       | `EventRef[]`                | Events from effects/transitions      |
 | `states`         | `StateRef[]`                | All states                           |
 | `initial`        | `StateRef`                  | Start state                          |
-| `context`        | `object`                    | Mutable context                      |
+| `context`        | `object`                    | Initial context                      |
 | `clock`          | `Clock`                     | Default: `RealClock`                 |
 | `setup`          | `(m: ActorBuilder) => void` | Register transitions and effects     |
 | `regions`        | `Record<string, Actor>`     | Static children                      |
@@ -82,13 +82,13 @@ class Actor<
 
 ### Methods
 
-| Method             | Signature             | What          |
-| ------------------ | --------------------- | ------------- |
-| `send(event)`      | `(event) => void`     | Send event    |
-| `snapshot()`       | `() => Snapshot`      | State tree    |
-| `on("change", fn)` | `(fn) => () => void`  | State changes |
-| `on("done", fn)`   | `(fn) => () => void`  | Final state   |
-| `settled()`        | `() => Promise<void>` | Queue drained |
+| Method             | Signature             | What                                              |
+| ------------------ | --------------------- | ------------------------------------------------- |
+| `send(event)`      | `(event) => void`     | Send event                                        |
+| `snapshot()`       | `() => Snapshot`      | State tree                                        |
+| `on("change", fn)` | `(fn) => () => void`  | State or context changed (`(snap, prev) => void`) |
+| `on("done", fn)`   | `(fn) => () => void`  | Final state                                       |
+| `settled()`        | `() => Promise<void>` | Queue drained                                     |
 
 ### Properties
 
@@ -164,9 +164,10 @@ Real timers. `globalThis.setTimeout`. Default for actors.
 ### `Snapshot`
 
 ```ts
-interface Snapshot {
+interface Snapshot<C = unknown> {
   path: string[];
-  regions: Record<string, Snapshot>;
+  context: C;
+  regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
 }
 ```
@@ -195,7 +196,7 @@ type EffectInput<ActorContext> = {
   signal: AbortSignal;
   state: { name: string; payload: unknown };
   event: InternalEvent;
-  context: ActorContext;
+  context: Context<ActorContext>;
   emit: (event: InternalEvent) => void;
   clock: Clock;
 };
@@ -220,14 +221,14 @@ type InternalEvent = { id: string } & Record<string, unknown>;
 ### `AnyActor`
 
 ```ts
-interface AnyActor {
+interface AnyActor<C = Record<string, unknown>> {
   state: AnyStateRef;
   clock: Clock;
   regions: Record<string, AnyActor>;
-  context?: Record<string, unknown>;
+  context?: C;
   send(event: AnyEventRef | InternalEvent): void;
-  snapshot(): Snapshot;
-  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  snapshot(): Snapshot<C>;
+  on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
 }

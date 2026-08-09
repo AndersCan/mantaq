@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { VirtualClock } from "@mantaq/core";
+import { VirtualClock, Context } from "@mantaq/core";
 import { withTimeout } from "../src/effects/timeout.ts";
 
 describe("withTimeout", () => {
@@ -14,7 +14,10 @@ describe("withTimeout", () => {
         signal: abort.signal,
         state: { name: "", payload: undefined },
         event: { id: "" },
-        context: undefined,
+        context: new Context(
+          () => undefined,
+          () => {},
+        ),
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       },
@@ -39,7 +42,10 @@ describe("withTimeout", () => {
         signal: abort.signal,
         state: { name: "", payload: undefined },
         event: { id: "" },
-        context: undefined,
+        context: new Context(
+          () => undefined,
+          () => {},
+        ),
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       },
@@ -63,7 +69,10 @@ describe("withTimeout", () => {
         signal: abort.signal,
         state: { name: "", payload: undefined },
         event: { id: "" },
-        context: undefined,
+        context: new Context(
+          () => undefined,
+          () => {},
+        ),
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       },
@@ -85,7 +94,10 @@ describe("withTimeout", () => {
         signal: abort.signal,
         state: { name: "", payload: undefined },
         event: { id: "" },
-        context: undefined,
+        context: new Context(
+          () => undefined,
+          () => {},
+        ),
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       },
@@ -107,7 +119,10 @@ describe("withTimeout", () => {
         signal: abort.signal,
         state: { name: "", payload: undefined },
         event: { id: "" },
-        context: undefined,
+        context: new Context(
+          () => undefined,
+          () => {},
+        ),
         emit: (e: { id: string; [key: string]: unknown }) => emitted.push(e),
         clock,
       },

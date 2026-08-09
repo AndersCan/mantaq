@@ -1,4 +1,5 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
+import { Context } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import type {
   ActorGraph,
@@ -74,12 +75,16 @@ function buildNodesFromStates(
 function invokeHandler(
   handler: TransitionHandler,
   eventId: string,
-  ctx: Record<string, unknown>,
+  context: Record<string, unknown>,
   actor: AnyActor,
 ): Either<unknown, HandledTransition> {
   return Either.from(() => {
     const syntheticEvent: SyntheticEvent = { id: eventId };
-    const result = handler(syntheticEvent, { context: ctx, actor });
+    const syntheticContext = new Context<Record<string, unknown>>(
+      () => context,
+      () => {},
+    );
+    const result = handler(syntheticEvent, { context: syntheticContext, actor });
     return {
       targetName: result?.state?.name,
       emitNames: result?.emit?.map((e) => e.id).filter((id): id is string => Boolean(id)) ?? [],
@@ -127,9 +132,9 @@ function processStateTransitions(
   for (const [eventId, handler] of Object.entries(stateTransitions)) {
     if (typeof handler !== "function") continue;
     for (const ctxName of pass.traversal.contextNames) {
-      const ctx = pass.traversal.contexts[ctxName];
+      const sampleContext = pass.traversal.contexts[ctxName];
       const handled = Either.getOrElse(
-        invokeHandler(handler, eventId, ctx, pass.traversal.actor),
+        invokeHandler(handler, eventId, sampleContext, pass.traversal.actor),
         () => ({ targetName: undefined, emitNames: [] }),
       );
       if (handled.targetName) stateTransitionedEvents.add(eventId);
@@ -153,9 +158,9 @@ function mergeAnyTransitions(
     if (typeof handler !== "function") continue;
     if (stateTransitionedEvents.has(eventId)) continue;
     for (const ctxName of pass.traversal.contextNames) {
-      const ctx = pass.traversal.contexts[ctxName];
+      const sampleContext = pass.traversal.contexts[ctxName];
       const handled = Either.getOrElse(
-        invokeHandler(handler, eventId, ctx, pass.traversal.actor),
+        invokeHandler(handler, eventId, sampleContext, pass.traversal.actor),
         () => ({ targetName: undefined, emitNames: [] }),
       );
       upsertEdge(

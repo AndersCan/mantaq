@@ -1,10 +1,11 @@
 import type { AnyStateRef } from "./state.ts";
 import type { Snapshot } from "./actor-types.ts";
 
-export function buildSnapshot(
+export function buildSnapshot<C>(
   s: AnyStateRef,
   regions: Record<string, { snapshot(): Snapshot }>,
-): Snapshot {
+  context: C,
+): Snapshot<C> {
   const path = [s.name];
   const regionSnapshots: Record<string, Snapshot> = {};
 
@@ -12,7 +13,7 @@ export function buildSnapshot(
     regionSnapshots[regionName] = child.snapshot();
   }
 
-  const snap: Snapshot = { path, regions: regionSnapshots };
+  const snap: Snapshot<C> = { path, context, regions: regionSnapshots };
 
   if (s.isFinal) {
     snap.done = true;

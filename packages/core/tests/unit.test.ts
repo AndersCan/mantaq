@@ -9,6 +9,7 @@ import { buildSnapshot } from "../src/snapshot.ts";
 import { parseTarget } from "../src/dispatch.ts";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
+import { Context } from "../src/context.ts";
 
 describe("VirtualClock", () => {
   test("now starts at zero and advance moves it", () => {
@@ -221,7 +222,10 @@ describe("runEffects", () => {
       state: state("done")().final(),
       statePayload: undefined,
       event: { id: "X" },
-      context: {},
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
       emit: () => {},
       clock: new VirtualClock(),
     });
@@ -234,7 +238,10 @@ describe("runEffects", () => {
       state: state("idle")(),
       statePayload: undefined,
       event: { id: "X" },
-      context: {},
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
       emit: () => {},
       clock: new VirtualClock(),
     });
@@ -251,7 +258,7 @@ describe("runEffects", () => {
             expect(signal.aborted).toBe(false);
             expect(state.name).toBe("idle");
             expect(event.id).toBe("X");
-            expect(context).toEqual({ n: 1 });
+            expect(context.get()).toEqual({ n: 1 });
             expect(c).toBe(clock);
             emit({ id: "OUT" });
             seen.push("ran");
@@ -261,7 +268,10 @@ describe("runEffects", () => {
       state: state("idle")(),
       statePayload: { x: 1 },
       event: { id: "X" },
-      context: { n: 1 },
+      context: new Context(
+        () => ({ n: 1 }),
+        () => {},
+      ),
       emit: (e) => seen.push(`emit:${e.id}`),
       clock,
     });
@@ -272,8 +282,8 @@ describe("runEffects", () => {
 
 describe("Subscribers", () => {
   test("change subscribers fire with snapshot and unsubscribe removes", () => {
-    const subs = new Subscribers();
-    const snap = { path: ["idle"], regions: {} };
+    const subs = new Subscribers<Record<string, never>>();
+    const snap = { path: ["idle"], context: {}, regions: {} };
     const seen: string[] = [];
     const off = subs.addChange((s) => seen.push(s.path[0]));
     subs.emitChange(snap);
@@ -295,17 +305,20 @@ describe("Subscribers", () => {
 });
 
 describe("buildSnapshot", () => {
-  test("builds path and regions", () => {
-    const snap = buildSnapshot(state("root")(), {
-      sub: { snapshot: () => ({ path: ["leaf"], regions: {} }) },
-    });
+  test("builds path, context and regions", () => {
+    const snap = buildSnapshot(
+      state("root")(),
+      { sub: { snapshot: () => ({ path: ["leaf"], context: {}, regions: {} }) } },
+      { n: 1 },
+    );
     expect(snap.path).toEqual(["root"]);
+    expect(snap.context).toEqual({ n: 1 });
     expect(snap.regions.sub.path).toEqual(["leaf"]);
     expect(snap.done).toBeUndefined();
   });
 
   test("marks done for final states", () => {
-    const snap = buildSnapshot(state("done")().final(), {});
+    const snap = buildSnapshot(state("done")().final(), {}, {});
     expect(snap.done).toBe(true);
   });
 });

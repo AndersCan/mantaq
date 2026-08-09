@@ -1,11 +1,17 @@
 import type { Snapshot } from "./actor-types.ts";
 
-export class Subscribers {
-  readonly change = new Set<(snapshot: Snapshot) => void>();
+export class Subscribers<C> {
+  readonly change = new Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>();
   readonly done = new Set<() => void>();
+  #last: Snapshot<C> | null = null;
 
-  addChange(fn: (snapshot: Snapshot) => void): () => void {
+  seed(snapshot: Snapshot<C>): void {
+    this.#last = snapshot;
+  }
+
+  addChange(fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void {
     this.change.add(fn);
+    if (this.#last) fn(this.#last, this.#last);
     return () => this.change.delete(fn);
   }
 
@@ -14,8 +20,10 @@ export class Subscribers {
     return () => this.done.delete(fn);
   }
 
-  emitChange(snapshot: Snapshot): void {
-    for (const fn of this.change) fn(snapshot);
+  emitChange(snapshot: Snapshot<C>): void {
+    const prev = this.#last ?? snapshot;
+    this.#last = snapshot;
+    for (const fn of this.change) fn(snapshot, prev);
   }
 
   emitDone(): void {

@@ -1,4 +1,4 @@
-import type { AnyActor } from "@mantaq/core";
+import type { AnyActor, Context } from "@mantaq/core";
 
 /** Synthetic event object for graph introspection — matches minimal InternalEvent shape */
 export interface SyntheticEvent {
@@ -17,7 +17,7 @@ export type StateDef = { name: string; isFinal: boolean };
 /** Transition handler signature for graph introspection */
 export type TransitionHandler = (
   event: SyntheticEvent,
-  options: { context: Record<string, unknown>; actor: AnyActor },
+  options: { context: Context<Record<string, unknown>>; actor: AnyActor },
 ) => HandlerResult | undefined;
 
 /** Map of state/Any → event → handler */

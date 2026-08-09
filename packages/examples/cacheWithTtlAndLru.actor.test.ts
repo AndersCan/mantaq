@@ -65,7 +65,7 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     setup: () => {},
   });
 
-  const ctx: CacheContext = {
+  const context: CacheContext = {
     entries: new Map(),
     accessOrder: [],
     capacity,
@@ -82,65 +82,92 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     states: [cacheStates.ready, cacheStates.purging, cacheStates.full],
     initial: cacheStates.ready,
     clock: c,
-    context: ctx,
+    context,
     regions: { tier: tierActor },
     setup: (m) => {
       m.effect(cacheStates.purging, (input) => {
         const now = input.clock.now();
+        const s = input.context.get();
         const expired: string[] = [];
-        for (const [key, entry] of input.context.entries) {
+        for (const [key, entry] of s.entries) {
           if (entry.expiresAt !== null && entry.expiresAt <= now) {
             expired.push(key);
           }
         }
+        const entries = new Map(s.entries);
+        let accessOrder = s.accessOrder;
         for (const key of expired) {
-          input.context.entries.delete(key);
-          input.context.accessOrder = input.context.accessOrder.filter((k) => k !== key);
-          input.context.expires++;
+          entries.delete(key);
+          accessOrder = accessOrder.filter((k) => k !== key);
         }
+        input.context.set({ ...s, entries, accessOrder, expires: s.expires + expired.length });
         input.emit(e.PURGE_DONE.create(undefined));
       });
       m.effect(cacheStates.full, (input) => {
-        if (input.context.accessOrder.length >= input.context.capacity) {
-          const lruKey = input.context.accessOrder.shift();
+        const s = input.context.get();
+        if (s.accessOrder.length >= s.capacity) {
+          const accessOrder = [...s.accessOrder];
+          const lruKey = accessOrder.shift();
           if (lruKey) {
-            input.context.entries.delete(lruKey);
-            input.context.evictions++;
+            const entries = new Map(s.entries);
+            entries.delete(lruKey);
+            input.context.set({ ...s, accessOrder, entries, evictions: s.evictions + 1 });
           }
         }
         input.emit(e.EVICTION_DONE.create(undefined));
       });
       m.onAny(getEvent, (event, opts) => {
         const { context } = opts!;
-        const entry = context.entries.get(event.key);
+        const s = context.get();
+        const entry = s.entries.get(event.key);
         if (entry) {
           const now = c.now();
           if (entry.expiresAt !== null && entry.expiresAt <= now) {
-            context.entries.delete(event.key);
-            context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
-            context.expires++;
-            context.misses++;
+            const entries = new Map(s.entries);
+            entries.delete(event.key);
+            context.set({
+              ...s,
+              entries,
+              accessOrder: s.accessOrder.filter((k) => k !== event.key),
+              expires: s.expires + 1,
+              misses: s.misses + 1,
+            });
             return {};
           }
-          entry.accessCount++;
-          entry.lastAccessed = now;
-          context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
-          context.accessOrder.push(event.key);
-          context.hits++;
+          const entries = new Map(s.entries);
+          entries.set(event.key, {
+            ...entry,
+            accessCount: entry.accessCount + 1,
+            lastAccessed: now,
+          });
+          context.set({
+            ...s,
+            entries,
+            accessOrder: [...s.accessOrder.filter((k) => k !== event.key), event.key],
+            hits: s.hits + 1,
+          });
           return {};
         }
-        context.misses++;
+        context.set({ ...s, misses: s.misses + 1 });
         return {};
       });
       m.onAny(deleteEvent, (event, opts) => {
         const { context } = opts!;
-        if (context.entries.delete(event.key)) {
-          context.accessOrder = context.accessOrder.filter((k) => k !== event.key);
+        const s = context.get();
+        if (s.entries.has(event.key)) {
+          const entries = new Map(s.entries);
+          entries.delete(event.key);
+          context.set({
+            ...s,
+            entries,
+            accessOrder: s.accessOrder.filter((k) => k !== event.key),
+          });
         }
         return {};
       });
       m.onAny(putEvent, (event, opts) => {
         const { context } = opts!;
+        const s = context.get();
         const now = c.now();
         const entry: CacheEntry = {
           value: event.value,
@@ -148,30 +175,33 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
           accessCount: 0,
           lastAccessed: now,
         };
-        if (!context.entries.has(event.key)) {
-          context.accessOrder.push(event.key);
-        }
-        context.entries.set(event.key, entry);
-        if (context.entries.size > context.capacity) {
+        const entries = new Map(s.entries);
+        const accessOrder = s.entries.has(event.key)
+          ? s.accessOrder
+          : [...s.accessOrder, event.key];
+        entries.set(event.key, entry);
+        context.set({ ...s, entries, accessOrder });
+        if (entries.size > s.capacity) {
           return { state: cacheStates.full };
         }
         return {};
       });
       m.onAny(e.PURGE, () => ({ state: cacheStates.purging }));
       m.onAny(setCapacityEvent, (event, opts) => {
-        opts!.context.capacity = event.capacity;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, capacity: event.capacity });
         return {};
       });
       m.on(cacheStates.purging, e.PURGE_DONE, (_event, opts) => {
-        const { context } = opts!;
-        if (context.entries.size > context.capacity) {
+        const s = opts!.context.get();
+        if (s.entries.size > s.capacity) {
           return { state: cacheStates.full };
         }
         return { state: cacheStates.ready };
       });
       m.on(cacheStates.full, e.EVICTION_DONE, (_event, opts) => {
-        const { context } = opts!;
-        if (context.entries.size > context.capacity) {
+        const s = opts!.context.get();
+        if (s.entries.size > s.capacity) {
           return { state: cacheStates.full };
         }
         return { state: cacheStates.ready };
@@ -179,57 +209,57 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     },
   });
 
-  return { actor, clock: c, ctx };
+  return { actor, clock: c, context };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
 describe("cache with TTL and LRU eviction", () => {
   it("starts in ready state with empty cache", () => {
-    const { actor, ctx } = createCacheActor();
+    const { actor } = createCacheActor();
     expect(matches(actor, "ready")).toBe(true);
-    expect(ctx.entries.size).toBe(0);
-    expect(ctx.hits).toBe(0);
-    expect(ctx.misses).toBe(0);
+    expect(actor.context.entries.size).toBe(0);
+    expect(actor.context.hits).toBe(0);
+    expect(actor.context.misses).toBe(0);
   });
 
   it("PUT then GET returns value (cache hit)", () => {
-    const { actor, ctx } = createCacheActor();
+    const { actor } = createCacheActor();
 
     actor.send(putEvent.create({ key: "foo", value: 42 }));
-    expect(ctx.entries.size).toBe(1);
+    expect(actor.context.entries.size).toBe(1);
 
     actor.send(getEvent.create({ key: "foo" }));
-    expect(ctx.hits).toBe(1);
-    expect(ctx.misses).toBe(0);
-    expect(ctx.entries.get("foo")?.accessCount).toBe(1);
+    expect(actor.context.hits).toBe(1);
+    expect(actor.context.misses).toBe(0);
+    expect(actor.context.entries.get("foo")?.accessCount).toBe(1);
   });
 
   it("GET missing key counts as miss", () => {
-    const { actor, ctx } = createCacheActor();
+    const { actor } = createCacheActor();
 
     actor.send(getEvent.create({ key: "missing" }));
-    expect(ctx.misses).toBe(1);
-    expect(ctx.hits).toBe(0);
+    expect(actor.context.misses).toBe(1);
+    expect(actor.context.hits).toBe(0);
   });
 
   it("DELETE removes entry", () => {
-    const { actor, ctx } = createCacheActor();
+    const { actor } = createCacheActor();
 
     actor.send(putEvent.create({ key: "foo", value: 42 }));
-    expect(ctx.entries.size).toBe(1);
+    expect(actor.context.entries.size).toBe(1);
 
     actor.send(deleteEvent.create({ key: "foo" }));
-    expect(ctx.entries.size).toBe(0);
+    expect(actor.context.entries.size).toBe(0);
   });
 
   it("PUT with TTL expires after timeout", () => {
-    const { actor, clock, ctx } = createCacheActor();
+    const { actor, clock } = createCacheActor();
 
     actor.send(putEvent.create({ key: "temp", value: "data", ttlMs: 1000 }));
-    expect(ctx.entries.size).toBe(1);
+    expect(actor.context.entries.size).toBe(1);
 
     clock.advance(500);
-    expect(ctx.entries.size).toBe(1);
+    expect(actor.context.entries.size).toBe(1);
     expect(matches(actor, "ready")).toBe(true);
 
     clock.advance(500);
@@ -237,33 +267,33 @@ describe("cache with TTL and LRU eviction", () => {
   });
 
   it("TTL expired entry treated as miss on GET", () => {
-    const { actor, clock, ctx } = createCacheActor();
+    const { actor, clock } = createCacheActor();
 
     actor.send(putEvent.create({ key: "temp", value: "data", ttlMs: 1000 }));
     clock.advance(1001);
 
     actor.send(getEvent.create({ key: "temp" }));
-    expect(ctx.misses).toBe(1);
-    expect(ctx.hits).toBe(0);
-    expect(ctx.entries.size).toBe(0);
+    expect(actor.context.misses).toBe(1);
+    expect(actor.context.hits).toBe(0);
+    expect(actor.context.entries.size).toBe(0);
   });
 
   it("LRU eviction when capacity exceeded", () => {
-    const { actor, ctx } = createCacheActor(2);
+    const { actor } = createCacheActor(2);
 
     actor.send(putEvent.create({ key: "a", value: 1 }));
     actor.send(putEvent.create({ key: "b", value: 2 }));
-    expect(ctx.entries.size).toBe(2);
+    expect(actor.context.entries.size).toBe(2);
 
     actor.send(putEvent.create({ key: "c", value: 3 }));
     expect(matches(actor, "ready")).toBe(true);
-    expect(ctx.entries.size).toBe(2);
-    expect(ctx.evictions).toBe(1);
-    expect(ctx.accessOrder).not.toContain("a");
+    expect(actor.context.entries.size).toBe(2);
+    expect(actor.context.evictions).toBe(1);
+    expect(actor.context.accessOrder).not.toContain("a");
   });
 
   it("GET updates LRU order (prevents eviction of recently accessed)", () => {
-    const { actor, ctx } = createCacheActor(2);
+    const { actor } = createCacheActor(2);
 
     actor.send(putEvent.create({ key: "a", value: 1 }));
     actor.send(putEvent.create({ key: "b", value: 2 }));
@@ -271,13 +301,13 @@ describe("cache with TTL and LRU eviction", () => {
     actor.send(getEvent.create({ key: "a" }));
 
     actor.send(putEvent.create({ key: "c", value: 3 }));
-    expect(ctx.accessOrder).toContain("a");
-    expect(ctx.accessOrder).not.toContain("b");
-    expect(ctx.evictions).toBe(1);
+    expect(actor.context.accessOrder).toContain("a");
+    expect(actor.context.accessOrder).not.toContain("b");
+    expect(actor.context.evictions).toBe(1);
   });
 
   it("PURGE removes expired entries", () => {
-    const { actor, clock, ctx } = createCacheActor();
+    const { actor, clock } = createCacheActor();
 
     actor.send(putEvent.create({ key: "a", value: 1, ttlMs: 500 }));
     actor.send(putEvent.create({ key: "b", value: 2 }));
@@ -285,66 +315,66 @@ describe("cache with TTL and LRU eviction", () => {
 
     actor.send(e.PURGE.create());
     expect(matches(actor, "ready")).toBe(true);
-    expect(ctx.expires).toBe(1);
-    expect(ctx.entries.size).toBe(1);
-    expect(ctx.entries.has("b")).toBe(true);
+    expect(actor.context.expires).toBe(1);
+    expect(actor.context.entries.size).toBe(1);
+    expect(actor.context.entries.has("b")).toBe(true);
   });
 
   it("SET_CAPACITY updates capacity", () => {
-    const { actor, ctx } = createCacheActor(3);
+    const { actor } = createCacheActor(3);
 
     actor.send(setCapacityEvent.create({ capacity: 1 }));
-    expect(ctx.capacity).toBe(1);
+    expect(actor.context.capacity).toBe(1);
 
     actor.send(putEvent.create({ key: "a", value: 1 }));
     actor.send(putEvent.create({ key: "b", value: 2 }));
-    expect(ctx.evictions).toBe(1);
-    expect(ctx.entries.size).toBe(1);
+    expect(actor.context.evictions).toBe(1);
+    expect(actor.context.entries.size).toBe(1);
   });
 
   it("PUT replacing existing key does not duplicate in accessOrder", () => {
-    const { actor, ctx } = createCacheActor();
+    const { actor } = createCacheActor();
 
     actor.send(putEvent.create({ key: "a", value: 1 }));
     actor.send(putEvent.create({ key: "a", value: 2 }));
-    expect(ctx.accessOrder.filter((k) => k === "a").length).toBe(1);
-    expect(ctx.entries.get("a")?.value).toBe(2);
+    expect(actor.context.accessOrder.filter((k) => k === "a").length).toBe(1);
+    expect(actor.context.entries.get("a")?.value).toBe(2);
   });
 
   it("multiple evictions fill to capacity", () => {
-    const { actor, ctx } = createCacheActor(2);
+    const { actor } = createCacheActor(2);
 
     actor.send(putEvent.create({ key: "a", value: 1 }));
     actor.send(putEvent.create({ key: "b", value: 2 }));
     actor.send(putEvent.create({ key: "c", value: 3 }));
     actor.send(putEvent.create({ key: "d", value: 4 }));
 
-    expect(ctx.entries.size).toBe(2);
-    expect(ctx.evictions).toBe(2);
-    expect(ctx.accessOrder).toContain("c");
-    expect(ctx.accessOrder).toContain("d");
+    expect(actor.context.entries.size).toBe(2);
+    expect(actor.context.evictions).toBe(2);
+    expect(actor.context.accessOrder).toContain("c");
+    expect(actor.context.accessOrder).toContain("d");
   });
 
   it("DELETE from empty cache is no-op", () => {
-    const { actor, ctx } = createCacheActor();
+    const { actor } = createCacheActor();
 
     actor.send(deleteEvent.create({ key: "missing" }));
-    expect(ctx.entries.size).toBe(0);
-    expect(ctx.evictions).toBe(0);
+    expect(actor.context.entries.size).toBe(0);
+    expect(actor.context.evictions).toBe(0);
   });
 
   it("GET after delete counts as miss", () => {
-    const { actor, ctx } = createCacheActor();
+    const { actor } = createCacheActor();
 
     actor.send(putEvent.create({ key: "a", value: 1 }));
     actor.send(deleteEvent.create({ key: "a" }));
     actor.send(getEvent.create({ key: "a" }));
-    expect(ctx.misses).toBe(1);
-    expect(ctx.hits).toBe(0);
+    expect(actor.context.misses).toBe(1);
+    expect(actor.context.hits).toBe(0);
   });
 
   it("cache metrics track correctly across operations", () => {
-    const { actor, clock, ctx } = createCacheActor(2);
+    const { actor, clock } = createCacheActor(2);
 
     actor.send(putEvent.create({ key: "a", value: 1, ttlMs: 1000 }));
     actor.send(putEvent.create({ key: "b", value: 2 }));
@@ -353,13 +383,13 @@ describe("cache with TTL and LRU eviction", () => {
     actor.send(getEvent.create({ key: "b" }));
     actor.send(getEvent.create({ key: "c" }));
 
-    expect(ctx.hits).toBe(2);
-    expect(ctx.misses).toBe(1);
+    expect(actor.context.hits).toBe(2);
+    expect(actor.context.misses).toBe(1);
 
     clock.advance(1001);
     actor.send(getEvent.create({ key: "a" }));
-    expect(ctx.expires).toBe(1);
-    expect(ctx.misses).toBe(2);
+    expect(actor.context.expires).toBe(1);
+    expect(actor.context.misses).toBe(2);
   });
 
   it("tier region starts at l1", () => {
@@ -368,13 +398,13 @@ describe("cache with TTL and LRU eviction", () => {
   });
 
   it("full state transitions back to ready after eviction", () => {
-    const { actor, ctx } = createCacheActor(1);
+    const { actor } = createCacheActor(1);
 
     actor.send(putEvent.create({ key: "a", value: 1 }));
     expect(matches(actor, "ready")).toBe(true);
 
     actor.send(putEvent.create({ key: "b", value: 2 }));
     expect(matches(actor, "ready")).toBe(true);
-    expect(ctx.entries.size).toBe(1);
+    expect(actor.context.entries.size).toBe(1);
   });
 });

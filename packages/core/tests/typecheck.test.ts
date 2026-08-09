@@ -1,5 +1,5 @@
 import { expect, expectTypeOf, test, describe } from "vite-plus/test";
-import { Actor, state, event } from "../src/index.ts";
+import { Actor, state, event, Context } from "../src/index.ts";
 import type { StateRef } from "../src/index.ts";
 import { setOutputHandler, pushInternal, getChildren } from "../src/internal-registry.ts";
 import type { RegistryError } from "../src/internal-registry.ts";
@@ -79,7 +79,8 @@ describe("API type safety", () => {
       context: { count: 0 },
       setup: (m) => {
         m.on(idle, tick, (_e, { context }) => {
-          context.count++;
+          const s = context.get();
+          context.set({ ...s, count: s.count + 1 });
           return {};
         });
       },
@@ -153,11 +154,13 @@ describe("type level contract — type = behavior", () => {
       context: { count: 0 },
       setup: (m) => {
         m.on(idle, tick, (_e, { context }) => {
-          expectTypeOf(context).toEqualTypeOf<{ count: number }>();
+          expectTypeOf(context).toEqualTypeOf<Context<{ count: number }>>();
+          expectTypeOf(context.get()).toEqualTypeOf<{ count: number }>();
           return {};
         });
         m.effect(idle, ({ context }) => {
-          expectTypeOf(context).toEqualTypeOf<{ count: number }>();
+          expectTypeOf(context).toEqualTypeOf<Context<{ count: number }>>();
+          expectTypeOf(context.get()).toEqualTypeOf<{ count: number }>();
         });
       },
     });

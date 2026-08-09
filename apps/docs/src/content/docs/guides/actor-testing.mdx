@@ -122,7 +122,12 @@ type CounterContext = { count: number };
 const increment = event("INCREMENT")();
 
 // In setup:
-// m.on(counter, increment, (_event, opts) => { opts!.context.count++; return {}; })
+// In setup:
+// m.on(counter, increment, (_event, opts) => {
+//   const s = opts!.context.get();
+//   opts!.context.set({ ...s, count: s.count + 1 });
+//   return {};
+// })
 
 actor.send(increment.create());
 expect(actor.context.count).toBe(1);
@@ -181,15 +186,16 @@ function createLoginActor() {
     context: { attempts: 0 } as AuthContext,
     setup: (m) => {
       m.on(idle, login, (event, opts) => {
-        opts!.context.username = event.username;
-        opts!.context.attempts++;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, username: event.username, attempts: s.attempts + 1 });
         return { state: authenticating };
       });
       m.on(authenticating, authDone, () => ({ state: authenticated }));
       m.on(authenticating, authFail, () => ({ state: error }));
       m.on(error, retry, () => ({ state: idle }));
       m.on(authenticated, logout, (_event, opts) => {
-        opts!.context.username = undefined;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, username: undefined });
         return { state: idle };
       });
     },

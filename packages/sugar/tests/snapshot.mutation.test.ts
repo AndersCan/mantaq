@@ -3,7 +3,7 @@ import type { Snapshot } from "@mantaq/core";
 import { activeLeaves } from "../src/index.ts";
 
 function snap(path: string[], regions: Record<string, Snapshot> = {}): Snapshot {
-  return { path, regions };
+  return { path, context: {}, regions };
 }
 
 describe("activeLeaves mutation guard", () => {

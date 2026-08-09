@@ -69,7 +69,7 @@ const signInWithPhoneEffect = (input: EffectInput<AuthContext>) => {
       const user: User = {
         uid: `user-${Date.now()}`,
         email: `user${Date.now()}@example.com`,
-        phone: input.context.phoneNumber,
+        phone: input.context.get().phoneNumber,
       };
       input.emit(signInDoneEvent.create({ user }));
     } else {
@@ -107,30 +107,35 @@ function createAuthActor(clock?: VirtualClock) {
       m.effect(s.signingOut, signingOutEffect);
       m.onAny(e.MONITOR_TICK, () => ({}));
       m.on(s.checkingAuth, signInEvent, (event, opts) => {
-        opts!.context.phoneNumber = event.phoneNumber;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, phoneNumber: event.phoneNumber });
         return { state: s.signingIn };
       });
       m.on(s.loggedOut, signInEvent, (event, opts) => {
-        opts!.context.phoneNumber = event.phoneNumber;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, phoneNumber: event.phoneNumber });
         return { state: s.signingIn };
       });
       m.on(s.signingIn, signInDoneEvent, (event, opts) => {
-        opts!.context.user = event.user;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, user: event.user });
         return { state: s.loggedIn };
       });
       m.on(s.signingIn, signInErrorEvent, (event, opts) => {
-        opts!.context.error = event.error;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, error: event.error });
         return { state: s.signInError };
       });
       m.on(s.loggedIn, e.SIGN_OUT, (_event, opts) => {
-        opts!.context.user = undefined;
-        opts!.context.phoneNumber = undefined;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, user: undefined, phoneNumber: undefined });
         return { state: s.signingOut };
       });
       m.on(s.signingOut, e.SIGNING_OUT_DONE, () => ({ state: s.loggedOut }));
       m.on(s.signInError, e.RETRY, () => ({ state: s.signingIn }));
       m.on(s.signInError, signInEvent, (event, opts) => {
-        opts!.context.phoneNumber = event.phoneNumber;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, phoneNumber: event.phoneNumber });
         return { state: s.signingIn };
       });
     },

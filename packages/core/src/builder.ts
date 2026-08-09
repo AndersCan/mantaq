@@ -1,7 +1,7 @@
 import type { AnyStateRef, StateRef } from "./state.ts";
 import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
 import type { AnyActor } from "./actor-internal.ts";
-import type { EffectFn, TransitionResult } from "./actor-types.ts";
+import type { Context, EffectFn, TransitionResult } from "./actor-types.ts";
 
 type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, object | void> ? Id : never;
 
@@ -10,7 +10,7 @@ type PayloadOf<S extends AnyStateRef> =
 
 type TransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
-  opts: { context: ActorContext; actor: AnyActor },
+  opts: { context: Context<ActorContext>; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
 
 export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
@@ -33,14 +33,14 @@ export class ActorBuilder<
     eventRef: E,
     fn: (
       event: E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never,
-      opts: { context: ActorContext; actor: AnyActor },
+      opts: { context: Context<ActorContext>; actor: AnyActor },
     ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>,
   ): this {
     const sName = stateRef.name;
     const eId = eventRef.id;
     (this.#transitions[sName] ??= {})[eId] = fn as (
       event: unknown,
-      opts: { context: ActorContext; actor: AnyActor },
+      opts: { context: Context<ActorContext>; actor: AnyActor },
     ) => TransitionResult<States[number], string>;
     return this;
   }
@@ -49,13 +49,13 @@ export class ActorBuilder<
     eventRef: E,
     fn: (
       event: E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never,
-      opts: { context: ActorContext; actor: AnyActor },
+      opts: { context: Context<ActorContext>; actor: AnyActor },
     ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>,
   ): this {
     const eId = eventRef.id;
     (this.#transitions["Any"] ??= {})[eId] = fn as (
       event: unknown,
-      opts: { context: ActorContext; actor: AnyActor },
+      opts: { context: Context<ActorContext>; actor: AnyActor },
     ) => TransitionResult<States[number], string>;
     return this;
   }
