@@ -5,6 +5,7 @@
     "vite",
     "@stryker-mutator/core",
     "@stryker-mutator/vitest-runner",
-    "@typescript/native-preview"
+    "@typescript/native-preview",
+    "@varlock/bumpy"
   ]
 }
