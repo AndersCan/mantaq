@@ -102,14 +102,14 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
         withTimeout(5000, input, () => ({ id: "HEARTBEAT_TIMEOUT" })),
       );
       m.effect(reconnectingState, ({ signal, context, emit, clock }) => {
-        const ctx = context as WsContext;
-        if (ctx.retryCount >= ctx.maxRetries) {
+        const s = context.get();
+        if (s.retryCount >= s.maxRetries) {
           clock.setTimeout(100, () => {
             if (signal.aborted) return;
             emit({ id: "MAX_RETRIES_REACHED" });
           });
         } else {
-          const delay = 1000 * Math.pow(2, ctx.retryCount);
+          const delay = 1000 * Math.pow(2, s.retryCount);
           clock.setTimeout(delay, () => {
             if (signal.aborted) return;
             emit({ id: "RECONNECT_TIMEOUT" });
@@ -118,30 +118,32 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
       });
       m.onAny(disconnect, () => ({ state: disconnectedState }));
       m.onAny(forceReconnect, (_event, opts) => {
-        opts!.context.retryCount = 0;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, retryCount: 0 });
         return { state: reconnectingState };
       });
       m.on(disconnectedState, connect, (event, opts) => {
-        opts!.context.url = event.url;
-        opts!.context.retryCount = 0;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, url: event.url, retryCount: 0 });
         return { state: connectingState };
       });
       m.on(connectingState, connectionEstablished, () => ({ state: connectedState }));
       m.on(connectingState, connectionFailed, (event, opts) => {
-        opts!.context.retryCount++;
-        opts!.context.error = event.error;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, retryCount: s.retryCount + 1, error: event.error });
         return { state: reconnectingState };
       });
       m.on(connectedState, heartbeatTimeout, () => ({ state: reconnectingState }));
       m.on(reconnectingState, connectionEstablished, (_event, opts) => {
-        opts!.context.retryCount = 0;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, retryCount: 0 });
         return { state: connectedState };
       });
       m.on(reconnectingState, reconnectTimeout, () => ({ state: connectingState }));
       m.on(reconnectingState, maxRetriesReached, () => ({ state: permanentlyDisconnectedState }));
       m.on(permanentlyDisconnectedState, connect, (event, opts) => {
-        opts!.context.url = event.url;
-        opts!.context.retryCount = 0;
+        const s = opts!.context.get();
+        opts!.context.set({ ...s, url: event.url, retryCount: 0 });
         return { state: connectingState };
       });
     },

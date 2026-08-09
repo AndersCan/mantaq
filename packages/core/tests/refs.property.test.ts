@@ -86,7 +86,7 @@ describe("buildSnapshot property tests", () => {
           children[regionName] = { snapshot: () => childSnaps[i] };
         }
         const ref = isFinal ? state(name)().final() : state(name)();
-        const snap = buildSnapshot(ref, children);
+        const snap = buildSnapshot(ref, children, {});
         if (snap.path[0] !== name) return false;
         for (const [key, value] of Object.entries(regions)) {
           if (snap.regions[key] !== value) return false;
@@ -101,7 +101,7 @@ describe("buildSnapshot property tests", () => {
 describe("Subscribers property tests", () => {
   test("emit reaches exactly the still-subscribed callbacks", () => {
     runProperty(fc.array(fc.boolean(), { minLength: 1, maxLength: 8 }), (keep) => {
-      const subs = new Subscribers();
+      const subs = new Subscribers<unknown>();
       const called: number[] = [];
       const offs: Array<() => void> = [];
       for (let i = 0; i < keep.length; i++) {
@@ -110,7 +110,7 @@ describe("Subscribers property tests", () => {
       for (let i = 0; i < keep.length; i++) {
         if (!keep[i]) offs[i]();
       }
-      const snap: Snapshot = { path: ["idle"], regions: {} };
+      const snap: Snapshot = { path: ["idle"], context: {}, regions: {} };
       subs.emitChange(snap);
       const expected = keep
         .map((k, i) => (k ? i : -1))

@@ -132,21 +132,21 @@ function createSagaActor(clock?: VirtualClock) {
       m.effect(s.reservingInventory, (input) => {
         withTimeout(100, input, () =>
           INVENTORY_RESERVED.create({
-            result: { reservationId: `RES-${input.context.order?.orderId ?? "unknown"}` },
+            result: { reservationId: `RES-${input.context.get().order?.orderId ?? "unknown"}` },
           }),
         );
       });
       m.effect(s.processingPayment, (input) => {
         withTimeout(200, input, () =>
           PAYMENT_PROCESSED.create({
-            result: { transactionId: `TXN-${input.context.order?.orderId ?? "unknown"}` },
+            result: { transactionId: `TXN-${input.context.get().order?.orderId ?? "unknown"}` },
           }),
         );
       });
       m.effect(s.creatingShipment, (input) => {
         withTimeout(150, input, () =>
           SHIPMENT_CREATED.create({
-            result: { trackingNumber: `TRK-${input.context.order?.orderId ?? "unknown"}` },
+            result: { trackingNumber: `TRK-${input.context.get().order?.orderId ?? "unknown"}` },
           }),
         );
       });
@@ -160,72 +160,92 @@ function createSagaActor(clock?: VirtualClock) {
         withTimeout(80, input, () => RELEASE_DONE.create(undefined));
       });
       m.onAny(CANCEL, (_event, opts) => {
-        const context = opts!.context;
-        if (context.completedSteps.includes("inventory")) {
-          context.error = "Cancelled by user";
+        const cur = opts!.context.get();
+        if (cur.completedSteps.includes("inventory")) {
+          opts!.context.set({ ...cur, error: "Cancelled by user" });
           return { state: s.compensatingRelease };
         }
         return { state: failed };
       });
       m.on(s.idle, START, (event, opts) => {
-        opts!.context.order = event.order;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, order: event.order });
         return { state: s.reservingInventory };
       });
       m.on(s.reservingInventory, INVENTORY_RESERVED, (event, opts) => {
-        const context = opts!.context;
-        context.reservationId = event.result.reservationId;
-        context.completedSteps.push("inventory");
+        const cur = opts!.context.get();
+        opts!.context.set({
+          ...cur,
+          reservationId: event.result.reservationId,
+          completedSteps: [...cur.completedSteps, "inventory"],
+        });
         return { state: s.processingPayment };
       });
       m.on(s.reservingInventory, INVENTORY_FAILED, (event, opts) => {
-        opts!.context.error = event.error;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, error: event.error });
         return { state: failed };
       });
       m.on(s.processingPayment, PAYMENT_PROCESSED, (event, opts) => {
-        const context = opts!.context;
-        context.transactionId = event.result.transactionId;
-        context.completedSteps.push("payment");
+        const cur = opts!.context.get();
+        opts!.context.set({
+          ...cur,
+          transactionId: event.result.transactionId,
+          completedSteps: [...cur.completedSteps, "payment"],
+        });
         return { state: s.creatingShipment };
       });
       m.on(s.processingPayment, PAYMENT_FAILED, (event, opts) => {
-        const context = opts!.context;
-        context.error = event.error;
-        context.completedSteps.push("payment_failed");
+        const cur = opts!.context.get();
+        opts!.context.set({
+          ...cur,
+          error: event.error,
+          completedSteps: [...cur.completedSteps, "payment_failed"],
+        });
         return { state: s.compensatingRefund };
       });
       m.on(s.creatingShipment, SHIPMENT_CREATED, (event, opts) => {
-        const context = opts!.context;
-        context.trackingNumber = event.result.trackingNumber;
-        context.completedSteps.push("shipment");
+        const cur = opts!.context.get();
+        opts!.context.set({
+          ...cur,
+          trackingNumber: event.result.trackingNumber,
+          completedSteps: [...cur.completedSteps, "shipment"],
+        });
         return { state: s.notifying };
       });
       m.on(s.creatingShipment, SHIPMENT_FAILED, (event, opts) => {
-        opts!.context.error = event.error;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, error: event.error });
         return { state: s.compensatingRefund };
       });
       m.on(s.notifying, NOTIFICATION_SENT, () => ({ state: completed }));
       m.on(s.notifying, NOTIFICATION_FAILED, (_event, opts) => {
-        opts!.context.error = "Notification failed";
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, error: "Notification failed" });
         return { state: completed };
       });
       m.on(s.compensatingRefund, REFUND_DONE, (_event, opts) => {
-        const context = opts!.context;
-        context.completedSteps.push("refunded");
-        if (context.completedSteps.includes("inventory")) {
+        const cur = opts!.context.get();
+        const completedSteps = [...cur.completedSteps, "refunded"];
+        opts!.context.set({ ...cur, completedSteps });
+        if (completedSteps.includes("inventory")) {
           return { state: s.compensatingRelease };
         }
         return { state: failed };
       });
       m.on(s.compensatingRefund, REFUND_FAILED, (event, opts) => {
-        opts!.context.error = `Refund failed: ${event.error}`;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, error: `Refund failed: ${event.error}` });
         return { state: failed };
       });
       m.on(s.compensatingRelease, RELEASE_DONE, (_event, opts) => {
-        opts!.context.completedSteps.push("released");
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, completedSteps: [...cur.completedSteps, "released"] });
         return { state: failed };
       });
       m.on(s.compensatingRelease, RELEASE_FAILED, (event, opts) => {
-        opts!.context.error = `Release failed: ${event.error}`;
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, error: `Release failed: ${event.error}` });
         return { state: failed };
       });
     },

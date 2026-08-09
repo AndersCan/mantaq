@@ -104,10 +104,10 @@ function createCharacter(clock?: VirtualClock) {
         });
         signal.addEventListener("abort", () => clock.clearInterval(id));
       });
-      m.on(lifeStates.alive, e.START_SPRINT, (_event, opts) => {
-        const context = opts!.context;
-        if (context.stamina <= 0) return {};
-        context.stamina = Math.max(0, context.stamina - 20);
+      m.on(lifeStates.alive, e.START_SPRINT, (_event, { context }) => {
+        const cur = context.get();
+        if (cur.stamina <= 0) return {};
+        context.set({ ...cur, stamina: Math.max(0, cur.stamina - 20) });
         actor.regions.movement.send(e.START_SPRINT.create());
         return {};
       });
@@ -115,32 +115,36 @@ function createCharacter(clock?: VirtualClock) {
         actor.regions.movement.send(e.STOP_SPRINT.create());
         return {};
       });
-      m.on(lifeStates.alive, e.ATTACK, (_event, opts) => {
-        const context = opts!.context;
-        if (context.health <= 0) return {};
-        if (context.combatState !== "idle") return {};
-        context.combatState = "attacking";
+      m.on(lifeStates.alive, e.ATTACK, (_event, { context }) => {
+        const cur = context.get();
+        if (cur.health <= 0) return {};
+        if (cur.combatState !== "idle") return {};
+        context.set({ ...cur, combatState: "attacking" });
         c.setTimeout(500, () => {
-          context.combatState = "cooldown";
-          c.setTimeout(context.attackCooldownMs, () => {
-            context.combatState = "idle";
+          context.set({ ...context.get(), combatState: "cooldown" });
+          c.setTimeout(context.get().attackCooldownMs, () => {
+            context.set({ ...context.get(), combatState: "idle" });
           });
         });
         return {};
       });
-      m.onAny(takeDamageEvent, (event, opts) => {
-        const context = opts!.context;
-        context.health = Math.max(0, context.health - event.amount);
-        if (context.health <= 0) {
-          context.combatState = "idle";
+      m.onAny(takeDamageEvent, (event, { context }) => {
+        const cur = context.get();
+        const health = Math.max(0, cur.health - event.amount);
+        if (health <= 0) {
+          context.set({ ...cur, health, combatState: "idle" });
           return { state: lifeStates.dead };
         }
+        context.set({ ...cur, health });
         return {};
       });
-      m.onAny(e.REGEN, (_event, opts) => {
-        const context = opts!.context;
-        context.stamina = Math.min(context.maxStamina, context.stamina + context.staminaRegenRate);
-        context.health = Math.min(context.maxHealth, context.health + context.healthRegenRate);
+      m.onAny(e.REGEN, (_event, { context }) => {
+        const cur = context.get();
+        context.set({
+          ...cur,
+          stamina: Math.min(cur.maxStamina, cur.stamina + cur.staminaRegenRate),
+          health: Math.min(cur.maxHealth, cur.health + cur.healthRegenRate),
+        });
         return {};
       });
     },
@@ -286,9 +290,9 @@ describe("game character actor", () => {
   it("DX: context type assertions needed everywhere", () => {
     const { actor } = createCharacter();
 
-    // Every transition handler needs: const ctx = context as CharacterContext
+    // Every transition handler needs: const cur = context.get()
     // No type narrowing from state, no typed context per state
-    // The type assertion is repeated in every handler (~10 times in this example)
+    // The read-modify-write is repeated in every handler (~10 times in this example)
     actor.send(takeDamageEvent.create({ amount: 50 }));
     expect((actor.context as CharacterContext).health).toBe(50);
   });

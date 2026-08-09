@@ -25,6 +25,7 @@ export const anyPayload = fc.jsonValue();
 
 export interface SnapshotTree {
   path: string[];
+  context: unknown;
   regions: Record<string, SnapshotTree>;
   done?: boolean;
 }
@@ -32,6 +33,7 @@ export interface SnapshotTree {
 export function anySnapshotTree(depth: number): fc.Arbitrary<SnapshotTree> {
   const leaf = fc.record({
     path: fc.array(anyName, { minLength: 1, maxLength: 2 }),
+    context: fc.constant({}),
     regions: fc.constant({}),
   });
   const node = (d: number): fc.Arbitrary<SnapshotTree> =>
@@ -39,6 +41,7 @@ export function anySnapshotTree(depth: number): fc.Arbitrary<SnapshotTree> {
       ? leaf
       : fc.record({
           path: fc.array(anyName, { minLength: 1, maxLength: 2 }),
+          context: fc.constant({}),
           regions: fc.dictionary(anyName, node(d - 1), { maxKeys: 3 }),
         });
   return node(depth);
@@ -49,6 +52,7 @@ export const anySnapshot: fc.Arbitrary<SnapshotTree> = anySnapshotTree(2);
 export function anyActorSnapshotTree(depth: number): fc.Arbitrary<SnapshotTree> {
   const leaf = fc.record({
     path: fc.array(anyName, { minLength: 1, maxLength: 1 }),
+    context: fc.constant({}),
     regions: fc.constant({}),
   });
   const node = (d: number): fc.Arbitrary<SnapshotTree> =>
@@ -56,6 +60,7 @@ export function anyActorSnapshotTree(depth: number): fc.Arbitrary<SnapshotTree> 
       ? leaf
       : fc.record({
           path: fc.array(anyName, { minLength: 1, maxLength: 1 }),
+          context: fc.constant({}),
           regions: fc.dictionary(anyName, node(d - 1), { maxKeys: 3 }),
         });
   return node(depth);

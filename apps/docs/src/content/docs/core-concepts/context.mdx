@@ -1,9 +1,9 @@
 ---
 title: Context
-description: Mutable state across transitions.
+description: Data that survives transitions.
 ---
 
-Context. Mutable record. Survives transitions. Holds data.
+Context. Holds data. Survives transitions. Replaced, not mutated.
 
 ## Define context
 
@@ -18,8 +18,9 @@ const actor = new Actor({
   initial: idle,
   context: { count: 0 } as CounterContext,
   setup: (m) => {
-    m.on(idle, increment, (_event, opts) => {
-      opts!.context.count++;
+    m.on(idle, increment, (_event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, count: s.count + 1 });
       return {};
     });
   },
@@ -31,31 +32,41 @@ const actor = new Actor({
 ## Read context
 
 ```ts
-actor.context.count; // 0
+actor.context.count; // current value
 ```
 
 ## Context in transitions
 
-Handler gets context directly.
+Handlers get a `context` handle. `get()` reads the current value; `set()`
+replaces it wholesale. A change is detected when the reference changes —
+that is what triggers a `change` event.
 
 ```ts
 setup: (m) => {
-  m.on(idle, login, (event, opts) => {
-    opts!.context.username = event.username;
-    opts!.context.attempts++;
+  m.on(idle, login, (event, { context }) => {
+    const s = context.get();
+    context.set({ ...s, username: event.username, attempts: s.attempts + 1 });
     return { state: authenticating };
   });
 },
 ```
 
+Nested values must be copied too — `set` only sees the top-level reference:
+
+```ts
+const s = context.get();
+context.set({ ...s, items: [...s.items, item] });
+```
+
 ## Context in effects
 
-Effects get context too.
+Effects get the same handle.
 
 ```ts
 setup: (m) => {
   m.effect(authenticating, ({ context, emit }) => {
-    authenticate(context.username).then(
+    const s = context.get();
+    authenticate(s.username).then(
       (result) => emit({ id: "AUTH_DONE", result }),
     );
   });
@@ -74,3 +85,6 @@ actor.send(login.create({ username: "admin", password: "pass" }));
 expect(actor.context.username).toBe("admin");
 expect(actor.context.attempts).toBe(1);
 ```
+
+Always read through `actor.context` — the value is replaced, not mutated, so a
+reference you captured earlier goes stale.

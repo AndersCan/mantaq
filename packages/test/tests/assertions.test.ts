@@ -49,7 +49,8 @@ function makeActorWithContext() {
     initial: a,
     setup: (m) => {
       m.on(a, go, (_event, { context }) => {
-        context.count++;
+        const s = context.get();
+        context.set({ ...s, count: s.count + 1 });
         return { state: b };
       });
     },
@@ -170,14 +171,14 @@ describe("assertions", () => {
     test("passes when predicate does not match", () => {
       const actor = makeActorWithContext();
       expect(() =>
-        assertContextNever(actor, (ctx) => (ctx as { count: number }).count > 10),
+        assertContextNever(actor, (context) => (context as { count: number }).count > 10),
       ).not.toThrow();
     });
 
     test("throws when predicate matches", () => {
       const actor = makeActorWithContext();
       expect(() =>
-        assertContextNever(actor, (ctx) => (ctx as { count: number }).count === 0),
+        assertContextNever(actor, (context) => (context as { count: number }).count === 0),
       ).toThrow(/predicate matched/);
     });
   });

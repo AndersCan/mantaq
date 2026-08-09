@@ -156,3 +156,101 @@ describe("Actor regions", () => {
     expect(parent.snapshot().regions.child.path[0]).toBe("cdone");
   });
 });
+
+describe("Actor context change detection", () => {
+  test("context.set without a transition emits change", () => {
+    const idle = state("idle")();
+    const reset = event("RESET_PROGRESS")();
+    const actor = new Actor({
+      inputs: [reset],
+      states: [idle],
+      initial: idle,
+      context: { progress: 1 },
+      setup: (m) => {
+        m.on(idle, reset, (_e, { context }) => {
+          context.set({ progress: 0 });
+          return {};
+        });
+      },
+    });
+    const seen: number[] = [];
+    actor.on("change", (snap) => seen.push(snap.context.progress));
+    actor.send(reset.create());
+    expect(seen).toEqual([1, 0]);
+  });
+
+  test("prev snapshot discriminates state vs context change", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle, active],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.onAny(tick, (_e, { context }) => {
+          context.set({ n: 5 });
+          return {};
+        });
+      },
+    });
+    const kinds: string[] = [];
+    actor.on("change", (snap, prev) => {
+      const stateChanged = snap.path[0] !== prev.path[0];
+      const contextChanged = snap.context !== prev.context;
+      kinds.push(`${stateChanged ? "state" : ""}${contextChanged ? "context" : ""}`);
+    });
+    actor.send(go.create());
+    actor.send(tick.create());
+    expect(kinds[0]).toBe(""); // subscribe ping: current vs current
+    expect(kinds[1]).toBe("state");
+    expect(kinds[2]).toBe("context");
+  });
+
+  test("set plus transition in one handler emits a single coalesced change", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, (_e, { context }) => {
+          const s = context.get();
+          context.set({ ...s, n: 1 });
+          return { state: active };
+        });
+      },
+    });
+    let calls = 0;
+    actor.on("change", () => calls++);
+    actor.send(go.create());
+    expect(calls).toBe(2); // subscribe ping + one end-of-dispatch emit
+  });
+
+  test("snapshot().context is the current context reference", () => {
+    const idle = state("idle")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [tick],
+      states: [idle],
+      initial: idle,
+      context: { n: 1 },
+      setup: (m) => {
+        m.on(idle, tick, (_e, { context }) => {
+          const s = context.get();
+          context.set({ ...s, n: 2 });
+          return {};
+        });
+      },
+    });
+    expect(actor.snapshot().context).toEqual({ n: 1 });
+    actor.send(tick.create());
+    expect(actor.snapshot().context).toEqual({ n: 2 });
+  });
+});

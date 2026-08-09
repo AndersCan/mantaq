@@ -3,7 +3,7 @@ import { Actor, type Snapshot, event, state } from "@mantaq/core";
 import { isIn, activeLeaves, matches, tag, ActorMap, states, events } from "../src/index.ts";
 
 function snap(path: string[], regions: Record<string, Snapshot> = {}): Snapshot {
-  return { path, regions };
+  return { path, context: {}, regions };
 }
 
 describe("sugar re-exports", () => {
@@ -80,14 +80,14 @@ describe("sugar re-exports", () => {
       const idle = state("idle")();
       const loading = state("loading")();
       const t = tag(idle, loading);
-      const s: Snapshot = { path: ["idle"], regions: {} };
+      const s: Snapshot = { path: ["idle"], context: {}, regions: {} };
       expect(t.has(s)).toBe(true);
     });
 
     test("does not match wrong state", () => {
       const idle = state("idle")();
       const t = tag(idle);
-      const s: Snapshot = { path: ["done"], regions: {} };
+      const s: Snapshot = { path: ["done"], context: {}, regions: {} };
       expect(t.has(s)).toBe(false);
     });
 
@@ -96,7 +96,8 @@ describe("sugar re-exports", () => {
       const t = tag(active);
       const s: Snapshot = {
         path: ["connected"],
-        regions: { default: { path: ["active"], regions: {} } },
+        context: {},
+        regions: { default: { path: ["active"], regions: {}, context: {} } },
       };
       expect(t.has(s)).toBe(true);
     });

@@ -5,6 +5,7 @@ import { InternalQueue } from "../src/queue.ts";
 import { trackAbort } from "../src/abort-tracker.ts";
 import { runEffects } from "../src/effects.ts";
 import { Subscribers } from "../src/subscribers.ts";
+import { Context } from "../src/context.ts";
 import { Actor } from "../src/actor.ts";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
@@ -270,7 +271,10 @@ describe("runEffects", () => {
       state: state("done")().final(),
       statePayload: undefined,
       event: { id: "X" },
-      context: {},
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
       emit: () => {},
       clock: new VirtualClock(),
     });
@@ -284,7 +288,10 @@ describe("runEffects", () => {
       state: state("idle")(),
       statePayload: undefined,
       event: { id: "X" },
-      context: {},
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
       emit: () => {},
       clock: new VirtualClock(),
     });
@@ -469,7 +476,7 @@ describe("Actor", () => {
       context: { n: 5 },
       setup: (m) => {
         m.onAny(tick, (_e, { context, actor: a }) => {
-          gotContext = context.n;
+          gotContext = context.get().n;
           gotActor = a;
           return {};
         });
@@ -748,7 +755,7 @@ describe("Actor directed mutation tests", () => {
       clock: new VirtualClock(),
       regions: {},
       send: () => {},
-      snapshot: () => ({ path: ["s"], regions: {} }),
+      snapshot: () => ({ path: ["s"], context: {}, regions: {} }),
       on: () => () => {},
       settled: async () => {},
     };

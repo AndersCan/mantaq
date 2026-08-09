@@ -37,8 +37,11 @@ class Actor<
     regions?: Record<string, AnyActor>;
   });
   send(event: CreatedOf<Inputs[number]>): void;
-  snapshot(): Snapshot;
-  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  snapshot(): Snapshot<ActorContext>;
+  on(
+    event: "change",
+    fn: (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void,
+  ): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
 }
@@ -129,16 +132,33 @@ const evt = move.create({ x: 1, y: 2 }); // { x: 1, y: 2, id: "MOVE" }
 if (move.is(evt)) evt.x; // narrowed
 ```
 
+### Context
+
+The handle passed to transition handlers and effects as `{ context }`. `get()` reads the current context value; `set(value)` replaces it wholesale — reference replacement is how context changes are detected. Every mutation goes through `set`; earlier `get()` bindings go stale after a `set`.
+
+```ts
+class Context<T> {
+  get(): T;
+  set(value: T): void;
+}
+m.on(idle, tick, (_e, { context }) => {
+  const s = context.get();
+  context.set({ ...s, count: s.count + 1 });
+  return {};
+});
+```
+
 ## Types
 
 ### Snapshot
 
-Read-only view of actor state: `path` is the state-name chain from the root, `regions` nests child snapshots, `done` appears once a final state is reached.
+Read-only view of actor state: `path` is the state-name chain from the root, `context` is the current context reference, `regions` nests child snapshots, `done` appears once a final state is reached.
 
 ```ts
-interface Snapshot {
+interface Snapshot<C = unknown> {
   path: string[];
-  regions: Record<string, Snapshot>;
+  context: C;
+  regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
 }
 ```
@@ -148,14 +168,14 @@ interface Snapshot {
 Structural handle for any actor — regions and `options.regions`. `__`-prefixed members are internal plumbing (a refactor is removing them), **not** public contract; treat them as absent.
 
 ```ts
-interface AnyActor {
+interface AnyActor<C = Record<string, unknown>> {
   state: AnyStateRef;
   clock: Clock;
   regions: Record<string, AnyActor>;
-  context?: Record<string, unknown>;
+  context?: C;
   send(event: AnyEventRef | InternalEvent): void;
-  snapshot(): Snapshot;
-  on(event: "change", fn: (snapshot: Snapshot) => void): () => void;
+  snapshot(): Snapshot<C>;
+  on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
 }
@@ -194,11 +214,14 @@ class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
   onAny<E extends Inputs[number] | Internal[number]>(eventRef: E, fn: Handler): this;
   effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext, PayloadOf<S>>): this;
 }
-// Handler = (event, opts: { context: ActorContext; actor: AnyActor }) =>
+// Handler = (event, opts: { context: Context<ActorContext>; actor: AnyActor }) =>
 //   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ id: string }> }
 m.on(idle, click, () => ({ state: active, emit: [pong.create()] }));
 m.onAny(click, () => ({ state: idle }));
-m.effect(active, ({ context }) => {});
+m.effect(active, ({ context }) => {
+  const s = context.get();
+  context.set({ ...s, ready: true });
+});
 ```
 
 ### SetupFn
@@ -252,7 +275,7 @@ interface EffectInput<ActorContext, Payload = unknown> {
   signal: AbortSignal;
   state: { name: string; payload: Payload };
   event: InternalEvent;
-  context: ActorContext;
+  context: Context<ActorContext>;
   emit: (event: InternalEvent) => void;
   clock: Clock;
 }

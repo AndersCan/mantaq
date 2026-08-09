@@ -249,7 +249,7 @@ describe("buildGraph with sampleContexts", () => {
       context: {} as { ready: boolean },
       setup: (m) => {
         m.on(idle, go, (_event, { context }) =>
-          context.ready ? { state: active } : { state: blocked },
+          context.get().ready ? { state: active } : { state: blocked },
         );
       },
     });
@@ -329,7 +329,7 @@ describe("buildGraph with sampleContexts", () => {
       initial: idle,
       context: {} as { x: number },
       setup: (m) => {
-        m.on(idle, go, (_event, { context }) => (context.x > 10 ? {} : {}));
+        m.on(idle, go, (_event, { context }) => (context.get().x > 10 ? {} : {}));
       },
     });
 

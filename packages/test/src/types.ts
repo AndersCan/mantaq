@@ -29,7 +29,7 @@ export interface TestHarness {
   assertStateNeverVisited(stateName: string): void;
   assertTransitionVisited(from: string, event: string): void;
   assertTransitionNeverVisited(from: string, event: string): void;
-  assertContextNever(predicate: (ctx: unknown) => boolean): void;
+  assertContextNever(predicate: (context: unknown) => boolean): void;
   assertEffectRan(stateName: string): void;
   assertEffectNeverRan(stateName: string): void;
   assertReachedState(stateName: string): void;

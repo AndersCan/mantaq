@@ -1,8 +1,11 @@
 import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
 import type { AnyStateRef } from "./state.ts";
 import type { Clock } from "./clock.ts";
+import type { Context } from "./context.ts";
 
 export type { Snapshot } from "./actor-internal.ts";
+
+export type { Context } from "./context.ts";
 
 export type CreatedOf<E extends AnyEventRef> =
   E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never;
@@ -16,7 +19,7 @@ export interface EffectInput<ActorContext, Payload = unknown> {
   signal: AbortSignal;
   state: { name: string; payload: Payload };
   event: InternalEvent;
-  context: ActorContext;
+  context: Context<ActorContext>;
   emit: (event: InternalEvent) => void;
   clock: Clock;
 }

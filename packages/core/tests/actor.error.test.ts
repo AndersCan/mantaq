@@ -35,7 +35,7 @@ describe("Actor error paths", () => {
       clock: new VirtualClock(),
       regions: {},
       send: () => {},
-      snapshot: () => ({ path: ["s"], regions: {} }),
+      snapshot: () => ({ path: ["s"], context: {}, regions: {} }),
       on: () => () => {},
       settled: async () => {},
     };

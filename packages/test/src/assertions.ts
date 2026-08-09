@@ -56,7 +56,10 @@ export function assertTransitionNeverVisited(history: History, from: string, eve
   }
 }
 
-export function assertContextNever(actor: AnyActor, predicate: (ctx: unknown) => boolean): void {
+export function assertContextNever(
+  actor: AnyActor,
+  predicate: (context: unknown) => boolean,
+): void {
   if (predicate(actor.context)) {
     throw new Error("assertContextNever failed: predicate matched current context");
   }

@@ -149,13 +149,13 @@ describe("InternalQueue directed mutation tests", () => {
 
 describe("Subscribers directed mutation tests", () => {
   test("clear removes change and done subscribers", () => {
-    const subs = new Subscribers();
+    const subs = new Subscribers<unknown>();
     let changes = 0;
     let dones = 0;
     subs.addChange(() => changes++);
     subs.addDone(() => dones++);
     subs.clear();
-    subs.emitChange({ path: ["idle"], regions: {} });
+    subs.emitChange({ path: ["idle"], context: {}, regions: {} });
     subs.emitDone();
     expect(changes).toBe(0);
     expect(dones).toBe(0);

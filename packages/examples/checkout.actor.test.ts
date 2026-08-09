@@ -77,11 +77,13 @@ function createCheckoutActor(clock?: VirtualClock) {
       m.onAny(backEvent, (_event, opts) => {
         const s = actor.state.name;
         if (s === "payment") {
-          delete opts!.context.paymentInfo;
+          const cur = opts!.context.get();
+          opts!.context.set({ ...cur, paymentInfo: undefined });
           return { state: shippingAddressState };
         }
         if (s === "shippingAddress") {
-          delete opts!.context.shippingAddress;
+          const cur = opts!.context.get();
+          opts!.context.set({ ...cur, shippingAddress: undefined });
           return { state: basicInfoState };
         }
         if (s === "error") {
@@ -90,19 +92,21 @@ function createCheckoutActor(clock?: VirtualClock) {
         return {};
       });
       m.on(basicInfoState, submitBasicInfo, (event, opts) => {
-        opts!.context.basicInfo = { email: event.email, name: event.name };
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, basicInfo: { email: event.email, name: event.name } });
         return { state: shippingAddressState };
       });
       m.on(shippingAddressState, submitShipping, (event, opts) => {
-        opts!.context.shippingAddress = {
-          street: event.street,
-          city: event.city,
-          zip: event.zip,
-        };
+        const cur = opts!.context.get();
+        opts!.context.set({
+          ...cur,
+          shippingAddress: { street: event.street, city: event.city, zip: event.zip },
+        });
         return { state: paymentState };
       });
       m.on(paymentState, submitPayment, (event, opts) => {
-        opts!.context.paymentInfo = { cardNumber: event.cardNumber };
+        const cur = opts!.context.get();
+        opts!.context.set({ ...cur, paymentInfo: { cardNumber: event.cardNumber } });
         return { state: submittingState };
       });
       m.on(submittingState, submittingDoneEvent, () => ({ state: successState }));

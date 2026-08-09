@@ -102,11 +102,11 @@ type AccountSnapshot = {
   events: AccountEvent[];
 };
 
-function takeSnapshot(ctx: AccountContext): AccountSnapshot {
+function takeSnapshot(context: AccountContext): AccountSnapshot {
   return {
-    version: ctx.version,
-    balance: ctx.balance,
-    events: [...ctx.events],
+    version: context.version,
+    balance: context.balance,
+    events: [...context.events],
   };
 }
 
@@ -138,53 +138,65 @@ function createAccountAggregate(clock?: VirtualClock) {
     context: { events: [], balance: 0, version: 0 } as AccountContext,
     setup: (m) => {
       m.on(activeState, openAccountCmd, (evt, opts) => {
-        const context = opts!.context;
+        const s = opts!.context.get();
         const domainEvent: AccountEvent = {
           type: "ACCOUNT_OPENED",
           accountId: evt.accountId,
           initialBalance: evt.initialBalance,
           at: c.now(),
         };
-        context.events.push(domainEvent);
-        context.balance += evt.initialBalance;
-        context.version++;
+        opts!.context.set({
+          ...s,
+          events: [...s.events, domainEvent],
+          balance: s.balance + evt.initialBalance,
+          version: s.version + 1,
+        });
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, depositCmd, (evt, opts) => {
-        const context = opts!.context;
+        const s = opts!.context.get();
         if (evt.amount <= 0) return {};
         const domainEvent: AccountEvent = {
           type: "MONEY_DEPOSITED",
           amount: evt.amount,
           at: c.now(),
         };
-        context.events.push(domainEvent);
-        context.balance += evt.amount;
-        context.version++;
+        opts!.context.set({
+          ...s,
+          events: [...s.events, domainEvent],
+          balance: s.balance + evt.amount,
+          version: s.version + 1,
+        });
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, withdrawCmd, (evt, opts) => {
-        const context = opts!.context;
-        if (evt.amount <= 0 || evt.amount > context.balance) return {};
+        const s = opts!.context.get();
+        if (evt.amount <= 0 || evt.amount > s.balance) return {};
         const domainEvent: AccountEvent = {
           type: "MONEY_WITHDRAWN",
           amount: evt.amount,
           at: c.now(),
         };
-        context.events.push(domainEvent);
-        context.balance -= evt.amount;
-        context.version++;
+        opts!.context.set({
+          ...s,
+          events: [...s.events, domainEvent],
+          balance: s.balance - evt.amount,
+          version: s.version + 1,
+        });
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, closeAccountCmd, (evt, opts) => {
-        const context = opts!.context;
+        const s = opts!.context.get();
         const domainEvent: AccountEvent = {
           type: "ACCOUNT_CLOSED",
           reason: evt.reason,
           at: c.now(),
         };
-        context.events.push(domainEvent);
-        context.version++;
+        opts!.context.set({
+          ...s,
+          events: [...s.events, domainEvent],
+          version: s.version + 1,
+        });
         return { state: closedState, emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
     },
@@ -214,11 +226,10 @@ function createBalanceProjection(clock?: VirtualClock) {
     context: { balance: 0, lastVersion: 0, accountEvents: [] } as BalanceProjectionContext,
     setup: (m) => {
       m.on(trackingState, eventStoredEvt, (evt, opts) => {
-        const context = opts!.context;
-        context.accountEvents.push(evt.event);
-        const { balance } = foldEvents(context.accountEvents);
-        context.balance = balance;
-        context.lastVersion = context.accountEvents.length;
+        const s = opts!.context.get();
+        const accountEvents = [...s.accountEvents, evt.event];
+        const { balance } = foldEvents(accountEvents);
+        opts!.context.set({ ...s, accountEvents, balance, lastVersion: accountEvents.length });
         return {};
       });
     },

@@ -43,7 +43,8 @@ const actor = new Actor({
   setup: (m) => {
     m.on(idle, start, () => ({ state: loading }));
     m.on(idle, fetchData, (event, opts) => {
-      opts!.context.url = event.url;
+      const s = opts!.context.get();
+      opts!.context.set({ ...s, url: event.url });
       return { state: loading };
     });
   },
@@ -80,7 +81,8 @@ const actor = new Actor({
 ```ts
 setup: (m) => {
   m.onAny(cancel, (_event, opts) => {
-    opts!.context.cancelled = true;
+    const s = opts!.context.get();
+    opts!.context.set({ ...s, cancelled: true });
     return { state: cancelled };
   });
   m.on(idle, start, () => ({ state: running }));
