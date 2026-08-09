@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/traversal",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Graph extraction, traversal algorithms, and runtime tracking for mantaq actors.",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/utils",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Zero-dependency utility library — Either type as a [left, right] tuple.",
   "license": "MIT",
   "repository": {
