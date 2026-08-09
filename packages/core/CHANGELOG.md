@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.2
+
+<sub>2026-08-09</sub>
+
+- _(patch)_ Effects now receive the state's declared payload type (no cast needed in m.effect).
+- _(patch)_ Fixed flaky, slow stryker mutation runs (related-file collection + shared cache).
+- _(patch)_
+  Context in handlers and effects is now a handle (`context.get()` / `context.set()`), and `set()` replaces the whole context — so context writes emit a `change` event even without a transition. Snapshots now carry `context`, and change handlers receive the previous snapshot (`(snapshot, prev)`) for identity comparison.
+
 ## 0.0.1
 
 <sub>2026-08-09</sub>

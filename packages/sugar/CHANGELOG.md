@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.2
+
+<sub>2026-08-09</sub>
+
+- _(patch)_ Fixed flaky, slow stryker mutation runs (related-file collection + shared cache).
+
 ## 0.0.1
 
 <sub>2026-08-09</sub>
