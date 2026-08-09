@@ -70,16 +70,11 @@ jobs:
           node-version: "24"
           cache: true
       - run: vp install
-      # npm publish reads the auth token from .npmrc, not the env var alone.
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> "$HOME/.npmrc"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       # No build step here: bumpy requires a clean tree (vp pack rewrites
       # package.json exports), and the tree must stay clean for its check.
       # Each package's `prepack` (vp run build) builds + rewrites exports
       # during pnpm pack, after the check has passed.
+      # Publishing uses npm trusted publishing (OIDC) — no token secrets.
       - run: vp exec bumpy ci release --expect-mode publish
         env:
           GH_TOKEN: ${{ github.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
