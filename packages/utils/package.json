@@ -1,15 +1,31 @@
 {
   "name": "@mantaq/utils",
   "version": "0.0.0",
-  "private": true,
-  "description": "Private utility library — zero-dependency Either type, [left, right] tuple representation.",
+  "description": "Zero-dependency utility library — Either type as a [left, right] tuple.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/utils"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "prepublishOnly": "vp run build",
+    "coverage": "vp test run --coverage"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

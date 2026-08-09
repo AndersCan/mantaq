@@ -1,9 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreFiles": [
-    "packages/core/stryker.vitest.config.ts",
-    "scripts/ensure-core-internal-export.mjs"
-  ],
+  "ignoreFiles": ["packages/core/stryker.vitest.config.ts"],
   "ignoreDependencies": [
     "vite",
     "@stryker-mutator/core",

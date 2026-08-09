@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "description": "State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/core"
+  },
   "files": [
     "dist"
   ],
@@ -17,7 +22,6 @@
   },
   "scripts": {
     "build": "vp pack",
-    "postbuild": "node ../../scripts/ensure-core-internal-export.mjs",
     "dev": "vp pack --watch",
     "test": "vp test",
     "check": "vp check",
