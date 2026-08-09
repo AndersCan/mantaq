@@ -11,15 +11,13 @@ concurrency:
   group: bumpy-release-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
-
 jobs:
   check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -31,11 +29,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm bumpy ci check --comment
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
 
-  release:
+  # Versioning is manual (run `bumpy version` locally, commit via PR).
+  # `plan` detects what a push to main means: `publish` when versions were
+  # bumped and are unpublished, otherwise `nothing` — so routine merges with
+  # pending bump files stay green instead of failing the release job.
+  plan:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,7 +53,33 @@ jobs:
           pnpm-version: 11
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - run: pnpm bumpy ci release
+      - id: plan
+        run: pnpm bumpy ci plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: plan
+    if: needs.plan.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          pnpm-version: 11
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      # Build must run here — bumpy packs + publishes tarballs directly, so
+      # each package's `prepublishOnly` never fires.
+      - run: vp run -r build
+      - run: pnpm bumpy ci release --expect-mode publish
         env:
           GH_TOKEN: ${{ github.token }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

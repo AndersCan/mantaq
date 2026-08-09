@@ -54,6 +54,18 @@ vp run -r test    # run all tests
 vp run -r build   # build all packages
 ```
 
+## Releasing
+
+Versioning is manual; publishing runs in CI with npm provenance
+(`.github/workflows/release.yml`).
+
+1. Accumulate bump files in `.bumpy/` as changes land.
+2. When ready: `bumpy version` — bumps versions, writes changelogs,
+   consumes bump files.
+3. Commit the version changes, push, open a PR, merge to `main`.
+4. The publish job builds every package and publishes the versioned ones.
+   Requires the `NPM_TOKEN` secret (an npm automation token).
+
 ## Project Structure
 
 ```
