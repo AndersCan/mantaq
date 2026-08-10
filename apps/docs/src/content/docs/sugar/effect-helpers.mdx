@@ -53,7 +53,7 @@ Same logic. More code. Easy to forget abort check.
 
 ```ts
 withPromise(promise, signal, emit, {
-  success: (data) => ({ id: "DONE", data }), // must return InternalEvent
+  success: (data) => ({ id: "DONE", data }), // must return event-like { id, ... }
   error: (err) => ({ id: "FAIL", error: err }), // same
 });
 ```
@@ -68,7 +68,7 @@ Timeout via actor's clock. Abort-safe.
 import { withTimeout } from "@mantaq/sugar";
 
 setup: (m) => {
-  m.effect(idle, (input) => {
+  m.effect(waiting, (input) => {
     withTimeout(5000, input, () => ({ id: "TIMEOUT" }));
   });
 },
@@ -77,33 +77,48 @@ setup: (m) => {
 ### What it does
 
 1. Schedules timeout on actor's clock
-2. On fire → calls `eventFn` → emits resulting event
-3. Aborts automatically on state exit
+2. On fire → checks `signal.aborted` → calls `eventFn` → emits resulting event
+3. State exit aborts the effect signal → no emit after exit
+
+Warns on invalid `ms`.
 
 Without sugar:
 
 ```ts
 setup: (m) => {
-  m.effect(idle, ({ clock, signal, emit }) => {
+  m.effect(waiting, ({ clock, signal, emit }) => {
     clock.setTimeout(5000, () => {
       if (!signal.aborted) emit({ id: "TIMEOUT" });
-    }, { signal });
+    });
   });
 },
 ```
 
-Sugar handles abort wiring.
+Sugar checks the signal for you.
 
 ### VirtualClock testing
 
 ```ts
-import { VirtualClock } from "@mantaq/core";
+import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { withTimeout } from "@mantaq/sugar";
 
+const idle = state("idle")();
+const waiting = state("waiting")();
+const start = event("START")();
 const clock = new VirtualClock();
-const actor = createActor(clock);
 
-actor.send(startEvent);
+const actor = new Actor({
+  inputs: [start],
+  states: [idle, waiting],
+  initial: idle,
+  clock,
+  setup: (m) => {
+    m.on(idle, start, () => ({ state: waiting }));
+    m.effect(waiting, (input) => withTimeout(5000, input, () => ({ id: "TIMEOUT" })));
+  },
+});
+
+actor.send(start.create());
 clock.advance(5000); // triggers timeout
 ```
 

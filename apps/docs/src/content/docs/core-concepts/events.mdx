@@ -42,9 +42,9 @@ const actor = new Actor({
   initial: idle,
   setup: (m) => {
     m.on(idle, start, () => ({ state: loading }));
-    m.on(idle, fetchData, (event, opts) => {
-      const s = opts!.context.get();
-      opts!.context.set({ ...s, url: event.url });
+    m.on(idle, fetchData, (event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, url: event.url });
       return { state: loading };
     });
   },
@@ -80,13 +80,14 @@ const actor = new Actor({
 
 ```ts
 setup: (m) => {
-  m.onAny(cancel, (_event, opts) => {
-    const s = opts!.context.get();
-    opts!.context.set({ ...s, cancelled: true });
+  m.onAny(cancel, (_event, { context }) => {
+    const s = context.get();
+    context.set({ ...s, cancelled: true });
     return { state: cancelled };
   });
   m.on(idle, start, () => ({ state: running }));
 },
 ```
 
-State-specific runs first. `onAny` runs after.
+State-specific runs first. `onAny` runs after — and only transitions if no
+state-specific handler fired. Its `emit` still queues.
