@@ -94,11 +94,25 @@ const actor = new Actor({
   context: {} as AuthContext,
   setup: (m) => {
     m.on(idleState, signInEvent, (event, opts) => {
-      opts!.context.phoneNumber = event.phoneNumber; // ✅ typed
+      // ✅ typed — context.get()/set() flow the constructor type
+      opts!.context.set({ ...opts!.context.get(), phoneNumber: event.phoneNumber });
       return { state: signingInState };
     });
   },
 });
+```
+
+`set()` requires a **new object reference** — change detection is reference equality. Always spread the current value:
+
+```ts
+opts.context.set({ ...opts.context.get(), phoneNumber: event.phoneNumber });
+```
+
+**Never mutate in place:**
+
+```ts
+// ❌ defeats change detection — subscribers and persistence stay silent
+opts!.context.phoneNumber = event.phoneNumber;
 ```
 
 **Anti-pattern — casting in every handler:**
@@ -107,7 +121,7 @@ const actor = new Actor({
 setup: (m) => {
   m.on(idleState, signInEvent, (event, opts) => {
     const c = opts!.context as AuthContext; // ❌ unnecessary — already typed
-    c.phoneNumber = event.phoneNumber;
+    c.set({ ...c.get(), phoneNumber: event.phoneNumber });
     return { state: signingInState };
   });
 },
@@ -198,7 +212,7 @@ const actor = new Actor({
 return { state: loadingState.create({ url: event.url }) };
 
 // ⚠️ context — works but shared across all states
-opts!.context.url = event.url;
+opts!.context.set({ ...opts!.context.get(), url: event.url });
 return { state: loadingState };
 ```
 
@@ -289,7 +303,10 @@ function createActor() {
       m.on(idleState, startEvent, () => ({ state: workingState }));
       m.on(workingState, doneEvent, () => ({ state: doneState }));
       m.on(workingState, failedEvent, (_event, opts) => {
-        opts!.context.retryCount++;
+        opts!.context.set({
+          ...opts!.context.get(),
+          retryCount: opts!.context.get().retryCount + 1,
+        });
         return { state: errorState };
       });
     },
@@ -478,7 +495,7 @@ Prefer storing the error in context and transitioning to an error state:
 ```ts
 m.on(idleState, submitEvent, (event, opts) => {
   if (!event.data) {
-    opts!.context.error = "missing data";
+    opts!.context.set({ ...opts!.context.get(), error: "missing data" });
     return { state: errorState };
   }
   return { state: doneState };
@@ -493,7 +510,7 @@ Use `onAny` to intercept events across all states — useful for universal error
 setup: (m) => {
   // CANCEL works from any state
   m.onAny(cancelEvent, (_event, opts) => {
-    opts!.context.cancelled = true;
+    opts!.context.set({ ...opts!.context.get(), cancelled: true });
     return { state: cancelledState };
   });
   // State-specific handlers still run for their state
@@ -507,13 +524,13 @@ setup: (m) => {
 setup: (m) => {
   // ❌ state-specific logic in onAny defeats the purpose
   m.onAny(submitBasicInfoEvent, (event, opts) => {
-    opts!.context.basicInfo = event; // wrong — only makes sense in basicInfo state
+    opts!.context.set({ ...opts!.context.get(), basicInfo: event }); // wrong — only makes sense in basicInfo state
     return { state: shippingAddressState };
   });
 
   // ✅ keep state-specific logic in state handlers
   m.on(basicInfoState, submitBasicInfoEvent, (event, opts) => {
-    opts!.context.basicInfo = event;
+    opts!.context.set({ ...opts!.context.get(), basicInfo: event });
     return { state: shippingAddressState };
   });
 },
