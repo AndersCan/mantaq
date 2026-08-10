@@ -1,5 +1,13 @@
 # Mantaq
 
+[![CI](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml/badge.svg)](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@mantaq/core?logo=npm&logoColor=white)](https://www.npmjs.com/package/@mantaq/core)
+[![npm downloads](https://img.shields.io/npm/dm/@mantaq/core?logo=npm&logoColor=white)](https://www.npmjs.com/package/@mantaq/core)
+[![npm provenance](https://img.shields.io/badge/SLSA%20provenance-verified-brightgreen?logo=github)](https://www.npmjs.com/package/@mantaq/core)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Node >=22](https://img.shields.io/badge/node-%3E%3D22.12-blue?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+
 A TypeScript state machine library built around actors, events, and hierarchical states.
 
 ## Packages

@@ -7,7 +7,7 @@ Check where actor is. Group states. Find leaves.
 
 ## matches
 
-Dot-notation path check.
+Dot-notation path check. Prefix match.
 
 ```ts
 import { matches } from "@mantaq/sugar";
@@ -16,12 +16,15 @@ matches(actor, "active"); // top-level
 matches(actor, "connected.default.active"); // nested path
 ```
 
+Starts at the top-level state. Descends only through region names, in order. Ends at a state or region boundary. NOT a whole-tree search — a nested `"active"` under a different top state fails `matches(actor, "active")`. Use `isIn` for that.
+
 Without sugar:
 
 ```ts
 actor.snapshot().path[0] === "active";
 // or for nested:
-actor.snapshot().path.join(".") === "connected.default.active";
+const snap = actor.snapshot();
+snap.path[0] === "connected" && snap.regions["default"]?.path[0] === "active";
 ```
 
 `matches` handles path joining.
@@ -33,7 +36,7 @@ Recursive search. State anywhere in the snapshot tree.
 ```ts
 import { isIn } from "@mantaq/sugar";
 
-isIn(actor.snapshot(), "active"); // true if "active" is a state on the path
+isIn(actor.snapshot(), "active"); // true if "active" anywhere in the tree
 ```
 
 Useful with hierarchical states:
@@ -48,8 +51,13 @@ isIn(snapshot, "idle"); // false
 Without sugar:
 
 ```ts
-const snap = actor.snapshot();
-snap.path[0] === "active" || Object.values(snap.regions).some((r) => r.path[0] === "active");
+import type { Snapshot } from "@mantaq/core";
+
+function inTree(snap: Snapshot, name: string): boolean {
+  if (snap.path[0] === name) return true;
+  return Object.values(snap.regions).some((r) => inTree(r, name));
+}
+inTree(actor.snapshot(), "active");
 ```
 
 ## activeLeaves
@@ -59,7 +67,7 @@ All leaf states in current path.
 ```ts
 import { activeLeaves } from "@mantaq/sugar";
 
-// path: ["connected", "default", "active"]
+// snapshot.path: ["connected"], regions: { default: { path: ["active"] } }
 activeLeaves(actor.snapshot()); // ["connected.default.active"]
 ```
 
@@ -79,7 +87,7 @@ Group states. Check membership.
 import { tag } from "@mantaq/sugar";
 
 const activeTag = tag(idle, loading, success);
-activeTag.has(actor.snapshot()); // true if any of those states
+activeTag.has(actor.snapshot()); // true if any of those states anywhere in the tree
 ```
 
 Use for bulk checks:
@@ -101,6 +109,8 @@ if (path === "networkError" || path === "validationError" || path === "timeoutEr
 }
 ```
 
+Top-level only. `tag.has` searches the whole tree.
+
 Tag scales better. Many states → one check.
 
 ## Before/after
@@ -119,8 +129,13 @@ matches(actor, "active");
 
 ```ts
 // Before
-const snap = actor.snapshot();
-snap.path[0] === "active" || Object.values(snap.regions).some((r) => r.path[0] === "active");
+import type { Snapshot } from "@mantaq/core";
+
+function inTree(snap: Snapshot, name: string): boolean {
+  if (snap.path[0] === name) return true;
+  return Object.values(snap.regions).some((r) => inTree(r, name));
+}
+inTree(actor.snapshot(), "active");
 
 // After
 isIn(actor.snapshot(), "active");
@@ -129,8 +144,15 @@ isIn(actor.snapshot(), "active");
 ### Group errors
 
 ```ts
+import { state } from "@mantaq/core";
+import { tag } from "@mantaq/sugar";
+
+const err1 = state("err1")();
+const err2 = state("err2")();
+const err3 = state("err3")();
+
 // Before
-const isError = ["err1", "err2", "err3"].includes(actor.snapshot().path[0]);
+const isError = [err1, err2, err3].some((s) => s.name === actor.snapshot().path[0]);
 
 // After
 const isError = tag(err1, err2, err3).has(actor.snapshot());

@@ -28,48 +28,51 @@ Seven calls. Repetitive.
 import { states, events } from "@mantaq/sugar";
 
 const { idle, loading, success, error } = states("idle", "loading", "success", "error");
-const { fetch, retry, cancel } = events("FETCH", "RETRY", "CANCEL");
+const { FETCH, RETRY, CANCEL } = events("FETCH", "RETRY", "CANCEL");
 ```
 
 Two calls. Typed names as keys.
 
 ## Return type
 
-`states()` returns `Record<string, StateRef>`. Keys = state names.
+`states()` returns a typed record keyed by the literal names — `{ [K in T]: StateRef<K> }`. Not a plain `Record<string, ...>`.
 
-`events()` returns `Record<string, EventRef>`. Keys = event names.
+`events()` same shape for `EventRef`.
 
-Dot access:
-
-```ts
-states.idle; // StateRef
-events.FETCH; // EventRef
-```
-
-Destructure or bracket:
+Keys are the names you passed. Dot or bracket access:
 
 ```ts
 const s = states("a", "b", "c");
-s.a; // StateRef
-s["b"]; // StateRef
+s.a; // StateRef<"a">
+s["b"]; // StateRef<"b">
+
+const e = events("X", "Y");
+e.X; // EventRef<"X">
+```
+
+Destructure or keep the record:
+
+```ts
+const s = states("a", "b", "c");
+const { a, b, c } = s;
 ```
 
 ## Real example
 
 ```ts
-import { Actor, state, event } from "@mantaq/core";
+import { Actor } from "@mantaq/core";
 import { states, events } from "@mantaq/sugar";
 
 const { idle, loading, done } = states("idle", "loading", "done");
-const { start, finish } = events("START", "FINISH");
+const { START, FINISH } = events("START", "FINISH");
 
 const actor = new Actor({
-  inputs: [start, finish],
+  inputs: [START, FINISH],
   states: [idle, loading, done],
   initial: idle,
   setup: (m) => {
-    m.on(idle, start, () => ({ state: loading }));
-    m.on(loading, finish, () => ({ state: done }));
+    m.on(idle, START, () => ({ state: loading }));
+    m.on(loading, FINISH, () => ({ state: done }));
   },
 });
 ```

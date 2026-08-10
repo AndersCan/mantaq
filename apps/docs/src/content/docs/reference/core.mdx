@@ -18,13 +18,13 @@ const withPayload = state("loading")<{ taskId: string }>();
 
 ### `StateRef<T, Payload, IsFinal>`
 
-| Property            | Type                         | What               |
-| ------------------- | ---------------------------- | ------------------ |
-| `name`              | `T`                          | State id           |
-| `isFinal`           | `IsFinal`                    | Terminal state?    |
-| `.final()`          | `StateRef<T, Payload, true>` | Mark final         |
-| `.create(payload)`  | `{ state, payload }`         | Make state entry   |
-| `.regions(options)` | `this`                       | Attach sub-regions |
+| Property            | Type                         | What                               |
+| ------------------- | ---------------------------- | ---------------------------------- |
+| `name`              | `T`                          | State id                           |
+| `isFinal`           | `IsFinal`                    | Terminal state?                    |
+| `.final()`          | `StateRef<T, Payload, true>` | Mark final                         |
+| `.create(payload)`  | `{ state, payload }`         | Make state entry. Payload required |
+| `.regions(options)` | `this`                       | Attach sub-regions                 |
 
 ---
 
@@ -45,11 +45,26 @@ const fetchData = event("FETCH")<{ url: string }>();
 
 ### `EventRef<T, Payload>`
 
-| Property           | Type                  | What                |
-| ------------------ | --------------------- | ------------------- |
-| `id`               | `T`                   | Event id            |
-| `.is(event)`       | `boolean`             | Identity check      |
-| `.create(payload)` | `Payload & { id: T }` | Make event instance |
+| Property           | Type                  | What                       |
+| ------------------ | --------------------- | -------------------------- |
+| `id`               | `T`                   | Event id                   |
+| `.is(event)`       | `boolean`             | Identity check. Type guard |
+| `.create()`        | `{ id: T }`           | Void-payload instance      |
+| `.create(payload)` | `Payload & { id: T }` | Payload instance           |
+
+---
+
+## `Context`
+
+```ts
+class Context<T> {
+  constructor(get: () => T, set: (value: T) => void);
+  get(): T;
+  set(value: T): void;
+}
+```
+
+Read/write handle to actor context. Passed to handlers and effects.
 
 ---
 
@@ -67,43 +82,44 @@ class Actor<
 
 ### Constructor options
 
-| Option           | Type                        | What                                 |
-| ---------------- | --------------------------- | ------------------------------------ |
-| `inputs`         | `EventRef[]`                | External events accepted             |
-| `outputs`        | `EventRef[]`                | Events to parent                     |
-| `internal`       | `EventRef[]`                | Events from effects/transitions      |
-| `states`         | `StateRef[]`                | All states                           |
-| `initial`        | `StateRef`                  | Start state                          |
-| `context`        | `object`                    | Initial context                      |
-| `clock`          | `Clock`                     | Default: `RealClock`                 |
-| `setup`          | `(m: ActorBuilder) => void` | Register transitions and effects     |
-| `regions`        | `Record<string, Actor>`     | Static children                      |
-| `internalBudget` | `number`                    | Max internal events (default: 10000) |
+| Option           | Type                                | What                                 |
+| ---------------- | ----------------------------------- | ------------------------------------ |
+| `inputs`         | `EventRef[]`                        | External events accepted             |
+| `outputs`        | `EventRef[]`                        | Events to parent                     |
+| `internal`       | `EventRef[]`                        | Events from effects/transitions      |
+| `states`         | `StateRef[]`                        | All states                           |
+| `initial`        | `StateRef` or `{ state, payload? }` | Start state                          |
+| `context`        | `ActorContext`                      | Initial context                      |
+| `clock`          | `Clock`                             | Default: `RealClock`                 |
+| `setup`          | `(m: ActorBuilder) => void`         | Register transitions and effects     |
+| `regions`        | `Record<string, AnyActor>`          | Static children                      |
+| `internalBudget` | `number`                            | Max internal events (default: 10000) |
 
 ### Methods
 
-| Method             | Signature             | What                                              |
-| ------------------ | --------------------- | ------------------------------------------------- |
-| `send(event)`      | `(event) => void`     | Send event                                        |
-| `snapshot()`       | `() => Snapshot`      | State tree                                        |
-| `on("change", fn)` | `(fn) => () => void`  | State or context changed (`(snap, prev) => void`) |
-| `on("done", fn)`   | `(fn) => () => void`  | Final state                                       |
-| `settled()`        | `() => Promise<void>` | Queue drained                                     |
+| Method             | Signature                                    | What                                              |
+| ------------------ | -------------------------------------------- | ------------------------------------------------- |
+| `send(event)`      | `(event: CreatedOf<Inputs[number]>) => void` | Send event                                        |
+| `snapshot()`       | `() => Snapshot`                             | State tree                                        |
+| `on("change", fn)` | `(fn) => () => void`                         | State or context changed (`(snap, prev) => void`) |
+| `on("done", fn)`   | `(fn) => () => void`                         | Final state                                       |
+| `settled()`        | `() => Promise<void>`                        | Queue drained                                     |
 
 ### Properties
 
-| Property  | Type                       | What            |
-| --------- | -------------------------- | --------------- |
-| `state`   | `States[number]`           | Current state   |
-| `context` | `ActorContext`             | Current context |
-| `clock`   | `Clock`                    | Clock instance  |
-| `regions` | `Record<string, AnyActor>` | Children        |
+| Property  | Type                       | What                         |
+| --------- | -------------------------- | ---------------------------- |
+| `state`   | `States[number]`           | Current state                |
+| `context` | `ActorContext`             | Current context              |
+| `clock`   | `Clock`                    | Clock instance               |
+| `regions` | `Record<string, AnyActor>` | Children                     |
+| `options` | `InternalActorOptions`     | Built options. Semi-internal |
 
 ---
 
 ## `ActorBuilder`
 
-The type-safe registrar passed to `setup`. Targets validate against declared states, inputs, and internal events — an undeclared target fails to compile.
+The type-safe registrar passed to `setup`. Targets validate against declared states, inputs, internal, and output events — an undeclared state, event, or emit fails to compile.
 
 ```ts
 setup: (m) => {
@@ -139,7 +155,7 @@ class VirtualClock implements Clock {
 }
 ```
 
-Deterministic. Testing. `advance(ms)` fires all due timers instantly.
+Deterministic. Testing. `advance(ms)` fires all due timers instantly. Aborted signal passed to `setTimeout`/`setInterval` → returns `-1`.
 
 ---
 
@@ -192,9 +208,9 @@ interface Clock {
 ### `EffectInput`
 
 ```ts
-type EffectInput<ActorContext> = {
+type EffectInput<ActorContext, Payload = unknown> = {
   signal: AbortSignal;
-  state: { name: string; payload: unknown };
+  state: { name: string; payload: Payload };
   event: InternalEvent;
   context: Context<ActorContext>;
   emit: (event: InternalEvent) => void;
@@ -212,6 +228,8 @@ type TransitionResult<AllowedState = AnyStateRef, AllowedEmit = string> = {
 };
 ```
 
+Internal type. Not exported. Handler returns infer from it.
+
 ### `InternalEvent`
 
 ```ts
@@ -226,6 +244,11 @@ interface AnyActor<C = Record<string, unknown>> {
   clock: Clock;
   regions: Record<string, AnyActor>;
   context?: C;
+  options?: {
+    transitions?: Record<string, Record<string, unknown>>;
+    effects?: Record<string, unknown[]>;
+    states?: ReadonlyArray<{ name: string; isFinal: boolean }>;
+  };
   send(event: AnyEventRef | InternalEvent): void;
   snapshot(): Snapshot<C>;
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
@@ -233,3 +256,13 @@ interface AnyActor<C = Record<string, unknown>> {
   settled(): Promise<void>;
 }
 ```
+
+### More types
+
+| Type                       | What                                                        |
+| -------------------------- | ----------------------------------------------------------- |
+| `NonFinalStateRef<States>` | Non-terminal state refs                                     |
+| `CreatedOf<E>`             | Event instance type for `E`: `{ id }` or `Payload & { id }` |
+| `CreatedOfEvent<Id, P>`    | Same, explicit id and payload                               |
+| `EffectFn<C, P>`           | `(input: EffectInput<C, P>) => void`                        |
+| `SetupFn<...>`             | `(m: ActorBuilder<...>) => void` — the `setup` option type  |

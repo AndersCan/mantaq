@@ -63,7 +63,7 @@ const manager = new Actor({
 Snapshot. Nested.
 
 ```ts
-// { path: ["connected"], regions: { health: { path: ["healthy"], regions: {} } } }
+// { path: ["connected"], context: {...}, regions: { health: { path: ["healthy"], context: {...}, regions: {} } } }
 ```
 
 ## Parallel states
@@ -71,26 +71,31 @@ Snapshot. Nested.
 Multiple regions. Run same time.
 
 ```ts
+const playerState = state("player")();
 const player = new Actor({
   inputs: [playToggle, muteToggle],
-  states: [player],
-  initial: player,
+  states: [playerState],
+  initial: playerState,
   regions: {
     playback: playbackActor,
     audio: audioActor,
   },
+  setup: () => {},
 });
 ```
 
-Each region is its own actor. `matches(actor, "player.playback.playing")` checks a specific region's state.
+Each region is its own actor. `matches(player, "player.playback.playing")` checks a specific region's state.
 
 ## Payloads
 
-Transition needs payload. Carry it.
+States carry optional payload. Type it at creation.
 
 ```ts
+const loading = state("loading")<{ taskId: string }>();
+const success = state("success")<{ data: string }>();
+
 // In transition handler:
-return { state: successState.create({ data: result }) };
+return { state: success.create({ data: result }) };
 ```
 
-Payload in effects. `state.payload`.
+Effects read it: `state.payload`. Typed from the state ref.

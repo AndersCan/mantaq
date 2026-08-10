@@ -69,25 +69,25 @@ Waits. Internal events drained. Use after effects.
 
 ```ts
 actor.snapshot();
-// { path: ["active"], regions: {}, done: undefined }
+// { path: ["active"], context: {...}, regions: {} }
 ```
 
 State tree. Nested for hierarchical actors.
 
 ## Constructor options
 
-| Option           | Type                    | What                                 |
-| ---------------- | ----------------------- | ------------------------------------ |
-| `inputs`         | `EventRef[]`            | External events accepted             |
-| `outputs`        | `EventRef[]`            | Events to parent                     |
-| `internal`       | `EventRef[]`            | Events from effects/transitions      |
-| `states`         | `StateRef[]`            | All states                           |
-| `initial`        | `StateRef`              | Start state                          |
-| `context`        | `object`                | Mutable context                      |
-| `setup`          | `(m) => void`           | Register transitions and effects     |
-| `clock`          | `Clock`                 | Default: `RealClock`                 |
-| `regions`        | `Record<string, Actor>` | Static children                      |
-| `internalBudget` | `number`                | Max internal events (default: 10000) |
+| Option           | Type                                | What                                 |
+| ---------------- | ----------------------------------- | ------------------------------------ |
+| `inputs`         | `EventRef[]`                        | External events accepted             |
+| `outputs`        | `EventRef[]`                        | Events to parent                     |
+| `internal`       | `EventRef[]`                        | Events from effects/transitions      |
+| `states`         | `StateRef[]`                        | All states                           |
+| `initial`        | `StateRef` or `{ state, payload? }` | Start state                          |
+| `context`        | `object`                            | Mutable context                      |
+| `setup`          | `(m) => void`                       | Register transitions and effects     |
+| `clock`          | `Clock`                             | Default: `RealClock`                 |
+| `regions`        | `Record<string, Actor>`             | Static children                      |
+| `internalBudget` | `number`                            | Max internal events (default: 10000) |
 
 ### `setup` builder
 
@@ -97,4 +97,4 @@ State tree. Nested for hierarchical actors.
 | `m.onAny(event, fn)`     | Handler for an event in every state         |
 | `m.effect(state, fn)`    | Run `fn` on state entry                     |
 
-Handler returns `{ state }` (with optional `payload` or `emit`) or `{}` to stay in place.
+Handler returns `{ state }` (optional `payload`, or `emit: [{ id }]`) or `{}` to stay in place.

@@ -35,8 +35,7 @@ States: `green` → `yellow` → `red` → `green` (cycle)
 Events: `NEXT`
 
 ```ts
-import { Actor } from "@mantaq/core";
-import { state, event } from "@mantaq/core";
+import { Actor, state, event } from "@mantaq/core";
 
 const green = state("green")();
 const yellow = state("yellow")();
@@ -117,17 +116,22 @@ expect(actor.snapshot().path[0]).toBe("green"); // cycle back
 If your actor stores data in context:
 
 ```ts
-type CounterContext = { count: number };
-
+const counter = state("counter")();
 const increment = event("INCREMENT")();
 
-// In setup:
-// In setup:
-// m.on(counter, increment, (_event, opts) => {
-//   const s = opts!.context.get();
-//   opts!.context.set({ ...s, count: s.count + 1 });
-//   return {};
-// })
+const actor = new Actor({
+  inputs: [increment],
+  states: [counter],
+  initial: counter,
+  context: { count: 0 },
+  setup: (m) => {
+    m.on(counter, increment, (_event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, count: s.count + 1 });
+      return {};
+    });
+  },
+});
 
 actor.send(increment.create());
 expect(actor.context.count).toBe(1);
@@ -138,12 +142,33 @@ expect(actor.context.count).toBe(1);
 For actors with timers or async effects:
 
 ```ts
-import { VirtualClock } from "@mantaq/core";
+import { Actor, state, event, VirtualClock } from "@mantaq/core";
+
+const idle = state("idle")();
+const loading = state("loading")();
+const done = state("done")();
+
+const start = event("START")();
+const finish = event("FINISH")();
 
 const clock = new VirtualClock();
-const actor = createActor(clock);
 
-actor.send(startEvent);
+const actor = new Actor({
+  inputs: [start],
+  internal: [finish],
+  states: [idle, loading, done],
+  initial: idle,
+  clock,
+  setup: (m) => {
+    m.on(idle, start, () => ({ state: loading }));
+    m.effect(loading, ({ signal, emit, clock }) => {
+      clock.setTimeout(1000, () => emit(finish.create()), { signal });
+    });
+    m.on(loading, finish, () => ({ state: done }));
+  },
+});
+
+actor.send(start.create());
 expect(actor.snapshot().path[0]).toBe("loading");
 
 clock.advance(1000); // fast-forward time
@@ -153,20 +178,32 @@ expect(actor.snapshot().path[0]).toBe("done");
 ### Assert Final State
 
 ```ts
-const successState = state("success")().final();
-// ...
+const idle = state("idle")();
+const success = state("success")().final();
+const finish = event("FINISH")();
+
+const actor = new Actor({
+  inputs: [finish],
+  states: [idle, success],
+  initial: idle,
+  setup: (m) => {
+    m.on(idle, finish, () => ({ state: success }));
+  },
+});
+
+actor.send(finish.create());
 expect(actor.snapshot().done).toBe(true);
 ```
 
 ## More Complex Example: Login Flow
 
 States: `idle` → `authenticating` → `authenticated` | `error`
-Events: `LOGIN`, `LOGOUT`, `RETRY`
+Events: `LOGIN`, `LOGOUT`, `RETRY`, `AUTH_DONE`, `AUTH_FAIL`
 
 ```ts
 const idle = state("idle")();
 const authenticating = state("authenticating")();
-const authenticated = state("authenticated")().final();
+const authenticated = state("authenticated")();
 const error = state("error")();
 
 const login = event("LOGIN")<{ username: string; password: string }>();
@@ -179,23 +216,22 @@ type AuthContext = { username?: string; attempts: number };
 
 function createLoginActor() {
   return new Actor({
-    inputs: [login, logout, retry],
-    internal: [authDone, authFail],
+    inputs: [login, logout, retry, authDone, authFail],
     states: [idle, authenticating, authenticated, error],
     initial: idle,
     context: { attempts: 0 } as AuthContext,
     setup: (m) => {
-      m.on(idle, login, (event, opts) => {
-        const s = opts!.context.get();
-        opts!.context.set({ ...s, username: event.username, attempts: s.attempts + 1 });
+      m.on(idle, login, (event, { context }) => {
+        const s = context.get();
+        context.set({ ...s, username: event.username, attempts: s.attempts + 1 });
         return { state: authenticating };
       });
       m.on(authenticating, authDone, () => ({ state: authenticated }));
       m.on(authenticating, authFail, () => ({ state: error }));
       m.on(error, retry, () => ({ state: idle }));
-      m.on(authenticated, logout, (_event, opts) => {
-        const s = opts!.context.get();
-        opts!.context.set({ ...s, username: undefined });
+      m.on(authenticated, logout, (_event, { context }) => {
+        const s = context.get();
+        context.set({ ...s, username: undefined });
         return { state: idle };
       });
     },

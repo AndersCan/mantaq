@@ -17,7 +17,7 @@ matches(actor, "connected.default.active"); // hierarchical
 matches(actor, "player.playback.playing"); // parallel
 ```
 
-Prefix semantics. `matches(actor, "connected")` → true if anywhere inside.
+Prefix match. Checks top-level state name first, then descends only through region names in order. Ends at a state boundary. `matches(actor, "connected")` → true only if top-level state is `connected`. Not "anywhere inside" — that's `isIn`.
 
 ---
 
@@ -55,7 +55,7 @@ e.fetch.create(); // { id: "fetch" }
 ## `tag(...stateRefs)`
 
 ```ts
-function tag(...stateNames: StateRef[]): Tag;
+function tag(...stateRefs: StateRef<string, unknown>[]): Tag;
 ```
 
 Group states. `tag.has(snapshot)` → true if any active.
@@ -79,16 +79,16 @@ map.send("worker1", someEvent);
 map.kill("worker1");
 ```
 
-| Method                 | What                           |
-| ---------------------- | ------------------------------ |
-| `spawn(key, factory)`  | Make child. Replace if exists. |
-| `ensure(key, factory)` | No-op if exists.               |
-| `send(key, event)`     | Send to child.                 |
-| `kill(key)`            | Abort. Remove.                 |
-| `has(key)`             | Exists?                        |
-| `keys()`               | List keys.                     |
-| `snapshot(key)`        | Child snapshot.                |
-| `size`                 | Count.                         |
+| Method                 | What                                   |
+| ---------------------- | -------------------------------------- |
+| `spawn(key, factory)`  | Make child. Replace if exists.         |
+| `ensure(key, factory)` | No-op if exists.                       |
+| `send(key, event)`     | Send to child.                         |
+| `kill(key)`            | Abort. Remove.                         |
+| `has(key)`             | Exists?                                |
+| `keys()`               | List keys.                             |
+| `snapshot(key)`        | Child snapshot. `undefined` if absent. |
+| `size`                 | Count.                                 |
 
 Parent constructor → child outputs auto-forward.
 
@@ -97,7 +97,7 @@ Parent constructor → child outputs auto-forward.
 ## `broadcast(map, event)`
 
 ```ts
-function broadcast(map: SendableMap, event: SendableEvent): void;
+function broadcast<const T extends SendableEvent>(map: SendableMap<T>, event: T): void;
 ```
 
 Send to all children.

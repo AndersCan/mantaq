@@ -29,10 +29,10 @@ const actor = new Actor({
 ```ts
 {
   signal: AbortSignal;           // abort on state exit
-  state: { name: string; payload: unknown };  // current state + payload
+  state: { name: string; payload: unknown };  // payload typed from state ref
   event: InternalEvent;  // trigger event (created instance)
   context: Context<ActorContext>; // handle: get() reads, set() replaces
-  emit: (event) => void;        // emit internal event
+  emit: (event) => void;        // emit event: internal, input, or output
   clock: Clock;                 // timers
 }
 ```
