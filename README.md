@@ -7,6 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Node >=22](https://img.shields.io/badge/node-%3E%3D22.12-blue?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![skills.sh](https://skills.sh/b/AndersCan/mantaq)](https://skills.sh/AndersCan/mantaq)
 
 A TypeScript state machine library built around actors, events, and hierarchical states.
 
