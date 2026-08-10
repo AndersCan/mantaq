@@ -3,6 +3,8 @@ name: react-flow
 description: Build React Flow node-based diagrams. Custom nodes, edges, handles, layouts. Use when creating flow editors, node graphs, or visual node-based UIs.
 argument-hint: "[description of diagram to build]"
 allowed-tools: Read Grep Glob Bash Edit Write
+metadata:
+  internal: true
 ---
 
 # React Flow Diagram Builder
