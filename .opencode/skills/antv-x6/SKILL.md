@@ -1,6 +1,8 @@
 ---
 name: antv-x6
 description: Build graph and diagram editors with AntV X6 v3 (@antv/x6) — flowcharts, DAGs, ER diagrams, workflow canvases, node-link views, with lit-html for custom node content. Use this skill whenever the user mentions X6, @antv/x6, "graph editor", "flowchart library", "diagram canvas", "node and edge editor", or is building/debugging an X6 canvas. Especially use it when the canvas renders blank, nodes do not show, edges will not connect, ports/magnets fail, or lit-html node content does not update — X6 docs are thin and these are the traps this skill fixes.
+metadata:
+  internal: true
 ---
 
 # AntV X6 (v3, lit-html)

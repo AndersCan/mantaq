@@ -2,6 +2,8 @@
 name: self-improvement-worker
 description: Worker agent for self-improvement. Receives task, implements change, commits to branch.
 allowed-tools: Read Grep Glob Bash Edit Write
+metadata:
+  internal: true
 ---
 
 # Self-Improvement Worker

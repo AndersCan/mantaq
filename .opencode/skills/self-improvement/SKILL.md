@@ -4,6 +4,8 @@ description: Orchestrate self-improvement loop. Find tasks, spawn worker agents,
 argument-hint: "[iteration_count] [depth]"
 allowed-tools: Read Grep Glob Bash Edit Write Task
 version: 2
+metadata:
+  internal: true
 ---
 
 # Self-Improvement Orchestrator

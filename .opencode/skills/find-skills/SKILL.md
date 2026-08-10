@@ -3,6 +3,8 @@ name: find-skills
 description: Discover and install agent skills from open ecosystem. Use when user asks how to do X or wants to extend capabilities.
 allowed-tools: Read Grep Glob Bash
 argument-hint: "[search query]"
+metadata:
+  internal: true
 ---
 
 # Find Skills

@@ -2,6 +2,8 @@
 name: save-changes
 description: Save and commit changes. Run after meaningful work done and user confirms ready to commit.
 allowed-tools: Read Grep Glob Bash Edit Write
+metadata:
+  internal: true
 ---
 
 # Save changes

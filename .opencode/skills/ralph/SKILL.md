@@ -2,6 +2,8 @@
 name: ralph
 description: Ralph Wiggum loop. Deep structural improvement. Core first. Refactors and simplifies — good abstractions make bugs impossible. Expensive model thinks, @worker executes. Splits long functions, kills multi-responsibility classes, reduces branching, kills type casts, improves DX via sugar, leaves FIXMEs for next run, self-reflects and improves own prompt at end. Use when user wants run self-improvement loop for deep work.
 allowed-tools: Read Grep Glob Bash Edit Write Task
+metadata:
+  internal: true
 ---
 
 # Ralph Wiggum Loop

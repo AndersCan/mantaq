@@ -60,7 +60,7 @@ actor.snapshot().path[0]; // "running"
 Agent skills for **end users** building with `@mantaq/core` — writing, testing, and reviewing actor-model code. These are **not** for developing the library itself.
 
 ```bash
-npx skills add AndersCan/mantaq --skill mantaq
+npx skills add AndersCan/mantaq
 ```
 
 The `mantaq` skill covers philosophy, building blocks, and transition rules, with sibling files for patterns, testing, sugar helpers, and review conventions.
