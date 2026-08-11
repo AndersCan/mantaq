@@ -47,7 +47,7 @@ map.snapshot("order-1");
 Send one event to every actor in a map (or any `{ keys(), send() }`):
 
 ```ts
-broadcast(map, shutdownEvent); // SendableEvent = EventRef | { id, ... }
+broadcast(map, shutdownEvent); // SendableEvent = EventRef | { type, payload? }
 ```
 
 ## Effect Helpers
