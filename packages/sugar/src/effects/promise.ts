@@ -1,12 +1,12 @@
-type EmitFn = (event: { id: string; [key: string]: unknown }) => void;
+type EmitFn = (event: { type: string; payload?: unknown }) => void;
 
 export function withPromise<T>(
   promise: Promise<T>,
   signal: AbortSignal,
   emit: EmitFn,
   events: {
-    success: (data: T) => { id: string; [key: string]: unknown };
-    error: (err: unknown) => { id: string; [key: string]: unknown };
+    success: (data: T) => { type: string; payload?: unknown };
+    error: (err: unknown) => { type: string; payload?: unknown };
   },
 ): void {
   promise

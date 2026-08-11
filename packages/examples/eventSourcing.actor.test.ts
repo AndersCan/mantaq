@@ -34,10 +34,10 @@ import { matches, states, events } from "@mantaq/sugar";
 // ── Domain Events ──────────────────────────────────────────────────
 
 type AccountEvent =
-  | { type: "ACCOUNT_OPENED"; accountId: string; initialBalance: number; at: number }
-  | { type: "MONEY_DEPOSITED"; amount: number; at: number }
-  | { type: "MONEY_WITHDRAWN"; amount: number; at: number }
-  | { type: "ACCOUNT_CLOSED"; reason: string; at: number };
+  | { type: "ACCOUNT_OPENED"; payload: { accountId: string; initialBalance: number; at: number } }
+  | { type: "MONEY_DEPOSITED"; payload: { amount: number; at: number } }
+  | { type: "MONEY_WITHDRAWN"; payload: { amount: number; at: number } }
+  | { type: "ACCOUNT_CLOSED"; payload: { reason: string; at: number } };
 
 // ── States ─────────────────────────────────────────────────────────
 
@@ -75,13 +75,13 @@ function foldEvents(events: AccountEvent[]): { balance: number } {
   for (const e of events) {
     switch (e.type) {
       case "ACCOUNT_OPENED":
-        balance += e.initialBalance;
+        balance += e.payload.initialBalance;
         break;
       case "MONEY_DEPOSITED":
-        balance += e.amount;
+        balance += e.payload.amount;
         break;
       case "MONEY_WITHDRAWN":
-        balance -= e.amount;
+        balance -= e.payload.amount;
         break;
       case "ACCOUNT_CLOSED":
         break;
@@ -141,46 +141,52 @@ function createAccountAggregate(clock?: VirtualClock) {
         const s = opts!.context.get();
         const domainEvent: AccountEvent = {
           type: "ACCOUNT_OPENED",
-          accountId: evt.accountId,
-          initialBalance: evt.initialBalance,
-          at: c.now(),
+          payload: {
+            accountId: evt.payload.accountId,
+            initialBalance: evt.payload.initialBalance,
+            at: c.now(),
+          },
         };
         opts!.context.set({
           ...s,
           events: [...s.events, domainEvent],
-          balance: s.balance + evt.initialBalance,
+          balance: s.balance + evt.payload.initialBalance,
           version: s.version + 1,
         });
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, depositCmd, (evt, opts) => {
         const s = opts!.context.get();
-        if (evt.amount <= 0) return {};
+        if (evt.payload.amount <= 0) return {};
         const domainEvent: AccountEvent = {
           type: "MONEY_DEPOSITED",
-          amount: evt.amount,
-          at: c.now(),
+          payload: {
+            amount: evt.payload.amount,
+            at: c.now(),
+          },
         };
         opts!.context.set({
           ...s,
           events: [...s.events, domainEvent],
-          balance: s.balance + evt.amount,
+          balance: s.balance + evt.payload.amount,
           version: s.version + 1,
         });
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, withdrawCmd, (evt, opts) => {
         const s = opts!.context.get();
-        if (evt.amount <= 0 || evt.amount > s.balance) return {};
+        if (evt.payload.amount <= 0 || evt.payload.amount > s.balance) return {};
         const domainEvent: AccountEvent = {
           type: "MONEY_WITHDRAWN",
-          amount: evt.amount,
-          at: c.now(),
+          payload: {
+            amount: evt.payload.amount,
+            at: c.now(),
+          },
         };
         opts!.context.set({
           ...s,
           events: [...s.events, domainEvent],
-          balance: s.balance - evt.amount,
+          balance: s.balance - evt.payload.amount,
           version: s.version + 1,
         });
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
@@ -189,8 +195,10 @@ function createAccountAggregate(clock?: VirtualClock) {
         const s = opts!.context.get();
         const domainEvent: AccountEvent = {
           type: "ACCOUNT_CLOSED",
-          reason: evt.reason,
-          at: c.now(),
+          payload: {
+            reason: evt.payload.reason,
+            at: c.now(),
+          },
         };
         opts!.context.set({
           ...s,
@@ -227,7 +235,7 @@ function createBalanceProjection(clock?: VirtualClock) {
     setup: (m) => {
       m.on(trackingState, eventStoredEvt, (evt, opts) => {
         const s = opts!.context.get();
-        const accountEvents = [...s.accountEvents, evt.event];
+        const accountEvents = [...s.accountEvents, evt.payload.event];
         const { balance } = foldEvents(accountEvents);
         opts!.context.set({ ...s, accountEvents, balance, lastVersion: accountEvents.length });
         return {};
@@ -350,9 +358,9 @@ describe("event sourcing — bank account aggregate", () => {
 describe("event sourcing — state derivation via fold", () => {
   it("foldEvents derives balance from event log", () => {
     const events: AccountEvent[] = [
-      { type: "ACCOUNT_OPENED", accountId: "ACC-001", initialBalance: 1000, at: 0 },
-      { type: "MONEY_DEPOSITED", amount: 500, at: 1 },
-      { type: "MONEY_WITHDRAWN", amount: 200, at: 2 },
+      { type: "ACCOUNT_OPENED", payload: { accountId: "ACC-001", initialBalance: 1000, at: 0 } },
+      { type: "MONEY_DEPOSITED", payload: { amount: 500, at: 1 } },
+      { type: "MONEY_WITHDRAWN", payload: { amount: 200, at: 2 } },
     ];
 
     const { balance } = foldEvents(events);
@@ -361,10 +369,10 @@ describe("event sourcing — state derivation via fold", () => {
 
   it("foldEventsToVersion derives state at specific version", () => {
     const events: AccountEvent[] = [
-      { type: "ACCOUNT_OPENED", accountId: "ACC-001", initialBalance: 1000, at: 0 },
-      { type: "MONEY_DEPOSITED", amount: 500, at: 1 },
-      { type: "MONEY_WITHDRAWN", amount: 200, at: 2 },
-      { type: "MONEY_DEPOSITED", amount: 100, at: 3 },
+      { type: "ACCOUNT_OPENED", payload: { accountId: "ACC-001", initialBalance: 1000, at: 0 } },
+      { type: "MONEY_DEPOSITED", payload: { amount: 500, at: 1 } },
+      { type: "MONEY_WITHDRAWN", payload: { amount: 200, at: 2 } },
+      { type: "MONEY_DEPOSITED", payload: { amount: 100, at: 3 } },
     ];
 
     expect(foldEventsToVersion(events, 0).balance).toBe(0);
@@ -393,12 +401,14 @@ describe("event sourcing — snapshot and rebuild", () => {
       version: 2,
       balance: 1500,
       events: [
-        { type: "ACCOUNT_OPENED", accountId: "ACC-001", initialBalance: 1000, at: 0 },
-        { type: "MONEY_DEPOSITED", amount: 500, at: 1 },
+        { type: "ACCOUNT_OPENED", payload: { accountId: "ACC-001", initialBalance: 1000, at: 0 } },
+        { type: "MONEY_DEPOSITED", payload: { amount: 500, at: 1 } },
       ],
     };
 
-    const newEvents: AccountEvent[] = [{ type: "MONEY_WITHDRAWN", amount: 200, at: 2 }];
+    const newEvents: AccountEvent[] = [
+      { type: "MONEY_WITHDRAWN", payload: { amount: 200, at: 2 } },
+    ];
 
     const restored = restoreFromSnapshot(snapshot, newEvents);
     expect(restored.balance).toBe(1300);
@@ -453,14 +463,17 @@ describe("event sourcing — balance projection (read model)", () => {
 
     projection.actor.send(
       eventStoredEvt.create({
-        event: { type: "ACCOUNT_OPENED", accountId: "ACC-001", initialBalance: 1000, at: 0 },
+        event: {
+          type: "ACCOUNT_OPENED",
+          payload: { accountId: "ACC-001", initialBalance: 1000, at: 0 },
+        },
       }),
     );
     expect(projection.actor.context.lastVersion).toBe(1);
 
     projection.actor.send(
       eventStoredEvt.create({
-        event: { type: "MONEY_DEPOSITED", amount: 500, at: 1 },
+        event: { type: "MONEY_DEPOSITED", payload: { amount: 500, at: 1 } },
       }),
     );
     expect(projection.actor.context.lastVersion).toBe(2);
@@ -495,9 +508,9 @@ describe("event sourcing — time travel debugging", () => {
 
     const events = actor.context.events;
 
-    expect(events[0].at).toBe(0);
-    expect(events[1].at).toBe(100);
-    expect(events[2].at).toBe(300);
-    expect(events[0]).toHaveProperty("accountId", "ACC-001");
+    expect(events[0].payload.at).toBe(0);
+    expect(events[1].payload.at).toBe(100);
+    expect(events[2].payload.at).toBe(300);
+    expect(events[0]).toHaveProperty("payload.accountId", "ACC-001");
   });
 });

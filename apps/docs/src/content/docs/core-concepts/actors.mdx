@@ -97,4 +97,4 @@ State tree. Nested for hierarchical actors.
 | `m.onAny(event, fn)`     | Handler for an event in every state         |
 | `m.effect(state, fn)`    | Run `fn` on state entry                     |
 
-Handler returns `{ state }` (optional `payload`, or `emit: [{ id }]`) or `{}` to stay in place.
+Handler returns `{ state }` (optional `payload`, or `emit: [{ type }]`) or `{}` to stay in place.

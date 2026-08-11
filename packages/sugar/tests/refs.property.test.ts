@@ -20,7 +20,7 @@ describe("sugar events helper property tests", () => {
     runProperty(fc.array(anyName, { minLength: 1, maxLength: 6 }), (names) => {
       const refs = events(...names);
       for (const name of names) {
-        if (refs[name].id !== name) return false;
+        if (refs[name].type !== name) return false;
       }
       return true;
     });

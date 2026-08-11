@@ -187,7 +187,7 @@ describe("InternalQueue", () => {
   test("isProcessing is true during processing and false after", () => {
     const queue = new InternalQueue();
     const seen: Array<boolean | undefined> = [];
-    queue.push({ id: "A" });
+    queue.push({ type: "A" });
     queue.process(() => seen.push(queue.isProcessing));
     seen.push(queue.isProcessing);
     expect(seen).toEqual([true, false]);
@@ -196,7 +196,7 @@ describe("InternalQueue", () => {
   test("length is the remaining count while processing", () => {
     const queue = new InternalQueue();
     const lens: number[] = [];
-    queue.push({ id: "A" }, { id: "B" }, { id: "C" });
+    queue.push({ type: "A" }, { type: "B" }, { type: "C" });
     queue.process(() => lens.push(queue.length));
     expect(lens).toEqual([2, 1, 0]);
   });
@@ -214,7 +214,7 @@ describe("InternalQueue", () => {
 
   test("settled stays pending while events are queued", async () => {
     const queue = new InternalQueue();
-    queue.push({ id: "A" });
+    queue.push({ type: "A" });
     let resolved = false;
     const p = queue.settled();
     void p.then(() => {
@@ -228,9 +228,9 @@ describe("InternalQueue", () => {
 
   test("a cancelled process does not leak stopped state", () => {
     const queue = new InternalQueue();
-    queue.push({ id: "A" });
+    queue.push({ type: "A" });
     queue.processCancellable(() => false);
-    queue.push({ id: "B" });
+    queue.push({ type: "B" });
     expect(queue.length).toBe(1);
     queue.process(() => {});
     expect(queue.length).toBe(0);
@@ -239,12 +239,12 @@ describe("InternalQueue", () => {
   test("nested process calls are ignored while processing", () => {
     const queue = new InternalQueue();
     const seen: string[] = [];
-    queue.push({ id: "A" }, { id: "B" });
+    queue.push({ type: "A" }, { type: "B" });
     queue.process((e) => {
-      if (e.id === "A") {
-        queue.process((inner) => seen.push(`inner:${inner.id}`));
+      if (e.type === "A") {
+        queue.process((inner) => seen.push(`inner:${inner.type}`));
       } else {
-        seen.push(`outer:${e.id}`);
+        seen.push(`outer:${e.type}`);
       }
     });
     expect(seen).toEqual(["outer:B"]);
@@ -270,7 +270,7 @@ describe("runEffects", () => {
       effects: { done: [() => seen.push("ran")] },
       state: state("done")().final(),
       statePayload: undefined,
-      event: { id: "X" },
+      event: { type: "X" },
       context: new Context(
         () => ({}),
         () => {},
@@ -287,7 +287,7 @@ describe("runEffects", () => {
       effects: { idle: [] },
       state: state("idle")(),
       statePayload: undefined,
-      event: { id: "X" },
+      event: { type: "X" },
       context: new Context(
         () => ({}),
         () => {},
@@ -340,8 +340,8 @@ describe("internal-registry", () => {
     const fn = () => {};
     setOutputHandler(actor, fn);
     expect(getOutputHandler(actor)[1]).toBe(fn);
-    pushInternal(actor, { id: "P" });
-    expect(pushed).toEqual([{ id: "P" }]);
+    pushInternal(actor, { type: "P" });
+    expect(pushed).toEqual([{ type: "P" }]);
     drainInternal(actor);
     expect(drained).toBe(1);
     abortEffects(actor);
@@ -458,7 +458,7 @@ describe("Actor", () => {
         m.onAny(tick, () => ({ state: active }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.id));
+    setOutputHandler(actor, (e) => received.push(e.type));
     actor.send(tick.create());
     expect(actor.snapshot().path[0]).toBe("active");
     expect(received).toEqual(["OUT"]);
@@ -526,7 +526,7 @@ describe("Actor", () => {
         m.on(idle, go, () => ({ state: active, emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.id));
+    setOutputHandler(actor, (e) => received.push(e.type));
     const warns: string[] = [];
     const original = console.warn;
     console.warn = (...args: unknown[]) => warns.push(String(args[0]));
@@ -556,7 +556,7 @@ describe("Actor", () => {
         m.on(active, stop, () => ({ state: idle, emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.id));
+    setOutputHandler(actor, (e) => received.push(e.type));
     actor.send(go.create());
     actor.send(stop.create());
     expect(actor.snapshot().path[0]).toBe("idle");
@@ -886,7 +886,7 @@ describe("Actor directed mutation tests", () => {
         m.on(idle, go, () => ({ emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.id));
+    setOutputHandler(actor, (e) => received.push(e.type));
     actor.send(go.create());
     expect(received).toEqual(["OUT"]);
   });
@@ -984,7 +984,7 @@ describe("Actor directed mutation tests 2", () => {
         m.onAny(tick, () => ({ emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.id));
+    setOutputHandler(actor, (e) => received.push(e.type));
     actor.send(tick.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(received).toEqual(["OUT"]);

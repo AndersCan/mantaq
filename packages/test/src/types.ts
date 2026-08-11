@@ -18,7 +18,7 @@ export interface TestHarness {
   history: History;
   coverage: () => CoverageReport;
 
-  send(event: { id: string } & Record<string, unknown>): void;
+  send(event: { type: string; payload?: unknown }): void;
   state: AnyActor["state"];
   snapshot(): Snapshot;
   context: Record<string, unknown> | undefined;

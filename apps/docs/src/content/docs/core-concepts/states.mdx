@@ -40,7 +40,7 @@ const healthMonitor = new Actor({
   initial: unknown,
   setup: (m) => {
     m.on(unknown, healthCheckResult, (event) => ({
-      state: event.healthy ? healthy : degraded,
+      state: event.payload.healthy ? healthy : degraded,
     }));
   },
 });
@@ -53,7 +53,7 @@ const manager = new Actor({
   regions: { health: healthMonitor }, // child named "health"
   setup: (m) => {
     m.on(connected, healthCheckResult, (event) => {
-      manager.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
+      manager.regions.health.send(healthCheckResult.create({ healthy: event.payload.healthy }));
       return {};
     });
   },

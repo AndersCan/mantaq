@@ -223,7 +223,7 @@ function createLoginActor() {
     setup: (m) => {
       m.on(idle, login, (event, { context }) => {
         const s = context.get();
-        context.set({ ...s, username: event.username, attempts: s.attempts + 1 });
+        context.set({ ...s, username: event.payload.username, attempts: s.attempts + 1 });
         return { state: authenticating };
       });
       m.on(authenticating, authDone, () => ({ state: authenticated }));

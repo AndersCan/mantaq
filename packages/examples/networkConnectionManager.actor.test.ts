@@ -25,7 +25,7 @@ import type { RegistryError } from "@mantaq/core/internal";
 import { Either } from "@mantaq/utils";
 import { matches, states, events } from "@mantaq/sugar";
 
-function inject(actor: object, event: { id: string }): void {
+function inject(actor: object, event: { type: string }): void {
   Either.match(
     pushInternal(actor, event),
     (err: RegistryError) => {
@@ -96,13 +96,13 @@ function createConnectionManager(clock?: VirtualClock) {
     context: {} as {},
     setup: (m) => {
       m.on(healthStates.unknown, healthCheckResult, (event) => ({
-        state: event.healthy ? healthStates.healthy : healthStates.degraded,
+        state: event.payload.healthy ? healthStates.healthy : healthStates.degraded,
       }));
       m.on(healthStates.healthy, healthCheckResult, (event) => ({
-        state: event.healthy ? healthStates.healthy : healthStates.degraded,
+        state: event.payload.healthy ? healthStates.healthy : healthStates.degraded,
       }));
       m.on(healthStates.degraded, healthCheckResult, (event) => ({
-        state: event.healthy ? healthStates.healthy : healthStates.degraded,
+        state: event.payload.healthy ? healthStates.healthy : healthStates.degraded,
       }));
     },
   });
@@ -147,7 +147,7 @@ function createConnectionManager(clock?: VirtualClock) {
       });
       m.on(connectionStates.disconnected, connectEvent, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, url: event.url, retryCount: 0, lastError: undefined });
+        opts!.context.set({ ...s, url: event.payload.url, retryCount: 0, lastError: undefined });
         return { state: connectionStates.connecting };
       });
       m.on(connectionStates.connecting, e.CONNECTION_ESTABLISHED, (_event, opts) => {
@@ -158,7 +158,7 @@ function createConnectionManager(clock?: VirtualClock) {
       m.on(connectionStates.connecting, connectionFailed, (event, opts) => {
         const s = opts!.context.get();
         const retryCount = s.retryCount + 1;
-        opts!.context.set({ ...s, lastError: event.error, retryCount });
+        opts!.context.set({ ...s, lastError: event.payload.error, retryCount });
         if (retryCount >= s.maxRetries) {
           return { state: connectionStates.failed };
         }
@@ -168,8 +168,8 @@ function createConnectionManager(clock?: VirtualClock) {
         state: connectionStates.disconnected,
       }));
       m.on(connectionStates.connected, healthCheckResult, (event, opts) => {
-        actor.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
-        if (!event.healthy) {
+        actor.regions.health.send(healthCheckResult.create({ healthy: event.payload.healthy }));
+        if (!event.payload.healthy) {
           const s = opts!.context.get();
           opts!.context.set({ ...s, lastError: "Health check failed", retryCount: 0 });
           return { state: connectionStates.reconnecting };
@@ -184,7 +184,7 @@ function createConnectionManager(clock?: VirtualClock) {
       m.on(connectionStates.reconnecting, connectionFailed, (event, opts) => {
         const s = opts!.context.get();
         const retryCount = s.retryCount + 1;
-        opts!.context.set({ ...s, lastError: event.error, retryCount });
+        opts!.context.set({ ...s, lastError: event.payload.error, retryCount });
         if (retryCount >= s.maxRetries) {
           return { state: connectionStates.failed };
         }

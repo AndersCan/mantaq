@@ -43,7 +43,7 @@ describe("Actor dispatch resolution", () => {
     });
 
     const received: string[] = [];
-    setOutputHandler(actor, (e) => received.push(e.id));
+    setOutputHandler(actor, (e) => received.push(e.type));
     actor.send(tick.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(received).toEqual(["OUT"]);

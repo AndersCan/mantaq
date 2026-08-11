@@ -8,7 +8,7 @@ export type { Snapshot } from "./actor-internal.ts";
 export type { Context } from "./context.ts";
 
 export type CreatedOf<E extends AnyEventRef> =
-  E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never;
+  E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never;
 
 export type NonFinalStateRef<States extends AnyStateRef[]> = Extract<
   States[number],
@@ -34,5 +34,5 @@ export type TransitionResult<
 > = {
   state?: AllowedState | { state: AllowedState; payload?: unknown };
   payload?: unknown;
-  emit?: Array<{ id: AllowedEmit }>;
+  emit?: Array<{ type: AllowedEmit }>;
 };

@@ -2,8 +2,8 @@ import { test, describe } from "vite-plus/test";
 import { fc, anyPayload } from "@mantaq/pbt";
 import { withPromise } from "../src/effects/promise.ts";
 
-const SUCCESS = (data: unknown) => ({ id: "success", data });
-const ERROR = (err: unknown) => ({ id: "error", err: String(err) });
+const SUCCESS = (data: unknown) => ({ type: "success", data });
+const ERROR = (err: unknown) => ({ type: "error", err: String(err) });
 
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -13,14 +13,14 @@ describe("withPromise property tests", () => {
   test("a resolved promise emits success exactly once with the data", async () => {
     await fc.assert(
       fc.asyncProperty(anyPayload, async (data) => {
-        const emitted: Array<{ id: string }> = [];
+        const emitted: Array<{ type: string }> = [];
         withPromise(Promise.resolve(data), new AbortController().signal, (e) => emitted.push(e), {
           success: SUCCESS,
           error: ERROR,
         });
         await flush();
         if (emitted.length !== 1) return false;
-        if (emitted[0].id !== "success") return false;
+        if (emitted[0].type !== "success") return false;
         return true;
       }),
     );
@@ -29,14 +29,14 @@ describe("withPromise property tests", () => {
   test("a rejected promise emits error exactly once", async () => {
     await fc.assert(
       fc.asyncProperty(anyPayload, async (data) => {
-        const emitted: Array<{ id: string }> = [];
+        const emitted: Array<{ type: string }> = [];
         withPromise(Promise.reject(data), new AbortController().signal, (e) => emitted.push(e), {
           success: SUCCESS,
           error: ERROR,
         });
         await flush();
         if (emitted.length !== 1) return false;
-        if (emitted[0].id !== "error") return false;
+        if (emitted[0].type !== "error") return false;
         return true;
       }),
     );
@@ -47,7 +47,7 @@ describe("withPromise property tests", () => {
       fc.asyncProperty(anyPayload, async (data) => {
         const controller = new AbortController();
         controller.abort();
-        const emitted: Array<{ id: string }> = [];
+        const emitted: Array<{ type: string }> = [];
         withPromise(Promise.resolve(data), controller.signal, (e) => emitted.push(e), {
           success: SUCCESS,
           error: ERROR,
@@ -62,7 +62,7 @@ describe("withPromise property tests", () => {
     await fc.assert(
       fc.asyncProperty(anyPayload, async (data) => {
         const controller = new AbortController();
-        const emitted: Array<{ id: string }> = [];
+        const emitted: Array<{ type: string }> = [];
         withPromise(Promise.resolve(data), controller.signal, (e) => emitted.push(e), {
           success: SUCCESS,
           error: ERROR,
@@ -70,7 +70,7 @@ describe("withPromise property tests", () => {
         await flush();
         controller.abort();
         await flush();
-        return emitted.length === 1 && emitted[0].id === "success";
+        return emitted.length === 1 && emitted[0].type === "success";
       }),
     );
   });

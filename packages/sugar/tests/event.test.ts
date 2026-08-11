@@ -6,9 +6,9 @@ describe("events", () => {
   test("creates multiple event refs from names", () => {
     const e = events("click", "submit", "cancel");
     expect(e.click).toBeInstanceOf(EventRef);
-    expect(e.click.id).toBe("click");
-    expect(e.submit.id).toBe("submit");
-    expect(e.cancel.id).toBe("cancel");
+    expect(e.click.type).toBe("click");
+    expect(e.submit.type).toBe("submit");
+    expect(e.cancel.type).toBe("cancel");
   });
 
   test("returns empty object for no names", () => {
@@ -24,7 +24,7 @@ describe("events", () => {
   test("create on returned refs works", () => {
     const e = events("click");
     const payload = e.click.create(undefined);
-    expect(payload).toEqual({ id: "click" });
+    expect(payload).toEqual({ type: "click" });
   });
 
   test("is method works on returned refs", () => {
@@ -38,6 +38,6 @@ describe("events", () => {
   test("single event", () => {
     const e = events("tick");
     expect(e.tick).toBeInstanceOf(EventRef);
-    expect(e.tick.id).toBe("tick");
+    expect(e.tick.type).toBe("tick");
   });
 });

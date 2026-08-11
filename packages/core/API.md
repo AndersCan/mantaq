@@ -112,7 +112,7 @@ Factory for `EventRef`. Same curry shape as `state`; payload must be `object | v
 
 ```ts
 function event<const T extends string>(
-  id: T,
+  type: T,
 ): <Payload extends object | void = void>() => EventRef<T, Payload>;
 const click = event("CLICKED")(); // no payload
 const move = event("MOVE")<{ x: number; y: number }>();
@@ -120,16 +120,16 @@ const move = event("MOVE")<{ x: number; y: number }>();
 
 ### EventRef
 
-A declared event: literal id plus optional payload. Creates the event objects `send` accepts and handlers receive.
+A declared event: literal type plus optional payload. Creates the event objects `send` accepts and handlers receive.
 
 ```ts
 class EventRef<const T extends string, Payload extends object | void = void> {
-  readonly id: T;
+  readonly type: T;
   create(payload: Payload): CreatedOfEvent<T, Payload>;
   is(anyEvent: unknown): anyEvent is CreatedOfEvent<T, Payload>;
 }
-const evt = move.create({ x: 1, y: 2 }); // { x: 1, y: 2, id: "MOVE" }
-if (move.is(evt)) evt.x; // narrowed
+const evt = move.create({ x: 1, y: 2 }); // { type: "MOVE", payload: { x: 1, y: 2 } }
+if (move.is(evt)) evt.payload.x; // narrowed
 ```
 
 ### Context
@@ -215,7 +215,7 @@ class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
   effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext, PayloadOf<S>>): this;
 }
 // Handler = (event, opts: { context: Context<ActorContext>; actor: AnyActor }) =>
-//   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ id: string }> }
+//   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ type: string }> }
 m.on(idle, click, () => ({ state: active, emit: [pong.create()] }));
 m.onAny(click, () => ({ state: idle }));
 m.effect(active, ({ context }) => {
@@ -252,18 +252,18 @@ type AnyEventRef = EventRef<string, object | void>;
 
 ### InternalEvent
 
-Runtime event shape: `{ id: string }` plus arbitrary fields — the structural contract the queue, effects, and region wiring move. Public despite the prefix; it is the allowlist exception.
+Runtime event shape: `{ type: string; payload?: unknown }` — the structural contract the queue, effects, and region wiring move. Public despite the prefix; it is the allowlist exception.
 
 ```ts
-type InternalEvent = { id: string } & Record<string, unknown>;
+type InternalEvent = { type: string; payload?: unknown };
 ```
 
 ### CreatedOfEvent
 
-The payload-carrying event object type: payload merged with the literal id, or just `{ id }` when payload-less.
+The payload-carrying event object type: envelope `{ type, payload }`, or just `{ type }` when payload-less.
 
 ```ts
-type CreatedOfEvent<Id extends string, P> = P extends void ? { id: Id } : P & { id: Id };
+type CreatedOfEvent<T extends string, P> = P extends void ? { type: T } : { type: T; payload: P };
 ```
 
 ### EffectInput
@@ -314,7 +314,7 @@ Lifts an `EventRef` to its created event object. `Actor.send` uses it so only de
 
 ```ts
 type CreatedOf<E extends AnyEventRef> =
-  E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never;
+  E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never;
 ```
 
 ## Surface rules

@@ -76,16 +76,16 @@ describe("InternalQueue property tests", () => {
 
         for (const op of ops) {
           if (op.t === "push") {
-            const events = Array.from({ length: op.count }, () => ({ id: `e${n++}` }));
+            const events = Array.from({ length: op.count }, () => ({ type: `e${n++}` }));
             queue.push(...events);
           } else if (op.t === "process") {
             queue.process((e) => {
-              seenReal.push(e.id);
+              seenReal.push(e.type);
             });
           } else {
             let processed = 0;
             queue.processCancellable((e) => {
-              seenReal.push(e.id);
+              seenReal.push(e.type);
               processed++;
               return processed <= op.stop;
             });

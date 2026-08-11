@@ -1,34 +1,33 @@
-export function event<const T extends string>(id: T) {
-  return <Payload extends object | void = void>() => new EventRef<T, Payload>(id);
+export function event<const T extends string>(type: T) {
+  return <Payload extends object | void = void>() => new EventRef<T, Payload>(type);
 }
 
 export type AnyEventRef = EventRef<string, object | void>;
-export type InternalEvent = { id: string } & Record<string, unknown>;
+export type InternalEvent = { type: string; payload?: unknown };
 
-export type CreatedOfEvent<Id extends string, P> = P extends void ? { id: Id } : P & { id: Id };
+export type CreatedOfEvent<T extends string, P> = P extends void
+  ? { type: T }
+  : { type: T; payload: P };
 
 export class EventRef<const T extends string, Payload extends object | void = void> {
-  readonly id: T;
+  readonly type: T;
 
-  constructor(id: T) {
-    this.id = id;
+  constructor(type: T) {
+    this.type = type;
   }
 
   is(anyEvent: unknown): anyEvent is CreatedOfEvent<T, Payload> {
     return (
       !!anyEvent &&
       typeof anyEvent === "object" &&
-      "id" in anyEvent &&
-      (anyEvent as { id: string }).id === this.id
+      "type" in anyEvent &&
+      (anyEvent as { type: string }).type === this.type
     );
   }
 
-  create(): Payload extends void ? { id: T } : void;
-  create(payload: Payload): Payload extends void ? { id: T } : Payload & { id: T };
-  create(payload?: Payload): void | { id: T } | (Payload & { id: T }) {
-    if (payload === undefined) {
-      return { id: this.id };
-    }
-    return { ...payload, id: this.id };
+  create(): Payload extends void ? { type: T } : void;
+  create(payload: Payload): Payload extends void ? { type: T } : { type: T; payload: Payload };
+  create(payload?: Payload): void | { type: T } | { type: T; payload: Payload } {
+    return payload === undefined ? { type: this.type } : { type: this.type, payload };
   }
 }

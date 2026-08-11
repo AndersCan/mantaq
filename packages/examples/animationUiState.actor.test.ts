@@ -123,10 +123,10 @@ function createAnimationActor(clock?: VirtualClock) {
     },
     setup: (m) => {
       m.effect(drawer.drawerOpening, (input) =>
-        withTimeout(300, input, () => ({ id: "DRAWER_OPEN_DONE" })),
+        withTimeout(300, input, () => ({ type: "DRAWER_OPEN_DONE" })),
       );
       m.effect(drawer.drawerClosing, (input) =>
-        withTimeout(300, input, () => ({ id: "DRAWER_CLOSE_DONE" })),
+        withTimeout(300, input, () => ({ type: "DRAWER_CLOSE_DONE" })),
       );
       m.on(drawer.drawerRoot, mainEvents.OPEN_DRAWER, () => ({ state: drawer.drawerOpening }));
       m.on(drawer.drawerRoot, mainEvents.CLOSE_DRAWER, () => ({ state: drawer.drawerClosing }));
@@ -143,7 +143,9 @@ function createAnimationActor(clock?: VirtualClock) {
         return {};
       });
       m.onAny(setBrightnessEvent, (event) => {
-        actor.regions.brightness.send(setBrightnessRegionEvent.create({ level: event.level }));
+        actor.regions.brightness.send(
+          setBrightnessRegionEvent.create({ level: event.payload.level }),
+        );
         return {};
       });
       m.onAny(mainEvents.CYCLE_COLOR, () => {

@@ -31,7 +31,7 @@ Clock extras: `clock.hasPending()`, `clock.pendingTimers()` (assert no leaked ti
 import { createTestHarness } from "@mantaq/test";
 
 const h = createTestHarness(actor);
-h.send({ id: "CONNECTION_FAILED" }); // same as actor.send, but any id
+h.send({ type: "CONNECTION_FAILED" }); // same as actor.send, but any id
 clock.advance(2000);
 expect(matches(actor, "reconnecting")).toBe(true);
 ```

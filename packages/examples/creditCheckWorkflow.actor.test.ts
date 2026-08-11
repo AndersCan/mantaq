@@ -21,7 +21,7 @@ import type { RegistryError } from "@mantaq/core/internal";
 import { Either } from "@mantaq/utils";
 import { matches, withTimeout } from "@mantaq/sugar";
 
-function inject(actor: object, event: { id: string }): void {
+function inject(actor: object, event: { type: string }): void {
   Either.match(
     pushInternal(actor, event),
     (err: RegistryError) => {
@@ -138,13 +138,13 @@ function createCreditCheckActor(clock?: VirtualClock) {
       m.onAny(cancelEvent, () => ({ state: idleState }));
       m.on(idleState, startOrderEvent, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, order: event.order });
+        opts!.context.set({ ...s, order: event.payload.order });
         return { state: checkingCreditState };
       });
       m.on(checkingCreditState, creditCheckDoneEvent, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, creditCheckResult: event.result });
-        if (event.result.approved) {
+        opts!.context.set({ ...s, creditCheckResult: event.payload.result });
+        if (event.payload.result.approved) {
           return { state: processingPaymentState };
         }
         return { state: creditDeniedState };

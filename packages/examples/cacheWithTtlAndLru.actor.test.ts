@@ -119,23 +119,23 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
       m.onAny(getEvent, (event, opts) => {
         const { context } = opts!;
         const s = context.get();
-        const entry = s.entries.get(event.key);
+        const entry = s.entries.get(event.payload.key);
         if (entry) {
           const now = c.now();
           if (entry.expiresAt !== null && entry.expiresAt <= now) {
             const entries = new Map(s.entries);
-            entries.delete(event.key);
+            entries.delete(event.payload.key);
             context.set({
               ...s,
               entries,
-              accessOrder: s.accessOrder.filter((k) => k !== event.key),
+              accessOrder: s.accessOrder.filter((k) => k !== event.payload.key),
               expires: s.expires + 1,
               misses: s.misses + 1,
             });
             return {};
           }
           const entries = new Map(s.entries);
-          entries.set(event.key, {
+          entries.set(event.payload.key, {
             ...entry,
             accessCount: entry.accessCount + 1,
             lastAccessed: now,
@@ -143,7 +143,10 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
           context.set({
             ...s,
             entries,
-            accessOrder: [...s.accessOrder.filter((k) => k !== event.key), event.key],
+            accessOrder: [
+              ...s.accessOrder.filter((k) => k !== event.payload.key),
+              event.payload.key,
+            ],
             hits: s.hits + 1,
           });
           return {};
@@ -154,13 +157,13 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
       m.onAny(deleteEvent, (event, opts) => {
         const { context } = opts!;
         const s = context.get();
-        if (s.entries.has(event.key)) {
+        if (s.entries.has(event.payload.key)) {
           const entries = new Map(s.entries);
-          entries.delete(event.key);
+          entries.delete(event.payload.key);
           context.set({
             ...s,
             entries,
-            accessOrder: s.accessOrder.filter((k) => k !== event.key),
+            accessOrder: s.accessOrder.filter((k) => k !== event.payload.key),
           });
         }
         return {};
@@ -170,16 +173,16 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
         const s = context.get();
         const now = c.now();
         const entry: CacheEntry = {
-          value: event.value,
-          expiresAt: event.ttlMs !== undefined ? now + event.ttlMs : null,
+          value: event.payload.value,
+          expiresAt: event.payload.ttlMs !== undefined ? now + event.payload.ttlMs : null,
           accessCount: 0,
           lastAccessed: now,
         };
         const entries = new Map(s.entries);
-        const accessOrder = s.entries.has(event.key)
+        const accessOrder = s.entries.has(event.payload.key)
           ? s.accessOrder
-          : [...s.accessOrder, event.key];
-        entries.set(event.key, entry);
+          : [...s.accessOrder, event.payload.key];
+        entries.set(event.payload.key, entry);
         context.set({ ...s, entries, accessOrder });
         if (entries.size > s.capacity) {
           return { state: cacheStates.full };
@@ -189,7 +192,7 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
       m.onAny(e.PURGE, () => ({ state: cacheStates.purging }));
       m.onAny(setCapacityEvent, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, capacity: event.capacity });
+        opts!.context.set({ ...s, capacity: event.payload.capacity });
         return {};
       });
       m.on(cacheStates.purging, e.PURGE_DONE, (_event, opts) => {

@@ -38,8 +38,8 @@ const loading = state("loading")<{ id: string }>();
 ```ts
 const start = event("START")();
 const submit = event("SUBMIT")<{ email: string }>();
-submit.create({ email: "a@b.com" }); // → { id, ...payload }
-start.create(); // → { id }
+submit.create({ email: "a@b.com" }); // → { type: "SUBMIT", payload: { email } }
+start.create(); // → { type: "START" }
 submit.is(anything); // type guard
 ```
 
@@ -68,12 +68,12 @@ m.effect(submittingState, (input) => {
   const { signal, clock, emit } = input;
   clock.setTimeout(800, () => {
     if (signal.aborted) return;
-    emit({ id: "SUBMITTING_DONE" });
+    emit({ type: "SUBMITTING_DONE" });
   });
 });
 ```
 
-`emit` accepts a created event or a raw `{ id }`. An id declared in `internal` (or `inputs`) dispatches back into the actor; anything else routes to the output handler (parent queue) or is dropped if no parent. Full routing in Transitions below.
+`emit` accepts a created event or a raw `{ type }`. A type declared in `internal` (or `inputs`) dispatches back into the actor; anything else routes to the output handler (parent queue) or is dropped if no parent. Full routing in Transitions below.
 
 ### Clock
 
@@ -132,7 +132,7 @@ Result — all optional:
 
 ```ts
 { state: doneState }                  // plain transition
-{ state: loading.create({ id }) }     // transition + state payload
+{ state: loading.create({ id }) }     // transition + state payload (state payload, not event)
 { emit: [submittingDone.create()] }   // queue an event, same synchronous run
 { state: x, emit: [...] }             // both
 {}                                    // no-op — cross-state handling in onAny
