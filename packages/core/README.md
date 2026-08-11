@@ -221,8 +221,7 @@ return { state: loadingState };
 
 ```ts
 m.effect(loadingState, ({ event, emit }) => {
-  // ❌ event is the union type, not the specific triggering event
-  // event.payload.url doesn't exist on the union
+  // ❌ event is InternalEvent — payload is unknown, not the triggering event's payload
   emit(doneEvent.create()); // fine — but event.payload.url would be a type error
 });
 ```
