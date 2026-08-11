@@ -2,9 +2,10 @@ import { expect, test, describe } from "vite-plus/test";
 import { Actor, VirtualClock } from "../src/index.ts";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
-import { pushInternal } from "../src/internal-registry.ts";
+import { pushInternal, setOutputHandler } from "../src/internal-registry.ts";
 import type { AnyActor } from "../src/actor-internal.ts";
 import type { AnyStateRef } from "../src/state.ts";
+import type { Snapshot } from "../src/index.ts";
 
 describe("Actor error paths", () => {
   test("initial state warning lists undeclared and declared states", () => {
@@ -135,16 +136,9 @@ describe("Actor error paths", () => {
         });
       },
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(start.create());
-    } finally {
-      console.warn = original;
-    }
+    actor.send(start.create());
     expect(handlerCalls).toBe(2);
-    expect(warns.some((w) => w.includes("budget"))).toBe(true);
+    expect(actor.snapshot().error?.reason).toBe("budget");
   });
 
   test("budget exhaustion aborts the running effect", () => {
@@ -175,5 +169,278 @@ describe("Actor error paths", () => {
     pushInternal(actor, loop.create());
     clock.advance(1);
     expect(effectSignal?.aborted).toBe(true);
+  });
+
+  test("the issue repro: a throwing effect never escapes send and the machine dies", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const done = state("done")();
+    const start = event("START")();
+    const finish = event("FINISH")();
+    let effectRuns = 0;
+    const actor = new Actor({
+      inputs: [start],
+      outputs: [finish],
+      internal: [finish],
+      states: [idle, loading, done],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, start, () => ({ state: loading, emit: [finish.create(), finish.create()] }));
+        m.effect(loading, () => {
+          effectRuns++;
+          throw new Error("effect bug");
+        });
+        m.on(loading, finish, () => ({ state: done }));
+      },
+    });
+    expect(() => actor.send(start.create())).not.toThrow();
+    expect(effectRuns).toBe(1);
+    const snap = actor.snapshot();
+    expect(snap.path[0]).toBe("__error");
+    expect(snap.error?.reason).toBe("effect");
+    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.event.type).toBe("START");
+    expect(snap.error?.error instanceof Error).toBe(true);
+    if (snap.error) {
+      expect((snap.error.error as Error).message).toBe("effect bug");
+    }
+  });
+
+  test("a throwing transition handler routes to the error state and never resurrects", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    let ranAny = false;
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+        m.onAny(go, () => {
+          ranAny = true;
+          return { state: active };
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(() => actor.send(go.create())).not.toThrow();
+    const snap = actor.snapshot();
+    expect(snap.path[0]).toBe("__error");
+    expect(snap.done).toBeUndefined();
+    expect(snap.error?.reason).toBe("transition");
+    expect(snap.error?.event.type).toBe("GO");
+    expect(snap.error?.state.name).toBe("idle");
+    expect(ranAny).toBe(false);
+  });
+
+  test("a throwing effect records the last known good state (half-apply pin)", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, () => {
+          throw new Error("effect boom");
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    const snap = actor.snapshot();
+    expect(snap.path[0]).toBe("__error");
+    expect(snap.error?.reason).toBe("effect");
+    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.event.type).toBe("GO");
+  });
+
+  test("error context is the context from before the bad event", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, (_e, { context }) => {
+          context.set({ n: 99 });
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().error?.context).toEqual({ n: 0 });
+  });
+
+  test("a throwing subscriber is skipped and the machine survives", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const seen: string[] = [];
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+    const warns: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
+    try {
+      actor.on("change", () => {
+        throw new Error("sub boom");
+      });
+      actor.on("change", (snap) => seen.push(snap.path[0]));
+      expect(() => actor.send(go.create())).not.toThrow();
+    } finally {
+      console.warn = original;
+    }
+    expect(seen).toEqual(["idle", "active"]);
+    expect(actor.snapshot().path[0]).toBe("active");
+    expect(actor.snapshot().error).toBeUndefined();
+    expect(warns.some((w) => w.includes("subscriber threw"))).toBe(true);
+  });
+
+  test("a throwing output handler routes to the error state", () => {
+    const idle = state("idle")();
+    const out = event("OUT")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ emit: [out.create()] }));
+      },
+    });
+    setOutputHandler(actor, () => {
+      throw new Error("output boom");
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().error?.reason).toBe("output");
+    expect(actor.snapshot().error?.event.type).toBe("OUT");
+  });
+
+  test("an invalid transition target routes to the error state", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: { state: "garbage" } }) as never);
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().error?.reason).toBe("transition");
+    expect(actor.snapshot().error?.state.name).toBe("idle");
+  });
+
+  test("an async effect rejection routes to the error state", async () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, async () => {
+          throw new Error("late boom");
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    await actor.settled();
+    const snap = actor.snapshot();
+    expect(snap.path[0]).toBe("__error");
+    expect(snap.error?.reason).toBe("effect");
+    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.error instanceof Error).toBe(true);
+    if (snap.error) {
+      expect((snap.error.error as Error).message).toBe("late boom");
+    }
+  });
+
+  test("death emits exactly one change and no done", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    let changes = 0;
+    let dones = 0;
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.effect(active, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.on("change", () => changes++);
+    actor.on("done", () => dones++);
+    changes = 0;
+    actor.send(go.create());
+    expect(changes).toBe(1);
+    expect(dones).toBe(0);
+  });
+
+  test("throwing handlers converge regardless of delivery path", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const bad = event("BAD")();
+    const make = () =>
+      new Actor({
+        inputs: [go, bad],
+        states: [idle, active],
+        initial: idle,
+        setup: (m) => {
+          m.on(idle, go, () => ({ state: active }));
+          m.on(active, bad, () => {
+            throw new Error("boom");
+          });
+        },
+      });
+    const norm = (s: Snapshot) => ({
+      path: s.path,
+      reason: s.error?.reason,
+      event: s.error?.event.type,
+      state: s.error?.state.name,
+    });
+
+    const a = make();
+    const aChanges: Array<{ path: string[]; error?: string }> = [];
+    a.on("change", (s) => aChanges.push({ path: s.path, error: s.error ? "error" : "ok" }));
+    expect(() => a.send(go.create())).not.toThrow();
+    expect(() => a.send(bad.create())).not.toThrow();
+
+    const b = make();
+    const bChanges: Array<{ path: string[]; error?: string }> = [];
+    let sent = false;
+    b.on("change", (s) => {
+      bChanges.push({ path: s.path, error: s.error ? "error" : "ok" });
+      if (s.path[0] === "active" && !sent) {
+        sent = true;
+        b.send(bad.create());
+      }
+    });
+    expect(() => b.send(go.create())).not.toThrow();
+
+    expect(aChanges).toEqual(bChanges);
+    expect(norm(a.snapshot())).toEqual(norm(b.snapshot()));
   });
 });

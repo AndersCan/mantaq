@@ -8,3 +8,4 @@ export type { AnyStateRef } from "./state.ts";
 export { event, EventRef } from "./event.ts";
 export type { AnyEventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
 export type { EffectInput, EffectFn, NonFinalStateRef, CreatedOf } from "./actor-types.ts";
+export type { ErrorInfo, ErrorState } from "./actor-types.ts";

@@ -20,7 +20,7 @@ class Actor<
   const Outputs extends readonly AnyEventRef[] = readonly [],
   ActorContext = Record<string, unknown>,
 > {
-  state: States[number];
+  state: States[number] | ErrorState;
   readonly clock: Clock;
   readonly context: ActorContext;
   readonly regions: Record<string, AnyActor>;
@@ -152,7 +152,7 @@ m.on(idle, tick, (_e, { context }) => {
 
 ### Snapshot
 
-Read-only view of actor state: `path` is the state-name chain from the root, `context` is the current context reference, `regions` nests child snapshots, `done` appears once a final state is reached.
+Read-only view of actor state: `path` is the state-name chain from the root, `context` is the current context reference, `regions` nests child snapshots, `done` appears once a final state is reached. `error` appears once the machine dies into the error state — the actor stops processing and every later `send` is a no-op.
 
 ```ts
 interface Snapshot<C = unknown> {
@@ -160,8 +160,42 @@ interface Snapshot<C = unknown> {
   context: C;
   regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
+  error?: ErrorInfo;
 }
 ```
+
+`done` and `error` are mutually exclusive: `done` means the machine completed successfully, `error` means it died. The machine is dead either way — sends are ignored.
+
+### ErrorInfo
+
+What the machine records when it dies into the error state: the thrown value, the last known good state and context (the state/context when the bad event began processing), the bad event, and why the machine died.
+
+```ts
+interface ErrorInfo {
+  error: unknown;
+  state: AnyStateRef;
+  context: unknown;
+  event: InternalEvent;
+  reason: "transition" | "effect" | "budget" | "output" | "internal" | "async";
+}
+const snap = actor.snapshot();
+if (snap.error) {
+  snap.error.reason; // why the machine died
+  snap.error.state.name; // last known good state
+  snap.error.event.type; // the bad event
+}
+```
+
+### ErrorState
+
+The built-in terminal state the machine enters on any runtime error: a user handler or effect threw, the internal budget was exhausted, or an output handler threw. It is not a declared state — it is synthesized by the actor. The machine is dead: remaining queued events are dropped, effects are aborted, and every subsequent `send` is a no-op. Subscriber exceptions never kill the machine; they are logged and skipped.
+
+```ts
+type ErrorState = StateRef<"__error", unknown, false>;
+const dead = actor.snapshot().path[0] === "__error";
+```
+
+Errors never escape `send()` — they become the error state. Check `snapshot().error` to observe a failure; it is deterministic (same inputs, same trace).
 
 ### AnyActor
 
@@ -287,12 +321,12 @@ payload generic (`state("idle")()`) keep `payload: unknown`.
 
 ### EffectFn
 
-An effect function, run on state entry; the signal aborts on state exit or actor halt.
+An effect function, run on state entry; the signal aborts on state exit or actor halt. May return a promise for async work — a rejected promise is contained the same way as a synchronous throw and kills the machine.
 
 ```ts
 type EffectFn<ActorContext, Payload = unknown> = (
   input: EffectInput<ActorContext, Payload>,
-) => void;
+) => void | Promise<void>;
 m.effect(loading, ({ signal, emit, state }) => {
   state.payload.url; // typed to loading's payload
   const t = setTimeout(() => emit(done.create()), 1000);

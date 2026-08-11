@@ -31,11 +31,11 @@ export const Either = {
     return [undefined, value];
   },
 
-  from<R extends {}>(fn: () => R): Either<unknown, R> {
+  from<R>(fn: () => R): Either<unknown, R> {
     try {
       return [undefined, fn()];
     } catch (error) {
-      return [error, undefined];
+      return [error ?? new Error("thrown value was undefined"), undefined];
     }
   },
 
