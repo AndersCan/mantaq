@@ -1,10 +1,11 @@
 import type { AnyStateRef } from "./state.ts";
-import type { Snapshot } from "./actor-types.ts";
+import type { ErrorInfo, Snapshot } from "./actor-types.ts";
 
 export function buildSnapshot<C>(
   s: AnyStateRef,
   regions: Record<string, { snapshot(): Snapshot }>,
   context: C,
+  error?: ErrorInfo,
 ): Snapshot<C> {
   const path = [s.name];
   const regionSnapshots: Record<string, Snapshot> = {};
@@ -17,6 +18,9 @@ export function buildSnapshot<C>(
 
   if (s.isFinal) {
     snap.done = true;
+  }
+  if (error !== undefined) {
+    snap.error = error;
   }
 
   return snap;

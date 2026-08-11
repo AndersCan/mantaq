@@ -1,5 +1,5 @@
 import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
-import type { AnyStateRef } from "./state.ts";
+import type { AnyStateRef, StateRef } from "./state.ts";
 import type { Clock } from "./clock.ts";
 import type { Context } from "./context.ts";
 
@@ -26,8 +26,22 @@ export interface EffectInput<ActorContext, Payload = unknown> {
 
 export type EffectFn<ActorContext, Payload = unknown> = (
   input: EffectInput<ActorContext, Payload>,
-) => void;
+) => void | Promise<void>;
+export type ErrorReason = "transition" | "effect" | "budget" | "output" | "internal" | "async";
 
+export interface ErrorInfo {
+  error: unknown;
+  state: AnyStateRef;
+  context: unknown;
+  event: InternalEvent;
+  reason: ErrorReason;
+}
+export type ErrorState = StateRef<"__error", unknown, false>;
+
+export interface LastKnownState {
+  state: AnyStateRef;
+  context: unknown;
+}
 export type TransitionResult<
   AllowedState extends AnyStateRef = AnyStateRef,
   AllowedEmit extends string = string,

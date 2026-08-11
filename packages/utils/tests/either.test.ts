@@ -34,6 +34,14 @@ describe("Either runtime", () => {
     expect(Either.getLeft(caught)).toBe(err);
   });
 
+  test("from normalizes a thrown undefined into an error", () => {
+    const caught = Either.from(() => {
+      throw undefined;
+    });
+    expect(Either.isLeft(caught)).toBe(true);
+    expect((Either.getLeft(caught) as Error).message).toMatch(/thrown value was undefined/);
+  });
+
   test("getLeft / getRight expose the value or undefined", () => {
     expect(Either.getLeft(Either.left("e"))).toBe("e");
     expect(Either.getLeft(Either.right(1))).toBeUndefined();

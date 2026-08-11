@@ -1,4 +1,5 @@
 import type { Snapshot } from "./actor-types.ts";
+import { Either } from "@mantaq/utils";
 
 export class Subscribers<C> {
   readonly change = new Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>();
@@ -11,7 +12,8 @@ export class Subscribers<C> {
 
   addChange(fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void {
     this.change.add(fn);
-    if (this.#last) fn(this.#last, this.#last);
+    const last = this.#last;
+    if (last) this.#safe(() => fn(last, last));
     return () => this.change.delete(fn);
   }
 
@@ -23,15 +25,28 @@ export class Subscribers<C> {
   emitChange(snapshot: Snapshot<C>): void {
     const prev = this.#last ?? snapshot;
     this.#last = snapshot;
-    for (const fn of this.change) fn(snapshot, prev);
+    for (const fn of this.change) {
+      this.#safe(() => fn(snapshot, prev));
+    }
   }
 
   emitDone(): void {
-    for (const fn of this.done) fn();
+    for (const fn of this.done) {
+      this.#safe(fn);
+    }
   }
 
   clear(): void {
     this.change.clear();
     this.done.clear();
+  }
+
+  #safe(fn: () => void): void {
+    const err = Either.from(fn);
+    if (err[0] !== undefined) {
+      console.warn(
+        `[Actor] subscriber threw: ${err[0] instanceof Error ? err[0].message : "unknown error"}`,
+      );
+    }
   }
 }
