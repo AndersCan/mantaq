@@ -89,7 +89,7 @@ import { events } from "@mantaq/sugar";
 
 const e = events("fetch", "resolve", "fail");
 
-e.fetch.create(); // { id: "fetch" }
+e.fetch.create(); // { type: "fetch" }
 e.resolve.is(emittedEvent); // boolean
 
 const actor = new Actor({
@@ -203,7 +203,7 @@ map.kill("child1");
 
 ```ts
 map.spawn("child1", () => createChild());
-map.spawn("child1", () => createChild()); // overwrites silently — previous child lost
+map.spawn("child1", () => createChild()); // warns, aborts the previous child, replaces
 ```
 
 `ensure()` is idempotent — safe to call repeatedly. `spawn()` always replaces.
@@ -217,8 +217,8 @@ import { withPromise } from "@mantaq/sugar";
 
 // Correct — abort-aware
 withPromise(fetchData(), input.signal, input.emit, {
-  success: (data) => ({ id: "loaded", data }),
-  error: (err) => ({ id: "loadFailed", error: String(err) }),
+  success: (data) => ({ type: "loaded", payload: data }),
+  error: (err) => ({ type: "loadFailed", payload: String(err) }),
 });
 ```
 
@@ -227,14 +227,14 @@ withPromise(fetchData(), input.signal, input.emit, {
 ```ts
 fetchData()
   .then((data) => {
-    input.emit({ id: "loaded", data }); // fires even if actor destroyed
+    input.emit({ type: "loaded", payload: data }); // fires even if actor destroyed
   })
   .catch((err) => {
-    input.emit({ id: "loadFailed", error: String(err) }); // same problem
+    input.emit({ type: "loadFailed", payload: String(err) }); // same problem
   });
 ```
 
-`withPromise` checks `isAborted(signal)` before each emit. Manual chains fire events into destroyed actors.
+`withPromise` checks `signal.aborted` before each emit. Manual chains fire events into destroyed actors.
 
 ## Helpers
 
@@ -302,7 +302,7 @@ Send an event to every key in an `ActorMap` (or any `SendableMap`):
 ```ts
 import { broadcast } from "@mantaq/sugar";
 
-broadcast(map, { id: "ping" });
+broadcast(map, { type: "ping" });
 ```
 
 Works with `ActorMap` or any object implementing `{ keys(): string[]; send(key, event): void }`.
@@ -344,7 +344,7 @@ Batch-create `EventRef`s as a typed record:
 import { events } from "@mantaq/sugar";
 
 const e = events("click", "submit");
-e.click.create(); // { id: "click" }
+e.click.create(); // { type: "click" }
 e.click.is(emittedEvent); // boolean
 ```
 
@@ -356,8 +356,8 @@ Bridge a promise into actor events. Emits `success` on resolve, `error` on rejec
 import { withPromise } from "@mantaq/sugar";
 
 withPromise(fetchData(), input.signal, input.emit, {
-  success: (data) => ({ id: "loaded", data }),
-  error: (err) => ({ id: "loadFailed", error: String(err) }),
+  success: (data) => ({ type: "loaded", payload: data }),
+  error: (err) => ({ type: "loadFailed", payload: String(err) }),
 });
 ```
 
@@ -368,7 +368,7 @@ Schedule a timeout event through the actor's clock. Aborts cleanly if the actor 
 ```ts
 import { withTimeout } from "@mantaq/sugar";
 
-withTimeout(5000, input, () => ({ id: "timeout", reason: "exceeded" }));
+withTimeout(5000, input, () => ({ type: "timeout", payload: { reason: "exceeded" } }));
 ```
 
 ## Migration from Core

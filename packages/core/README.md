@@ -10,18 +10,19 @@ npm install @mantaq/core
 
 ## Quick Reference
 
-| Pattern         | Correct                                | Anti-pattern                           |
-| --------------- | -------------------------------------- | -------------------------------------- |
-| Type context    | `context: {} as MyContext`             | casting in every handler               |
-| Type events     | `event("ID")<Payload>()`               | `event("ID")()` without generic        |
-| Send events     | `actor.send(signInEvent.create(data))` | raw `{ type: "ID", payload }` objects  |
-| Effect data     | Use state payload                      | Depend on `event` in effect            |
-| Error handling  | Emit internal event                    | Throw in effect or transition          |
-| Internal events | Declare in `internal: [...]`           | Put user events in internal            |
-| Signal check    | `if (signal.aborted) return`           | Skip abort check in async work         |
-| Regions         | Child outputs in parent `internal`     | Forget to declare child outputs        |
-| Snapshot        | Save path + context manually           | Expect `snapshot()` to include context |
-| Any handler     | Universal events only (CANCEL)         | State-specific logic in `onAny`        |
+| Pattern         | Correct                                | Anti-pattern                          |
+| --------------- | -------------------------------------- | ------------------------------------- |
+| Type context    | `context: {} as MyContext`             | casting in every handler              |
+| Write context   | `context.set({ ...context.get() })`    | mutate without `set()`                |
+| Type events     | `event("ID")<Payload>()`               | `event("ID")()` without generic       |
+| Send events     | `actor.send(signInEvent.create(data))` | raw `{ type: "ID", payload }` objects |
+| Effect data     | Use state payload                      | Depend on `event` in effect           |
+| Error handling  | Emit internal event                    | Throw in effect or transition         |
+| Internal events | Declare in `internal: [...]`           | Put user events in internal           |
+| Signal check    | `if (signal.aborted) return`           | Skip abort check in async work        |
+| Regions         | Child outputs in parent `internal`     | Forget to declare child outputs       |
+| Snapshot        | `snapshot()` carries path + context    | Re-serialize context by hand          |
+| Any handler     | Universal events only (CANCEL)         | State-specific logic in `onAny`       |
 
 ## Contents
 
@@ -102,7 +103,7 @@ const actor = new Actor({
 });
 ```
 
-`set()` requires a **new object reference** — change detection is reference equality. Always spread the current value:
+`set()` is the write signal — always call it to write, even when the new value is the same reference. Any `set()` triggers `change`. Spread the current value:
 
 ```ts
 opts.context.set({ ...opts.context.get(), phoneNumber: event.payload.phoneNumber });
@@ -111,7 +112,7 @@ opts.context.set({ ...opts.context.get(), phoneNumber: event.payload.phoneNumber
 **Never mutate in place:**
 
 ```ts
-// ❌ defeats change detection — subscribers and persistence stay silent
+// ❌ mutation without set() — never signals; subscribers and persistence stay silent
 opts!.context.phoneNumber = event.payload.phoneNumber;
 ```
 
@@ -174,7 +175,7 @@ actor.send({ type: "SIGN_IN", payload: { phoneNumber: "+1234567890" } });
 
 ### Effects and Event Typing
 
-Effects run when entering a state. The `event` parameter in effects is typed as the union of all possible events (`Inputs[number] | Internal[number]`) — not the specific event that triggered the transition. This is by design: effects live on states, not transitions. Multiple transitions can lead to the same state, so the effect cannot know which event caused entry.
+Effects run when entering a state. The `event` parameter in effects is typed `InternalEvent` — `{ type, payload? }` with `payload: unknown` — not the specific event that triggered the transition. This is by design: effects live on states, not transitions. Multiple transitions can lead to the same state, so the effect cannot know which event caused entry.
 
 **Pass data to effects via state payload.** Set the payload in the transition return, read it from `state.payload` in the effect.
 
@@ -337,45 +338,29 @@ m.effect(workingState, ({ signal, emit, clock }) => {
 
 ### Snapshot & Restore
 
-`actor.snapshot()` returns a serializable `Snapshot` — `{ path, regions, done? }`. It does **not** include context. Use it to save/restore actor state across sessions.
+`actor.snapshot()` returns a `Snapshot` — `{ path, context, regions, done?, error? }`. Context is included. Use it to save/restore actor state across sessions.
 
 ```ts
-interface SerializedActor {
-  path: string[];
-  regions: Record<string, unknown>;
-  context: Record<string, unknown>;
-}
-
-function saveActor(actor: { snapshot(): Snapshot; context: unknown }): SerializedActor {
-  return {
-    ...actor.snapshot(),
-    context: { ...(actor.context as Record<string, unknown>) },
-  };
-}
-
-// Usage
-const saved = saveActor(actor);
+// Snapshot carries path, context, and regions — serialize it directly
+const saved = actor.snapshot();
 localStorage.setItem("actor", JSON.stringify(saved));
 
 const raw = localStorage.getItem("actor");
 if (raw) {
-  const data = JSON.parse(raw) as SerializedActor;
-  // restore from data.path and data.context
+  const data = JSON.parse(raw) as Snapshot;
+  // rebuild the actor from data.path (re-seed context from data.context if needed)
 }
 ```
 
-**Anti-pattern — trying to snapshot context via `snapshot()`:**
+**Anti-pattern — re-serializing context by hand:**
 
 ```ts
-// ❌ snapshot() only returns path + regions, not context
+// ❌ snapshot() already includes context — no manual step needed
 const snap = actor.snapshot();
-snap.context; // doesn't exist
+snap.context; // exists
 
-// ✅ serialize context yourself
-const stateData = {
-  path: actor.snapshot().path,
-  context: { ...actor.context },
-};
+// ✅ save the snapshot as-is
+const stateData = actor.snapshot();
 ```
 
 ### Dynamic Children (Regions)
