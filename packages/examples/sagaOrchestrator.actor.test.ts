@@ -26,7 +26,7 @@ import type { RegistryError } from "@mantaq/core/internal";
 import { Either } from "@mantaq/utils";
 import { matches, states, events, withTimeout } from "@mantaq/sugar";
 
-function inject(actor: object, event: { id: string }): void {
+function inject(actor: object, event: { type: string }): void {
   Either.match(
     pushInternal(actor, event),
     (err: RegistryError) => {
@@ -169,28 +169,28 @@ function createSagaActor(clock?: VirtualClock) {
       });
       m.on(s.idle, START, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, order: event.order });
+        opts!.context.set({ ...cur, order: event.payload.order });
         return { state: s.reservingInventory };
       });
       m.on(s.reservingInventory, INVENTORY_RESERVED, (event, opts) => {
         const cur = opts!.context.get();
         opts!.context.set({
           ...cur,
-          reservationId: event.result.reservationId,
+          reservationId: event.payload.result.reservationId,
           completedSteps: [...cur.completedSteps, "inventory"],
         });
         return { state: s.processingPayment };
       });
       m.on(s.reservingInventory, INVENTORY_FAILED, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, error: event.error });
+        opts!.context.set({ ...cur, error: event.payload.error });
         return { state: failed };
       });
       m.on(s.processingPayment, PAYMENT_PROCESSED, (event, opts) => {
         const cur = opts!.context.get();
         opts!.context.set({
           ...cur,
-          transactionId: event.result.transactionId,
+          transactionId: event.payload.result.transactionId,
           completedSteps: [...cur.completedSteps, "payment"],
         });
         return { state: s.creatingShipment };
@@ -199,7 +199,7 @@ function createSagaActor(clock?: VirtualClock) {
         const cur = opts!.context.get();
         opts!.context.set({
           ...cur,
-          error: event.error,
+          error: event.payload.error,
           completedSteps: [...cur.completedSteps, "payment_failed"],
         });
         return { state: s.compensatingRefund };
@@ -208,14 +208,14 @@ function createSagaActor(clock?: VirtualClock) {
         const cur = opts!.context.get();
         opts!.context.set({
           ...cur,
-          trackingNumber: event.result.trackingNumber,
+          trackingNumber: event.payload.result.trackingNumber,
           completedSteps: [...cur.completedSteps, "shipment"],
         });
         return { state: s.notifying };
       });
       m.on(s.creatingShipment, SHIPMENT_FAILED, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, error: event.error });
+        opts!.context.set({ ...cur, error: event.payload.error });
         return { state: s.compensatingRefund };
       });
       m.on(s.notifying, NOTIFICATION_SENT, () => ({ state: completed }));
@@ -235,7 +235,7 @@ function createSagaActor(clock?: VirtualClock) {
       });
       m.on(s.compensatingRefund, REFUND_FAILED, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, error: `Refund failed: ${event.error}` });
+        opts!.context.set({ ...cur, error: `Refund failed: ${event.payload.error}` });
         return { state: failed };
       });
       m.on(s.compensatingRelease, RELEASE_DONE, (_event, opts) => {
@@ -245,7 +245,7 @@ function createSagaActor(clock?: VirtualClock) {
       });
       m.on(s.compensatingRelease, RELEASE_FAILED, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, error: `Release failed: ${event.error}` });
+        opts!.context.set({ ...cur, error: `Release failed: ${event.payload.error}` });
         return { state: failed };
       });
     },

@@ -16,11 +16,11 @@ describe("broadcast", () => {
     const sent: Array<{ key: string; event: unknown }> = [];
     const map = mockMap(["a", "b"], sent);
 
-    broadcast(map, { id: "ping" });
+    broadcast(map, { type: "ping" });
 
     expect(sent).toEqual([
-      { key: "a", event: { id: "ping" } },
-      { key: "b", event: { id: "ping" } },
+      { key: "a", event: { type: "ping" } },
+      { key: "b", event: { type: "ping" } },
     ]);
   });
 
@@ -28,7 +28,7 @@ describe("broadcast", () => {
     const sent: Array<{ key: string; event: unknown }> = [];
     const map = mockMap([], sent);
 
-    expect(() => broadcast(map, { id: "ping" })).not.toThrow();
+    expect(() => broadcast(map, { type: "ping" })).not.toThrow();
     expect(sent).toEqual([]);
   });
 
@@ -64,7 +64,7 @@ describe("broadcast", () => {
 
   test("with empty ActorMap — no-op", () => {
     const map = new ActorMap();
-    expect(() => broadcast(map, { id: "ping" })).not.toThrow();
+    expect(() => broadcast(map, { type: "ping" })).not.toThrow();
   });
 
   test("with different event types via ActorMap", () => {

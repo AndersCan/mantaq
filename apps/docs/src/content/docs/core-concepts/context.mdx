@@ -45,7 +45,7 @@ that is what triggers a `change` event.
 setup: (m) => {
   m.on(idle, login, (event, { context }) => {
     const s = context.get();
-    context.set({ ...s, username: event.username, attempts: s.attempts + 1 });
+    context.set({ ...s, username: event.payload.username, attempts: s.attempts + 1 });
     return { state: authenticating };
   });
 },
@@ -67,7 +67,7 @@ setup: (m) => {
   m.effect(authenticating, ({ context, emit }) => {
     const s = context.get();
     authenticate(s.username).then(
-      (result) => emit({ id: "AUTH_DONE", result }),
+      (result) => emit({ type: "AUTH_DONE", payload: result }),
     );
   });
 },

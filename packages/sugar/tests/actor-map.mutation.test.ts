@@ -258,7 +258,7 @@ describe("ActorMap directed mutation tests", () => {
 
   test("send to a missing key is a no-op", () => {
     const map = new ActorMap();
-    expect(() => map.send("missing", { id: "x" })).not.toThrow();
+    expect(() => map.send("missing", { type: "x" })).not.toThrow();
   });
 
   test("kill of a missing key is a no-op", () => {
@@ -293,12 +293,12 @@ describe("ActorMap directed mutation tests", () => {
   });
 
   test("spawn with a parent wires child output to the parent send", () => {
-    const sent: Array<{ id: string }> = [];
+    const sent: Array<{ type: string }> = [];
     const parent = {
       state: state("parent")(),
       clock: new VirtualClock(),
       regions: {},
-      send: (e: unknown) => sent.push(e as { id: string }),
+      send: (e: unknown) => sent.push(e as { type: string }),
       snapshot: () => ({ path: ["parent"], regions: {} }),
       on: () => () => {},
       settled: async () => {},

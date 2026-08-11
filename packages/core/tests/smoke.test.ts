@@ -38,7 +38,7 @@ describe("API smoke", () => {
       initial: { state: idle, payload: { x: 0 } },
       setup: (m) => {
         m.on(idle, start, (event) => {
-          expect(typeof event.url).toBe("string");
+          expect(typeof event.payload.url).toBe("string");
           return { state: running };
         });
       },

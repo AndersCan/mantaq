@@ -1,6 +1,6 @@
 import { StateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
-import type { AnyEventRef, EventRef, InternalEvent } from "./event.ts";
+import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
 import { RealClock } from "./real-clock.ts";
 import { VirtualClock } from "./virtual-clock.ts";
 import type { Clock } from "./clock.ts";
@@ -20,7 +20,7 @@ export { RealClock, VirtualClock };
 export type { Clock, Snapshot, AnyActor };
 
 type CreatedOf<E extends AnyEventRef> =
-  E extends EventRef<infer Id, infer P> ? (P extends void ? { id: Id } : P & { id: Id }) : never;
+  E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never;
 
 type InitialState<S extends AnyStateRef> =
   S extends StateRef<infer _N extends string, infer P>
@@ -152,8 +152,8 @@ export class Actor<
       effects: built.effects,
     };
 
-    this.#internalIds = new Set((options.internal ?? []).map((e) => e.id));
-    this.#inputIds = new Set(options.inputs.map((e) => e.id));
+    this.#internalIds = new Set((options.internal ?? []).map((e) => e.type));
+    this.#inputIds = new Set(options.inputs.map((e) => e.type));
     this.#internalBudget = options.internalBudget ?? 10_000;
     this.clock = options.clock ?? new RealClock();
     this.clock.setDrain?.(() => this.#drainInternal());
@@ -228,8 +228,8 @@ export class Actor<
   #dispatch(event: InternalEvent): void {
     if (this.state.isFinal) return;
     const transitions = this.#options.transitions;
-    const stateTransition = transitions[this.state.name]?.[event.id];
-    const anyTransition = transitions["Any"]?.[event.id];
+    const stateTransition = transitions[this.state.name]?.[event.type];
+    const anyTransition = transitions["Any"]?.[event.type];
 
     const transitionApplied = stateTransition
       ? this.#applyStateStep(event, stateTransition)
@@ -242,7 +242,7 @@ export class Actor<
       this.#drainInternal();
     } else if (!stateTransition && !anyTransition) {
       console.warn(
-        `[Actor] no transition for event "${event.id}" in state "${this.state.name}". Event dropped.`,
+        `[Actor] no transition for event "${event.type}" in state "${this.state.name}". Event dropped.`,
       );
     }
   }
@@ -333,7 +333,7 @@ export class Actor<
           return false;
         }
         count++;
-        if (this.#internalIds.has(event.id) || this.#inputIds.has(event.id)) {
+        if (this.#internalIds.has(event.type) || this.#inputIds.has(event.type)) {
           this.#dispatch(event);
         } else if (this.#outputHandler) {
           this.#outputHandler(event);

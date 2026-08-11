@@ -53,8 +53,8 @@ function wrapWithProxy(
     },
 
     send(event: unknown) {
-      const { id: eventId } = trackSendEvent(history, event);
-      pendingEventId.value = eventId;
+      const { type: eventType } = trackSendEvent(history, event);
+      pendingEventId.value = eventType;
       try {
         origSend(event as Parameters<typeof origSend>[0]);
       } finally {
@@ -85,14 +85,14 @@ function recordTransition(history: History, from: string, to: string, eventId: s
   });
 }
 
-function trackSendEvent(history: History, event: unknown): { id: string } {
-  const evt = event as { id?: string };
-  const eventId = evt?.id ?? "unknown";
+function trackSendEvent(history: History, event: unknown): { type: string } {
+  const evt = event as { type?: string };
+  const eventId = evt?.type ?? "unknown";
   history.append({
     type: "send",
     data: { event: eventId, timestamp: Date.now() },
   });
-  return { id: eventId };
+  return { type: eventId };
 }
 
 export function instrument(actor: AnyActor): InstrumentedActor {

@@ -45,12 +45,12 @@ const fetchData = event("FETCH")<{ url: string }>();
 
 ### `EventRef<T, Payload>`
 
-| Property           | Type                  | What                       |
-| ------------------ | --------------------- | -------------------------- |
-| `id`               | `T`                   | Event id                   |
-| `.is(event)`       | `boolean`             | Identity check. Type guard |
-| `.create()`        | `{ id: T }`           | Void-payload instance      |
-| `.create(payload)` | `Payload & { id: T }` | Payload instance           |
+| Property           | Type                            | What                       |
+| ------------------ | ------------------------------- | -------------------------- |
+| `type`             | `T`                             | Event type (discriminant)  |
+| `.is(event)`       | `boolean`                       | Identity check. Type guard |
+| `.create()`        | `{ type: T }`                   | Void-payload instance      |
+| `.create(payload)` | `{ type: T; payload: Payload }` | Payload instance           |
 
 ---
 
@@ -224,7 +224,7 @@ type EffectInput<ActorContext, Payload = unknown> = {
 type TransitionResult<AllowedState = AnyStateRef, AllowedEmit = string> = {
   state?: AllowedState | { state: AllowedState; payload?: unknown };
   payload?: unknown;
-  emit?: Array<{ id: AllowedEmit }>;
+  emit?: Array<{ type: AllowedEmit }>;
 };
 ```
 
@@ -233,7 +233,7 @@ Internal type. Not exported. Handler returns infer from it.
 ### `InternalEvent`
 
 ```ts
-type InternalEvent = { id: string } & Record<string, unknown>;
+type InternalEvent = { type: string; payload?: unknown };
 ```
 
 ### `AnyActor`
@@ -259,10 +259,10 @@ interface AnyActor<C = Record<string, unknown>> {
 
 ### More types
 
-| Type                       | What                                                        |
-| -------------------------- | ----------------------------------------------------------- |
-| `NonFinalStateRef<States>` | Non-terminal state refs                                     |
-| `CreatedOf<E>`             | Event instance type for `E`: `{ id }` or `Payload & { id }` |
-| `CreatedOfEvent<Id, P>`    | Same, explicit id and payload                               |
-| `EffectFn<C, P>`           | `(input: EffectInput<C, P>) => void`                        |
-| `SetupFn<...>`             | `(m: ActorBuilder<...>) => void` — the `setup` option type  |
+| Type                       | What                                                           |
+| -------------------------- | -------------------------------------------------------------- |
+| `NonFinalStateRef<States>` | Non-terminal state refs                                        |
+| `CreatedOf<E>`             | Event instance type for `E`: `{ type }` or `{ type; payload }` |
+| `CreatedOfEvent<Id, P>`    | Same, explicit id and payload                                  |
+| `EffectFn<C, P>`           | `(input: EffectInput<C, P>) => void`                           |
+| `SetupFn<...>`             | `(m: ActorBuilder<...>) => void` — the `setup` option type     |

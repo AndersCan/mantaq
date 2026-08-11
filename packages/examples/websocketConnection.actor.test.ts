@@ -18,7 +18,7 @@ import type { RegistryError } from "@mantaq/core/internal";
 import { Either } from "@mantaq/utils";
 import { matches, withTimeout } from "@mantaq/sugar";
 
-function inject(actor: object, event: { id: string }): void {
+function inject(actor: object, event: { type: string }): void {
   Either.match(
     pushInternal(actor, event),
     (err: RegistryError) => {
@@ -96,23 +96,23 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
     } as WsContext,
     setup: (m) => {
       m.effect(connectingState, (input) =>
-        withTimeout(500, input, () => ({ id: "CONNECTION_ESTABLISHED" })),
+        withTimeout(500, input, () => ({ type: "CONNECTION_ESTABLISHED" })),
       );
       m.effect(connectedState, (input) =>
-        withTimeout(5000, input, () => ({ id: "HEARTBEAT_TIMEOUT" })),
+        withTimeout(5000, input, () => ({ type: "HEARTBEAT_TIMEOUT" })),
       );
       m.effect(reconnectingState, ({ signal, context, emit, clock }) => {
         const s = context.get();
         if (s.retryCount >= s.maxRetries) {
           clock.setTimeout(100, () => {
             if (signal.aborted) return;
-            emit({ id: "MAX_RETRIES_REACHED" });
+            emit({ type: "MAX_RETRIES_REACHED" });
           });
         } else {
           const delay = 1000 * Math.pow(2, s.retryCount);
           clock.setTimeout(delay, () => {
             if (signal.aborted) return;
-            emit({ id: "RECONNECT_TIMEOUT" });
+            emit({ type: "RECONNECT_TIMEOUT" });
           });
         }
       });
@@ -124,13 +124,13 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
       });
       m.on(disconnectedState, connect, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, url: event.url, retryCount: 0 });
+        opts!.context.set({ ...s, url: event.payload.url, retryCount: 0 });
         return { state: connectingState };
       });
       m.on(connectingState, connectionEstablished, () => ({ state: connectedState }));
       m.on(connectingState, connectionFailed, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, retryCount: s.retryCount + 1, error: event.error });
+        opts!.context.set({ ...s, retryCount: s.retryCount + 1, error: event.payload.error });
         return { state: reconnectingState };
       });
       m.on(connectedState, heartbeatTimeout, () => ({ state: reconnectingState }));
@@ -143,7 +143,7 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
       m.on(reconnectingState, maxRetriesReached, () => ({ state: permanentlyDisconnectedState }));
       m.on(permanentlyDisconnectedState, connect, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, url: event.url, retryCount: 0 });
+        opts!.context.set({ ...s, url: event.payload.url, retryCount: 0 });
         return { state: connectingState };
       });
     },

@@ -75,7 +75,7 @@ describe("internal-registry directed mutation tests", () => {
     const message = /not registered/;
     expect(getChildren(victim)[0]?.message).toMatch(message);
     expect(getOutputHandler(victim)[0]?.message).toMatch(message);
-    expect(pushInternal(victim, { id: "X" })[0]?.message).toMatch(message);
+    expect(pushInternal(victim, { type: "X" })[0]?.message).toMatch(message);
     expect(drainInternal(victim)[0]?.message).toMatch(message);
     expect(abortEffects(victim)[0]?.message).toMatch(message);
   });
@@ -93,7 +93,7 @@ describe("internal-registry directed mutation tests", () => {
     const fn = () => {};
     setOutputHandler(actor, fn);
     expect(getOutputHandler(actor)[1]).toBe(fn);
-    pushInternal(actor, { id: "P" });
+    pushInternal(actor, { type: "P" });
     drainInternal(actor);
     abortEffects(actor);
     expect(internal).toBeDefined();
@@ -103,7 +103,7 @@ describe("internal-registry directed mutation tests", () => {
 describe("InternalQueue directed mutation tests", () => {
   test("settled while processing resolves once the drain finishes", async () => {
     const queue = new InternalQueue();
-    queue.push({ id: "A" });
+    queue.push({ type: "A" });
     let resolved = false;
     const p = queue.settled();
     void p.then(() => {
@@ -116,7 +116,7 @@ describe("InternalQueue directed mutation tests", () => {
 
   test("multiple settled callers all resolve", async () => {
     const queue = new InternalQueue();
-    queue.push({ id: "A" });
+    queue.push({ type: "A" });
     const p1 = queue.settled();
     const p2 = queue.settled();
     queue.process(() => {});
@@ -126,10 +126,10 @@ describe("InternalQueue directed mutation tests", () => {
   test("events pushed during processing are drained in the same pass", () => {
     const queue = new InternalQueue();
     const seen: string[] = [];
-    queue.push({ id: "A" });
+    queue.push({ type: "A" });
     queue.process((e) => {
-      seen.push(e.id);
-      if (e.id === "A") queue.push({ id: "B" });
+      seen.push(e.type);
+      if (e.type === "A") queue.push({ type: "B" });
     });
     expect(seen).toEqual(["A", "B"]);
   });
@@ -137,10 +137,10 @@ describe("InternalQueue directed mutation tests", () => {
   test("processCancellable stopping mid-drain drops the remaining events", () => {
     const queue = new InternalQueue();
     const seen: string[] = [];
-    queue.push({ id: "A" }, { id: "B" }, { id: "C" });
+    queue.push({ type: "A" }, { type: "B" }, { type: "C" });
     queue.processCancellable((e) => {
-      seen.push(e.id);
-      return e.id !== "B";
+      seen.push(e.type);
+      return e.type !== "B";
     });
     expect(seen).toEqual(["A", "B"]);
     expect(queue.length).toBe(0);
@@ -168,7 +168,7 @@ describe("internal-registry directed mutation tests 2", () => {
     const expected = "[mantaq] actor is not registered with the internal registry";
     expect(getChildren(victim)).toEqual([{ message: expected }, undefined]);
     expect(getOutputHandler(victim)).toEqual([{ message: expected }, undefined]);
-    expect(pushInternal(victim, { id: "X" })).toEqual([{ message: expected }, undefined]);
+    expect(pushInternal(victim, { type: "X" })).toEqual([{ message: expected }, undefined]);
     expect(drainInternal(victim)).toEqual([{ message: expected }, undefined]);
     expect(abortEffects(victim)).toEqual([{ message: expected }, undefined]);
   });

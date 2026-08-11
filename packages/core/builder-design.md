@@ -34,8 +34,8 @@ new Actor({
   inputs: [start], // start = event("START")<{url: string}>()
   setup: (m) => {
     m.on(idle, start, (event, { context }) => {
-      // event: {url: string} & {id: "START"}  ← inferred from start
-      context.url = event.url; // ✓ typed
+      // event: {type: "START"; payload: {url: string}}  ← inferred from start
+      context.set({ ...context.get(), url: event.payload.url }); // ✓ typed
       return { state: running };
     });
   },

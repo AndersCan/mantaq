@@ -2,13 +2,14 @@ import type { AnyActor, Context } from "@mantaq/core";
 
 /** Synthetic event object for graph introspection — matches minimal InternalEvent shape */
 export interface SyntheticEvent {
-  id: string;
+  type: string;
+  payload?: unknown;
 }
 
 /** Simplified handler return — matches TransitionResult with erased generics */
 interface HandlerResult {
   state?: { name?: string };
-  emit?: Array<{ id?: string }>;
+  emit?: Array<{ type?: string }>;
 }
 
 /** State definition — matches AnyActor.options.states element type */

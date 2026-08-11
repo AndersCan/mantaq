@@ -151,7 +151,7 @@ function createEditorActor(clock?: VirtualClock) {
       });
       m.onAny(undoToCheckpointEvent, (event, { context }) => {
         const cur = context.get();
-        const targetIndex = cur.checkpoints.get(event.name);
+        const targetIndex = cur.checkpoints.get(event.payload.name);
         if (targetIndex === undefined) {
           return { state: s.idle };
         }
@@ -178,7 +178,7 @@ function createEditorActor(clock?: VirtualClock) {
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
-            label: `insert "${event.text}" at ${event.at}`,
+            label: `insert "${event.payload.text}" at ${event.payload.at}`,
           },
         ];
         context.set({
@@ -186,8 +186,8 @@ function createEditorActor(clock?: VirtualClock) {
           undoStack,
           redoStack: [],
           buffer: {
-            content: insertAt(cur.buffer.content, event.at, event.text),
-            cursor: event.at + event.text.length,
+            content: insertAt(cur.buffer.content, event.payload.at, event.payload.text),
+            cursor: event.payload.at + event.payload.text.length,
           },
         });
         return { state: s.editing };
@@ -198,7 +198,7 @@ function createEditorActor(clock?: VirtualClock) {
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
-            label: `delete [${event.from}..${event.to}]`,
+            label: `delete [${event.payload.from}..${event.payload.to}]`,
           },
         ];
         context.set({
@@ -206,8 +206,8 @@ function createEditorActor(clock?: VirtualClock) {
           undoStack,
           redoStack: [],
           buffer: {
-            content: deleteRange(cur.buffer.content, event.from, event.to),
-            cursor: event.from,
+            content: deleteRange(cur.buffer.content, event.payload.from, event.payload.to),
+            cursor: event.payload.from,
           },
         });
         return { state: s.editing };
@@ -218,17 +218,17 @@ function createEditorActor(clock?: VirtualClock) {
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
-            label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+            label: `replace [${event.payload.from}..${event.payload.to}] with "${event.payload.text}"`,
           },
         ];
-        const deleted = deleteRange(cur.buffer.content, event.from, event.to);
+        const deleted = deleteRange(cur.buffer.content, event.payload.from, event.payload.to);
         context.set({
           ...cur,
           undoStack,
           redoStack: [],
           buffer: {
-            content: insertAt(deleted, event.from, event.text),
-            cursor: event.from + event.text.length,
+            content: insertAt(deleted, event.payload.from, event.payload.text),
+            cursor: event.payload.from + event.payload.text.length,
           },
         });
         return { state: s.editing };
@@ -236,7 +236,7 @@ function createEditorActor(clock?: VirtualClock) {
       m.on(s.idle, checkpointEvent, (event, { context }) => {
         const cur = context.get();
         const checkpoints = new Map(cur.checkpoints);
-        checkpoints.set(event.name, cur.undoStack.length);
+        checkpoints.set(event.payload.name, cur.undoStack.length);
         context.set({ ...cur, checkpoints });
         return {};
       });
@@ -246,7 +246,7 @@ function createEditorActor(clock?: VirtualClock) {
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
-            label: `insert "${event.text}" at ${event.at}`,
+            label: `insert "${event.payload.text}" at ${event.payload.at}`,
           },
         ];
         context.set({
@@ -254,8 +254,8 @@ function createEditorActor(clock?: VirtualClock) {
           undoStack,
           redoStack: [],
           buffer: {
-            content: insertAt(cur.buffer.content, event.at, event.text),
-            cursor: event.at + event.text.length,
+            content: insertAt(cur.buffer.content, event.payload.at, event.payload.text),
+            cursor: event.payload.at + event.payload.text.length,
           },
         });
         return {};
@@ -266,7 +266,7 @@ function createEditorActor(clock?: VirtualClock) {
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
-            label: `delete [${event.from}..${event.to}]`,
+            label: `delete [${event.payload.from}..${event.payload.to}]`,
           },
         ];
         context.set({
@@ -274,8 +274,8 @@ function createEditorActor(clock?: VirtualClock) {
           undoStack,
           redoStack: [],
           buffer: {
-            content: deleteRange(cur.buffer.content, event.from, event.to),
-            cursor: event.from,
+            content: deleteRange(cur.buffer.content, event.payload.from, event.payload.to),
+            cursor: event.payload.from,
           },
         });
         return {};
@@ -286,17 +286,17 @@ function createEditorActor(clock?: VirtualClock) {
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
-            label: `replace [${event.from}..${event.to}] with "${event.text}"`,
+            label: `replace [${event.payload.from}..${event.payload.to}] with "${event.payload.text}"`,
           },
         ];
-        const deleted = deleteRange(cur.buffer.content, event.from, event.to);
+        const deleted = deleteRange(cur.buffer.content, event.payload.from, event.payload.to);
         context.set({
           ...cur,
           undoStack,
           redoStack: [],
           buffer: {
-            content: insertAt(deleted, event.from, event.text),
-            cursor: event.from + event.text.length,
+            content: insertAt(deleted, event.payload.from, event.payload.text),
+            cursor: event.payload.from + event.payload.text.length,
           },
         });
         return {};
@@ -304,7 +304,7 @@ function createEditorActor(clock?: VirtualClock) {
       m.on(s.editing, checkpointEvent, (event, { context }) => {
         const cur = context.get();
         const checkpoints = new Map(cur.checkpoints);
-        checkpoints.set(event.name, cur.undoStack.length);
+        checkpoints.set(event.payload.name, cur.undoStack.length);
         context.set({ ...cur, checkpoints });
         return {};
       });

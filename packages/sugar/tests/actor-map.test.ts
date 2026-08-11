@@ -87,7 +87,7 @@ describe("ActorMap", () => {
 
   test("send to non-existent key does not throw", () => {
     const map = new ActorMap();
-    expect(() => map.send("nonexistent", { id: "test" })).not.toThrow();
+    expect(() => map.send("nonexistent", { type: "test" })).not.toThrow();
   });
 
   test("kill non-existent key does not throw", () => {

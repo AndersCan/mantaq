@@ -72,7 +72,7 @@ function createCheckoutActor(clock?: VirtualClock) {
     context: {} as CheckoutContext,
     setup: (m) => {
       m.effect(submittingState, (input) =>
-        withTimeout(800, input, () => ({ id: "SUBMITTING_DONE" })),
+        withTimeout(800, input, () => ({ type: "SUBMITTING_DONE" })),
       );
       m.onAny(backEvent, (_event, opts) => {
         const s = actor.state.name;
@@ -93,20 +93,27 @@ function createCheckoutActor(clock?: VirtualClock) {
       });
       m.on(basicInfoState, submitBasicInfo, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, basicInfo: { email: event.email, name: event.name } });
+        opts!.context.set({
+          ...cur,
+          basicInfo: { email: event.payload.email, name: event.payload.name },
+        });
         return { state: shippingAddressState };
       });
       m.on(shippingAddressState, submitShipping, (event, opts) => {
         const cur = opts!.context.get();
         opts!.context.set({
           ...cur,
-          shippingAddress: { street: event.street, city: event.city, zip: event.zip },
+          shippingAddress: {
+            street: event.payload.street,
+            city: event.payload.city,
+            zip: event.payload.zip,
+          },
         });
         return { state: paymentState };
       });
       m.on(paymentState, submitPayment, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, paymentInfo: { cardNumber: event.cardNumber } });
+        opts!.context.set({ ...cur, paymentInfo: { cardNumber: event.payload.cardNumber } });
         return { state: submittingState };
       });
       m.on(submittingState, submittingDoneEvent, () => ({ state: successState }));

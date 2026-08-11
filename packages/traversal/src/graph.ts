@@ -79,7 +79,7 @@ function invokeHandler(
   actor: AnyActor,
 ): Either<unknown, HandledTransition> {
   return Either.from(() => {
-    const syntheticEvent: SyntheticEvent = { id: eventId };
+    const syntheticEvent: SyntheticEvent = { type: eventId, payload: {} };
     const syntheticContext = new Context<Record<string, unknown>>(
       () => context,
       () => {},
@@ -87,7 +87,8 @@ function invokeHandler(
     const result = handler(syntheticEvent, { context: syntheticContext, actor });
     return {
       targetName: result?.state?.name,
-      emitNames: result?.emit?.map((e) => e.id).filter((id): id is string => Boolean(id)) ?? [],
+      emitNames:
+        result?.emit?.map((e) => e.type).filter((type): type is string => Boolean(type)) ?? [],
     };
   });
 }

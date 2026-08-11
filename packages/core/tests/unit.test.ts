@@ -148,8 +148,8 @@ describe("InternalQueue", () => {
   test("process drains events in order", () => {
     const queue = new InternalQueue();
     const seen: string[] = [];
-    queue.push({ id: "A" }, { id: "B" });
-    queue.process((e) => seen.push(e.id));
+    queue.push({ type: "A" }, { type: "B" });
+    queue.process((e) => seen.push(e.type));
     expect(seen).toEqual(["A", "B"]);
     expect(queue.length).toBe(0);
   });
@@ -157,17 +157,17 @@ describe("InternalQueue", () => {
   test("processCancellable stops when handler returns false", () => {
     const queue = new InternalQueue();
     const seen: string[] = [];
-    queue.push({ id: "A" }, { id: "B" }, { id: "C" });
+    queue.push({ type: "A" }, { type: "B" }, { type: "C" });
     queue.processCancellable((e) => {
-      seen.push(e.id);
-      return e.id !== "B";
+      seen.push(e.type);
+      return e.type !== "B";
     });
     expect(seen).toEqual(["A", "B"]);
   });
 
   test("settled resolves when queue is idle", async () => {
     const queue = new InternalQueue();
-    queue.push({ id: "A" });
+    queue.push({ type: "A" });
     const settled = queue.settled();
     queue.process(() => {});
     await settled;
@@ -182,8 +182,8 @@ describe("InternalQueue", () => {
   test("length counts pending events", () => {
     const queue = new InternalQueue();
     expect(queue.length).toBe(0);
-    queue.push({ id: "A" });
-    queue.push({ id: "B" });
+    queue.push({ type: "A" });
+    queue.push({ type: "B" });
     expect(queue.length).toBe(2);
   });
 });
@@ -221,7 +221,7 @@ describe("runEffects", () => {
       effects: {},
       state: state("done")().final(),
       statePayload: undefined,
-      event: { id: "X" },
+      event: { type: "X" },
       context: new Context(
         () => ({}),
         () => {},
@@ -237,7 +237,7 @@ describe("runEffects", () => {
       effects: {},
       state: state("idle")(),
       statePayload: undefined,
-      event: { id: "X" },
+      event: { type: "X" },
       context: new Context(
         () => ({}),
         () => {},
@@ -257,22 +257,22 @@ describe("runEffects", () => {
           ({ signal, state, event, context, emit, clock: c }) => {
             expect(signal.aborted).toBe(false);
             expect(state.name).toBe("idle");
-            expect(event.id).toBe("X");
+            expect(event.type).toBe("X");
             expect(context.get()).toEqual({ n: 1 });
             expect(c).toBe(clock);
-            emit({ id: "OUT" });
+            emit({ type: "OUT" });
             seen.push("ran");
           },
         ],
       },
       state: state("idle")(),
       statePayload: { x: 1 },
-      event: { id: "X" },
+      event: { type: "X" },
       context: new Context(
         () => ({ n: 1 }),
         () => {},
       ),
-      emit: (e) => seen.push(`emit:${e.id}`),
+      emit: (e) => seen.push(`emit:${e.type}`),
       clock,
     });
     expect(seen).toEqual(["emit:OUT", "ran"]);
@@ -342,20 +342,20 @@ describe("parseTarget", () => {
 });
 
 describe("event ref", () => {
-  test("create builds payload with id", () => {
+  test("create builds envelope with type and payload", () => {
     const e = event("GO")<{ x: number }>();
-    expect(e.create({ x: 1 })).toEqual({ x: 1, id: "GO" });
+    expect(e.create({ x: 1 })).toEqual({ type: "GO", payload: { x: 1 } });
   });
 
   test("create without payload produces id only", () => {
     const e = event("PING")();
-    expect(e.create()).toEqual({ id: "PING" });
+    expect(e.create()).toEqual({ type: "PING" });
   });
 
   test("is matches by id", () => {
     const a = event("A")<{ x: number }>();
-    expect(a.is({ id: "A", x: 1 })).toBe(true);
-    expect(a.is({ id: "B" })).toBe(false);
+    expect(a.is({ type: "A", x: 1 })).toBe(true);
+    expect(a.is({ type: "B" })).toBe(false);
     expect(a.is(null)).toBe(false);
     expect(a.is(42)).toBe(false);
   });

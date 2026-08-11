@@ -8,12 +8,12 @@ describe("withPromise", () => {
     const signal = new AbortController().signal;
 
     withPromise(Promise.resolve(42), signal, emit, {
-      success: (data) => ({ id: "ok", data }),
-      error: (err) => ({ id: "err", message: String(err) }),
+      success: (data) => ({ type: "ok", data }),
+      error: (err) => ({ type: "err", message: String(err) }),
     });
 
     await Promise.resolve();
-    expect(emitted).toEqual([{ id: "ok", data: 42 }]);
+    expect(emitted).toEqual([{ type: "ok", data: 42 }]);
   });
 
   test("emits error on reject", async () => {
@@ -22,13 +22,13 @@ describe("withPromise", () => {
     const signal = new AbortController().signal;
 
     withPromise(Promise.reject(new Error("fail")), signal, emit, {
-      success: (data) => ({ id: "ok", data }),
-      error: (err) => ({ id: "err", message: String(err) }),
+      success: (data) => ({ type: "ok", data }),
+      error: (err) => ({ type: "err", message: String(err) }),
     });
 
     await Promise.resolve();
     await Promise.resolve();
-    expect(emitted).toEqual([{ id: "err", message: "Error: fail" }]);
+    expect(emitted).toEqual([{ type: "err", message: "Error: fail" }]);
   });
 
   test("does not emit if signal aborted before resolve", async () => {
@@ -37,8 +37,8 @@ describe("withPromise", () => {
     const controller = new AbortController();
 
     withPromise(Promise.resolve(42), controller.signal, emit, {
-      success: (data) => ({ id: "ok", data }),
-      error: (err) => ({ id: "err", message: String(err) }),
+      success: (data) => ({ type: "ok", data }),
+      error: (err) => ({ type: "err", message: String(err) }),
     });
 
     controller.abort();
@@ -52,8 +52,8 @@ describe("withPromise", () => {
     const controller = new AbortController();
 
     withPromise(Promise.reject(new Error("fail")), controller.signal, emit, {
-      success: (data) => ({ id: "ok", data }),
-      error: (err) => ({ id: "err", message: String(err) }),
+      success: (data) => ({ type: "ok", data }),
+      error: (err) => ({ type: "err", message: String(err) }),
     });
 
     controller.abort();

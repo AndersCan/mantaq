@@ -54,12 +54,12 @@ broadcast(map, shutdownEvent); // SendableEvent = EventRef | { id, ... }
 
 ```ts
 // fire one event after ms (injected clock — deterministic in tests)
-m.effect(submittingState, (input) => withTimeout(800, input, () => ({ id: "SUBMITTING_DONE" })));
+m.effect(submittingState, (input) => withTimeout(800, input, () => ({ type: "SUBMITTING_DONE" })));
 
 // resolve a promise → emit success/error event (guarded by abort signal)
 withPromise(promise, signal, emit, {
-  success: (data) => ({ id: "FETCH_OK", data }),
-  error: (err) => ({ id: "FETCH_ERR", err }),
+  success: (data) => ({ type: "FETCH_OK", payload: data }),
+  error: (err) => ({ type: "FETCH_ERR", payload: err }),
 });
 ```
 

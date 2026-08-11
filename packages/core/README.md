@@ -10,18 +10,18 @@ npm install @mantaq/core
 
 ## Quick Reference
 
-| Pattern         | Correct                            | Anti-pattern                           |
-| --------------- | ---------------------------------- | -------------------------------------- |
-| Type context    | `context: {} as MyContext`         | casting in every handler               |
-| Type events     | `event("ID")<Payload>()`           | `event("ID")()` without generic        |
-| Send events     | `actor.send(event.create(data))`   | raw `{ id: "ID", ... }` objects        |
-| Effect data     | Use state payload                  | Depend on `event` in effect            |
-| Error handling  | Emit internal event                | Throw in effect or transition          |
-| Internal events | Declare in `internal: [...]`       | Put user events in internal            |
-| Signal check    | `if (signal.aborted) return`       | Skip abort check in async work         |
-| Regions         | Child outputs in parent `internal` | Forget to declare child outputs        |
-| Snapshot        | Save path + context manually       | Expect `snapshot()` to include context |
-| Any handler     | Universal events only (CANCEL)     | State-specific logic in `onAny`        |
+| Pattern         | Correct                                | Anti-pattern                           |
+| --------------- | -------------------------------------- | -------------------------------------- |
+| Type context    | `context: {} as MyContext`             | casting in every handler               |
+| Type events     | `event("ID")<Payload>()`               | `event("ID")()` without generic        |
+| Send events     | `actor.send(signInEvent.create(data))` | raw `{ type: "ID", payload }` objects  |
+| Effect data     | Use state payload                      | Depend on `event` in effect            |
+| Error handling  | Emit internal event                    | Throw in effect or transition          |
+| Internal events | Declare in `internal: [...]`           | Put user events in internal            |
+| Signal check    | `if (signal.aborted) return`           | Skip abort check in async work         |
+| Regions         | Child outputs in parent `internal`     | Forget to declare child outputs        |
+| Snapshot        | Save path + context manually           | Expect `snapshot()` to include context |
+| Any handler     | Universal events only (CANCEL)         | State-specific logic in `onAny`        |
 
 ## Contents
 
@@ -95,7 +95,7 @@ const actor = new Actor({
   setup: (m) => {
     m.on(idleState, signInEvent, (event, opts) => {
       // ✅ typed — context.get()/set() flow the constructor type
-      opts!.context.set({ ...opts!.context.get(), phoneNumber: event.phoneNumber });
+      opts!.context.set({ ...opts!.context.get(), phoneNumber: event.payload.phoneNumber });
       return { state: signingInState };
     });
   },
@@ -105,14 +105,14 @@ const actor = new Actor({
 `set()` requires a **new object reference** — change detection is reference equality. Always spread the current value:
 
 ```ts
-opts.context.set({ ...opts.context.get(), phoneNumber: event.phoneNumber });
+opts.context.set({ ...opts.context.get(), phoneNumber: event.payload.phoneNumber });
 ```
 
 **Never mutate in place:**
 
 ```ts
 // ❌ defeats change detection — subscribers and persistence stay silent
-opts!.context.phoneNumber = event.phoneNumber;
+opts!.context.phoneNumber = event.payload.phoneNumber;
 ```
 
 **Anti-pattern — casting in every handler:**
@@ -121,7 +121,7 @@ opts!.context.phoneNumber = event.phoneNumber;
 setup: (m) => {
   m.on(idleState, signInEvent, (event, opts) => {
     const c = opts!.context as AuthContext; // ❌ unnecessary — already typed
-    c.set({ ...c.get(), phoneNumber: event.phoneNumber });
+    c.set({ ...c.get(), phoneNumber: event.payload.phoneNumber });
     return { state: signingInState };
   });
 },
@@ -146,7 +146,7 @@ Handlers receive the correct payload type:
 ```ts
 setup: (m) => {
   m.on(idleState, signInEvent, (event) => {
-    event.phoneNumber; // ✅ string
+    event.payload.phoneNumber; // ✅ string
     return { state: signingInState };
   });
 },
@@ -169,7 +169,7 @@ const goodEvent = event("SIGN_IN")<{ phoneNumber: string }>();
 actor.send(signInEvent.create({ phoneNumber: "+1234567890" }));
 
 // ❌ bypasses type checking
-actor.send({ id: "SIGN_IN", phoneNumber: "+1234567890" });
+actor.send({ type: "SIGN_IN", payload: { phoneNumber: "+1234567890" } });
 ```
 
 ### Effects and Event Typing
@@ -198,7 +198,7 @@ const actor = new Actor({
       });
     });
     m.on(idleState, fetchEvent, (event) => {
-      return { state: loadingState.create({ url: event.url }) };
+      return { state: loadingState.create({ url: event.payload.url }) };
     });
     m.on(loadingState, doneEvent, () => ({ state: loadedState }));
   },
@@ -209,10 +209,10 @@ const actor = new Actor({
 
 ```ts
 // ✅ state payload — scoped to this state entry
-return { state: loadingState.create({ url: event.url }) };
+return { state: loadingState.create({ url: event.payload.url }) };
 
 // ⚠️ context — works but shared across all states
-opts!.context.set({ ...opts!.context.get(), url: event.url });
+opts!.context.set({ ...opts!.context.get(), url: event.payload.url });
 return { state: loadingState };
 ```
 
@@ -221,8 +221,8 @@ return { state: loadingState };
 ```ts
 m.effect(loadingState, ({ event, emit }) => {
   // ❌ event is the union type, not the specific triggering event
-  // event.url doesn't exist on the union
-  emit(doneEvent.create()); // fine — but event.url would be a type error
+  // event.payload.url doesn't exist on the union
+  emit(doneEvent.create()); // fine — but event.payload.url would be a type error
 });
 ```
 
@@ -391,10 +391,10 @@ const healthMonitor = new Actor({
   initial: unknownState,
   setup: (m) => {
     m.on(unknownState, healthCheckResult, (event) => ({
-      state: event.healthy ? healthyState : degradedState,
+      state: event.payload.healthy ? healthyState : degradedState,
     }));
     m.on(healthyState, healthCheckResult, (event) => ({
-      state: event.healthy ? healthyState : degradedState,
+      state: event.payload.healthy ? healthyState : degradedState,
     }));
   },
 });
@@ -408,7 +408,7 @@ const manager = new Actor({
   setup: (m) => {
     m.on(connectedState, healthCheckResult, (event, opts) => {
       // access child via actor.regions
-      manager.regions.health.send(healthCheckResult.create({ healthy: event.healthy }));
+      manager.regions.health.send(healthCheckResult.create({ healthy: event.payload.healthy }));
       return {};
     });
   },
@@ -465,7 +465,7 @@ setup: (m) => {
   m.on(workingState, doneEvent, () => ({ state: doneState }));
   m.on(workingState, failedEvent, (event) => {
     // handle error in transition, not in effect
-    return { state: errorState.create({ error: event.error }) };
+    return { state: errorState.create({ error: event.payload.error }) };
   });
 },
 ```
@@ -485,7 +485,7 @@ try {
 
 ```ts
 m.on(idleState, submitEvent, (event) => {
-  if (!event.data) throw new Error("missing data"); // ❌ breaks the machine
+  if (!event.payload.data) throw new Error("missing data"); // ❌ breaks the machine
   return { state: doneState };
 });
 ```
@@ -494,7 +494,7 @@ Prefer storing the error in context and transitioning to an error state:
 
 ```ts
 m.on(idleState, submitEvent, (event, opts) => {
-  if (!event.data) {
+  if (!event.payload.data) {
     opts!.context.set({ ...opts!.context.get(), error: "missing data" });
     return { state: errorState };
   }

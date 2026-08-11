@@ -17,8 +17,8 @@ import { withPromise } from "@mantaq/sugar";
 setup: (m) => {
   m.effect(loading, ({ signal, emit }) => {
     withPromise(fetch("/api"), signal, emit, {
-      success: (data) => ({ id: "FETCH_DONE", data }),
-      error: (err) => ({ id: "FETCH_ERROR", error: err }),
+      success: (data) => ({ type: "FETCH_DONE", payload: data }),
+      error: (err) => ({ type: "FETCH_ERROR", payload: err }),
     });
   });
 },
@@ -38,10 +38,10 @@ setup: (m) => {
   m.effect(loading, ({ signal, emit }) => {
     fetch("/api")
       .then((data) => {
-        if (!signal.aborted) emit({ id: "FETCH_DONE", data });
+        if (!signal.aborted) emit({ type: "FETCH_DONE", payload: data });
       })
       .catch((err) => {
-        if (!signal.aborted) emit({ id: "FETCH_ERROR", error: err });
+        if (!signal.aborted) emit({ type: "FETCH_ERROR", payload: err });
       });
   });
 },
@@ -53,12 +53,12 @@ Same logic. More code. Easy to forget abort check.
 
 ```ts
 withPromise(promise, signal, emit, {
-  success: (data) => ({ id: "DONE", data }), // must return event-like { id, ... }
-  error: (err) => ({ id: "FAIL", error: err }), // same
+  success: (data) => ({ type: "DONE", payload: data }), // must return event-like { id, ... }
+  error: (err) => ({ type: "FAIL", payload: err }), // same
 });
 ```
 
-Return value emitted as internal event. Actor processes it.
+Return value emitted as internal event.payload. Actor processes it.
 
 ## withTimeout
 
@@ -69,7 +69,7 @@ import { withTimeout } from "@mantaq/sugar";
 
 setup: (m) => {
   m.effect(waiting, (input) => {
-    withTimeout(5000, input, () => ({ id: "TIMEOUT" }));
+    withTimeout(5000, input, (() => ({ type: "TIMEOUT" })));
   });
 },
 ```
@@ -88,7 +88,7 @@ Without sugar:
 setup: (m) => {
   m.effect(waiting, ({ clock, signal, emit }) => {
     clock.setTimeout(5000, () => {
-      if (!signal.aborted) emit({ id: "TIMEOUT" });
+      if (!signal.aborted) emit({ type: "TIMEOUT" });
     });
   });
 },
@@ -114,7 +114,7 @@ const actor = new Actor({
   clock,
   setup: (m) => {
     m.on(idle, start, () => ({ state: waiting }));
-    m.effect(waiting, (input) => withTimeout(5000, input, () => ({ id: "TIMEOUT" })));
+    m.effect(waiting, (input) => withTimeout(5000, input, () => ({ type: "TIMEOUT" })));
   },
 });
 

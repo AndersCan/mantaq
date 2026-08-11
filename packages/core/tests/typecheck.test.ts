@@ -22,13 +22,13 @@ describe("API type safety", () => {
       },
     });
 
-    let received: Array<{ id: string }> = [];
+    let received: Array<{ type: string }> = [];
     setOutputHandler(actor, (e) => {
       received.push(e);
     });
     actor.send(clicked.create({ x: 3 }));
     expect(received.length).toBe(1);
-    expect(received[0].id).toBe("PONG");
+    expect(received[0].type).toBe("PONG");
   });
 
   test("Any handler transitions", () => {
@@ -103,12 +103,14 @@ describe("type level contract — type = behavior", () => {
       setup: () => {},
     });
 
-    expectTypeOf<Parameters<typeof actor.send>[0]>().toEqualTypeOf<
-      { x: number } & { id: "CLICKED" }
-    >();
-    expectTypeOf<ReturnType<typeof clicked.create>>().toEqualTypeOf<
-      { x: number } & { id: "CLICKED" }
-    >();
+    expectTypeOf<Parameters<typeof actor.send>[0]>().toEqualTypeOf<{
+      type: "CLICKED";
+      payload: { x: number };
+    }>();
+    expectTypeOf<ReturnType<typeof clicked.create>>().toEqualTypeOf<{
+      type: "CLICKED";
+      payload: { x: number };
+    }>();
   });
 
   test("state is the declared states union", () => {
@@ -136,7 +138,7 @@ describe("type level contract — type = behavior", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, clicked, (event) => {
-          expectTypeOf(event).toEqualTypeOf<{ x: number } & { id: "CLICKED" }>();
+          expectTypeOf(event).toEqualTypeOf<{ type: "CLICKED"; payload: { x: number } }>();
           return {};
         });
       },
@@ -221,7 +223,7 @@ describe("type level contract — type = behavior", () => {
     // @ts-expect-error send takes an event object, not a bare string id
     actor.send("CLICKED");
     // @ts-expect-error created event requires the declared payload
-    actor.send({ id: "CLICKED" });
+    actor.send({ type: "CLICKED" });
 
     const ready = state("ready")<{ items: string[] }>();
     // @ts-expect-error create requires the full payload
@@ -267,7 +269,7 @@ describe("transition contract — type = behavior", () => {
       initial: idle,
       setup: (m) => {
         // @ts-expect-error emit id must be a declared output
-        m.on(idle, clicked, () => ({ emit: [{ id: "UNDECLARED_OUT" }] }));
+        m.on(idle, clicked, () => ({ emit: [{ type: "UNDECLARED_OUT" }] }));
       },
     });
   });

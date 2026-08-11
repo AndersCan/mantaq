@@ -13,7 +13,7 @@ describe("internal-registry error paths", () => {
     const victim = {};
     expect(getChildren(victim)[0]?.message).toMatch(/not registered/);
     expect(getOutputHandler(victim)[0]?.message).toMatch(/not registered/);
-    expect(pushInternal(victim, { id: "X" })[0]?.message).toMatch(/not registered/);
+    expect(pushInternal(victim, { type: "X" })[0]?.message).toMatch(/not registered/);
     expect(drainInternal(victim)[0]?.message).toMatch(/not registered/);
     expect(abortEffects(victim)[0]?.message).toMatch(/not registered/);
   });

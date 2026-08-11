@@ -7,13 +7,13 @@ describe("broadcast property tests", () => {
     runProperty(
       fc.tuple(fc.array(anyName, { minLength: 0, maxLength: 8 }), anyName),
       ([keys, eventId]) => {
-        const sent: Array<{ key: string; event: { id: string } }> = [];
+        const sent: Array<{ key: string; event: { type: string } }> = [];
         const map = {
           keys: () => keys,
-          send: (key: string, event: { id: string }) => sent.push({ key, event }),
+          send: (key: string, event: { type: string }) => sent.push({ key, event }),
         };
-        broadcast(map, { id: eventId });
-        const expected = keys.map((key) => ({ key, event: { id: eventId } }));
+        broadcast(map, { type: eventId });
+        const expected = keys.map((key) => ({ key, event: { type: eventId } }));
         return JSON.stringify(sent) === JSON.stringify(expected);
       },
     );

@@ -9,19 +9,20 @@ import type { Snapshot } from "../src/actor-internal.ts";
 
 describe("event ref property tests", () => {
   test("create builds payload with id and is() accepts only matching ids", () => {
-    const anyPayloadObject = fc
-      .object({ maxKeys: 4, values: [fc.string(), fc.integer(), fc.boolean()] })
-      .filter((o) => !("id" in o));
+    const anyPayloadObject = fc.object({
+      maxKeys: 4,
+      values: [fc.string(), fc.integer(), fc.boolean()],
+    });
     runProperty(fc.tuple(anyName, anyPayloadObject, anyName), ([id, payload, otherId]) => {
       const ref = event(id)<Record<string, unknown>>();
       if (id === otherId) return true;
       const created = ref.create({ ...payload });
-      if (created.id !== id) return false;
+      if (created.type !== id) return false;
       for (const [key, value] of Object.entries(payload)) {
-        if (created[key] !== value) return false;
+        if ((created.payload as Record<string, unknown>)[key] !== value) return false;
       }
       if (!ref.is(created)) return false;
-      if (ref.is({ id: otherId })) return false;
+      if (ref.is({ type: otherId })) return false;
       if (ref.is(null)) return false;
       if (ref.is(42)) return false;
       return true;

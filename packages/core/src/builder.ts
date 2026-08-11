@@ -3,7 +3,8 @@ import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./eve
 import type { AnyActor } from "./actor-internal.ts";
 import type { Context, EffectFn, TransitionResult } from "./actor-types.ts";
 
-type EventIdOf<E extends AnyEventRef> = E extends EventRef<infer Id, object | void> ? Id : never;
+type EventTypeOf<E extends AnyEventRef> =
+  E extends EventRef<infer Type, object | void> ? Type : never;
 
 type PayloadOf<S extends AnyStateRef> =
   S extends StateRef<infer _Name, infer Payload, infer _IsFinal> ? Payload : never;
@@ -32,13 +33,13 @@ export class ActorBuilder<
     stateRef: S,
     eventRef: E,
     fn: (
-      event: E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never,
+      event: E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never,
       opts: { context: Context<ActorContext>; actor: AnyActor },
-    ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>,
+    ) => TransitionResult<States[number], EventTypeOf<Outputs[number]>>,
   ): this {
     const sName = stateRef.name;
-    const eId = eventRef.id;
-    (this.#transitions[sName] ??= {})[eId] = fn as (
+    const eType = eventRef.type;
+    (this.#transitions[sName] ??= {})[eType] = fn as (
       event: unknown,
       opts: { context: Context<ActorContext>; actor: AnyActor },
     ) => TransitionResult<States[number], string>;
@@ -48,12 +49,12 @@ export class ActorBuilder<
   onAny<E extends Inputs[number] | Internal[number]>(
     eventRef: E,
     fn: (
-      event: E extends EventRef<infer Id, infer P> ? CreatedOfEvent<Id, P> : never,
+      event: E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never,
       opts: { context: Context<ActorContext>; actor: AnyActor },
-    ) => TransitionResult<States[number], EventIdOf<Outputs[number]>>,
+    ) => TransitionResult<States[number], EventTypeOf<Outputs[number]>>,
   ): this {
-    const eId = eventRef.id;
-    (this.#transitions["Any"] ??= {})[eId] = fn as (
+    const eType = eventRef.type;
+    (this.#transitions["Any"] ??= {})[eType] = fn as (
       event: unknown,
       opts: { context: Context<ActorContext>; actor: AnyActor },
     ) => TransitionResult<States[number], string>;

@@ -138,8 +138,8 @@ describe("sugar re-exports", () => {
   describe("events (from sugar barrel)", () => {
     test("creates multiple event refs", () => {
       const e = events("click", "submit");
-      expect(e.click.id).toBe("click");
-      expect(e.submit.id).toBe("submit");
+      expect(e.click.type).toBe("click");
+      expect(e.submit.type).toBe("submit");
     });
   });
 });

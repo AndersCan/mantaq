@@ -13,7 +13,7 @@
  *
  * DX Pain Points Exposed:
  *   - Guard conditions require manual state + context checks in transitions
- *   - No declarative guard syntax (e.g., `when(state, event, guard, handler)`)
+ *   - No declarative guard syntax (e.payload.g., `when(state, event, guard, handler)`)
  *   - Context type assertions needed everywhere
  *   - Region-to-region communication requires knowing actor instances
  *   - Effects tied to parent states, not region states — can't react to region changes
@@ -130,7 +130,7 @@ function createCharacter(clock?: VirtualClock) {
       });
       m.onAny(takeDamageEvent, (event, { context }) => {
         const cur = context.get();
-        const health = Math.max(0, cur.health - event.amount);
+        const health = Math.max(0, cur.health - event.payload.amount);
         if (health <= 0) {
           context.set({ ...cur, health, combatState: "idle" });
           return { state: lifeStates.dead };

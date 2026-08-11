@@ -18,10 +18,10 @@ import {
 
 export function createTestHarness(actor: AnyActor): TestHarness {
   const instrumented = instrument(actor);
-  const internalIds = new Set(
-    ((actor.options as { internal?: Array<{ id: string }> })?.internal ?? []).map((e) => e.id),
+  const internalTypes = new Set(
+    ((actor.options as { internal?: Array<{ type: string }> })?.internal ?? []).map((e) => e.type),
   );
-  const graph = buildGraph(actor, { internalIds });
+  const graph = buildGraph(actor, { internalIds: internalTypes });
 
   const harness: TestHarness = {
     actor: instrumented,
@@ -30,7 +30,7 @@ export function createTestHarness(actor: AnyActor): TestHarness {
 
     coverage: () => computeCoverage(graph, instrumented.history),
 
-    send(event: { id: string } & Record<string, unknown>) {
+    send(event: { type: string; payload?: unknown }) {
       instrumented.send(event as Parameters<typeof instrumented.send>[0]);
     },
 

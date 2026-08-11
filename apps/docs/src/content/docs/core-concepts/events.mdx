@@ -13,7 +13,7 @@ import { event } from "@mantaq/core";
 const start = event("START")();
 const fetchData = event("FETCH")<{ url: string }>();
 
-start.id; // "START"
+start.type; // "START"
 ```
 
 Payload must be `object | void`. No payload by default.
@@ -21,8 +21,8 @@ Payload must be `object | void`. No payload by default.
 ## Create instances
 
 ```ts
-start.create(); // { id: "START" }
-fetchData.create({ url: "/api" }); // { id: "FETCH", url: "/api" }
+start.create(); // { type: "START" }
+fetchData.create({ url: "/api" }); // { type: "FETCH", payload: { url: "/api" } }
 ```
 
 ## Check identity
@@ -31,7 +31,7 @@ fetchData.create({ url: "/api" }); // { id: "FETCH", url: "/api" }
 start.is(someEvent); // boolean
 ```
 
-`someEvent.id === "START"`.
+`someEvent.type === "START"`.
 
 ## Use in transitions
 
@@ -44,7 +44,7 @@ const actor = new Actor({
     m.on(idle, start, () => ({ state: loading }));
     m.on(idle, fetchData, (event, { context }) => {
       const s = context.get();
-      context.set({ ...s, url: event.url });
+      context.set({ ...s, url: event.payload.url });
       return { state: loading };
     });
   },

@@ -96,7 +96,7 @@ const parent = new Actor({
   initial: idle,
   setup: (m) => {
     m.onAny(task, (event) => {
-      workers.spawn(event.jobId, createWorker);
+      workers.spawn(event.payload.jobId, createWorker);
       return {};
     });
     m.onAny(shutdown, () => {

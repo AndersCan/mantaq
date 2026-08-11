@@ -17,7 +17,7 @@ const actor = new Actor({
       fetch("/api")
         .then((res) => res.json())
         .then((data) => {
-          if (!signal.aborted) emit({ id: "FETCH_DONE", data });
+          if (!signal.aborted) emit({ type: "FETCH_DONE", payload: data });
         });
     });
   },
@@ -74,7 +74,7 @@ setup: (m) => {
     fetch("/api")
       .then((res) => res.json())
       .catch((err) => {
-        if (!signal.aborted) emit({ id: "FETCH_FAILED", error: String(err) });
+        if (!signal.aborted) emit({ type: "FETCH_FAILED", payload: error: String(err) });
       });
   });
 },

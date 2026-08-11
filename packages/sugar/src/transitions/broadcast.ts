@@ -1,6 +1,6 @@
 import type { AnyEventRef } from "@mantaq/core";
 
-export type EventLike = { id: string; [key: string]: unknown };
+export type EventLike = { type: string; payload?: unknown };
 
 export type SendableEvent = AnyEventRef | EventLike;
 
