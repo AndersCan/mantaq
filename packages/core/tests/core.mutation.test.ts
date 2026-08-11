@@ -184,20 +184,14 @@ describe("RealClock", () => {
 });
 
 describe("InternalQueue", () => {
-  test("isProcessing is true during processing and false after", () => {
-    const queue = new InternalQueue();
-    const seen: Array<boolean | undefined> = [];
-    queue.push({ id: "A" });
-    queue.process(() => seen.push(queue.isProcessing));
-    seen.push(queue.isProcessing);
-    expect(seen).toEqual([true, false]);
-  });
-
   test("length is the remaining count while processing", () => {
     const queue = new InternalQueue();
     const lens: number[] = [];
     queue.push({ id: "A" }, { id: "B" }, { id: "C" });
-    queue.process(() => lens.push(queue.length));
+    queue.processCancellable(() => {
+      lens.push(queue.length);
+      return true;
+    });
     expect(lens).toEqual([2, 1, 0]);
   });
 
@@ -222,7 +216,7 @@ describe("InternalQueue", () => {
     });
     await new Promise((r) => setTimeout(r, 0));
     expect(resolved).toBe(false);
-    queue.process(() => {});
+    queue.processCancellable(() => true);
     await p;
   });
 
@@ -232,7 +226,7 @@ describe("InternalQueue", () => {
     queue.processCancellable(() => false);
     queue.push({ id: "B" });
     expect(queue.length).toBe(1);
-    queue.process(() => {});
+    queue.processCancellable(() => true);
     expect(queue.length).toBe(0);
   });
 
@@ -240,12 +234,16 @@ describe("InternalQueue", () => {
     const queue = new InternalQueue();
     const seen: string[] = [];
     queue.push({ id: "A" }, { id: "B" });
-    queue.process((e) => {
+    queue.processCancellable((e) => {
       if (e.id === "A") {
-        queue.process((inner) => seen.push(`inner:${inner.id}`));
+        queue.processCancellable((inner) => {
+          seen.push(`inner:${inner.id}`);
+          return true;
+        });
       } else {
         seen.push(`outer:${e.id}`);
       }
+      return true;
     });
     expect(seen).toEqual(["outer:B"]);
   });
@@ -267,7 +265,13 @@ describe("runEffects", () => {
   test("does not run effects for final states even when declared", () => {
     const seen: string[] = [];
     const result = runEffects({
-      effects: { done: [() => seen.push("ran")] },
+      effects: {
+        done: [
+          () => {
+            seen.push("ran");
+          },
+        ],
+      },
       state: state("done")().final(),
       statePayload: undefined,
       event: { id: "X" },
@@ -277,12 +281,15 @@ describe("runEffects", () => {
       ),
       emit: () => {},
       clock: new VirtualClock(),
+      abort: new AbortController(),
+      lastGood: { state: state("done")().final(), context: {} },
+      onError: () => {},
     });
-    expect(result).toBeNull();
+    expect(result.pending).toEqual([]);
     expect(seen).toEqual([]);
   });
 
-  test("returns null for an empty effect list", () => {
+  test("returns no pending for an empty effect list", () => {
     const result = runEffects({
       effects: { idle: [] },
       state: state("idle")(),
@@ -294,8 +301,11 @@ describe("runEffects", () => {
       ),
       emit: () => {},
       clock: new VirtualClock(),
+      abort: new AbortController(),
+      lastGood: { state: state("idle")(), context: {} },
+      onError: () => {},
     });
-    expect(result).toBeNull();
+    expect(result.pending).toEqual([]);
   });
 });
 
@@ -701,7 +711,7 @@ describe("Actor directed mutation tests", () => {
     expect(actor.context).toEqual({ n: 5 });
   });
 
-  test("internalBudget of zero triggers the budget warning on the first event", () => {
+  test("internalBudget of zero triggers the error state on the first event", () => {
     const idle = state("idle")();
     const start = event("START")();
     const loop = event("LOOP")();
@@ -717,15 +727,8 @@ describe("Actor directed mutation tests", () => {
         m.on(idle, loop, () => ({ emit: [loop.create()] }));
       },
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(start.create());
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("budget"))).toBe(true);
+    actor.send(start.create());
+    expect(actor.snapshot().error?.reason).toBe("budget");
   });
 
   test("initial state warning fires when the state is not declared", () => {
@@ -860,16 +863,9 @@ describe("Actor directed mutation tests", () => {
         });
       },
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(start.create());
-    } finally {
-      console.warn = original;
-    }
+    actor.send(start.create());
     expect(handlerCalls).toBe(1);
-    expect(warns.some((w) => w.includes("budget"))).toBe(true);
+    expect(actor.snapshot().error?.reason).toBe("budget");
   });
 
   test("output routing to the handler happens for unlisted event ids", () => {
@@ -1074,5 +1070,555 @@ describe("Actor directed mutation tests 2", () => {
     actor.send(go.create());
     expect(gotActor).toBe(actor);
     expect(actor.snapshot().path[0]).toBe("active");
+  });
+});
+
+describe("Actor error state directed mutation tests", () => {
+  test("a throwing handler cannot escape send", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().error?.reason).toBe("transition");
+  });
+
+  test("death is terminal — later sends never resurrect the machine", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const bad = event("BAD")();
+    let handlerCalls = 0;
+    const actor = new Actor({
+      inputs: [go, bad],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.onAny(bad, () => {
+          throw new Error("boom");
+        });
+        m.on(active, go, () => {
+          handlerCalls++;
+          return { state: idle };
+        });
+      },
+    });
+    actor.send(bad.create());
+    actor.send(go.create());
+    expect(handlerCalls).toBe(0);
+    expect(actor.snapshot().path[0]).toBe("__error");
+  });
+
+  test("subscriber isolation — a throwing subscriber leaves the machine running", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+    actor.on("change", () => {
+      throw new Error("boom");
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().path[0]).toBe("active");
+    expect(actor.snapshot().error).toBeUndefined();
+  });
+
+  test("budget exhaustion routes to the error state, not a bare halt", () => {
+    const idle = state("idle")();
+    const start = event("START")();
+    const loop = event("LOOP")();
+    const actor = new Actor({
+      inputs: [start],
+      outputs: [loop],
+      internal: [loop],
+      states: [idle],
+      initial: idle,
+      internalBudget: 1,
+      setup: (m) => {
+        m.on(idle, start, () => ({ emit: [loop.create()] }));
+        m.on(idle, loop, () => ({ emit: [loop.create()] }));
+      },
+    });
+    expect(() => actor.send(start.create())).not.toThrow();
+    expect(actor.snapshot().error?.reason).toBe("budget");
+    expect(actor.snapshot().path[0]).toBe("__error");
+  });
+
+  test("a throwing entry effect kills the machine and skips later effects", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const seen: string[] = [];
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, () => {
+          seen.push("first");
+          throw new Error("boom");
+        });
+        m.effect(loading, () => {
+          seen.push("second");
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(seen).toEqual(["first"]);
+    expect(actor.snapshot().error?.reason).toBe("effect");
+  });
+
+  test("a throwing output handler kills the machine", () => {
+    const idle = state("idle")();
+    const out = event("OUT")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ emit: [out.create()] }));
+      },
+    });
+    setOutputHandler(actor, () => {
+      throw new Error("output boom");
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().error?.reason).toBe("output");
+  });
+
+  test("the first error wins — a later throw does not replace it", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const bad = event("BAD")();
+    const actor = new Actor({
+      inputs: [go, bad],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(go, () => {
+          throw new Error("first");
+        });
+        m.onAny(bad, () => {
+          throw new Error("second");
+        });
+      },
+    });
+    actor.send(go.create());
+    actor.send(bad.create());
+    const snap = actor.snapshot();
+    expect(snap.error?.event.id).toBe("GO");
+    expect(snap.error?.error instanceof Error).toBe(true);
+    if (snap.error) {
+      expect((snap.error.error as Error).message).toBe("first");
+    }
+  });
+
+  test("death emits exactly one change and no done", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    let changes = 0;
+    let dones = 0;
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.effect(active, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.on("change", () => changes++);
+    actor.on("done", () => dones++);
+    changes = 0;
+    actor.send(go.create());
+    expect(changes).toBe(1);
+    expect(dones).toBe(0);
+  });
+
+  test("an async rejection kills the machine once the run settles", async () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, async () => {
+          throw new Error("late boom");
+        });
+      },
+    });
+    actor.send(go.create());
+    await actor.settled();
+    expect(actor.snapshot().path[0]).toBe("__error");
+    expect(actor.snapshot().error?.reason).toBe("effect");
+  });
+
+  test("an any transition cannot resurrect a dead machine", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const bad = event("BAD")();
+    let anyCalls = 0;
+    const actor = new Actor({
+      inputs: [go, bad],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(go, () => {
+          anyCalls++;
+          return { state: active };
+        });
+        m.onAny(bad, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(anyCalls).toBe(1);
+    expect(actor.snapshot().path[0]).toBe("active");
+    actor.send(bad.create());
+    expect(actor.snapshot().path[0]).toBe("__error");
+    actor.send(go.create());
+    expect(anyCalls).toBe(1);
+    expect(actor.snapshot().path[0]).toBe("__error");
+  });
+
+  test("the first error wins across reentrant drains", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const boom = event("BOOM")();
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [boom],
+      internal: [boom],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.on(loading, boom, () => {
+          throw new Error("nested");
+        });
+        m.effect(loading, ({ emit }) => {
+          emit(boom.create());
+          throw new Error("outer");
+        });
+      },
+    });
+    actor.send(go.create());
+    const snap = actor.snapshot();
+    expect(snap.error?.reason).toBe("transition");
+    expect(snap.error?.event.id).toBe("BOOM");
+  });
+
+  test("a falsy thrown value still kills the machine", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw 0;
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().error?.reason).toBe("transition");
+  });
+
+  test("an invalid transition target kills the machine", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: { state: "garbage" } }) as never);
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().error?.reason).toBe("transition");
+    expect(actor.snapshot().error?.state.name).toBe("idle");
+  });
+
+  test("an Any handler does not run after the state handler dies", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    let ranAny = false;
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+        m.onAny(go, () => {
+          ranAny = true;
+          return { state: active };
+        });
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(ranAny).toBe(false);
+    expect(actor.snapshot().path[0]).toBe("__error");
+  });
+
+  test("a successful output handler does not stop the drain", () => {
+    const idle = state("idle")();
+    const out = event("OUT")();
+    const go = event("GO")();
+    const received: string[] = [];
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ emit: [out.create(), out.create()] }));
+      },
+    });
+    setOutputHandler(actor, (e) => received.push(e.id));
+    actor.send(go.create());
+    expect(received).toEqual(["OUT", "OUT"]);
+  });
+
+  test("no spurious change after a change already consumed a context write", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const ping = event("PING")();
+    let changes = 0;
+    const actor = new Actor({
+      inputs: [go, ping],
+      states: [idle],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, (_e, { context }) => {
+          context.set({ n: 1 });
+          return {};
+        });
+        m.on(idle, ping, () => ({}));
+      },
+    });
+    actor.on("change", () => changes++);
+    changes = 0;
+    actor.send(go.create());
+    actor.send(ping.create());
+    expect(changes).toBe(1);
+  });
+
+  test("the invalid target error message is deterministic", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: { state: "garbage" } }) as never);
+      },
+    });
+    actor.send(go.create());
+    const msg = actor.snapshot().error?.error;
+    expect(msg instanceof Error && msg.message).toBe("invalid transition target");
+  });
+
+  test("a throw during a drain drops the remaining queued events", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const boom = event("BOOM")();
+    let boomCalls = 0;
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [boom],
+      internal: [boom],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading, emit: [boom.create(), boom.create()] }));
+        m.on(loading, boom, () => {
+          boomCalls++;
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(boomCalls).toBe(1);
+    expect(actor.snapshot().path[0]).toBe("__error");
+  });
+
+  test("a resolving async effect does not kill the machine", async () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    let settled = false;
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, async () => {
+          await Promise.resolve();
+          settled = true;
+        });
+      },
+    });
+    actor.send(go.create());
+    await actor.settled();
+    expect(settled).toBe(true);
+    expect(actor.snapshot().path[0]).toBe("loading");
+    expect(actor.snapshot().error).toBeUndefined();
+  });
+
+  test("settled waits for a delayed async rejection", async () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+          throw new Error("delayed boom");
+        });
+      },
+    });
+    actor.send(go.create());
+    await actor.settled();
+    const delayedSnap = actor.snapshot();
+    expect(delayedSnap.error?.reason).toBe("effect");
+    expect(delayedSnap.error?.error instanceof Error).toBe(true);
+    if (delayedSnap.error) {
+      expect((delayedSnap.error.error as Error).message).toBe("delayed boom");
+    }
+  });
+
+  test("an output with no handler is dropped and the machine survives", () => {
+    const idle = state("idle")();
+    const out = event("OUT")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ emit: [out.create()] }));
+      },
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().path[0]).toBe("idle");
+    expect(actor.snapshot().error).toBeUndefined();
+  });
+
+  test("the error field is absent while the machine is healthy", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    expect("error" in actor.snapshot()).toBe(false);
+  });
+
+  test("an output throw outside a dispatch records the current state", () => {
+    const clock = new VirtualClock();
+    const idle = state("idle")();
+    const out = event("OUT")();
+    const actor = new Actor({
+      clock,
+      inputs: [],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    setOutputHandler(actor, () => {
+      throw new Error("boom");
+    });
+    pushInternal(actor, out.create());
+    clock.advance(1);
+    expect(actor.snapshot().error?.reason).toBe("output");
+    expect(actor.snapshot().error?.state.name).toBe("idle");
+  });
+
+  test("the budget error carries the deterministic message", () => {
+    const idle = state("idle")();
+    const start = event("START")();
+    const loop = event("LOOP")();
+    const actor = new Actor({
+      inputs: [start],
+      outputs: [loop],
+      internal: [loop],
+      states: [idle],
+      initial: idle,
+      internalBudget: 0,
+      setup: (m) => {
+        m.on(idle, start, () => ({ emit: [loop.create()] }));
+      },
+    });
+    actor.send(start.create());
+    const budgetSnap = actor.snapshot();
+    expect(budgetSnap.error?.reason).toBe("budget");
+    expect(budgetSnap.error?.error instanceof Error).toBe(true);
+    if (budgetSnap.error) {
+      expect((budgetSnap.error.error as Error).message).toBe("internal event budget exceeded");
+    }
+  });
+
+  test("an effect death records the pre-transition state", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().error?.state.name).toBe("idle");
+    expect(actor.snapshot().error?.context).toEqual({});
   });
 });

@@ -145,11 +145,14 @@ describe("RealClock", () => {
 });
 
 describe("InternalQueue", () => {
-  test("process drains events in order", () => {
+  test("processCancellable drains events in order", () => {
     const queue = new InternalQueue();
     const seen: string[] = [];
     queue.push({ id: "A" }, { id: "B" });
-    queue.process((e) => seen.push(e.id));
+    queue.processCancellable((e) => {
+      seen.push(e.id);
+      return true;
+    });
     expect(seen).toEqual(["A", "B"]);
     expect(queue.length).toBe(0);
   });
@@ -169,7 +172,7 @@ describe("InternalQueue", () => {
     const queue = new InternalQueue();
     queue.push({ id: "A" });
     const settled = queue.settled();
-    queue.process(() => {});
+    queue.processCancellable(() => true);
     await settled;
     expect(queue.length).toBe(0);
   });
@@ -216,7 +219,7 @@ describe("abort-tracker", () => {
 });
 
 describe("runEffects", () => {
-  test("returns null for final state", () => {
+  test("returns no pending for final state", () => {
     const result = runEffects({
       effects: {},
       state: state("done")().final(),
@@ -228,11 +231,14 @@ describe("runEffects", () => {
       ),
       emit: () => {},
       clock: new VirtualClock(),
+      abort: new AbortController(),
+      lastGood: { state: state("done")().final(), context: {} },
+      onError: () => {},
     });
-    expect(result).toBeNull();
+    expect(result.pending).toEqual([]);
   });
 
-  test("returns null when no effects for the state", () => {
+  test("returns no pending when no effects for the state", () => {
     const result = runEffects({
       effects: {},
       state: state("idle")(),
@@ -244,14 +250,17 @@ describe("runEffects", () => {
       ),
       emit: () => {},
       clock: new VirtualClock(),
+      abort: new AbortController(),
+      lastGood: { state: state("idle")(), context: {} },
+      onError: () => {},
     });
-    expect(result).toBeNull();
+    expect(result.pending).toEqual([]);
   });
 
-  test("runs effects with input and returns an AbortController", () => {
+  test("runs effects with input and returns no pending for sync effects", () => {
     const clock = new VirtualClock();
     const seen: string[] = [];
-    const abort = runEffects({
+    const result = runEffects({
       effects: {
         idle: [
           ({ signal, state, event, context, emit, clock: c }) => {
@@ -274,9 +283,109 @@ describe("runEffects", () => {
       ),
       emit: (e) => seen.push(`emit:${e.id}`),
       clock,
+      abort: new AbortController(),
+      lastGood: { state: state("idle")(), context: {} },
+      onError: () => {},
     });
     expect(seen).toEqual(["emit:OUT", "ran"]);
-    expect(abort).not.toBeNull();
+    expect(result.pending).toEqual([]);
+  });
+
+  test("routes a synchronous effect throw to onError and stops", () => {
+    const seen: string[] = [];
+    runEffects({
+      effects: {
+        idle: [
+          () => {
+            seen.push("one");
+          },
+          () => {
+            throw new Error("boom");
+          },
+          () => {
+            seen.push("three");
+          },
+        ],
+      },
+      state: state("idle")(),
+      statePayload: undefined,
+      event: { id: "X" },
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
+      emit: () => {},
+      clock: new VirtualClock(),
+      abort: new AbortController(),
+      lastGood: { state: state("idle")(), context: {} },
+      onError: (error) => {
+        expect((error as Error).message).toBe("boom");
+      },
+    });
+    expect(seen).toEqual(["one"]);
+  });
+
+  test("routes an async rejection to onError after abort guard passes", async () => {
+    const seen: string[] = [];
+    const abort = new AbortController();
+    const result = runEffects({
+      effects: {
+        idle: [
+          async () => {
+            throw new Error("late boom");
+          },
+        ],
+      },
+      state: state("idle")(),
+      statePayload: undefined,
+      event: { id: "X" },
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
+      emit: () => {},
+      clock: new VirtualClock(),
+      abort,
+      lastGood: { state: state("idle")(), context: {} },
+      onError: (error) => {
+        seen.push((error as Error).message);
+      },
+    });
+    await Promise.all(result.pending);
+    expect(seen).toEqual(["late boom"]);
+  });
+
+  test("does not report a rejection caused by abort", async () => {
+    const seen: string[] = [];
+    const abort = new AbortController();
+    const result = runEffects({
+      effects: {
+        idle: [
+          async ({ signal }) => {
+            await new Promise((_, reject) => {
+              signal.addEventListener("abort", () => reject(new Error("aborted")));
+            });
+          },
+        ],
+      },
+      state: state("idle")(),
+      statePayload: undefined,
+      event: { id: "X" },
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
+      emit: () => {},
+      clock: new VirtualClock(),
+      abort,
+      lastGood: { state: state("idle")(), context: {} },
+      onError: () => {
+        seen.push("reported");
+      },
+    });
+    abort.abort();
+    await Promise.all(result.pending);
+    expect(seen).toEqual([]);
   });
 });
 

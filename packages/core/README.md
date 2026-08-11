@@ -441,7 +441,16 @@ const parent = new Actor({
 
 ### Error Handling
 
-Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. Errors thrown inside a handler or effect have no subscriber — the machine just stops applying it.
+Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. If user code throws anyway, the machine does **not** misbehave silently: it dies into a built-in terminal `__error` state, records `snapshot().error` (the thrown value, the last known good state/context, the bad event), drops remaining events, and ignores later `send`s. Errors never escape `send()` and the machine stays deterministic — same inputs, same trace.
+
+```ts
+const snap = actor.snapshot();
+if (snap.error) {
+  snap.error.reason; // "transition" | "effect" | "budget" | "output" | "internal" | "async"
+  snap.error.state.name; // last known good state
+  snap.error.event.id; // the bad event
+}
+```
 
 Catch errors inside effects and emit recovery events:
 
@@ -477,7 +486,7 @@ try {
   const result = riskyOperation();
   emit(doneEvent.create());
 } catch (err) {
-  throw err; // ❌ throw in effect — no handler, machine misbehaves
+  throw err; // ❌ throw in effect — the machine dies into __error
 }
 ```
 
@@ -485,7 +494,7 @@ try {
 
 ```ts
 m.on(idleState, submitEvent, (event) => {
-  if (!event.data) throw new Error("missing data"); // ❌ breaks the machine
+  if (!event.data) throw new Error("missing data"); // ❌ kills the machine
   return { state: doneState };
 });
 ```

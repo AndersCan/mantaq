@@ -1,12 +1,14 @@
 import type { AnyStateRef } from "./state.ts";
 import type { AnyEventRef, InternalEvent } from "./event.ts";
 import type { Clock } from "./clock.ts";
+import type { ErrorInfo } from "./actor-types.ts";
 
 export interface Snapshot<C = unknown> {
   path: string[];
   context: C;
   regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
+  error?: ErrorInfo;
 }
 
 export interface AnyActor<C = Record<string, unknown>> {

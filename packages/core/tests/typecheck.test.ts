@@ -1,6 +1,7 @@
 import { expect, expectTypeOf, test, describe } from "vite-plus/test";
 import { Actor, state, event, Context } from "../src/index.ts";
-import type { StateRef } from "../src/index.ts";
+import type { StateRef, ErrorInfo, ErrorState, InternalEvent, AnyStateRef } from "../src/index.ts";
+import type { ErrorReason } from "../src/actor-types.ts";
 import { setOutputHandler, pushInternal, getChildren } from "../src/internal-registry.ts";
 import type { RegistryError } from "../src/internal-registry.ts";
 import type { Either } from "@mantaq/utils";
@@ -122,8 +123,40 @@ describe("type level contract — type = behavior", () => {
       setup: () => {},
     });
 
-    expectTypeOf(actor.state.name).toEqualTypeOf<"idle" | "active">();
+    expectTypeOf(actor.state.name).toEqualTypeOf<"idle" | "active" | "__error">();
     expectTypeOf(actor.state).toMatchTypeOf<StateRef<string>>();
+  });
+
+  test("snapshot.error narrows on presence", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    const snap = actor.snapshot();
+    if (snap.error) {
+      expectTypeOf(snap.error).toEqualTypeOf<ErrorInfo>();
+      expectTypeOf(snap.error.reason).toEqualTypeOf<ErrorReason>();
+      expectTypeOf(snap.error.state).toEqualTypeOf<AnyStateRef>();
+      expectTypeOf(snap.error.event).toEqualTypeOf<InternalEvent>();
+    } else {
+      expectTypeOf(snap.error).toBeUndefined();
+    }
+  });
+
+  test("actor.state can be the error state", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    if (actor.state.name === "__error") {
+      expectTypeOf(actor.state).toEqualTypeOf<ErrorState>();
+    }
   });
 
   test("handler event carries declared id and payload end to end", () => {

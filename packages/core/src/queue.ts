@@ -1,6 +1,5 @@
 import type { InternalEvent } from "./event.ts";
 
-export type ProcessEventFn = (event: InternalEvent) => void;
 export type CancellableProcessEventFn = (event: InternalEvent) => boolean;
 
 export class InternalQueue {
@@ -14,10 +13,6 @@ export class InternalQueue {
     return this.#queue.length - this.#index;
   }
 
-  get isProcessing(): boolean {
-    return this.#processing;
-  }
-
   push(...events: InternalEvent[]): void {
     if (this.#stopped) return;
     this.#queue.push(...events);
@@ -29,13 +24,6 @@ export class InternalQueue {
     }
     return new Promise<void>((resolve) => {
       this.#settledResolvers.push(resolve);
-    });
-  }
-
-  process(processEvent: ProcessEventFn): void {
-    this.#process((event) => {
-      processEvent(event);
-      return true;
     });
   }
 

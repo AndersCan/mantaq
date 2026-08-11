@@ -11,10 +11,18 @@ import { Subscribers } from "./subscribers.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import { runEffects } from "./effects.ts";
 import { parseTarget } from "./dispatch.ts";
-import type { EffectFn, TransitionResult } from "./actor-types.ts";
+import type {
+  EffectFn,
+  ErrorInfo,
+  ErrorReason,
+  ErrorState,
+  LastKnownState,
+  TransitionResult,
+} from "./actor-types.ts";
 import { Context } from "./context.ts";
 import { ActorBuilder } from "./builder.ts";
 import type { SetupFn } from "./builder.ts";
+import { Either } from "@mantaq/utils";
 
 export { RealClock, VirtualClock };
 export type { Clock, Snapshot, AnyActor };
@@ -29,12 +37,8 @@ type InitialState<S extends AnyStateRef> =
       : { state: S; payload: P }
     : never;
 
-function pickState<S extends AnyStateRef>(initial: S | { state: S }): S {
+function resolveInitial<S extends AnyStateRef>(initial: S | { state: S }): S {
   return initial instanceof StateRef ? initial : initial.state;
-}
-
-function resolveInitial<S extends AnyStateRef>(initial: InitialState<S>): S {
-  return pickState<S>(initial);
 }
 
 export interface ActorOptions<
@@ -62,18 +66,9 @@ export interface InternalActorOptions<
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext = Record<string, unknown>,
-> {
-  inputs: Inputs;
-  outputs?: Outputs;
-  internal?: Internal;
-  states: States;
-  context?: ActorContext;
-  initial: InitialState<States[number]>;
-  clock?: Clock;
-  internalBudget?: number;
+> extends Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup"> {
   transitions: TransitionDispatch<States, ActorContext>;
   effects: Record<string, Array<EffectFn<ActorContext>>>;
-  regions?: Record<string, AnyActor>;
 }
 
 type TransitionDispatch<States extends readonly AnyStateRef[], ActorContext> = Record<
@@ -100,7 +95,7 @@ export class Actor<
   const Outputs extends readonly AnyEventRef[] = readonly [],
   ActorContext = Record<string, unknown>,
 > {
-  state: States[number];
+  state: States[number] | ErrorState;
   readonly clock: Clock;
   #context: ActorContext;
   #contextHandle: Context<ActorContext>;
@@ -117,6 +112,10 @@ export class Actor<
   #inputIds: Set<string>;
   #internalBudget: number;
   #draining = false;
+  #errorState = new StateRef<"__error", unknown, false>("__error", false);
+  #error: ErrorInfo | null = null;
+  #entry: LastKnownState | null = null;
+  #pendingEffects: Array<Promise<void>> = [];
 
   get context(): ActorContext {
     return this.#context;
@@ -137,7 +136,7 @@ export class Actor<
       setOutputHandler: (fn) => {
         this.#outputHandler = fn;
       },
-      pushInternal: (event) => this.#pushEvent(event),
+      pushInternal: (event) => this.#queue.push(event),
       drainInternal: () => this.#drainInternal(),
       abortEffects: () => this.#abortEffects(),
     });
@@ -210,7 +209,7 @@ export class Actor<
   }
 
   settled(): Promise<void> {
-    return this.#queue.settled();
+    return Promise.all([this.#queue.settled(), ...this.#pendingEffects]).then(() => undefined);
   }
 
   send(event: CreatedOf<Inputs[number]>): void {
@@ -226,59 +225,72 @@ export class Actor<
   }
 
   #dispatch(event: InternalEvent): void {
-    if (this.state.isFinal) return;
-    const transitions = this.#options.transitions;
-    const stateTransition = transitions[this.state.name]?.[event.id];
-    const anyTransition = transitions["Any"]?.[event.id];
-
-    const transitionApplied = stateTransition
-      ? this.#applyStateStep(event, stateTransition)
-      : false;
-    const anyEmitted = anyTransition
-      ? this.#applyAnyStep(event, anyTransition, !transitionApplied)
-      : false;
-
-    if (anyEmitted || this.#queue.length > 0) {
-      this.#drainInternal();
-    } else if (!stateTransition && !anyTransition) {
-      console.warn(
-        `[Actor] no transition for event "${event.id}" in state "${this.state.name}". Event dropped.`,
-      );
+    if (this.#error !== null || this.state.isFinal) return;
+    const prev = this.#entry;
+    this.#entry = { state: this.state, context: this.#context };
+    try {
+      const transitions = this.#options.transitions;
+      const stateTransition = transitions[this.state.name]?.[event.id];
+      const anyTransition = transitions["Any"]?.[event.id];
+      const transitionApplied = stateTransition
+        ? this.#applyStateStep(event, stateTransition)
+        : false;
+      const anyEmitted =
+        this.#error === null ? this.#applyAnyStep(event, anyTransition, !transitionApplied) : false;
+      if (anyEmitted || this.#queue.length > 0) {
+        this.#drainInternal();
+      } else if (!stateTransition && !anyTransition) {
+        console.warn(
+          `[Actor] no transition for event "${event.id}" in state "${this.state.name}". Event dropped.`,
+        );
+      }
+    } finally {
+      this.#entry = prev;
     }
   }
 
-  #applyStateStep(event: InternalEvent, transition: StepFn<States, ActorContext>): boolean {
-    const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
-    if (step.emit) this.#queue.push(...step.emit);
-    if (step.state) {
-      this.#applyTransition(event, step);
-      return true;
-    }
+  #safe(reason: ErrorReason, event: InternalEvent, fn: () => void): boolean {
+    const attempt = Either.from(fn);
+    if (attempt[0] === undefined) return true;
+    this.#enterError(reason, event, attempt[0]);
     return false;
+  }
+
+  #applyStateStep(event: InternalEvent, transition: StepFn<States, ActorContext>): boolean {
+    let applied = false;
+    this.#safe("transition", event, () => {
+      const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
+      if (step.emit) this.#queue.push(...step.emit);
+      if (step.state) {
+        this.#applyTransition(event, step);
+        applied = true;
+      }
+    });
+    return applied;
   }
 
   #applyAnyStep(
     event: InternalEvent,
-    transition: StepFn<States, ActorContext>,
+    transition: StepFn<States, ActorContext> | undefined,
     allowTransition: boolean,
   ): boolean {
-    const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
-    if (step.state && allowTransition) {
-      this.#applyTransition(event, step);
-    }
-    if (step.emit) {
-      this.#queue.push(...step.emit);
-      return true;
-    }
-    return false;
+    if (transition === undefined) return false;
+    let emitted = false;
+    this.#safe("transition", event, () => {
+      const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
+      if (step.state && allowTransition) {
+        this.#applyTransition(event, step);
+      }
+      if (step.emit) {
+        this.#queue.push(...step.emit);
+        emitted = true;
+      }
+    });
+    return emitted;
   }
 
   snapshot(): Snapshot<ActorContext> {
-    return buildSnapshot(this.state, this.#regions, this.#context);
-  }
-
-  #pushEvent(event: InternalEvent): void {
-    this.#queue.push(event);
+    return buildSnapshot(this.state, this.#regions, this.#context, this.#error ?? undefined);
   }
 
   #abortEffects(): void {
@@ -287,10 +299,15 @@ export class Actor<
   }
 
   #applyTransition(event: InternalEvent, step: TransitionResult<States[number], string>): void {
+    if (this.#error !== null) return;
     if (!step.state) return;
-    this.#effectAbort?.abort();
     const resolved = parseTarget<States[number]>(step);
     if (!resolved) return;
+    if (!(resolved.state instanceof StateRef)) {
+      this.#enterError("transition", event, new Error("invalid transition target"));
+      return;
+    }
+    this.#effectAbort?.abort();
     this.state = resolved.state;
     this.#runEffects(event, resolved.payload);
     if (this.state.isFinal) {
@@ -300,54 +317,74 @@ export class Actor<
 
   #runEffects(event: InternalEvent, statePayload: unknown): void {
     const list = this.#options.effects[this.state.name];
-    if (!list || list.length === 0) {
+    if (!list) {
       this.#effectAbort = null;
       return;
     }
-    const abort = runEffects<ActorContext>({
+    const abort = new AbortController();
+    this.#effectAbort = abort;
+    const lastGood: LastKnownState = this.#entry ?? { state: this.state, context: this.#context };
+    const result = runEffects<ActorContext>({
       effects: { [this.state.name]: list },
       state: this.state,
       statePayload,
       event,
       context: this.#contextHandle,
       emit: (e: InternalEvent) => {
+        if (this.#error !== null) return;
         this.#queue.push(e);
         this.#drainInternal();
       },
       clock: this.clock,
+      abort,
+      lastGood,
+      onError: (error: unknown) => this.#enterError("effect", event, error, lastGood),
     });
-    this.#effectAbort = abort;
+    this.#pendingEffects.push(...result.pending);
+  }
+
+  #enterError(
+    reason: ErrorReason,
+    event: InternalEvent,
+    error: unknown,
+    lastGood?: LastKnownState,
+  ): void {
+    if (this.#error !== null) return;
+    const entry = lastGood ?? this.#entry ?? { state: this.state, context: this.#context };
+    this.#error = { error, state: entry.state, context: entry.context, event, reason };
+    this.#effectAbort?.abort();
+    this.state = this.#errorState;
+    this.#lastState = this.#errorState;
+    this.#contextWritten = false;
+    this.#subs.emitChange(this.snapshot());
   }
 
   #drainInternal(): void {
     if (this.#draining) return;
     this.#draining = true;
-    let budgetExceeded = false;
     try {
       const budget = this.#internalBudget;
       let count = 0;
       this.#queue.processCancellable((event) => {
+        if (this.#error !== null) return false;
         if (count >= budget) {
-          budgetExceeded = true;
-          this.#abortEffects();
+          this.#enterError("budget", event, new Error("internal event budget exceeded"));
           return false;
         }
         count++;
         if (this.#internalIds.has(event.id) || this.#inputIds.has(event.id)) {
           this.#dispatch(event);
-        } else if (this.#outputHandler) {
-          this.#outputHandler(event);
+        } else {
+          const outputHandler = this.#outputHandler;
+          if (outputHandler) {
+            if (!this.#safe("output", event, () => outputHandler(event))) return false;
+          }
         }
         return true;
       });
     } finally {
       this.#draining = false;
       this.#emitChangeIfDirty();
-    }
-    if (budgetExceeded) {
-      console.warn(
-        `[Actor] internal event budget (${this.#internalBudget}) exceeded — possible emit loop. Actor halting.`,
-      );
     }
   }
 }
