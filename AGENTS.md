@@ -30,6 +30,28 @@ Yes:
 
 > Bug in auth middleware. Token expiry check use `<` not `<=`. Fix:
 
+## Starting Work
+
+Always start from newest `origin/main`. Local `main` goes stale — branching off it means building on deleted files, old APIs, dead branches.
+
+```
+git fetch origin
+git checkout -b <branch> origin/main   # not `main`
+```
+
+Before touching anything, confirm the base is current:
+
+- `git rev-parse main origin/main` — differ? Local main stale. `git reset --hard origin/main`, or branch from `origin/main` directly.
+- `git log main..origin/main --oneline` — output? Local main behind. Start from `origin/main`, never `main`.
+- Merged PRs only reach you via `origin/main`. Fetch first, always.
+
+Rules:
+
+1. Branch off `origin/main`, never local `main`.
+2. No edits on a base older than `origin/main`.
+3. `origin/main` advanced mid-task? Rebase, or re-do work on new base.
+4. Rename stale local main: `git branch -m main main-stale`.
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web
