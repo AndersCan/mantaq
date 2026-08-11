@@ -38,8 +38,8 @@ actor.context.count; // current value
 ## Context in transitions
 
 Handlers get a `context` handle. `get()` reads the current value; `set()`
-replaces it wholesale. A change is detected when the reference changes —
-that is what triggers a `change` event.
+replaces it wholesale. Any `set()` call triggers a `change` event — even
+setting the same reference. Copy the current value to mutate.
 
 ```ts
 setup: (m) => {

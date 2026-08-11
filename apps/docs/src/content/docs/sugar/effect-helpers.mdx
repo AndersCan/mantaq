@@ -53,12 +53,12 @@ Same logic. More code. Easy to forget abort check.
 
 ```ts
 withPromise(promise, signal, emit, {
-  success: (data) => ({ type: "DONE", payload: data }), // must return event-like { id, ... }
+  success: (data) => ({ type: "DONE", payload: data }), // must return envelope: { type, payload? }
   error: (err) => ({ type: "FAIL", payload: err }), // same
 });
 ```
 
-Return value emitted as internal event.payload. Actor processes it.
+Return value emitted as an event. Actor dispatches it (internal/input → transition, else output).
 
 ## withTimeout
 
@@ -69,7 +69,7 @@ import { withTimeout } from "@mantaq/sugar";
 
 setup: (m) => {
   m.effect(waiting, (input) => {
-    withTimeout(5000, input, (() => ({ type: "TIMEOUT" })));
+    withTimeout(5000, input, () => ({ type: "TIMEOUT" }));
   });
 },
 ```

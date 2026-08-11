@@ -45,12 +45,12 @@ const fetchData = event("FETCH")<{ url: string }>();
 
 ### `EventRef<T, Payload>`
 
-| Property           | Type                            | What                       |
-| ------------------ | ------------------------------- | -------------------------- |
-| `type`             | `T`                             | Event type (discriminant)  |
-| `.is(event)`       | `boolean`                       | Identity check. Type guard |
-| `.create()`        | `{ type: T }`                   | Void-payload instance      |
-| `.create(payload)` | `{ type: T; payload: Payload }` | Payload instance           |
+| Property           | Type                            | What                          |
+| ------------------ | ------------------------------- | ----------------------------- |
+| `type`             | `T`                             | Event type (discriminant)     |
+| `.is(event)`       | `boolean`                       | Identity check. Type guard    |
+| `.create()`        | `{ type: T }`                   | Void-payload events only      |
+| `.create(payload)` | `{ type: T; payload: Payload }` | Payload events — arg required |
 
 ---
 
@@ -107,13 +107,13 @@ class Actor<
 
 ### Properties
 
-| Property  | Type                       | What                         |
-| --------- | -------------------------- | ---------------------------- |
-| `state`   | `States[number]`           | Current state                |
-| `context` | `ActorContext`             | Current context              |
-| `clock`   | `Clock`                    | Clock instance               |
-| `regions` | `Record<string, AnyActor>` | Children                     |
-| `options` | `InternalActorOptions`     | Built options. Semi-internal |
+| Property  | Type                           | What                               |
+| --------- | ------------------------------ | ---------------------------------- |
+| `state`   | `States[number] \| ErrorState` | Current state (`__error` on error) |
+| `context` | `ActorContext`                 | Current context                    |
+| `clock`   | `Clock`                        | Clock instance                     |
+| `regions` | `Record<string, AnyActor>`     | Children                           |
+| `options` | `InternalActorOptions<...>`    | Built options. Semi-internal       |
 
 ---
 
@@ -185,6 +185,7 @@ interface Snapshot<C = unknown> {
   context: C;
   regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
+  error?: ErrorInfo;
 }
 ```
 
@@ -264,5 +265,7 @@ interface AnyActor<C = Record<string, unknown>> {
 | `NonFinalStateRef<States>` | Non-terminal state refs                                        |
 | `CreatedOf<E>`             | Event instance type for `E`: `{ type }` or `{ type; payload }` |
 | `CreatedOfEvent<Id, P>`    | Same, explicit id and payload                                  |
-| `EffectFn<C, P>`           | `(input: EffectInput<C, P>) => void`                           |
+| `EffectFn<C, P>`           | `(input: EffectInput<C, P>) => void \| Promise<void>`          |
+| `ErrorInfo`                | `{ error; state; context; event; reason }` — last failure      |
+| `ErrorState`               | `StateRef<"__error", unknown, false>` — terminal error state   |
 | `SetupFn<...>`             | `(m: ActorBuilder<...>) => void` — the `setup` option type     |

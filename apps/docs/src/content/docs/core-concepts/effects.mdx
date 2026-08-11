@@ -66,7 +66,9 @@ setup: (m) => {
 ## Error handling
 
 Never throw in an effect. Catch errors and emit an internal error event; a
-transition handles it.
+transition handles it. An uncaught error still can't crash `send()` — the actor
+transitions to the built-in terminal `__error` state and the thrown value lands
+in `snapshot().error`.
 
 ```ts
 setup: (m) => {
@@ -74,7 +76,7 @@ setup: (m) => {
     fetch("/api")
       .then((res) => res.json())
       .catch((err) => {
-        if (!signal.aborted) emit({ type: "FETCH_FAILED", payload: error: String(err) });
+        if (!signal.aborted) emit({ type: "FETCH_FAILED", payload: { error: String(err) } });
       });
   });
 },

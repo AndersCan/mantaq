@@ -2,6 +2,11 @@
 
 Why `setup(m) => m.on(stateRef, eventRef, fn)` builder. Not `transitions: { idle: { START: fn } }` static map.
 
+> Historical design notes. Type shapes and plans predate the current API: events are
+> now envelopes `{ type, payload }`, and errors land in the universal `__error` state
+> (`snapshot().error`) instead of a reserved `@error` event. Read as history, not
+> current contract.
+
 ## The Problem
 
 Static map looks clean. Is a type trap.
@@ -17,7 +22,7 @@ new Actor({
 });
 ```
 
-Handler `event` param type? Map key `"START"` is a string. TypeScript cannot look up which `EventRef<"START", Payload>` in `inputs` tuple has id `"START"` and pull its `Payload` into the handler. Result: `event: InternalEvent` = `{id: string} & Record<string, unknown>`. Payload fields are `unknown`.
+Handler `event` param type? Map key `"START"` is a string. TypeScript cannot look up which `EventRef<"START", Payload>` in `inputs` tuple has id `"START"` and pull its `Payload` into the handler. Result: `event: InternalEvent` = `{type: string; payload?: unknown}`. Payload fields are `unknown`.
 
 User writes `event.phoneNumber` → tsc error → user casts `event as any`. Vision violated. We saw this: 9 casts in undoRedo, 3 in creditCheck, 1 in gameCharacter. Plus `context as CreditCheckContext` casts because context type loose too.
 

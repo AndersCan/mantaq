@@ -125,7 +125,8 @@ A declared event: literal type plus optional payload. Creates the event objects 
 ```ts
 class EventRef<const T extends string, Payload extends object | void = void> {
   readonly type: T;
-  create(payload: Payload): CreatedOfEvent<T, Payload>;
+  create(): Payload extends void ? { type: T } : void;
+  create(payload: Payload): Payload extends void ? { type: T } : { type: T; payload: Payload };
   is(anyEvent: unknown): anyEvent is CreatedOfEvent<T, Payload>;
 }
 const evt = move.create({ x: 1, y: 2 }); // { type: "MOVE", payload: { x: 1, y: 2 } }
@@ -199,7 +200,7 @@ Errors never escape `send()` — they become the error state. Check `snapshot().
 
 ### AnyActor
 
-Structural handle for any actor — regions and `options.regions`. `__`-prefixed members are internal plumbing (a refactor is removing them), **not** public contract; treat them as absent.
+Structural handle for any actor — regions, `context`, and `options`. `context` is the raw current value; write through the handler `context.set()` instead.
 
 ```ts
 interface AnyActor<C = Record<string, unknown>> {
@@ -212,6 +213,11 @@ interface AnyActor<C = Record<string, unknown>> {
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   settled(): Promise<void>;
+  options?: {
+    transitions?: Record<string, Record<string, unknown>>;
+    effects?: Record<string, unknown[]>;
+    states?: ReadonlyArray<{ name: string; isFinal: boolean }>;
+  };
 }
 ```
 
@@ -360,8 +366,8 @@ document is the oracle for API taste — the product.
 - **Small surface.** `index.ts` is capped by an export budget. Every addition
   pays: it must earn its place and update this document.
 - **No `Internal*` leaks.** Nothing named `Internal*` may be public except the
-  allowlist — currently `InternalEvent`. `__`-prefixed members (e.g.
-  `AnyActor.__children`) are internal plumbing, not API; treat as absent.
+  allowlist — currently `InternalEvent`. `__`-prefixed members are internal
+  plumbing, not API; treat as absent.
 - **One way to do things.** No aliases, no competing APIs. If two exports do the
   same thing, one is a bug. Recipes compose primitives; they add no surface.
 - **Type = behavior.** If it typechecks, it runs correct. The names, payloads,
