@@ -27,7 +27,14 @@ export interface EffectInput<ActorContext, Payload = unknown> {
 export type EffectFn<ActorContext, Payload = unknown> = (
   input: EffectInput<ActorContext, Payload>,
 ) => void | Promise<void>;
-export type ErrorReason = "transition" | "effect" | "budget" | "output" | "internal" | "async";
+export type ErrorReason =
+  | "transition"
+  | "effect"
+  | "budget"
+  | "output"
+  | "internal"
+  | "async"
+  | "unhandled";
 
 export interface ErrorInfo {
   error: unknown;

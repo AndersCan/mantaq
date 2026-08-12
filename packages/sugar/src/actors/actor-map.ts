@@ -13,7 +13,6 @@ export class ActorMap implements SendableMap<SendableEvent> {
 
   spawn(key: string, factory: () => AnyActor): void {
     if (this.#actors.has(key)) {
-      console.warn(`[ActorMap] spawning over existing key "${key}". Old actor will be aborted.`);
       this.kill(key);
     }
     const child = factory();
@@ -22,7 +21,9 @@ export class ActorMap implements SendableMap<SendableEvent> {
         setOutputHandler(child, (event) => {
           this.#parent!.send(event);
         }),
-        (err) => console.error(err.message),
+        (err) => {
+          throw new Error(err.message);
+        },
         () => {},
       );
     }
@@ -38,7 +39,9 @@ export class ActorMap implements SendableMap<SendableEvent> {
     if (actor) {
       Either.match(
         abortEffects(actor),
-        (err) => console.error(err.message),
+        (err) => {
+          throw new Error(err.message);
+        },
         () => {},
       );
     }

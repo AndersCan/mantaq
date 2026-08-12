@@ -24,10 +24,16 @@ export class VirtualClock implements Clock {
     return this.#now;
   }
 
-  #validMs(ms: number, method: string): boolean {
-    if (Number.isFinite(ms) && ms >= 0) return true;
-    console.warn(`[VirtualClock] invalid ${method} ms value: ${ms}. Call ignored.`);
-    return false;
+  /**
+   * Platform-matching delay clamp (like setTimeout/setInterval):
+   * NaN, negative, and 0 clamp to 0; values above the 32-bit max clamp to 1.
+   * Intervals additionally enforce a 1ms floor — a 0ms interval would spin the
+   * synchronous advance loop forever.
+   */
+  #delay(ms: number, interval: boolean): number {
+    if (!(ms > 0)) return interval ? 1 : 0;
+    if (ms > 2_147_483_647) return 1;
+    return ms;
   }
 
   setTimeout(
@@ -35,13 +41,12 @@ export class VirtualClock implements Clock {
     cb: () => void,
     options?: { signal?: AbortSignal; eventName?: string },
   ): number {
-    if (!this.#validMs(ms, "setTimeout")) return -1;
     const signal = options?.signal;
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
     const onAbort = trackAbort(signal, id, this.#timers);
     this.#timers.set(id, {
-      deadline: this.#now + ms,
+      deadline: this.#now + this.#delay(ms, false),
       cb,
       signal,
       onAbort,
@@ -59,12 +64,17 @@ export class VirtualClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    if (!this.#validMs(ms, "setInterval")) return -1;
     const signal = options?.signal;
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
     const onAbort = trackAbort(signal, id, this.#intervals);
-    this.#intervals.set(id, { ms, next: this.#now + ms, cb, signal, onAbort });
+    this.#intervals.set(id, {
+      ms: this.#delay(ms, true),
+      next: this.#now + this.#delay(ms, true),
+      cb,
+      signal,
+      onAbort,
+    });
     return id;
   }
 
@@ -126,8 +136,8 @@ export class VirtualClock implements Clock {
   }
 
   advance(ms: number): void {
-    if (!this.#validMs(ms, "advance")) return;
-    const target = this.#now + ms;
+    const delta = Number.isFinite(ms) && ms > 0 ? ms : 0;
+    const target = this.#now + delta;
 
     while (true) {
       const deadline = this.#findEarliestDeadline(target);

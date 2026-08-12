@@ -35,6 +35,21 @@ export default defineConfig({
         rules: {
           "mantaq/no-try-catch": "error",
           "mantaq/no-throw": "error",
+          "mantaq/no-console": "error",
+        },
+      },
+      {
+        files: [
+          "packages/core/src/actor.ts",
+          "packages/sugar/src/actors/actor-map.ts",
+          "packages/traversal/src/graph.ts",
+        ],
+        rules: {
+          // Programmer-error validation sites — these throw per the no-console
+          // rule (undeclared initial state, unregistered regions, registry
+          // LEFTs, malformed graphs). Runtime error flow still uses Either +
+          // the error state, never thrown.
+          "mantaq/no-throw": "off",
         },
       },
       {

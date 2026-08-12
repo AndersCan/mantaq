@@ -175,7 +175,7 @@ export class Actor<
     const initState = resolveInitial(options.initial);
     const stateNames = new Set(options.states.map((s) => s.name));
     if (!stateNames.has(initState.name)) {
-      console.warn(
+      throw new Error(
         `[Actor] initial state "${initState.name}" not found in declared states [${[...stateNames].join(", ")}]`,
       );
     }
@@ -200,7 +200,7 @@ export class Actor<
           this.#drainInternal();
         });
         if (result[0] !== undefined) {
-          console.error(result[0].message);
+          throw new Error(result[0].message);
         }
         this.#children.set(key, child);
       }
@@ -283,9 +283,17 @@ export class Actor<
       if (result.emitted || this.#queue.length > 0) {
         this.#drainInternal();
       } else if (!stateTransition && !anyTransition) {
-        console.warn(
-          `[Actor] no transition for event "${event.type}" in state "${this.state.name}". Event dropped.`,
-        );
+        if (this.#internalIds.has(event.type)) {
+          this.#enterError(
+            "unhandled",
+            event,
+            new Error(
+              `[Actor] internal event "${event.type}" emitted but no handler in state "${this.state.name}"`,
+            ),
+          );
+        }
+        // external events with no handler in this state are ignored by design
+        // (broadcast fan-out, cross-state sends) — silent, documented pattern.
       }
     } finally {
       this.#entry = prev;

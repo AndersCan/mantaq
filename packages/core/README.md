@@ -431,11 +431,16 @@ Never throw from effects or transitions. Emit an error as an internal event and 
 ```ts
 const snap = actor.snapshot();
 if (snap.error) {
-  snap.error.reason; // "transition" | "effect" | "budget" | "output" | "internal" | "async"
+  snap.error.reason; // "transition" | "effect" | "budget" | "output" | "internal" | "async" | "unhandled"
   snap.error.state.name; // the state at the point of failure
   snap.error.event.type; // the bad event
 }
 ```
+
+Two deliberate exceptions to "every failure is loud":
+
+- **Subscribers only watch.** They read snapshots and never change the machine, so a throwing `on("change")`/`on("done")`/`on("transition")` callback is swallowed — the machine and its callers are unaffected.
+- **Unhandled external events are ignored.** An event with no handler in the current state is dropped by design (broadcast fan-out, cross-state sends). An **internal** event with no handler, however, is a machine-authoring bug and routes to the error state (`reason: "unhandled"`).
 
 A dead machine can be manually resumed with `actor.recover({ state, context })` — an explicit, **inherently dangerous** escape hatch (the caller injects state and context, so determinism no longer holds). Effects are not re-run and timers are not re-armed; processing resumes on the next event. Prefer fixing the root cause and recreating the actor.
 

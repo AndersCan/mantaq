@@ -55,11 +55,8 @@ export class Subscribers<C> {
   }
 
   #safe(fn: () => void): void {
-    const err = Either.from(fn);
-    if (err[0] !== undefined) {
-      console.warn(
-        `[Actor] subscriber threw: ${err[0] instanceof Error ? err[0].message : "unknown error"}`,
-      );
-    }
+    // A subscriber only watches the machine — it never changes it. Its throw
+    // is swallowed so the machine and its callers are unaffected.
+    void Either.from(fn);
   }
 }

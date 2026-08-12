@@ -72,7 +72,7 @@ const id = new RealClock().setTimeout(10, () => {});
 
 ### VirtualClock
 
-Deterministic `Clock` for tests. Time advances only when you say so; drive the machine without sleeping.
+Deterministic `Clock` for tests. Time advances only when you say so; drive the machine without sleeping. Delays follow platform semantics: `NaN`, negative, and `0` clamp to `0` (timeouts fire at the next advance); values above the 32-bit max clamp to `1`; intervals enforce a `1ms` floor so a bad interval can never spin the synchronous advance loop.
 
 ```ts
 class VirtualClock implements Clock {
@@ -183,7 +183,7 @@ interface ErrorInfo {
   state: AnyStateRef;
   context: unknown;
   event: InternalEvent;
-  reason: "transition" | "effect" | "budget" | "output" | "internal" | "async";
+  reason: ErrorReason;
 }
 const snap = actor.snapshot();
 if (snap.error) {
@@ -195,7 +195,9 @@ if (snap.error) {
 
 ### ErrorState
 
-The built-in terminal state the machine enters on any runtime error: a user handler or effect threw, the internal budget was exhausted, or an output handler threw. It is not a declared state — it is synthesized by the actor. The machine is dead: remaining queued events are dropped, effects are aborted, and every subsequent `send` is a no-op. Subscriber exceptions never kill the machine; they are logged and skipped.
+The built-in terminal state the machine enters on any runtime error: a user handler or effect threw; the internal budget was exhausted; an output handler threw; or an internal event was emitted with no handler. It is not a declared state — it is synthesized by the actor. The machine is dead: remaining queued events are dropped, effects are aborted, and every subsequent `send` is a no-op.
+
+Subscribers are watchers — they only read snapshots, never change the machine — so a subscriber throw is swallowed and never affects the machine or its callers. External events with no handler in the current state are likewise ignored by design (broadcast fan-out, cross-state sends). Every other failure is loud: misconfiguration throws at construction, invalid clock input is clamped platform-style, and runtime user-code errors route to the error state.
 
 ```ts
 type ErrorState = StateRef<"__error", unknown, false>;
@@ -209,7 +211,8 @@ Errors never escape `send()` — they become the error state. Check `snapshot().
 The `reason` field of `ErrorInfo`: which boundary the machine died on.
 
 ```ts
-type ErrorReason = "transition" | "effect" | "budget" | "output" | "internal" | "async";
+type ErrorReason =
+  "transition" | "effect" | "budget" | "output" | "internal" | "async" | "unhandled";
 ```
 
 ### TransitionResult

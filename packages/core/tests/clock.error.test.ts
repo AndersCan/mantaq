@@ -49,26 +49,25 @@ describe("VirtualClock error paths", () => {
     expect(b).toBe(0);
   });
 
-  test("invalid ms values are rejected without poisoning the clock", () => {
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      const clock = new VirtualClock();
-      expect(clock.setTimeout(NaN, () => {})).toBe(-1);
-      expect(clock.setTimeout(-1, () => {})).toBe(-1);
-      expect(clock.setInterval(Infinity, () => {})).toBe(-1);
-      clock.advance(NaN);
-      expect(clock.now()).toBe(0);
-      expect(clock.hasPending()).toBe(false);
-      let fired = 0;
-      clock.setTimeout(10, () => fired++);
-      clock.advance(10);
-      expect(fired).toBe(1);
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.length).toBeGreaterThanOrEqual(4);
+  test("invalid ms values clamp to 0 and never poison the clock", () => {
+    const clock = new VirtualClock();
+    let nanFired = 0;
+    clock.setTimeout(NaN, () => nanFired++);
+    clock.advance(0);
+    expect(nanFired).toBe(1);
+
+    let negFired = 0;
+    clock.setTimeout(-1, () => negFired++);
+    clock.advance(0);
+    expect(negFired).toBe(1);
+
+    let count = 0;
+    clock.setInterval(Infinity, () => count++);
+    clock.advance(2);
+    expect(count).toBe(2);
+
+    clock.advance(NaN);
+    expect(clock.now()).toBeGreaterThan(0);
   });
 });
 

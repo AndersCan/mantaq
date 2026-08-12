@@ -5,10 +5,6 @@ export function withTimeout<ActorContext>(
   input: EffectInput<ActorContext>,
   event: () => InternalEvent,
 ): void {
-  if (!Number.isFinite(ms) || ms < 0) {
-    console.warn(`[withTimeout] invalid ms value: ${ms}. Timeout skipped.`);
-    return;
-  }
   input.clock.setTimeout(
     ms,
     () => {

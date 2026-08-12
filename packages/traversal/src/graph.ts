@@ -363,8 +363,7 @@ export function buildGraph<C>(
       return { nodes, edges };
     }),
     (error) => {
-      console.error("[mantaq/traversal] buildGraph failed:", error);
-      return { nodes: [], edges: [] };
+      throw error;
     },
     (result) => result,
   );

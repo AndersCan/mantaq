@@ -58,18 +58,33 @@ describe("ActorMap mutation tests", () => {
     expect(signal?.aborted).toBe(true);
   });
 
-  test("re-spawn calls console.warn unconditionally", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  test("re-spawn silently replaces and aborts the old actor", () => {
     const map = new ActorMap();
+    const toggle = event("toggle")();
+    const on = state("on")();
+    const off = state("off")();
+    let signal: AbortSignal | undefined;
 
-    map.spawn("a", () => makeActor("a").actor);
-    warnSpy.mockClear();
+    const oldActor = new Actor({
+      inputs: [toggle],
+      states: [off, on],
+      initial: off,
+      setup: (m) => {
+        m.on(off, toggle, () => ({ state: on }));
+        m.effect(on, ({ signal: s }) => {
+          signal = s;
+        });
+      },
+    });
+
+    map.spawn("a", () => oldActor);
+    map.send("a", toggle.create());
+    expect(signal?.aborted).toBe(false);
 
     map.spawn("a", () => makeActor("b").actor);
-    expect(warnSpy).toHaveBeenCalledOnce();
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[ActorMap] spawning over existing key "a". Old actor will be aborted.',
-    );
+    expect(signal?.aborted).toBe(true);
+    expect(map.has("a")).toBe(true);
+    expect(map.size).toBe(1);
   });
 
   test("after kill, can re-spawn with same key", () => {
@@ -169,38 +184,6 @@ describe("ActorMap mutation tests", () => {
     delete process.env.NODE_ENV;
     vi.resetModules();
   }
-
-  test("re-spawn warns in development mode with correct message", async () => {
-    const DevActorMap = await loadDevActorMap();
-    try {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const map = new DevActorMap();
-
-      map.spawn("a", () => makeActor("a").actor);
-      map.spawn("a", () => makeActor("b").actor);
-
-      expect(warnSpy).toHaveBeenCalledOnce();
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[ActorMap] spawning over existing key "a". Old actor will be aborted.',
-      );
-    } finally {
-      cleanupDevMode();
-    }
-  });
-
-  test("first spawn does not warn in development mode", async () => {
-    const DevActorMap = await loadDevActorMap();
-    try {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const map = new DevActorMap();
-
-      map.spawn("a", () => makeActor("a").actor);
-
-      expect(warnSpy).not.toHaveBeenCalled();
-    } finally {
-      cleanupDevMode();
-    }
-  });
 
   test("re-spawn aborts old actor effects in development mode", async () => {
     const DevActorMap = await loadDevActorMap();
@@ -310,7 +293,7 @@ describe("ActorMap directed mutation tests", () => {
     expect(sent).toEqual([output.create({ from: "a" })]);
   });
 
-  test("spawn with a parent and an unregistered child logs the registry error", () => {
+  test("spawn with a parent and an unregistered child throws", () => {
     const parent = {
       state: state("parent")(),
       clock: new VirtualClock(),
@@ -329,10 +312,7 @@ describe("ActorMap directed mutation tests", () => {
       on: () => () => {},
       settled: async () => {},
     };
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const map = new ActorMap(parent as never);
-    map.spawn("a", () => child as never);
-    expect(errorSpy).toHaveBeenCalled();
-    errorSpy.mockRestore();
+    expect(() => map.spawn("a", () => child as never)).toThrow(/not registered/);
   });
 });

@@ -731,27 +731,22 @@ describe("Actor directed mutation tests", () => {
     expect(actor.snapshot().error?.reason).toBe("budget");
   });
 
-  test("initial state warning fires when the state is not declared", () => {
+  test("initial state not declared throws", () => {
     const a = state("a")();
     const b = state("b")();
     const stray = state("stray")();
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [a, b] as AnyStateRef[],
-        initial: stray as never,
-        setup: () => {},
-      });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("stray"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/stray/);
   });
 
-  test("unregistered region child logs a registry error", () => {
+  test("unregistered region child throws a registry error", () => {
     const idle = state("idle")();
     const stub: AnyActor = {
       state: state("s")(),
@@ -763,24 +758,36 @@ describe("Actor directed mutation tests", () => {
       recover: () => {},
       settled: async () => {},
     };
-    const errors: string[] = [];
-    const original = console.error;
-    console.error = (...args: unknown[]) => errors.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [idle],
-        initial: idle,
-        regions: { child: stub },
-        setup: () => {},
-      });
-    } finally {
-      console.error = original;
-    }
-    expect(errors.some((e) => e.includes("not registered"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [idle],
+          initial: idle,
+          regions: { child: stub },
+          setup: () => {},
+        }),
+    ).toThrow(/not registered/);
   });
 
-  test("no-transition warning fires for an unhandled event", () => {
+  test("an internal event emitted with no handler routes to the error state", () => {
+    const idle = state("idle")();
+    const boom = event("BOOM")();
+    const actor = new Actor({
+      inputs: [],
+      internal: [boom],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    pushInternal(actor, boom.create());
+    drainInternal(actor);
+    expect(actor.snapshot().path[0]).toBe("__error");
+    expect(actor.snapshot().error?.reason).toBe("unhandled");
+    expect(actor.snapshot().error?.event.type).toBe("BOOM");
+  });
+
+  test("an unhandled external event is ignored without dying", () => {
     const idle = state("idle")();
     const stray = event("STRAY")();
     const actor = new Actor({
@@ -789,15 +796,9 @@ describe("Actor directed mutation tests", () => {
       initial: idle,
       setup: () => {},
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(stray.create());
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("no transition"))).toBe(true);
+    actor.send(stray.create());
+    expect(actor.state.name).toBe("idle");
+    expect(actor.snapshot().error).toBeUndefined();
   });
 
   test("abortEffects on an actor with no running effect does not throw", () => {
@@ -913,25 +914,28 @@ describe("Actor directed mutation tests 2", () => {
     expect(strayRuns).toBe(0);
   });
 
-  test("initial state warning lists both declared states", () => {
+  test("initial state not declared throws and lists both declared states", () => {
     const a = state("a")();
     const b = state("b")();
     const stray = state("stray")();
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [a, b] as AnyStateRef[],
-        initial: stray as never,
-        setup: () => {},
-      });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("stray"))).toBe(true);
-    expect(warns.some((w) => w.includes("a, b"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/stray/);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/a, b/);
   });
 
   test("region child output routes to the parent queue and drains", () => {
@@ -1119,7 +1123,7 @@ describe("Actor error state directed mutation tests", () => {
     expect(actor.snapshot().path[0]).toBe("__error");
   });
 
-  test("subscriber isolation — a throwing subscriber leaves the machine running", () => {
+  test("a throwing subscriber leaves the machine running", () => {
     const idle = state("idle")();
     const active = state("active")();
     const go = event("GO")();
@@ -1733,18 +1737,11 @@ describe("Actor error state directed mutation tests", () => {
         m.on(idle, go, () => ({ state: idle }));
       },
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.on("transition", () => {
-        throw new Error("sub boom");
-      });
-      actor.send(go.create());
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("subscriber threw"))).toBe(true);
+    actor.on("transition", () => {
+      throw new Error("sub boom");
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().path[0]).toBe("idle");
     expect(actor.snapshot().error).toBeUndefined();
   });
 
