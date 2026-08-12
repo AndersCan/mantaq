@@ -5,30 +5,62 @@ description: Create multiple states and events in one call.
 
 `states()` and `events()`. Batch create. One call, typed record.
 
+Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six states, its seven events — created in two calls.
+
 ## Without sugar
 
 ```ts
 import { state, event } from "@mantaq/core";
 
-const idle = state("idle")();
-const loading = state("loading")();
-const success = state("success")();
+const basicInfo = state("basicInfo")();
+const shippingAddress = state("shippingAddress")();
+const payment = state("payment")();
+const submitting = state("submitting")();
+const success = state("success")().final();
 const error = state("error")();
 
-const fetch = event("FETCH")();
-const retry = event("RETRY")();
-const cancel = event("CANCEL")();
+const submitBasicInfo = event("SUBMIT_BASIC_INFO")();
+const submitShipping = event("SUBMIT_SHIPPING")();
+const submitPayment = event("SUBMIT_PAYMENT")();
+const back = event("BACK")();
+const paymentOk = event("PAYMENT_OK")();
+const paymentFail = event("PAYMENT_FAIL")();
+const submittingDone = event("SUBMITTING_DONE")();
 ```
 
-Seven calls. Repetitive.
+Thirteen calls. Repetitive.
 
 ## With sugar
 
 ```ts
 import { states, events } from "@mantaq/sugar";
 
-const { idle, loading, success, error } = states("idle", "loading", "success", "error");
-const { FETCH, RETRY, CANCEL } = events("FETCH", "RETRY", "CANCEL");
+const { basicInfo, shippingAddress, payment, submitting, success, error } = states(
+  "basicInfo",
+  "shippingAddress",
+  "payment",
+  "submitting",
+  "success",
+  "error",
+);
+
+const {
+  SUBMIT_BASIC_INFO,
+  SUBMIT_SHIPPING,
+  SUBMIT_PAYMENT,
+  BACK,
+  PAYMENT_OK,
+  PAYMENT_FAIL,
+  SUBMITTING_DONE,
+} = events(
+  "SUBMIT_BASIC_INFO",
+  "SUBMIT_SHIPPING",
+  "SUBMIT_PAYMENT",
+  "BACK",
+  "PAYMENT_OK",
+  "PAYMENT_FAIL",
+  "SUBMITTING_DONE",
+);
 ```
 
 Two calls. Typed names as keys.
@@ -42,51 +74,56 @@ Two calls. Typed names as keys.
 Keys are the names you passed. Dot or bracket access:
 
 ```ts
-const s = states("a", "b", "c");
-s.a; // StateRef<"a">
-s["b"]; // StateRef<"b">
+const s = states("basicInfo", "payment", "success");
+s.basicInfo; // StateRef<"basicInfo">
+s["payment"]; // StateRef<"payment">
 
-const e = events("X", "Y");
-e.X; // EventRef<"X">
+const e = events("SUBMIT_BASIC_INFO", "SUBMIT_PAYMENT");
+e.SUBMIT_BASIC_INFO; // EventRef<"SUBMIT_BASIC_INFO">
 ```
 
 Destructure or keep the record:
 
 ```ts
-const s = states("a", "b", "c");
-const { a, b, c } = s;
+const s = states("basicInfo", "payment", "success");
+const { basicInfo, payment, success } = s;
 ```
 
 ## Real example
+
+Same checkout machine. Fewer lines.
 
 ```ts
 import { Actor } from "@mantaq/core";
 import { states, events } from "@mantaq/sugar";
 
-const { idle, loading, done } = states("idle", "loading", "done");
-const { START, FINISH } = events("START", "FINISH");
+const { basicInfo, payment, success } = states("basicInfo", "payment", "success");
+const { SUBMIT_BASIC_INFO, SUBMIT_PAYMENT } = events("SUBMIT_BASIC_INFO", "SUBMIT_PAYMENT");
 
-const actor = new Actor({
-  inputs: [START, FINISH],
-  states: [idle, loading, done],
-  initial: idle,
+const checkout = new Actor({
+  inputs: [SUBMIT_BASIC_INFO, SUBMIT_PAYMENT],
+  states: [basicInfo, payment, success],
+  initial: basicInfo,
   setup: (m) => {
-    m.on(idle, START, () => ({ state: loading }));
-    m.on(loading, FINISH, () => ({ state: done }));
+    m.on(basicInfo, SUBMIT_BASIC_INFO, () => ({ state: payment }));
+    m.on(payment, SUBMIT_PAYMENT, () => ({ state: success }));
   },
 });
 ```
 
-Same actor. Fewer lines.
-
 ## Type safety
 
 ```ts
-const { idle, active } = states("idle", "active");
+const { basicInfo, success } = states("basicInfo", "success");
 
 // TypeScript knows:
-idle.name; // "idle"
-active.name; // "active"
+basicInfo.name; // "basicInfo"
+success.name; // "success"
+success.final(); // isFinal = true
 ```
 
 Names inferred as string literals.
+
+:::tip[Next]
+[Matching](/mantaq/sugar/matching/) checks where the checkout machine is: `matches()`, `isIn()`, `activeLeaves()`, `tag()`.
+:::

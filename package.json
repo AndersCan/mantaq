@@ -6,6 +6,7 @@
   "scripts": {
     "ready": "vp check && vp run guard && vp run knip && vp run -r test && vp run -r build",
     "guard": "node scripts/vision-guard.mjs",
+    "docs:check": "node scripts/docs-check.mjs",
     "knip": "knip",
     "coverage": "vp run -r coverage",
     "dev": "vp run docs#dev",

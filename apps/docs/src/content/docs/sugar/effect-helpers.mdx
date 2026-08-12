@@ -5,23 +5,27 @@ description: Promise bridging and timeout helpers for effects.
 
 Effects need patterns. Promise bridging. Timeouts. Sugar provides two.
 
-Register effects in `setup` with `m.effect(state, fn)`.
+Checkout machine from [Effects](/mantaq/core-concepts/effects/). The `submitting`
+effect charges the card and falls back on timeout. Sugar versions.
 
 ## withPromise
 
 Bridge promise to actor events. Abort-safe.
 
+The charge effect, sugar style:
+
 ```ts
 import { withPromise } from "@mantaq/sugar";
 
 setup: (m) => {
-  m.effect(loading, ({ signal, emit }) => {
-    withPromise(fetch("/api"), signal, emit, {
-      success: (data) => ({ type: "FETCH_DONE", payload: data }),
-      error: (err) => ({ type: "FETCH_ERROR", payload: err }),
+  m.effect(submitting, (input) => {
+    const s = input.context.get();
+    withPromise(chargeCard(s.paymentInfo!.cardNumber), input.signal, input.emit, {
+      success: (orderId) => paymentOk.create({ orderId }),
+      error: (reason) => paymentFail.create({ reason: String(reason) }),
     });
   });
-},
+};
 ```
 
 ### What it does
@@ -35,16 +39,16 @@ Without sugar:
 
 ```ts
 setup: (m) => {
-  m.effect(loading, ({ signal, emit }) => {
-    fetch("/api")
-      .then((data) => {
-        if (!signal.aborted) emit({ type: "FETCH_DONE", payload: data });
+  m.effect(submitting, ({ signal, emit }) => {
+    chargeCard(s.paymentInfo!.cardNumber)
+      .then((orderId) => {
+        if (!signal.aborted) emit(paymentOk.create({ orderId }));
       })
-      .catch((err) => {
-        if (!signal.aborted) emit({ type: "FETCH_ERROR", payload: err });
+      .catch((reason) => {
+        if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
       });
   });
-},
+};
 ```
 
 Same logic. More code. Easy to forget abort check.
@@ -53,8 +57,8 @@ Same logic. More code. Easy to forget abort check.
 
 ```ts
 withPromise(promise, signal, emit, {
-  success: (data) => ({ type: "DONE", payload: data }), // must return envelope: { type, payload? }
-  error: (err) => ({ type: "FAIL", payload: err }), // same
+  success: (data) => ({ type: "PAYMENT_OK", payload: data }), // must return envelope: { type, payload? }
+  error: (err) => ({ type: "PAYMENT_FAIL", payload: err }), // same
 });
 ```
 
@@ -64,14 +68,16 @@ Return value emitted as an event. Actor dispatches it (internal/input → transi
 
 Timeout via actor's clock. Abort-safe.
 
+The fallback effect. Charge hangs → 800ms → `SUBMITTING_DONE` → `success`.
+
 ```ts
 import { withTimeout } from "@mantaq/sugar";
 
 setup: (m) => {
-  m.effect(waiting, (input) => {
-    withTimeout(5000, input, () => ({ type: "TIMEOUT" }));
+  m.effect(submitting, (input) => {
+    withTimeout(800, input, () => submittingDone.create());
   });
-},
+};
 ```
 
 ### What it does
@@ -86,12 +92,12 @@ Without sugar:
 
 ```ts
 setup: (m) => {
-  m.effect(waiting, ({ clock, signal, emit }) => {
-    clock.setTimeout(5000, () => {
-      if (!signal.aborted) emit({ type: "TIMEOUT" });
+  m.effect(submitting, ({ clock, signal, emit }) => {
+    clock.setTimeout(800, () => {
+      if (!signal.aborted) emit(submittingDone.create());
     });
   });
-},
+};
 ```
 
 Sugar checks the signal for you.
@@ -99,27 +105,32 @@ Sugar checks the signal for you.
 ### VirtualClock testing
 
 ```ts
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
-import { withTimeout } from "@mantaq/sugar";
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { matches, withTimeout } from "@mantaq/sugar";
 
-const idle = state("idle")();
-const waiting = state("waiting")();
-const start = event("START")();
+const payment = state("payment")();
+const submitting = state("submitting")();
+const success = state("success")().final();
+const submitPayment = event("SUBMIT_PAYMENT")();
+const submittingDone = event("SUBMITTING_DONE")();
 const clock = new VirtualClock();
 
-const actor = new Actor({
-  inputs: [start],
-  states: [idle, waiting],
-  initial: idle,
+const checkout = new Actor({
+  inputs: [submitPayment],
+  internal: [submittingDone],
+  states: [payment, submitting, success],
+  initial: payment,
   clock,
   setup: (m) => {
-    m.on(idle, start, () => ({ state: waiting }));
-    m.effect(waiting, (input) => withTimeout(5000, input, () => ({ type: "TIMEOUT" })));
+    m.effect(submitting, (input) => withTimeout(800, input, () => submittingDone.create()));
+    m.on(payment, submitPayment, () => ({ state: submitting }));
+    m.on(submitting, submittingDone, () => ({ state: success }));
   },
 });
 
-actor.send(start.create());
-clock.advance(5000); // triggers timeout
+checkout.send(submitPayment.create()); // → submitting, effect schedules timeout
+clock.advance(800); // triggers timeout
+matches(checkout, "success"); // true
 ```
 
 Deterministic. Same as core, less boilerplate.
@@ -131,3 +142,7 @@ Both helpers check `signal.aborted`. State exit aborts effect.
 Promise resolves after state exit → no emit. Timer fires after exit → no emit.
 
 No manual checks needed. Sugar handles it.
+
+:::tip[Next]
+[API Reference](/mantaq/reference/core/) — every option and method, exact signatures.
+:::

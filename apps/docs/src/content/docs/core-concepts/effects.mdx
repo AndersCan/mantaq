@@ -7,22 +7,31 @@ Effect. Runs on state entry. Gets `EffectInput`. Can emit events.
 
 Register effects in `setup` with `m.effect(state, fn)`.
 
+Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its `submitting`
+state needs two things: charge the card, and bail out if it takes too long.
+Both are effects.
+
 ## Basic effect
 
+The `submitting` effect. Entry starts the charge. `emit` carries the result
+back to the machine as internal events.
+
 ```ts
-const actor = new Actor({
-  // ...
-  setup: (m) => {
-    m.effect(loading, ({ signal, emit }) => {
-      fetch("/api")
-        .then((res) => res.json())
-        .then((data) => {
-          if (!signal.aborted) emit({ type: "FETCH_DONE", payload: data });
-        });
-    });
-  },
-});
+setup: (m) => {
+  m.effect(submitting, (input) => {
+    const s = input.context.get();
+    chargeCard(s.paymentInfo!.cardNumber).then(
+      (orderId) => input.emit(paymentOk.create({ orderId })),
+      (reason) => input.emit(paymentFail.create({ reason: String(reason) })),
+    );
+  });
+};
 ```
+
+`chargeCard` is your payment provider. A promise. Resolves → `PAYMENT_OK` →
+`submitting` transitions to `success`. Rejects → `PAYMENT_FAIL` → `error`.
+
+Effect return value ignored. Effect emits. Machine reacts.
 
 ## EffectInput
 
@@ -39,18 +48,21 @@ const actor = new Actor({
 
 ## Auto-abort
 
-Effect aborts. Actor leaves state.
+Effect aborts. Actor leaves state. The `signal` fires. In-flight promises must
+check it before emitting.
 
 ```ts
 setup: (m) => {
-  m.effect(loading, ({ signal, clock }) => {
-    const id = clock.setTimeout(5000, () => {
-      // timeout
-    }, { signal });
-    // No manual clear. AbortSignal handles it.
+  m.effect(submitting, ({ signal, emit }) => {
+    chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
+      if (!signal.aborted) emit(paymentOk.create({ orderId }));
+    });
   });
-},
+};
 ```
+
+No manual cleanup. AbortSignal handles it. Charge returns after user backed
+out → no emit.
 
 ## Multiple effects
 
@@ -58,28 +70,44 @@ Call `m.effect` multiple times for the same state. Runs in order.
 
 ```ts
 setup: (m) => {
-  m.effect(active, ({ signal }) => { /* one */ });
-  m.effect(active, ({ signal }) => { /* two */ });
-},
+  m.effect(submitting, ({ signal }) => {
+    /* charge */
+  });
+  m.effect(submitting, (input) => {
+    // fallback: if charge hangs, time out
+    input.clock.setTimeout(800, () => {
+      if (!input.signal.aborted) input.emit(submittingDone.create());
+    });
+  });
+};
 ```
+
+`submittingDone` transitions to `success` — the timeout fallback. See [Effect Helpers](/mantaq/sugar/effect-helpers/) for the sugar version of both patterns.
 
 ## Error handling
 
-Never throw in an effect. Catch errors and emit an internal error event; a
-transition handles it. An uncaught error still can't crash `send()` — the actor
-transitions to the built-in terminal `__error` state and the thrown value lands
-in `snapshot().error`.
+Never throw in an effect. Catch and emit an internal error event; a transition
+handles it. `PAYMENT_FAIL` lands the machine in `error` — the transition already
+exists.
+
+An uncaught error still can't crash `send()`. The actor transitions to the
+built-in terminal `__error` state, and the thrown value lands in
+`snapshot().error`.
 
 ```ts
 setup: (m) => {
-  m.effect(loading, ({ signal, emit }) => {
-    fetch("/api")
-      .then((res) => res.json())
-      .catch((err) => {
-        if (!signal.aborted) emit({ type: "FETCH_FAILED", payload: { error: String(err) } });
+  m.effect(submitting, ({ signal, emit }) => {
+    chargeCard(s.paymentInfo!.cardNumber)
+      .then((orderId) => {
+        if (!signal.aborted) emit(paymentOk.create({ orderId }));
+      })
+      .catch((reason) => {
+        if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
       });
   });
-},
+};
 ```
 
-Tip: `@mantaq/sugar` provides `withPromise` and `withTimeout` helpers for common effect patterns. See [Sugar](/mantaq/sugar/effect-helpers/).
+:::tip[Next]
+[Context](/mantaq/core-concepts/context/) holds the form data the effects and transitions read.
+:::

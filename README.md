@@ -35,25 +35,43 @@ vp run ready
 
 ## Usage
 
+The docs tell one story — a multi-step checkout form. Same machine here.
+
 ```ts
 import { Actor, state, event } from "@mantaq/core";
 
-const idle = state("idle")();
-const running = state("running")();
-const start = event("START")();
+const basicInfo = state("basicInfo")();
+const payment = state("payment")();
+const success = state("success")().final();
 
-const actor = new Actor({
-  inputs: [start],
-  states: [idle, running],
-  initial: idle,
+const submitBasicInfo = event("SUBMIT_BASIC_INFO")();
+const submitPayment = event("SUBMIT_PAYMENT")();
+
+const checkout = new Actor({
+  inputs: [submitBasicInfo, submitPayment],
+  states: [basicInfo, payment, success],
+  initial: basicInfo,
   setup: (m) => {
-    m.on(idle, start, () => ({ state: running }));
+    m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
+    m.on(payment, submitPayment, () => ({ state: success }));
   },
 });
 
-actor.send(start.create());
-actor.snapshot().path[0]; // "running"
+checkout.send(submitBasicInfo.create());
+checkout.snapshot().path[0]; // "payment"
 ```
+
+## Docs
+
+The documentation site (`apps/docs`) builds **one running example** from start to
+finish: the checkout form. Each page expands the machine from the previous
+page. Entity IDs are fixed — the same states and events everywhere.
+
+- Canonical example: `packages/examples/checkout.actor.test.ts`
+- `vp run docs:check` — verifies docs use only canonical IDs, imports match real
+  package exports, and the canonical example typechecks.
+- `.opencode/skills/docs-write/` — agent skill for writing docs: single-example
+  rules and a five-persona review loop (from `ux-research/personas-and-journeys.md`).
 
 ## Skills
 

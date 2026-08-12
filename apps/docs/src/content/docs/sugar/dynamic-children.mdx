@@ -5,6 +5,9 @@ description: Dynamic child management with ActorMap and broadcast.
 
 Static children via `regions`. Dynamic children need more.
 
+Checkout story continues. Order placed. Now the shop fulfills it. Orders arrive
+at runtime — how many, unknown. One worker per order. `ActorMap` tracks them.
+
 ## ActorMap
 
 Registry. Spawn, kill, query children by ID.
@@ -12,41 +15,78 @@ Registry. Spawn, kill, query children by ID.
 ```ts
 import { ActorMap } from "@mantaq/sugar";
 
-const workers = new ActorMap(actor);
+const orders = new ActorMap(shop);
 ```
 
 Parent optional. With parent, child outputs forwarded to it. `new ActorMap()` valid without parent — outputs stay local.
 
+### Order workers
+
+```ts
+const picking = state("picking")();
+const shipped = state("shipped")();
+const open = state("open")();
+
+const checkoutDone = event("CHECKOUT_DONE")<{ orderId: string }>();
+const cancelAll = event("CANCEL_ALL")();
+const ship = event("SHIP")();
+const cancel = event("CANCEL")();
+
+function createOrderWorker(orderId: string) {
+  return new Actor({
+    inputs: [ship, cancel],
+    states: [picking, shipped],
+    initial: picking,
+    context: { orderId },
+    setup: (m) => {
+      m.on(picking, ship, () => ({ state: shipped }));
+      m.on(picking, cancel, () => ({ state: picking }));
+    },
+  });
+}
+```
+
 ### Operations
 
 ```ts
-workers.spawn("worker-1", () => createWorker("worker-1")); // create child
-workers.spawn("worker-2", () => createWorker("worker-2"));
-workers.ensure("worker-3", () => createWorker("worker-3")); // spawn if missing
+orders.spawn("ord_1", () => createOrderWorker("ord_1")); // create child
+orders.ensure("ord_1", () => createOrderWorker("ord_1")); // no-op, exists
 
-workers.send("worker-1", someEvent); // send to child
-workers.kill("worker-1"); // remove child
+orders.send("ord_1", ship.create()); // ship order 1
+orders.kill("ord_1"); // remove child
 
-workers.has("worker-1"); // boolean
-workers.keys(); // ["worker-2", "worker-3"]
-
-const snap = workers.snapshot("worker-2"); // Snapshot, or undefined if missing
+orders.has("ord_1"); // boolean
+orders.keys(); // []
 ```
 
-### Factory function
+### The shop parent
 
-Passed to `spawn` or `ensure`. Returns Actor.
+Checkout done → spawn a worker for the order. Cancel all → broadcast to every worker.
 
 ```ts
-workers.spawn("worker-1", () => {
-  return new Actor({
-    inputs: [taskEvent],
-    states: [idle, working],
-    initial: idle,
-    // ...
-  });
+import { Actor, state, event } from "@mantaq/core";
+import { ActorMap, broadcast } from "@mantaq/sugar";
+
+const orders = new ActorMap();
+
+const shop = new Actor({
+  inputs: [checkoutDone, cancelAll],
+  states: [open],
+  initial: open,
+  setup: (m) => {
+    m.on(open, checkoutDone, (event) => {
+      orders.ensure(event.payload.orderId, () => createOrderWorker(event.payload.orderId));
+      return {};
+    });
+    m.onAny(cancelAll, () => {
+      broadcast(orders, cancel.create());
+      return {};
+    });
+  },
 });
 ```
+
+`ensure` spawns only if missing. Repeat `CHECKOUT_DONE` with same order id → no duplicate worker.
 
 ## broadcast
 
@@ -55,74 +95,41 @@ Send event to all children.
 ```ts
 import { broadcast } from "@mantaq/sugar";
 
-broadcast(workers, shutdownEvent);
+broadcast(orders, cancel.create());
 ```
 
 Without sugar:
 
 ```ts
-for (const id of workers.keys()) {
-  workers.send(id, shutdownEvent);
+for (const id of orders.keys()) {
+  orders.send(id, cancel.create());
 }
 ```
 
-## Worker pool example
+## Factory function
+
+Passed to `spawn` or `ensure`. Returns Actor.
 
 ```ts
-import { Actor, state, event } from "@mantaq/core";
-import { ActorMap, broadcast } from "@mantaq/sugar";
-
-const task = event("TASK")<{ jobId: string }>();
-const shutdown = event("SHUTDOWN")();
-const idle = state("idle")();
-const working = state("working")();
-
-function createWorker() {
-  return new Actor({
-    inputs: [shutdown],
-    states: [idle, working],
-    initial: idle,
-    setup: (m) => {
-      m.on(working, shutdown, () => ({ state: idle }));
-    },
-  });
-}
-
-const workers = new ActorMap();
-
-const parent = new Actor({
-  inputs: [task, shutdown],
-  states: [idle, working],
-  initial: idle,
-  setup: (m) => {
-    m.onAny(task, (event) => {
-      workers.spawn(event.payload.jobId, createWorker);
-      return {};
-    });
-    m.onAny(shutdown, () => {
-      broadcast(workers, shutdown.create());
-      return {};
-    });
-  },
-});
+orders.spawn("ord_2", () => createOrderWorker("ord_2"));
 ```
 
-Dynamic pool. Spawn on demand. Broadcast shutdown.
+Factory runs at spawn time. New actor per call.
 
 ## Snapshot
 
 `ActorMap.snapshot(key)` returns a single child's `Snapshot`, or `undefined` if the key is missing.
 
 ```ts
-const snap = workers.snapshot("worker-1");
-// { path: ["idle"], context, regions: {} } — done present only for final states
+const snap = orders.snapshot("ord_1");
+// { path: ["picking"], context: { orderId: "ord_1" }, regions: {} }
 ```
 
 Get all children:
 
 ```ts
-for (const key of workers.keys()) {
-  const snap = workers.snapshot(key);
+for (const key of orders.keys()) {
+  const snap = orders.snapshot(key);
   // ...
 }
 ```
@@ -130,8 +137,12 @@ for (const key of workers.keys()) {
 ## Cleanup
 
 ```ts
-workers.kill("worker-1");
+orders.kill("ord_1");
 // Actor exits. Effects abort. Context gone.
 ```
 
 No manual cleanup. Actor handles it.
+
+:::tip[Next]
+[Effect Helpers](/mantaq/sugar/effect-helpers/) bridge the charge promise and add the timeout fallback.
+:::

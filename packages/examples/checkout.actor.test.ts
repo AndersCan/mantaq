@@ -1,23 +1,24 @@
 /**
- * Problem: Forms have many states (idle → submitting → success/error). Easy to mess up with booleans
- * (isLoading, isSubmitted, hasError scattered everywhere).
+ * CANONICAL DOCS EXAMPLE — multi-step checkout.
  *
- * Actor model approach:
- *   - Each state is a named node (basicInfo, shippingAddress, payment, submitting, success, error)
- *   - Context holds accumulated form data (not state tracking)
- *   - snapshot().path tells you current state (no "step" field needed)
- *   - snapshot().done tells you if terminal state reached
- *   - Effects + clock handle async work (simulated API calls)
+ * This file is the single source of truth for the running example used
+ * throughout the Mantaq docs (apps/docs). The docs must use ONLY the entity
+ * IDs declared here. `scripts/docs-check.mjs` parses this file and verifies
+ * every ID used in the narrative docs exists in this registry.
  *
- * Structure:
- *   basicInfo → shippingAddress → payment → submitting → success
- *                                      ↕ (BACK) ↕
- *                                    error
+ * Story: a multi-step checkout form.
+ *
+ *   basicInfo → shippingAddress → payment → submitting → success (final)
+ *                                     ↕ (BACK) ↕               ↕ (BACK)
+ *                                                          error
+ *
+ * Effects on `submitting`: charge card via promise (PAYMENT_OK / PAYMENT_FAIL)
+ * and a 800ms timeout fallback (SUBMITTING_DONE).
  */
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
-import { matches, withTimeout } from "@mantaq/sugar";
+import { matches, withTimeout, withPromise } from "@mantaq/sugar";
 
 type BasicInfo = {
   email: string;
@@ -34,98 +35,101 @@ type PaymentInfo = {
   cardNumber: string;
 };
 
-const basicInfoState = state("basicInfo")();
-const shippingAddressState = state("shippingAddress")();
-const paymentState = state("payment")();
-const submittingState = state("submitting")();
-const successState = state("success")().final();
-const errorState = state("error")();
-
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")<BasicInfo>();
-const submitShipping = event("SUBMIT_SHIPPING")<ShippingAddress>();
-const submitPayment = event("SUBMIT_PAYMENT")<PaymentInfo>();
-const backEvent = event("BACK")();
-const submittingDoneEvent = event("SUBMITTING_DONE")();
-
 type CheckoutContext = {
   basicInfo?: BasicInfo;
   shippingAddress?: ShippingAddress;
   paymentInfo?: PaymentInfo;
+  orderId?: string;
 };
 
-function createCheckoutActor(clock?: VirtualClock) {
+const basicInfo = state("basicInfo")();
+const shippingAddress = state("shippingAddress")();
+const payment = state("payment")();
+const submitting = state("submitting")();
+const success = state("success")().final();
+const error = state("error")();
+
+const submitBasicInfo = event("SUBMIT_BASIC_INFO")<BasicInfo>();
+const submitShipping = event("SUBMIT_SHIPPING")<ShippingAddress>();
+const submitPayment = event("SUBMIT_PAYMENT")<PaymentInfo>();
+const back = event("BACK")();
+const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
+const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
+const submittingDone = event("SUBMITTING_DONE")();
+
+function chargeCard(cardNumber: string): Promise<string> {
+  // your payment provider. resolves with an order id.
+  return Promise.resolve(`ord_${cardNumber.slice(-4)}`);
+}
+
+function createCheckoutActor(
+  clock?: VirtualClock,
+  chargeCardImpl: (cardNumber: string) => Promise<string> = chargeCard,
+) {
   const c = clock ?? new VirtualClock();
   const actor = new Actor({
-    inputs: [submitBasicInfo, submitShipping, submitPayment, backEvent],
-    outputs: [],
-    internal: [submittingDoneEvent],
-    states: [
-      basicInfoState,
-      shippingAddressState,
-      paymentState,
-      submittingState,
-      successState,
-      errorState,
-    ],
-    initial: basicInfoState,
+    inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+    internal: [paymentOk, paymentFail, submittingDone],
+    states: [basicInfo, shippingAddress, payment, submitting, success, error],
+    initial: basicInfo,
     clock: c,
     context: {} as CheckoutContext,
     setup: (m) => {
-      m.effect(submittingState, (input) =>
-        withTimeout(800, input, () => ({ type: "SUBMITTING_DONE" })),
-      );
-      m.onAny(backEvent, (_event, opts) => {
+      m.effect(submitting, (input) => {
+        const s = input.context.get();
+        withPromise(chargeCardImpl(s.paymentInfo!.cardNumber), input.signal, input.emit, {
+          success: (orderId) => paymentOk.create({ orderId }),
+          error: (reason) => paymentFail.create({ reason: String(reason) }),
+        });
+        withTimeout(800, input, () => submittingDone.create());
+      });
+      m.onAny(back, (_event, opts) => {
         const s = actor.state.name;
         if (s === "payment") {
-          const cur = opts!.context.get();
-          opts!.context.set({ ...cur, paymentInfo: undefined });
-          return { state: shippingAddressState };
+          const cur = opts.context.get();
+          opts.context.set({ ...cur, paymentInfo: undefined });
+          return { state: shippingAddress };
         }
         if (s === "shippingAddress") {
-          const cur = opts!.context.get();
-          opts!.context.set({ ...cur, shippingAddress: undefined });
-          return { state: basicInfoState };
+          const cur = opts.context.get();
+          opts.context.set({ ...cur, shippingAddress: undefined });
+          return { state: basicInfo };
         }
         if (s === "error") {
-          return { state: paymentState };
+          return { state: payment };
         }
         return {};
       });
-      m.on(basicInfoState, submitBasicInfo, (event, opts) => {
-        const cur = opts!.context.get();
-        opts!.context.set({
-          ...cur,
-          basicInfo: { email: event.payload.email, name: event.payload.name },
-        });
-        return { state: shippingAddressState };
+      m.on(basicInfo, submitBasicInfo, (event, opts) => {
+        const cur = opts.context.get();
+        opts.context.set({ ...cur, basicInfo: { ...event.payload } });
+        return { state: shippingAddress };
       });
-      m.on(shippingAddressState, submitShipping, (event, opts) => {
-        const cur = opts!.context.get();
-        opts!.context.set({
-          ...cur,
-          shippingAddress: {
-            street: event.payload.street,
-            city: event.payload.city,
-            zip: event.payload.zip,
-          },
-        });
-        return { state: paymentState };
+      m.on(shippingAddress, submitShipping, (event, opts) => {
+        const cur = opts.context.get();
+        opts.context.set({ ...cur, shippingAddress: { ...event.payload } });
+        return { state: payment };
       });
-      m.on(paymentState, submitPayment, (event, opts) => {
-        const cur = opts!.context.get();
-        opts!.context.set({ ...cur, paymentInfo: { cardNumber: event.payload.cardNumber } });
-        return { state: submittingState };
+      m.on(payment, submitPayment, (event, opts) => {
+        const cur = opts.context.get();
+        opts.context.set({ ...cur, paymentInfo: { ...event.payload } });
+        return { state: submitting };
       });
-      m.on(submittingState, submittingDoneEvent, () => ({ state: successState }));
+      m.on(submitting, paymentOk, (event, opts) => {
+        const cur = opts.context.get();
+        opts.context.set({ ...cur, orderId: event.payload.orderId });
+        return { state: success };
+      });
+      m.on(submitting, paymentFail, () => ({ state: error }));
+      m.on(submitting, submittingDone, () => ({ state: success }));
     },
   });
   return { actor, clock: c };
 }
 
 describe("checkout actor", () => {
-  it("should navigate basicInfo → shippingAddress → payment → submitting → success", () => {
-    const clock = new VirtualClock();
-    const { actor } = createCheckoutActor(clock);
+  it("navigates basicInfo → shippingAddress → payment → submitting → success", async () => {
+    const { actor } = createCheckoutActor();
 
     expect(matches(actor, "basicInfo")).toBe(true);
     expect(actor.snapshot().done).toBeFalsy();
@@ -140,12 +144,13 @@ describe("checkout actor", () => {
     expect(matches(actor, "submitting")).toBe(true);
     expect(actor.snapshot().done).toBeFalsy();
 
-    clock.advance(800);
+    await actor.settled();
     expect(matches(actor, "success")).toBe(true);
     expect(actor.snapshot().done).toBe(true);
+    expect(actor.context.orderId).toBe("ord_4444");
   });
 
-  it("should accumulate form data in context across steps", () => {
+  it("accumulates form data in context across steps", () => {
     const { actor } = createCheckoutActor();
 
     actor.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
@@ -160,24 +165,38 @@ describe("checkout actor", () => {
     expect(actor.context.paymentInfo).toEqual({ cardNumber: "1111222233334444" });
   });
 
-  it("should handle back navigation from shippingAddress to basicInfo", () => {
+  it("backs up from shippingAddress to basicInfo", () => {
     const { actor } = createCheckoutActor();
 
     actor.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
     expect(matches(actor, "shippingAddress")).toBe(true);
 
-    actor.send(backEvent.create());
+    actor.send(back.create());
     expect(matches(actor, "basicInfo")).toBe(true);
   });
 
-  it("should handle back navigation from payment to shippingAddress", () => {
+  it("backs up from payment to shippingAddress", () => {
     const { actor } = createCheckoutActor();
 
     actor.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
     actor.send(submitShipping.create({ street: "123", city: "C", zip: "12345" }));
     expect(matches(actor, "payment")).toBe(true);
 
-    actor.send(backEvent.create());
+    actor.send(back.create());
     expect(matches(actor, "shippingAddress")).toBe(true);
+  });
+
+  it("falls back to SUBMITTING_DONE timeout when charge hangs", () => {
+    const clock = new VirtualClock();
+    const { actor } = createCheckoutActor(clock, () => new Promise(() => {}));
+
+    actor.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
+    actor.send(submitShipping.create({ street: "123", city: "C", zip: "12345" }));
+    actor.send(submitPayment.create({ cardNumber: "1111222233334444" }));
+    expect(matches(actor, "submitting")).toBe(true);
+
+    clock.advance(800);
+    expect(matches(actor, "success")).toBe(true);
+    expect(actor.snapshot().done).toBe(true);
   });
 });

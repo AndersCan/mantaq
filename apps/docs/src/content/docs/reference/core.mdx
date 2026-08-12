@@ -12,8 +12,8 @@ function state<const T extends string>(id: T): <Payload = unknown>() => StateRef
 State reference. Two calls. First: id. Second: payload type.
 
 ```ts
-const idle = state("idle")();
-const withPayload = state("loading")<{ taskId: string }>();
+const basicInfo = state("basicInfo")();
+const payment = state("payment")<{ cardNumber: string }>();
 ```
 
 ### `StateRef<T, Payload, IsFinal>`
@@ -39,8 +39,8 @@ function event<const T extends string>(
 Event reference. Two calls. First: id. Second: payload type. Payload must be `object | void`.
 
 ```ts
-const start = event("START")();
-const fetchData = event("FETCH")<{ url: string }>();
+const submitBasicInfo = event("SUBMIT_BASIC_INFO")<{ email: string; name: string }>();
+const back = event("BACK")();
 ```
 
 ### `EventRef<T, Payload>`
@@ -123,9 +123,9 @@ The type-safe registrar passed to `setup`. Targets validate against declared sta
 
 ```ts
 setup: (m) => {
-  m.on(idle, start, () => ({ state: running }));
-  m.onAny(cancel, () => ({ state: idle }));
-  m.effect(loading, ({ signal, emit }) => {});
+  m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
+  m.onAny(back, () => ({ state: basicInfo }));
+  m.effect(payment, ({ signal, emit }) => {});
 };
 ```
 
