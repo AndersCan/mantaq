@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.2
+
+<sub>2026-08-12</sub>
+
+- _(patch)_
+  Added universal terminal error state for contained user errors; send() no longer throws and errors surface via snapshot().error.
+
 ## 0.0.1
 
 <sub>2026-08-09</sub>
