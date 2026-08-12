@@ -1,3 +1,5 @@
+<div align="center">
+
 # Mantaq
 
 [![CI](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml/badge.svg)](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml)
@@ -10,6 +12,8 @@
 [![skills.sh](https://skills.sh/b/AndersCan/mantaq)](https://skills.sh/AndersCan/mantaq)
 
 A TypeScript state machine library built around actors, events, and hierarchical states.
+
+</div>
 
 ## Packages
 
