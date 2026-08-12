@@ -12,16 +12,16 @@ export interface CoverageReport {
   percent: { states: number; transitions: number; effects: number };
 }
 
-export interface TestHarness {
-  actor: AnyActor;
+export interface TestHarness<C = Record<string, unknown>> {
+  actor: AnyActor<C>;
   graph: ActorGraph;
   history: History;
   coverage: () => CoverageReport;
 
   send(event: { type: string; payload?: unknown }): void;
   state: AnyActor["state"];
-  snapshot(): Snapshot;
-  context: Record<string, unknown> | undefined;
+  snapshot(): Snapshot<C>;
+  context: C | undefined;
 
   assertAllStatesVisited(): void;
   assertAllTransitionsVisited(): void;

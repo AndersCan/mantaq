@@ -280,3 +280,195 @@ describe("Actor context change detection", () => {
     expect(seen).toEqual([1, 2]);
   });
 });
+
+describe("Actor payload normalization", () => {
+  test("a payload-less event reaching a payload-reading handler gets an empty payload", () => {
+    const idle = state("idle")();
+    const update = event("UPDATE")<{ codeSize: number }>();
+    const actor = new Actor({
+      inputs: [update],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, update, (e) => {
+          void e.payload.codeSize;
+          return {};
+        });
+      },
+    });
+    const wide: { send(event: { type: string; payload?: unknown }): void } = actor;
+    wide.send({ type: "UPDATE" });
+    expect(actor.snapshot().error).toBeUndefined();
+    expect(actor.state.name).toBe("idle");
+  });
+
+  test("the payload is preserved when present", () => {
+    const idle = state("idle")();
+    const update = event("UPDATE")<{ codeSize: number }>();
+    let seen: unknown;
+    const actor = new Actor({
+      inputs: [update],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, update, (e) => {
+          seen = e.payload;
+          return {};
+        });
+      },
+    });
+    actor.send(update.create({ codeSize: 3 }));
+    expect(seen).toEqual({ codeSize: 3 });
+  });
+});
+
+describe("Actor snapshot payload", () => {
+  test("snapshot exposes the payload of the current state", () => {
+    const idle = state("idle")();
+    const ready = state("ready")<{ items: string[] }>();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, ready],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: ready.create({ items: ["a"] }) }));
+      },
+    });
+    expect(actor.snapshot().payload).toBeUndefined();
+    actor.send(go.create());
+    expect(actor.snapshot().payload).toEqual({ items: ["a"] });
+  });
+
+  test("an initial state with a payload is observable from the start", () => {
+    const ready = state("ready")<{ items: string[] }>();
+    const actor = new Actor({
+      inputs: [],
+      states: [ready],
+      initial: ready.create({ items: ["a"] }),
+      setup: () => {},
+    });
+    expect(actor.snapshot().path[0]).toBe("ready");
+    expect(actor.snapshot().payload).toEqual({ items: ["a"] });
+  });
+
+  test("a state entered without a payload has no snapshot payload", () => {
+    const idle = state("idle")();
+    const ready = state("ready")<{ items: string[] }>();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, ready],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: ready }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("ready");
+    expect(actor.snapshot().payload).toBeUndefined();
+  });
+});
+
+describe("Actor transition observability", () => {
+  test("transition hook reports every handled event", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+    const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
+    actor.on("transition", (info) =>
+      seen.push({ from: info.from, to: info.to, transitioned: info.transitioned }),
+    );
+    actor.send(go.create());
+    expect(seen).toEqual([{ from: "idle", to: "active", transitioned: true }]);
+  });
+
+  test("transition hook reports self-transitions as transitioned", () => {
+    const home = state("home")();
+    const reset = event("RESET")();
+    const actor = new Actor({
+      inputs: [reset],
+      states: [home],
+      initial: home,
+      setup: (m) => {
+        m.on(home, reset, () => ({ state: home }));
+      },
+    });
+    const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
+    actor.on("transition", (info) =>
+      seen.push({ from: info.from, to: info.to, transitioned: info.transitioned }),
+    );
+    actor.send(reset.create());
+    expect(seen).toEqual([{ from: "home", to: "home", transitioned: true }]);
+  });
+
+  test("transition hook reports no-op handlers as not transitioned", () => {
+    const idle = state("idle")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [tick],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(tick, () => ({}));
+      },
+    });
+    const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
+    actor.on("transition", (info) =>
+      seen.push({ from: info.from, to: info.to, transitioned: info.transitioned }),
+    );
+    actor.send(tick.create());
+    expect(seen).toEqual([{ from: "idle", to: "idle", transitioned: false }]);
+  });
+
+  test("transition hook reports an onAny handler that transitions", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(go, () => ({ state: active }));
+      },
+    });
+    const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
+    actor.on("transition", (info) =>
+      seen.push({ from: info.from, to: info.to, transitioned: info.transitioned }),
+    );
+    actor.send(go.create());
+    expect(seen).toEqual([{ from: "idle", to: "active", transitioned: true }]);
+  });
+
+  test("cascaded events each fire their own transition hook", () => {
+    const a = state("a")();
+    const b = state("b")();
+    const c = state("c")();
+    const start = event("START")();
+    const next = event("NEXT")();
+    const actor = new Actor({
+      inputs: [start],
+      internal: [next],
+      states: [a, b, c],
+      initial: a,
+      setup: (m) => {
+        m.on(a, start, () => ({ state: b }));
+        m.effect(b, ({ emit }) => emit(next.create()));
+        m.on(b, next, () => ({ state: c }));
+      },
+    });
+    const seen: Array<{ from: string; to: string }> = [];
+    actor.on("transition", (info) => seen.push({ from: info.from, to: info.to }));
+    actor.send(start.create());
+    expect(new Set(seen.map((s) => `${s.from}->${s.to}`))).toEqual(new Set(["a->b", "b->c"]));
+  });
+});

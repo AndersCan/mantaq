@@ -3,13 +3,13 @@ import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./eve
 import type { AnyActor } from "./actor-internal.ts";
 import type { Context, EffectFn, TransitionResult } from "./actor-types.ts";
 
-type EventTypeOf<E extends AnyEventRef> =
+export type EventTypeOf<E extends AnyEventRef> =
   E extends EventRef<infer Type, object | void> ? Type : never;
 
-type PayloadOf<S extends AnyStateRef> =
+export type PayloadOf<S extends AnyStateRef> =
   S extends StateRef<infer _Name, infer Payload, infer _IsFinal> ? Payload : never;
 
-type TransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
+export type TransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
   opts: { context: Context<ActorContext>; actor: AnyActor },
 ) => TransitionResult<States[number], string>;

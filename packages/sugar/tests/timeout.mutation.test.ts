@@ -276,11 +276,11 @@ describe("withTimeout mutation tests", () => {
     expect(spy.mock.calls[0][0]).toContain("invalid ms value");
   });
 
-  test("warning contains 'Timeout may not fire' text", () => {
+  test("warning contains 'Timeout skipped' text", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const clock = new VirtualClock();
     withTimeout(NaN, makeInput(clock), () => ({ type: "t" }));
-    expect(spy.mock.calls[0][0]).toContain("Timeout may not fire");
+    expect(spy.mock.calls[0][0]).toContain("Timeout skipped");
   });
 });
 
@@ -307,5 +307,93 @@ describe("withTimeout directed mutation tests", () => {
     }));
     clock.advance(50);
     expect(emitted).toEqual([{ type: "timeout" }]);
+  });
+
+  test("aborting removes the scheduled timer from the clock", () => {
+    const clock = new VirtualClock();
+    const abort = new AbortController();
+    withTimeout(50, { ...makeInput(clock), signal: abort.signal }, () => ({
+      type: "timeout",
+    }));
+    expect(clock.hasPending()).toBe(true);
+    abort.abort();
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("invalid ms schedules no timer and leaves the clock clean", () => {
+    const clock = new VirtualClock();
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    withTimeout(NaN, makeInput(clock), () => ({ type: "timeout" }));
+    expect(spy).toHaveBeenCalledOnce();
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("invalid ms never calls setTimeout on any clock", () => {
+    let calls = 0;
+    const stub = {
+      setTimeout: () => {
+        calls++;
+        return 1;
+      },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+      clearInterval: () => {},
+      now: () => 0,
+    };
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    withTimeout(NaN, { ...makeInput(stub as unknown as VirtualClock), clock: stub }, () => ({
+      type: "timeout",
+    }));
+    expect(spy).toHaveBeenCalled();
+    expect(calls).toBe(0);
+  });
+
+  test("negative ms never calls setTimeout on any clock", () => {
+    let calls = 0;
+    const stub = {
+      setTimeout: () => {
+        calls++;
+        return 1;
+      },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+      clearInterval: () => {},
+      now: () => 0,
+    };
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    withTimeout(-5, { ...makeInput(stub as unknown as VirtualClock), clock: stub }, () => ({
+      type: "timeout",
+    }));
+    expect(spy).toHaveBeenCalled();
+    expect(calls).toBe(0);
+  });
+
+  test("an aborted signal suppresses the emit even when the clock fires the callback", () => {
+    const timers: Array<() => void> = [];
+    const stub = {
+      setTimeout: (_ms: number, cb: () => void) => {
+        timers.push(cb);
+        return timers.length;
+      },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+      clearInterval: () => {},
+      now: () => 0,
+    };
+    const abort = new AbortController();
+    const emitted: unknown[] = [];
+    withTimeout(
+      50,
+      {
+        ...makeInput(stub as unknown as VirtualClock),
+        signal: abort.signal,
+        emit: (e) => emitted.push(e),
+        clock: stub,
+      },
+      () => ({ type: "timeout" }),
+    );
+    abort.abort();
+    for (const cb of timers.splice(0)) cb();
+    expect(emitted).toEqual([]);
   });
 });

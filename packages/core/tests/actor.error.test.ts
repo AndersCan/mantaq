@@ -38,6 +38,7 @@ describe("Actor error paths", () => {
       send: () => {},
       snapshot: () => ({ path: ["s"], context: {}, regions: {} }),
       on: () => () => {},
+      recover: () => {},
       settled: async () => {},
     };
     const errors: string[] = [];
@@ -198,7 +199,7 @@ describe("Actor error paths", () => {
     const snap = actor.snapshot();
     expect(snap.path[0]).toBe("__error");
     expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.state.name).toBe("loading");
     expect(snap.error?.event.type).toBe("START");
     expect(snap.error?.error instanceof Error).toBe(true);
     if (snap.error) {
@@ -236,7 +237,7 @@ describe("Actor error paths", () => {
     expect(ranAny).toBe(false);
   });
 
-  test("a throwing effect records the last known good state (half-apply pin)", () => {
+  test("a throwing effect records the state being entered (post-step pin)", () => {
     const idle = state("idle")();
     const loading = state("loading")();
     const go = event("GO")();
@@ -255,7 +256,7 @@ describe("Actor error paths", () => {
     const snap = actor.snapshot();
     expect(snap.path[0]).toBe("__error");
     expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.state.name).toBe("loading");
     expect(snap.error?.event.type).toBe("GO");
   });
 
@@ -366,7 +367,7 @@ describe("Actor error paths", () => {
     const snap = actor.snapshot();
     expect(snap.path[0]).toBe("__error");
     expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.state.name).toBe("loading");
     expect(snap.error?.error instanceof Error).toBe(true);
     if (snap.error) {
       expect((snap.error.error as Error).message).toBe("late boom");
@@ -442,5 +443,41 @@ describe("Actor error paths", () => {
 
     expect(aChanges).toEqual(bChanges);
     expect(norm(a.snapshot())).toEqual(norm(b.snapshot()));
+  });
+
+  test("recover resumes a dead machine from the caller-supplied state and context", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    let ticks = 0;
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle, loading],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, () => {
+          throw new Error("effect boom");
+        });
+        m.on(loading, tick, () => {
+          ticks++;
+          return { state: idle };
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().error?.reason).toBe("effect");
+    expect(() => actor.send(tick.create())).not.toThrow();
+    expect(ticks).toBe(0);
+
+    actor.recover({ state: loading, context: { n: 7 } });
+    expect(actor.snapshot().error).toBeUndefined();
+    expect(actor.snapshot().path[0]).toBe("loading");
+    expect(actor.context).toEqual({ n: 7 });
+    actor.send(tick.create());
+    expect(ticks).toBe(1);
+    expect(actor.snapshot().path[0]).toBe("idle");
   });
 });

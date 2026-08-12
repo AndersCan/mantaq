@@ -1,36 +1,24 @@
-import type { AnyActor, Snapshot } from "@mantaq/core";
+import type { AnyActor, Snapshot, TransitionInfo } from "@mantaq/core";
 import { History } from "./history.ts";
 
-export interface InstrumentedActor {
+export interface InstrumentedActor<C = Record<string, unknown>> {
   history: History;
   send(event: unknown): void;
   state: AnyActor["state"];
-  snapshot(): Snapshot<Record<string, unknown>>;
+  snapshot(): Snapshot<C>;
   regions: Record<string, AnyActor>;
-  context?: Record<string, unknown>;
+  context?: C;
   clock: AnyActor["clock"];
-  on(
-    event: "change",
-    fn: (
-      snapshot: Snapshot<Record<string, unknown>>,
-      prev: Snapshot<Record<string, unknown>>,
-    ) => void,
-  ): () => void;
-  on(event: "error", fn: (error: unknown) => void): () => void;
+  on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
+  on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
   on(event: "done", fn: () => void): () => void;
+  recover(target: { state: AnyActor["state"]; context: C }): void;
   settled(): Promise<void>;
   options?: AnyActor["options"];
 }
 
-function wrapWithProxy(
-  actor: AnyActor,
-  hooks: {
-    history: History;
-    origSend: AnyActor["send"];
-    pendingEventId: { value: string | undefined };
-  },
-): InstrumentedActor {
-  const { history, origSend, pendingEventId } = hooks;
+function wrapWithProxy<C>(actor: AnyActor<C>, history: History): InstrumentedActor<C> {
+  const origSend = actor.send.bind(actor);
 
   return {
     get history() {
@@ -53,67 +41,74 @@ function wrapWithProxy(
     },
 
     send(event: unknown) {
-      const { type: eventType } = trackSendEvent(history, event);
-      pendingEventId.value = eventType;
-      try {
-        origSend(event as Parameters<typeof origSend>[0]);
-      } finally {
-        pendingEventId.value = undefined;
-      }
+      trackSendEvent(history, event);
+      origSend(event as Parameters<typeof origSend>[0]);
     },
 
     snapshot() {
       return actor.snapshot();
     },
-    on: actor.on.bind(actor) as InstrumentedActor["on"],
+    on: actor.on.bind(actor) as InstrumentedActor<C>["on"],
+    recover: actor.recover.bind(actor),
     settled: actor.settled.bind(actor),
   };
 }
 
-function recordTransition(history: History, from: string, to: string, eventId: string) {
+function recordTransition(
+  history: History,
+  rec: {
+    from: string;
+    to: string;
+    event: string;
+    transitioned: boolean;
+    effects: Record<string, unknown[]>;
+  },
+) {
   history.append({
     type: "transition",
-    data: { from, event: eventId, to, timestamp: Date.now() },
+    data: { from: rec.from, event: rec.event, to: rec.to, timestamp: Date.now() },
   });
+  if (!rec.transitioned) return;
   history.append({
     type: "state_visit",
-    data: { stateName: to, timestamp: Date.now() },
+    data: { stateName: rec.to, timestamp: Date.now() },
   });
-  history.append({
-    type: "effect",
-    data: { stateName: to, timestamp: Date.now() },
-  });
+  if ((rec.effects[rec.to] ?? []).length > 0) {
+    history.append({
+      type: "effect",
+      data: { stateName: rec.to, timestamp: Date.now() },
+    });
+  }
 }
 
-function trackSendEvent(history: History, event: unknown): { type: string } {
+function trackSendEvent(history: History, event: unknown): void {
   const evt = event as { type?: string };
   const eventId = evt?.type ?? "unknown";
   history.append({
     type: "send",
     data: { event: eventId, timestamp: Date.now() },
   });
-  return { type: eventId };
 }
 
-export function instrument(actor: AnyActor): InstrumentedActor {
+export function instrument<C>(actor: AnyActor<C>): InstrumentedActor<C> {
   const history = new History();
-  const origSend = actor.send.bind(actor);
-  let prevStateName = actor.state.name;
-  const pendingEventId = { value: undefined as string | undefined };
 
   history.append({
     type: "state_visit",
     data: { stateName: actor.state.name, timestamp: Date.now() },
   });
 
-  const wrapped = wrapWithProxy(actor, { history, origSend, pendingEventId });
+  const wrapped = wrapWithProxy(actor, history);
 
-  actor.on("change", () => {
-    const currentName = actor.state.name;
-    if (currentName !== prevStateName) {
-      recordTransition(history, prevStateName, currentName, pendingEventId.value ?? "unknown");
-      prevStateName = currentName;
-    }
+  const effectsByState = actor.options?.effects ?? {};
+  actor.on("transition", ({ event, from, to, transitioned }) => {
+    recordTransition(history, {
+      from,
+      to,
+      event: event.type,
+      transitioned,
+      effects: effectsByState,
+    });
   });
 
   return wrapped;

@@ -1,9 +1,10 @@
-import type { Snapshot } from "./actor-types.ts";
+import type { Snapshot, TransitionInfo } from "./actor-types.ts";
 import { Either } from "@mantaq/utils";
 
 export class Subscribers<C> {
   readonly change = new Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>();
   readonly done = new Set<() => void>();
+  readonly transition = new Set<(info: TransitionInfo) => void>();
   #last: Snapshot<C> | null = null;
 
   seed(snapshot: Snapshot<C>): void {
@@ -22,6 +23,11 @@ export class Subscribers<C> {
     return () => this.done.delete(fn);
   }
 
+  addTransition(fn: (info: TransitionInfo) => void): () => void {
+    this.transition.add(fn);
+    return () => this.transition.delete(fn);
+  }
+
   emitChange(snapshot: Snapshot<C>): void {
     const prev = this.#last ?? snapshot;
     this.#last = snapshot;
@@ -36,9 +42,16 @@ export class Subscribers<C> {
     }
   }
 
+  emitTransition(info: TransitionInfo): void {
+    for (const fn of this.transition) {
+      this.#safe(() => fn(info));
+    }
+  }
+
   clear(): void {
     this.change.clear();
     this.done.clear();
+    this.transition.clear();
   }
 
   #safe(fn: () => void): void {

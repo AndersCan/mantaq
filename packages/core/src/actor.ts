@@ -20,6 +20,7 @@ import type {
   ErrorReason,
   ErrorState,
   LastKnownState,
+  TransitionInfo,
   TransitionResult,
 } from "./actor-types.ts";
 
@@ -31,7 +32,7 @@ import { Either } from "@mantaq/utils";
 type CreatedOf<E extends AnyEventRef> =
   E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never;
 
-type InitialState<S extends AnyStateRef> =
+export type InitialState<S extends AnyStateRef> =
   S extends StateRef<infer _N extends string, infer P>
     ? [unknown] extends [P]
       ? S | { state: S; payload?: P }
@@ -87,6 +88,12 @@ type StepFn<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
   options: { context: Context<ActorContext>; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
+
+interface StepOutcome {
+  emitted: boolean;
+  transitioned: boolean;
+  target?: string;
+}
 
 export class Actor<
   const States extends readonly AnyStateRef[],
@@ -173,6 +180,7 @@ export class Actor<
       );
     }
     this.state = initState;
+    this.#statePayload = options.initial instanceof StateRef ? undefined : options.initial.payload;
     this.#context = (options.context ?? {}) as ActorContext;
     this.#lastState = initState;
     this.#contextHandle = new Context<ActorContext>(
@@ -200,15 +208,22 @@ export class Actor<
   }
 
   on(
-    event: "change" | "done",
-    fn: ((snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void) | (() => void),
-  ): () => void {
+    event: "change",
+    fn: (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void,
+  ): () => void;
+  on(event: "done", fn: () => void): () => void;
+  on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
+  on(event: "change" | "done" | "transition", fn: (...args: never[]) => void): () => void {
     if (event === "change") {
       const cb = fn as (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void;
       return this.#subs.addChange(cb);
     }
-    const cb = fn as () => void;
-    return this.#subs.addDone(cb);
+    if (event === "done") {
+      const cb = fn as () => void;
+      return this.#subs.addDone(cb);
+    }
+    const cb = fn as (info: TransitionInfo) => void;
+    return this.#subs.addTransition(cb);
   }
 
   settled(): Promise<void> {
@@ -220,6 +235,27 @@ export class Actor<
     this.#emitChangeIfDirty();
   }
 
+  /**
+   * Manually restore the actor to a live state after a fatal `__error`.
+   * DANGER: the caller supplies state and context, so the trajectory is no
+   * longer deterministic ("same inputs, same trace"). Effects are not re-run
+   * and timers are not re-armed — processing resumes on the next event.
+   */
+  recover(target: { state: States[number]; context: ActorContext }): void {
+    if (this.#error === null) return;
+    this.#error = null;
+    this.#queue = new InternalQueue();
+    this.#effectAbort = null;
+    this.state = target.state;
+    this.#statePayload = undefined;
+    this.#context = target.context;
+    this.#lastState = target.state;
+    this.#contextWritten = false;
+    this.#entry = null;
+    this.#pendingEffects = [];
+    this.#subs.emitChange(this.snapshot());
+  }
+
   #emitChangeIfDirty(): void {
     if (this.state === this.#lastState && !this.#contextWritten) return;
     this.#lastState = this.state;
@@ -229,18 +265,22 @@ export class Actor<
 
   #dispatch(event: InternalEvent): void {
     if (this.#error !== null || this.state.isFinal) return;
+    const normalized: InternalEvent = { ...event, payload: event.payload ?? {} };
+    const from = this.state.name;
     const prev = this.#entry;
     this.#entry = { state: this.state, context: this.#context };
     try {
       const transitions = this.#options.transitions;
       const stateTransition = transitions[this.state.name]?.[event.type];
       const anyTransition = transitions["Any"]?.[event.type];
-      const transitionApplied = stateTransition
-        ? this.#applyStateStep(event, stateTransition)
-        : false;
-      const anyEmitted =
-        this.#error === null ? this.#applyAnyStep(event, anyTransition, !transitionApplied) : false;
-      if (anyEmitted || this.#queue.length > 0) {
+      const result = this.#step(normalized, stateTransition, anyTransition);
+      this.#maybeEmitTransition(
+        normalized,
+        from,
+        Boolean(stateTransition || anyTransition),
+        result,
+      );
+      if (result.emitted || this.#queue.length > 0) {
         this.#drainInternal();
       } else if (!stateTransition && !anyTransition) {
         console.warn(
@@ -252,41 +292,86 @@ export class Actor<
     }
   }
 
-  #applyStateStep(event: InternalEvent, transition: StepFn<States, ActorContext>): boolean {
+  #step(
+    normalized: InternalEvent,
+    stateTransition: StepFn<States, ActorContext> | undefined,
+    anyTransition: StepFn<States, ActorContext> | undefined,
+  ): StepOutcome {
+    const stateOutcome = stateTransition
+      ? this.#applyStateStep(normalized, stateTransition)
+      : { applied: false };
+    if (this.#error === null) {
+      const anyOutcome = this.#applyAnyStep(normalized, anyTransition, !stateOutcome.applied);
+      return {
+        emitted: anyOutcome.emitted,
+        transitioned: stateOutcome.applied || anyOutcome.transitioned,
+        target: stateOutcome.target ?? anyOutcome.target,
+      };
+    }
+    return { emitted: false, transitioned: false };
+  }
+
+  #maybeEmitTransition(
+    event: InternalEvent,
+    from: string,
+    handled: boolean,
+    outcome: StepOutcome,
+  ): void {
+    if (this.#error !== null) return;
+    if (!handled) return;
+    this.#subs.emitTransition({
+      event,
+      from,
+      to: outcome.target ?? this.state.name,
+      transitioned: outcome.transitioned,
+    });
+  }
+
+  #applyStateStep(
+    event: InternalEvent,
+    transition: StepFn<States, ActorContext>,
+  ): { applied: boolean; target?: string } {
     let applied = false;
+    let target: string | undefined;
     this.#safe("transition", event, () => {
       const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
       if (step.emit) this.#queue.push(...step.emit);
       if (step.state) {
-        this.#applyTransition(event, step);
+        target = this.#applyTransition(event, step);
         applied = true;
       }
     });
-    return applied;
+    return { applied, target };
   }
 
   #applyAnyStep(
     event: InternalEvent,
     transition: StepFn<States, ActorContext> | undefined,
     allowTransition: boolean,
-  ): boolean {
-    if (transition === undefined) return false;
+  ): StepOutcome {
+    if (transition === undefined) return { emitted: false, transitioned: false };
     let emitted = false;
+    let transitioned = false;
+    let target: string | undefined;
     this.#safe("transition", event, () => {
       const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
       if (step.state && allowTransition) {
-        this.#applyTransition(event, step);
+        target = this.#applyTransition(event, step);
+        transitioned = true;
       }
       if (step.emit) {
         this.#queue.push(...step.emit);
         emitted = true;
       }
     });
-    return emitted;
+    return { emitted, transitioned, target };
   }
 
   snapshot(): Snapshot<ActorContext> {
-    return buildSnapshot(this.state, this.#regions, this.#context, this.#error ?? undefined);
+    return buildSnapshot(this.state, this.#regions, this.#context, {
+      error: this.#error ?? undefined,
+      payload: this.#statePayload,
+    });
   }
 
   #abortEffects(): void {
@@ -294,20 +379,27 @@ export class Actor<
     this.#subs.clear();
   }
 
-  #applyTransition(event: InternalEvent, step: TransitionResult<States[number], string>): void {
-    if (this.#error !== null || !step.state) return;
+  #applyTransition(
+    event: InternalEvent,
+    step: TransitionResult<States[number], string>,
+  ): string | undefined {
+    if (this.#error !== null || !step.state) return undefined;
     const resolved = parseTarget<States[number]>(step);
-    if (!resolved) return;
+    if (!resolved) return undefined;
     if (!(resolved.state instanceof StateRef)) {
       this.#enterError("transition", event, new Error("invalid transition target"));
-      return;
+      return undefined;
     }
     this.#effectAbort?.abort();
     this.state = resolved.state;
+    const target = this.state.name;
+    this.#statePayload = resolved.payload;
+    this.#entry = { state: this.state, context: this.#context };
     this.#runEffects(event, resolved.payload);
     if (this.state.isFinal) {
       this.#subs.emitDone();
     }
+    return target;
   }
 
   #runEffects(event: InternalEvent, statePayload: unknown): void {
@@ -318,7 +410,10 @@ export class Actor<
     }
     const abort = new AbortController();
     this.#effectAbort = abort;
-    const lastGood: LastKnownState = this.#entry ?? { state: this.state, context: this.#context };
+    const lastGood: LastKnownState = this.#entry ?? {
+      state: this.state,
+      context: this.#context,
+    };
     const result = runEffects<ActorContext>({
       effects: { [this.state.name]: list },
       state: this.state,
@@ -367,10 +462,12 @@ export class Actor<
     }
   }
 
+  #statePayload: unknown;
+  #pendingEffects: Array<Promise<void>> = [];
+
   #errorState = new StateRef<"__error", unknown, false>("__error", false);
   #error: ErrorInfo | null = null;
   #entry: LastKnownState | null = null;
-  #pendingEffects: Array<Promise<void>> = [];
 
   #safe(reason: ErrorReason, event: InternalEvent, fn: () => void): boolean {
     const attempt = Either.from(fn);
@@ -390,6 +487,7 @@ export class Actor<
     this.#error = { error, state: entry.state, context: entry.context, event, reason };
     this.#effectAbort?.abort();
     this.state = this.#errorState;
+    this.#statePayload = undefined;
     this.#lastState = this.#errorState;
     this.#contextWritten = false;
     this.#subs.emitChange(this.snapshot());

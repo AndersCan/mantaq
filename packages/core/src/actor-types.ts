@@ -36,6 +36,13 @@ export interface ErrorInfo {
   event: InternalEvent;
   reason: ErrorReason;
 }
+
+export interface TransitionInfo {
+  event: InternalEvent;
+  from: string;
+  to: string;
+  transitioned: boolean;
+}
 export type ErrorState = StateRef<"__error", unknown, false>;
 
 export interface LastKnownState {
@@ -48,5 +55,5 @@ export type TransitionResult<
 > = {
   state?: AllowedState | { state: AllowedState; payload?: unknown };
   payload?: unknown;
-  emit?: Array<{ type: AllowedEmit }>;
+  emit?: Array<{ type: AllowedEmit; payload?: unknown }>;
 };

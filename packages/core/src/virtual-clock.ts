@@ -24,11 +24,18 @@ export class VirtualClock implements Clock {
     return this.#now;
   }
 
+  #validMs(ms: number, method: string): boolean {
+    if (Number.isFinite(ms) && ms >= 0) return true;
+    console.warn(`[VirtualClock] invalid ${method} ms value: ${ms}. Call ignored.`);
+    return false;
+  }
+
   setTimeout(
     ms: number,
     cb: () => void,
     options?: { signal?: AbortSignal; eventName?: string },
   ): number {
+    if (!this.#validMs(ms, "setTimeout")) return -1;
     const signal = options?.signal;
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
@@ -52,6 +59,7 @@ export class VirtualClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    if (!this.#validMs(ms, "setInterval")) return -1;
     const signal = options?.signal;
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
@@ -118,6 +126,7 @@ export class VirtualClock implements Clock {
   }
 
   advance(ms: number): void {
+    if (!this.#validMs(ms, "advance")) return;
     const target = this.#now + ms;
 
     while (true) {

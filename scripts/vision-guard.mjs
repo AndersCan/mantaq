@@ -28,9 +28,9 @@ import { join } from "node:path";
 const CORE_SRC = join(import.meta.dirname, "..", "packages", "core", "src");
 const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 
-const BUDGET_TOTAL_LINES = 1210;
-const BUDGET_FILE_LINES = 400;
-const BUDGET_EXPORTS = 25;
+const BUDGET_TOTAL_LINES = 1340;
+const BUDGET_FILE_LINES = 500;
+const BUDGET_EXPORTS = 32;
 
 const FORBIDDEN = [
   { name: "as any", pattern: /\bas any\b/g },

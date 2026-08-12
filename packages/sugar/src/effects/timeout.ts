@@ -5,11 +5,16 @@ export function withTimeout<ActorContext>(
   input: EffectInput<ActorContext>,
   event: () => InternalEvent,
 ): void {
-  if (typeof ms !== "number" || ms < 0 || !Number.isFinite(ms)) {
-    console.warn(`[withTimeout] invalid ms value: ${ms}. Timeout may not fire.`);
+  if (!Number.isFinite(ms) || ms < 0) {
+    console.warn(`[withTimeout] invalid ms value: ${ms}. Timeout skipped.`);
+    return;
   }
-  input.clock.setTimeout(ms, () => {
-    if (input.signal.aborted) return;
-    input.emit(event());
-  });
+  input.clock.setTimeout(
+    ms,
+    () => {
+      if (input.signal.aborted) return;
+      input.emit(event());
+    },
+    { signal: input.signal },
+  );
 }

@@ -134,4 +134,28 @@ describe("withTimeout", () => {
     clock.advance(100);
     expect(emitted).toEqual([]);
   });
+
+  test("aborting removes the scheduled timer from the clock", () => {
+    const clock = new VirtualClock();
+    const abort = new AbortController();
+
+    withTimeout(
+      100,
+      {
+        signal: abort.signal,
+        state: { name: "", payload: undefined },
+        event: { type: "" },
+        context: new Context(
+          () => undefined,
+          () => {},
+        ),
+        emit: () => {},
+        clock,
+      },
+      () => ({ type: "timeout" }),
+    );
+    expect(clock.hasPending()).toBe(true);
+    abort.abort();
+    expect(clock.hasPending()).toBe(false);
+  });
 });

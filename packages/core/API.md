@@ -43,6 +43,11 @@ class Actor<
     fn: (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void,
   ): () => void;
   on(event: "done", fn: () => void): () => void;
+  on(
+    event: "transition",
+    fn: (info: { event: InternalEvent; from: string; to: string }) => void,
+  ): () => void;
+  recover(target: { state: States[number]; context: ActorContext }): void;
   settled(): Promise<void>;
 }
 const a = new Actor({
@@ -153,12 +158,13 @@ m.on(idle, tick, (_e, { context }) => {
 
 ### Snapshot
 
-Read-only view of actor state: `path` is the state-name chain from the root, `context` is the current context reference, `regions` nests child snapshots, `done` appears once a final state is reached. `error` appears once the machine dies into the error state — the actor stops processing and every later `send` is a no-op.
+Read-only view of actor state: `path` is the state-name chain from the root, `context` is the current context reference, `payload` is the payload the current state was entered with (present only when the transition carried one), `regions` nests child snapshots, `done` appears once a final state is reached. `error` appears once the machine dies into the error state — the actor stops processing and every later `send` is a no-op.
 
 ```ts
 interface Snapshot<C = unknown> {
   path: string[];
   context: C;
+  payload?: unknown;
   regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
   error?: ErrorInfo;
@@ -169,7 +175,7 @@ interface Snapshot<C = unknown> {
 
 ### ErrorInfo
 
-What the machine records when it dies into the error state: the thrown value, the last known good state and context (the state/context when the bad event began processing), the bad event, and why the machine died.
+What the machine records when it dies into the error state: the thrown value, the state and context at the point of failure (the state being entered when its effect or handler threw — post-step, so error reports reflect what actually ran), the bad event, and why the machine died.
 
 ```ts
 interface ErrorInfo {
@@ -182,7 +188,7 @@ interface ErrorInfo {
 const snap = actor.snapshot();
 if (snap.error) {
   snap.error.reason; // why the machine died
-  snap.error.state.name; // last known good state
+  snap.error.state.name; // the state at the point of failure
   snap.error.event.type; // the bad event
 }
 ```
@@ -198,6 +204,81 @@ const dead = actor.snapshot().path[0] === "__error";
 
 Errors never escape `send()` — they become the error state. Check `snapshot().error` to observe a failure; it is deterministic (same inputs, same trace).
 
+### ErrorReason
+
+The `reason` field of `ErrorInfo`: which boundary the machine died on.
+
+```ts
+type ErrorReason = "transition" | "effect" | "budget" | "output" | "internal" | "async";
+```
+
+### TransitionResult
+
+What a transition handler returns: an optional target state (with optional payload), and/or events to emit. `emit` may carry a payload; the declared `AllowedEmit` constrains the `type`.
+
+```ts
+type TransitionResult<
+  AllowedState extends AnyStateRef = AnyStateRef,
+  AllowedEmit extends string = string,
+> = {
+  state?: AllowedState | { state: AllowedState; payload?: unknown };
+  payload?: unknown;
+  emit?: Array<{ type: AllowedEmit; payload?: unknown }>;
+};
+```
+
+### ActorOptions
+
+The `Actor` constructor options, as a nameable type.
+
+```ts
+type ActorOptions<States, Inputs, Internal, Outputs, ActorContext = Record<string, unknown>> = {
+  inputs: Inputs;
+  outputs?: Outputs;
+  internal?: Internal;
+  states: States;
+  context?: ActorContext;
+  initial: InitialState<States[number]>;
+  clock?: Clock;
+  internalBudget?: number;
+  setup: SetupFn<States, Inputs, Internal, Outputs, ActorContext>;
+  regions?: Record<string, AnyActor>;
+};
+```
+
+### InitialState
+
+The `initial` option type: either a bare `StateRef` or `{ state, payload }` when the initial state carries a payload.
+
+```ts
+type InitialState<S extends AnyStateRef> =
+  S extends StateRef<infer _N extends string, infer P>
+    ? [unknown] extends [P]
+      ? S | { state: S; payload?: P }
+      : { state: S; payload: P }
+    : never;
+```
+
+### recover
+
+`actor.recover({ state, context })` manually restores a dead machine. It is **inherently dangerous** — the caller injects state and context, so the trajectory is no longer deterministic ("same inputs, same trace" no longer holds). It is an explicit escape hatch for app-level recovery, not part of the normal flow; prefer fixing the root cause and recreating the actor.
+
+Recovery does **not** re-run the target state's effects and does not re-arm its timers — the machine resumes event processing only. Send an event (or transition through the state) to re-trigger effects. Recovering into the same state whose effect killed the machine is safe because nothing re-runs.
+
+```ts
+actor.recover({ state: idle, context: { retries: 0 } });
+```
+
+### on("transition", fn)
+
+Observability hook fired for every **handled** event (matched a state or `onAny` handler), including self-transitions and no-op results, with the real event — internal events from effects included. `from` is the state before dispatch, `to` is the event's own transition target (captured before any cascade runs, so cascaded internal events each report their own `from`/`to` correctly). `transitioned` is true when a state step was applied (including self-transitions, whose effects re-run). Not fired for dropped events. This is the instrumentation primitive behind `@mantaq/test`'s coverage.
+
+```ts
+actor.on("transition", ({ event, from, to, transitioned }) => {
+  console.log(`${from} --${event.type}--> ${to}${transitioned ? "" : " (no-op)"}`);
+});
+```
+
 ### AnyActor
 
 Structural handle for any actor — regions, `context`, and `options`. `context` is the raw current value; write through the handler `context.set()` instead.
@@ -212,6 +293,8 @@ interface AnyActor<C = Record<string, unknown>> {
   snapshot(): Snapshot<C>;
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
+  on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
+  recover(target: { state: AnyStateRef; context: C }): void;
   settled(): Promise<void>;
   options?: {
     transitions?: Record<string, Record<string, unknown>>;
@@ -255,7 +338,7 @@ class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
   effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext, PayloadOf<S>>): this;
 }
 // Handler = (event, opts: { context: Context<ActorContext>; actor: AnyActor }) =>
-//   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ type: string }> }
+//   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ type: string; payload?: unknown }> }
 m.on(idle, click, () => ({ state: active, emit: [pong.create()] }));
 m.onAny(click, () => ({ state: idle }));
 m.effect(active, ({ context }) => {
@@ -272,6 +355,46 @@ The setup callback type. Receives the builder and wires the machine; invoked by 
 type SetupFn<States, Inputs, Internal, Outputs, ActorContext> = (
   m: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>,
 ) => void;
+```
+
+### BuiltMaps
+
+The built transition/effect registries produced by `ActorBuilder.build()`. Exposed on `actor.options` for tooling and diagnostics.
+
+```ts
+interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
+  transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
+  effects: Record<string, Array<EffectFn<ActorContext>>>;
+}
+```
+
+### PayloadOf
+
+Lifts a `StateRef` to its declared payload type — the type `m.effect` infers for `state.payload`.
+
+```ts
+type PayloadOf<S extends AnyStateRef> =
+  S extends StateRef<infer _Name, infer Payload, infer _IsFinal> ? Payload : never;
+```
+
+### EventTypeOf
+
+Lifts an `EventRef` to its declared `type` literal — the constraint on `emit` entries.
+
+```ts
+type EventTypeOf<E extends AnyEventRef> =
+  E extends EventRef<infer Type, object | void> ? Type : never;
+```
+
+### TransitionHandler
+
+The transition handler signature: receives the runtime event and `{ context, actor }`, returns a `TransitionResult`.
+
+```ts
+type TransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
+  event: InternalEvent,
+  opts: { context: Context<ActorContext>; actor: AnyActor },
+) => TransitionResult<States[number], string>;
 ```
 
 ### AnyStateRef
@@ -292,7 +415,7 @@ type AnyEventRef = EventRef<string, object | void>;
 
 ### InternalEvent
 
-Runtime event shape: `{ type: string; payload?: unknown }` — the structural contract the queue, effects, and region wiring move. Public despite the prefix; it is the allowlist exception.
+Runtime event shape: `{ type: string; payload?: unknown }` — the structural contract the queue, effects, and region wiring move. Public despite the prefix; it is the allowlist exception. Handlers always receive a `payload` — a payload-less event is normalized to `payload: {}` at the dispatch boundary, so payload-reading handlers never hit `undefined`.
 
 ```ts
 type InternalEvent = { type: string; payload?: unknown };

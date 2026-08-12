@@ -16,14 +16,14 @@ import {
   assertNeverReachedState,
 } from "./assertions.ts";
 
-export function createTestHarness(actor: AnyActor): TestHarness {
+export function createTestHarness<C>(actor: AnyActor<C>): TestHarness<C> {
   const instrumented = instrument(actor);
   const internalTypes = new Set(
     ((actor.options as { internal?: Array<{ type: string }> })?.internal ?? []).map((e) => e.type),
   );
   const graph = buildGraph(actor, { internalIds: internalTypes });
 
-  const harness: TestHarness = {
+  const harness: TestHarness<C> = {
     actor: instrumented,
     graph,
     history: instrumented.history,
@@ -38,7 +38,7 @@ export function createTestHarness(actor: AnyActor): TestHarness {
       return instrumented.state;
     },
 
-    snapshot(): Snapshot {
+    snapshot(): Snapshot<C> {
       return instrumented.snapshot();
     },
 
