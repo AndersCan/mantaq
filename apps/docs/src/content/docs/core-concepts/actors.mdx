@@ -7,6 +7,8 @@ Actor. State machine instance. Holds everything.
 
 Current state. Mutable context. Transition handlers. Effects. Clock. Children.
 
+Checkout form from [Introduction](/mantaq/getting-started/introduction/). Now full. All six states, all seven events.
+
 ## Make actor
 
 Transitions and effects are registered in a `setup` callback. The builder is
@@ -15,64 +17,137 @@ type-safe: a target state or event you didn't declare won't compile.
 ```ts
 import { Actor, state, event } from "@mantaq/core";
 
-const idle = state("idle")();
-const active = state("active")();
+type BasicInfo = { email: string; name: string };
+type ShippingAddress = { street: string; city: string; zip: string };
+type PaymentInfo = { cardNumber: string };
 
-const activate = event("ACTIVATE")();
+type CheckoutContext = {
+  basicInfo?: BasicInfo;
+  shippingAddress?: ShippingAddress;
+  paymentInfo?: PaymentInfo;
+  orderId?: string;
+};
 
-const actor = new Actor({
-  inputs: [activate],
-  states: [idle, active],
-  initial: idle,
+const basicInfo = state("basicInfo")();
+const shippingAddress = state("shippingAddress")();
+const payment = state("payment")();
+const submitting = state("submitting")();
+const success = state("success")().final();
+const error = state("error")();
+
+const submitBasicInfo = event("SUBMIT_BASIC_INFO")<BasicInfo>();
+const submitShipping = event("SUBMIT_SHIPPING")<ShippingAddress>();
+const submitPayment = event("SUBMIT_PAYMENT")<PaymentInfo>();
+const back = event("BACK")();
+const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
+const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
+const submittingDone = event("SUBMITTING_DONE")();
+
+const checkout = new Actor({
+  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+  internal: [paymentOk, paymentFail, submittingDone],
+  states: [basicInfo, shippingAddress, payment, submitting, success, error],
+  initial: basicInfo,
+  context: {} as CheckoutContext,
   setup: (m) => {
-    m.on(idle, activate, () => ({ state: active }));
+    m.on(basicInfo, submitBasicInfo, (event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, basicInfo: { ...event.payload } });
+      return { state: shippingAddress };
+    });
+    m.on(shippingAddress, submitShipping, (event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, shippingAddress: { ...event.payload } });
+      return { state: payment };
+    });
+    m.on(payment, submitPayment, (event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, paymentInfo: { ...event.payload } });
+      return { state: submitting };
+    });
+    m.on(submitting, paymentOk, (event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, orderId: event.payload.orderId });
+      return { state: success };
+    });
+    m.on(submitting, paymentFail, () => ({ state: error }));
+    m.on(submitting, submittingDone, () => ({ state: success }));
+    m.onAny(back, (_event, { context }) => {
+      const s = checkout.state.name;
+      if (s === "payment") {
+        const cur = context.get();
+        context.set({ ...cur, paymentInfo: undefined });
+        return { state: shippingAddress };
+      }
+      if (s === "shippingAddress") {
+        const cur = context.get();
+        context.set({ ...cur, shippingAddress: undefined });
+        return { state: basicInfo };
+      }
+      if (s === "error") return { state: payment };
+      return {};
+    });
   },
 });
 ```
 
+Flow:
+
+```
+basicInfo → shippingAddress → payment → submitting → success
+                  ↕ (BACK) ↕                   ↕ (BACK)
+                                           error
+```
+
+`BACK` handled in every state with `onAny`. State-specific handler first. `onAny` after — only transitions if no state handler fired.
+
+Note: nothing emits `PAYMENT_OK` yet. Effects do that. [Effects page](/mantaq/core-concepts/effects/) adds them.
+
 ## Send events
 
 ```ts
-actor.send(activate.create());
+checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
+checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
 ```
+
+`.create()` builds the event. Payload events need the payload argument.
 
 ## Check state
 
 ```ts
-actor.snapshot().path[0]; // "active"
-actor.snapshot().path.includes("active"); // true
+checkout.snapshot().path[0]; // "payment"
 ```
 
-Tip: `@mantaq/sugar` has `matches(actor, "active")` for cleaner checks. See [Sugar](/mantaq/sugar/matching/).
+Tip: `@mantaq/sugar` has `matches(checkout, "payment")` for cleaner checks. See [Matching](/mantaq/sugar/matching/).
 
 ## Listen for changes
 
 ```ts
-const unsub = actor.on("change", (snapshot) => {
+const unsub = checkout.on("change", (snapshot) => {
   console.log("New state:", snapshot.path);
 });
 
 // Call unsub() to stop
 ```
 
-Fires immediately. Current snapshot.
+Fires immediately with current snapshot. Then on every state or context change.
 
 ## Settled
 
 ```ts
-await actor.settled();
+await checkout.settled();
 ```
 
-Waits. Internal events drained. Use after effects.
+Waits. Internal events drained, pending effects done. Use after effects before asserting.
 
 ## Snapshot
 
 ```ts
-actor.snapshot();
-// { path: ["active"], context: {...}, regions: {} }
+checkout.snapshot();
+// { path: ["payment"], context: {...}, regions: {} }
 ```
 
-State tree. Nested for hierarchical actors.
+State tree. Nested for actors with children.
 
 ## Constructor options
 
@@ -83,10 +158,10 @@ State tree. Nested for hierarchical actors.
 | `internal`       | `EventRef[]`                        | Events from effects/transitions      |
 | `states`         | `StateRef[]`                        | All states                           |
 | `initial`        | `StateRef` or `{ state, payload? }` | Start state                          |
-| `context`        | `object`                            | Mutable context                      |
-| `setup`          | `(m) => void`                       | Register transitions and effects     |
+| `context`        | `ActorContext`                      | Initial context                      |
 | `clock`          | `Clock`                             | Default: `RealClock`                 |
-| `regions`        | `Record<string, Actor>`             | Static children                      |
+| `setup`          | `(m: ActorBuilder) => void`         | Register transitions and effects     |
+| `regions`        | `Record<string, AnyActor>`          | Static children                      |
 | `internalBudget` | `number`                            | Max internal events (default: 10000) |
 
 ### `setup` builder
@@ -98,3 +173,7 @@ State tree. Nested for hierarchical actors.
 | `m.effect(state, fn)`    | Run `fn` on state entry                     |
 
 Handler returns `{ state }` (optional `payload`, or `emit: [{ type }]`) or `{}` to stay in place.
+
+:::tip[Next]
+[States](/mantaq/core-concepts/states/) dissects the machine's states: nodes, final states, child actors.
+:::

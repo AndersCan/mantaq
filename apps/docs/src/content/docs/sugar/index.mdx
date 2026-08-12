@@ -7,6 +7,9 @@ Sugar. Optional package. Wraps core primitives.
 
 Reduces boilerplate. Every pattern here possible in userland. Sugar saves typing.
 
+The sugar pages apply each helper to the checkout machine from
+[Actors](/mantaq/core-concepts/actors/).
+
 ## What's inside
 
 | Helper                                           | What                        |
@@ -53,3 +56,10 @@ Skip sugar when:
 Sugar not required. Core sufficient for everything.
 
 Sugar = less code for common patterns. Nothing hidden. You could write every helper yourself.
+
+## Pages
+
+- [Batch Creation](/mantaq/sugar/batch-creation/) — `states()` and `events()` on the checkout machine
+- [Matching](/mantaq/sugar/matching/) — `matches()`, `isIn()`, `activeLeaves()`, `tag()`
+- [Dynamic Children](/mantaq/sugar/dynamic-children/) — `ActorMap` and `broadcast()` for shop order workers
+- [Effect Helpers](/mantaq/sugar/effect-helpers/) — `withPromise()` and `withTimeout()` for the charge effect

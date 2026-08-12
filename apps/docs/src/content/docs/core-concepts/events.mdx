@@ -5,89 +5,107 @@ description: Messages that trigger transitions.
 
 Event. Typed message. Triggers transition. `event(id)()` makes one.
 
+Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its events move the form.
+
 ## Basic events
 
 ```ts
 import { event } from "@mantaq/core";
 
-const start = event("START")();
-const fetchData = event("FETCH")<{ url: string }>();
+const back = event("BACK")();
+const submitBasicInfo = event("SUBMIT_BASIC_INFO")<{ email: string; name: string }>();
+const submitShipping = event("SUBMIT_SHIPPING")<{ street: string; city: string; zip: string }>();
 
-start.type; // "START"
+back.type; // "BACK"
 ```
 
-Payload must be `object | void`. No payload by default.
+Payload must be `object | void`. No payload by default. `BACK` has none. Submit events carry form data.
 
 ## Create instances
 
 ```ts
-start.create(); // { type: "START" }
-fetchData.create({ url: "/api" }); // { type: "FETCH", payload: { url: "/api" } }
+back.create(); // { type: "BACK" }
+submitBasicInfo.create({ email: "a@b.com", name: "A" });
+// { type: "SUBMIT_BASIC_INFO", payload: { email: "a@b.com", name: "A" } }
 ```
+
+`.create()` builds the event you send. Payload events need the payload argument.
 
 ## Check identity
 
 ```ts
-start.is(someEvent); // boolean
+back.is(someEvent); // boolean
 ```
 
-`someEvent.type === "START"`.
+True if `someEvent.type === "BACK"`. Type guard.
 
 ## Use in transitions
 
+Handlers get the typed event. Payload typed from the event ref.
+
 ```ts
-const actor = new Actor({
-  inputs: [start, fetchData],
-  states: [idle, loading],
-  initial: idle,
-  setup: (m) => {
-    m.on(idle, start, () => ({ state: loading }));
-    m.on(idle, fetchData, (event, { context }) => {
-      const s = context.get();
-      context.set({ ...s, url: event.payload.url });
-      return { state: loading };
-    });
-  },
+m.on(shippingAddress, submitShipping, (event, { context }) => {
+  const s = context.get();
+  context.set({ ...s, shippingAddress: { ...event.payload } });
+  return { state: payment };
 });
 ```
 
-Handler gets typed event object.
+`event.payload.street`, `event.payload.city` — all typed.
 
 ## Internal events
 
-Events from effects. Processed after current transition.
+Events from effects. Declared in `internal`, not `inputs`. Processed after the
+current transition. Effects emit them. Nothing external can send them through
+`send()`.
+
+Checkout's internal events — charge and timeout results:
 
 ```ts
-const authDone = event("AUTH_DONE")();
+const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
+const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
+const submittingDone = event("SUBMITTING_DONE")();
 
-const actor = new Actor({
-  inputs: [login],
-  internal: [authDone],
-  // ...
+const checkout = new Actor({
+  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+  internal: [paymentOk, paymentFail, submittingDone],
+  states: [basicInfo, shippingAddress, payment, submitting, success, error],
+  initial: basicInfo,
   setup: (m) => {
-    m.effect(authenticating, ({ signal, emit }) => {
-      authenticate().then((result) => {
-        if (!signal.aborted) emit(authDone.create());
-      });
+    m.on(submitting, paymentOk, (event, { context }) => {
+      const s = context.get();
+      context.set({ ...s, orderId: event.payload.orderId });
+      return { state: success };
     });
+    m.on(submitting, paymentFail, () => ({ state: error }));
+    m.on(submitting, submittingDone, () => ({ state: success }));
   },
 });
 ```
 
+Nothing emits these yet. [Effects](/mantaq/core-concepts/effects/) do.
+
 ## Any handler
 
-`m.onAny` intercepts an event in every state.
+`m.onAny` intercepts an event in every state. Checkout's `BACK`:
 
 ```ts
-setup: (m) => {
-  m.onAny(cancel, (_event, { context }) => {
-    const s = context.get();
-    context.set({ ...s, cancelled: true });
-    return { state: cancelled };
-  });
-  m.on(idle, start, () => ({ state: running }));
-},
+m.onAny(back, (_event, { context }) => {
+  const s = checkout.state.name;
+  if (s === "payment") {
+    const cur = context.get();
+    context.set({ ...cur, paymentInfo: undefined });
+    return { state: shippingAddress };
+  }
+  if (s === "error") return { state: payment };
+  return {};
+});
 ```
 
-State-specific runs first. `onAny` runs after — and only transitions if no
-state-specific handler fired. Its `emit` still queues.
+State-specific handler runs first. `onAny` after — and only transitions if no
+state-specific handler fired. `BACK` from `payment` returns to `shippingAddress`;
+from `error` retries at `payment`; elsewhere stays put.
+
+:::tip[Next]
+[Effects](/mantaq/core-concepts/effects/) make the machine act: charge card, time out, abort.
+:::

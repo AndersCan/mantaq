@@ -22,35 +22,57 @@ Actors. Events. Hierarchical states. Three concepts.
 | `@mantaq/core`  | Runtime. `Actor`, `state`, `event`, `VirtualClock`                                                                           |
 | `@mantaq/sugar` | Helpers. `matches`, `states`, `events`, `tag`, `isIn`, `activeLeaves`, `ActorMap`, `broadcast`, `withPromise`, `withTimeout` |
 
+## The docs story
+
+The whole docs build **one example**: a multi-step checkout form.
+
+Buyer fills basic info, shipping address, payment. System charges card, shows
+result. Every page adds a piece to the same machine.
+
+```
+basicInfo → payment → success (final)
+```
+
+Full flow later. More states, more events, effects, testing.
+
 ## Quick example
+
+Minimal slice. Three states, two events. The checkout form, cut to bone.
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
 
-const idle = state("idle")();
-const running = state("running")();
+const basicInfo = state("basicInfo")();
+const payment = state("payment")();
+const success = state("success")().final();
 
-const start = event("START")();
-const stop = event("STOP")();
+const submitBasicInfo = event("SUBMIT_BASIC_INFO")();
+const submitPayment = event("SUBMIT_PAYMENT")();
 
-const machine = new Actor({
-  inputs: [start, stop],
-  states: [idle, running],
-  initial: idle,
+const checkout = new Actor({
+  inputs: [submitBasicInfo, submitPayment],
+  states: [basicInfo, payment, success],
+  initial: basicInfo,
   setup: (m) => {
-    m.on(idle, start, () => ({ state: running }));
-    m.on(running, stop, () => ({ state: idle }));
+    m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
+    m.on(payment, submitPayment, () => ({ state: success }));
   },
 });
 
-machine.send(start.create());
-machine.snapshot().path[0] === "running"; // true
+checkout.send(submitBasicInfo.create());
+checkout.snapshot().path[0]; // "payment"
 ```
+
+`success` is final. Actor stops there. Entering it fires `"done"` subscribers.
 
 :::tip[Sugar exists]
 Core API verbose on purpose. Shows what happens under hood.
 
-`@mantaq/sugar` has helpers: `matches(machine, "running")` instead of `snapshot().path[0] === "running"`. Batch creation, effect helpers, state grouping.
+`@mantaq/sugar` has helpers: `matches(checkout, "payment")` instead of `snapshot().path[0] === "payment"`. Batch creation, effect helpers, state grouping.
 
 Learn core first. Sugar second. You'll know _why_ each helper exists.
+:::
+
+:::tip[Next]
+[Actors](/mantaq/core-concepts/actors/) builds the full checkout machine. All six states, all seven events.
 :::

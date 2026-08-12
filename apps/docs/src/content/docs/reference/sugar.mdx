@@ -12,9 +12,9 @@ function matches(actor: { snapshot(): Snapshot }, pattern: string): boolean;
 Dot-separated pattern. Snapshot tree.
 
 ```ts
-matches(actor, "idle"); // flat
-matches(actor, "connected.default.active"); // hierarchical
-matches(actor, "player.playback.playing"); // parallel
+matches(checkout, "payment"); // flat
+matches(checkout, "basicInfo.fraud.scanning"); // hierarchical
+matches(checkout, "basicInfo.fraud.cleared"); // parallel region
 ```
 
 Prefix match. Checks top-level state name first, then descends only through region names in order. Ends at a state boundary. `matches(actor, "connected")` → true only if top-level state is `connected`. Not "anywhere inside" — that's `isIn`.
@@ -30,8 +30,8 @@ function states<T extends string>(...names: T[]): { [K in T]: StateRef<K> };
 Batch state creation.
 
 ```ts
-const s = states("idle", "loading", "success", "error");
-s.idle.name; // "idle"
+const s = states("basicInfo", "payment", "success", "error");
+s.basicInfo.name; // "basicInfo"
 s.success.final(); // isFinal = true
 ```
 
@@ -46,8 +46,8 @@ function events<T extends string>(...names: T[]): { [K in T]: EventRef<K> };
 Batch event creation.
 
 ```ts
-const e = events("fetch", "resolve", "fail");
-e.fetch.create(); // { type: "fetch" }
+const e = events("SUBMIT_BASIC_INFO", "SUBMIT_PAYMENT", "BACK");
+e.SUBMIT_BASIC_INFO.create(); // { type: "SUBMIT_BASIC_INFO" }
 ```
 
 ---
@@ -61,8 +61,8 @@ function tag(...stateRefs: StateRef<string, unknown>[]): Tag;
 Group states. `tag.has(snapshot)` → true if any active.
 
 ```ts
-const busy = tag(s.loading, s.authenticating);
-busy.has(actor.snapshot()); // true if loading or authenticating
+const busy = tag(s.payment, s.submitting);
+busy.has(checkout.snapshot()); // true if paying or submitting
 ```
 
 ---
@@ -72,11 +72,11 @@ busy.has(actor.snapshot()); // true if loading or authenticating
 Dynamic child actor registry.
 
 ```ts
-const map = new ActorMap(parentActor);
+const map = new ActorMap(shop);
 
-map.spawn("worker1", () => createWorker());
-map.send("worker1", someEvent);
-map.kill("worker1");
+map.spawn("ord_1", () => createOrderWorker("ord_1"));
+map.send("ord_1", ship.create());
+map.kill("ord_1");
 ```
 
 | Method                 | What                                   |

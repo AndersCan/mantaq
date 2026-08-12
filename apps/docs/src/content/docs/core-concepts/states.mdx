@@ -5,97 +5,144 @@ description: Nodes in the state graph.
 
 State. Node in graph. `state(id)()` makes one.
 
+Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six states:
+
 ## Basic states
 
 ```ts
 import { state } from "@mantaq/core";
 
-const idle = state("idle")();
-const loading = state("loading")();
-const success = state("success")();
+const basicInfo = state("basicInfo")();
+const shippingAddress = state("shippingAddress")();
+const payment = state("payment")();
+const submitting = state("submitting")();
+const error = state("error")();
 
-idle.name; // "idle"
-idle.isFinal; // false
+basicInfo.name; // "basicInfo"
+basicInfo.isFinal; // false
 ```
+
+Each step of the form is a node. No boolean flags. No `currentStep` variable. The state IS the step.
 
 ## Final states
 
 Mark state done. Signal completion.
 
 ```ts
-const done = state("done")().final();
-done.isFinal; // true
+const success = state("success")().final();
+
+success.isFinal; // true
 ```
 
-Actor enters final state → `"done"` subscribers fire.
+Actor enters `success` → `"done"` subscribers fire. `snapshot().done` becomes `true`.
+
+```ts
+checkout.on("done", () => {
+  console.log("Order placed!");
+});
+```
+
+Final state means the machine stops accepting events. Done.
+
+## Payloads
+
+States carry optional payload. Passed when entering. Effects read it.
+
+`error` can carry the failure reason:
+
+```ts
+m.on(submitting, paymentFail, (_event) => ({
+  state: error,
+  payload: { reason: "card declined" },
+}));
+```
+
+Effect on `error` reads it:
+
+```ts
+m.effect(error, ({ state }) => {
+  console.log("Checkout failed:", state.payload.reason);
+});
+```
 
 ## Hierarchical states (regions)
 
-Sub-actors. Passed as `regions` to the Actor constructor. Child runs concurrently.
+Sub-actors. Passed as `regions` to the Actor constructor. Child runs alongside
+parent. Snapshot nests.
+
+Story extension: checkout machine also runs a fraud monitor. Child named `fraud`:
 
 ```ts
-const healthMonitor = new Actor({
-  inputs: [healthCheckResult],
-  states: [unknown, healthy, degraded],
-  initial: unknown,
+const scanning = state("scanning")();
+const cleared = state("cleared")();
+const flagged = state("flagged")();
+
+const scanDone = event("SCAN_DONE")<{ risky: boolean }>();
+
+const fraudMonitor = new Actor({
+  inputs: [scanDone],
+  states: [scanning, cleared, flagged],
+  initial: scanning,
   setup: (m) => {
-    m.on(unknown, healthCheckResult, (event) => ({
-      state: event.payload.healthy ? healthy : degraded,
+    m.on(scanning, scanDone, (event) => ({
+      state: event.payload.risky ? flagged : cleared,
     }));
   },
 });
 
-const manager = new Actor({
-  inputs: [connect],
-  internal: [healthCheckResult],
-  states: [disconnected, connected],
-  initial: disconnected,
-  regions: { health: healthMonitor }, // child named "health"
-  setup: (m) => {
-    m.on(connected, healthCheckResult, (event) => {
-      manager.regions.health.send(healthCheckResult.create({ healthy: event.payload.healthy }));
-      return {};
-    });
-  },
+const checkoutWithFraud = new Actor({
+  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+  internal: [paymentOk, paymentFail, submittingDone],
+  states: [basicInfo, shippingAddress, payment, submitting, success, error],
+  initial: basicInfo,
+  regions: { fraud: fraudMonitor },
+  setup: () => {},
 });
 ```
 
 Snapshot. Nested.
 
 ```ts
-// { path: ["connected"], context: {...}, regions: { health: { path: ["healthy"], context: {...}, regions: {} } } }
+// { path: ["basicInfo"], context: {...},
+//   regions: { fraud: { path: ["scanning"], context: {...}, regions: {} } } }
 ```
+
+Child runs its own flow. Parent and child don't block each other.
+
+`matches(checkoutWithFraud, "basicInfo.fraud.cleared")` checks a specific child state.
 
 ## Parallel states
 
 Multiple regions. Run same time.
 
+Second child: an analytics monitor.
+
 ```ts
-const playerState = state("player")();
-const player = new Actor({
-  inputs: [playToggle, muteToggle],
-  states: [playerState],
-  initial: playerState,
-  regions: {
-    playback: playbackActor,
-    audio: audioActor,
-  },
+const tracking = state("tracking")();
+
+const analyticsMonitor = new Actor({
+  inputs: [],
+  states: [tracking],
+  initial: tracking,
   setup: () => {},
 });
 ```
 
-Each region is its own actor. `matches(player, "player.playback.playing")` checks a specific region's state.
-
-## Payloads
-
-States carry optional payload. Type it at creation.
-
 ```ts
-const loading = state("loading")<{ taskId: string }>();
-const success = state("success")<{ data: string }>();
-
-// In transition handler:
-return { state: success.create({ data: result }) };
+regions: {
+  fraud: fraudMonitor,
+  analytics: analyticsMonitor, // second child
+}
 ```
 
-Effects read it: `state.payload`. Typed from the state ref.
+Each region is its own actor. Both run. `matches(actor, "basicInfo.fraud.cleared")`
+and `matches(actor, "basicInfo.analytics.tracking")` both work.
+
+## State vs context
+
+State answers "where am I?" Context answers "what do I know?" The step is a
+state. The entered data is context. Covered in [Context](/mantaq/core-concepts/context/).
+
+:::tip[Next]
+[Events](/mantaq/core-concepts/events/) looks at what moves the machine: typed events.
+:::
