@@ -27,37 +27,46 @@ Every narrative docs page may use ONLY these IDs. Reference pages exempt.
 
 ### States
 
-| ID                | Where                                          | Final?               |
-| ----------------- | ---------------------------------------------- | -------------------- |
-| `basicInfo`       | checkout form                                  | no                   |
-| `shippingAddress` | checkout form                                  | no                   |
-| `payment`         | checkout form                                  | no                   |
-| `submitting`      | checkout form                                  | no                   |
-| `success`         | checkout form                                  | **yes** (`.final()`) |
-| `error`           | checkout form                                  | no                   |
-| `scanning`        | fraud monitor (States page extension)          | no                   |
-| `cleared`         | fraud monitor (States page extension)          | no                   |
-| `flagged`         | fraud monitor (States page extension)          | no                   |
-| `tracking`        | analytics monitor (States page extension)      | no                   |
-| `open`            | shop (Dynamic Children page extension)         | no                   |
-| `picking`         | order worker (Dynamic Children page extension) | no                   |
-| `shipped`         | order worker (Dynamic Children page extension) | no                   |
+| ID                | Where                                               | Final?               |
+| ----------------- | --------------------------------------------------- | -------------------- |
+| `basicInfo`       | checkout form                                       | no                   |
+| `shippingAddress` | checkout form                                       | no                   |
+| `payment`         | checkout form                                       | no                   |
+| `submitting`      | checkout form                                       | no                   |
+| `success`         | checkout form                                       | **yes** (`.final()`) |
+| `error`           | checkout form                                       | no                   |
+| `scanning`        | fraud monitor (States page extension)               | no                   |
+| `cleared`         | fraud monitor (States page extension)               | no                   |
+| `flagged`         | fraud monitor (States page extension)               | no                   |
+| `tracking`        | analytics monitor (States page extension)           | no                   |
+| `open`            | shop (Dynamic Children page extension)              | no                   |
+| `picking`         | order worker (Dynamic Children page extension)      | no                   |
+| `shipped`         | order worker (Dynamic Children page extension)      | no                   |
+| `idle`            | request handler (Request / Response page extension) | no                   |
+| `pending`         | request handler (Request / Response page extension) | no                   |
+| `answered`        | request handler (Request / Response page extension) | **yes** (final)      |
+| `timedOut`        | request handler (Request / Response page extension) | **yes** (final)      |
 
 ### Events
 
-| ID                | Payload                 | Kind           |
-| ----------------- | ----------------------- | -------------- |
-| `submitBasicInfo` | `{ email, name }`       | input          |
-| `submitShipping`  | `{ street, city, zip }` | input          |
-| `submitPayment`   | `{ cardNumber }`        | input          |
-| `back`            | —                       | input          |
-| `paymentOk`       | `{ orderId }`           | internal       |
-| `paymentFail`     | `{ reason }`            | internal       |
-| `submittingDone`  | —                       | internal       |
-| `scanDone`        | `{ risky }`             | input (fraud)  |
-| `checkoutDone`    | `{ orderId }`           | input (shop)   |
-| `ship`            | —                       | input (worker) |
-| `cancel`          | —                       | input (worker) |
+| ID                | Payload                        | Kind                              |
+| ----------------- | ------------------------------ | --------------------------------- |
+| `submitBasicInfo` | `{ email, name }`              | input                             |
+| `submitShipping`  | `{ street, city, zip }`        | input                             |
+| `submitPayment`   | `{ cardNumber }`               | input                             |
+| `back`            | —                              | input                             |
+| `paymentOk`       | `{ orderId }`                  | internal                          |
+| `paymentFail`     | `{ reason }`                   | internal                          |
+| `submittingDone`  | —                              | internal                          |
+| `scanDone`        | `{ risky }`                    | input (fraud)                     |
+| `checkoutDone`    | `{ orderId }`                  | input (shop)                      |
+| `ship`            | —                              | input (worker)                    |
+| `cancel`          | —                              | input (worker)                    |
+| `request`         | `{ orderId, timeoutMs }`       | input (parent + handler)          |
+| `answer`          | `{ orderId, result }`          | input (parent + handler)          |
+| `timeout`         | —                              | internal (handler)                |
+| `requestSettled`  | `{ orderId, status, result? }` | output (handler) = input (parent) |
+| `orderSettled`    | `{ orderId, status, result? }` | output (parent)                   |
 
 Built-in: `__error` (universal error state) is allowed anywhere.
 
@@ -260,6 +269,71 @@ const shop = new Actor({
 });
 ```
 
+### Request handlers — Request / Response page
+
+Order workers answered nothing. Now the shop asks the shipping partner to
+confirm each order. One parent machine owns an `ActorMap` of short-lived
+request handlers — one per order, keyed by orderId, each with its own timeout,
+each settling exactly once (answered or timed out). Handlers report back
+through declared outputs; one wiring line in the factory forwards them into
+the parent:
+
+```ts
+const request = event("request")<{ orderId: string; timeoutMs: number }>();
+const answer = event("answer")<{ orderId: string; result: string }>();
+const timeout = event("timeout")();
+const requestSettled = event("requestSettled")<{
+  orderId: string;
+  status: "answered" | "timedOut";
+  result?: string;
+}>();
+const orderSettled = event("orderSettled")<{
+  orderId: string;
+  status: "answered" | "timedOut";
+  result?: string;
+}>();
+
+const idle = state("idle")();
+const pending = state("pending")();
+const answered = state("answered")().final();
+const timedOut = state("timedOut")().final();
+
+function createRequestHandler(orderId: string, clock) {
+  return new Actor({
+    inputs: [request, answer],
+    internal: [timeout],
+    outputs: [requestSettled],
+    states: [idle, pending, answered, timedOut],
+    initial: idle,
+    clock,
+    context: { orderId },
+    setup: (m) => {
+      m.on(idle, request, (event, opts) => {
+        opts.context.set({ ...opts.context.get(), timeoutMs: event.payload.timeoutMs });
+        return { state: pending };
+      });
+      m.effect(pending, (input) => {
+        withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
+      });
+      m.on(pending, answer, (event) => ({
+        state: answered,
+        emit: [
+          requestSettled.create({ orderId, status: "answered", result: event.payload.result }),
+        ],
+      }));
+      m.on(pending, timeout, () => ({
+        state: timedOut,
+        emit: [requestSettled.create({ orderId, status: "timedOut" })],
+      }));
+    },
+  });
+}
+```
+
+The parent routes requests and answers to the keyed handlers, records
+settlements in context, and re-emits them outward as `orderSettled`. A bridge
+at the parent's output edge turns settlements into promises (`waitFor`).
+
 ## Page → slice map
 
 | Page             | Slice                                                                                                         |
@@ -277,4 +351,5 @@ const shop = new Actor({
 | matching         | `matches(actor, "payment")`, `isIn`, `activeLeaves`, `tag` on checkout                                        |
 | dynamic-children | shop order workers extension                                                                                  |
 | effect-helpers   | `withPromise` + `withTimeout` on `submitting` effect                                                          |
+| request-response | request handler extension: manager + `ActorMap` + `autoReap` + handler outputs + bridge                       |
 | reference/\*     | generic (exempt from registry, snippets still must compile)                                                   |
