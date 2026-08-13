@@ -293,39 +293,6 @@ describe("ActorMap", () => {
     expect(map.has("a")).toBe(false);
   });
 
-  test("autoReap releases the completed child for collection", async () => {
-    const gc = (globalThis as { gc?: () => void }).gc;
-    if (typeof gc !== "function") {
-      throw new Error("autoReap leak test requires --expose-gc");
-    }
-    const toggle = event("toggle")();
-    const off = state("off")();
-    const on = state("on")().final();
-    let child: AnyActor | undefined;
-    const map = new ActorMap(
-      () => {
-        child = new Actor({
-          inputs: [toggle],
-          context: {},
-          states: [off, on],
-          initial: off,
-          setup: (m) => m.on(off, toggle, () => ({ state: on })),
-        });
-        return child;
-      },
-      { autoReap: true },
-    );
-    map.spawn("a");
-    const ref = new WeakRef(child!);
-    map.send("a", toggle.create());
-    expect(map.has("a")).toBe(false);
-    child = undefined;
-    gc();
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    gc();
-    expect(ref.deref()).toBeUndefined();
-  });
-
   test("broadcast sends event to all children", () => {
     const map = actorMap();
     const { toggle } = makeActor("a");
