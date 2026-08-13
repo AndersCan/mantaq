@@ -137,7 +137,8 @@ describe("type level contract — type = behavior", () => {
     });
 
     expectTypeOf(actor.state.name).toEqualTypeOf<"idle" | "active" | "__error">();
-    expectTypeOf(actor.state).toMatchTypeOf<StateRef<string>>();
+    expectTypeOf(actor.state).toMatchTypeOf<StateRef<string, unknown, boolean>>();
+    expectTypeOf(actor.state.isFinal).toEqualTypeOf<false | true>();
   });
 
   test("snapshot.error narrows on presence", () => {

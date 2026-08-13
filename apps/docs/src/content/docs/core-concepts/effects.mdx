@@ -28,8 +28,8 @@ setup: (m) => {
 };
 ```
 
-`chargeCard` is your payment provider. A promise. Resolves → `PAYMENT_OK` →
-`submitting` transitions to `success`. Rejects → `PAYMENT_FAIL` → `error`.
+`chargeCard` is your payment provider. A promise. Resolves → `paymentOk` →
+`submitting` transitions to `success`. Rejects → `paymentFail` → `error`.
 
 Effect return value ignored. Effect emits. Machine reacts.
 
@@ -39,12 +39,17 @@ Effect return value ignored. Effect emits. Machine reacts.
 {
   signal: AbortSignal;           // abort on state exit
   state: { name: string; payload: unknown };  // payload typed from state ref
-  event: InternalEvent;  // trigger event (created instance)
+  event: InternalEvent;  // trigger event (`{ type: "__init" }` at construction)
   context: Context<ActorContext>; // handle: get() reads, set() replaces
   emit: (event) => void;        // emit event: internal, input, or output
   clock: Clock;                 // timers
 }
 ```
+
+Effects run on every state entry — the initial state included. An effect on the
+initial state fires at construction, armed like any other entry. Its `event` is
+the synthetic `{ type: "__init" }`. Terminal states run their entry effects too,
+so a final state can `emit` a completion output to a parent.
 
 ## Auto-abort
 
@@ -62,7 +67,8 @@ setup: (m) => {
 ```
 
 No manual cleanup. AbortSignal handles it. Charge returns after user backed
-out → no emit.
+out → no emit. The guard is belt-and-braces: an `emit` called after abort is a
+silent no-op anyway — the guard just skips the wasted call.
 
 ## Multiple effects
 
@@ -87,12 +93,13 @@ setup: (m) => {
 ## Error handling
 
 Never throw in an effect. Catch and emit an internal error event; a transition
-handles it. `PAYMENT_FAIL` lands the machine in `error` — the transition already
+handles it. `paymentFail` lands the machine in `error` — the transition already
 exists.
 
 An uncaught error still can't crash `send()`. The actor transitions to the
 built-in terminal `__error` state, and the thrown value lands in
-`snapshot().error`.
+`snapshot().error`. `__error` is final — `snapshot().done` is `true` and the
+`"done"` event fires, so a parent or `ActorMap` can reap a died child.
 
 ```ts
 setup: (m) => {

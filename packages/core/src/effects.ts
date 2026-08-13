@@ -26,7 +26,6 @@ export function runEffects<ActorContext>(
   options: EffectRunnerOptions<ActorContext>,
 ): EffectRunResult {
   const pending: Array<Promise<void>> = [];
-  if (options.state.isFinal) return { pending };
   const list = options.effects[options.state.name];
   if (!list) return { pending };
 

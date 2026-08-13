@@ -35,13 +35,13 @@ const submitting = state("submitting")();
 const success = state("success")().final();
 const error = state("error")();
 
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")<BasicInfo>();
-const submitShipping = event("SUBMIT_SHIPPING")<ShippingAddress>();
-const submitPayment = event("SUBMIT_PAYMENT")<PaymentInfo>();
-const back = event("BACK")();
-const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
-const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
-const submittingDone = event("SUBMITTING_DONE")();
+const submitBasicInfo = event("submitBasicInfo")<BasicInfo>();
+const submitShipping = event("submitShipping")<ShippingAddress>();
+const submitPayment = event("submitPayment")<PaymentInfo>();
+const back = event("back")();
+const paymentOk = event("paymentOk")<{ orderId: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+const submittingDone = event("submittingDone")();
 
 const checkout = new Actor({
   inputs: [submitBasicInfo, submitShipping, submitPayment, back],
@@ -95,13 +95,13 @@ Flow:
 
 ```
 basicInfo → shippingAddress → payment → submitting → success
-                  ↕ (BACK) ↕                   ↕ (BACK)
+                  ↕ (back) ↕                   ↕ (back)
                                            error
 ```
 
-`BACK` handled in every state with `onAny`. State-specific handler first. `onAny` after — only transitions if no state handler fired.
+`back` handled in every state with `onAny`. State-specific handler first. `onAny` after — only transitions if no state handler fired.
 
-Note: nothing emits `PAYMENT_OK` yet. Effects do that. [Effects page](/mantaq/core-concepts/effects/) adds them.
+Note: nothing emits `paymentOk` yet. Effects do that. [Effects page](/mantaq/core-concepts/effects/) adds them.
 
 ## Send events
 

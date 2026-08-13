@@ -14,12 +14,12 @@ System charges card, shows result.
 
 ```
 basicInfo → shippingAddress → payment → submitting → success (final)
-                  ↕ (BACK) ↕                  ↕ (BACK)
+                  ↕ (back) ↕                  ↕ (back)
                                           error
 ```
 
-`submitting` runs two effects: charge card (promise → `PAYMENT_OK` /
-`PAYMENT_FAIL`) and a 800ms timeout fallback (`SUBMITTING_DONE`).
+`submitting` runs two effects: charge card (promise → `paymentOk` /
+`paymentFail`) and a 800ms timeout fallback (`submittingDone`).
 
 ## Entity registry
 
@@ -45,19 +45,19 @@ Every narrative docs page may use ONLY these IDs. Reference pages exempt.
 
 ### Events
 
-| ID                  | Payload                 | Kind           |
-| ------------------- | ----------------------- | -------------- |
-| `SUBMIT_BASIC_INFO` | `{ email, name }`       | input          |
-| `SUBMIT_SHIPPING`   | `{ street, city, zip }` | input          |
-| `SUBMIT_PAYMENT`    | `{ cardNumber }`        | input          |
-| `BACK`              | —                       | input          |
-| `PAYMENT_OK`        | `{ orderId }`           | internal       |
-| `PAYMENT_FAIL`      | `{ reason }`            | internal       |
-| `SUBMITTING_DONE`   | —                       | internal       |
-| `SCAN_DONE`         | `{ risky }`             | input (fraud)  |
-| `CHECKOUT_DONE`     | `{ orderId }`           | input (shop)   |
-| `SHIP`              | —                       | input (worker) |
-| `CANCEL`            | —                       | input (worker) |
+| ID                | Payload                 | Kind           |
+| ----------------- | ----------------------- | -------------- |
+| `submitBasicInfo` | `{ email, name }`       | input          |
+| `submitShipping`  | `{ street, city, zip }` | input          |
+| `submitPayment`   | `{ cardNumber }`        | input          |
+| `back`            | —                       | input          |
+| `paymentOk`       | `{ orderId }`           | internal       |
+| `paymentFail`     | `{ reason }`            | internal       |
+| `submittingDone`  | —                       | internal       |
+| `scanDone`        | `{ risky }`             | input (fraud)  |
+| `checkoutDone`    | `{ orderId }`           | input (shop)   |
+| `ship`            | —                       | input (worker) |
+| `cancel`          | —                       | input (worker) |
 
 Built-in: `__error` (universal error state) is allowed anywhere.
 
@@ -85,13 +85,13 @@ const submitting = state("submitting")();
 const success = state("success")().final();
 const error = state("error")();
 
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")<BasicInfo>();
-const submitShipping = event("SUBMIT_SHIPPING")<ShippingAddress>();
-const submitPayment = event("SUBMIT_PAYMENT")<PaymentInfo>();
-const back = event("BACK")();
-const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
-const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
-const submittingDone = event("SUBMITTING_DONE")();
+const submitBasicInfo = event("submitBasicInfo")<BasicInfo>();
+const submitShipping = event("submitShipping")<ShippingAddress>();
+const submitPayment = event("submitPayment")<PaymentInfo>();
+const back = event("back")();
+const paymentOk = event("paymentOk")<{ orderId: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+const submittingDone = event("submittingDone")();
 
 function chargeCard(cardNumber: string): Promise<string> {
   // your payment provider. resolves with an order id.
@@ -178,7 +178,7 @@ const scanning = state("scanning")();
 const cleared = state("cleared")();
 const flagged = state("flagged")();
 
-const scanDone = event("SCAN_DONE")<{ risky: boolean }>();
+const scanDone = event("scanDone")<{ risky: boolean }>();
 
 const fraudMonitor = new Actor({
   inputs: [scanDone],
@@ -223,10 +223,10 @@ const open = state("open")();
 const picking = state("picking")();
 const shipped = state("shipped")();
 
-const checkoutDone = event("CHECKOUT_DONE")<{ orderId: string }>();
-const cancelAll = event("CANCEL_ALL")();
-const ship = event("SHIP")();
-const cancel = event("CANCEL")();
+const checkoutDone = event("checkoutDone")<{ orderId: string }>();
+const cancelAll = event("cancelAll")();
+const ship = event("ship")();
+const cancel = event("cancel")();
 
 function createOrderWorker(orderId: string) {
   return new Actor({
@@ -262,19 +262,19 @@ const shop = new Actor({
 
 ## Page → slice map
 
-| Page             | Slice                                                                                                             |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
-| introduction     | 3 states (`basicInfo`, `payment`, `success`), 3 events (`SUBMIT_BASIC_INFO`, `SUBMIT_PAYMENT`, `SUBMITTING_DONE`) |
-| installation     | none (no example)                                                                                                 |
-| actors           | full `createCheckoutActor`, send, snapshot, `on("change")`, `settled()`                                           |
-| states           | nodes, `.final()` on `success`, payloads, + fraud region                                                          |
-| events           | payloads, `.type`/`.is`/`.create`, `BACK`, internal events                                                        |
-| effects          | `submitting` effect: charge promise, timeout, abort, error                                                        |
-| context          | `CheckoutContext` accumulation, `get()`/`set()`                                                                   |
-| testing          | checkout with `VirtualClock`: timeout path, settled happy path                                                    |
-| sugar            | overview, no new machine                                                                                          |
-| batch-creation   | `states("basicInfo", ...)`, `events("SUBMIT_BASIC_INFO", ...)`                                                    |
-| matching         | `matches(actor, "payment")`, `isIn`, `activeLeaves`, `tag` on checkout                                            |
-| dynamic-children | shop order workers extension                                                                                      |
-| effect-helpers   | `withPromise` + `withTimeout` on `submitting` effect                                                              |
-| reference/\*     | generic (exempt from registry, snippets still must compile)                                                       |
+| Page             | Slice                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| introduction     | 3 states (`basicInfo`, `payment`, `success`), 3 events (`submitBasicInfo`, `submitPayment`, `submittingDone`) |
+| installation     | none (no example)                                                                                             |
+| actors           | full `createCheckoutActor`, send, snapshot, `on("change")`, `settled()`                                       |
+| states           | nodes, `.final()` on `success`, payloads, + fraud region                                                      |
+| events           | payloads, `.type`/`.is`/`.create`, `back`, internal events                                                    |
+| effects          | `submitting` effect: charge promise, timeout, abort, error                                                    |
+| context          | `CheckoutContext` accumulation, `get()`/`set()`                                                               |
+| testing          | checkout with `VirtualClock`: timeout path, settled happy path                                                |
+| sugar            | overview, no new machine                                                                                      |
+| batch-creation   | `states("basicInfo", ...)`, `events("submitBasicInfo", ...)`                                                  |
+| matching         | `matches(actor, "payment")`, `isIn`, `activeLeaves`, `tag` on checkout                                        |
+| dynamic-children | shop order workers extension                                                                                  |
+| effect-helpers   | `withPromise` + `withTimeout` on `submitting` effect                                                          |
+| reference/\*     | generic (exempt from registry, snippets still must compile)                                                   |

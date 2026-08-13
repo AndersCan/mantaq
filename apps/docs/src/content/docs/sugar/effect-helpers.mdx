@@ -57,8 +57,8 @@ Same logic. More code. Easy to forget abort check.
 
 ```ts
 withPromise(promise, signal, emit, {
-  success: (data) => ({ type: "PAYMENT_OK", payload: data }), // must return envelope: { type, payload? }
-  error: (err) => ({ type: "PAYMENT_FAIL", payload: err }), // same
+  success: (data) => ({ type: "paymentOk", payload: data }), // must return envelope: { type, payload? }
+  error: (err) => ({ type: "paymentFail", payload: err }), // same
 });
 ```
 
@@ -68,7 +68,7 @@ Return value emitted as an event. Actor dispatches it (internal/input → transi
 
 Timeout via actor's clock. Abort-safe.
 
-The fallback effect. Charge hangs → 800ms → `SUBMITTING_DONE` → `success`.
+The fallback effect. Charge hangs → 800ms → `submittingDone` → `success`.
 
 ```ts
 import { withTimeout } from "@mantaq/sugar";
@@ -111,8 +111,8 @@ import { matches, withTimeout } from "@mantaq/sugar";
 const payment = state("payment")();
 const submitting = state("submitting")();
 const success = state("success")().final();
-const submitPayment = event("SUBMIT_PAYMENT")();
-const submittingDone = event("SUBMITTING_DONE")();
+const submitPayment = event("submitPayment")();
+const submittingDone = event("submittingDone")();
 const clock = new VirtualClock();
 
 const checkout = new Actor({

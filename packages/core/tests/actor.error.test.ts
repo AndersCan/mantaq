@@ -222,7 +222,7 @@ describe("Actor error paths", () => {
     expect(() => actor.send(go.create())).not.toThrow();
     const snap = actor.snapshot();
     expect(snap.path[0]).toBe("__error");
-    expect(snap.done).toBeUndefined();
+    expect(snap.done).toBe(true);
     expect(snap.error?.reason).toBe("transition");
     expect(snap.error?.event.type).toBe("GO");
     expect(snap.error?.state.name).toBe("idle");
@@ -358,7 +358,7 @@ describe("Actor error paths", () => {
     }
   });
 
-  test("death emits exactly one change and no done", () => {
+  test("death emits exactly one change and one done", () => {
     const idle = state("idle")();
     const active = state("active")();
     const go = event("GO")();
@@ -380,7 +380,7 @@ describe("Actor error paths", () => {
     changes = 0;
     actor.send(go.create());
     expect(changes).toBe(1);
-    expect(dones).toBe(0);
+    expect(dones).toBe(1);
   });
 
   test("throwing handlers converge regardless of delivery path", () => {

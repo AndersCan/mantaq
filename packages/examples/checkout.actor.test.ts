@@ -9,11 +9,11 @@
  * Story: a multi-step checkout form.
  *
  *   basicInfo → shippingAddress → payment → submitting → success (final)
- *                                     ↕ (BACK) ↕               ↕ (BACK)
+ *                                     ↕ (back) ↕               ↕ (back)
  *                                                          error
  *
- * Effects on `submitting`: charge card via promise (PAYMENT_OK / PAYMENT_FAIL)
- * and a 800ms timeout fallback (SUBMITTING_DONE).
+ * Effects on `submitting`: charge card via promise (paymentOk / paymentFail)
+ * and a 800ms timeout fallback (submittingDone).
  */
 
 import { describe, it, expect } from "vite-plus/test";
@@ -49,13 +49,13 @@ const submitting = state("submitting")();
 const success = state("success")().final();
 const error = state("error")();
 
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")<BasicInfo>();
-const submitShipping = event("SUBMIT_SHIPPING")<ShippingAddress>();
-const submitPayment = event("SUBMIT_PAYMENT")<PaymentInfo>();
-const back = event("BACK")();
-const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
-const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
-const submittingDone = event("SUBMITTING_DONE")();
+const submitBasicInfo = event("submitBasicInfo")<BasicInfo>();
+const submitShipping = event("submitShipping")<ShippingAddress>();
+const submitPayment = event("submitPayment")<PaymentInfo>();
+const back = event("back")();
+const paymentOk = event("paymentOk")<{ orderId: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+const submittingDone = event("submittingDone")();
 
 function chargeCard(cardNumber: string): Promise<string> {
   // your payment provider. resolves with an order id.
@@ -186,7 +186,7 @@ describe("checkout actor", () => {
     expect(matches(actor, "shippingAddress")).toBe(true);
   });
 
-  it("falls back to SUBMITTING_DONE timeout when charge hangs", () => {
+  it("falls back to submittingDone timeout when charge hangs", () => {
     const clock = new VirtualClock();
     const { actor } = createCheckoutActor(clock, () => new Promise(() => {}));
 

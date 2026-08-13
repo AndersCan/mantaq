@@ -32,102 +32,90 @@ describe("broadcast", () => {
     expect(sent).toEqual([]);
   });
 
-  test("with ActorMap — sends event to all spawned actors", () => {
+  function makeChild() {
     const toggle = event("toggle")();
     const off = state("off")();
     const on = state("on")();
-    const map = new ActorMap();
-    const a1 = new Actor({
-      inputs: [toggle],
-      states: [off, on],
-      initial: off,
-      setup: (m) => {
-        m.on(off, toggle, () => ({ state: on }));
-      },
-    });
-    const a2 = new Actor({
-      inputs: [toggle],
-      states: [off, on],
-      initial: off,
-      setup: (m) => {
-        m.on(off, toggle, () => ({ state: on }));
-      },
-    });
-    map.spawn("a", () => a1);
-    map.spawn("b", () => a2);
+    return {
+      actor: new Actor({
+        inputs: [toggle],
+        states: [off, on],
+        initial: off,
+        setup: (m) => {
+          m.on(off, toggle, () => ({ state: on }));
+        },
+      }),
+      toggle,
+    };
+  }
+
+  test("with ActorMap — sends event to all spawned actors", () => {
+    const map = new ActorMap(() => makeChild().actor);
+    const { toggle } = makeChild();
+    map.spawn("a");
+    map.spawn("b");
 
     broadcast(map, toggle.create());
 
-    expect(matches(a1, "on")).toBe(true);
-    expect(matches(a2, "on")).toBe(true);
+    expect(map.snapshot("a")?.path[0]).toBe("on");
+    expect(map.snapshot("b")?.path[0]).toBe("on");
   });
 
   test("with empty ActorMap — no-op", () => {
-    const map = new ActorMap();
+    const map = new ActorMap(() => makeChild().actor);
     expect(() => broadcast(map, { type: "ping" })).not.toThrow();
   });
 
-  test("with different event types via ActorMap", () => {
+  test("with ActorMap — fan-out then reset keeps every child in step", () => {
     const toggle = event("toggle")();
     const reset = event("reset")();
     const off = state("off")();
     const on = state("on")();
-    const map = new ActorMap();
-    const a1 = new Actor({
-      inputs: [toggle, reset],
-      states: [off, on],
-      initial: off,
-      setup: (m) => {
-        m.on(off, toggle, () => ({ state: on }));
-        m.on(on, reset, () => ({ state: off }));
-      },
-    });
-    const a2 = new Actor({
-      inputs: [toggle, reset],
-      states: [off, on],
-      initial: on,
-      setup: (m) => {
-        m.on(off, toggle, () => ({ state: on }));
-        m.on(on, reset, () => ({ state: off }));
-      },
-    });
-    map.spawn("a", () => a1);
-    map.spawn("b", () => a2);
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [toggle, reset],
+          context: {},
+          states: [off, on],
+          initial: off,
+          setup: (m) => {
+            m.on(off, toggle, () => ({ state: on }));
+            m.on(on, reset, () => ({ state: off }));
+          },
+        }),
+    );
+    map.spawn("a");
+    map.spawn("b");
 
     broadcast(map, toggle.create());
-    expect(matches(a1, "on")).toBe(true);
-    expect(matches(a2, "on")).toBe(true);
+    expect(map.snapshot("a")?.path[0]).toBe("on");
+    expect(map.snapshot("b")?.path[0]).toBe("on");
 
     broadcast(map, reset.create());
-    expect(matches(a1, "off")).toBe(true);
-    expect(matches(a2, "off")).toBe(true);
+    expect(map.snapshot("a")?.path[0]).toBe("off");
+    expect(map.snapshot("b")?.path[0]).toBe("off");
   });
 
-  test("with ActorMap where some actors ignore event — does not throw", () => {
+  test("with ActorMap where children ignore the event — does not throw", () => {
     const toggle = event("toggle")();
     const off = state("off")();
     const on = state("on")();
-    const map = new ActorMap();
-    const a1 = new Actor({
-      inputs: [toggle],
-      states: [off, on],
-      initial: off,
-      setup: (m) => {
-        m.on(off, toggle, () => ({ state: on }));
-      },
-    });
-    const a2 = new Actor({
-      inputs: [],
-      states: [off, on],
-      initial: off,
-      setup: () => {},
-    });
-    map.spawn("a", () => a1);
-    map.spawn("b", () => a2);
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [toggle],
+          context: {},
+          states: [off, on],
+          initial: off,
+          setup: () => {},
+        }),
+    );
+    map.spawn("a");
+    map.spawn("b");
 
     expect(() => broadcast(map, toggle.create())).not.toThrow();
-    expect(matches(a1, "on")).toBe(true);
-    expect(matches(a2, "off")).toBe(true);
+    expect(map.snapshot("a")?.path[0]).toBe("off");
+    expect(map.snapshot("b")?.path[0]).toBe("off");
   });
 
   test("broadcast inside actor effect — integration with VirtualClock", () => {
@@ -139,18 +127,20 @@ describe("broadcast", () => {
     const childOff = state("childOff")();
     const childOn = state("childOn")();
 
-    const map = new ActorMap();
-
-    const child = new Actor({
-      clock,
-      inputs: [pong],
-      states: [childOff, childOn],
-      initial: childOff,
-      setup: (m) => {
-        m.on(childOff, pong, () => ({ state: childOn }));
-      },
-    });
-    map.spawn("child", () => child);
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          clock,
+          inputs: [pong],
+          context: {},
+          states: [childOff, childOn],
+          initial: childOff,
+          setup: (m) => {
+            m.on(childOff, pong, () => ({ state: childOn }));
+          },
+        }),
+    );
+    map.spawn("child");
 
     const parent = new Actor({
       clock,
@@ -168,6 +158,6 @@ describe("broadcast", () => {
     parent.send(ping.create());
 
     expect(matches(parent, "done")).toBe(true);
-    expect(matches(child, "childOn")).toBe(true);
+    expect(map.snapshot("child")?.path[0]).toBe("childOn");
   });
 });

@@ -50,7 +50,7 @@ export interface TransitionInfo {
   to: string;
   transitioned: boolean;
 }
-export type ErrorState = StateRef<"__error", unknown, false>;
+export type ErrorState = StateRef<"__error", unknown, true>;
 
 export interface LastKnownState {
   state: AnyStateRef;

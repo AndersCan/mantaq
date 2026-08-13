@@ -12,21 +12,21 @@ Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its events move t
 ```ts
 import { event } from "@mantaq/core";
 
-const back = event("BACK")();
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")<{ email: string; name: string }>();
-const submitShipping = event("SUBMIT_SHIPPING")<{ street: string; city: string; zip: string }>();
+const back = event("back")();
+const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
+const submitShipping = event("submitShipping")<{ street: string; city: string; zip: string }>();
 
-back.type; // "BACK"
+back.type; // "back"
 ```
 
-Payload must be `object | void`. No payload by default. `BACK` has none. Submit events carry form data.
+Payload must be `object | void`. No payload by default. `back` has none. Submit events carry form data.
 
 ## Create instances
 
 ```ts
-back.create(); // { type: "BACK" }
+back.create(); // { type: "back" }
 submitBasicInfo.create({ email: "a@b.com", name: "A" });
-// { type: "SUBMIT_BASIC_INFO", payload: { email: "a@b.com", name: "A" } }
+// { type: "submitBasicInfo", payload: { email: "a@b.com", name: "A" } }
 ```
 
 `.create()` builds the event you send. Payload events need the payload argument.
@@ -37,7 +37,7 @@ submitBasicInfo.create({ email: "a@b.com", name: "A" });
 back.is(someEvent); // boolean
 ```
 
-True if `someEvent.type === "BACK"`. Type guard.
+True if `someEvent.type === "back"`. Type guard.
 
 ## Use in transitions
 
@@ -62,9 +62,9 @@ current transition. Effects emit them. Nothing external can send them through
 Checkout's internal events — charge and timeout results:
 
 ```ts
-const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
-const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
-const submittingDone = event("SUBMITTING_DONE")();
+const paymentOk = event("paymentOk")<{ orderId: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+const submittingDone = event("submittingDone")();
 
 const checkout = new Actor({
   inputs: [submitBasicInfo, submitShipping, submitPayment, back],
@@ -87,7 +87,7 @@ Nothing emits these yet. [Effects](/mantaq/core-concepts/effects/) do.
 
 ## Any handler
 
-`m.onAny` intercepts an event in every state. Checkout's `BACK`:
+`m.onAny` intercepts an event in every state. Checkout's `back`:
 
 ```ts
 m.onAny(back, (_event, { context }) => {
@@ -103,7 +103,7 @@ m.onAny(back, (_event, { context }) => {
 ```
 
 State-specific handler runs first. `onAny` after — and only transitions if no
-state-specific handler fired. `BACK` from `payment` returns to `shippingAddress`;
+state-specific handler fired. `back` from `payment` returns to `shippingAddress`;
 from `error` retries at `payment`; elsewhere stays put.
 
 :::tip[Next]

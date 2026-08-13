@@ -19,13 +19,13 @@ const submitting = state("submitting")();
 const success = state("success")().final();
 const error = state("error")();
 
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")();
-const submitShipping = event("SUBMIT_SHIPPING")();
-const submitPayment = event("SUBMIT_PAYMENT")();
-const back = event("BACK")();
-const paymentOk = event("PAYMENT_OK")();
-const paymentFail = event("PAYMENT_FAIL")();
-const submittingDone = event("SUBMITTING_DONE")();
+const submitBasicInfo = event("submitBasicInfo")();
+const submitShipping = event("submitShipping")();
+const submitPayment = event("submitPayment")();
+const back = event("back")();
+const paymentOk = event("paymentOk")();
+const paymentFail = event("paymentFail")();
+const submittingDone = event("submittingDone")();
 ```
 
 Thirteen calls. Repetitive.
@@ -40,26 +40,26 @@ const { basicInfo, shippingAddress, payment, submitting, success, error } = stat
   "shippingAddress",
   "payment",
   "submitting",
-  "success",
+  { name: "success", final: true },
   "error",
 );
 
 const {
-  SUBMIT_BASIC_INFO,
-  SUBMIT_SHIPPING,
-  SUBMIT_PAYMENT,
-  BACK,
-  PAYMENT_OK,
-  PAYMENT_FAIL,
-  SUBMITTING_DONE,
+  submitBasicInfo,
+  submitShipping,
+  submitPayment,
+  back,
+  paymentOk,
+  paymentFail,
+  submittingDone,
 } = events(
-  "SUBMIT_BASIC_INFO",
-  "SUBMIT_SHIPPING",
-  "SUBMIT_PAYMENT",
-  "BACK",
-  "PAYMENT_OK",
-  "PAYMENT_FAIL",
-  "SUBMITTING_DONE",
+  "submitBasicInfo",
+  "submitShipping",
+  "submitPayment",
+  "back",
+  "paymentOk",
+  "paymentFail",
+  "submittingDone",
 );
 ```
 
@@ -78,8 +78,8 @@ const s = states("basicInfo", "payment", "success");
 s.basicInfo; // StateRef<"basicInfo">
 s["payment"]; // StateRef<"payment">
 
-const e = events("SUBMIT_BASIC_INFO", "SUBMIT_PAYMENT");
-e.SUBMIT_BASIC_INFO; // EventRef<"SUBMIT_BASIC_INFO">
+const e = events("submitBasicInfo", "submitPayment");
+e.submitBasicInfo; // EventRef<"submitBasicInfo">
 ```
 
 Destructure or keep the record:
@@ -97,16 +97,19 @@ Same checkout machine. Fewer lines.
 import { Actor } from "@mantaq/core";
 import { states, events } from "@mantaq/sugar";
 
-const { basicInfo, payment, success } = states("basicInfo", "payment", "success");
-const { SUBMIT_BASIC_INFO, SUBMIT_PAYMENT } = events("SUBMIT_BASIC_INFO", "SUBMIT_PAYMENT");
+const { basicInfo, payment, success } = states("basicInfo", "payment", {
+  name: "success",
+  final: true,
+});
+const { submitBasicInfo, submitPayment } = events("submitBasicInfo", "submitPayment");
 
 const checkout = new Actor({
-  inputs: [SUBMIT_BASIC_INFO, SUBMIT_PAYMENT],
+  inputs: [submitBasicInfo, submitPayment],
   states: [basicInfo, payment, success],
   initial: basicInfo,
   setup: (m) => {
-    m.on(basicInfo, SUBMIT_BASIC_INFO, () => ({ state: payment }));
-    m.on(payment, SUBMIT_PAYMENT, () => ({ state: success }));
+    m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
+    m.on(payment, submitPayment, () => ({ state: success }));
   },
 });
 ```
@@ -114,15 +117,16 @@ const checkout = new Actor({
 ## Type safety
 
 ```ts
-const { basicInfo, success } = states("basicInfo", "success");
+const { basicInfo, success } = states("basicInfo", { name: "success", final: true });
 
 // TypeScript knows:
 basicInfo.name; // "basicInfo"
-success.name; // "success"
-success.final(); // isFinal = true
+basicInfo.isFinal; // false
+success.isFinal; // true
 ```
 
-Names inferred as string literals.
+Finality is declared at creation — `{ name, final: true }`. No `.final()` call
+to remember or discard. Names inferred as string literals.
 
 :::tip[Next]
 [Matching](/mantaq/sugar/matching/) checks where the checkout machine is: `matches()`, `isIn()`, `activeLeaves()`, `tag()`.
