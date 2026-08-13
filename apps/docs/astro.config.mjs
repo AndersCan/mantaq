@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import starlightLlmsTxt from "starlight-llms-txt";
 import remarkGfm from "remark-gfm";
 
 // https://astro.build/config
@@ -17,6 +18,11 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Mantaq",
+      plugins: [
+        starlightLlmsTxt({
+          projectName: "Mantaq",
+        }),
+      ],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/anderscan/mantaq" }],
       sidebar: [
         {

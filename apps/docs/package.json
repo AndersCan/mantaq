@@ -13,7 +13,8 @@
   "dependencies": {
     "@astrojs/starlight": "^0.41.7",
     "astro": "^7.2.0",
-    "sharp": "catalog:"
+    "sharp": "catalog:",
+    "starlight-llms-txt": "catalog:"
   },
   "devDependencies": {
     "remark-gfm": "catalog:",
