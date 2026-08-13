@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+<sub>2026-08-13</sub>
+
+- _(minor)_
+  Added actor recovery, transition observability, snapshot state payloads, and hardened clocks against invalid ms; fixed error-report accuracy and made the test harness context-generic. Banned console.* in library src — failures now throw (misconfiguration) or route to the error state (runtime), with platform-matching clock delay clamping.
+- _(minor)_
+  Effects run on every state entry — initial state at construction, terminal states included. __error is final and fires done.
+
 ## 0.1.0
 
 <sub>2026-08-12</sub>

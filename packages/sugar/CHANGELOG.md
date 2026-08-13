@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+<sub>2026-08-13</sub>
+
+- _(minor)_
+  ActorMap is a keyed registry of one actor type — constructor takes the factory, spawn takes the key. states() accepts { name, final: true } objects.
+- _(patch)_
+  Added actor recovery, transition observability, snapshot state payloads, and hardened clocks against invalid ms; fixed error-report accuracy and made the test harness context-generic. Banned console.* in library src — failures now throw (misconfiguration) or route to the error state (runtime), with platform-matching clock delay clamping.
+
 ## 0.1.0
 
 <sub>2026-08-12</sub>
