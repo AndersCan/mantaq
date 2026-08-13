@@ -3,14 +3,28 @@ title: Context
 description: Data that survives transitions.
 ---
 
-Context. Holds data. Survives transitions. Replaced, not mutated.
+## What
 
-Checkout machine from [Actors](/mantaq/core-concepts/actors/). Context holds the
-form data as the buyer moves through steps.
+Context is the actor's data — a record you define, pass in at construction, and
+read and replace while the machine runs.
+
+## Why
+
+A flow accumulates data. The buyer enters their email, then their address, then
+their payment details, and all of it needs to be around at the end when the
+card is charged. Context is that place: it survives transitions, so each step
+can add to what the previous steps collected.
+
+Context is not state. It doesn't decide where the machine is — the state does.
+And it is replaced, not mutated: `set()` swaps the whole record, so a reference
+you captured earlier goes stale.
+
+The checkout machine from [Actors](/mantaq/core-concepts/actors/). Context
+holds the form data as the buyer moves through the steps.
 
 ## Define context
 
-Pass object to Actor constructor.
+Pass an object to the Actor constructor.
 
 ```ts
 type BasicInfo = { email: string; name: string };
@@ -33,13 +47,13 @@ const checkout = new Actor({
 });
 ```
 
-Typed. Shape known from the start. No runtime cost.
+It's typed — the shape is known from the start, with no runtime cost.
 
 ## Context in transitions
 
 Handlers get a `context` handle. `get()` reads the current value; `set()`
-replaces it wholesale. Any `set()` call triggers a `change` event — even
-setting the same reference. Copy the current value to mutate.
+replaces it wholesale. Any `set()` call triggers a `change` event — even if you
+set the same reference. Copy the current value to mutate.
 
 ```ts
 m.on(basicInfo, submitBasicInfo, (event, { context }) => {
@@ -65,13 +79,13 @@ context.set({ ...s, items: [...s.items, item] });
 checkout.context.basicInfo?.email; // current value
 ```
 
-Always read through `actor.context` — the value is replaced, not mutated, so a
+Always read through `actor.context`. The value is replaced, not mutated, so a
 reference you captured earlier goes stale.
 
 ## Context in effects
 
-Effects get the same handle. The charge effect reads payment info, writes the
-order id on success.
+Effects get the same handle. The charge effect reads the payment info and
+writes the order id on success.
 
 ```ts
 setup: (m) => {
@@ -88,7 +102,8 @@ setup: (m) => {
 
 ## Context in children
 
-Child actors (regions). Own context. Communicate via events. See [States](/mantaq/core-concepts/states/).
+Child actors (regions) have their own context and communicate via events. See
+[States](/mantaq/core-concepts/states/).
 
 ## Test context
 
@@ -101,8 +116,4 @@ checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150
 checkout.context.shippingAddress; // { street: "1 Main", city: "Oslo", zip: "0150" }
 ```
 
-Accumulates. Step by step.
-
-:::tip[Next]
-[Testing](/mantaq/guides/actor-testing/) drives the checkout machine and asserts every step.
-:::
+It accumulates, step by step.

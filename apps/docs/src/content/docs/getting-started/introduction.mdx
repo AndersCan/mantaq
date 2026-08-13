@@ -3,17 +3,33 @@ title: Introduction
 description: What is Mantaq.
 ---
 
-Mantaq. TypeScript state machine library.
+## What
 
-Actors. Events. Hierarchical states. Three concepts.
+Mantaq is a state machine library for TypeScript. You model a flow — a
+checkout form, an order pipeline, a game — as states and the events that move
+between them. Mantaq runs the machine: it tracks where the flow is, fires
+transitions, runs side effects, and cleans up after itself.
+
+## Why
+
+Multi-step flows are hard to keep correct in plain code. Booleans, nested
+conditionals, and a `currentStep` variable drift apart as the flow grows, and
+there is no compiler help when you forget a branch. A state machine makes the
+flow the source of truth: every state and every possible transition is declared
+up front, typed, and testable.
+
+Reach for Mantaq whenever you have a flow with a known set of steps and clear
+transitions between them. It is not a general-purpose state container — it
+models _where a process is_, not every piece of data your app holds.
 
 ## Core ideas
 
-- **Actor** — state machine. Has context, states, effects, transitions, clock.
-- **State** — node in graph. Optional: mark final.
-- **Event** — typed message. Triggers transitions.
-- **Effect** — runs on state entry. Aborts on exit.
-- **Context** — mutable record. Survives transitions.
+- **Actor** — one running state machine. Holds the current state, context,
+  effects, transitions, and clock.
+- **State** — a node in the flow. A state can be marked final.
+- **Event** — a typed message. Events trigger transitions.
+- **Effect** — code that runs on state entry and aborts on state exit.
+- **Context** — the data the machine carries. Survives transitions.
 
 ## Packages
 
@@ -26,18 +42,19 @@ Actors. Events. Hierarchical states. Three concepts.
 
 The whole docs build **one example**: a multi-step checkout form.
 
-Buyer fills basic info, shipping address, payment. System charges card, shows
-result. Every page adds a piece to the same machine.
+The buyer fills in basic info, a shipping address, and payment details. The
+system charges the card and shows the result. Every page adds a piece to the
+same machine.
 
 ```
 basicInfo → payment → success (final)
 ```
 
-Full flow later. More states, more events, effects, testing.
+Later pages add more states, more events, effects, and testing.
 
 ## Quick example
 
-Minimal slice. Three states, two events. The checkout form, cut to bone.
+The checkout form, cut to bone: three states and two events.
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
@@ -63,16 +80,15 @@ checkout.send(submitBasicInfo.create());
 checkout.snapshot().path[0]; // "payment"
 ```
 
-`success` is final. Actor stops there. Entering it fires `"done"` subscribers.
+`success` is final. The actor stops there, and entering it fires the `"done"`
+subscribers.
 
 :::tip[Sugar exists]
-Core API verbose on purpose. Shows what happens under hood.
+Core is verbose on purpose — it shows what happens under the hood.
 
-`@mantaq/sugar` has helpers: `matches(checkout, "payment")` instead of `snapshot().path[0] === "payment"`. Batch creation, effect helpers, state grouping.
+`@mantaq/sugar` has helpers: `matches(checkout, "payment")` instead of
+`snapshot().path[0] === "payment"`. Batch creation, effect helpers, state
+grouping.
 
 Learn core first. Sugar second. You'll know _why_ each helper exists.
-:::
-
-:::tip[Next]
-[Actors](/mantaq/core-concepts/actors/) builds the full checkout machine. All six states, all seven events.
 :::

@@ -3,12 +3,18 @@ title: Request / Response
 description: One parent machine, many short-lived request handlers. Handlers reply through outputs.
 ---
 
+## What
+
+One parent machine owns an `ActorMap` of short-lived request handlers — one per
+order. Each handler is armed with its own timeout and settles exactly once,
+answered or timed out, and reports back through declared outputs.
+
 ## Why
 
-Checkout story continues. Shop fulfills orders. But fulfillment needs answers:
-shipping partner must confirm the order ships. The shop fires many requests at
-once. Each order gets its own request, its own timeout, and settles exactly
-once — answered or timed out.
+The checkout story continues. The shop fulfills orders, but fulfillment needs
+answers: the shipping partner must confirm the order ships. The shop fires many
+requests at once, and each order needs its own request, its own timeout, and
+exactly one outcome — answered or timed out.
 
 [Dynamic Children](/mantaq/sugar/dynamic-children/) gave workers that answered
 nothing. [Effect Helpers](/mantaq/sugar/effect-helpers/) gave the timeout. This
@@ -292,7 +298,3 @@ it("times out an unanswered request", async () => {
 Same clock, same inputs, same trace. The full journey — answer, timeout, late
 answer, duplicate answer, many in flight, re-dispatch — runs in
 `packages/examples/requestResponse.actor.test.ts`.
-
-:::tip[Next]
-[API Reference](/mantaq/reference/core/) — every option and method, exact signatures.
-:::

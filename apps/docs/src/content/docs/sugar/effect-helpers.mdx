@@ -3,14 +3,25 @@ title: Effect Helpers
 description: Promise bridging and timeout helpers for effects.
 ---
 
-Effects need patterns. Promise bridging. Timeouts. Sugar provides two.
+## What
 
-Checkout machine from [Effects](/mantaq/core-concepts/effects/). The `submitting`
-effect charges the card and falls back on timeout. Sugar versions.
+`withPromise()` and `withTimeout()` wrap the two effect patterns every machine
+ends up needing: bridging a promise into events, and arming a timeout that
+fires an event.
+
+## Why
+
+Both patterns share a footgun: the abort check. A promise resolves after the
+user left the state, or a timer fires after exit — without the check, you emit
+into a machine that has already moved on. The helpers do the check for you, and
+they read the actor's clock, so tests stay deterministic on a `VirtualClock`.
+
+The checkout machine from [Effects](/mantaq/core-concepts/effects/). The
+`submitting` effect charges the card and falls back on timeout. Sugar versions.
 
 ## withPromise
 
-Bridge promise to actor events. Abort-safe.
+Bridge a promise to actor events. Abort-safe.
 
 The charge effect, sugar style:
 
@@ -30,9 +41,9 @@ setup: (m) => {
 
 ### What it does
 
-1. Awaits promise
-2. On resolve → calls `success` → emits resulting event
-3. On reject → calls `error` → emits resulting event
+1. Awaits the promise
+2. On resolve → calls `success` → emits the resulting event
+3. On reject → calls `error` → emits the resulting event
 4. Checks `signal.aborted` before emitting
 
 Without sugar:
@@ -51,7 +62,7 @@ setup: (m) => {
 };
 ```
 
-Same logic. More code. Easy to forget abort check.
+Same logic, more code, and the abort check is easy to forget.
 
 ### Mapper functions
 
@@ -62,13 +73,14 @@ withPromise(promise, signal, emit, {
 });
 ```
 
-Return value emitted as an event. Actor dispatches it (internal/input → transition, else output).
+The return value is emitted as an event. The actor dispatches it — internal or
+input events trigger a transition, anything else goes out as an output.
 
 ## withTimeout
 
-Timeout via actor's clock. Abort-safe.
+A timeout on the actor's clock. Abort-safe.
 
-The fallback effect. Charge hangs → 800ms → `submittingDone` → `success`.
+The fallback effect. The charge hangs → 800ms → `submittingDone` → `success`.
 
 ```ts
 import { withTimeout } from "@mantaq/sugar";
@@ -82,8 +94,8 @@ setup: (m) => {
 
 ### What it does
 
-1. Schedules timeout on actor's clock
-2. On fire → checks `signal.aborted` → calls `eventFn` → emits resulting event
+1. Schedules the timeout on the actor's clock
+2. On fire → checks `signal.aborted` → calls `eventFn` → emits the resulting event
 3. State exit aborts the effect signal → no emit after exit
 
 Warns on invalid `ms`.
@@ -133,16 +145,13 @@ clock.advance(800); // triggers timeout
 matches(checkout, "success"); // true
 ```
 
-Deterministic. Same as core, less boilerplate.
+The test stays deterministic — same as core, less boilerplate.
 
 ## Abort safety
 
-Both helpers check `signal.aborted`. State exit aborts effect.
+Both helpers check `signal.aborted`. State exit aborts the effect.
 
-Promise resolves after state exit → no emit. Timer fires after exit → no emit.
+A promise that resolves after state exit → no emit. A timer that fires after
+exit → no emit.
 
 No manual checks needed. Sugar handles it.
-
-:::tip[Next]
-[Request / Response](/mantaq/sugar/request-response/) — short-lived handlers that answer back.
-:::

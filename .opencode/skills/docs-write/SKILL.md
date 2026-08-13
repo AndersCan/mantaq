@@ -36,7 +36,7 @@ only IDs from it.
    - Opens referencing what the reader built: "The checkout machine from the
      last page. Now add effects."
    - Adds the smallest slice showing the concept.
-   - Closes with a forward pointer: "Next: test this checkout machine."
+   - Stands alone — no "Next:" forward pointer. Sidebar order is the thread.
 4. **No dead code.** Every snippet compiles against the real API, or is an
    explicitly marked fragment (`// ...unchanged`).
 5. **Full blocks when needed.** When a page extends the machine, show the
@@ -52,8 +52,9 @@ only IDs from it.
      the what/why, never above. If the signature invites a wrong reading, the
      what/why must preempt it — e.g. ActorMap: "keyed registry of one actor
      type, not a collection of things."
-7. **Caveman voice.** Short. Direct. No filler. Technical terms exact. Matches
-   existing docs (`index.mdx` note).
+7. **Human voice.** Natural prose. Tight, but written like a person explaining
+   to another person — full sentences, no caveman fragments ("Effect. Runs on
+   state entry."). Technical terms exact. Matches existing docs.
 
 ## Steps
 
@@ -108,6 +109,6 @@ violations. Re-run the failed pass.
 - Never teach a concept with a throwaway machine when the checkout slice can
   show it.
 - Never leave an example half-built across a page boundary — each page must
-  stand alone (open: where we are, close: where we go).
+  stand alone (open: where we are).
 - Snippet fragments (`setup: (m) => ...`) are fine when marked, but the full
   machine must exist on some page.

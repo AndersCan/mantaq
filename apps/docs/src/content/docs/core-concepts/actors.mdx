@@ -3,13 +3,26 @@ title: Actors
 description: Core runtime unit.
 ---
 
-Actor. State machine instance. Holds everything.
+## What
 
-Current state. Mutable context. Transition handlers. Effects. Clock. Children.
+An Actor is one running state machine instance. It owns everything the machine
+needs: the current state, the mutable context, the registered transitions and
+effects, the clock, and any child actors.
 
-Checkout form from [Introduction](/mantaq/getting-started/introduction/). Now full. All six states, all seven events.
+## Why
 
-## Make actor
+States, events, and effects are declarations until an Actor runs them. The
+Actor is what makes the machine live — it accepts events, applies transitions,
+runs effects, and reports what it is doing. When you test a flow, you test an
+Actor.
+
+It's not a class you subclass per state. One Actor per flow, with its
+transitions and effects registered together in `setup`.
+
+The checkout form from [Introduction](/mantaq/getting-started/introduction/)
+is now full: all six states, all seven events.
+
+## Make an actor
 
 Transitions and effects are registered in a `setup` callback. The builder is
 type-safe: a target state or event you didn't declare won't compile.
@@ -91,17 +104,19 @@ const checkout = new Actor({
 });
 ```
 
-Flow:
+The flow:
 
 ```
 basicInfo → shippingAddress → payment → submitting → success
                   ↕ (back) ↕                   ↕ (back)
-                                           error
+                                            error
 ```
 
-`back` handled in every state with `onAny`. State-specific handler first. `onAny` after — only transitions if no state handler fired.
+`back` is handled in every state with `onAny`. A state-specific handler runs
+first; `onAny` only transitions if no state handler fired.
 
-Note: nothing emits `paymentOk` yet. Effects do that. [Effects page](/mantaq/core-concepts/effects/) adds them.
+Note that nothing emits `paymentOk` yet. Effects do that — the
+[Effects page](/mantaq/core-concepts/effects/) adds them.
 
 ## Send events
 
@@ -110,15 +125,17 @@ checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
 ```
 
-`.create()` builds the event. Payload events need the payload argument.
+`.create()` builds the event you send. Events with a payload need the payload
+argument.
 
-## Check state
+## Check the state
 
 ```ts
 checkout.snapshot().path[0]; // "payment"
 ```
 
-Tip: `@mantaq/sugar` has `matches(checkout, "payment")` for cleaner checks. See [Matching](/mantaq/sugar/matching/).
+For cleaner checks, `@mantaq/sugar` has `matches(checkout, "payment")`. See
+[Matching](/mantaq/sugar/matching/).
 
 ## Listen for changes
 
@@ -130,7 +147,8 @@ const unsub = checkout.on("change", (snapshot) => {
 // Call unsub() to stop
 ```
 
-Fires immediately with current snapshot. Then on every state or context change.
+The handler fires immediately with the current snapshot, then on every state
+or context change.
 
 ## Settled
 
@@ -138,7 +156,8 @@ Fires immediately with current snapshot. Then on every state or context change.
 await checkout.settled();
 ```
 
-Waits. Internal events drained, pending effects done. Use after effects before asserting.
+Waits until internal events are drained and pending effects are done. Use it
+after effects before asserting.
 
 ## Snapshot
 
@@ -147,7 +166,7 @@ checkout.snapshot();
 // { path: ["payment"], context: {...}, regions: {} }
 ```
 
-State tree. Nested for actors with children.
+The full state tree. It nests for actors with children.
 
 ## Constructor options
 
@@ -172,8 +191,5 @@ State tree. Nested for actors with children.
 | `m.onAny(event, fn)`     | Handler for an event in every state         |
 | `m.effect(state, fn)`    | Run `fn` on state entry                     |
 
-Handler returns `{ state }` (optional `payload`, or `emit: [{ type }]`) or `{}` to stay in place.
-
-:::tip[Next]
-[States](/mantaq/core-concepts/states/) dissects the machine's states: nodes, final states, child actors.
-:::
+A handler returns `{ state }` (optionally with `payload`, or `emit:
+[{ type }]`) to transition, or `{}` to stay in place.

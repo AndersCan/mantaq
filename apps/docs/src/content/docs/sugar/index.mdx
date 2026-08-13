@@ -3,9 +3,19 @@ title: Sugar
 description: Convenience helpers for common patterns.
 ---
 
-Sugar. Optional package. Wraps core primitives.
+## What
 
-Reduces boilerplate. Every pattern here possible in userland. Sugar saves typing.
+`@mantaq/sugar` is an optional companion package. It wraps core primitives with
+convenience helpers for the patterns every machine ends up repeating: batch
+creation, state matching, effect timeouts, dynamic children.
+
+## Why
+
+Core is deliberately small and explicit — it shows what happens under the hood.
+But the boilerplate adds up: thirteen `state(...)`/`event(...)` calls, a manual
+abort check in every promise effect, hand-rolled path joins. Sugar cuts that
+without hiding anything. Every helper compiles to the same behavior you could
+write yourself — sugar just saves the typing.
 
 The sugar pages apply each helper to the checkout machine from
 [Actors](/mantaq/core-concepts/actors/).
@@ -33,7 +43,7 @@ Needs `@mantaq/core` installed.
 import { matches, states, events } from "@mantaq/sugar";
 ```
 
-All exports from one entry point.
+All exports come from one entry point.
 
 ## When to use
 
@@ -53,9 +63,10 @@ Skip sugar when:
 
 ## Philosophy
 
-Sugar not required. Core sufficient for everything.
+Sugar is not required. Core is sufficient for everything.
 
-Sugar = less code for common patterns. Nothing hidden. You could write every helper yourself.
+Sugar means less code for common patterns, nothing hidden. You could write every
+helper yourself.
 
 ## Pages
 

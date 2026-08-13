@@ -80,14 +80,14 @@ Decides based on whether the whole docs story coheres and onboarding cost.
 - Reading intro → testing guide in order, is there one continuous build?
 - Would a new hire get lost jumping between pages? (Every page must say where
   the example stands.)
-- Does each page end pointing at the next page's expansion?
+- Does each page say where the example stands, without forward pointers?
 - Can I demo this to product leadership from the docs alone?
 
 **Violations**
 
 - Page that assumes knowledge introduced nowhere.
 - Example changes identity between pages.
-- No forward pointer at the end of a page.
+- No forward pointer at the end of a page. Each page stands alone; sidebar order is the thread.
 - A concept promised in the intro (`VirtualClock`, sugar) never picked up.
 
 ## Pass 5 — Tech Writer (Persona 5, S1)
