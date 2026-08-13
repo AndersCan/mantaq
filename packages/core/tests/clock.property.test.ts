@@ -1,5 +1,5 @@
 import { test, describe } from "vite-plus/test";
-import { fc, anyDuration, runProperty } from "@mantaq/pbt";
+import { fc, anyDuration, anySmallDuration, runProperty } from "@mantaq/pbt";
 import { VirtualClock } from "../src/virtual-clock.ts";
 
 interface TimerJob {
@@ -115,6 +115,59 @@ describe("VirtualClock property tests", () => {
           } else if (mss[id - 1] <= target) {
             if (!fired.has(id)) return false;
           }
+        }
+        return true;
+      },
+    );
+  });
+});
+
+describe("VirtualClock firing-order property tests", () => {
+  test("timers fire in deadline order regardless of registration order", () => {
+    runProperty(
+      fc.tuple(fc.array(anySmallDuration, { minLength: 2, maxLength: 12 }), anyDuration),
+      ([deadlines, target]) => {
+        const clock = new VirtualClock();
+        const fired: Array<{ ms: number }> = [];
+        for (const ms of deadlines) {
+          clock.setTimeout(ms, () => fired.push({ ms }));
+        }
+
+        clock.advance(target);
+
+        const expected = deadlines
+          .map((ms, index) => ({ ms, index }))
+          .filter(({ ms }) => ms <= target)
+          .sort((a, b) => a.ms - b.ms || a.index - b.index);
+        if (fired.length !== expected.length) return false;
+        for (let i = 0; i < expected.length; i++) {
+          if (fired[i].ms !== expected[i].ms) return false;
+        }
+        return true;
+      },
+    );
+  });
+
+  test("timers registered in reverse deadline order still fire in time order", () => {
+    runProperty(
+      fc.tuple(fc.array(anySmallDuration, { minLength: 2, maxLength: 12 }), anyDuration),
+      ([mss, target]) => {
+        const deadlines = [...mss].sort((a, b) => b - a);
+        const clock = new VirtualClock();
+        const fired: Array<{ ms: number }> = [];
+        for (const ms of deadlines) {
+          clock.setTimeout(ms, () => fired.push({ ms }));
+        }
+
+        clock.advance(target);
+
+        const expected = deadlines
+          .map((ms, index) => ({ ms, index }))
+          .filter(({ ms }) => ms <= target)
+          .sort((a, b) => a.ms - b.ms || a.index - b.index);
+        if (fired.length !== expected.length) return false;
+        for (let i = 0; i < expected.length; i++) {
+          if (fired[i].ms !== expected[i].ms) return false;
         }
         return true;
       },
