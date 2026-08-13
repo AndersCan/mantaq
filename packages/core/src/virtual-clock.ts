@@ -24,6 +24,19 @@ export class VirtualClock implements Clock {
     return this.#now;
   }
 
+  /**
+   * Delay normalization: NaN and ±Infinity throw (programmer error); negative
+   * and 0 clamp to 0 for timeouts like the platform, to a 1ms floor for
+   * intervals (a 0ms interval would spin the synchronous advance loop
+   * forever). Finite positive values schedule at their real deadline.
+   */
+  #delay(ms: number, method: string, interval: boolean): number {
+    if (!Number.isFinite(ms)) {
+      throw new RangeError(`[VirtualClock] invalid ${method} ms value: ${ms}`);
+    }
+    return ms <= 0 ? (interval ? 1 : 0) : ms;
+  }
+
   setTimeout(
     ms: number,
     cb: () => void,
@@ -34,7 +47,7 @@ export class VirtualClock implements Clock {
     const id = this.#nextId++;
     const onAbort = trackAbort(signal, id, this.#timers);
     this.#timers.set(id, {
-      deadline: this.#now + ms,
+      deadline: this.#now + this.#delay(ms, "setTimeout", false),
       cb,
       signal,
       onAbort,
@@ -56,7 +69,14 @@ export class VirtualClock implements Clock {
     if (signal?.aborted) return -1;
     const id = this.#nextId++;
     const onAbort = trackAbort(signal, id, this.#intervals);
-    this.#intervals.set(id, { ms, next: this.#now + ms, cb, signal, onAbort });
+    const d = this.#delay(ms, "setInterval", true);
+    this.#intervals.set(id, {
+      ms: d,
+      next: this.#now + d,
+      cb,
+      signal,
+      onAbort,
+    });
     return id;
   }
 
@@ -118,7 +138,10 @@ export class VirtualClock implements Clock {
   }
 
   advance(ms: number): void {
-    const target = this.#now + ms;
+    if (!Number.isFinite(ms)) {
+      throw new RangeError(`[VirtualClock] invalid advance ms value: ${ms}`);
+    }
+    const target = this.#now + Math.max(0, ms);
 
     while (true) {
       const deadline = this.#findEarliestDeadline(target);

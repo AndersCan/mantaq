@@ -27,7 +27,14 @@ export interface EffectInput<ActorContext, Payload = unknown> {
 export type EffectFn<ActorContext, Payload = unknown> = (
   input: EffectInput<ActorContext, Payload>,
 ) => void | Promise<void>;
-export type ErrorReason = "transition" | "effect" | "budget" | "output" | "internal" | "async";
+export type ErrorReason =
+  | "transition"
+  | "effect"
+  | "budget"
+  | "output"
+  | "internal"
+  | "async"
+  | "unhandled";
 
 export interface ErrorInfo {
   error: unknown;
@@ -35,6 +42,13 @@ export interface ErrorInfo {
   context: unknown;
   event: InternalEvent;
   reason: ErrorReason;
+}
+
+export interface TransitionInfo {
+  event: InternalEvent;
+  from: string;
+  to: string;
+  transitioned: boolean;
 }
 export type ErrorState = StateRef<"__error", unknown, false>;
 
@@ -48,5 +62,5 @@ export type TransitionResult<
 > = {
   state?: AllowedState | { state: AllowedState; payload?: unknown };
   payload?: unknown;
-  emit?: Array<{ type: AllowedEmit }>;
+  emit?: Array<{ type: AllowedEmit; payload?: unknown }>;
 };

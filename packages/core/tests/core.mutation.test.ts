@@ -731,27 +731,22 @@ describe("Actor directed mutation tests", () => {
     expect(actor.snapshot().error?.reason).toBe("budget");
   });
 
-  test("initial state warning fires when the state is not declared", () => {
+  test("initial state not declared throws", () => {
     const a = state("a")();
     const b = state("b")();
     const stray = state("stray")();
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [a, b] as AnyStateRef[],
-        initial: stray as never,
-        setup: () => {},
-      });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("stray"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/stray/);
   });
 
-  test("unregistered region child logs a registry error", () => {
+  test("unregistered region child throws a registry error", () => {
     const idle = state("idle")();
     const stub: AnyActor = {
       state: state("s")(),
@@ -760,26 +755,39 @@ describe("Actor directed mutation tests", () => {
       send: () => {},
       snapshot: () => ({ path: ["s"], context: {}, regions: {} }),
       on: () => () => {},
+      recover: () => {},
       settled: async () => {},
     };
-    const errors: string[] = [];
-    const original = console.error;
-    console.error = (...args: unknown[]) => errors.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [idle],
-        initial: idle,
-        regions: { child: stub },
-        setup: () => {},
-      });
-    } finally {
-      console.error = original;
-    }
-    expect(errors.some((e) => e.includes("not registered"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [idle],
+          initial: idle,
+          regions: { child: stub },
+          setup: () => {},
+        }),
+    ).toThrow(/not registered/);
   });
 
-  test("no-transition warning fires for an unhandled event", () => {
+  test("an internal event emitted with no handler routes to the error state", () => {
+    const idle = state("idle")();
+    const boom = event("BOOM")();
+    const actor = new Actor({
+      inputs: [],
+      internal: [boom],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    pushInternal(actor, boom.create());
+    drainInternal(actor);
+    expect(actor.snapshot().path[0]).toBe("__error");
+    expect(actor.snapshot().error?.reason).toBe("unhandled");
+    expect(actor.snapshot().error?.event.type).toBe("BOOM");
+  });
+
+  test("an unhandled external event is ignored without dying", () => {
     const idle = state("idle")();
     const stray = event("STRAY")();
     const actor = new Actor({
@@ -788,15 +796,9 @@ describe("Actor directed mutation tests", () => {
       initial: idle,
       setup: () => {},
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(stray.create());
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("no transition"))).toBe(true);
+    actor.send(stray.create());
+    expect(actor.state.name).toBe("idle");
+    expect(actor.snapshot().error).toBeUndefined();
   });
 
   test("abortEffects on an actor with no running effect does not throw", () => {
@@ -912,25 +914,28 @@ describe("Actor directed mutation tests 2", () => {
     expect(strayRuns).toBe(0);
   });
 
-  test("initial state warning lists both declared states", () => {
+  test("initial state not declared throws and lists both declared states", () => {
     const a = state("a")();
     const b = state("b")();
     const stray = state("stray")();
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [a, b] as AnyStateRef[],
-        initial: stray as never,
-        setup: () => {},
-      });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("stray"))).toBe(true);
-    expect(warns.some((w) => w.includes("a, b"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/stray/);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/a, b/);
   });
 
   test("region child output routes to the parent queue and drains", () => {
@@ -1118,7 +1123,7 @@ describe("Actor error state directed mutation tests", () => {
     expect(actor.snapshot().path[0]).toBe("__error");
   });
 
-  test("subscriber isolation — a throwing subscriber leaves the machine running", () => {
+  test("a throwing subscriber leaves the machine running", () => {
     const idle = state("idle")();
     const active = state("active")();
     const go = event("GO")();
@@ -1602,7 +1607,7 @@ describe("Actor error state directed mutation tests", () => {
     }
   });
 
-  test("an effect death records the pre-transition state", () => {
+  test("an effect death records the state being entered", () => {
     const idle = state("idle")();
     const loading = state("loading")();
     const go = event("GO")();
@@ -1618,7 +1623,251 @@ describe("Actor error state directed mutation tests", () => {
       },
     });
     actor.send(go.create());
-    expect(actor.snapshot().error?.state.name).toBe("idle");
+    expect(actor.snapshot().error?.state.name).toBe("loading");
     expect(actor.snapshot().error?.context).toEqual({});
+  });
+
+  test("a payload-less event reaching a payload-reading handler gets an empty payload", () => {
+    const idle = state("idle")();
+    const update = event("UPDATE")<{ codeSize: number }>();
+    const actor = new Actor({
+      inputs: [update],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, update, (e) => {
+          void e.payload.codeSize;
+          return {};
+        });
+      },
+    });
+    (actor as AnyActor).send({ type: "UPDATE" });
+    expect(actor.snapshot().error).toBeUndefined();
+    expect(actor.state.name).toBe("idle");
+  });
+
+  test("transition hook fires for handled events and reports transitioned", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+    const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
+    actor.on("transition", (info) =>
+      seen.push({ from: info.from, to: info.to, transitioned: info.transitioned }),
+    );
+    actor.send(go.create());
+    expect(seen).toHaveLength(1);
+    expect(seen[0].from).toBe("idle");
+    expect(seen[0].to).toBe("active");
+    expect(seen[0].transitioned).toBe(true);
+  });
+
+  test("transition hook does not fire for dropped events", () => {
+    const idle = state("idle")();
+    const stray = event("STRAY")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    let fires = 0;
+    actor.on("transition", () => fires++);
+    (actor as AnyActor).send(stray.create());
+    expect(fires).toBe(0);
+  });
+
+  test("transition hook does not fire once the machine is dead", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    let fires = 0;
+    actor.on("transition", () => fires++);
+    actor.send(go.create());
+    expect(actor.snapshot().error?.reason).toBe("transition");
+    expect(fires).toBe(0);
+  });
+
+  test("transition hook does not fire when a transition's effect throws", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, loading],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, () => {
+          throw new Error("effect boom");
+        });
+      },
+    });
+    let fires = 0;
+    actor.on("transition", () => fires++);
+    actor.send(go.create());
+    expect(actor.snapshot().error?.reason).toBe("effect");
+    expect(fires).toBe(0);
+  });
+
+  test("a throwing transition subscriber is contained and the machine survives", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: idle }));
+      },
+    });
+    actor.on("transition", () => {
+      throw new Error("sub boom");
+    });
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(actor.snapshot().path[0]).toBe("idle");
+    expect(actor.snapshot().error).toBeUndefined();
+  });
+
+  test("recover restores a dead machine to the caller-supplied state and context", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    let ticks = 0;
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle, loading],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, () => {
+          throw new Error("effect boom");
+        });
+        m.on(loading, tick, () => {
+          ticks++;
+          return { state: idle };
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().error?.reason).toBe("effect");
+    actor.recover({ state: loading, context: { n: 7 } });
+    expect(actor.snapshot().error).toBeUndefined();
+    expect(actor.snapshot().path[0]).toBe("loading");
+    expect(actor.context).toEqual({ n: 7 });
+    actor.send(tick.create());
+    expect(ticks).toBe(1);
+  });
+
+  test("recover is a no-op when the machine is not dead", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      context: { n: 1 },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: idle }));
+      },
+    });
+    let changes = 0;
+    actor.on("change", () => changes++);
+    changes = 0;
+    actor.recover({ state: idle, context: { n: 99 } });
+    expect(changes).toBe(0);
+    expect(actor.context).toEqual({ n: 1 });
+  });
+
+  test("done subscribers receive the done callback", () => {
+    const pending = state("pending")();
+    const done = state("done")().final();
+    const finish = event("FINISH")();
+    const actor = new Actor({
+      inputs: [finish],
+      states: [pending, done],
+      initial: pending,
+      setup: (m) => {
+        m.on(pending, finish, () => ({ state: done }));
+      },
+    });
+    let dones = 0;
+    actor.on("done", () => dones++);
+    actor.send(finish.create());
+    expect(actor.snapshot().done).toBe(true);
+    expect(dones).toBe(1);
+  });
+
+  test("snapshot exposes the payload of the current state", () => {
+    const idle = state("idle")();
+    const ready = state("ready")<{ items: string[] }>();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, ready],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: ready, payload: { items: ["a"] } }));
+      },
+    });
+    expect(actor.snapshot().payload).toBeUndefined();
+    actor.send(go.create());
+    expect(actor.snapshot().payload).toEqual({ items: ["a"] });
+  });
+
+  test("snapshot payload is cleared once the machine dies", () => {
+    const idle = state("idle")();
+    const ready = state("ready")<{ items: string[] }>();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, ready],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: ready, payload: { items: ["a"] } }));
+        m.effect(ready, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("__error");
+    expect(actor.snapshot().payload).toBeUndefined();
+  });
+
+  test("an undeclared-internal actor routes unknown-typed events to the output handler", () => {
+    const idle = state("idle")();
+    const out = event("OUT")();
+    const actor = new Actor({
+      inputs: [],
+      outputs: [out],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    const received: Array<{ type?: string }> = [];
+    setOutputHandler(actor, (e) => received.push(e));
+    pushInternal(actor, { type: undefined } as unknown as InternalEvent);
+    drainInternal(actor);
+    expect(received).toHaveLength(1);
+    expect(received[0].type).toBeUndefined();
   });
 });

@@ -56,8 +56,8 @@ export function assertTransitionNeverVisited(history: History, from: string, eve
   }
 }
 
-export function assertContextNever(
-  actor: AnyActor,
+export function assertContextNever<C>(
+  actor: AnyActor<C>,
   predicate: (context: unknown) => boolean,
 ): void {
   if (predicate(actor.context)) {

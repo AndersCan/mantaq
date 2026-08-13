@@ -5,7 +5,7 @@ export function buildSnapshot<C>(
   s: AnyStateRef,
   regions: Record<string, { snapshot(): Snapshot }>,
   context: C,
-  error?: ErrorInfo,
+  opts: { error?: ErrorInfo; payload?: unknown } = {},
 ): Snapshot<C> {
   const path = [s.name];
   const regionSnapshots: Record<string, Snapshot> = {};
@@ -16,11 +16,14 @@ export function buildSnapshot<C>(
 
   const snap: Snapshot<C> = { path, context, regions: regionSnapshots };
 
+  if (opts.payload !== undefined) {
+    snap.payload = opts.payload;
+  }
   if (s.isFinal) {
     snap.done = true;
   }
-  if (error !== undefined) {
-    snap.error = error;
+  if (opts.error !== undefined) {
+    snap.error = opts.error;
   }
 
   return snap;

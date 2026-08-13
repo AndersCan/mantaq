@@ -1,6 +1,5 @@
-import { expect, test, describe, vi, afterEach, beforeEach } from "vite-plus/test";
+import { expect, test, describe } from "vite-plus/test";
 import { VirtualClock, Context } from "@mantaq/core";
-import type { withTimeout as WithTimeoutFn } from "../src/effects/timeout.ts";
 import { withTimeout } from "../src/effects/timeout.ts";
 
 function makeInput(clock: VirtualClock) {
@@ -19,268 +18,37 @@ function makeInput(clock: VirtualClock) {
 }
 
 describe("withTimeout mutation tests", () => {
-  let withTimeout: typeof WithTimeoutFn;
-  const originalNodeEnv = process.env.NODE_ENV;
-
-  beforeEach(async () => {
-    process.env.NODE_ENV = "development";
-    vi.resetModules();
-    const mod = await import("../src/effects/timeout.ts");
-    withTimeout = mod.withTimeout;
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    if (originalNodeEnv === undefined) {
-      delete process.env.NODE_ENV;
-    } else {
-      process.env.NODE_ENV = originalNodeEnv;
-    }
-  });
-
-  test("warns on non-number string", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  function collect(ms: number, advanceBy = 0) {
     const clock = new VirtualClock();
-    withTimeout("abc" as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-    expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("[withTimeout] invalid ms value: abc"),
+    const emitted: Array<{ type: string; [key: string]: unknown }> = [];
+    withTimeout(ms, { ...makeInput(clock), emit: (e) => emitted.push(e) }, () => ({ type: "t" }));
+    clock.advance(advanceBy);
+    return emitted;
+  }
+
+  test("negative ms clamps to 0 and fires on the next advance", () => {
+    expect(collect(-1, 0)).toEqual([{ type: "t" }]);
+  });
+
+  test("NaN ms throws (the clock rejects it)", () => {
+    expect(() => withTimeout(NaN, makeInput(new VirtualClock()), () => ({ type: "t" }))).toThrow(
+      RangeError,
     );
   });
 
-  test("warns on null", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(null as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
+  test("Infinity ms throws (the clock rejects it)", () => {
+    expect(() =>
+      withTimeout(Infinity, makeInput(new VirtualClock()), () => ({ type: "t" })),
+    ).toThrow(RangeError);
   });
 
-  test("warns on undefined", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(undefined as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
+  test("valid ms fires exactly at the deadline", () => {
+    expect(collect(50, 49)).toEqual([]);
+    expect(collect(50, 50)).toEqual([{ type: "t" }]);
   });
 
-  test("warns on boolean", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(true as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns on object", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout({} as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns on array", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout([] as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns on negative ms", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(-1, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).toHaveBeenCalledOnce();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("[withTimeout] invalid ms value: -1"));
-  });
-
-  test("warns on large negative ms", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(-1000, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns on NaN", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(NaN, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).toHaveBeenCalledOnce();
-    expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("[withTimeout] invalid ms value: NaN"),
-    );
-  });
-
-  test("warns on Infinity", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(Infinity, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).toHaveBeenCalledOnce();
-    expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("[withTimeout] invalid ms value: Infinity"),
-    );
-  });
-
-  test("warns on -Infinity", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(-Infinity, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("does not warn on zero", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(0, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  test("does not warn on positive integer", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(100, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  test("does not warn on positive float", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(0.5, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  test("warning message contains [withTimeout] prefix", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout("bad" as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy.mock.calls[0][0]).toMatch(/^\[withTimeout\]/);
-  });
-
-  test("warning message includes the invalid value", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(-42, makeInput(clock), () => ({ type: "t" }));
-    expect(spy.mock.calls[0][0]).toContain("-42");
-  });
-
-  test("warning message includes the value for NaN", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(NaN, makeInput(clock), () => ({ type: "t" }));
-    expect(spy.mock.calls[0][0]).toContain("NaN");
-  });
-
-  test("warns for typeof check (string)", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout("hello" as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns for ms < 0 check (negative)", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(-0.001, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns for Number.isFinite check (Infinity)", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(Number.POSITIVE_INFINITY, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns for Number.isFinite check (negative Infinity)", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(Number.NEGATIVE_INFINITY, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("does not warn on 1", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(1, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  test("does not warn on 999999", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(999999, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  test("valid ms does not warn then invalid ms warns", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-
-    withTimeout(50, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).not.toHaveBeenCalled();
-
-    withTimeout("nope" as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warn is called exactly once per invalid call", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-
-    withTimeout(-1, makeInput(clock), () => ({ type: "a" }));
-    withTimeout(NaN, makeInput(clock), () => ({ type: "b" }));
-    withTimeout(Infinity, makeInput(clock), () => ({ type: "c" }));
-
-    expect(spy).toHaveBeenCalledTimes(3);
-  });
-
-  test("warns on empty string", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout("" as unknown as number, makeInput(clock), () => ({ type: "t" }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warns on Number object wrapper", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(new Number(5) as unknown as number, makeInput(clock), () => ({
-      type: "t",
-    }));
-    expect(spy).toHaveBeenCalledOnce();
-  });
-
-  test("warning contains 'invalid ms value' text", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(-99, makeInput(clock), () => ({ type: "t" }));
-    expect(spy.mock.calls[0][0]).toContain("invalid ms value");
-  });
-
-  test("warning contains 'Timeout may not fire' text", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const clock = new VirtualClock();
-    withTimeout(NaN, makeInput(clock), () => ({ type: "t" }));
-    expect(spy.mock.calls[0][0]).toContain("Timeout may not fire");
+  test("zero ms fires on the next advance", () => {
+    expect(collect(0, 0)).toEqual([{ type: "t" }]);
   });
 });
 
@@ -307,5 +75,81 @@ describe("withTimeout directed mutation tests", () => {
     }));
     clock.advance(50);
     expect(emitted).toEqual([{ type: "timeout" }]);
+  });
+
+  test("aborting removes the scheduled timer from the clock", () => {
+    const clock = new VirtualClock();
+    const abort = new AbortController();
+    withTimeout(50, { ...makeInput(clock), signal: abort.signal }, () => ({
+      type: "timeout",
+    }));
+    expect(clock.hasPending()).toBe(true);
+    abort.abort();
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("invalid ms is passed to the clock which clamps it", () => {
+    let calls = 0;
+    const stub = {
+      setTimeout: () => {
+        calls++;
+        return 1;
+      },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+      clearInterval: () => {},
+      now: () => 0,
+    };
+    withTimeout(NaN, { ...makeInput(stub as unknown as VirtualClock), clock: stub }, () => ({
+      type: "timeout",
+    }));
+    expect(calls).toBe(1);
+  });
+
+  test("negative ms is passed to the clock which clamps it", () => {
+    let calls = 0;
+    const stub = {
+      setTimeout: () => {
+        calls++;
+        return 1;
+      },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+      clearInterval: () => {},
+      now: () => 0,
+    };
+    withTimeout(-5, { ...makeInput(stub as unknown as VirtualClock), clock: stub }, () => ({
+      type: "timeout",
+    }));
+    expect(calls).toBe(1);
+  });
+
+  test("an aborted signal suppresses the emit even when the clock fires the callback", () => {
+    const timers: Array<() => void> = [];
+    const stub = {
+      setTimeout: (_ms: number, cb: () => void) => {
+        timers.push(cb);
+        return timers.length;
+      },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+      clearInterval: () => {},
+      now: () => 0,
+    };
+    const abort = new AbortController();
+    const emitted: unknown[] = [];
+    withTimeout(
+      50,
+      {
+        ...makeInput(stub as unknown as VirtualClock),
+        signal: abort.signal,
+        emit: (e) => emitted.push(e),
+        clock: stub,
+      },
+      () => ({ type: "timeout" }),
+    );
+    abort.abort();
+    for (const cb of timers.splice(0)) cb();
+    expect(emitted).toEqual([]);
   });
 });

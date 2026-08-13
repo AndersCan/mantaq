@@ -123,4 +123,30 @@ describe("harness", () => {
     expect(labels).toContain("a");
     expect(labels).toContain("b");
   });
+
+  test("accepts an actor with a typed context", () => {
+    const idle = state("idle")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [tick],
+      outputs: [],
+      internal: [],
+      states: [idle],
+      initial: idle,
+      context: { count: 0 },
+      setup: (m) => {
+        m.on(idle, tick, (_e, { context }) => {
+          const s = context.get();
+          context.set({ ...s, count: s.count + 1 });
+          return {};
+        });
+      },
+    });
+    const harness = createTestHarness(actor);
+    expect(harness.context?.count).toBe(0);
+    const go = event("TICK")();
+    harness.send(go.create(undefined));
+    expect(harness.context?.count).toBe(1);
+    expect(harness.snapshot().context.count).toBe(1);
+  });
 });

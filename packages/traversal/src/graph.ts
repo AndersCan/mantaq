@@ -14,7 +14,7 @@ import type {
 export const INITIAL_NODE_ID = "__initial__";
 
 interface GraphTraversal {
-  actor: AnyActor;
+  actor: AnyActor<unknown>;
   pathPrefix: string;
   activeSet: Set<string>;
   internalIds?: Set<string>;
@@ -76,7 +76,7 @@ function invokeHandler(
   handler: TransitionHandler,
   eventId: string,
   context: Record<string, unknown>,
-  actor: AnyActor,
+  actor: AnyActor<unknown>,
 ): Either<unknown, HandledTransition> {
   return Either.from(() => {
     const syntheticEvent: SyntheticEvent = { type: eventId, payload: {} };
@@ -218,7 +218,7 @@ function buildEdgesFromTransitions(
 }
 
 function addNodesForActor(
-  actor: AnyActor,
+  actor: AnyActor<unknown>,
   pathPrefix: string,
   activeSet: Set<string>,
 ): GraphNode[] {
@@ -226,7 +226,7 @@ function addNodesForActor(
   return buildNodesFromStates(states, activeSet, pathPrefix);
 }
 
-function addEdgesForActor(actor: AnyActor, traversal: GraphTraversal): GraphEdge[] {
+function addEdgesForActor(actor: AnyActor<unknown>, traversal: GraphTraversal): GraphEdge[] {
   const states = (actor.options?.states ?? []) as ReadonlyArray<StateDef>;
   return buildEdgesFromTransitions(
     states,
@@ -237,7 +237,7 @@ function addEdgesForActor(actor: AnyActor, traversal: GraphTraversal): GraphEdge
 }
 
 function recurseRegions(
-  actor: AnyActor,
+  actor: AnyActor<unknown>,
   traversal: GraphTraversal,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = [];
@@ -256,7 +256,7 @@ function recurseRegions(
 }
 
 function addEffectSelfLoops(
-  actor: AnyActor,
+  actor: AnyActor<unknown>,
   pathPrefix: string,
   activeSet: Set<string>,
 ): GraphEdge[] {
@@ -281,7 +281,7 @@ function addEffectSelfLoops(
 }
 
 function buildForActor(
-  actor: AnyActor,
+  actor: AnyActor<unknown>,
   traversal: GraphTraversal,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   if (!actor) return { nodes: [], edges: [] };
@@ -294,7 +294,7 @@ function buildForActor(
   return { nodes, edges };
 }
 
-function addInitialNode(actor: AnyActor, nodes: GraphNode[], edges: GraphEdge[]): void {
+function addInitialNode(actor: AnyActor<unknown>, nodes: GraphNode[], edges: GraphEdge[]): void {
   // AnyActor.options type lacks `initial` field — cast required (see actor-internal.ts)
   const initialName = (actor.options as { initial?: { name?: string } })?.initial?.name;
   if (!initialName) return;
@@ -332,8 +332,8 @@ function collectNamedContexts(options?: {
   );
 }
 
-export function buildGraph(
-  actor: AnyActor,
+export function buildGraph<C>(
+  actor: AnyActor<C>,
   options?: {
     internalIds?: Set<string>;
     sampleContext?: Record<string, unknown>;
@@ -345,7 +345,9 @@ export function buildGraph(
     Either.from(() => {
       const activeSet = collectActorsFromSnapshot(actor.snapshot());
       const namedContexts = collectNamedContexts(options);
-      const contexts = namedContexts ?? { default: { ...actor.context } };
+      const contexts = namedContexts ?? {
+        default: { ...actor.context } as Record<string, unknown>,
+      };
       const traversal: GraphTraversal = {
         actor,
         pathPrefix: "",
@@ -361,8 +363,7 @@ export function buildGraph(
       return { nodes, edges };
     }),
     (error) => {
-      console.error("[mantaq/traversal] buildGraph failed:", error);
-      return { nodes: [], edges: [] };
+      throw error;
     },
     (result) => result,
   );

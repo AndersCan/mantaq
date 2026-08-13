@@ -18,7 +18,7 @@ export type StateDef = { name: string; isFinal: boolean };
 /** Transition handler signature for graph introspection */
 export type TransitionHandler = (
   event: SyntheticEvent,
-  options: { context: Context<Record<string, unknown>>; actor: AnyActor },
+  options: { context: Context<Record<string, unknown>>; actor: AnyActor<unknown> },
 ) => HandlerResult | undefined;
 
 /** Map of state/Any → event → handler */

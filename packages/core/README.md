@@ -10,19 +10,19 @@ npm install @mantaq/core
 
 ## Quick Reference
 
-| Pattern         | Correct                                | Anti-pattern                          |
-| --------------- | -------------------------------------- | ------------------------------------- |
-| Type context    | `context: {} as MyContext`             | casting in every handler              |
-| Write context   | `context.set({ ...context.get() })`    | mutate without `set()`                |
-| Type events     | `event("ID")<Payload>()`               | `event("ID")()` without generic       |
-| Send events     | `actor.send(signInEvent.create(data))` | raw `{ type: "ID", payload }` objects |
-| Effect data     | Use state payload                      | Depend on `event` in effect           |
-| Error handling  | Emit internal event                    | Throw in effect or transition         |
-| Internal events | Declare in `internal: [...]`           | Put user events in internal           |
-| Signal check    | `if (signal.aborted) return`           | Skip abort check in async work        |
-| Regions         | Child outputs in parent `internal`     | Forget to declare child outputs       |
-| Snapshot        | `snapshot()` carries path + context    | Re-serialize context by hand          |
-| Any handler     | Universal events only (CANCEL)         | State-specific logic in `onAny`       |
+| Pattern         | Correct                                       | Anti-pattern                          |
+| --------------- | --------------------------------------------- | ------------------------------------- |
+| Type context    | `context: {} as MyContext`                    | casting in every handler              |
+| Write context   | `context.set({ ...context.get() })`           | mutate without `set()`                |
+| Type events     | `event("ID")<Payload>()`                      | `event("ID")()` without generic       |
+| Send events     | `actor.send(signInEvent.create(data))`        | raw `{ type: "ID", payload }` objects |
+| Effect data     | Use state payload                             | Depend on `event` in effect           |
+| Error handling  | Emit internal event                           | Throw in effect or transition         |
+| Internal events | Declare in `internal: [...]`                  | Put user events in internal           |
+| Signal check    | `if (signal.aborted) return`                  | Skip abort check in async work        |
+| Regions         | Child outputs in parent `internal`            | Forget to declare child outputs       |
+| Snapshot        | `snapshot()` carries path + context + payload | Re-serialize context by hand          |
+| Any handler     | Universal events only (CANCEL)                | State-specific logic in `onAny`       |
 
 ## Contents
 
@@ -42,6 +42,7 @@ npm install @mantaq/core
   - [Any Handler](#any-handler)
   - [Testing with VirtualClock](#testing-with-virtualclock)
 - [Development](#development)
+- [Testing](#testing)
 - [License](#license)
 
 ## Quick Start
@@ -337,7 +338,7 @@ m.effect(workingState, ({ signal, emit, clock }) => {
 
 ### Snapshot & Restore
 
-`actor.snapshot()` returns a `Snapshot` — `{ path, context, regions, done?, error? }`. Context is included. Use it to save/restore actor state across sessions.
+`actor.snapshot()` returns a `Snapshot` — `{ path, context, payload?, regions, done?, error? }`. Context is included; `payload` is the payload the current state was entered with (present only when the transition carried one). Use it to save/restore actor state across sessions.
 
 ```ts
 // Snapshot carries path, context, and regions — serialize it directly
@@ -425,16 +426,23 @@ const parent = new Actor({
 
 ### Error Handling
 
-Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. If user code throws anyway, the machine does **not** misbehave silently: it dies into a built-in terminal `__error` state, records `snapshot().error` (the thrown value, the last known good state/context, the bad event), drops remaining events, and ignores later `send`s. Errors never escape `send()` and the machine stays deterministic — same inputs, same trace.
+Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. If user code throws anyway, the machine does **not** misbehave silently: it dies into a built-in terminal `__error` state, records `snapshot().error` (the thrown value, the state/context at the point of failure, the bad event), drops remaining events, and ignores later `send`s. Errors never escape `send()` and the machine stays deterministic — same inputs, same trace.
 
 ```ts
 const snap = actor.snapshot();
 if (snap.error) {
-  snap.error.reason; // "transition" | "effect" | "budget" | "output" | "internal" | "async"
-  snap.error.state.name; // last known good state
+  snap.error.reason; // "transition" | "effect" | "budget" | "output" | "internal" | "async" | "unhandled"
+  snap.error.state.name; // the state at the point of failure
   snap.error.event.type; // the bad event
 }
 ```
+
+Two deliberate exceptions to "every failure is loud":
+
+- **Subscribers only watch.** They read snapshots and never change the machine, so a throwing `on("change")`/`on("done")`/`on("transition")` callback is swallowed — the machine and its callers are unaffected.
+- **Unhandled external events are ignored.** An event with no handler in the current state is dropped by design (broadcast fan-out, cross-state sends). An **internal** event with no handler, however, is a machine-authoring bug and routes to the error state (`reason: "unhandled"`).
+
+A dead machine can be manually resumed with `actor.recover({ state, context })` — an explicit, **inherently dangerous** escape hatch (the caller injects state and context, so determinism no longer holds). Effects are not re-run and timers are not re-armed; processing resumes on the next event. Prefer fixing the root cause and recreating the actor.
 
 Catch errors inside effects and emit recovery events:
 
@@ -661,6 +669,25 @@ vp install
 vp test
 vp pack
 ```
+
+## Testing
+
+The package ships with a full test suite you can run and audit:
+
+```bash
+vp test          # feature + error + property tests
+vp check         # format, lint, typecheck (includes type-level contract tests)
+vp run mutation:core   # mutation score must stay ≥ 90
+```
+
+**Test contract.** Behavior is pinned by four kinds of tests, split by filename:
+
+- `*.test.ts` — features and happy paths, hand-maintained.
+- `*.error.test.ts` — failure paths: warnings, budgets, abort, unregistered, the `__error` state.
+- `*.property.test.ts` — property-based invariants against a reference model (fast-check, replayable via `MANTAQ_SEED`).
+- `*.mutation.test.ts` — directed tests that kill specific mutants; regenerable and thrown away between stryker runs.
+
+Coverage is analyzed per test (stryker `perTest` coverage analysis) so every mutant is attributed to the test that pins it. The mutation break threshold is 90 — a change that drops the score below 90 fails the build.
 
 ## License
 

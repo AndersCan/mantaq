@@ -112,4 +112,106 @@ describe("VirtualClock directed mutation tests", () => {
     clock.advance(25);
     expect(order).toEqual([1, 2, 1, 2]);
   });
+
+  test("setTimeout with NaN throws", () => {
+    const clock = new VirtualClock();
+    expect(() => clock.setTimeout(NaN, () => {})).toThrow(
+      "[VirtualClock] invalid setTimeout ms value: NaN",
+    );
+  });
+
+  test("setTimeout with Infinity throws", () => {
+    const clock = new VirtualClock();
+    expect(() => clock.setTimeout(Infinity, () => {})).toThrow(RangeError);
+  });
+
+  test("setTimeout with -Infinity throws", () => {
+    const clock = new VirtualClock();
+    expect(() => clock.setTimeout(-Infinity, () => {})).toThrow(RangeError);
+  });
+
+  test("setTimeout with negative ms clamps to 0 and fires on the next advance", () => {
+    const clock = new VirtualClock();
+    let fired = 0;
+    clock.setTimeout(-5, () => fired++);
+    clock.advance(0);
+    expect(fired).toBe(1);
+  });
+
+  test("setTimeout with zero ms fires on the next advance", () => {
+    const clock = new VirtualClock();
+    let fired = 0;
+    clock.setTimeout(0, () => fired++);
+    clock.advance(0);
+    expect(fired).toBe(1);
+  });
+
+  test("a huge finite ms schedules at its real deadline", () => {
+    const clock = new VirtualClock();
+    let fired = 0;
+    clock.setTimeout(2_147_483_648, () => fired++);
+    clock.advance(2_147_483_647);
+    expect(fired).toBe(0);
+    clock.advance(1);
+    expect(fired).toBe(1);
+  });
+
+  test("setInterval with NaN throws", () => {
+    const clock = new VirtualClock();
+    expect(() => clock.setInterval(NaN, () => {})).toThrow(RangeError);
+  });
+
+  test("setInterval with negative ms clamps to a 1ms floor", () => {
+    const clock = new VirtualClock();
+    let count = 0;
+    clock.setInterval(-10, () => count++);
+    clock.advance(3);
+    expect(count).toBe(3);
+  });
+
+  test("advance with NaN throws and leaves the clock untouched", () => {
+    const clock = new VirtualClock();
+    clock.advance(5);
+    expect(() => clock.advance(NaN)).toThrow(RangeError);
+    expect(clock.now()).toBe(5);
+  });
+
+  test("advance with Infinity throws", () => {
+    const clock = new VirtualClock();
+    clock.advance(5);
+    expect(() => clock.advance(Infinity)).toThrow(RangeError);
+    expect(clock.now()).toBe(5);
+  });
+
+  test("advance with negative ms is a no-op", () => {
+    const clock = new VirtualClock();
+    clock.advance(5);
+    clock.advance(-3);
+    expect(clock.now()).toBe(5);
+  });
+
+  test("valid ms behaves normally", () => {
+    const clock = new VirtualClock();
+    let fired = 0;
+    clock.setTimeout(10, () => fired++);
+    clock.advance(10);
+    expect(fired).toBe(1);
+  });
+
+  test("a single timer fires exactly once across advances", () => {
+    const clock = new VirtualClock();
+    let fired = 0;
+    clock.setTimeout(10, () => fired++);
+    clock.advance(5);
+    clock.advance(5);
+    expect(fired).toBe(1);
+  });
+
+  test("an interval fires across every elapsed tick", () => {
+    const clock = new VirtualClock();
+    let count = 0;
+    clock.setInterval(10, () => count++);
+    clock.advance(25);
+    expect(count).toBe(2);
+  });
 });

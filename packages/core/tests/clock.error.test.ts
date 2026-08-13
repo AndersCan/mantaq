@@ -48,6 +48,19 @@ describe("VirtualClock error paths", () => {
     expect(a).toBe(1);
     expect(b).toBe(0);
   });
+
+  test("NaN and Infinity ms throw; negative clamps to 0", () => {
+    const clock = new VirtualClock();
+    expect(() => clock.setTimeout(NaN, () => {})).toThrow(RangeError);
+    expect(() => clock.setTimeout(Infinity, () => {})).toThrow(RangeError);
+    expect(() => clock.setInterval(NaN, () => {})).toThrow(RangeError);
+    expect(() => clock.advance(NaN)).toThrow(RangeError);
+
+    let negFired = 0;
+    clock.setTimeout(-1, () => negFired++);
+    clock.advance(0);
+    expect(negFired).toBe(1);
+  });
 });
 
 describe("RealClock error paths", () => {

@@ -1,6 +1,17 @@
 import { expect, expectTypeOf, test, describe } from "vite-plus/test";
 import { Actor, state, event, Context } from "../src/index.ts";
-import type { StateRef, ErrorInfo, ErrorState, InternalEvent, AnyStateRef } from "../src/index.ts";
+import type {
+  StateRef,
+  ErrorInfo,
+  ErrorState,
+  InternalEvent,
+  AnyStateRef,
+  TransitionResult,
+  TransitionHandler,
+  ActorOptions,
+  PayloadOf,
+  EventTypeOf,
+} from "../src/index.ts";
 import type { ErrorReason } from "../src/actor-types.ts";
 import { setOutputHandler, pushInternal, getChildren } from "../src/internal-registry.ts";
 import type { RegistryError } from "../src/internal-registry.ts";
@@ -321,5 +332,97 @@ describe("transition contract — type = behavior", () => {
         m.on(idle, clicked, () => ({ emit: [pong.create({ n: 1 })] }));
       },
     });
+  });
+
+  test("emit entries may carry a payload", () => {
+    const idle = state("idle")();
+    const clicked = event("CLICKED")();
+    const pong = event("PONG")<{ n: number }>();
+
+    new Actor({
+      inputs: [clicked],
+      outputs: [pong],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, clicked, () => ({ emit: [{ type: "PONG", payload: { n: 1 } }] }));
+      },
+    });
+  });
+});
+
+describe("public type surface — nameable helper types", () => {
+  test("new public types are exported and nameable", () => {
+    const idle = state("idle")();
+    const clicked = event("CLICKED")<{ x: number }>();
+
+    new Actor({
+      inputs: [clicked],
+      states: [idle],
+      initial: idle,
+      setup: () => {
+        const result: TransitionResult<typeof idle, "PONG"> = {
+          state: idle,
+          emit: [{ type: "PONG" }],
+        };
+        void result;
+        const handler: TransitionHandler<[typeof idle], { n: number }> = () => ({});
+        void handler;
+        const opts: ActorOptions<[typeof idle], [typeof clicked], [], [], { n: number }> = {
+          inputs: [clicked],
+          states: [idle],
+          initial: idle,
+          context: { n: 1 },
+          setup: (b) => void b,
+        };
+        void opts;
+      },
+    });
+
+    type P = PayloadOf<typeof idle>;
+    expectTypeOf<P>().toEqualTypeOf<unknown>();
+    type E = EventTypeOf<typeof clicked>;
+    expectTypeOf<E>().toEqualTypeOf<"CLICKED">();
+  });
+
+  test("on('done') callbacks must take no arguments", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    actor.on("done", () => {});
+    // @ts-expect-error done callbacks receive no arguments — (snapshot, prev) is a change callback
+    actor.on("done", (_snap, _prev) => {});
+  });
+
+  test("on('transition') callback receives TransitionInfo", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    actor.on("transition", (info) => {
+      expectTypeOf(info.event).toEqualTypeOf<InternalEvent>();
+      expectTypeOf(info.from).toBeString();
+      expectTypeOf(info.to).toBeString();
+      expectTypeOf(info.transitioned).toBeBoolean();
+    });
+  });
+
+  test("snapshot payload is observable and optional", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    const snap = actor.snapshot();
+    expectTypeOf(snap.payload).toEqualTypeOf<unknown>();
   });
 });

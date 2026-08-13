@@ -166,26 +166,18 @@ describe("Subscribers directed mutation tests", () => {
     expect(dones).toBe(0);
   });
 
-  test("a throwing subscriber is skipped and the others still run", () => {
+  test("a throwing change subscriber is contained and the others still run", () => {
     const subs = new Subscribers<unknown>();
     const seen: string[] = [];
     subs.addChange(() => {
       throw new Error("boom");
     });
     subs.addChange((s) => seen.push(s.path[0]));
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      subs.emitChange({ path: ["active"], context: {}, regions: {} });
-    } finally {
-      console.warn = original;
-    }
+    expect(() => subs.emitChange({ path: ["active"], context: {}, regions: {} })).not.toThrow();
     expect(seen).toEqual(["active"]);
-    expect(warns.some((w) => w.includes("subscriber threw"))).toBe(true);
   });
 
-  test("a throwing done subscriber is skipped and the others still run", () => {
+  test("a throwing done subscriber is contained and the others still run", () => {
     const subs = new Subscribers<unknown>();
     const seen: string[] = [];
     subs.addDone(() => {
@@ -196,66 +188,45 @@ describe("Subscribers directed mutation tests", () => {
     expect(seen).toEqual(["ran"]);
   });
 
-  test("the warn message names the thrown error", () => {
+  test("a throwing transition subscriber is contained", () => {
     const subs = new Subscribers<unknown>();
-    subs.addChange(() => {
-      throw new Error("the specific boom");
+    subs.addTransition(() => {
+      throw new Error("boom");
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      subs.emitChange({ path: ["idle"], context: {}, regions: {} });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("the specific boom"))).toBe(true);
+    expect(() =>
+      subs.emitTransition({
+        event: { type: "GO" },
+        from: "a",
+        to: "b",
+        transitioned: true,
+      }),
+    ).not.toThrow();
   });
 
-  test("a throwing subscriber during addChange seed is skipped", () => {
+  test("a throwing subscriber during addChange seed is contained", () => {
     const subs = new Subscribers<unknown>();
     subs.seed({ path: ["idle"], context: {}, regions: {} });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
+    expect(() =>
       subs.addChange(() => {
         throw new Error("seed boom");
-      });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("seed boom"))).toBe(true);
+      }),
+    ).not.toThrow();
   });
 
-  test("a successful subscriber produces no warning", () => {
+  test("a successful subscriber leaves everything untouched", () => {
     const subs = new Subscribers<unknown>();
-    subs.addChange(() => {});
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      subs.emitChange({ path: ["idle"], context: {}, regions: {} });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns).toEqual([]);
+    let calls = 0;
+    subs.addChange(() => calls++);
+    expect(() => subs.emitChange({ path: ["idle"], context: {}, regions: {} })).not.toThrow();
+    expect(calls).toBe(1);
   });
 
-  test("a non-Error thrown value is reported as unknown error", () => {
+  test("a non-Error thrown value is contained too", () => {
     const subs = new Subscribers<unknown>();
     subs.addChange(() => {
       throw "string boom";
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      subs.emitChange({ path: ["idle"], context: {}, regions: {} });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("unknown error"))).toBe(true);
+    expect(() => subs.emitChange({ path: ["idle"], context: {}, regions: {} })).not.toThrow();
   });
 
   test("the first emit passes the snapshot as prev when nothing was seeded", () => {

@@ -8,28 +8,31 @@ import type { AnyStateRef } from "../src/state.ts";
 import type { Snapshot } from "../src/index.ts";
 
 describe("Actor error paths", () => {
-  test("initial state warning lists undeclared and declared states", () => {
+  test("initial state not declared throws with the full state list", () => {
     const a = state("a")();
     const b = state("b")();
     const stray = state("stray")();
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [a, b] as AnyStateRef[],
-        initial: stray as never,
-        setup: () => {},
-      });
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("stray"))).toBe(true);
-    expect(warns.some((w) => w.includes("a, b"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/stray/);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [a, b] as AnyStateRef[],
+          initial: stray as never,
+          setup: () => {},
+        }),
+    ).toThrow(/a, b/);
   });
 
-  test("unregistered region child logs a registry error", () => {
+  test("unregistered region child throws a registry error", () => {
     const idle = state("idle")();
     const stub: AnyActor = {
       state: state("s")(),
@@ -38,23 +41,19 @@ describe("Actor error paths", () => {
       send: () => {},
       snapshot: () => ({ path: ["s"], context: {}, regions: {} }),
       on: () => () => {},
+      recover: () => {},
       settled: async () => {},
     };
-    const errors: string[] = [];
-    const original = console.error;
-    console.error = (...args: unknown[]) => errors.push(String(args[0]));
-    try {
-      new Actor({
-        inputs: [],
-        states: [idle],
-        initial: idle,
-        regions: { child: stub },
-        setup: () => {},
-      });
-    } finally {
-      console.error = original;
-    }
-    expect(errors.some((e) => e.includes("not registered"))).toBe(true);
+    expect(
+      () =>
+        new Actor({
+          inputs: [],
+          states: [idle],
+          initial: idle,
+          regions: { child: stub },
+          setup: () => {},
+        }),
+    ).toThrow(/not registered/);
   });
 
   test("send is ignored entirely once final", () => {
@@ -96,7 +95,7 @@ describe("Actor error paths", () => {
     expect(() => actor.send(go.create())).not.toThrow();
   });
 
-  test("unhandled event warns and is dropped", () => {
+  test("unhandled external event is ignored silently", () => {
     const idle = state("idle")();
     const stray = event("STRAY")();
     const actor = new Actor({
@@ -105,15 +104,9 @@ describe("Actor error paths", () => {
       initial: idle,
       setup: () => {},
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.send(stray.create());
-    } finally {
-      console.warn = original;
-    }
-    expect(warns.some((w) => w.includes("no transition"))).toBe(true);
+    actor.send(stray.create());
+    expect(actor.state.name).toBe("idle");
+    expect(actor.snapshot().error).toBeUndefined();
   });
 
   test("emit loop halts after the internal budget is consumed", () => {
@@ -198,7 +191,7 @@ describe("Actor error paths", () => {
     const snap = actor.snapshot();
     expect(snap.path[0]).toBe("__error");
     expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.state.name).toBe("loading");
     expect(snap.error?.event.type).toBe("START");
     expect(snap.error?.error instanceof Error).toBe(true);
     if (snap.error) {
@@ -236,7 +229,7 @@ describe("Actor error paths", () => {
     expect(ranAny).toBe(false);
   });
 
-  test("a throwing effect records the last known good state (half-apply pin)", () => {
+  test("a throwing effect records the state being entered (post-step pin)", () => {
     const idle = state("idle")();
     const loading = state("loading")();
     const go = event("GO")();
@@ -255,7 +248,7 @@ describe("Actor error paths", () => {
     const snap = actor.snapshot();
     expect(snap.path[0]).toBe("__error");
     expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.state.name).toBe("loading");
     expect(snap.error?.event.type).toBe("GO");
   });
 
@@ -278,7 +271,7 @@ describe("Actor error paths", () => {
     expect(actor.snapshot().error?.context).toEqual({ n: 0 });
   });
 
-  test("a throwing subscriber is skipped and the machine survives", () => {
+  test("a throwing subscriber is contained and the machine survives", () => {
     const idle = state("idle")();
     const active = state("active")();
     const go = event("GO")();
@@ -291,22 +284,14 @@ describe("Actor error paths", () => {
         m.on(idle, go, () => ({ state: active }));
       },
     });
-    const warns: string[] = [];
-    const original = console.warn;
-    console.warn = (...args: unknown[]) => warns.push(String(args[0]));
-    try {
-      actor.on("change", () => {
-        throw new Error("sub boom");
-      });
-      actor.on("change", (snap) => seen.push(snap.path[0]));
-      expect(() => actor.send(go.create())).not.toThrow();
-    } finally {
-      console.warn = original;
-    }
-    expect(seen).toEqual(["idle", "active"]);
+    actor.on("change", () => {
+      throw new Error("sub boom");
+    });
+    actor.on("change", (snap) => seen.push(snap.path[0]));
+    expect(() => actor.send(go.create())).not.toThrow();
     expect(actor.snapshot().path[0]).toBe("active");
     expect(actor.snapshot().error).toBeUndefined();
-    expect(warns.some((w) => w.includes("subscriber threw"))).toBe(true);
+    expect(seen).toContain("active");
   });
 
   test("a throwing output handler routes to the error state", () => {
@@ -327,7 +312,7 @@ describe("Actor error paths", () => {
     });
     expect(() => actor.send(go.create())).not.toThrow();
     expect(actor.snapshot().error?.reason).toBe("output");
-    expect(actor.snapshot().error?.event.type).toBe("OUT");
+    expect(actor.snapshot()?.error?.event.type).toBe("OUT");
   });
 
   test("an invalid transition target routes to the error state", () => {
@@ -366,7 +351,7 @@ describe("Actor error paths", () => {
     const snap = actor.snapshot();
     expect(snap.path[0]).toBe("__error");
     expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("idle");
+    expect(snap.error?.state.name).toBe("loading");
     expect(snap.error?.error instanceof Error).toBe(true);
     if (snap.error) {
       expect((snap.error.error as Error).message).toBe("late boom");
@@ -418,7 +403,7 @@ describe("Actor error paths", () => {
     const norm = (s: Snapshot) => ({
       path: s.path,
       reason: s.error?.reason,
-      event: s.error?.event.type,
+      event: s?.error?.event.type,
       state: s.error?.state.name,
     });
 
@@ -442,5 +427,41 @@ describe("Actor error paths", () => {
 
     expect(aChanges).toEqual(bChanges);
     expect(norm(a.snapshot())).toEqual(norm(b.snapshot()));
+  });
+
+  test("recover resumes a dead machine from the caller-supplied state and context", () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    let ticks = 0;
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle, loading],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: loading }));
+        m.effect(loading, () => {
+          throw new Error("effect boom");
+        });
+        m.on(loading, tick, () => {
+          ticks++;
+          return { state: idle };
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().error?.reason).toBe("effect");
+    expect(() => actor.send(tick.create())).not.toThrow();
+    expect(ticks).toBe(0);
+
+    actor.recover({ state: loading, context: { n: 7 } });
+    expect(actor.snapshot().error).toBeUndefined();
+    expect(actor.snapshot().path[0]).toBe("loading");
+    expect(actor.context).toEqual({ n: 7 });
+    actor.send(tick.create());
+    expect(ticks).toBe(1);
+    expect(actor.snapshot().path[0]).toBe("idle");
   });
 });
