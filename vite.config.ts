@@ -234,4 +234,7 @@ export default defineConfig({
   run: {
     cache: true,
   },
+  test: {
+    execArgv: ["--expose-gc"],
+  },
 });
