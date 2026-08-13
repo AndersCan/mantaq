@@ -1,0 +1,298 @@
+---
+title: Request / Response
+description: One parent machine, many short-lived request handlers. Handlers reply through outputs.
+---
+
+## Why
+
+Checkout story continues. Shop fulfills orders. But fulfillment needs answers:
+shipping partner must confirm the order ships. The shop fires many requests at
+once. Each order gets its own request, its own timeout, and settles exactly
+once — answered or timed out.
+
+[Dynamic Children](/mantaq/sugar/dynamic-children/) gave workers that answered
+nothing. [Effect Helpers](/mantaq/sugar/effect-helpers/) gave the timeout. This
+page: workers answer back.
+
+## The request handler
+
+**What:** one short-lived machine per request. `idle` until told to work, then
+`pending` — armed with its own timeout — then one final state: `answered` or
+`timedOut`.
+
+**Why:** the child IS the bookkeeping. Exactly once, by construction: a final
+state accepts nothing more, and `autoReap` removes the settled handler.
+
+```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
+import { states, events, withTimeout } from "@mantaq/sugar";
+
+type Settled = {
+  orderId: string;
+  status: "answered" | "timedOut";
+  result?: string;
+};
+
+const request = event("request")<{ orderId: string; timeoutMs: number }>();
+const answer = event("answer")<{ orderId: string; result: string }>();
+const { timeout } = events("timeout");
+const requestSettled = event("requestSettled")<Settled>();
+
+const { idle, pending } = states("idle", "pending");
+const answered = state("answered")().final();
+const timedOut = state("timedOut")().final();
+
+function createRequestHandler(orderId: string, clock: Clock) {
+  return new Actor({
+    inputs: [request, answer],
+    internal: [timeout],
+    outputs: [requestSettled],
+    states: [idle, pending, answered, timedOut],
+    initial: idle,
+    clock,
+    context: { orderId, timeoutMs: 0 },
+    setup: (m) => {
+      m.on(idle, request, (event, opts) => {
+        opts.context.set({ ...opts.context.get(), timeoutMs: event.payload.timeoutMs });
+        return { state: pending };
+      });
+      m.effect(pending, (input) => {
+        withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
+      });
+      m.on(pending, answer, (event) => ({
+        state: answered,
+        emit: [
+          requestSettled.create({ orderId, status: "answered", result: event.payload.result }),
+        ],
+      }));
+      m.on(pending, timeout, () => ({
+        state: timedOut,
+        emit: [requestSettled.create({ orderId, status: "timedOut" })],
+      }));
+    },
+  });
+}
+```
+
+### The reply channel
+
+`requestSettled` is declared in **outputs**, not inputs. The handler emits it
+and walks away. It never learns who is listening.
+
+An emitted event routes one of two ways: it drives the handler's own
+transitions if it is declared internal or input, otherwise it is an **output**
+delivered to the wiring. That is the child→parent reporting mechanism.
+
+## The coordinator
+
+**What:** one parent machine owns an `ActorMap` of handlers, keyed by order id.
+It routes answers to the right handler and collects settlements. The bridge
+watches the parent's outputs and turns settlements into promises.
+
+**Why:** many requests in flight, keyed by correlation id. The map gives
+per-key routing for free. The parent is a thin coordinator — it does not track
+pending requests; the handler lifecycle does. Promises live at the boundary,
+never in the machine.
+
+```ts
+// Coordinator — same file as the handler above. `states`, `event`, `Settled`,
+// `request`, `answer`, `requestSettled`, `createRequestHandler` stay as
+// declared. New imports:
+import { RealClock } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
+import { ActorMap, onOutput } from "@mantaq/sugar";
+
+const { open } = states("open");
+
+const orderSettled = event("orderSettled")<Settled>();
+
+type ManagerContext = {
+  results: Record<string, Settled>;
+};
+
+export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs = 5000) {
+  const pending = new Map<string, Array<(settled: Settled) => void>>();
+
+  const manager = new Actor({
+    inputs: [request, answer, requestSettled],
+    outputs: [orderSettled],
+    states: [open],
+    initial: open,
+    clock,
+    context: { results: {} } as ManagerContext,
+    setup: (m) => {
+      m.on(open, request, (event, opts) => {
+        const s = opts.context.get();
+        if (s.results[event.payload.orderId]) {
+          const results = { ...s.results };
+          delete results[event.payload.orderId];
+          opts.context.set({ results });
+        }
+        requests.spawn(event.payload.orderId);
+        requests.send(event.payload.orderId, request.create(event.payload));
+        return {};
+      });
+      m.on(open, answer, (event) => {
+        requests.send(event.payload.orderId, answer.create(event.payload));
+        return {};
+      });
+      m.on(open, requestSettled, (event, opts) => {
+        const s = opts.context.get();
+        opts.context.set({ results: { ...s.results, [event.payload.orderId]: event.payload } });
+        return { emit: [orderSettled.create(event.payload)] };
+      });
+    },
+  });
+
+  const requests = new ActorMap(
+    (orderId) => {
+      const child = createRequestHandler(orderId, clock);
+      onOutput(child, (e) => {
+        if (requestSettled.is(e)) manager.send(e);
+      });
+      return child;
+    },
+    { autoReap: true },
+  );
+
+  onOutput(manager, (e) => {
+    if (!orderSettled.is(e)) return;
+    const resolvers = pending.get(e.payload.orderId);
+    if (!resolvers) return;
+    pending.delete(e.payload.orderId);
+    for (const resolve of resolvers) resolve(e.payload);
+  });
+
+  return {
+    manager,
+    requests,
+    request: (orderId: string, timeoutMs: number = defaultTimeoutMs) => {
+      manager.send(request.create({ orderId, timeoutMs }));
+    },
+    answer: (orderId: string, result: string) => {
+      manager.send(answer.create({ orderId, result }));
+    },
+    waitFor: (orderId: string): Promise<Settled> => {
+      const settled = manager.snapshot().context.results[orderId];
+      if (settled) return Promise.resolve(settled); // already done — idempotent
+      return new Promise((resolve) => {
+        const list = pending.get(orderId);
+        if (list) list.push(resolve);
+        else pending.set(orderId, [resolve]);
+      });
+    },
+  };
+}
+```
+
+Three transitions. `request` spawns a handler and hands it the request.
+`answer` forwards to the keyed handler. `requestSettled` — the handler's
+output, received as an input — records the result and re-emits it outward as
+`orderSettled`.
+
+### The wiring line
+
+`regions` wire child outputs into the parent automatically. `ActorMap`
+children do not — one explicit line in the factory does it:
+
+```ts
+onOutput(child, (e) => {
+  if (requestSettled.is(e)) manager.send(e);
+});
+```
+
+`onOutput` is sugar's public wrapper for the output seam — no internal import
+needed. The `is()` guard narrows the child's output to the parent's declared
+input. No cast, no parent pointer, no hand-rolled routing.
+
+[Dynamic Children](/mantaq/sugar/dynamic-children/) taught `reportTo` — the
+receiver carried in the child's context. It works. But context is state: a
+live actor reference in it is not serializable, and the child learns its
+listener's name. Declared outputs keep the child parent-agnostic — it emits
+`requestSettled` and walks away. One wiring line replaces the pointer. The map
+still wires nothing.
+
+## Auto-reap
+
+**What:** `{ autoReap: true }` removes a handler the moment it finishes.
+
+**Why:** a settled request leaves nothing behind. Answer arrives → handler
+final → done → removed. Timeout fires → same. No cleanup code.
+
+```ts
+manager.send(request.create({ orderId: "ord_1", timeoutMs: 1000 }));
+manager.send(answer.create({ orderId: "ord_1", result: "shipped" }));
+
+requests.size; // 0 — handler reported and reaped
+```
+
+Late answers are dropped the same way: the handler is gone, so forwarding is a
+no-op. Settles exactly once.
+
+## Timeout
+
+**What:** the handler owns its timeout. The `pending` effect arms it via
+`withTimeout`; leaving the state aborts it.
+
+**Why:** abort-safe. Answer wins → timer cancelled, nothing fires. Timeout wins
+→ handler settles `timedOut`. No dangling timers:
+
+```ts
+clock.advance(1001); // unanswered → timedOut
+clock.hasPending(); // false — the timer is gone
+```
+
+Each request has its own timeout (`timeoutMs` in the payload). Independent
+deadlines, one clock.
+
+## Await the result
+
+**What:** `waitFor(orderId)` returns a promise that resolves when that request
+settles.
+
+**Why:** the caller gets an `await`, the machine stays pure. No callbacks in
+events, no resolvers in context — the bridge in `createRequester` maps the
+`orderSettled` output to a resolver keyed by order id.
+
+`waitFor` reads the parent context first. A call after settlement resolves
+immediately — idempotent. Re-dispatching an order clears its settled result, so
+`waitFor` waits for the new attempt instead of returning stale data:
+
+```ts
+const requester = createRequester(clock, 1000);
+
+requester.request("ord_1", 1000);
+requester.answer("ord_1", "shipped");
+
+await requester.waitFor("ord_1"); // { orderId: "ord_1", status: "answered", result: "shipped" }
+await requester.waitFor("ord_1"); // same — already settled
+```
+
+## Testing
+
+The journey is deterministic on one `VirtualClock`. Advance fires due timers
+and settles everything synchronously:
+
+```ts
+it("times out an unanswered request", async () => {
+  const clock = new VirtualClock();
+  const requester = createRequester(clock, 1000);
+
+  const promise = requester.waitFor("ord_2");
+  requester.request("ord_2", 1000);
+  clock.advance(1001);
+
+  await expect(promise).resolves.toEqual({ orderId: "ord_2", status: "timedOut" });
+  expect(requester.requests.size).toBe(0);
+  expect(clock.hasPending()).toBe(false);
+});
+```
+
+Same clock, same inputs, same trace. The full journey — answer, timeout, late
+answer, duplicate answer, many in flight, re-dispatch — runs in
+`packages/examples/requestResponse.actor.test.ts`.
+
+:::tip[Next]
+[API Reference](/mantaq/reference/core/) — every option and method, exact signatures.
+:::

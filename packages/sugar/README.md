@@ -307,6 +307,29 @@ broadcast(map, { type: "ping" });
 
 Works with `ActorMap` or any object implementing `{ keys(): string[]; send(key, event): void }`.
 
+### `onOutput(actor, handler)`
+
+Route an actor's emitted outputs to a handler. `regions` auto-wire child
+outputs into the parent; ActorMap children do not — this is the public
+wrapper for that wiring seam, no internal import needed:
+
+```ts
+import { ActorMap, onOutput } from "@mantaq/sugar";
+
+const requests = new ActorMap(
+  (id) => {
+    const child = createHandler(id);
+    onOutput(child, (e) => {
+      if (result.is(e)) parent.send(e);
+    });
+    return child;
+  },
+  { autoReap: true },
+);
+```
+
+The `is()` guard narrows the output to the receiver's declared input.
+
 ### `tag(...stateRefs)`
 
 Group multiple `StateRef`s and test if a snapshot matches any of them. Useful for UI state grouping.
