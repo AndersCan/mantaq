@@ -27,25 +27,25 @@ Every narrative docs page may use ONLY these IDs. Reference pages exempt.
 
 ### States
 
-| ID                | Where                                               | Final?               |
-| ----------------- | --------------------------------------------------- | -------------------- |
-| `basicInfo`       | checkout form                                       | no                   |
-| `shippingAddress` | checkout form                                       | no                   |
-| `payment`         | checkout form                                       | no                   |
-| `submitting`      | checkout form                                       | no                   |
-| `success`         | checkout form                                       | **yes** (`.final()`) |
-| `error`           | checkout form                                       | no                   |
-| `scanning`        | fraud monitor (States page extension)               | no                   |
-| `cleared`         | fraud monitor (States page extension)               | no                   |
-| `flagged`         | fraud monitor (States page extension)               | no                   |
-| `tracking`        | analytics monitor (States page extension)           | no                   |
-| `open`            | shop (Dynamic Children page extension)              | no                   |
-| `picking`         | order worker (Dynamic Children page extension)      | no                   |
-| `shipped`         | order worker (Dynamic Children page extension)      | no                   |
-| `idle`            | request handler (Request / Response page extension) | no                   |
-| `pending`         | request handler (Request / Response page extension) | no                   |
-| `answered`        | request handler (Request / Response page extension) | **yes** (final)      |
-| `timedOut`        | request handler (Request / Response page extension) | **yes** (final)      |
+| ID                | Where                                                      | Final?               |
+| ----------------- | ---------------------------------------------------------- | -------------------- |
+| `basicInfo`       | checkout form                                              | no                   |
+| `shippingAddress` | checkout form                                              | no                   |
+| `payment`         | checkout form                                              | no                   |
+| `submitting`      | checkout form                                              | no                   |
+| `success`         | checkout form                                              | **yes** (`.final()`) |
+| `error`           | checkout form                                              | no                   |
+| `scanning`        | fraud monitor (States page extension)                      | no                   |
+| `cleared`         | fraud monitor (States page extension)                      | no                   |
+| `flagged`         | fraud monitor (States page extension)                      | no                   |
+| `tracking`        | analytics monitor (States page extension)                  | no                   |
+| `open`            | shop (Dynamic Children) + coordinator (Request / Response) | no                   |
+| `picking`         | order worker (Dynamic Children page extension)             | no                   |
+| `shipped`         | order worker (Dynamic Children page extension)             | no                   |
+| `idle`            | request handler (Request / Response page extension)        | no                   |
+| `pending`         | request handler (Request / Response page extension)        | no                   |
+| `answered`        | request handler (Request / Response page extension)        | **yes** (final)      |
+| `timedOut`        | request handler (Request / Response page extension)        | **yes** (final)      |
 
 ### Events
 
@@ -306,7 +306,7 @@ function createRequestHandler(orderId: string, clock) {
     states: [idle, pending, answered, timedOut],
     initial: idle,
     clock,
-    context: { orderId },
+    context: { orderId, timeoutMs: 0 },
     setup: (m) => {
       m.on(idle, request, (event, opts) => {
         opts.context.set({ ...opts.context.get(), timeoutMs: event.payload.timeoutMs });

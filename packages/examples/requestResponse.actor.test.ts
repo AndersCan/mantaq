@@ -33,11 +33,6 @@ type Settled = {
   result?: string;
 };
 
-type RequestHandlerContext = {
-  orderId: string;
-  timeoutMs?: number;
-};
-
 type ManagerContext = {
   results: Record<string, Settled>;
 };
@@ -61,14 +56,14 @@ function createRequestHandler(orderId: string, clock: Clock) {
     states: [idle, pending, answered, timedOut],
     initial: idle,
     clock,
-    context: { orderId } as RequestHandlerContext,
+    context: { orderId, timeoutMs: 0 },
     setup: (m) => {
       m.on(idle, request, (event, opts) => {
         opts.context.set({ ...opts.context.get(), timeoutMs: event.payload.timeoutMs });
         return { state: pending };
       });
       m.effect(pending, (input) => {
-        withTimeout(input.context.get().timeoutMs!, input, () => timeout.create());
+        withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
       });
       m.on(pending, answer, (event) => ({
         state: answered,
@@ -95,7 +90,13 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
     clock,
     context: { results: {} } as ManagerContext,
     setup: (m) => {
-      m.on(open, request, (event) => {
+      m.on(open, request, (event, opts) => {
+        const s = opts.context.get();
+        if (s.results[event.payload.orderId]) {
+          const results = { ...s.results };
+          delete results[event.payload.orderId];
+          opts.context.set({ results });
+        }
         requests.spawn(event.payload.orderId);
         requests.send(event.payload.orderId, request.create(event.payload));
         return {};
@@ -289,6 +290,30 @@ describe("request / response", () => {
 
     clock.advance(501);
     await expect(promise).resolves.toEqual({ orderId: "ord_6", status: "timedOut" });
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  it("re-dispatch supersedes a settled result — waitFor waits for the new attempt", async () => {
+    const clock = new VirtualClock();
+    const requester = createRequester(clock, 1000);
+
+    requester.request("ord_7", 1000);
+    requester.answer("ord_7", "first");
+    await expect(requester.waitFor("ord_7")).resolves.toEqual({
+      orderId: "ord_7",
+      status: "answered",
+      result: "first",
+    });
+
+    requester.request("ord_7", 1000); // re-dispatch clears the settled result
+    const second = requester.waitFor("ord_7");
+    requester.answer("ord_7", "second");
+
+    await expect(second).resolves.toEqual({
+      orderId: "ord_7",
+      status: "answered",
+      result: "second",
+    });
     expect(clock.hasPending()).toBe(false);
   });
 });

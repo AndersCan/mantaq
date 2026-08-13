@@ -51,14 +51,14 @@ function createRequestHandler(orderId: string, clock: Clock) {
     states: [idle, pending, answered, timedOut],
     initial: idle,
     clock,
-    context: { orderId } as { orderId: string; timeoutMs?: number },
+    context: { orderId, timeoutMs: 0 },
     setup: (m) => {
       m.on(idle, request, (event, opts) => {
         opts.context.set({ ...opts.context.get(), timeoutMs: event.payload.timeoutMs });
         return { state: pending };
       });
       m.effect(pending, (input) => {
-        withTimeout(input.context.get().timeoutMs!, input, () => timeout.create());
+        withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
       });
       m.on(pending, answer, (event) => ({
         state: answered,
@@ -96,7 +96,11 @@ pending requests; the handler lifecycle does. Promises live at the boundary,
 never in the machine.
 
 ```ts
+// Coordinator — same file as the handler above. `states`, `event`, `Settled`,
+// `request`, `answer`, `requestSettled`, `createRequestHandler` stay as
+// declared. New imports:
 import { RealClock } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import { ActorMap } from "@mantaq/sugar";
 import { setOutputHandler } from "@mantaq/core/internal";
 
@@ -119,7 +123,13 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
     clock,
     context: { results: {} } as ManagerContext,
     setup: (m) => {
-      m.on(open, request, (event) => {
+      m.on(open, request, (event, opts) => {
+        const s = opts.context.get();
+        if (s.results[event.payload.orderId]) {
+          const results = { ...s.results };
+          delete results[event.payload.orderId];
+          opts.context.set({ results });
+        }
         requests.spawn(event.payload.orderId);
         requests.send(event.payload.orderId, request.create(event.payload));
         return {};
@@ -246,7 +256,8 @@ events, no resolvers in context — the bridge in `createRequester` maps the
 `orderSettled` output to a resolver keyed by order id.
 
 `waitFor` reads the parent context first. A call after settlement resolves
-immediately — idempotent:
+immediately — idempotent. Re-dispatching an order clears its settled result, so
+`waitFor` waits for the new attempt instead of returning stale data:
 
 ```ts
 const requester = createRequester(clock, 1000);
