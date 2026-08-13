@@ -21,18 +21,21 @@ Prefix match. Checks top-level state name first, then descends only through regi
 
 ---
 
-## `states(...names)`
+## `states(...entries)`
 
 ```ts
-function states<T extends string>(...names: T[]): { [K in T]: StateRef<K> };
+function states(
+  ...entries: Array<string | { name: string; final?: boolean }>
+): Record<string, StateRef>;
 ```
 
-Batch state creation.
+Batch state creation. Entries are strings, or objects with `final: true` for a
+terminal state. `success` is final right at creation — no `.final()` call.
 
 ```ts
-const s = states("basicInfo", "payment", "success", "error");
+const s = states("basicInfo", "payment", { name: "success", final: true }, "error");
 s.basicInfo.name; // "basicInfo"
-s.success.final(); // isFinal = true
+s.success.isFinal; // true
 ```
 
 ---
@@ -46,8 +49,8 @@ function events<T extends string>(...names: T[]): { [K in T]: EventRef<K> };
 Batch event creation.
 
 ```ts
-const e = events("SUBMIT_BASIC_INFO", "SUBMIT_PAYMENT", "BACK");
-e.SUBMIT_BASIC_INFO.create(); // { type: "SUBMIT_BASIC_INFO" }
+const e = events("submitBasicInfo", "submitPayment", "back");
+e.submitBasicInfo.create(); // { type: "submitBasicInfo" }
 ```
 
 ---
@@ -69,28 +72,33 @@ busy.has(checkout.snapshot()); // true if paying or submitting
 
 ## `ActorMap`
 
-Dynamic child actor registry.
+Keyed registry of one actor type.
 
 ```ts
-const map = new ActorMap(shop);
+const map = new ActorMap(createOrderWorker);
 
-map.spawn("ord_1", () => createOrderWorker("ord_1"));
+map.spawn("ord_1");
+map.spawn("ord_2");
 map.send("ord_1", ship.create());
 map.kill("ord_1");
 ```
 
-| Method                 | What                                   |
-| ---------------------- | -------------------------------------- |
-| `spawn(key, factory)`  | Make child. Replace if exists.         |
-| `ensure(key, factory)` | No-op if exists.                       |
-| `send(key, event)`     | Send to child.                         |
-| `kill(key)`            | Abort. Remove.                         |
-| `has(key)`             | Exists?                                |
-| `keys()`               | List keys.                             |
-| `snapshot(key)`        | Child snapshot. `undefined` if absent. |
-| `size`                 | Count.                                 |
+`new ActorMap(factory, options?)` — `factory` builds the actor, receiving the
+key: `(id: string) => Actor`. Every `spawn(key)` creates a fresh instance of
+the same actor, keyed by id. `options: { autoReap? }` — `true` removes a child
+once it reaches a final state (or dies into `__error`). Off by default;
+completed children linger until `kill`.
 
-Parent constructor → child outputs auto-forward.
+| Method             | What                                   |
+| ------------------ | -------------------------------------- |
+| `spawn(key)`       | Fresh instance via the factory.        |
+| `ensure(key)`      | No-op if exists.                       |
+| `send(key, event)` | Send to child.                         |
+| `kill(key)`        | Abort. Remove.                         |
+| `has(key)`         | Exists?                                |
+| `keys()`           | List keys.                             |
+| `snapshot(key)`    | Child snapshot. `undefined` if absent. |
+| `size`             | Count.                                 |
 
 ---
 

@@ -105,23 +105,25 @@ describe("sugar re-exports", () => {
 
   describe("ActorMap (from sugar barrel)", () => {
     test("spawn and keys", () => {
-      const map = new ActorMap();
       const off = state("off")();
       const on = state("on")();
       const toggle = event("toggle")();
-      const actor = new Actor({
-        inputs: [toggle],
-        outputs: [],
-        internal: [],
-        context: {},
-        states: [off, on],
-        initial: off,
-        setup: (m) => {
-          m.on(off, toggle, () => ({ state: on }));
-          m.on(on, toggle, () => ({ state: off }));
-        },
-      });
-      map.spawn("a", () => actor);
+      const map = new ActorMap(
+        () =>
+          new Actor({
+            inputs: [toggle],
+            outputs: [],
+            internal: [],
+            context: {},
+            states: [off, on],
+            initial: off,
+            setup: (m) => {
+              m.on(off, toggle, () => ({ state: on }));
+              m.on(on, toggle, () => ({ state: off }));
+            },
+          }),
+      );
+      map.spawn("a");
       expect(map.keys()).toEqual(["a"]);
     });
   });

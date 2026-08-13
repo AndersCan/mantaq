@@ -9,7 +9,7 @@ The checkout machine from [Context](/mantaq/core-concepts/context/). Full flow:
 
 ```
 basicInfo → shippingAddress → payment → submitting → success (final)
-                  ↕ (BACK) ↕                  ↕ (BACK)
+                  ↕ (back) ↕                  ↕ (back)
                                            error
 ```
 
@@ -32,20 +32,20 @@ const submitting = state("submitting")();
 const success = state("success")().final();
 const error = state("error")();
 
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")<{
+const submitBasicInfo = event("submitBasicInfo")<{
   email: string;
   name: string;
 }>();
-const submitShipping = event("SUBMIT_SHIPPING")<{
+const submitShipping = event("submitShipping")<{
   street: string;
   city: string;
   zip: string;
 }>();
-const submitPayment = event("SUBMIT_PAYMENT")<{ cardNumber: string }>();
-const back = event("BACK")();
-const paymentOk = event("PAYMENT_OK")<{ orderId: string }>();
-const paymentFail = event("PAYMENT_FAIL")<{ reason: string }>();
-const submittingDone = event("SUBMITTING_DONE")();
+const submitPayment = event("submitPayment")<{ cardNumber: string }>();
+const back = event("back")();
+const paymentOk = event("paymentOk")<{ orderId: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+const submittingDone = event("submittingDone")();
 
 function createCheckoutActor() {
   return new Actor({
@@ -112,7 +112,7 @@ Data lands in context. Step by step.
 
 ### Assert Back Navigation
 
-`BACK` in `payment` returns to `shippingAddress`:
+`back` in `payment` returns to `shippingAddress`:
 
 ```ts
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
@@ -139,7 +139,7 @@ expect(checkout.snapshot().done).toBe(true);
 The machine in production charges a card via a promise effect. For tests,
 control time instead. Give the actor a `VirtualClock`, then advance.
 
-Charge hangs → the 800ms timeout fires → `SUBMITTING_DONE` → `success`:
+Charge hangs → the 800ms timeout fires → `submittingDone` → `success`:
 
 ```ts
 const clock = new VirtualClock();
@@ -176,7 +176,7 @@ Deterministic. No fake timers. No sleeps. Same inputs, same trace.
 
 ### Assert Promise Effects with settled
 
-Charge resolves → `PAYMENT_OK` emitted → `success`. The emit happens in a
+Charge resolves → `paymentOk` emitted → `success`. The emit happens in a
 microtask. `settled()` waits for it:
 
 ```ts
@@ -214,7 +214,7 @@ expect(checkout.snapshot().path[0]).toBe("success");
 ## Key Takeaways
 
 - **States are nodes** — `state("basicInfo")()` creates a node in the graph
-- **Events are edges** — `event("SUBMIT_BASIC_INFO")()` defines a possible transition
+- **Events are edges** — `event("submitBasicInfo")()` defines a possible transition
 - **Transitions are the graph** — `(state, event) → newState` maps edges
 - **Context is memory** — survives transitions, holds accumulated data
 - **Effects are side effects** — run on state entry, abort on exit

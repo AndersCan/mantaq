@@ -42,7 +42,17 @@ only IDs from it.
 5. **Full blocks when needed.** When a page extends the machine, show the
    complete updated machine where the reader needs it. `// ...unchanged` for
    untouched parts. Never force a mental merge of scattered fragments.
-6. **Caveman voice.** Short. Direct. No filler. Technical terms exact. Matches
+6. **What and why, first.** Every page and every feature section opens by
+   answering both, before any code:
+   - **What** — the thing, in one line. What is it? What does it do?
+   - **Why** — the problem it solves and when to reach for it. Why does it
+     exist? What breaks without it? What is it _not_ (the misreadings)?
+     A reader must be able to say what a feature is and why it exists after the
+     first paragraph, without decoding the API. Naming and signatures live below
+     the what/why, never above. If the signature invites a wrong reading, the
+     what/why must preempt it — e.g. ActorMap: "keyed registry of one actor
+     type, not a collection of things."
+7. **Caveman voice.** Short. Direct. No filler. Technical terms exact. Matches
    existing docs (`index.mdx` note).
 
 ## Steps

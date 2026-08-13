@@ -46,8 +46,8 @@ const basicInfo = state("basicInfo")();
 const payment = state("payment")();
 const success = state("success")().final();
 
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")();
-const submitPayment = event("SUBMIT_PAYMENT")();
+const submitBasicInfo = event("submitBasicInfo")();
+const submitPayment = event("submitPayment")();
 
 const checkout = new Actor({
   inputs: [submitBasicInfo, submitPayment],

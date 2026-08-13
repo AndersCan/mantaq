@@ -49,7 +49,7 @@ see state flow, not read walls. Gets frustrated by invisible state.
 - Transition effects not explained ("this leads to success" missing).
 - Code block with no plain-language walk-through.
 - Back navigation (`BACK` handling) unexplained.
-- Error path invisible (how does `PAYMENT_FAIL` reach `error`?).
+- Error path invisible (how does `paymentFail` reach `error`?).
 
 ## Pass 3 — Library Builder (Persona 3)
 

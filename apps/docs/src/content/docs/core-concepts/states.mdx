@@ -77,7 +77,7 @@ const scanning = state("scanning")();
 const cleared = state("cleared")();
 const flagged = state("flagged")();
 
-const scanDone = event("SCAN_DONE")<{ risky: boolean }>();
+const scanDone = event("scanDone")<{ risky: boolean }>();
 
 const fraudMonitor = new Actor({
   inputs: [scanDone],

@@ -262,7 +262,7 @@ describe("abort-tracker", () => {
 });
 
 describe("runEffects", () => {
-  test("does not run effects for final states even when declared", () => {
+  test("runs effects for final states when declared", () => {
     const seen: string[] = [];
     const result = runEffects({
       effects: {
@@ -286,7 +286,7 @@ describe("runEffects", () => {
       onError: () => {},
     });
     expect(result.pending).toEqual([]);
-    expect(seen).toEqual([]);
+    expect(seen).toEqual(["ran"]);
   });
 
   test("returns no pending for an empty effect list", () => {
@@ -306,6 +306,84 @@ describe("runEffects", () => {
       onError: () => {},
     });
     expect(result.pending).toEqual([]);
+  });
+});
+
+describe("Actor state entry directed mutation tests", () => {
+  test("initial state effects run at construction with the synthetic __init event", () => {
+    const idle = state("idle")();
+    const done = state("done")().final();
+    const tick = event("TICK")();
+    let sawEvent: InternalEvent | undefined;
+    const actor = new Actor({
+      inputs: [],
+      internal: [tick],
+      states: [idle, done],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, ({ event: e, emit }) => {
+          sawEvent = e;
+          emit(tick.create());
+        });
+        m.on(idle, tick, () => ({ state: done }));
+      },
+    });
+    expect(sawEvent?.type).toBe("__init");
+    expect(actor.snapshot().path[0]).toBe("done");
+    expect(actor.snapshot().done).toBe(true);
+  });
+
+  test("initial state effect arms a timer that completes the machine at the deadline", () => {
+    const clock = new VirtualClock();
+    const idle = state("idle")();
+    const done = state("done")().final();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      clock,
+      inputs: [],
+      internal: [tick],
+      states: [idle, done],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, ({ clock: c, emit }) => {
+          c.setTimeout(100, () => emit(tick.create()));
+        });
+        m.on(idle, tick, () => ({ state: done }));
+      },
+    });
+    expect(actor.snapshot().path[0]).toBe("idle");
+    clock.advance(99);
+    expect(actor.snapshot().path[0]).toBe("idle");
+    clock.advance(1);
+    expect(actor.snapshot().path[0]).toBe("done");
+  });
+
+  test("emit after the effect aborts is a silent no-op", () => {
+    const idle = state("idle")();
+    const running = state("running")();
+    const go = event("GO")();
+    const stop = event("STOP")();
+    const out = event("OUT")();
+    const received: string[] = [];
+    let savedEmit: ((e: InternalEvent) => void) | undefined;
+    const actor = new Actor({
+      inputs: [go, stop],
+      outputs: [out],
+      states: [idle, running],
+      initial: idle,
+      setup: (m) => {
+        m.effect(running, ({ emit }) => {
+          savedEmit = emit;
+        });
+        m.on(idle, go, () => ({ state: running }));
+        m.on(running, stop, () => ({ state: idle }));
+      },
+    });
+    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.send(go.create());
+    actor.send(stop.create());
+    savedEmit?.(out.create());
+    expect(received).toEqual([]);
   });
 });
 
@@ -1236,7 +1314,7 @@ describe("Actor error state directed mutation tests", () => {
     }
   });
 
-  test("death emits exactly one change and no done", () => {
+  test("death emits exactly one change and one done", () => {
     const idle = state("idle")();
     const active = state("active")();
     const go = event("GO")();
@@ -1258,7 +1336,7 @@ describe("Actor error state directed mutation tests", () => {
     changes = 0;
     actor.send(go.create());
     expect(changes).toBe(1);
-    expect(dones).toBe(0);
+    expect(dones).toBe(1);
   });
 
   test("an async rejection kills the machine once the run settles", async () => {

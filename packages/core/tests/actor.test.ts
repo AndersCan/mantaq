@@ -1,5 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
-import { Actor, state, event } from "../src/index.ts";
+import { Actor, state, event, VirtualClock } from "../src/index.ts";
 import { setOutputHandler } from "../src/internal-registry.ts";
 
 describe("Actor dispatch resolution", () => {
@@ -73,6 +73,144 @@ describe("Actor dispatch resolution", () => {
 });
 
 describe("Actor effects", () => {
+  test("initial state effects run at construction", () => {
+    const idle = state("idle")();
+    const done = state("done")().final();
+    const tick = event("TICK")();
+    const clock = new VirtualClock();
+    let effectRuns = 0;
+    const actor = new Actor({
+      clock,
+      inputs: [],
+      internal: [tick],
+      states: [idle, done],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, ({ event, emit }) => {
+          effectRuns++;
+          expect(event.type).toBe("__init");
+          emit(tick.create());
+        });
+        m.on(idle, tick, () => ({ state: done }));
+      },
+    });
+    expect(effectRuns).toBe(1);
+    expect(actor.snapshot().path[0]).toBe("done");
+    expect(actor.snapshot().done).toBe(true);
+  });
+
+  test("initial state effects arm timers deterministically", () => {
+    const idle = state("idle")();
+    const done = state("done")().final();
+    const tick = event("TICK")();
+    const clock = new VirtualClock();
+    const actor = new Actor({
+      clock,
+      inputs: [],
+      internal: [tick],
+      states: [idle, done],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, ({ emit }) => {
+          clock.setTimeout(500, () => emit(tick.create()), {
+            signal: new AbortController().signal,
+          });
+        });
+        m.on(idle, tick, () => ({ state: done }));
+      },
+    });
+    expect(actor.snapshot().path[0]).toBe("idle");
+    clock.advance(499);
+    expect(actor.snapshot().path[0]).toBe("idle");
+    clock.advance(1);
+    expect(actor.snapshot().path[0]).toBe("done");
+    expect(clock.hasPending()).toBe(false);
+  });
+
+  test("effects run on final state entry", () => {
+    const pending = state("pending")();
+    const done = state("done")().final();
+    const finish = event("FINISH")();
+    let finalEffectRuns = 0;
+    const actor = new Actor({
+      inputs: [finish],
+      states: [pending, done],
+      initial: pending,
+      setup: (m) => {
+        m.on(pending, finish, () => ({ state: done }));
+        m.effect(done, () => {
+          finalEffectRuns++;
+        });
+      },
+    });
+    actor.send(finish.create());
+    expect(finalEffectRuns).toBe(1);
+    expect(actor.snapshot().done).toBe(true);
+  });
+
+  test("final state effects can emit outputs to a parent", () => {
+    const childIdle = state("cidle")();
+    const childDone = state("cdone")().final();
+    const childGo = event("CGO")();
+    const childOut = event("COUT")();
+    const parentIdle = state("pidle")();
+    const parentActive = state("pactive")();
+
+    const child = new Actor({
+      inputs: [childGo],
+      outputs: [childOut],
+      states: [childIdle, childDone],
+      initial: childIdle,
+      setup: (m) => {
+        m.on(childIdle, childGo, () => ({ state: childDone }));
+        m.effect(childDone, ({ emit }) => emit(childOut.create()));
+      },
+    });
+
+    const parent = new Actor({
+      inputs: [childOut],
+      states: [parentIdle, parentActive],
+      initial: parentIdle,
+      regions: { child },
+      setup: (m) => {
+        m.on(parentIdle, childOut, () => ({ state: parentActive }));
+      },
+    });
+
+    child.send(childGo.create());
+    expect(child.snapshot().done).toBe(true);
+    expect(parent.snapshot().path[0]).toBe("pactive");
+  });
+
+  test("emit after abort is a silent no-op", () => {
+    const idle = state("idle")();
+    const running = state("running")();
+    const go = event("GO")();
+    const stop = event("STOP")();
+    const out = event("OUT")();
+    const received: string[] = [];
+    let savedEmit: ((e: { type: string; payload?: unknown }) => void) | undefined;
+    const actor = new Actor({
+      inputs: [go, stop],
+      outputs: [out],
+      states: [idle, running],
+      initial: idle,
+      setup: (m) => {
+        m.effect(running, ({ emit }) => {
+          savedEmit = emit;
+        });
+        m.on(idle, go, () => ({ state: running }));
+        m.on(running, stop, () => ({ state: idle }));
+      },
+    });
+    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.send(go.create());
+    expect(savedEmit).toBeDefined();
+    actor.send(stop.create());
+    savedEmit!(out.create());
+    expect(received).toEqual([]);
+  });
+
   test("transition aborts the running effect", () => {
     const idle = state("idle")();
     const running = state("running")();

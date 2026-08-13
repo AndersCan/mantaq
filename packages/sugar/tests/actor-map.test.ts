@@ -1,8 +1,9 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, event, state, VirtualClock } from "@mantaq/core";
+import type { AnyActor } from "@mantaq/core";
+import { setOutputHandler } from "@mantaq/core/internal";
 import { ActorMap } from "../src/actors/actor-map.ts";
 import { broadcast } from "../src/transitions/broadcast.ts";
-import { matches } from "../src/actors/matches.ts";
 
 describe("ActorMap", () => {
   function makeActor(id: string) {
@@ -14,7 +15,7 @@ describe("ActorMap", () => {
       inputs: [toggle],
       outputs: [output],
       internal: [],
-      context: {},
+      context: { id },
       states: [off, on],
       initial: off,
       setup: (m) => {
@@ -25,73 +26,76 @@ describe("ActorMap", () => {
     return { actor, toggle, output, off, on };
   }
 
+  const actorMap = () => new ActorMap((id) => makeActor(id).actor);
+
   test("spawn adds child", () => {
-    const map = new ActorMap();
-    const { actor } = makeActor("a");
-    map.spawn("a", () => actor);
+    const map = actorMap();
+    map.spawn("a");
     expect(map.keys()).toEqual(["a"]);
   });
 
-  test("spawn multiple children", () => {
-    const map = new ActorMap();
-    map.spawn("a", () => makeActor("a").actor);
-    map.spawn("b", () => makeActor("b").actor);
+  test("spawn creates a fresh actor per key", () => {
+    const map = actorMap();
+    map.spawn("a");
+    map.spawn("b");
     expect(map.keys().sort()).toEqual(["a", "b"]);
+    expect(map.snapshot("a")?.context).toEqual({ id: "a" });
+    expect(map.snapshot("b")?.context).toEqual({ id: "b" });
   });
 
   test("send transitions child state", () => {
-    const map = new ActorMap();
-    const { actor, toggle } = makeActor("a");
-    map.spawn("a", () => actor);
-    expect(matches(actor, "off")).toBe(true);
+    const map = actorMap();
+    const { toggle } = makeActor("a");
+    map.spawn("a");
+    expect(map.snapshot("a")?.path).toEqual(["off"]);
     map.send("a", toggle.create());
-    expect(matches(actor, "on")).toBe(true);
+    expect(map.snapshot("a")?.path).toEqual(["on"]);
   });
 
   test("kill removes child", () => {
-    const map = new ActorMap();
-    map.spawn("a", () => makeActor("a").actor);
+    const map = actorMap();
+    map.spawn("a");
     expect(map.keys()).toEqual(["a"]);
     map.kill("a");
     expect(map.keys()).toEqual([]);
   });
 
   test("size returns number of children", () => {
-    const map = new ActorMap();
+    const map = actorMap();
     expect(map.size).toBe(0);
-    map.spawn("a", () => makeActor("a").actor);
+    map.spawn("a");
     expect(map.size).toBe(1);
-    map.spawn("b", () => makeActor("b").actor);
+    map.spawn("b");
     expect(map.size).toBe(2);
     map.kill("a");
     expect(map.size).toBe(1);
   });
 
   test("has returns true for existing key", () => {
-    const map = new ActorMap();
-    map.spawn("a", () => makeActor("a").actor);
+    const map = actorMap();
+    map.spawn("a");
     expect(map.has("a")).toBe(true);
   });
 
   test("has returns false for missing key", () => {
-    const map = new ActorMap();
+    const map = actorMap();
     expect(map.has("a")).toBe(false);
   });
 
   test("has returns false after kill", () => {
-    const map = new ActorMap();
-    map.spawn("a", () => makeActor("a").actor);
+    const map = actorMap();
+    map.spawn("a");
     map.kill("a");
     expect(map.has("a")).toBe(false);
   });
 
   test("send to non-existent key does not throw", () => {
-    const map = new ActorMap();
+    const map = actorMap();
     expect(() => map.send("nonexistent", { type: "test" })).not.toThrow();
   });
 
   test("kill non-existent key does not throw", () => {
-    const map = new ActorMap();
+    const map = actorMap();
     expect(() => map.kill("nonexistent")).not.toThrow();
   });
 
@@ -102,25 +106,25 @@ describe("ActorMap", () => {
     const on = state("on")();
     let effectRan = false;
 
-    const map = new ActorMap();
-    map.spawn("a", () => {
-      const a = new Actor({
-        inputs: [toggle],
-        outputs: [],
-        internal: [],
-        context: {},
-        clock,
-        states: [off, on],
-        initial: off,
-        setup: (m) => {
-          m.on(off, toggle, () => ({ state: on }));
-          m.effect(on, () => {
-            effectRan = true;
-          });
-        },
-      });
-      return a;
-    });
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [toggle],
+          outputs: [],
+          internal: [],
+          context: {},
+          clock,
+          states: [off, on],
+          initial: off,
+          setup: (m) => {
+            m.on(off, toggle, () => ({ state: on }));
+            m.effect(on, () => {
+              effectRan = true;
+            });
+          },
+        }),
+    );
+    map.spawn("a");
 
     map.send("a", toggle.create());
     expect(effectRan).toBe(true);
@@ -132,56 +136,174 @@ describe("ActorMap", () => {
   });
 
   test("ensure spawns if not exists", () => {
-    const map = new ActorMap();
-    const { actor } = makeActor("a");
     let factoryCalls = 0;
-    map.ensure("a", () => {
+    const map = new ActorMap((id) => {
       factoryCalls++;
-      return actor;
+      return makeActor(id).actor;
     });
+    map.ensure("a");
     expect(factoryCalls).toBe(1);
     expect(map.keys()).toEqual(["a"]);
   });
 
   test("ensure does not re-spawn existing child", () => {
-    const map = new ActorMap();
-    const { actor } = makeActor("a");
-    map.spawn("a", () => actor);
     let factoryCalls = 0;
-    map.ensure("a", () => {
+    const map = new ActorMap((id) => {
       factoryCalls++;
-      return makeActor("a").actor;
+      return makeActor(id).actor;
     });
-    expect(factoryCalls).toBe(0);
+    map.spawn("a");
+    expect(factoryCalls).toBe(1);
+    map.ensure("a");
+    expect(factoryCalls).toBe(1);
     expect(map.keys()).toEqual(["a"]);
   });
 
   test("snapshot returns child snapshot", () => {
-    const map = new ActorMap();
-    const { actor } = makeActor("a");
-    map.spawn("a", () => actor);
+    const map = actorMap();
+    map.spawn("a");
     const snap = map.snapshot("a");
     expect(snap).toBeDefined();
     expect(snap!.path).toEqual(["off"]);
   });
 
   test("snapshot returns undefined for missing key", () => {
-    const map = new ActorMap();
+    const map = actorMap();
     expect(map.snapshot("nonexistent")).toBeUndefined();
   });
 
-  test("broadcast sends event to all children", () => {
-    const map = new ActorMap();
-    const { actor: a1, toggle } = makeActor("a");
-    const { actor: a2 } = makeActor("b");
-    map.spawn("a", () => a1);
-    map.spawn("b", () => a2);
-    broadcast(map, toggle.create());
-    expect(matches(a1, "on")).toBe(true);
-    expect(matches(a2, "on")).toBe(true);
+  test("re-spawn replaces the child with a fresh instance", () => {
+    const map = actorMap();
+    map.spawn("a");
+    const first = map.snapshot("a");
+    map.spawn("a");
+    const second = map.snapshot("a");
+    expect(map.keys()).toEqual(["a"]);
+    expect(first?.context).toEqual({ id: "a" });
+    expect(second?.context).toEqual({ id: "a" });
   });
 
-  test("child output wired to parent", () => {
+  test("autoReap is off by default — completed child lingers", () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")().final();
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [toggle],
+          context: {},
+          states: [off, on],
+          initial: off,
+          setup: (m) => m.on(off, toggle, () => ({ state: on })),
+        }),
+    );
+    map.spawn("a");
+    map.send("a", toggle.create());
+    expect(map.has("a")).toBe(true);
+    expect(map.size).toBe(1);
+  });
+
+  test("autoReap removes a child that reaches a final state", () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")().final();
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [toggle],
+          context: {},
+          states: [off, on],
+          initial: off,
+          setup: (m) => m.on(off, toggle, () => ({ state: on })),
+        }),
+      { autoReap: true },
+    );
+    map.spawn("a");
+    expect(map.size).toBe(1);
+    map.send("a", toggle.create());
+    expect(map.has("a")).toBe(false);
+    expect(map.size).toBe(0);
+  });
+
+  test("autoReap removes a child that dies into __error", () => {
+    const go = event("go")();
+    const off = state("off")();
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [go],
+          context: {},
+          states: [off],
+          initial: off,
+          setup: (m) =>
+            m.on(off, go, () => {
+              throw new Error("boom");
+            }),
+        }),
+      { autoReap: true },
+    );
+    map.spawn("a");
+    map.send("a", go.create());
+    expect(map.has("a")).toBe(false);
+  });
+
+  test("autoReap reaps a child already final at spawn", () => {
+    const init = state("init")();
+    const done = state("done")().final();
+    const tick = event("TICK")();
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [],
+          internal: [tick],
+          context: {},
+          states: [init, done],
+          initial: init,
+          setup: (m) => {
+            m.effect(init, ({ emit }) => emit(tick.create()));
+            m.on(init, tick, () => ({ state: done }));
+          },
+        }),
+      { autoReap: true },
+    );
+    map.spawn("a");
+    expect(map.size).toBe(0);
+  });
+
+  test("re-spawn after autoReap reaps only the new child", () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")().final();
+    const map = new ActorMap(
+      () =>
+        new Actor({
+          inputs: [toggle],
+          context: {},
+          states: [off, on],
+          initial: off,
+          setup: (m) => m.on(off, toggle, () => ({ state: on })),
+        }),
+      { autoReap: true },
+    );
+    map.spawn("a");
+    map.send("a", toggle.create());
+    expect(map.has("a")).toBe(false);
+    map.spawn("a");
+    map.send("a", toggle.create());
+    expect(map.has("a")).toBe(false);
+  });
+
+  test("broadcast sends event to all children", () => {
+    const map = actorMap();
+    const { toggle } = makeActor("a");
+    map.spawn("a");
+    map.spawn("b");
+    broadcast(map, toggle.create());
+    expect(map.snapshot("a")?.path).toEqual(["on"]);
+    expect(map.snapshot("b")?.path).toEqual(["on"]);
+  });
+
+  test("factory wires child output to a receiver", () => {
     const childOutput = event("childOutput")<{ data: string }>();
     const childOff = state("childOff")();
     const childOn = state("childOn")();
@@ -201,27 +323,27 @@ describe("ActorMap", () => {
       },
     });
 
-    const map = new ActorMap(parent);
-    map.spawn(
-      "child",
-      () =>
-        new Actor({
-          inputs: [go],
-          outputs: [childOutput],
-          internal: [],
-          context: {},
-          states: [childOff, childOn],
-          initial: childOff,
-          setup: (m) => {
-            m.on(childOff, go, () => ({
-              state: childOn,
-              emit: [childOutput.create({ data: "hello" })],
-            }));
-          },
-        }),
-    );
+    const map = new ActorMap(() => {
+      const child = new Actor({
+        inputs: [go],
+        outputs: [childOutput],
+        internal: [],
+        context: {},
+        states: [childOff, childOn],
+        initial: childOff,
+        setup: (m) => {
+          m.on(childOff, go, () => ({
+            state: childOn,
+            emit: [childOutput.create({ data: "hello" })],
+          }));
+        },
+      });
+      setOutputHandler(child, (event) => (parent as AnyActor).send(event));
+      return child;
+    });
+    map.spawn("child");
 
     map.send("child", go.create());
-    expect(matches(parent, "parentDone")).toBe(true);
+    expect(parent.snapshot().path[0]).toBe("parentDone");
   });
 });

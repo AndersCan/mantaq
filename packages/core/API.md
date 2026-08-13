@@ -171,7 +171,7 @@ interface Snapshot<C = unknown> {
 }
 ```
 
-`done` and `error` are mutually exclusive: `done` means the machine completed successfully, `error` means it died. The machine is dead either way — sends are ignored.
+`done` and `error` are not mutually exclusive: the machine sets `error` when it dies, and the error state is itself terminal, so `done` is also set. `done` alone means the machine completed successfully; `error` means it died. The machine is dead either way — sends are ignored.
 
 ### ErrorInfo
 
@@ -195,12 +195,12 @@ if (snap.error) {
 
 ### ErrorState
 
-The built-in terminal state the machine enters on any runtime error: a user handler or effect threw; the internal budget was exhausted; an output handler threw; or an internal event was emitted with no handler. It is not a declared state — it is synthesized by the actor. The machine is dead: remaining queued events are dropped, effects are aborted, and every subsequent `send` is a no-op.
+The built-in terminal state the machine enters on any runtime error: a user handler or effect threw; the internal budget was exhausted; an output handler threw; or an internal event was emitted with no handler. It is not a declared state — it is synthesized by the actor. It is final: `snapshot().done` is true and the `done` event fires, so parents and maps can reap it. The machine is dead: remaining queued events are dropped, effects are aborted, and every subsequent `send` is a no-op.
 
 Subscribers are watchers — they only read snapshots, never change the machine — so a subscriber throw is swallowed and never affects the machine or its callers. External events with no handler in the current state are likewise ignored by design (broadcast fan-out, cross-state sends). Every other failure is loud: misconfiguration throws at construction, invalid clock input is clamped platform-style, and runtime user-code errors route to the error state.
 
 ```ts
-type ErrorState = StateRef<"__error", unknown, false>;
+type ErrorState = StateRef<"__error", unknown, true>;
 const dead = actor.snapshot().path[0] === "__error";
 ```
 
@@ -434,7 +434,7 @@ type CreatedOfEvent<T extends string, P> = P extends void ? { type: T } : { type
 
 ### EffectInput
 
-Argument to every effect. `signal` ties lifetime to state exit; `emit` sends events back into the machine; `state` is the entered state, `event` caused it.
+Argument to every effect. `signal` ties lifetime to state exit; `emit` sends events back into the machine; `state` is the entered state, `event` caused it. Effects run exactly once per state entry — the initial state runs its effects at construction (`event` is the synthetic `{ type: "__init" }`), and terminal states run theirs on entry.
 
 ```ts
 interface EffectInput<ActorContext, Payload = unknown> {

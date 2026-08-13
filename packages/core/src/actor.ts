@@ -190,7 +190,6 @@ export class Actor<
         this.#contextWritten = true;
       },
     );
-    this.#subs.seed(this.snapshot());
 
     if (options.regions) {
       for (const [key, child] of Object.entries(options.regions)) {
@@ -205,6 +204,10 @@ export class Actor<
         this.#children.set(key, child);
       }
     }
+
+    // Enter the initial state like any other entry: run effects, then seed.
+    this.#runEffects({ type: "__init" }, this.#statePayload);
+    this.#subs.seed(this.snapshot());
   }
 
   on(
@@ -404,7 +407,7 @@ export class Actor<
     this.#statePayload = resolved.payload;
     this.#entry = { state: this.state, context: this.#context };
     this.#runEffects(event, resolved.payload);
-    if (this.state.isFinal) {
+    if (resolved.state.isFinal && this.#error === null) {
       this.#subs.emitDone();
     }
     return target;
@@ -429,7 +432,7 @@ export class Actor<
       event,
       context: this.#contextHandle,
       emit: (e: InternalEvent) => {
-        if (this.#error !== null) return;
+        if (this.#error !== null || abort.signal.aborted) return;
         this.#queue.push(e);
         this.#drainInternal();
       },
@@ -473,7 +476,7 @@ export class Actor<
   #statePayload: unknown;
   #pendingEffects: Array<Promise<void>> = [];
 
-  #errorState = new StateRef<"__error", unknown, false>("__error", false);
+  #errorState = new StateRef<"__error", unknown, true>("__error", true);
   #error: ErrorInfo | null = null;
   #entry: LastKnownState | null = null;
 
@@ -499,5 +502,6 @@ export class Actor<
     this.#lastState = this.#errorState;
     this.#contextWritten = false;
     this.#subs.emitChange(this.snapshot());
+    this.#subs.emitDone();
   }
 }
