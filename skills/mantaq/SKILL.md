@@ -50,12 +50,16 @@ Mutable shared data. Not state tracking — that's what states are.
 ```ts
 new Actor({ context: {} as Ctx, ... });
 // in handlers:
-opts.context.get();                          // read
-opts.context.set({ ...cur, x: 1 });          // MUST be a new reference
+opts.context.get();                          // read — live record
+const cur = opts.context.get();
+cur.x = 1;                                   // mutate — context is user land
+opts.context.set(cur);                       // write signal — change event
 // outside: actor.context
 ```
 
-`set` must receive a new object — change detection is reference equality. Mutate the read object and subscribers stay silent.
+Context is user land — mutate it freely. `set()` is the write signal: any
+`set()` fires a `change` event, even with the same reference. Mutate without
+`set()` and subscribers stay silent.
 
 ### Effects
 

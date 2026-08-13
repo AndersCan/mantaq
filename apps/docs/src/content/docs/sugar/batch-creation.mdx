@@ -3,9 +3,21 @@ title: Batch Creation
 description: Create multiple states and events in one call.
 ---
 
-`states()` and `events()`. Batch create. One call, typed record.
+## What
 
-Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six states, its seven events — created in two calls.
+`states()` and `events()` create many state or event refs in one call, and
+return a typed record keyed by name.
+
+## Why
+
+A real machine has many states and events. Creating them one by one —
+`state("basicInfo")()`, `state("shippingAddress")()`, and so on — is
+repetitive noise that buries the flow. Two calls replace thirteen. Reach for it
+when the boilerplate outweighs the one-line-per-ref form; for a handful of
+refs, the plain form stays clearer.
+
+The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six
+states and seven events, created in two calls.
 
 ## Without sugar
 
@@ -67,9 +79,10 @@ Two calls. Typed names as keys.
 
 ## Return type
 
-`states()` returns a typed record keyed by the literal names — `{ [K in T]: StateRef<K> }`. Not a plain `Record<string, ...>`.
+`states()` returns a typed record keyed by the literal names — `{ [K in T]:
+StateRef<K> }`. Not a plain `Record<string, ...>`.
 
-`events()` same shape for `EventRef`.
+`events()` has the same shape for `EventRef`.
 
 Keys are the names you passed. Dot or bracket access:
 
@@ -91,7 +104,7 @@ const { basicInfo, payment, success } = s;
 
 ## Real example
 
-Same checkout machine. Fewer lines.
+The same checkout machine, fewer lines.
 
 ```ts
 import { Actor } from "@mantaq/core";
@@ -126,8 +139,4 @@ success.isFinal; // true
 ```
 
 Finality is declared at creation — `{ name, final: true }`. No `.final()` call
-to remember or discard. Names inferred as string literals.
-
-:::tip[Next]
-[Matching](/mantaq/sugar/matching/) checks where the checkout machine is: `matches()`, `isIn()`, `activeLeaves()`, `tag()`.
-:::
+to remember or discard. Names are inferred as string literals.

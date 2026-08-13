@@ -3,9 +3,24 @@ title: Events
 description: Messages that trigger transitions.
 ---
 
-Event. Typed message. Triggers transition. `event(id)()` makes one.
+## What
 
-Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its events move the form.
+An event is a typed message that triggers a transition. `event("back")()`
+declares one.
+
+## Why
+
+Actors react to messages, not direct calls. You send an event, and any handler
+registered for the current state and that event fires. Because events carry
+their payload type, handlers read typed data without casting.
+
+Events are the only thing that moves a machine. Driving a flow with a fixed,
+declared set of messages keeps it predictable and testable — the set of
+possible inputs is written down in the `inputs` array, and the compiler
+enforces it.
+
+The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its events
+move the form.
 
 ## Basic events
 
@@ -19,7 +34,8 @@ const submitShipping = event("submitShipping")<{ street: string; city: string; z
 back.type; // "back"
 ```
 
-Payload must be `object | void`. No payload by default. `back` has none. Submit events carry form data.
+A payload must be `object | void`. By default there is no payload — `back` has
+none. The submit events carry form data.
 
 ## Create instances
 
@@ -29,7 +45,8 @@ submitBasicInfo.create({ email: "a@b.com", name: "A" });
 // { type: "submitBasicInfo", payload: { email: "a@b.com", name: "A" } }
 ```
 
-`.create()` builds the event you send. Payload events need the payload argument.
+`.create()` builds the event you send. Events with a payload need the payload
+argument.
 
 ## Check identity
 
@@ -37,16 +54,18 @@ submitBasicInfo.create({ email: "a@b.com", name: "A" });
 back.is(someEvent); // boolean
 ```
 
-True if `someEvent.type === "back"`. Type guard.
+True if `someEvent.type === "back"`. It doubles as a type guard.
 
 ## Use in transitions
 
-Handlers get the typed event. Payload typed from the event ref.
+Handlers receive the typed event, and the payload type comes from the event
+ref.
 
 ```ts
 m.on(shippingAddress, submitShipping, (event, { context }) => {
   const s = context.get();
-  context.set({ ...s, shippingAddress: { ...event.payload } });
+  s.shippingAddress = event.payload;
+  context.set(s);
   return { state: payment };
 });
 ```
@@ -55,11 +74,11 @@ m.on(shippingAddress, submitShipping, (event, { context }) => {
 
 ## Internal events
 
-Events from effects. Declared in `internal`, not `inputs`. Processed after the
-current transition. Effects emit them. Nothing external can send them through
-`send()`.
+Internal events come from effects, not from the outside. They're declared in
+`internal`, not `inputs`, and they're processed after the current transition.
+Effects emit them; nothing external can send them through `send()`.
 
-Checkout's internal events — charge and timeout results:
+Checkout's internal events — the charge and timeout results:
 
 ```ts
 const paymentOk = event("paymentOk")<{ orderId: string }>();
@@ -74,7 +93,8 @@ const checkout = new Actor({
   setup: (m) => {
     m.on(submitting, paymentOk, (event, { context }) => {
       const s = context.get();
-      context.set({ ...s, orderId: event.payload.orderId });
+      s.orderId = event.payload.orderId;
+      context.set(s);
       return { state: success };
     });
     m.on(submitting, paymentFail, () => ({ state: error }));
@@ -94,7 +114,8 @@ m.onAny(back, (_event, { context }) => {
   const s = checkout.state.name;
   if (s === "payment") {
     const cur = context.get();
-    context.set({ ...cur, paymentInfo: undefined });
+    cur.paymentInfo = undefined;
+    context.set(cur);
     return { state: shippingAddress };
   }
   if (s === "error") return { state: payment };
@@ -102,10 +123,6 @@ m.onAny(back, (_event, { context }) => {
 });
 ```
 
-State-specific handler runs first. `onAny` after — and only transitions if no
-state-specific handler fired. `back` from `payment` returns to `shippingAddress`;
-from `error` retries at `payment`; elsewhere stays put.
-
-:::tip[Next]
-[Effects](/mantaq/core-concepts/effects/) make the machine act: charge card, time out, abort.
-:::
+A state-specific handler runs first; `onAny` only transitions if no
+state-specific handler fired. `back` from `payment` returns to
+`shippingAddress`; from `error` it retries at `payment`; elsewhere it stays put.

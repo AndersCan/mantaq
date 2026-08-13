@@ -58,7 +58,9 @@ function createRequestHandler(orderId: string, clock: Clock) {
     context: { orderId, timeoutMs: 0 },
     setup: (m) => {
       m.on(idle, request, (event, opts) => {
-        opts.context.set({ ...opts.context.get(), timeoutMs: event.payload.timeoutMs });
+        const s = opts.context.get();
+        s.timeoutMs = event.payload.timeoutMs;
+        opts.context.set(s);
         return { state: pending };
       });
       m.effect(pending, (input) => {
@@ -92,9 +94,8 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
       m.on(open, request, (event, opts) => {
         const s = opts.context.get();
         if (s.results[event.payload.orderId]) {
-          const results = { ...s.results };
-          delete results[event.payload.orderId];
-          opts.context.set({ results });
+          delete s.results[event.payload.orderId];
+          opts.context.set(s);
         }
         requests.spawn(event.payload.orderId);
         requests.send(event.payload.orderId, request.create(event.payload));
@@ -106,7 +107,8 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
       });
       m.on(open, requestSettled, (event, opts) => {
         const s = opts.context.get();
-        opts.context.set({ results: { ...s.results, [event.payload.orderId]: event.payload } });
+        s.results[event.payload.orderId] = event.payload;
+        opts.context.set(s);
         return { emit: [orderSettled.create(event.payload)] };
       });
     },

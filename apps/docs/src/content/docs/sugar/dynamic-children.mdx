@@ -3,26 +3,32 @@ title: Dynamic Children
 description: Dynamic child management with ActorMap and broadcast.
 ---
 
+## What
+
+`ActorMap` and `broadcast()` manage children that arrive at runtime — the same
+actor shape, an unknown count, keyed by id. `ActorMap` is the keyed registry;
+`broadcast()` sends one event to every child.
+
 ## Why
 
-Checkout story continues. Order placed. The shop fulfills it. Orders arrive at
-runtime — how many, unknown. One worker per order.
+Static children — `regions` — are known at construction. Real systems spawn
+work at runtime: an order arrives, a worker starts. Something must create those
+workers, track them, and address them by id. That something is `ActorMap`.
 
-`regions` is for static children — you know them at construction. Dynamic
-children are different: they arrive at runtime, count unknown, one per incoming
-order. Something must spawn them, track them, and address them by id.
+The checkout story continues. The order is placed; the shop fulfills it. Orders
+arrive at runtime — how many, unknown. One worker per order.
 
 ## ActorMap
 
-**What:** a keyed registry of one actor type. Same actor, many instances,
-keyed by id.
+`ActorMap` is a keyed registry of one actor type: the same actor, many
+instances, keyed by id.
 
-**Why:** fan out to an unknown number of identical workers. One order → one
-worker → one key.
+The point is fan-out: one order → one worker → one key.
 
-**Not a map of things.** The constructor arg is a **factory** — the actor to
-replicate — never a parent, never a collection type. `new ActorMap(shop)` does
-not mean "a map of shops." It means "spawn copies of `shop`-shaped actors."
+**Not a map of things.** The constructor argument is a **factory** — the actor
+to replicate — never a parent, never a collection type. `new ActorMap(shop)`
+does not mean "a map of shops." It means "spawn copies of `shop`-shaped
+actors."
 
 ```ts
 import { ActorMap } from "@mantaq/sugar";
@@ -35,7 +41,7 @@ orders.spawn("ord_2"); // createOrderWorker("ord_2")
 
 `new ActorMap(factory, options?)`. The factory builds the actor and receives
 the key: `(id: string) => Actor`. Every `spawn(key)` creates a fresh instance
-of that one actor. `options: { autoReap }`, covered below.
+of that one actor. `options: { autoReap }` is covered below.
 
 ### One actor, many instances
 
@@ -62,7 +68,7 @@ const orders = new ActorMap(
 Same actor, fresh per key. `spawn("ord_1")` twice → two independent workers.
 
 A child that answers back holds its receiver in context — the map does no
-wiring. Worker reports, receiver listens:
+wiring. The worker reports, the receiver listens:
 
 ```ts
 const shop = new Actor({ ... }); // receiver
@@ -75,8 +81,8 @@ const orders = new ActorMap((orderId) =>
 );
 ```
 
-Child calls `context.get().reportTo.send(...)` when it has a result. The map
-stays dumb.
+The child calls `context.get().reportTo.send(...)` when it has a result. The
+map stays dumb.
 
 ### Order workers
 
@@ -104,7 +110,7 @@ function createOrderWorker(orderId: string) {
 }
 ```
 
-`shipped` is final. A worker that ships is done. The map can let it go.
+`shipped` is final. A worker that ships is done, and the map can let it go.
 
 ### Operations
 
@@ -121,7 +127,8 @@ orders.keys(); // []
 
 ### The shop parent
 
-Checkout done → spawn a worker for the order. Cancel all → broadcast to every worker.
+Checkout done → spawn a worker for the order. Cancel all → broadcast to every
+worker.
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
@@ -146,16 +153,18 @@ const shop = new Actor({
 });
 ```
 
-`ensure` spawns only if missing. Repeat `checkoutDone` with same order id → no duplicate worker.
+`ensure` spawns only if missing. A repeated `checkoutDone` with the same order
+id → no duplicate worker.
 
-Workers don't report back: the shop broadcasts to them, they answer nothing.
-If a worker had a result, its `reportTo` context would carry the receiver.
+The workers don't report back: the shop broadcasts to them, and they answer
+nothing. If a worker had a result, its `reportTo` context would carry the
+receiver.
 
 ### Auto-reap
 
-Ship an order → worker reaches `shipped` → done. By default the worker lingers
-in the map until `kill`. With `autoReap`, the map removes it the moment a child
-completes — or dies into `__error`.
+Ship an order → the worker reaches `shipped` → done. By default the worker
+lingers in the map until `kill`. With `autoReap`, the map removes it the moment
+a child completes — or dies into `__error`.
 
 ```ts
 const orders = new ActorMap(createOrderWorker, { autoReap: true });
@@ -171,7 +180,7 @@ No manual cleanup. Completed workers clean themselves up.
 
 ## broadcast
 
-Send event to all children.
+Send an event to all children.
 
 ```ts
 import { broadcast } from "@mantaq/sugar";
@@ -189,18 +198,19 @@ for (const id of orders.keys()) {
 
 ## Factory function
 
-Constructor argument. Receives the key, returns the actor.
+The constructor argument. It receives the key and returns the actor.
 
 ```ts
 const orders = new ActorMap((orderId) => createOrderWorker(orderId));
 orders.spawn("ord_2"); // createOrderWorker("ord_2")
 ```
 
-Factory runs at spawn time. New actor per key.
+The factory runs at spawn time. A new actor per key.
 
 ## Snapshot
 
-`ActorMap.snapshot(key)` returns a single child's `Snapshot`, or `undefined` if the key is missing.
+`ActorMap.snapshot(key)` returns a single child's `Snapshot`, or `undefined` if
+the key is missing.
 
 ```ts
 const snap = orders.snapshot("ord_1");
@@ -223,8 +233,4 @@ orders.kill("ord_1");
 // Actor exits. Effects abort. Context gone.
 ```
 
-No manual cleanup. Actor handles it.
-
-:::tip[Next]
-[Effect Helpers](/mantaq/sugar/effect-helpers/) bridge the charge promise and add the timeout fallback.
-:::
+No manual cleanup — the actor handles it.

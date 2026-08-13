@@ -3,6 +3,7 @@
 # Mantaq
 
 [![CI](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml/badge.svg)](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://anderscan.github.io/mantaq/)
 [![npm version](https://img.shields.io/npm/v/@mantaq/core?logo=npm&logoColor=white)](https://www.npmjs.com/package/@mantaq/core)
 [![npm downloads](https://img.shields.io/npm/dm/@mantaq/core?logo=npm&logoColor=white)](https://www.npmjs.com/package/@mantaq/core)
 [![npm provenance](https://img.shields.io/badge/SLSA%20provenance-verified-brightgreen?logo=github)](https://www.npmjs.com/package/@mantaq/core)

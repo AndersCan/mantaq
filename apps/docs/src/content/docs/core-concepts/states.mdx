@@ -3,9 +3,26 @@ title: States
 description: Nodes in the state graph.
 ---
 
-State. Node in graph. `state(id)()` makes one.
+## What
 
-Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six states:
+A state is a node in the machine's graph — one step of your flow, named and
+typed. `state("basicInfo")()` creates one.
+
+## Why
+
+The current step of a flow needs a home. The naive approach is a
+`currentStep` variable plus a handful of boolean flags, and keeping all of them
+in sync is exactly where flows rot. A state machine makes each step a
+first-class node: where you are is a property of the machine, not a variable
+you must remember to update.
+
+State is not data. The values you collect along the way — the email, the
+address, the card number — live in context, covered on the
+[Context](/mantaq/core-concepts/context/) page. State answers "where am I?";
+context answers "what do I know?".
+
+The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six
+states:
 
 ## Basic states
 
@@ -22,11 +39,12 @@ basicInfo.name; // "basicInfo"
 basicInfo.isFinal; // false
 ```
 
-Each step of the form is a node. No boolean flags. No `currentStep` variable. The state IS the step.
+Each step of the form is a node. No boolean flags, no `currentStep` variable —
+the state _is_ the step.
 
 ## Final states
 
-Mark state done. Signal completion.
+A final state marks the machine done and signals completion.
 
 ```ts
 const success = state("success")().final();
@@ -34,7 +52,8 @@ const success = state("success")().final();
 success.isFinal; // true
 ```
 
-Actor enters `success` → `"done"` subscribers fire. `snapshot().done` becomes `true`.
+When the actor enters `success`, the `"done"` subscribers fire and
+`snapshot().done` becomes `true`.
 
 ```ts
 checkout.on("done", () => {
@@ -42,11 +61,12 @@ checkout.on("done", () => {
 });
 ```
 
-Final state means the machine stops accepting events. Done.
+A final state means the machine stops accepting events. Done.
 
 ## Payloads
 
-States carry optional payload. Passed when entering. Effects read it.
+States carry an optional payload, passed in when the state is entered. Effects
+read it.
 
 `error` can carry the failure reason:
 
@@ -57,7 +77,7 @@ m.on(submitting, paymentFail, (_event) => ({
 }));
 ```
 
-Effect on `error` reads it:
+An effect on `error` reads it:
 
 ```ts
 m.effect(error, ({ state }) => {
@@ -67,10 +87,11 @@ m.effect(error, ({ state }) => {
 
 ## Hierarchical states (regions)
 
-Sub-actors. Passed as `regions` to the Actor constructor. Child runs alongside
-parent. Snapshot nests.
+Sub-actors. You pass them as `regions` to the Actor constructor. The child runs
+alongside the parent, and the snapshot nests.
 
-Story extension: checkout machine also runs a fraud monitor. Child named `fraud`:
+Story extension: the checkout machine also runs a fraud monitor. A child named
+`fraud`:
 
 ```ts
 const scanning = state("scanning")();
@@ -100,22 +121,22 @@ const checkoutWithFraud = new Actor({
 });
 ```
 
-Snapshot. Nested.
+The snapshot nests:
 
 ```ts
 // { path: ["basicInfo"], context: {...},
 //   regions: { fraud: { path: ["scanning"], context: {...}, regions: {} } } }
 ```
 
-Child runs its own flow. Parent and child don't block each other.
+The child runs its own flow. Parent and child don't block each other.
 
-`matches(checkoutWithFraud, "basicInfo.fraud.cleared")` checks a specific child state.
+`matches(checkoutWithFraud, "basicInfo.fraud.cleared")` checks a specific child
+state.
 
 ## Parallel states
 
-Multiple regions. Run same time.
-
-Second child: an analytics monitor.
+Multiple regions run at the same time. Add a second child: an analytics
+monitor.
 
 ```ts
 const tracking = state("tracking")();
@@ -135,14 +156,12 @@ regions: {
 }
 ```
 
-Each region is its own actor. Both run. `matches(actor, "basicInfo.fraud.cleared")`
-and `matches(actor, "basicInfo.analytics.tracking")` both work.
+Each region is its own actor, and both run. `matches(actor,
+"basicInfo.fraud.scanning")` and `matches(actor, "basicInfo.analytics.tracking")`
+both work.
 
 ## State vs context
 
 State answers "where am I?" Context answers "what do I know?" The step is a
-state. The entered data is context. Covered in [Context](/mantaq/core-concepts/context/).
-
-:::tip[Next]
-[Events](/mantaq/core-concepts/events/) looks at what moves the machine: typed events.
-:::
+state; the entered data is context. Covered in
+[Context](/mantaq/core-concepts/context/).

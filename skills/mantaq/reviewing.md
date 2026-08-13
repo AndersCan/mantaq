@@ -17,7 +17,7 @@ Check your actor code against mantaq conventions. Catches the bugs that typechec
 
 - Payload types declared at every boundary — `state("x")<T>()`, `event("x")<P>()`. Bare `state("x")()` leaves payload `unknown`.
 - Handler args inferred from refs — no casts, no `any`.
-- `context.set` passes a new reference — reference equality drives change detection. Mutating the read object silently kills change events.
+- `context.set` is the write signal — any `set()` fires `change`, even with the same reference. Context is user land: mutate the record in place, then `set()` it. Mutating without `set()` leaves subscribers silent.
 
 ## Effect Lifecycle
 

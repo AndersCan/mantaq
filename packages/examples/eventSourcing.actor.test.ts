@@ -147,12 +147,10 @@ function createAccountAggregate(clock?: VirtualClock) {
             at: c.now(),
           },
         };
-        opts!.context.set({
-          ...s,
-          events: [...s.events, domainEvent],
-          balance: s.balance + evt.payload.initialBalance,
-          version: s.version + 1,
-        });
+        s.events = [...s.events, domainEvent];
+        s.balance += evt.payload.initialBalance;
+        s.version += 1;
+        opts!.context.set(s);
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, depositCmd, (evt, opts) => {
@@ -165,12 +163,10 @@ function createAccountAggregate(clock?: VirtualClock) {
             at: c.now(),
           },
         };
-        opts!.context.set({
-          ...s,
-          events: [...s.events, domainEvent],
-          balance: s.balance + evt.payload.amount,
-          version: s.version + 1,
-        });
+        s.events = [...s.events, domainEvent];
+        s.balance += evt.payload.amount;
+        s.version += 1;
+        opts!.context.set(s);
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, withdrawCmd, (evt, opts) => {
@@ -183,12 +179,10 @@ function createAccountAggregate(clock?: VirtualClock) {
             at: c.now(),
           },
         };
-        opts!.context.set({
-          ...s,
-          events: [...s.events, domainEvent],
-          balance: s.balance - evt.payload.amount,
-          version: s.version + 1,
-        });
+        s.events = [...s.events, domainEvent];
+        s.balance -= evt.payload.amount;
+        s.version += 1;
+        opts!.context.set(s);
         return { emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
       m.on(activeState, closeAccountCmd, (evt, opts) => {
@@ -200,11 +194,9 @@ function createAccountAggregate(clock?: VirtualClock) {
             at: c.now(),
           },
         };
-        opts!.context.set({
-          ...s,
-          events: [...s.events, domainEvent],
-          version: s.version + 1,
-        });
+        s.events = [...s.events, domainEvent];
+        s.version += 1;
+        opts!.context.set(s);
         return { state: closedState, emit: [eventStoredEvt.create({ event: domainEvent })] };
       });
     },
@@ -235,9 +227,10 @@ function createBalanceProjection(clock?: VirtualClock) {
     setup: (m) => {
       m.on(trackingState, eventStoredEvt, (evt, opts) => {
         const s = opts!.context.get();
-        const accountEvents = [...s.accountEvents, evt.payload.event];
-        const { balance } = foldEvents(accountEvents);
-        opts!.context.set({ ...s, accountEvents, balance, lastVersion: accountEvents.length });
+        s.accountEvents = [...s.accountEvents, evt.payload.event];
+        s.balance = foldEvents(s.accountEvents).balance;
+        s.lastVersion = s.accountEvents.length;
+        opts!.context.set(s);
         return {};
       });
     },

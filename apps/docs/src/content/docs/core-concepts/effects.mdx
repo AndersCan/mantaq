@@ -3,18 +3,30 @@ title: Effects
 description: Side effects on state entry.
 ---
 
-Effect. Runs on state entry. Gets `EffectInput`. Can emit events.
+## What
 
-Register effects in `setup` with `m.effect(state, fn)`.
+An effect is a function the actor runs every time it enters a state. It
+receives an `EffectInput` — the current state, the context, an `emit` function,
+a clock, and an abort signal — and it can emit events back into the machine.
 
-Checkout machine from [Actors](/mantaq/core-concepts/actors/). Its `submitting`
-state needs two things: charge the card, and bail out if it takes too long.
-Both are effects.
+## Why
+
+Real machines do real work: charge a card, call an API, start a timer. That
+work has to start somewhere, and it has to stop when the flow moves on. Effects
+solve both. They run on entry, and their `AbortSignal` fires on exit, so
+in-flight work knows when to give up. No manual cleanup code.
+
+An effect is not a transition. It doesn't move the machine — it emits events,
+and those events trigger transitions.
+
+The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its
+`submitting` state needs two things: charge the card, and bail out if it takes
+too long. Both are effects.
 
 ## Basic effect
 
-The `submitting` effect. Entry starts the charge. `emit` carries the result
-back to the machine as internal events.
+The `submitting` effect. Entry starts the charge, and `emit` carries the
+result back to the machine as internal events.
 
 ```ts
 setup: (m) => {
@@ -28,10 +40,10 @@ setup: (m) => {
 };
 ```
 
-`chargeCard` is your payment provider. A promise. Resolves → `paymentOk` →
-`submitting` transitions to `success`. Rejects → `paymentFail` → `error`.
+`chargeCard` is your payment provider — a promise. Resolve → `paymentOk` →
+`submitting` transitions to `success`. Reject → `paymentFail` → `error`.
 
-Effect return value ignored. Effect emits. Machine reacts.
+The effect's return value is ignored. Effects emit; the machine reacts.
 
 ## EffectInput
 
@@ -53,8 +65,8 @@ so a final state can `emit` a completion output to a parent.
 
 ## Auto-abort
 
-Effect aborts. Actor leaves state. The `signal` fires. In-flight promises must
-check it before emitting.
+An effect aborts when the actor leaves the state: the `signal` fires, and
+in-flight promises must check it before emitting.
 
 ```ts
 setup: (m) => {
@@ -66,13 +78,14 @@ setup: (m) => {
 };
 ```
 
-No manual cleanup. AbortSignal handles it. Charge returns after user backed
-out → no emit. The guard is belt-and-braces: an `emit` called after abort is a
-silent no-op anyway — the guard just skips the wasted call.
+No manual cleanup — the `AbortSignal` handles it. If the charge returns after
+the user backed out, nothing is emitted. The guard is belt-and-braces: an
+`emit` called after abort is a silent no-op anyway. The guard just skips the
+wasted call.
 
 ## Multiple effects
 
-Call `m.effect` multiple times for the same state. Runs in order.
+Call `m.effect` multiple times for the same state. Effects run in order.
 
 ```ts
 setup: (m) => {
@@ -88,7 +101,9 @@ setup: (m) => {
 };
 ```
 
-`submittingDone` transitions to `success` — the timeout fallback. See [Effect Helpers](/mantaq/sugar/effect-helpers/) for the sugar version of both patterns.
+`submittingDone` transitions to `success` — the timeout fallback. See
+[Effect Helpers](/mantaq/sugar/effect-helpers/) for the sugar version of both
+patterns.
 
 ## Error handling
 
@@ -114,7 +129,3 @@ setup: (m) => {
   });
 };
 ```
-
-:::tip[Next]
-[Context](/mantaq/core-concepts/context/) holds the form data the effects and transitions read.
-:::

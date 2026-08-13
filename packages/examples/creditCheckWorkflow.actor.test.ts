@@ -138,12 +138,14 @@ function createCreditCheckActor(clock?: VirtualClock) {
       m.onAny(cancelEvent, () => ({ state: idleState }));
       m.on(idleState, startOrderEvent, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, order: event.payload.order });
+        s.order = event.payload.order;
+        opts!.context.set(s);
         return { state: checkingCreditState };
       });
       m.on(checkingCreditState, creditCheckDoneEvent, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, creditCheckResult: event.payload.result });
+        s.creditCheckResult = event.payload.result;
+        opts!.context.set(s);
         if (event.payload.result.approved) {
           return { state: processingPaymentState };
         }
@@ -166,7 +168,8 @@ function createCreditCheckActor(clock?: VirtualClock) {
       });
       m.on(creditCheckFailedState, retryEvent, (_event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, retryCount: s.retryCount + 1 });
+        s.retryCount += 1;
+        opts!.context.set(s);
         return { state: checkingCreditState };
       });
       m.on(paymentFailedState, retryEvent, () => {

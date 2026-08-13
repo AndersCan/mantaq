@@ -42,7 +42,9 @@ Events valid in every state (cancel, back, disconnect). One handler; return `{}`
 ```ts
 m.onAny(backEvent, (ev, { context, actor }) => {
   if (matches(actor, "payment")) {
-    context.set({ ...context.get(), paymentInfo: undefined });
+    const cur = context.get();
+    cur.paymentInfo = undefined;
+    context.set(cur);
     return { state: shippingAddress };
   }
   if (matches(actor, "error")) return { state: payment };
@@ -78,7 +80,8 @@ Events append to a log in context. State derived by folding the log — not stor
 // concrete state ref — m.on takes a StateRef, not "any state"
 m.on(activeState, domainEvent, (event, { context }) => {
   const s = context.get();
-  context.set({ ...s, log: [...s.log, event] });
+  s.log = [...s.log, event];
+  context.set(s);
   return { emit: [eventStored.create({ event })] };
 });
 ```

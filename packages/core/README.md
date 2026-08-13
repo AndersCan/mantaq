@@ -10,19 +10,19 @@ npm install @mantaq/core
 
 ## Quick Reference
 
-| Pattern         | Correct                                       | Anti-pattern                          |
-| --------------- | --------------------------------------------- | ------------------------------------- |
-| Type context    | `context: {} as MyContext`                    | casting in every handler              |
-| Write context   | `context.set({ ...context.get() })`           | mutate without `set()`                |
-| Type events     | `event("ID")<Payload>()`                      | `event("ID")()` without generic       |
-| Send events     | `actor.send(signInEvent.create(data))`        | raw `{ type: "ID", payload }` objects |
-| Effect data     | Use state payload                             | Depend on `event` in effect           |
-| Error handling  | Emit internal event                           | Throw in effect or transition         |
-| Internal events | Declare in `internal: [...]`                  | Put user events in internal           |
-| Signal check    | `if (signal.aborted) return`                  | Skip abort check in async work        |
-| Regions         | Child outputs in parent `internal`            | Forget to declare child outputs       |
-| Snapshot        | `snapshot()` carries path + context + payload | Re-serialize context by hand          |
-| Any handler     | Universal events only (CANCEL)                | State-specific logic in `onAny`       |
+| Pattern         | Correct                                            | Anti-pattern                          |
+| --------------- | -------------------------------------------------- | ------------------------------------- |
+| Type context    | `context: {} as MyContext`                         | casting in every handler              |
+| Write context   | `const s = context.get(); s.x = y; context.set(s)` | mutate without `set()`                |
+| Type events     | `event("ID")<Payload>()`                           | `event("ID")()` without generic       |
+| Send events     | `actor.send(signInEvent.create(data))`             | raw `{ type: "ID", payload }` objects |
+| Effect data     | Use state payload                                  | Depend on `event` in effect           |
+| Error handling  | Emit internal event                                | Throw in effect or transition         |
+| Internal events | Declare in `internal: [...]`                       | Put user events in internal           |
+| Signal check    | `if (signal.aborted) return`                       | Skip abort check in async work        |
+| Regions         | Child outputs in parent `internal`                 | Forget to declare child outputs       |
+| Snapshot        | `snapshot()` carries path + context + payload      | Re-serialize context by hand          |
+| Any handler     | Universal events only (CANCEL)                     | State-specific logic in `onAny`       |
 
 ## Contents
 
@@ -97,20 +97,24 @@ const actor = new Actor({
   setup: (m) => {
     m.on(idleState, signInEvent, (event, opts) => {
       // ✅ typed — context.get()/set() flow the constructor type
-      opts!.context.set({ ...opts!.context.get(), phoneNumber: event.payload.phoneNumber });
+      const s = opts!.context.get();
+      s.phoneNumber = event.payload.phoneNumber;
+      opts!.context.set(s);
       return { state: signingInState };
     });
   },
 });
 ```
 
-`set()` is the write signal — always call it to write, even when the new value is the same reference. Any `set()` triggers `change`. Spread the current value:
+Context is user land — mutate it freely. `set()` is the write signal: any `set()` triggers `change`, even with the same reference. Call it after you mutate:
 
 ```ts
-opts.context.set({ ...opts.context.get(), phoneNumber: event.payload.phoneNumber });
+const s = opts.context.get();
+s.phoneNumber = event.payload.phoneNumber;
+opts.context.set(s);
 ```
 
-**Never mutate in place:**
+**Never mutate without `set()`:**
 
 ```ts
 // ❌ mutation without set() — never signals; subscribers and persistence stay silent
@@ -123,7 +127,9 @@ opts!.context.phoneNumber = event.payload.phoneNumber;
 setup: (m) => {
   m.on(idleState, signInEvent, (event, opts) => {
     const c = opts!.context as AuthContext; // ❌ unnecessary — already typed
-    c.set({ ...c.get(), phoneNumber: event.payload.phoneNumber });
+    const s = c.get();
+    s.phoneNumber = event.payload.phoneNumber;
+    c.set(s);
     return { state: signingInState };
   });
 },
@@ -214,7 +220,9 @@ const actor = new Actor({
 return { state: loadingState.create({ url: event.payload.url }) };
 
 // ⚠️ context — works but shared across all states
-opts!.context.set({ ...opts!.context.get(), url: event.payload.url });
+const s = opts!.context.get();
+s.url = event.payload.url;
+opts!.context.set(s);
 return { state: loadingState };
 ```
 
@@ -304,10 +312,9 @@ function createActor() {
       m.on(idleState, startEvent, () => ({ state: workingState }));
       m.on(workingState, doneEvent, () => ({ state: doneState }));
       m.on(workingState, failedEvent, (_event, opts) => {
-        opts!.context.set({
-          ...opts!.context.get(),
-          retryCount: opts!.context.get().retryCount + 1,
-        });
+        const s = opts!.context.get();
+        s.retryCount += 1;
+        opts!.context.set(s);
         return { state: errorState };
       });
     },
@@ -496,7 +503,9 @@ Prefer storing the error in context and transitioning to an error state:
 ```ts
 m.on(idleState, submitEvent, (event, opts) => {
   if (!event.payload.data) {
-    opts!.context.set({ ...opts!.context.get(), error: "missing data" });
+    const s = opts!.context.get();
+    s.error = "missing data";
+    opts!.context.set(s);
     return { state: errorState };
   }
   return { state: doneState };
@@ -511,7 +520,9 @@ Use `onAny` to intercept events across all states — useful for universal error
 setup: (m) => {
   // CANCEL works from any state
   m.onAny(cancelEvent, (_event, opts) => {
-    opts!.context.set({ ...opts!.context.get(), cancelled: true });
+    const s = opts!.context.get();
+    s.cancelled = true;
+    opts!.context.set(s);
     return { state: cancelledState };
   });
   // State-specific handlers still run for their state
@@ -525,13 +536,17 @@ setup: (m) => {
 setup: (m) => {
   // ❌ state-specific logic in onAny defeats the purpose
   m.onAny(submitBasicInfoEvent, (event, opts) => {
-    opts!.context.set({ ...opts!.context.get(), basicInfo: event }); // wrong — only makes sense in basicInfo state
+    const s = opts!.context.get();
+    s.basicInfo = event; // wrong — only makes sense in basicInfo state
+    opts!.context.set(s);
     return { state: shippingAddressState };
   });
 
   // ✅ keep state-specific logic in state handlers
   m.on(basicInfoState, submitBasicInfoEvent, (event, opts) => {
-    opts!.context.set({ ...opts!.context.get(), basicInfo: event });
+    const s = opts!.context.get();
+    s.basicInfo = event;
+    opts!.context.set(s);
     return { state: shippingAddressState };
   });
 },

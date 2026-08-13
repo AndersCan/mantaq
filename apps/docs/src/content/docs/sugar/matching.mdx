@@ -3,9 +3,20 @@ title: Matching
 description: State matching, grouping, and leaf detection.
 ---
 
-Check where the checkout machine is. Group states. Find leaves.
+## What
 
-Checkout machine from [Actors](/mantaq/core-concepts/actors/).
+The matching helpers answer one question: where is the machine right now?
+`matches()` checks a top-level path, `isIn()` searches the whole tree,
+`activeLeaves()` lists the leaf states, and `tag()` groups states for one check.
+
+## Why
+
+`checkout.snapshot().path[0] === "payment"` works, but it reads badly, and it
+gets worse as machines nest — the fraud region pushes every child state one
+level deeper, and hand-joined path checks start compounding. The helpers give
+readable, intent-naming checks and handle the path joining for you.
+
+The checkout machine from [Actors](/mantaq/core-concepts/actors/).
 
 ## matches
 
@@ -18,7 +29,10 @@ matches(checkout, "payment"); // top-level
 matches(checkout, "basicInfo"); // top-level
 ```
 
-Starts at the top-level state. Descends only through region names, in order. Ends at a state or region boundary. NOT a whole-tree search — a nested `"payment"` under a different top state fails `matches(actor, "payment")`. Use `isIn` for that.
+It starts at the top-level state and descends only through region names, in
+order, ending at a state or region boundary. It is NOT a whole-tree search — a
+nested `"payment"` under a different top state fails `matches(actor,
+"payment")`. Use `isIn` for that.
 
 Without sugar:
 
@@ -26,11 +40,12 @@ Without sugar:
 checkout.snapshot().path[0] === "payment";
 ```
 
-`matches` handles path joining.
+`matches` handles the path joining.
 
 ### Nested path
 
-The fraud monitor from [States](/mantaq/core-concepts/states/) runs as region `fraud`:
+The fraud monitor from [States](/mantaq/core-concepts/states/) runs as region
+`fraud`:
 
 ```ts
 matches(checkoutWithFraud, "basicInfo"); // true
@@ -47,7 +62,7 @@ snap.path[0] === "basicInfo" && snap.regions["fraud"]?.path[0] === "scanning";
 
 ## isIn
 
-Recursive search. State anywhere in the snapshot tree.
+Recursive search. Is a state anywhere in the snapshot tree?
 
 ```ts
 import { isIn } from "@mantaq/sugar";
@@ -66,7 +81,7 @@ isIn(snapshot, "payment"); // false
 
 ## activeLeaves
 
-All leaf states in current path.
+All leaf states in the current path.
 
 ```ts
 import { activeLeaves } from "@mantaq/sugar";
@@ -78,7 +93,7 @@ activeLeaves(checkout.snapshot()); // ["payment"]
 activeLeaves(checkoutWithFraud.snapshot()); // ["basicInfo.fraud.scanning"]
 ```
 
-For parallel regions, returns multiple leaves.
+With parallel regions, it returns multiple leaves.
 
 ## tag
 
@@ -110,9 +125,8 @@ if (path === "error" || path === "flagged") {
 }
 ```
 
-Top-level only. `tag.has` searches the whole tree.
-
-Tag scales better. Many states → one check.
+`tag` matches at the top level only, but `tag.has` searches the whole tree. And
+it scales: many states, one check.
 
 ## Before/after
 
@@ -157,7 +171,3 @@ const isFailed = [failed1, failed2].some((s) => s.name === checkout.snapshot().p
 // After
 const isFailed = tag(failed1, failed2).has(checkout.snapshot());
 ```
-
-:::tip[Next]
-[Dynamic Children](/mantaq/sugar/dynamic-children/) tracks runtime children: `ActorMap` and `broadcast()`.
-:::

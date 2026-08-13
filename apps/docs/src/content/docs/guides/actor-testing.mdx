@@ -3,14 +3,24 @@ title: Testing Actors
 description: How to test the checkout machine using graph traversal patterns.
 ---
 
-Actors are state machines. States are nodes, transitions are edges. Testing means walking the graph and asserting you land where expected.
+## What
+
+Testing an actor means driving it with events and asserting where it lands. The
+machine is a graph — states are nodes, transitions are edges — so a test is a
+walk through that graph.
+
+## Why
+
+Mantaq is deterministic: same inputs, same trace, every time. That makes flows
+assertable without flakiness — no sleeps, no "wait 100ms and hope". Time-based
+transitions run on a `VirtualClock`, so you fast-forward instead of waiting.
 
 The checkout machine from [Context](/mantaq/core-concepts/context/). Full flow:
 
 ```
 basicInfo → shippingAddress → payment → submitting → success (final)
                   ↕ (back) ↕                  ↕ (back)
-                                           error
+                                            error
 ```
 
 ## The machine
@@ -57,17 +67,20 @@ function createCheckoutActor() {
     setup: (m) => {
       m.on(basicInfo, submitBasicInfo, (event, { context }) => {
         const s = context.get();
-        context.set({ ...s, basicInfo: { ...event.payload } });
+        s.basicInfo = event.payload;
+        context.set(s);
         return { state: shippingAddress };
       });
       m.on(shippingAddress, submitShipping, (event, { context }) => {
         const s = context.get();
-        context.set({ ...s, shippingAddress: { ...event.payload } });
+        s.shippingAddress = event.payload;
+        context.set(s);
         return { state: payment };
       });
       m.on(payment, submitPayment, (event, { context }) => {
         const s = context.get();
-        context.set({ ...s, paymentInfo: { ...event.payload } });
+        s.paymentInfo = event.payload;
+        context.set(s);
         return { state: submitting };
       });
       m.on(submitting, paymentOk, () => ({ state: success }));
@@ -78,7 +91,8 @@ function createCheckoutActor() {
 }
 ```
 
-Happy-path pieces work without time or promises. Test them directly.
+The happy-path pieces work without time or promises, so they can be tested
+directly.
 
 ## Testing Patterns
 
@@ -108,7 +122,7 @@ expect(checkout.context.basicInfo).toEqual({ email: "a@b.com", name: "A" });
 expect(checkout.context.shippingAddress).toBeUndefined();
 ```
 
-Data lands in context. Step by step.
+The data lands in context, step by step.
 
 ### Assert Back Navigation
 
@@ -136,8 +150,8 @@ expect(checkout.snapshot().done).toBe(true);
 
 ### Assert Side Effects with VirtualClock
 
-The machine in production charges a card via a promise effect. For tests,
-control time instead. Give the actor a `VirtualClock`, then advance.
+In production the machine charges a card via a promise effect. In tests, control
+time instead. Give the actor a `VirtualClock`, then advance.
 
 Charge hangs → the 800ms timeout fires → `submittingDone` → `success`:
 
@@ -172,12 +186,12 @@ clock.advance(800); // fast-forward time
 expect(checkout.snapshot().path[0]).toBe("success");
 ```
 
-Deterministic. No fake timers. No sleeps. Same inputs, same trace.
+Deterministic and fast: no fake timers, no sleeps — same inputs, same trace.
 
 ### Assert Promise Effects with settled
 
-Charge resolves → `paymentOk` emitted → `success`. The emit happens in a
-microtask. `settled()` waits for it:
+The charge resolves → `paymentOk` is emitted → `success`. The emit happens in a
+microtask, so `settled()` waits for it:
 
 ```ts
 function createCheckoutWithCharge() {
@@ -222,7 +236,3 @@ expect(checkout.snapshot().path[0]).toBe("success");
 - **`VirtualClock`** — deterministically test time-dependent transitions
 - **`settled()`** — wait for promise effects before asserting
 - **`snapshot().done`** — check if actor reached a final state
-
-:::tip[Next]
-[Sugar](/mantaq/sugar/) cuts the boilerplate. Same checkout machine, fewer lines.
-:::

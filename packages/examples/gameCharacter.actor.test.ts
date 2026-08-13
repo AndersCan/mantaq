@@ -107,7 +107,8 @@ function createCharacter(clock?: VirtualClock) {
       m.on(lifeStates.alive, e.START_SPRINT, (_event, { context }) => {
         const cur = context.get();
         if (cur.stamina <= 0) return {};
-        context.set({ ...cur, stamina: Math.max(0, cur.stamina - 20) });
+        cur.stamina = Math.max(0, cur.stamina - 20);
+        context.set(cur);
         actor.regions.movement.send(e.START_SPRINT.create());
         return {};
       });
@@ -119,32 +120,36 @@ function createCharacter(clock?: VirtualClock) {
         const cur = context.get();
         if (cur.health <= 0) return {};
         if (cur.combatState !== "idle") return {};
-        context.set({ ...cur, combatState: "attacking" });
+        cur.combatState = "attacking";
+        context.set(cur);
         c.setTimeout(500, () => {
-          context.set({ ...context.get(), combatState: "cooldown" });
-          c.setTimeout(context.get().attackCooldownMs, () => {
-            context.set({ ...context.get(), combatState: "idle" });
+          const cur = context.get();
+          cur.combatState = "cooldown";
+          context.set(cur);
+          c.setTimeout(cur.attackCooldownMs, () => {
+            const cur = context.get();
+            cur.combatState = "idle";
+            context.set(cur);
           });
         });
         return {};
       });
       m.onAny(takeDamageEvent, (event, { context }) => {
         const cur = context.get();
-        const health = Math.max(0, cur.health - event.payload.amount);
-        if (health <= 0) {
-          context.set({ ...cur, health, combatState: "idle" });
+        cur.health = Math.max(0, cur.health - event.payload.amount);
+        if (cur.health <= 0) {
+          cur.combatState = "idle";
+          context.set(cur);
           return { state: lifeStates.dead };
         }
-        context.set({ ...cur, health });
+        context.set(cur);
         return {};
       });
       m.onAny(e.REGEN, (_event, { context }) => {
         const cur = context.get();
-        context.set({
-          ...cur,
-          stamina: Math.min(cur.maxStamina, cur.stamina + cur.staminaRegenRate),
-          health: Math.min(cur.maxHealth, cur.health + cur.healthRegenRate),
-        });
+        cur.stamina = Math.min(cur.maxStamina, cur.stamina + cur.staminaRegenRate);
+        cur.health = Math.min(cur.maxHealth, cur.health + cur.healthRegenRate);
+        context.set(cur);
         return {};
       });
     },

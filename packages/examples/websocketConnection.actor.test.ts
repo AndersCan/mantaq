@@ -119,31 +119,39 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
       m.onAny(disconnect, () => ({ state: disconnectedState }));
       m.onAny(forceReconnect, (_event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, retryCount: 0 });
+        s.retryCount = 0;
+        opts!.context.set(s);
         return { state: reconnectingState };
       });
       m.on(disconnectedState, connect, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, url: event.payload.url, retryCount: 0 });
+        s.url = event.payload.url;
+        s.retryCount = 0;
+        opts!.context.set(s);
         return { state: connectingState };
       });
       m.on(connectingState, connectionEstablished, () => ({ state: connectedState }));
       m.on(connectingState, connectionFailed, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, retryCount: s.retryCount + 1, error: event.payload.error });
+        s.retryCount += 1;
+        s.error = event.payload.error;
+        opts!.context.set(s);
         return { state: reconnectingState };
       });
       m.on(connectedState, heartbeatTimeout, () => ({ state: reconnectingState }));
       m.on(reconnectingState, connectionEstablished, (_event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, retryCount: 0 });
+        s.retryCount = 0;
+        opts!.context.set(s);
         return { state: connectedState };
       });
       m.on(reconnectingState, reconnectTimeout, () => ({ state: connectingState }));
       m.on(reconnectingState, maxRetriesReached, () => ({ state: permanentlyDisconnectedState }));
       m.on(permanentlyDisconnectedState, connect, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, url: event.payload.url, retryCount: 0 });
+        s.url = event.payload.url;
+        s.retryCount = 0;
+        opts!.context.set(s);
         return { state: connectingState };
       });
     },
