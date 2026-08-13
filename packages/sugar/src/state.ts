@@ -1,6 +1,6 @@
 import { state, StateRef } from "@mantaq/core";
 
-export interface StatesEntry {
+interface StatesEntry {
   name: string;
   final?: boolean;
 }
