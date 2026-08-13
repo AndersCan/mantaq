@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+<sub>2026-08-13</sub>
+
+- _(minor)_
+  Added onOutput(actor, handler) — public wrapper for the child-output wiring seam, replacing direct @mantaq/core/internal imports.
+- _(patch)_
+  Fixed ActorMap auto-reap leaking dead children: done-reaped actors kept their reaper entry alive, pinning the full child closure graph and growing unbounded per completed key.
+
 ## 0.2.0
 
 <sub>2026-08-13</sub>
