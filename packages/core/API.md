@@ -72,7 +72,7 @@ const id = new RealClock().setTimeout(10, () => {});
 
 ### VirtualClock
 
-Deterministic `Clock` for tests. Time advances only when you say so; drive the machine without sleeping. Delays follow platform semantics: `NaN`, negative, and `0` clamp to `0` (timeouts fire at the next advance); values above the 32-bit max clamp to `1`; intervals enforce a `1ms` floor so a bad interval can never spin the synchronous advance loop.
+Deterministic `Clock` for tests. Time advances only when you say so; drive the machine without sleeping. Delay semantics: `NaN` and `±Infinity` **throw** `RangeError` (programmer error); negative and `0` clamp to `0` for timeouts (fire at the next advance) and to a `1ms` floor for intervals (a `0ms` interval would spin the synchronous advance loop forever). Finite positive values schedule at their real deadline.
 
 ```ts
 class VirtualClock implements Clock {

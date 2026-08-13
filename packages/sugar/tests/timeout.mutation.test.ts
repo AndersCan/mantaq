@@ -30,16 +30,16 @@ describe("withTimeout mutation tests", () => {
     expect(collect(-1, 0)).toEqual([{ type: "t" }]);
   });
 
-  test("NaN ms clamps to 0 and fires on the next advance", () => {
-    expect(collect(NaN, 0)).toEqual([{ type: "t" }]);
+  test("NaN ms throws (the clock rejects it)", () => {
+    expect(() => withTimeout(NaN, makeInput(new VirtualClock()), () => ({ type: "t" }))).toThrow(
+      RangeError,
+    );
   });
 
-  test("a numeric string is coerced like the platform", () => {
-    expect(collect("5" as unknown as number, 5)).toEqual([{ type: "t" }]);
-  });
-
-  test("Infinity clamps to 1 and fires after one ms", () => {
-    expect(collect(Infinity, 1)).toEqual([{ type: "t" }]);
+  test("Infinity ms throws (the clock rejects it)", () => {
+    expect(() =>
+      withTimeout(Infinity, makeInput(new VirtualClock()), () => ({ type: "t" })),
+    ).toThrow(RangeError);
   });
 
   test("valid ms fires exactly at the deadline", () => {

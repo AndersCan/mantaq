@@ -49,25 +49,17 @@ describe("VirtualClock error paths", () => {
     expect(b).toBe(0);
   });
 
-  test("invalid ms values clamp to 0 and never poison the clock", () => {
+  test("NaN and Infinity ms throw; negative clamps to 0", () => {
     const clock = new VirtualClock();
-    let nanFired = 0;
-    clock.setTimeout(NaN, () => nanFired++);
-    clock.advance(0);
-    expect(nanFired).toBe(1);
+    expect(() => clock.setTimeout(NaN, () => {})).toThrow(RangeError);
+    expect(() => clock.setTimeout(Infinity, () => {})).toThrow(RangeError);
+    expect(() => clock.setInterval(NaN, () => {})).toThrow(RangeError);
+    expect(() => clock.advance(NaN)).toThrow(RangeError);
 
     let negFired = 0;
     clock.setTimeout(-1, () => negFired++);
     clock.advance(0);
     expect(negFired).toBe(1);
-
-    let count = 0;
-    clock.setInterval(Infinity, () => count++);
-    clock.advance(2);
-    expect(count).toBe(2);
-
-    clock.advance(NaN);
-    expect(clock.now()).toBeGreaterThan(0);
   });
 });
 

@@ -113,16 +113,24 @@ describe("VirtualClock directed mutation tests", () => {
     expect(order).toEqual([1, 2, 1, 2]);
   });
 
-  test("setTimeout with NaN clamps to 0 and fires on the next advance", () => {
+  test("setTimeout with NaN throws", () => {
     const clock = new VirtualClock();
-    let fired = 0;
-    clock.setTimeout(NaN, () => fired++);
-    expect(clock.hasPending()).toBe(true);
-    clock.advance(0);
-    expect(fired).toBe(1);
+    expect(() => clock.setTimeout(NaN, () => {})).toThrow(
+      "[VirtualClock] invalid setTimeout ms value: NaN",
+    );
   });
 
-  test("setTimeout with negative ms clamps to 0 and fires immediately", () => {
+  test("setTimeout with Infinity throws", () => {
+    const clock = new VirtualClock();
+    expect(() => clock.setTimeout(Infinity, () => {})).toThrow(RangeError);
+  });
+
+  test("setTimeout with -Infinity throws", () => {
+    const clock = new VirtualClock();
+    expect(() => clock.setTimeout(-Infinity, () => {})).toThrow(RangeError);
+  });
+
+  test("setTimeout with negative ms clamps to 0 and fires on the next advance", () => {
     const clock = new VirtualClock();
     let fired = 0;
     clock.setTimeout(-5, () => fired++);
@@ -130,28 +138,27 @@ describe("VirtualClock directed mutation tests", () => {
     expect(fired).toBe(1);
   });
 
-  test("setTimeout with Infinity clamps to 1 like the platform", () => {
+  test("setTimeout with zero ms fires on the next advance", () => {
     const clock = new VirtualClock();
     let fired = 0;
-    clock.setTimeout(Infinity, () => fired++);
+    clock.setTimeout(0, () => fired++);
+    clock.advance(0);
+    expect(fired).toBe(1);
+  });
+
+  test("a huge finite ms schedules at its real deadline", () => {
+    const clock = new VirtualClock();
+    let fired = 0;
+    clock.setTimeout(2_147_483_648, () => fired++);
+    clock.advance(2_147_483_647);
+    expect(fired).toBe(0);
     clock.advance(1);
     expect(fired).toBe(1);
   });
 
-  test("setTimeout with a numeric string is coerced like the platform", () => {
+  test("setInterval with NaN throws", () => {
     const clock = new VirtualClock();
-    let fired = 0;
-    clock.setTimeout("5" as unknown as number, () => fired++);
-    clock.advance(5);
-    expect(fired).toBe(1);
-  });
-
-  test("setInterval with NaN clamps to a 1ms floor and never hangs", () => {
-    const clock = new VirtualClock();
-    let count = 0;
-    clock.setInterval(NaN, () => count++);
-    clock.advance(5);
-    expect(count).toBeGreaterThan(0);
+    expect(() => clock.setInterval(NaN, () => {})).toThrow(RangeError);
   });
 
   test("setInterval with negative ms clamps to a 1ms floor", () => {
@@ -162,19 +169,24 @@ describe("VirtualClock directed mutation tests", () => {
     expect(count).toBe(3);
   });
 
-  test("advance with NaN or negative ms is a no-op", () => {
+  test("advance with NaN throws and leaves the clock untouched", () => {
     const clock = new VirtualClock();
     clock.advance(5);
-    clock.advance(NaN);
-    expect(clock.now()).toBe(5);
-    clock.advance(-3);
+    expect(() => clock.advance(NaN)).toThrow(RangeError);
     expect(clock.now()).toBe(5);
   });
 
-  test("advance with Infinity is a no-op", () => {
+  test("advance with Infinity throws", () => {
     const clock = new VirtualClock();
     clock.advance(5);
-    clock.advance(Infinity);
+    expect(() => clock.advance(Infinity)).toThrow(RangeError);
+    expect(clock.now()).toBe(5);
+  });
+
+  test("advance with negative ms is a no-op", () => {
+    const clock = new VirtualClock();
+    clock.advance(5);
+    clock.advance(-3);
     expect(clock.now()).toBe(5);
   });
 
@@ -183,15 +195,6 @@ describe("VirtualClock directed mutation tests", () => {
     let fired = 0;
     clock.setTimeout(10, () => fired++);
     clock.advance(10);
-    expect(fired).toBe(1);
-  });
-
-  test("setTimeout above the 32-bit max clamps to 1 like the platform", () => {
-    const clock = new VirtualClock();
-    let fired = 0;
-    clock.setTimeout(2_147_483_648, () => fired++);
-    expect(clock.hasPending()).toBe(true);
-    clock.advance(1);
     expect(fired).toBe(1);
   });
 
