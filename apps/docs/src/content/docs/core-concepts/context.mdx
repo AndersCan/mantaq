@@ -16,8 +16,8 @@ card is charged. Context is that place: it survives transitions, so each step
 can add to what the previous steps collected.
 
 Context is not state. It doesn't decide where the machine is — the state does.
-And it is replaced, not mutated: `set()` swaps the whole record, so a reference
-you captured earlier goes stale.
+And it is user land: Mantaq just stores the record you give it, with no
+immutability or freezing. Mutate it however you like.
 
 The checkout machine from [Actors](/mantaq/core-concepts/actors/). Context
 holds the form data as the buyer moves through the steps.
@@ -51,14 +51,15 @@ It's typed — the shape is known from the start, with no runtime cost.
 
 ## Context in transitions
 
-Handlers get a `context` handle. `get()` reads the current value; `set()`
-replaces it wholesale. Any `set()` call triggers a `change` event — even if you
-set the same reference. Copy the current value to mutate.
+Handlers get a `context` handle. `get()` returns the live record; `set()` is
+the write signal. Any `set()` call triggers a `change` event — even if you
+pass the same reference. Mutate what `get()` gave you, then `set()` it:
 
 ```ts
 m.on(basicInfo, submitBasicInfo, (event, { context }) => {
   const s = context.get();
-  context.set({ ...s, basicInfo: { ...event.payload } });
+  s.basicInfo = event.payload;
+  context.set(s);
   return { state: shippingAddress };
 });
 ```
@@ -66,11 +67,12 @@ m.on(basicInfo, submitBasicInfo, (event, { context }) => {
 Each step adds one field. Earlier fields survive — context carries across
 transitions.
 
-Nested values must be copied too — `set` only sees the top-level reference:
+Nested values work the same way — context is your record, mutate it:
 
 ```ts
 const s = context.get();
-context.set({ ...s, items: [...s.items, item] });
+s.items.push(item);
+context.set(s);
 ```
 
 ## Read context
@@ -79,8 +81,8 @@ context.set({ ...s, items: [...s.items, item] });
 checkout.context.basicInfo?.email; // current value
 ```
 
-Always read through `actor.context`. The value is replaced, not mutated, so a
-reference you captured earlier goes stale.
+Always read through `actor.context`. It reflects whatever the handlers
+wrote.
 
 ## Context in effects
 
@@ -93,7 +95,8 @@ setup: (m) => {
     const s = context.get();
     chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
       const cur = context.get();
-      context.set({ ...cur, orderId });
+      cur.orderId = orderId;
+      context.set(cur);
       emit(paymentOk.create({ orderId }));
     });
   });

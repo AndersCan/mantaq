@@ -64,7 +64,8 @@ ref.
 ```ts
 m.on(shippingAddress, submitShipping, (event, { context }) => {
   const s = context.get();
-  context.set({ ...s, shippingAddress: { ...event.payload } });
+  s.shippingAddress = event.payload;
+  context.set(s);
   return { state: payment };
 });
 ```
@@ -92,7 +93,8 @@ const checkout = new Actor({
   setup: (m) => {
     m.on(submitting, paymentOk, (event, { context }) => {
       const s = context.get();
-      context.set({ ...s, orderId: event.payload.orderId });
+      s.orderId = event.payload.orderId;
+      context.set(s);
       return { state: success };
     });
     m.on(submitting, paymentFail, () => ({ state: error }));
@@ -112,7 +114,8 @@ m.onAny(back, (_event, { context }) => {
   const s = checkout.state.name;
   if (s === "payment") {
     const cur = context.get();
-    context.set({ ...cur, paymentInfo: undefined });
+    cur.paymentInfo = undefined;
+    context.set(cur);
     return { state: shippingAddress };
   }
   if (s === "error") return { state: payment };

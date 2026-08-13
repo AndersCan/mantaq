@@ -67,17 +67,20 @@ function createCheckoutActor() {
     setup: (m) => {
       m.on(basicInfo, submitBasicInfo, (event, { context }) => {
         const s = context.get();
-        context.set({ ...s, basicInfo: { ...event.payload } });
+        s.basicInfo = event.payload;
+        context.set(s);
         return { state: shippingAddress };
       });
       m.on(shippingAddress, submitShipping, (event, { context }) => {
         const s = context.get();
-        context.set({ ...s, shippingAddress: { ...event.payload } });
+        s.shippingAddress = event.payload;
+        context.set(s);
         return { state: payment };
       });
       m.on(payment, submitPayment, (event, { context }) => {
         const s = context.get();
-        context.set({ ...s, paymentInfo: { ...event.payload } });
+        s.paymentInfo = event.payload;
+        context.set(s);
         return { state: submitting };
       });
       m.on(submitting, paymentOk, () => ({ state: success }));

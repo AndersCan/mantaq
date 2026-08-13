@@ -147,19 +147,24 @@ function createConnectionManager(clock?: VirtualClock) {
       });
       m.on(connectionStates.disconnected, connectEvent, (event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, url: event.payload.url, retryCount: 0, lastError: undefined });
+        s.url = event.payload.url;
+        s.retryCount = 0;
+        s.lastError = undefined;
+        opts!.context.set(s);
         return { state: connectionStates.connecting };
       });
       m.on(connectionStates.connecting, e.CONNECTION_ESTABLISHED, (_event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, retryCount: 0 });
+        s.retryCount = 0;
+        opts!.context.set(s);
         return { state: connectionStates.connected };
       });
       m.on(connectionStates.connecting, connectionFailed, (event, opts) => {
         const s = opts!.context.get();
-        const retryCount = s.retryCount + 1;
-        opts!.context.set({ ...s, lastError: event.payload.error, retryCount });
-        if (retryCount >= s.maxRetries) {
+        s.lastError = event.payload.error;
+        s.retryCount += 1;
+        opts!.context.set(s);
+        if (s.retryCount >= s.maxRetries) {
           return { state: connectionStates.failed };
         }
         return { state: connectionStates.reconnecting };
@@ -171,21 +176,25 @@ function createConnectionManager(clock?: VirtualClock) {
         actor.regions.health.send(healthCheckResult.create({ healthy: event.payload.healthy }));
         if (!event.payload.healthy) {
           const s = opts!.context.get();
-          opts!.context.set({ ...s, lastError: "Health check failed", retryCount: 0 });
+          s.lastError = "Health check failed";
+          s.retryCount = 0;
+          opts!.context.set(s);
           return { state: connectionStates.reconnecting };
         }
         return {};
       });
       m.on(connectionStates.reconnecting, e.CONNECTION_ESTABLISHED, (_event, opts) => {
         const s = opts!.context.get();
-        opts!.context.set({ ...s, retryCount: 0 });
+        s.retryCount = 0;
+        opts!.context.set(s);
         return { state: connectionStates.connected };
       });
       m.on(connectionStates.reconnecting, connectionFailed, (event, opts) => {
         const s = opts!.context.get();
-        const retryCount = s.retryCount + 1;
-        opts!.context.set({ ...s, lastError: event.payload.error, retryCount });
-        if (retryCount >= s.maxRetries) {
+        s.lastError = event.payload.error;
+        s.retryCount += 1;
+        opts!.context.set(s);
+        if (s.retryCount >= s.maxRetries) {
           return { state: connectionStates.failed };
         }
         return {};

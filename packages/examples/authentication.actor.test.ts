@@ -108,34 +108,41 @@ function createAuthActor(clock?: VirtualClock) {
       m.onAny(e.MONITOR_TICK, () => ({}));
       m.on(s.checkingAuth, signInEvent, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, phoneNumber: event.payload.phoneNumber });
+        cur.phoneNumber = event.payload.phoneNumber;
+        opts!.context.set(cur);
         return { state: s.signingIn };
       });
       m.on(s.loggedOut, signInEvent, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, phoneNumber: event.payload.phoneNumber });
+        cur.phoneNumber = event.payload.phoneNumber;
+        opts!.context.set(cur);
         return { state: s.signingIn };
       });
       m.on(s.signingIn, signInDoneEvent, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, user: event.payload.user });
+        cur.user = event.payload.user;
+        opts!.context.set(cur);
         return { state: s.loggedIn };
       });
       m.on(s.signingIn, signInErrorEvent, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, error: event.payload.error });
+        cur.error = event.payload.error;
+        opts!.context.set(cur);
         return { state: s.signInError };
       });
       m.on(s.loggedIn, e.SIGN_OUT, (_event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, user: undefined, phoneNumber: undefined });
+        cur.user = undefined;
+        cur.phoneNumber = undefined;
+        opts!.context.set(cur);
         return { state: s.signingOut };
       });
       m.on(s.signingOut, e.SIGNING_OUT_DONE, () => ({ state: s.loggedOut }));
       m.on(s.signInError, e.RETRY, () => ({ state: s.signingIn }));
       m.on(s.signInError, signInEvent, (event, opts) => {
         const cur = opts!.context.get();
-        opts!.context.set({ ...cur, phoneNumber: event.payload.phoneNumber });
+        cur.phoneNumber = event.payload.phoneNumber;
+        opts!.context.set(cur);
         return { state: s.signingIn };
       });
     },

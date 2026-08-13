@@ -110,19 +110,15 @@ function createEditorActor(clock?: VirtualClock) {
         if (cur.undoStack.length === 0) {
           return { state: s.idle };
         }
-        const undoStack = cur.undoStack.slice(0, -1);
-        const entry = cur.undoStack[undoStack.length]!;
-        const redoStack = [
+        const entry = cur.undoStack[cur.undoStack.length - 1]!;
+        cur.undoStack = cur.undoStack.slice(0, -1);
+        cur.redoStack = [
           ...cur.redoStack,
           { buffer: snapshotBuffer(cur.buffer), label: entry.label },
         ];
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack,
-          buffer: snapshotBuffer(entry.buffer),
-        });
-        if (undoStack.length === 0) {
+        cur.buffer = snapshotBuffer(entry.buffer);
+        context.set(cur);
+        if (cur.undoStack.length === 0) {
           return { state: s.idle };
         }
         return { state: s.editing };
@@ -132,19 +128,15 @@ function createEditorActor(clock?: VirtualClock) {
         if (cur.redoStack.length === 0) {
           return { state: s.idle };
         }
-        const redoStack = cur.redoStack.slice(0, -1);
-        const entry = cur.redoStack[redoStack.length]!;
-        const undoStack = [
+        const entry = cur.redoStack[cur.redoStack.length - 1]!;
+        cur.redoStack = cur.redoStack.slice(0, -1);
+        cur.undoStack = [
           ...cur.undoStack,
           { buffer: snapshotBuffer(cur.buffer), label: entry.label },
         ];
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack,
-          buffer: snapshotBuffer(entry.buffer),
-        });
-        if (redoStack.length === 0) {
+        cur.buffer = snapshotBuffer(entry.buffer);
+        context.set(cur);
+        if (cur.redoStack.length === 0) {
           return { state: s.idle };
         }
         return { state: s.editing };
@@ -155,157 +147,142 @@ function createEditorActor(clock?: VirtualClock) {
         if (targetIndex === undefined) {
           return { state: s.idle };
         }
-        let undoStack = cur.undoStack;
-        let redoStack = cur.redoStack;
-        let buffer = cur.buffer;
-        while (undoStack.length > targetIndex) {
-          const entry = undoStack[undoStack.length - 1]!;
-          undoStack = undoStack.slice(0, -1);
-          redoStack = [...redoStack, { buffer: snapshotBuffer(buffer), label: entry.label }];
-          buffer = snapshotBuffer(entry.buffer);
+        while (cur.undoStack.length > targetIndex) {
+          const entry = cur.undoStack[cur.undoStack.length - 1]!;
+          cur.undoStack = cur.undoStack.slice(0, -1);
+          cur.redoStack = [
+            ...cur.redoStack,
+            { buffer: snapshotBuffer(cur.buffer), label: entry.label },
+          ];
+          cur.buffer = snapshotBuffer(entry.buffer);
         }
-        context.set({ ...cur, undoStack, redoStack, buffer });
+        context.set(cur);
         return { state: s.idle };
       });
       m.onAny(e.CLEAR_HISTORY, (_event, { context }) => {
         const cur = context.get();
-        context.set({ ...cur, undoStack: [], redoStack: [], checkpoints: new Map() });
+        cur.undoStack = [];
+        cur.redoStack = [];
+        cur.checkpoints = new Map();
+        context.set(cur);
         return {};
       });
       m.on(s.idle, insertTextEvent, (event, { context }) => {
         const cur = context.get();
-        const undoStack = [
+        cur.undoStack = [
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
             label: `insert "${event.payload.text}" at ${event.payload.at}`,
           },
         ];
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack: [],
-          buffer: {
-            content: insertAt(cur.buffer.content, event.payload.at, event.payload.text),
-            cursor: event.payload.at + event.payload.text.length,
-          },
-        });
+        cur.redoStack = [];
+        cur.buffer = {
+          content: insertAt(cur.buffer.content, event.payload.at, event.payload.text),
+          cursor: event.payload.at + event.payload.text.length,
+        };
+        context.set(cur);
         return { state: s.editing };
       });
       m.on(s.idle, deleteTextEvent, (event, { context }) => {
         const cur = context.get();
-        const undoStack = [
+        cur.undoStack = [
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
             label: `delete [${event.payload.from}..${event.payload.to}]`,
           },
         ];
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack: [],
-          buffer: {
-            content: deleteRange(cur.buffer.content, event.payload.from, event.payload.to),
-            cursor: event.payload.from,
-          },
-        });
+        cur.redoStack = [];
+        cur.buffer = {
+          content: deleteRange(cur.buffer.content, event.payload.from, event.payload.to),
+          cursor: event.payload.from,
+        };
+        context.set(cur);
         return { state: s.editing };
       });
       m.on(s.idle, replaceTextEvent, (event, { context }) => {
         const cur = context.get();
-        const undoStack = [
+        cur.undoStack = [
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
             label: `replace [${event.payload.from}..${event.payload.to}] with "${event.payload.text}"`,
           },
         ];
+        cur.redoStack = [];
         const deleted = deleteRange(cur.buffer.content, event.payload.from, event.payload.to);
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack: [],
-          buffer: {
-            content: insertAt(deleted, event.payload.from, event.payload.text),
-            cursor: event.payload.from + event.payload.text.length,
-          },
-        });
+        cur.buffer = {
+          content: insertAt(deleted, event.payload.from, event.payload.text),
+          cursor: event.payload.from + event.payload.text.length,
+        };
+        context.set(cur);
         return { state: s.editing };
       });
       m.on(s.idle, checkpointEvent, (event, { context }) => {
         const cur = context.get();
-        const checkpoints = new Map(cur.checkpoints);
-        checkpoints.set(event.payload.name, cur.undoStack.length);
-        context.set({ ...cur, checkpoints });
+        cur.checkpoints = new Map(cur.checkpoints);
+        cur.checkpoints.set(event.payload.name, cur.undoStack.length);
+        context.set(cur);
         return {};
       });
       m.on(s.editing, insertTextEvent, (event, { context }) => {
         const cur = context.get();
-        const undoStack = [
+        cur.undoStack = [
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
             label: `insert "${event.payload.text}" at ${event.payload.at}`,
           },
         ];
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack: [],
-          buffer: {
-            content: insertAt(cur.buffer.content, event.payload.at, event.payload.text),
-            cursor: event.payload.at + event.payload.text.length,
-          },
-        });
+        cur.redoStack = [];
+        cur.buffer = {
+          content: insertAt(cur.buffer.content, event.payload.at, event.payload.text),
+          cursor: event.payload.at + event.payload.text.length,
+        };
+        context.set(cur);
         return {};
       });
       m.on(s.editing, deleteTextEvent, (event, { context }) => {
         const cur = context.get();
-        const undoStack = [
+        cur.undoStack = [
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
             label: `delete [${event.payload.from}..${event.payload.to}]`,
           },
         ];
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack: [],
-          buffer: {
-            content: deleteRange(cur.buffer.content, event.payload.from, event.payload.to),
-            cursor: event.payload.from,
-          },
-        });
+        cur.redoStack = [];
+        cur.buffer = {
+          content: deleteRange(cur.buffer.content, event.payload.from, event.payload.to),
+          cursor: event.payload.from,
+        };
+        context.set(cur);
         return {};
       });
       m.on(s.editing, replaceTextEvent, (event, { context }) => {
         const cur = context.get();
-        const undoStack = [
+        cur.undoStack = [
           ...cur.undoStack,
           {
             buffer: snapshotBuffer(cur.buffer),
             label: `replace [${event.payload.from}..${event.payload.to}] with "${event.payload.text}"`,
           },
         ];
+        cur.redoStack = [];
         const deleted = deleteRange(cur.buffer.content, event.payload.from, event.payload.to);
-        context.set({
-          ...cur,
-          undoStack,
-          redoStack: [],
-          buffer: {
-            content: insertAt(deleted, event.payload.from, event.payload.text),
-            cursor: event.payload.from + event.payload.text.length,
-          },
-        });
+        cur.buffer = {
+          content: insertAt(deleted, event.payload.from, event.payload.text),
+          cursor: event.payload.from + event.payload.text.length,
+        };
+        context.set(cur);
         return {};
       });
       m.on(s.editing, checkpointEvent, (event, { context }) => {
         const cur = context.get();
-        const checkpoints = new Map(cur.checkpoints);
-        checkpoints.set(event.payload.name, cur.undoStack.length);
-        context.set({ ...cur, checkpoints });
+        cur.checkpoints = new Map(cur.checkpoints);
+        cur.checkpoints.set(event.payload.name, cur.undoStack.length);
+        context.set(cur);
         return {};
       });
     },

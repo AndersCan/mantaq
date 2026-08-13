@@ -40,7 +40,9 @@ new Actor({
   setup: (m) => {
     m.on(idle, start, (event, { context }) => {
       // event: {type: "START"; payload: {url: string}}  ← inferred from start
-      context.set({ ...context.get(), url: event.payload.url }); // ✓ typed
+      const s = context.get();
+      s.url = event.payload.url; // ✓ typed
+      context.set(s);
       return { state: running };
     });
   },

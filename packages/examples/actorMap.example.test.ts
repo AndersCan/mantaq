@@ -43,17 +43,18 @@ describe("actor map example", () => {
       setup: (m) => {
         m.on(collecting, requestWork, (event, { context }) => {
           const s = context.get();
-          context.set({ ...s, pending: s.pending + 1 });
+          s.pending += 1;
+          context.set(s);
           workers.spawn(event.payload.id);
           workers.send(event.payload.id, doWork.create({ id: event.payload.id }));
           return {};
         });
         m.on(collecting, workResult, (event, { context }) => {
           const s = context.get();
-          const results = [...s.results, event.payload];
-          const pending = s.pending - 1;
-          context.set({ ...s, results, pending });
-          return pending === 0 ? { emit: [allResults.create({ results })] } : {};
+          s.results = [...s.results, event.payload];
+          s.pending -= 1;
+          context.set(s);
+          return s.pending === 0 ? { emit: [allResults.create({ results: s.results })] } : {};
         });
       },
     });

@@ -140,7 +140,7 @@ if (move.is(evt)) evt.payload.x; // narrowed
 
 ### Context
 
-The handle passed to transition handlers and effects as `{ context }`. `get()` reads the current context value; `set(value)` replaces it wholesale and is the write signal — calling `set()` emits a `change` event even when the reference is unchanged (so a class instance mutated in place still signals by being passed to `set`). Context is compared by reference identity, never deep-compared. Earlier `get()` bindings go stale after a `set`.
+User land. The record you pass to the constructor, mutated freely in handlers. The handle passed to transition handlers and effects as `{ context }`. `get()` returns the live record; `set(value)` is the write signal — calling `set()` emits a `change` event even when the reference is unchanged (so an object mutated in place still signals by being passed to `set`). Context is never deep-compared.
 
 ```ts
 class Context<T> {
@@ -149,7 +149,8 @@ class Context<T> {
 }
 m.on(idle, tick, (_e, { context }) => {
   const s = context.get();
-  context.set({ ...s, count: s.count + 1 });
+  s.count += 1;
+  context.set(s);
   return {};
 });
 ```
@@ -346,7 +347,8 @@ m.on(idle, click, () => ({ state: active, emit: [pong.create()] }));
 m.onAny(click, () => ({ state: idle }));
 m.effect(active, ({ context }) => {
   const s = context.get();
-  context.set({ ...s, ready: true });
+  s.ready = true;
+  context.set(s);
 });
 ```
 

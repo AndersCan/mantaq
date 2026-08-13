@@ -87,12 +87,14 @@ function createCheckoutActor(
         const s = actor.state.name;
         if (s === "payment") {
           const cur = opts.context.get();
-          opts.context.set({ ...cur, paymentInfo: undefined });
+          cur.paymentInfo = undefined;
+          opts.context.set(cur);
           return { state: shippingAddress };
         }
         if (s === "shippingAddress") {
           const cur = opts.context.get();
-          opts.context.set({ ...cur, shippingAddress: undefined });
+          cur.shippingAddress = undefined;
+          opts.context.set(cur);
           return { state: basicInfo };
         }
         if (s === "error") {
@@ -102,22 +104,26 @@ function createCheckoutActor(
       });
       m.on(basicInfo, submitBasicInfo, (event, opts) => {
         const cur = opts.context.get();
-        opts.context.set({ ...cur, basicInfo: { ...event.payload } });
+        cur.basicInfo = event.payload;
+        opts.context.set(cur);
         return { state: shippingAddress };
       });
       m.on(shippingAddress, submitShipping, (event, opts) => {
         const cur = opts.context.get();
-        opts.context.set({ ...cur, shippingAddress: { ...event.payload } });
+        cur.shippingAddress = event.payload;
+        opts.context.set(cur);
         return { state: payment };
       });
       m.on(payment, submitPayment, (event, opts) => {
         const cur = opts.context.get();
-        opts.context.set({ ...cur, paymentInfo: { ...event.payload } });
+        cur.paymentInfo = event.payload;
+        opts.context.set(cur);
         return { state: submitting };
       });
       m.on(submitting, paymentOk, (event, opts) => {
         const cur = opts.context.get();
-        opts.context.set({ ...cur, orderId: event.payload.orderId });
+        cur.orderId = event.payload.orderId;
+        opts.context.set(cur);
         return { state: success };
       });
       m.on(submitting, paymentFail, () => ({ state: error }));
