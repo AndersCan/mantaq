@@ -101,8 +101,7 @@ never in the machine.
 // declared. New imports:
 import { RealClock } from "@mantaq/core";
 import type { Clock } from "@mantaq/core";
-import { ActorMap } from "@mantaq/sugar";
-import { setOutputHandler } from "@mantaq/core/internal";
+import { ActorMap, onOutput } from "@mantaq/sugar";
 
 const { open } = states("open");
 
@@ -149,7 +148,7 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
   const requests = new ActorMap(
     (orderId) => {
       const child = createRequestHandler(orderId, clock);
-      setOutputHandler(child, (e) => {
+      onOutput(child, (e) => {
         if (requestSettled.is(e)) manager.send(e);
       });
       return child;
@@ -157,7 +156,7 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
     { autoReap: true },
   );
 
-  setOutputHandler(manager, (e) => {
+  onOutput(manager, (e) => {
     if (!orderSettled.is(e)) return;
     const resolvers = pending.get(e.payload.orderId);
     if (!resolvers) return;
@@ -198,13 +197,14 @@ output, received as an input — records the result and re-emits it outward as
 children do not — one explicit line in the factory does it:
 
 ```ts
-setOutputHandler(child, (e) => {
+onOutput(child, (e) => {
   if (requestSettled.is(e)) manager.send(e);
 });
 ```
 
-The `is()` guard narrows the child's output to the parent's declared input. No
-cast, no parent pointer, no hand-rolled routing.
+`onOutput` is sugar's public wrapper for the output seam — no internal import
+needed. The `is()` guard narrows the child's output to the parent's declared
+input. No cast, no parent pointer, no hand-rolled routing.
 
 [Dynamic Children](/mantaq/sugar/dynamic-children/) taught `reportTo` — the
 receiver carried in the child's context. It works. But context is state: a

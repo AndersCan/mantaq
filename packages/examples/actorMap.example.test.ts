@@ -1,8 +1,7 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, state, event, VirtualClock } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
-import { ActorMap } from "@mantaq/sugar";
-import { setOutputHandler } from "@mantaq/core/internal";
+import { ActorMap, onOutput } from "@mantaq/sugar";
 
 const requestWork = event("REQUEST_WORK")<{ id: string }>();
 const doWork = event("DO_WORK")<{ id: string }>();
@@ -64,7 +63,7 @@ describe("actor map example", () => {
     const workers = new ActorMap((id) => createWorker(id, clock, parent));
 
     const received: Array<{ type: string; payload?: unknown }> = [];
-    setOutputHandler(parent, (e) => received.push(e));
+    onOutput(parent, (e) => received.push(e));
 
     parent.send(requestWork.create({ id: "a" }));
     parent.send(requestWork.create({ id: "b" }));

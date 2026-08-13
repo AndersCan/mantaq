@@ -24,8 +24,7 @@
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock, RealClock, state, event } from "@mantaq/core";
 import type { Clock } from "@mantaq/core";
-import { ActorMap, states, events, withTimeout } from "@mantaq/sugar";
-import { setOutputHandler } from "@mantaq/core/internal";
+import { ActorMap, states, events, withTimeout, onOutput } from "@mantaq/sugar";
 
 type Settled = {
   orderId: string;
@@ -116,7 +115,7 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
   const requests = new ActorMap(
     (orderId) => {
       const child = createRequestHandler(orderId, clock);
-      setOutputHandler(child, (e) => {
+      onOutput(child, (e) => {
         if (requestSettled.is(e)) manager.send(e);
       });
       return child;
@@ -124,7 +123,7 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
     { autoReap: true },
   );
 
-  setOutputHandler(manager, (e) => {
+  onOutput(manager, (e) => {
     if (!orderSettled.is(e)) return;
     const resolvers = pending.get(e.payload.orderId);
     if (!resolvers) return;

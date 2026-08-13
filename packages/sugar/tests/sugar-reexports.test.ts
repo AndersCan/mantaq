@@ -1,6 +1,15 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, type Snapshot, event, state } from "@mantaq/core";
-import { isIn, activeLeaves, matches, tag, ActorMap, states, events } from "../src/index.ts";
+import {
+  isIn,
+  activeLeaves,
+  matches,
+  tag,
+  ActorMap,
+  states,
+  events,
+  onOutput,
+} from "../src/index.ts";
 
 function snap(path: string[], regions: Record<string, Snapshot> = {}): Snapshot {
   return { path, context: {}, regions };
@@ -142,6 +151,31 @@ describe("sugar re-exports", () => {
       const e = events("click", "submit");
       expect(e.click.type).toBe("click");
       expect(e.submit.type).toBe("submit");
+    });
+  });
+
+  describe("onOutput (from sugar barrel)", () => {
+    test("delivers a child's emitted outputs to the handler", () => {
+      const done = event("done")<{ ok: boolean }>();
+      const go = event("go")();
+      const off = state("off")();
+      const finished = state("finished")();
+
+      const child = new Actor({
+        inputs: [go],
+        outputs: [done],
+        states: [off, finished],
+        initial: off,
+        setup: (m) => {
+          m.on(off, go, () => ({ state: finished, emit: [done.create({ ok: true })] }));
+        },
+      });
+
+      const received: Array<{ type: string; payload?: unknown }> = [];
+      onOutput(child, (e) => received.push(e));
+
+      child.send(go.create());
+      expect(received).toEqual([{ type: "done", payload: { ok: true } }]);
     });
   });
 });
