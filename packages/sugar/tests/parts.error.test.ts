@@ -28,11 +28,20 @@ describe("parts error paths", () => {
     const actor = withParts(machine, [emitBoomPart]);
     actor.send(start.create());
     expect(actor.state.name).toBe("__error");
+    expect(actor.snapshot().error?.reason).toBe("unhandled");
+    expect(actor.snapshot().error?.event.type).toBe("boom");
   });
 
   test("missing part for a state leaves its events unhandled", () => {
     const actor = withParts(machine, []);
     actor.send(start.create());
     expect(actor.state).toBe(idle);
+  });
+
+  test("a throwing part body propagates out of withParts", () => {
+    const boomPart = definePart<typeof machine>(() => {
+      throw new Error("part blew up");
+    });
+    expect(() => withParts(machine, [boomPart])).toThrow("part blew up");
   });
 });

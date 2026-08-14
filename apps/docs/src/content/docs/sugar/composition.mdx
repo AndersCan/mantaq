@@ -28,7 +28,8 @@ they do not change how the actor behaves.
 
 ## Before — one setup body
 
-The full checkout machine, effects and all, in one `setup`:
+The full checkout machine, effects and all, in one `setup`. The injectable
+`chargeCard` and clock are simplified here — the split below is the point:
 
 ```ts
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
@@ -205,8 +206,7 @@ own file:
 
 ```ts
 // parts/submitting.ts
-import { definePart } from "@mantaq/sugar";
-import { withPromise, withTimeout } from "@mantaq/sugar";
+import { definePart, withPromise, withTimeout } from "@mantaq/sugar";
 import {
   checkout,
   submitting,
@@ -283,15 +283,21 @@ import { backPart } from "./parts/back.ts";
 export const checkoutActor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
 ```
 
+`base` is the machine options object — pass `clock`, `regions`, or
+`internalBudget` through it the same way you would to `new Actor`. A
+`VirtualClock` in the base keeps the determinism story from
+[Testing](/mantaq/guides/actor-testing/) intact.
+
 ### 4. Hand-written setups still work
 
-`withParts` covers the common case. When the setup needs more — a clock, extra
-inline handlers, a region — use `use` inside a plain setup:
+`withParts` takes every option `new Actor` takes — clock, regions, budget
+included. Reach for a hand-written setup when you want parts and inline code
+side by side. `use` registers a part exactly where you call it:
 
 ```ts
 import { Actor, VirtualClock } from "@mantaq/core";
 import { use } from "@mantaq/sugar";
-import { checkout, back } from "./checkout.ts";
+import { checkout, basicInfo } from "./checkout.ts";
 import { basicInfoPart, submittingPart, backPart } from "./parts/index.ts";
 
 const actor = new Actor({
@@ -301,10 +307,16 @@ const actor = new Actor({
     use(m, basicInfoPart);
     use(m, submittingPart);
     use(m, backPart);
-    m.onAny(back, () => ({}));
+    m.effect(basicInfo, (input) => {
+      // an extra inline effect; parts and inline code share the same builder
+    });
   },
 });
 ```
+
+Inline registrations and parts are ordered: a handler for the same
+(state, event) replaces the one before it, whatever registered it. Effects
+append instead — both effects run on state entry.
 
 ## Type safety
 

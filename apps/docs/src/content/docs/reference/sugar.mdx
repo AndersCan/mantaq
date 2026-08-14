@@ -132,7 +132,7 @@ All leaf paths. Dot-separated strings.
 
 ---
 
-## `definePart(machine)`
+## `definePart(fn)`
 
 ```ts
 function definePart<M extends Machine>(fn: (m: BuilderOf<M>) => void): Fragment<M>;
@@ -177,21 +177,33 @@ setup: (m) => {
 ## `withParts(base, parts)`
 
 ```ts
-function withParts(
-  base: Omit<ActorOptions, "setup">,
-  parts: Array<(m: ActorBuilder) => void>,
+function withParts<
+  const States extends readonly AnyStateRef[],
+  const Inputs extends readonly AnyEventRef[],
+  const Internal extends readonly AnyEventRef[],
+  const Outputs extends readonly AnyEventRef[],
+  ActorContext,
+>(
+  base: Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup">,
+  parts: readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
 ): Actor;
 ```
 
 Build an actor from machine options plus an array of parts. The `setup` is
-generated — every part is run against the builder in order.
+generated — every part is run against the builder in order. `base` takes every
+option `new Actor` takes: `clock`, `regions`, `internalBudget`, and initial
+with payload included.
+
+The parts array shares the machine's generics — `Part<States, ...>`, not any
+machine. A part built against one machine cannot be wired into another.
+
+For the same (state, event), the last registered handler wins — across parts
+and inline code alike. Effects append instead: every effect on a state runs on
+entry.
 
 ```ts
 const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
 ```
-
-Handlers registered later overwrite earlier ones for the same state/event
-pair, matching inline ordering.
 
 ---
 
@@ -205,6 +217,10 @@ type Fragment<M>;  // (m: BuilderOf<M>) => void
 
 `Machine` is the constraint `definePart` and `use` accept. `BuilderOf` and
 `Fragment` name the part signature for explicit annotations.
+
+`Machine` is a constraint, not a value annotation: annotating a machine with
+`Machine` (or `ActorOptions`) erases its literal state/event/context types.
+Always pass `typeof <your options object>` — never annotate the object itself.
 
 ---
 

@@ -153,6 +153,89 @@ describe("withParts", () => {
     expect(actor.state).toBe(off);
     expect(actor.context.flips).toBe(2);
   });
+
+  test("onAny parts can emit through declared outputs", () => {
+    const ring = event("ring")();
+    const notify = event("notify")<{ msg: string }>();
+    const on = state("on")();
+    const off = state("off")();
+    const bell = {
+      inputs: [ring] as const,
+      internal: [] as const,
+      outputs: [notify] as const,
+      states: [on, off] as const,
+      initial: off,
+      context: {},
+    };
+    const dingPart = definePart<typeof bell>((m) => {
+      m.on(off, ring, () => ({ state: on }));
+      m.onAny(ring, () => ({ emit: [notify.create({ msg: "ding" })] }));
+    });
+    const actor = withParts(bell, [dingPart]);
+    const received: Array<{ type: string; payload?: unknown }> = [];
+    onOutput(actor, (e) => received.push(e));
+    actor.send(ring.create());
+    expect(actor.state).toBe(on);
+    expect(received).toEqual([{ type: "notify", payload: { msg: "ding" } }]);
+  });
+
+  test("later parts overwrite handlers for the same state and event", () => {
+    const firstPart = definePart<typeof load>((m) => {
+      m.on(idle, start, () => ({ state: failed }));
+    });
+    const secondPart = definePart<typeof load>((m) => {
+      m.on(idle, start, () => ({ state: loading }));
+    });
+    const actor = withParts(newLoad(), [firstPart, secondPart]);
+    actor.send(start.create());
+    expect(actor.state).toBe(loading);
+  });
+
+  test("effects from different parts accumulate on the same state", async () => {
+    const clock = new VirtualClock();
+    const countEffect = definePart<typeof load>((m) => {
+      m.effect(loading, (input) => {
+        const cur = input.context.get();
+        cur.attempts += 1;
+        input.context.set(cur);
+      });
+    });
+    const actor = withParts({ ...newLoad(), clock }, [startPart, countEffect, timeoutPart]);
+    actor.send(start.create());
+    expect(actor.context.attempts).toBe(2);
+    clock.advance(5);
+    await actor.settled();
+    expect(actor.state).toBe(failed);
+  });
+
+  test("initial state payload flows through withParts", () => {
+    const id = state("id")<{ value: string }>();
+    const store = {
+      inputs: [] as const,
+      internal: [] as const,
+      states: [id] as const,
+      initial: { state: id, payload: { value: "seed" } },
+      context: {},
+    };
+    const actor = withParts(store, []);
+    expect(actor.state).toBe(id);
+    expect(actor.snapshot().payload).toEqual({ value: "seed" });
+  });
+
+  test("regions and internal budget pass through withParts", () => {
+    const parent = {
+      inputs: [start, fail] as const,
+      internal: [] as const,
+      states: [idle, loading, done] as const,
+      initial: idle,
+      context: {} as LoadContext,
+      internalBudget: 3,
+      regions: {} as Record<string, never>,
+    };
+    const actor = withParts(parent, []);
+    expect(actor.options.internalBudget).toBe(3);
+    expect(actor.options.regions).toEqual({});
+  });
 });
 
 describe("parts keep full types", () => {
@@ -210,6 +293,16 @@ describe("parts keep full types", () => {
         state: loading,
         // @ts-expect-error no outputs declared, so emit is not allowed
         emit: [report.create({ value: 1 })],
+      }));
+    });
+  });
+
+  test("emit of a non-output event is rejected even with outputs declared", () => {
+    definePart<typeof load>((m) => {
+      m.on(loading, finish, () => ({
+        state: done,
+        // @ts-expect-error finish is an input, not a declared output
+        emit: [finish.create({ value: 1 })],
       }));
     });
   });
