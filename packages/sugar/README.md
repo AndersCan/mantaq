@@ -236,6 +236,37 @@ fetchData()
 
 `withPromise` checks `signal.aborted` before each emit. Manual chains fire events into destroyed actors.
 
+### Splitting a big setup with `definePart` and `withParts`
+
+A machine with many states and events grows one long `setup` body. `definePart`
+wraps a slice of that setup — its `m.on`, `m.onAny`, and `m.effect` calls — so
+it can live in its own file, fully typed against the machine. `withParts`
+composes the slices.
+
+```ts
+import { definePart, withParts } from "@mantaq/sugar";
+import { checkout, basicInfo, submitBasicInfo } from "./checkout.ts";
+
+const basicInfoPart = definePart<typeof checkout>((m) => {
+  m.on(basicInfo, submitBasicInfo, (event, opts) => {
+    const cur = opts.context.get();
+    cur.basicInfo = event.payload;
+    opts.context.set(cur);
+    return { state: shippingAddress };
+  });
+});
+
+export const checkoutActor = withParts(checkout, [basicInfoPart /* ... */]);
+```
+
+The machine options live in a plain object; `typeof checkout` anchors every
+type in the part. Wrong transition targets, event payloads, or context keys
+are compile errors — the same as inline. `use(m, part)` registers a part
+inside a hand-written setup.
+
+**Anti-pattern:** One monolithic `setup` when the machine outgrows a screen —
+every handler in one closure, impossible to split across files.
+
 ## Helpers
 
 ### `matches(actor, pattern)`
@@ -393,6 +424,36 @@ import { withTimeout } from "@mantaq/sugar";
 
 withTimeout(5000, input, () => ({ type: "timeout", payload: { reason: "exceeded" } }));
 ```
+
+### `definePart(machine)`
+
+Wrap a slice of a machine's setup so it can live in its own file. Type against
+the machine options object — `definePart<typeof checkout>((m) => {...})`. The
+builder inside the part carries the full machine types: states, events,
+context, outputs.
+
+### `use(m, part)`
+
+Register a part inside a hand-written setup:
+
+```ts
+setup: (m) => {
+  use(m, basicInfoPart);
+  use(m, submittingPart);
+};
+```
+
+### `withParts(base, parts)`
+
+Build an actor from machine options plus an array of parts. `base` takes every
+option `new Actor` takes — clock, regions, budget, initial included.
+
+```ts
+const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
+```
+
+For the same (state, event), the last registered handler wins. Effects append
+instead — every effect on a state runs on entry.
 
 ## Migration from Core
 
