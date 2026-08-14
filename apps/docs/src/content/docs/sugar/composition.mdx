@@ -29,7 +29,8 @@ they do not change how the actor behaves.
 ## Before — one setup body
 
 The full checkout machine, effects and all, in one `setup`. The injectable
-`chargeCard` and clock are simplified here — the split below is the point:
+`chargeCardImpl` from the canonical example is a plain function here — the
+split below is the point:
 
 ```ts
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
@@ -298,7 +299,9 @@ side by side. `use` registers a part exactly where you call it:
 import { Actor, VirtualClock } from "@mantaq/core";
 import { use } from "@mantaq/sugar";
 import { checkout, basicInfo } from "./checkout.ts";
-import { basicInfoPart, submittingPart, backPart } from "./parts/index.ts";
+import { basicInfoPart } from "./parts/basic-info.ts";
+import { submittingPart } from "./parts/submitting.ts";
+import { backPart } from "./parts/back.ts";
 
 const actor = new Actor({
   ...checkout,

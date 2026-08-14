@@ -181,7 +181,12 @@ describe("withParts", () => {
 
   test("later parts overwrite handlers for the same state and event", () => {
     const firstPart = definePart<typeof load>((m) => {
-      m.on(idle, start, () => ({ state: failed }));
+      m.on(idle, start, (_event, opts) => {
+        const cur = opts.context.get();
+        cur.attempts += 1;
+        opts.context.set(cur);
+        return { state: failed };
+      });
     });
     const secondPart = definePart<typeof load>((m) => {
       m.on(idle, start, () => ({ state: loading }));
@@ -189,6 +194,7 @@ describe("withParts", () => {
     const actor = withParts(newLoad(), [firstPart, secondPart]);
     actor.send(start.create());
     expect(actor.state).toBe(loading);
+    expect(actor.context.attempts).toBe(0);
   });
 
   test("effects from different parts accumulate on the same state", async () => {

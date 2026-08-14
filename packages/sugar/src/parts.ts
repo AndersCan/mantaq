@@ -46,7 +46,7 @@ export function use<M extends Machine>(m: BuilderOf<M>, part: Fragment<M>): void
   part(m);
 }
 
-type Part<
+export type Part<
   States extends readonly AnyStateRef[],
   Inputs extends readonly AnyEventRef[],
   Internal extends readonly AnyEventRef[],

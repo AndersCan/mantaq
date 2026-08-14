@@ -180,13 +180,13 @@ setup: (m) => {
 function withParts<
   const States extends readonly AnyStateRef[],
   const Inputs extends readonly AnyEventRef[],
-  const Internal extends readonly AnyEventRef[],
-  const Outputs extends readonly AnyEventRef[],
-  ActorContext,
+  const Internal extends readonly AnyEventRef[] = readonly [],
+  const Outputs extends readonly AnyEventRef[] = readonly [],
+  ActorContext = Record<string, unknown>,
 >(
   base: Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup">,
   parts: readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
-): Actor;
+): Actor<States, Inputs, Internal, Outputs, ActorContext>;
 ```
 
 Build an actor from machine options plus an array of parts. The `setup` is
@@ -213,10 +213,12 @@ const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
 type Machine;      // shape of a machine options object
 type BuilderOf<M>; // ActorBuilder for that machine
 type Fragment<M>;  // (m: BuilderOf<M>) => void
+type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — the withParts array element type
 ```
 
 `Machine` is the constraint `definePart` and `use` accept. `BuilderOf` and
-`Fragment` name the part signature for explicit annotations.
+`Fragment` name the part signature for explicit annotations. `Part` is the
+same shape with explicit generics — the element type `withParts` takes.
 
 `Machine` is a constraint, not a value annotation: annotating a machine with
 `Machine` (or `ActorOptions`) erases its literal state/event/context types.
@@ -242,7 +244,7 @@ Promise → actor events. Checks `signal.aborted`.
 
 ---
 
-## `withTimeout(ms, input, eventFn)`
+## `withTimeout(ms, input, event)`
 
 ```ts
 function withTimeout<ActorContext>(
