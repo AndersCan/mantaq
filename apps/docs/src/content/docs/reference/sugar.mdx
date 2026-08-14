@@ -24,13 +24,14 @@ Prefix match. Checks top-level state name first, then descends only through regi
 ## `states(...entries)`
 
 ```ts
-function states(
-  ...entries: Array<string | { name: string; final?: boolean }>
-): Record<string, StateRef>;
+function states<const T extends StatesArg[]>(
+  ...entries: T
+): { [K in T[number] as NameOf<K>]: StateRef<NameOf<K>, unknown, FinalOf<K>> };
 ```
 
 Batch state creation. Entries are strings, or objects with `final: true` for a
 terminal state. `success` is final right at creation — no `.final()` call.
+Keyed by the literal names — not a plain `Record<string, ...>`.
 
 ```ts
 const s = states("basicInfo", "payment", { name: "success", final: true }, "error");
@@ -84,7 +85,7 @@ map.kill("ord_1");
 ```
 
 `new ActorMap(factory, options?)` — `factory` builds the actor, receiving the
-key: `(id: string) => Actor`. Every `spawn(key)` creates a fresh instance of
+key: `(id: string) => AnyActor`. Every `spawn(key)` creates a fresh instance of
 the same actor, keyed by id. `options: { autoReap? }` — `true` removes a child
 once it reaches a final state (or dies into `__error`). Off by default;
 completed children linger until `kill`.
@@ -171,6 +172,10 @@ setup: (m) => {
   use(m, submittingPart);
 };
 ```
+
+`use` takes `Fragment`s from `definePart`. The hand-written `Part` type is for
+`withParts` arrays — a bare `Part` value won't unify with `use`'s inference;
+always define parts with `definePart`.
 
 ---
 

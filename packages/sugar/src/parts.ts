@@ -20,13 +20,21 @@ export interface Machine {
   internalBudget?: number;
 }
 
-type InternalOf<M extends Machine> = M extends { internal: infer I extends readonly AnyEventRef[] }
-  ? I
+type InternalOf<M extends Machine> = "internal" extends keyof M
+  ? [Exclude<M["internal"], undefined | null>] extends [never]
+    ? readonly []
+    : Exclude<M["internal"], undefined | null>
   : readonly [];
-type OutputsOf<M extends Machine> = M extends { outputs: infer O extends readonly AnyEventRef[] }
-  ? O
+type OutputsOf<M extends Machine> = "outputs" extends keyof M
+  ? [Exclude<M["outputs"], undefined | null>] extends [never]
+    ? readonly []
+    : Exclude<M["outputs"], undefined | null>
   : readonly [];
-type ContextOf<M extends Machine> = M extends { context: infer C } ? C : Record<string, unknown>;
+type ContextOf<M extends Machine> = "context" extends keyof M
+  ? [Exclude<M["context"], undefined | null>] extends [never]
+    ? Record<string, unknown>
+    : Exclude<M["context"], undefined | null>
+  : Record<string, unknown>;
 
 export type BuilderOf<M extends Machine> = ActorBuilder<
   M["states"],

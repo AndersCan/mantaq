@@ -1,6 +1,6 @@
 import { expect, test, describe, expectTypeOf } from "vite-plus/test";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
-import type { Context, ErrorState } from "@mantaq/core";
+import type { ActorOptions, Context, ErrorState } from "@mantaq/core";
 import { onOutput } from "../src/output.ts";
 import { withTimeout } from "../src/effects/timeout.ts";
 import { definePart, use, withParts } from "../src/parts.ts";
@@ -319,6 +319,32 @@ describe("parts keep full types", () => {
     expectTypeOf(actor.state).toEqualTypeOf<
       typeof idle | typeof loading | typeof done | typeof failed | ErrorState
     >();
+  });
+
+  test("annotated machine options keep full types through definePart", () => {
+    type Annotated = ActorOptions<
+      readonly [typeof idle, typeof loading],
+      readonly [typeof start],
+      readonly [typeof slow],
+      readonly [typeof report],
+      LoadContext
+    >;
+    const m = {
+      inputs: [start] as const,
+      internal: [slow] as const,
+      outputs: [report] as const,
+      states: [idle, loading] as const,
+      initial: idle,
+      context: {} as LoadContext,
+    } as Annotated;
+    const part = definePart<typeof m>((b) => {
+      b.on(idle, slow, (_event, opts) => {
+        expectTypeOf(opts.context.get().attempts).toEqualTypeOf<number>();
+        return { state: loading, emit: [report.create({ value: 1 })] };
+      });
+    });
+    withParts(m, [part]);
+    void part;
   });
 
   test("a part built for another machine is a compile error", () => {

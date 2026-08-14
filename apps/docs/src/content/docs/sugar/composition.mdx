@@ -29,8 +29,9 @@ they do not change how the actor behaves.
 ## Before — one setup body
 
 The full checkout machine, effects and all, in one `setup`. The injectable
-`chargeCardImpl` from the canonical example is a plain function here — the
-split below is the point:
+`chargeCardImpl` from the canonical example is a plain function here, and the
+`onAny` handler reads the actor through `opts.actor` instead of a closure —
+the split below is the point:
 
 ```ts
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
