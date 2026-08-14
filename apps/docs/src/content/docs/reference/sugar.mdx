@@ -132,6 +132,82 @@ All leaf paths. Dot-separated strings.
 
 ---
 
+## `definePart(machine)`
+
+```ts
+function definePart<M extends Machine>(fn: (m: BuilderOf<M>) => void): Fragment<M>;
+```
+
+Wrap a slice of a machine's setup — `m.on`, `m.onAny`, `m.effect` calls — so
+it can live in its own file. Type against the machine options object:
+
+```ts
+const checkoutPart = definePart<typeof checkout>((m) => {
+  m.on(basicInfo, submitBasicInfo, (event, opts) => {
+    const cur = opts.context.get();
+    cur.basicInfo = event.payload;
+    opts.context.set(cur);
+    return { state: shippingAddress };
+  });
+});
+```
+
+`typeof checkout` is the machine options object. It anchors every type in the
+part: states, events, context, outputs.
+
+---
+
+## `use(m, part)`
+
+```ts
+function use<M extends Machine>(m: BuilderOf<M>, part: Fragment<M>): void;
+```
+
+Register a part inside a hand-written setup.
+
+```ts
+setup: (m) => {
+  use(m, checkoutPart);
+  use(m, submittingPart);
+};
+```
+
+---
+
+## `withParts(base, parts)`
+
+```ts
+function withParts(
+  base: Omit<ActorOptions, "setup">,
+  parts: Array<(m: ActorBuilder) => void>,
+): Actor;
+```
+
+Build an actor from machine options plus an array of parts. The `setup` is
+generated — every part is run against the builder in order.
+
+```ts
+const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
+```
+
+Handlers registered later overwrite earlier ones for the same state/event
+pair, matching inline ordering.
+
+---
+
+## Types
+
+```ts
+type Machine;      // shape of a machine options object
+type BuilderOf<M>; // ActorBuilder for that machine
+type Fragment<M>;  // (m: BuilderOf<M>) => void
+```
+
+`Machine` is the constraint `definePart` and `use` accept. `BuilderOf` and
+`Fragment` name the part signature for explicit annotations.
+
+---
+
 ## `withPromise(promise, signal, emit, events)`
 
 ```ts

@@ -1,0 +1,38 @@
+import { expect, test, describe } from "vite-plus/test";
+import { event, state } from "@mantaq/core";
+import { definePart, withParts } from "../src/parts.ts";
+
+const idle = state("idle")();
+const loading = state("loading")();
+
+const start = event("start")();
+const boom = event("boom")();
+
+const machine = {
+  inputs: [start] as const,
+  internal: [boom] as const,
+  states: [idle, loading] as const,
+  initial: idle,
+  context: {} as { attempts: number },
+};
+
+const emitBoomPart = definePart<typeof machine>((m) => {
+  m.on(idle, start, () => ({ state: loading }));
+  m.effect(loading, (input) => {
+    input.emit(boom.create());
+  });
+});
+
+describe("parts error paths", () => {
+  test("unhandled internal event emitted from a part kills the actor", () => {
+    const actor = withParts(machine, [emitBoomPart]);
+    actor.send(start.create());
+    expect(actor.state.name).toBe("__error");
+  });
+
+  test("missing part for a state leaves its events unhandled", () => {
+    const actor = withParts(machine, []);
+    actor.send(start.create());
+    expect(actor.state).toBe(idle);
+  });
+});

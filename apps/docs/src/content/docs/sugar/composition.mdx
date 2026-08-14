@@ -1,0 +1,326 @@
+---
+title: Composition
+description: Split a machine's setup across files with definePart and withParts.
+---
+
+## What
+
+`definePart` and `withParts` slice one machine's `setup` into parts. Each part
+registers its own transitions and effects — in its own file, under its own
+name. The machine composes them with a single call.
+
+## Why
+
+The checkout machine from the [Effect Helpers](/mantaq/sugar/effect-helpers/) page
+has a setup that fits in one function. A real machine — a dozen states, a
+couple of effects per state, a cross-state handler or two — does not. Everything lives in one closure, in one file, in one `new Actor` call.
+There is no seam: either the setup body grows, or the whole machine moves to
+another file wholesale.
+
+Parts give you that seam. Group handlers by concern — one part per state, per
+flow, per effect — and keep every file small. TypeScript still checks each part
+against the machine's real states and events: a wrong transition target in any
+part file is a compile error, the same as writing the handler inline.
+
+Parts are not child actors. They run in the same machine, share the same
+context, and dispatch through the same event loop. They reorganize `setup`;
+they do not change how the actor behaves.
+
+## Before — one setup body
+
+The full checkout machine, effects and all, in one `setup`:
+
+```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { withPromise, withTimeout } from "@mantaq/sugar";
+
+type CheckoutContext = {
+  basicInfo?: { email: string; name: string };
+  shippingAddress?: { street: string; city: string; zip: string };
+  paymentInfo?: { cardNumber: string };
+  orderId?: string;
+};
+
+const basicInfo = state("basicInfo")();
+const shippingAddress = state("shippingAddress")();
+const payment = state("payment")();
+const submitting = state("submitting")();
+const success = state("success")().final();
+const error = state("error")();
+
+const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
+const submitShipping = event("submitShipping")<{ street: string; city: string; zip: string }>();
+const submitPayment = event("submitPayment")<{ cardNumber: string }>();
+const back = event("back")();
+const paymentOk = event("paymentOk")<{ orderId: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+const submittingDone = event("submittingDone")();
+
+function chargeCard(cardNumber: string): Promise<string> {
+  return Promise.resolve(`ord_${cardNumber.slice(-4)}`);
+}
+
+function createCheckoutActor(clock = new VirtualClock()) {
+  const actor = new Actor({
+    inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+    internal: [paymentOk, paymentFail, submittingDone],
+    states: [basicInfo, shippingAddress, payment, submitting, success, error],
+    initial: basicInfo,
+    clock,
+    context: {} as CheckoutContext,
+    setup: (m) => {
+      m.effect(submitting, (input) => {
+        const s = input.context.get();
+        withPromise(chargeCard(s.paymentInfo!.cardNumber), input.signal, input.emit, {
+          success: (orderId) => paymentOk.create({ orderId }),
+          error: (reason) => paymentFail.create({ reason: String(reason) }),
+        });
+        withTimeout(800, input, () => submittingDone.create());
+      });
+      m.onAny(back, (_event, opts) => {
+        if (opts.actor.state.name === "payment") {
+          const cur = opts.context.get();
+          cur.paymentInfo = undefined;
+          opts.context.set(cur);
+          return { state: shippingAddress };
+        }
+        if (opts.actor.state.name === "shippingAddress") {
+          const cur = opts.context.get();
+          cur.shippingAddress = undefined;
+          opts.context.set(cur);
+          return { state: basicInfo };
+        }
+        if (opts.actor.state.name === "error") {
+          return { state: payment };
+        }
+        return {};
+      });
+      m.on(basicInfo, submitBasicInfo, (event, opts) => {
+        const cur = opts.context.get();
+        cur.basicInfo = event.payload;
+        opts.context.set(cur);
+        return { state: shippingAddress };
+      });
+      m.on(shippingAddress, submitShipping, (event, opts) => {
+        const cur = opts.context.get();
+        cur.shippingAddress = event.payload;
+        opts.context.set(cur);
+        return { state: payment };
+      });
+      m.on(payment, submitPayment, (event, opts) => {
+        const cur = opts.context.get();
+        cur.paymentInfo = event.payload;
+        opts.context.set(cur);
+        return { state: submitting };
+      });
+      m.on(submitting, paymentOk, (event, opts) => {
+        const cur = opts.context.get();
+        cur.orderId = event.payload.orderId;
+        opts.context.set(cur);
+        return { state: success };
+      });
+      m.on(submitting, paymentFail, () => ({ state: error }));
+      m.on(submitting, submittingDone, () => ({ state: success }));
+    },
+  });
+  return { actor, clock };
+}
+```
+
+Every transition, every effect, in one closure. It reads fine at six states.
+It does not at twenty.
+
+## After — parts
+
+### 1. Declare the machine options as a value
+
+Parts are typed against the machine, so the options move out of `new Actor`
+into a plain object. This becomes the type anchor every part references.
+
+```ts
+// checkout.ts
+import { state, event } from "@mantaq/core";
+
+export const basicInfo = state("basicInfo")();
+export const shippingAddress = state("shippingAddress")();
+export const payment = state("payment")();
+export const submitting = state("submitting")();
+export const success = state("success")().final();
+export const error = state("error")();
+
+export const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
+export const submitShipping = event("submitShipping")<{
+  street: string;
+  city: string;
+  zip: string;
+}>();
+export const submitPayment = event("submitPayment")<{ cardNumber: string }>();
+export const back = event("back")();
+export const paymentOk = event("paymentOk")<{ orderId: string }>();
+export const paymentFail = event("paymentFail")<{ reason: string }>();
+export const submittingDone = event("submittingDone")();
+
+export type CheckoutContext = {
+  basicInfo?: { email: string; name: string };
+  shippingAddress?: { street: string; city: string; zip: string };
+  paymentInfo?: { cardNumber: string };
+  orderId?: string;
+};
+
+export function chargeCard(cardNumber: string): Promise<string> {
+  return Promise.resolve(`ord_${cardNumber.slice(-4)}`);
+}
+
+export const checkout = {
+  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+  internal: [paymentOk, paymentFail, submittingDone],
+  states: [basicInfo, shippingAddress, payment, submitting, success, error],
+  initial: basicInfo,
+  context: {} as CheckoutContext,
+};
+```
+
+### 2. One file per part
+
+`definePart` wraps a setup slice. The builder it receives is the machine's
+own — `m.on`, `m.onAny`, and `m.effect` work exactly as they do inline.
+
+```ts
+// parts/basic-info.ts
+import { definePart } from "@mantaq/sugar";
+import { checkout, basicInfo, shippingAddress, submitBasicInfo } from "../checkout.ts";
+
+export const basicInfoPart = definePart<typeof checkout>((m) => {
+  m.on(basicInfo, submitBasicInfo, (event, opts) => {
+    const cur = opts.context.get();
+    cur.basicInfo = event.payload;
+    opts.context.set(cur);
+    return { state: shippingAddress };
+  });
+});
+```
+
+Effects and their follow-up transitions stay together, each state owning its
+own file:
+
+```ts
+// parts/submitting.ts
+import { definePart } from "@mantaq/sugar";
+import { withPromise, withTimeout } from "@mantaq/sugar";
+import {
+  checkout,
+  submitting,
+  success,
+  error,
+  paymentOk,
+  paymentFail,
+  submittingDone,
+  chargeCard,
+} from "../checkout.ts";
+
+export const submittingPart = definePart<typeof checkout>((m) => {
+  m.effect(submitting, (input) => {
+    const s = input.context.get();
+    withPromise(chargeCard(s.paymentInfo!.cardNumber), input.signal, input.emit, {
+      success: (orderId) => paymentOk.create({ orderId }),
+      error: (reason) => paymentFail.create({ reason: String(reason) }),
+    });
+    withTimeout(800, input, () => submittingDone.create());
+  });
+  m.on(submitting, paymentOk, (event, opts) => {
+    const cur = opts.context.get();
+    cur.orderId = event.payload.orderId;
+    opts.context.set(cur);
+    return { state: success };
+  });
+  m.on(submitting, paymentFail, () => ({ state: error }));
+  m.on(submitting, submittingDone, () => ({ state: success }));
+});
+```
+
+Cross-state handlers go in their own part too. The handler still reaches the
+actor — through `opts.actor`, no closure needed:
+
+```ts
+// parts/back.ts
+import { definePart } from "@mantaq/sugar";
+import { checkout, back, basicInfo, shippingAddress, payment } from "../checkout.ts";
+
+export const backPart = definePart<typeof checkout>((m) => {
+  m.onAny(back, (_event, opts) => {
+    if (opts.actor.state.name === "payment") {
+      const cur = opts.context.get();
+      cur.paymentInfo = undefined;
+      opts.context.set(cur);
+      return { state: shippingAddress };
+    }
+    if (opts.actor.state.name === "shippingAddress") {
+      const cur = opts.context.get();
+      cur.shippingAddress = undefined;
+      opts.context.set(cur);
+      return { state: basicInfo };
+    }
+    if (opts.actor.state.name === "error") {
+      return { state: payment };
+    }
+    return {};
+  });
+});
+```
+
+### 3. Compose
+
+One call wires the parts together:
+
+```ts
+// machine.ts
+import { withParts } from "@mantaq/sugar";
+import { checkout } from "./checkout.ts";
+import { basicInfoPart } from "./parts/basic-info.ts";
+import { submittingPart } from "./parts/submitting.ts";
+import { backPart } from "./parts/back.ts";
+
+export const checkoutActor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
+```
+
+### 4. Hand-written setups still work
+
+`withParts` covers the common case. When the setup needs more — a clock, extra
+inline handlers, a region — use `use` inside a plain setup:
+
+```ts
+import { Actor, VirtualClock } from "@mantaq/core";
+import { use } from "@mantaq/sugar";
+import { checkout, back } from "./checkout.ts";
+import { basicInfoPart, submittingPart, backPart } from "./parts/index.ts";
+
+const actor = new Actor({
+  ...checkout,
+  clock: new VirtualClock(),
+  setup: (m) => {
+    use(m, basicInfoPart);
+    use(m, submittingPart);
+    use(m, backPart);
+    m.onAny(back, () => ({}));
+  },
+});
+```
+
+## Type safety
+
+`definePart<typeof checkout>` anchors the part to the machine. Inside the
+part, the builder carries the full machine types — event payloads, context,
+and transition targets are all checked, exactly as inline. The same
+`typeof checkout` anchor means a part built against one machine cannot be
+wired into another: the mismatch is a compile error.
+
+There is no runtime indirection. Parts register into the same transition and
+effect maps the setup body writes to, so determinism guarantees are
+unchanged.
+
+## When to reach for it
+
+A handful of states, a few transitions — keep the inline setup. When the
+setup body grows past what fits on a screen, split by concern: state files
+for state-local handlers, a file for cross-state handlers, a file for effects.
+Each file stays readable, and the machine reads as a list of parts.
