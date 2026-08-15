@@ -1,9 +1,14 @@
-/**
- * @mantaq/viz/core — pure, deterministic, framework-agnostic data layer.
- *
- * No React imports, no DOM reads, no Date.now/Math.random/performance.now.
- * Time comes from the injected `actor.clock.now()`. Same inputs, same output.
- *
- * Phase 0 stub — modules land with the vertical slice (Phase 1).
- */
-export {};
+export { buildVizGraph } from "./graph-model.ts";
+export type {
+  VizGraph,
+  VizNode,
+  VizEdge,
+  VizGroup,
+  VizEffect,
+  VizNodeKind,
+  VizEdgeKind,
+  VizResult,
+  VizErrorReason,
+} from "./graph-model.ts";
+export { layoutGraph } from "./layout.ts";
+export type { LayoutOptions, LayoutResult, LayoutDirection, VizPosition } from "./layout.ts";

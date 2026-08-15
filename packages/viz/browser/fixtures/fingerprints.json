@@ -1,0 +1,35 @@
+{
+  "$comment": "Drift guard: fixture actors run through buildVizGraph; id-set + node/edge counts must match. Update deliberately when a fixture's graph changes (bump FIXTURE_VERSION in the fixture header).",
+  "checkout": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": [
+      "__initial__",
+      "basicInfo",
+      "error",
+      "payment",
+      "shippingAddress",
+      "submitting",
+      "success"
+    ],
+    "nodeCount": 7,
+    "edgeCount": 14
+  },
+  "traffic-light": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": ["__initial__", "green", "red", "yellow"],
+    "nodeCount": 4,
+    "edgeCount": 4
+  },
+  "single": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": ["__initial__", "idle"],
+    "nodeCount": 2,
+    "edgeCount": 1
+  },
+  "self-loop": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": ["__initial__", "wait"],
+    "nodeCount": 2,
+    "edgeCount": 2
+  }
+}

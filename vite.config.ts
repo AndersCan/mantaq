@@ -188,7 +188,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["packages/viz/**"],
+        files: ["packages/viz/src/**"],
         rules: {
           "eslint/no-restricted-imports": [
             "error",

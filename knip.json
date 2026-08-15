@@ -39,11 +39,6 @@
     "@types/react-dom",
     "@vitejs/plugin-react",
     "react",
-    "react-dom",
-    // Used by Phase 1 (layout + graph model).
-    "@dagrejs/dagre",
-    "@mantaq/core",
-    "@mantaq/traversal",
-    "@mantaq/utils"
+    "react-dom"
   ]
 }

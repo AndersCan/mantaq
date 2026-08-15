@@ -1,16 +1,24 @@
 /**
- * @mantaq/viz — React public API.
- *
- * `index.ts` IS the spec: every export below is the entire public surface of
- * the package. Nothing is documented in the README that isn't exported here,
- * and nothing is exported that isn't tested through this import path.
- *
- * Two entry points in one package:
- *  - `@mantaq/viz`         — React components + data hooks
- *  - `@mantaq/viz/core`    — pure, deterministic, framework-agnostic pipeline
- *
- * Phase 0 stub — exports land with the vertical slice (Phase 1).
+ * Phase 1 vertical slice — graph rendering core.
+ * Exports grow per phase; each export is covered by the public-path contract
+ * test (`tests/index.test.ts`).
  */
-import "./styles/styles.css";
+export { buildVizGraph } from "./core/graph-model.ts";
+export type {
+  VizGraph,
+  VizNode,
+  VizEdge,
+  VizGroup,
+  VizEffect,
+  VizNodeKind,
+  VizEdgeKind,
+  VizResult,
+  VizErrorReason,
+} from "./core/graph-model.ts";
+export { layoutGraph } from "./core/layout.ts";
+export type { LayoutOptions, LayoutResult, LayoutDirection, VizPosition } from "./core/layout.ts";
 
-export {};
+// Side-effect import bundles the stylesheet: `vp pack` emits dist/styles.css
+// (React Flow CSS inlined) and adds the "./styles.css" export. Consumers opt
+// in with `import "@mantaq/viz/styles.css"`.
+import "./styles/styles.css";

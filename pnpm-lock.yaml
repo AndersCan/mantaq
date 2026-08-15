@@ -359,6 +359,9 @@ importers:
       '@fontsource/inter':
         specifier: '*'
         version: 5.3.0
+      '@mantaq/pbt':
+        specifier: workspace:*
+        version: link:../pbt
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.62.1
