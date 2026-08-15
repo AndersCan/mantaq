@@ -46,7 +46,7 @@ export type BuilderOf<M extends Machine> = ActorBuilder<
 
 export type Fragment<M extends Machine> = (m: BuilderOf<M>) => void;
 
-export function definePart<M extends Machine>(fn: (m: BuilderOf<M>) => void): Fragment<M> {
+export function definePart<M extends Machine = never>(fn: (m: BuilderOf<M>) => void): Fragment<M> {
   return fn;
 }
 
@@ -70,12 +70,15 @@ export function withParts<
   ActorContext = Record<string, unknown>,
 >(
   base: Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup">,
-  parts: readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
+  parts:
+    | Part<States, Inputs, Internal, Outputs, ActorContext>
+    | readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
 ) {
+  const list = Array.isArray(parts) ? parts : [parts];
   return new Actor({
     ...base,
     setup: (m) => {
-      for (const part of parts) part(m);
+      for (const part of list) part(m);
     },
   });
 }

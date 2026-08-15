@@ -44,4 +44,29 @@ describe("parts error paths", () => {
     });
     expect(() => withParts(machine, [boomPart])).toThrow("part blew up");
   });
+
+  test("parts emitting beyond the internal budget kill the actor", () => {
+    const loop = event("loop")();
+    const flood = {
+      inputs: [start] as const,
+      internal: [loop] as const,
+      states: [idle, loading] as const,
+      initial: idle,
+      context: {} as { attempts: number },
+      internalBudget: 2,
+    };
+    const floodPart = definePart<typeof flood>((m) => {
+      m.on(idle, start, () => ({ state: loading }));
+      m.on(loading, loop, () => ({ state: loading }));
+      m.effect(loading, (input) => {
+        input.emit(loop.create());
+        input.emit(loop.create());
+        input.emit(loop.create());
+      });
+    });
+    const actor = withParts(flood, floodPart);
+    actor.send(start.create());
+    expect(actor.state.name).toBe("__error");
+    expect(actor.snapshot().error?.reason).toBe("budget");
+  });
 });

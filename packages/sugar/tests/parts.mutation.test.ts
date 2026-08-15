@@ -50,6 +50,15 @@ describe("parts directed mutation tests", () => {
     expect(order).toEqual(["first", "second"]);
   });
 
+  test("withParts accepts a single part without an array", () => {
+    let invoked = false;
+    const part = definePart<typeof base>(() => {
+      invoked = true;
+    });
+    withParts(base, part);
+    expect(invoked).toBe(true);
+  });
+
   test("withParts carries base options onto the actor", () => {
     const actor = withParts({ ...base, internalBudget: 7 }, []);
     expect(actor.options.internalBudget).toBe(7);

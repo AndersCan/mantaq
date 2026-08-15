@@ -96,6 +96,139 @@ describe("withParts", () => {
     expect(actor.context.last).toBe("v3");
   });
 
+  test("accepts a single part without array brackets", () => {
+    const actor = withParts(newLoad(), startPart);
+    actor.send(start.create());
+    expect(actor.state).toBe(loading);
+    expect(actor.context.attempts).toBe(1);
+  });
+
+  test("accepts an inline arrow as a part", () => {
+    const actor = withParts(newLoad(), (m) => {
+      m.on(idle, start, () => ({ state: loading }));
+      m.on(loading, finish, () => ({ state: done }));
+    });
+    actor.send(start.create());
+    actor.send(finish.create({ value: 5 }));
+    expect(actor.state).toBe(done);
+  });
+
+  test("parts compose: a part can call another part's builder", () => {
+    const subA = definePart<typeof load>((m) => {
+      m.on(idle, start, () => ({ state: loading }));
+    });
+    const subB = definePart<typeof load>((m) => {
+      m.on(loading, finish, (event, opts) => {
+        const cur = opts.context.get();
+        cur.last = `v${event.payload.value}`;
+        opts.context.set(cur);
+        return { state: done };
+      });
+    });
+    const combined = definePart<typeof load>((m) => {
+      subA(m);
+      subB(m);
+    });
+    const actor = withParts(newLoad(), combined);
+    actor.send(start.create());
+    actor.send(finish.create({ value: 9 }));
+    expect(actor.state).toBe(done);
+    expect(actor.context.last).toBe("v9");
+  });
+
+  test("state and onAny handlers both emit, state emit first", () => {
+    const emitA = event("emitA")<{ n: number }>();
+    const emitB = event("emitB")();
+    const go = event("go")();
+    const on = state("on")();
+    const off = state("off")();
+    const pair = {
+      inputs: [go] as const,
+      internal: [] as const,
+      outputs: [emitA, emitB] as const,
+      states: [on, off] as const,
+      initial: off,
+      context: {},
+    };
+    const part = definePart<typeof pair>((m) => {
+      m.on(off, go, () => ({ state: on, emit: [emitA.create({ n: 1 })] }));
+      m.onAny(go, () => ({ emit: [emitB.create()] }));
+    });
+    const actor = withParts(pair, part);
+    const received: Array<{ type: string; payload?: unknown }> = [];
+    onOutput(actor, (e) => received.push(e));
+    actor.send(go.create());
+    expect(received).toEqual([{ type: "emitA", payload: { n: 1 } }, { type: "emitB" }]);
+  });
+
+  test("transitioning to the same state re-arms a part's effect", async () => {
+    const clock = new VirtualClock();
+    const bounce = event("bounce")();
+    const machine = {
+      inputs: [start, bounce] as const,
+      internal: [slow] as const,
+      states: [idle, loading, done] as const,
+      initial: idle,
+      context: {} as LoadContext,
+      clock,
+    };
+    const part = definePart<typeof machine>((m) => {
+      m.on(idle, start, () => ({ state: loading }));
+      m.on(loading, bounce, () => ({ state: loading }));
+      m.effect(loading, (input) => {
+        withTimeout(5, input, () => slow.create());
+      });
+      m.on(loading, slow, (_event, opts) => {
+        const cur = opts.context.get();
+        cur.last = "timed-out";
+        opts.context.set(cur);
+        return { state: done };
+      });
+    });
+    const actor = withParts(machine, part);
+    actor.send(start.create());
+    actor.send(bounce.create());
+    clock.advance(5);
+    await actor.settled();
+    expect(actor.state).toBe(done);
+    expect(actor.context.last).toBe("timed-out");
+  });
+
+  test("region child output drives a part handler", () => {
+    const go = event("go")();
+    const ready = event("ready")();
+    const cidle = state("cidle")();
+    const cdone = state("cdone")().final();
+    const pidle = state("pidle")();
+    const active = state("active")();
+    const childBase = {
+      inputs: [go] as const,
+      internal: [] as const,
+      outputs: [ready] as const,
+      states: [cidle, cdone] as const,
+      initial: cidle,
+      context: {},
+    };
+    const childPart = definePart<typeof childBase>((m) => {
+      m.on(cidle, go, () => ({ state: cdone, emit: [ready.create()] }));
+    });
+    const parentBase = {
+      inputs: [ready] as const,
+      internal: [] as const,
+      states: [pidle, active] as const,
+      initial: pidle,
+      context: {},
+    };
+    const parentPart = definePart<typeof parentBase>((m) => {
+      m.on(pidle, ready, () => ({ state: active }));
+    });
+    const child = withParts(childBase, childPart);
+    const parent = withParts({ ...parentBase, regions: { worker: child } }, parentPart);
+    child.send(go.create());
+    expect(parent.state).toBe(active);
+    expect(parent.snapshot().regions.worker.path[0]).toBe("cdone");
+  });
+
   test("parts can reference each other's states", () => {
     const actor = withParts(newLoad(), [startPart, finishPart, retryPart]);
     actor.send(start.create());
@@ -253,6 +386,13 @@ describe("parts keep full types", () => {
         expectTypeOf(opts.context.get().attempts).toEqualTypeOf<number>();
         return { state: done, emit: [report.create({ value: event.payload.value })] };
       });
+    });
+  });
+
+  test("definePart without a machine generic is a compile error, not silent widening", () => {
+    definePart((m) => {
+      // @ts-expect-error M defaults to never, so a machineless part cannot register anything
+      m.on(idle, start, () => ({ state: loading }));
     });
   });
 

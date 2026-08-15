@@ -154,7 +154,9 @@ const checkoutPart = definePart<typeof checkout>((m) => {
 ```
 
 `typeof checkout` is the machine options object. It anchors every type in the
-part: states, events, context, outputs.
+part: states, events, context, outputs. Import it type-only in the part file —
+`import type { checkout } from "./checkout.ts"` — and keep the refs as value
+imports.
 
 ---
 
@@ -173,9 +175,8 @@ setup: (m) => {
 };
 ```
 
-`use` takes `Fragment`s from `definePart`. The hand-written `Part` type is for
-`withParts` arrays — a bare `Part` value won't unify with `use`'s inference;
-always define parts with `definePart`.
+`use` is not the React hook. It takes `Fragment`s produced by `definePart` —
+define parts with `definePart`, never annotate the `Part` type by hand.
 
 ---
 
@@ -190,14 +191,16 @@ function withParts<
   ActorContext = Record<string, unknown>,
 >(
   base: Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup">,
-  parts: readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
+  parts:
+    | Part<States, Inputs, Internal, Outputs, ActorContext>
+    | readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
 ): Actor<States, Inputs, Internal, Outputs, ActorContext>;
 ```
 
-Build an actor from machine options plus an array of parts. The `setup` is
-generated — every part is run against the builder in order. `base` takes every
-option `new Actor` takes: `clock`, `regions`, `internalBudget`, and initial
-with payload included.
+Build an actor from machine options plus one part or an array of parts. The
+`setup` is generated — every part is run against the builder in order. `base`
+takes every option `new Actor` takes: `clock`, `regions`, `internalBudget`,
+and initial with payload included.
 
 The parts array shares the machine's generics — `Part<States, ...>`, not any
 machine. A part built against one machine cannot be wired into another.
@@ -223,7 +226,7 @@ type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — th
 
 `Machine` is the constraint `definePart` and `use` accept. `BuilderOf` and
 `Fragment` name the part signature for explicit annotations. `Part` is the
-same shape with explicit generics — the element type `withParts` takes.
+same shape with explicit generics — what `withParts` takes, one or an array.
 
 `Machine` is a constraint, not a value annotation: annotating a machine with
 `Machine` (or `ActorOptions`) erases its literal state/event/context types.

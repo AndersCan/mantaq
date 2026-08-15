@@ -180,18 +180,21 @@ export const checkout = {
   states: [basicInfo, shippingAddress, payment, submitting, success, error],
   initial: basicInfo,
   context: {} as CheckoutContext,
-};
+} as const;
 ```
 
 ### 2. One file per part
 
 `definePart` wraps a setup slice. The builder it receives is the machine's
-own — `m.on`, `m.onAny`, and `m.effect` work exactly as they do inline.
+own — `m.on`, `m.onAny`, and `m.effect` work exactly as they do inline. The
+options object is imported `type`-only as the part's anchor; the refs come in
+as values.
 
 ```ts
 // parts/basic-info.ts
 import { definePart } from "@mantaq/sugar";
-import { checkout, basicInfo, shippingAddress, submitBasicInfo } from "../checkout.ts";
+import type { checkout } from "../checkout.ts";
+import { basicInfo, shippingAddress, submitBasicInfo } from "../checkout.ts";
 
 export const basicInfoPart = definePart<typeof checkout>((m) => {
   m.on(basicInfo, submitBasicInfo, (event, opts) => {
@@ -204,13 +207,15 @@ export const basicInfoPart = definePart<typeof checkout>((m) => {
 ```
 
 Effects and their follow-up transitions stay together, each state owning its
-own file:
+own file. This part owns the charge effect and its three exits: `paymentOk` →
+`success`, `paymentFail` → `error`, and the 800ms `submittingDone` fallback →
+`success`:
 
 ```ts
 // parts/submitting.ts
 import { definePart, withPromise, withTimeout } from "@mantaq/sugar";
+import type { checkout } from "../checkout.ts";
 import {
-  checkout,
   submitting,
   success,
   error,
@@ -241,12 +246,15 @@ export const submittingPart = definePart<typeof checkout>((m) => {
 ```
 
 Cross-state handlers go in their own part too. The handler still reaches the
-actor — through `opts.actor`, no closure needed:
+actor — through `opts.actor`, no closure needed. `back` unwinds one step:
+`payment` → `shippingAddress`, `shippingAddress` → `basicInfo`, and from
+`error` it retries by returning to `payment`:
 
 ```ts
 // parts/back.ts
 import { definePart } from "@mantaq/sugar";
-import { checkout, back, basicInfo, shippingAddress, payment } from "../checkout.ts";
+import type { checkout } from "../checkout.ts";
+import { back, basicInfo, shippingAddress, payment } from "../checkout.ts";
 
 export const backPart = definePart<typeof checkout>((m) => {
   m.onAny(back, (_event, opts) => {
@@ -285,10 +293,18 @@ import { backPart } from "./parts/back.ts";
 export const checkoutActor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
 ```
 
-`base` is the machine options object — pass `clock`, `regions`, or
-`internalBudget` through it the same way you would to `new Actor`. A
-`VirtualClock` in the base keeps the determinism story from
-[Testing](/mantaq/guides/actor-testing/) intact.
+`base` (here `checkout`) is the machine options object — pass `clock`,
+`regions`, or `internalBudget` through it the same way you would to `new
+Actor`. A `VirtualClock` in the base keeps the determinism story from
+[Testing](/mantaq/guides/actor-testing/) intact:
+
+```ts
+const checkoutActor = withParts({ ...checkout, clock: new VirtualClock() }, [
+  basicInfoPart,
+  submittingPart,
+  backPart,
+]);
+```
 
 ### 4. Hand-written setups still work
 
@@ -318,9 +334,12 @@ const actor = new Actor({
 });
 ```
 
-Inline registrations and parts are ordered: a handler for the same
-(state, event) replaces the one before it, whatever registered it. Effects
-append instead — both effects run on state entry.
+Parts compose too — a part can call another part's builder (`subPart(m)`)
+before its own registrations. Inline registrations and parts are ordered: a
+handler for the same (state, event) replaces the one before it, whatever
+registered it. Effects append instead — both effects run on state entry. An
+`onAny` handler is a separate registration: it runs alongside a specific
+state handler rather than replacing it.
 
 ## Type safety
 
@@ -328,11 +347,14 @@ append instead — both effects run on state entry.
 part, the builder carries the full machine types — event payloads, context,
 and transition targets are all checked, exactly as inline. The same
 `typeof checkout` anchor means a part built against one machine cannot be
-wired into another: the mismatch is a compile error.
+wired into another: the mismatch is a compile error. Forget the anchor and
+`definePart` errors instead of widening silently.
 
 There is no runtime indirection. Parts register into the same transition and
 effect maps the setup body writes to, so determinism guarantees are
-unchanged.
+unchanged. The composed actor is trace-identical to the inline machine —
+see [checkout.actor.test.ts](https://github.com/AndersCan/mantaq/blob/main/packages/examples/checkout.actor.test.ts)
+and the parts trace-equivalence property test (`packages/sugar/tests/parts.property.test.ts`).
 
 ## When to reach for it
 

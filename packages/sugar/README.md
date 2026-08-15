@@ -245,7 +245,8 @@ composes the slices.
 
 ```ts
 import { definePart, withParts } from "@mantaq/sugar";
-import { checkout, basicInfo, submitBasicInfo } from "./checkout.ts";
+import type { checkout } from "./checkout.ts";
+import { basicInfo, submitBasicInfo } from "./checkout.ts";
 
 const basicInfoPart = definePart<typeof checkout>((m) => {
   m.on(basicInfo, submitBasicInfo, (event, opts) => {
@@ -261,8 +262,9 @@ export const checkoutActor = withParts(checkout, [basicInfoPart /* ... */]);
 
 The machine options live in a plain object; `typeof checkout` anchors every
 type in the part. Wrong transition targets, event payloads, or context keys
-are compile errors — the same as inline. `use(m, part)` registers a part
-inside a hand-written setup.
+are compile errors — the same as inline. Forget the anchor and `definePart`
+errors instead of widening silently. `use(m, part)` registers a part inside a
+hand-written setup.
 
 **Anti-pattern:** One monolithic `setup` when the machine outgrows a screen —
 every handler in one closure, impossible to split across files.
@@ -430,11 +432,12 @@ withTimeout(5000, input, () => ({ type: "timeout", payload: { reason: "exceeded"
 Wrap a slice of a machine's setup so it can live in its own file. Type against
 the machine options object — `definePart<typeof checkout>((m) => {...})`. The
 builder inside the part carries the full machine types: states, events,
-context, outputs.
+context, outputs. Without the anchor, `definePart` errors rather than widening
+silently.
 
 ### `use(m, part)`
 
-Register a part inside a hand-written setup:
+Register a part inside a hand-written setup (not the React hook):
 
 ```ts
 setup: (m) => {
@@ -445,11 +448,13 @@ setup: (m) => {
 
 ### `withParts(base, parts)`
 
-Build an actor from machine options plus an array of parts. `base` takes every
-option `new Actor` takes — clock, regions, budget, initial included.
+Build an actor from machine options plus one part or an array of parts. `base`
+takes every option `new Actor` takes — clock, regions, budget, initial
+included.
 
 ```ts
 const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
+const single = withParts(checkout, basicInfoPart);
 ```
 
 For the same (state, event), the last registered handler wins. Effects append
