@@ -1,1 +1,72 @@
-/* @mantaq/viz — error-banner component styles (filled in by phase). */
+/* @mantaq/viz — error-banner styles. Token-only values. */
+
+.mtq-error-banner {
+  position: absolute;
+  top: var(--mtq-sp-3);
+  right: var(--mtq-sp-3);
+  left: var(--mtq-sp-3);
+  z-index: var(--mtq-z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--mtq-sp-2);
+  padding: var(--mtq-sp-2) var(--mtq-sp-3);
+  background: var(--mtq-err-bg);
+  border: 1px solid var(--mtq-err);
+  border-radius: var(--mtq-radius-md);
+  color: var(--mtq-text);
+  font-family: var(--mtq-font-sans);
+  font-size: var(--mtq-font-size-sm);
+  box-shadow: var(--mtq-shadow);
+}
+
+.mtq-error-banner__chip {
+  padding: 0 var(--mtq-sp-1);
+  background: var(--mtq-err);
+  border-radius: var(--mtq-radius-sm);
+  color: var(--mtq-text-on-accent);
+  font-family: var(--mtq-font-mono);
+  font-size: var(--mtq-font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mtq-error-banner__reason {
+  font-weight: 700;
+}
+
+.mtq-error-banner__message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mtq-text-muted);
+  font-family: var(--mtq-font-mono);
+  font-size: var(--mtq-font-size-xs);
+}
+
+.mtq-error-banner__actions {
+  display: inline-flex;
+  gap: var(--mtq-sp-1);
+}
+
+.mtq-error-banner__button {
+  padding: var(--mtq-sp-1) var(--mtq-sp-2);
+  background: var(--mtq-bg-raised);
+  border: 1px solid var(--mtq-border-strong);
+  border-radius: var(--mtq-radius-sm);
+  color: var(--mtq-text);
+  font-family: var(--mtq-font-sans);
+  font-size: var(--mtq-font-size-xs);
+  cursor: pointer;
+}
+
+.mtq-error-banner__button:hover {
+  background: var(--mtq-bg-hover);
+}
+
+.mtq-error-banner__button:focus-visible {
+  outline: 2px solid var(--mtq-accent);
+  outline-offset: 1px;
+}

@@ -72,7 +72,7 @@ export type PaymentInfo = {
   cardNumber: string;
 };
 
-export type CheckoutContext = {
+type CheckoutContext = {
   basicInfo?: BasicInfo;
   shippingAddress?: ShippingAddress;
   paymentInfo?: PaymentInfo;
@@ -80,19 +80,19 @@ export type CheckoutContext = {
 };
 
 export const basicInfo = state("basicInfo")();
-export const shippingAddress = state("shippingAddress")();
-export const payment = state("payment")();
+const shippingAddress = state("shippingAddress")();
+const payment = state("payment")();
 export const submitting = state("submitting")();
-export const success = state("success")().final();
-export const error = state("error")();
+const success = state("success")().final();
+const error = state("error")();
 
 export const submitBasicInfo = event("submitBasicInfo")<BasicInfo>();
 export const submitShipping = event("submitShipping")<ShippingAddress>();
 export const submitPayment = event("submitPayment")<PaymentInfo>();
-export const back = event("back")();
-export const paymentOk = event("paymentOk")<{ orderId: string }>();
-export const paymentFail = event("paymentFail")<{ reason: string }>();
-export const submittingDone = event("submittingDone")();
+const back = event("back")();
+const paymentOk = event("paymentOk")<{ orderId: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+const submittingDone = event("submittingDone")();
 
 function chargeCard(cardNumber: string): Promise<string> {
   // your payment provider. resolves with an order id.

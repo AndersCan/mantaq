@@ -1,1 +1,39 @@
-/* @mantaq/viz — actor-badge component styles (filled in by phase). */
+/* @mantaq/viz — actor-badge styles. Token-only values. */
+
+.mtq-actor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mtq-sp-2);
+  padding: var(--mtq-sp-1) var(--mtq-sp-3);
+  background: var(--mtq-bg-raised);
+  border: 1px solid var(--mtq-border);
+  border-radius: var(--mtq-radius-full);
+  color: var(--mtq-text);
+  font-family: var(--mtq-font-sans);
+  font-size: var(--mtq-font-size-sm);
+}
+
+.mtq-actor-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--mtq-radius-full);
+  background: var(--mtq-accent);
+}
+
+.mtq-actor-badge[data-status="error"] .mtq-actor-badge__dot {
+  background: var(--mtq-err);
+}
+
+.mtq-actor-badge[data-status="done"] .mtq-actor-badge__dot {
+  background: var(--mtq-ok);
+}
+
+.mtq-actor-badge__name {
+  font-weight: 600;
+}
+
+.mtq-actor-badge__stats {
+  color: var(--mtq-text-muted);
+  font-family: var(--mtq-font-mono);
+  font-size: var(--mtq-font-size-xs);
+}

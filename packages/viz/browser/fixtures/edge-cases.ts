@@ -16,8 +16,8 @@
 
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
 
-export const idle = state("idle")();
-export const wait = state("wait")();
+const idle = state("idle")();
+const wait = state("wait")();
 export const loop = event("loop")();
 
 export function createSingleActor(clock?: VirtualClock) {

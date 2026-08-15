@@ -56,6 +56,7 @@
   "devDependencies": {
     "@fontsource/ibm-plex-mono": "*",
     "@fontsource/inter": "*",
+    "@mantaq/pbt": "workspace:*",
     "@playwright/test": "catalog:",
     "@testing-library/dom": "*",
     "@testing-library/react": "*",

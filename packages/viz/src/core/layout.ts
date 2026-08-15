@@ -19,6 +19,11 @@ import { Either } from "@mantaq/utils";
 
 export type LayoutDirection = "LR" | "TB";
 
+/** Fixed node width used by default layouts — adapter must match (no overlap). */
+export const DEFAULT_NODE_WIDTH = 180;
+/** Fixed node height used by default layouts — adapter must match. */
+export const DEFAULT_NODE_HEIGHT = 48;
+
 export interface LayoutOptions {
   /** Rank direction. Default `LR`. */
   direction?: LayoutDirection;
@@ -66,8 +71,8 @@ function sortedEdgePairs(graph: VizGraph): Array<[string, string]> {
 export function layoutGraph(graph: VizGraph, options: LayoutOptions = {}): LayoutResult {
   const {
     direction = "LR",
-    nodeWidth = 180,
-    nodeHeight = 48,
+    nodeWidth = DEFAULT_NODE_WIDTH,
+    nodeHeight = DEFAULT_NODE_HEIGHT,
     nodeSep = 40,
     rankSep = 60,
     margin = 24,

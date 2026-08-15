@@ -26,19 +26,12 @@
     "@radix-ui/react-switch",
     "@radix-ui/react-tabs",
     "@radix-ui/react-tooltip",
-    "@xyflow/react",
     "clsx",
     "lucide-react",
     "@fontsource/ibm-plex-mono",
     "@fontsource/inter",
-    "@testing-library/dom",
-    "@testing-library/react",
     "@testing-library/user-event",
     "@tsdown/css",
-    "@types/react",
-    "@types/react-dom",
-    "@vitejs/plugin-react",
-    "react",
-    "react-dom"
+    "@vitejs/plugin-react"
   ]
 }

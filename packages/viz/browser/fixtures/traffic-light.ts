@@ -10,9 +10,9 @@
 
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
 
-export const red = state("red")();
-export const green = state("green")();
-export const yellow = state("yellow")();
+const red = state("red")();
+const green = state("green")();
+const yellow = state("yellow")();
 
 export const tick = event("tick")();
 

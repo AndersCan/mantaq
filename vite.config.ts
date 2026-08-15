@@ -1,10 +1,16 @@
-import { defineConfig } from "vite-plus";
+import { defaultExclude, defineConfig } from "vite-plus";
 
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
   fmt: {},
+  test: {
+    // property-test suites register no `it()` (runProperty executes inline) —
+    // the package-level configs all set this; the root must too.
+    passWithNoTests: true,
+    exclude: [...defaultExclude, "packages/viz/browser/**"],
+  },
   lint: {
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },

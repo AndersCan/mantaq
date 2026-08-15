@@ -12,3 +12,4 @@ export type {
 } from "./graph-model.ts";
 export { layoutGraph } from "./layout.ts";
 export type { LayoutOptions, LayoutResult, LayoutDirection, VizPosition } from "./layout.ts";
+export { DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from "./layout.ts";

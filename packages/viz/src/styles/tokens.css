@@ -49,8 +49,11 @@
   --mtq-graph-node-label: #1b1f27;
   --mtq-graph-node-final: #e8890c;
   --mtq-graph-node-initial: #4c6ef5;
+  --mtq-graph-node-min-width: 180px;
+  --mtq-graph-node-min-height: 48px;
   --mtq-graph-edge: #9aa3b2;
   --mtq-graph-edge-active: #4c6ef5;
+  --mtq-graph-edge-initial: #4c6ef5;
   --mtq-graph-edge-internal: #c8cdd6;
   --mtq-graph-edge-undetermined: #e03131;
   --mtq-graph-edge-label-bg: #ffffff;
@@ -129,8 +132,11 @@
   --mtq-graph-node-label: #e8eaee;
   --mtq-graph-node-final: #f0a53c;
   --mtq-graph-node-initial: #7c96ff;
+  --mtq-graph-node-min-width: 180px;
+  --mtq-graph-node-min-height: 48px;
   --mtq-graph-edge: #4a5262;
   --mtq-graph-edge-active: #7c96ff;
+  --mtq-graph-edge-initial: #7c96ff;
   --mtq-graph-edge-internal: #3d4453;
   --mtq-graph-edge-undetermined: #f06565;
   --mtq-graph-edge-label-bg: #1e222b;
