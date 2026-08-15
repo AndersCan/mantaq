@@ -245,8 +245,7 @@ composes the slices.
 
 ```ts
 import { definePart, withParts } from "@mantaq/sugar";
-import type { checkout } from "./checkout.ts";
-import { basicInfo, shippingAddress, submitBasicInfo } from "./checkout.ts";
+import { checkout, basicInfo, shippingAddress, submitBasicInfo } from "./checkout.ts";
 
 const basicInfoPart = definePart<typeof checkout>((m) => {
   m.on(basicInfo, submitBasicInfo, (event, opts) => {

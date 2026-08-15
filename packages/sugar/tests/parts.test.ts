@@ -501,4 +501,16 @@ describe("parts keep full types", () => {
       }));
     });
   });
+
+  test("wiring a part into a different machine's withParts is a compile error", () => {
+    const other = {
+      inputs: [start] as const,
+      internal: [] as const,
+      states: [idle, done] as const,
+      initial: idle,
+      context: {},
+    };
+    // @ts-expect-error partA was anchored to the load machine, not "other"
+    withParts(other, startPart);
+  });
 });
