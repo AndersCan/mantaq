@@ -20,3 +20,25 @@ jobs:
       - run: vp run mutation:sugar
       - run: vp run ready
       - run: vp run knip
+
+  viz-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+      - run: vp install
+      - run: npx playwright install --with-deps chromium
+        working-directory: packages/viz
+      - run: pnpm --filter @mantaq/viz run test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: viz-playwright-report
+          path: |
+            packages/viz/browser/test-results/
+            packages/viz/browser/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

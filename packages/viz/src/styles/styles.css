@@ -1,0 +1,15 @@
+/*
+ * @mantaq/viz — single compiled stylesheet.
+ * Consumers import `@mantaq/viz/styles.css` (sideEffects flag keeps it alive).
+ * The lib build emits this as one dist/styles.css file (cssCodeSplit: false).
+ */
+@import "@xyflow/react/dist/style.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./components/actor-badge.css";
+@import "./components/error-banner.css";
+@import "./components/state-graph.css";
+@import "./components/event-palette.css";
+@import "./components/context-inspector.css";
+@import "./components/transition-timeline.css";
+@import "./components/viz.css";

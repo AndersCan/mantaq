@@ -145,3 +145,40 @@ Type-level tests live in `packages/core/tests/typecheck.test.ts` (`expectTypeOf`
 - [ ] Run `vp run mutation:core` and `vp run mutation:sugar` — mutation score must stay above the break threshold (90).
 
 <!--VISION ENFORCEMENT END-->
+
+<!--VIZ UI RULES START-->
+
+# @mantaq/viz UI Coding Rules
+
+The viz package is an LLM-built UI. The plan is `viz.v2.md` (root). Specs live
+in `packages/viz/src/specs/*.md` — **no component code before its spec exists**.
+These rules are the L4 lint/rules layer of the plan's guardrail stack
+(L0 specs → L1 types → L2 fixtures → L3 goldens+structural → L4 rules).
+
+1. **Spec first.** Never invent a prop beyond the spec.
+2. **Tokens only.** Every color/spacing/radius/font from `tokens.css`. Zero raw
+   hex/rgb, zero inline `style` for color/spacing/font. New token? Update
+   `tokens.css` first.
+3. **Every state renders.** default, hover, focus-visible, disabled, empty,
+   error, selected. Never `return null`/blank for a defined state.
+4. **Data is a discriminated union**, never boolean flags. Exhaustive `switch`
+   - `assertNever`. If a state can't exist, it must not compile.
+5. **No dead controls.** Every button/tab/chip has a wired, tested handler.
+   No `disabled: true` without reason. Internal event chips are spans.
+6. **Hooks:** no async `useEffect`, no effect without cleanup, never suppress
+   `react-hooks/*` lint.
+7. **Semantic HTML + a11y:** native `<button>`, aria-labels on icon buttons,
+   focus ring via `:focus-visible` + token, keyboard contract from the spec.
+8. **Errors surface.** No `console.*` in library code; errors flow via
+   `VizError`/`onError`. Never swallow a handler error into a blank canvas.
+9. **Motion is token-only** and honors `prefers-reduced-motion`.
+10. **Determinism.** No `Date.now`/`Math.random`/`performance.now` in
+    `src/core`. Time = `actor.clock.now()`; `seq` is the replay axis.
+11. **Before done:** `vp check` + `vp test` + run the fixture gallery
+    (`cd packages/viz && vp run serve:test`, then `playwright test`), verify
+    empty/error states, then the golden + structural suite.
+
+Commands: `pnpm --filter @mantaq/viz run test` (vitest), `... test:browser`
+(Playwright), `... browser:build` / `browser:preview` / `serve:test`.
+
+<!--VIZ UI RULES END-->

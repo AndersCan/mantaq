@@ -39,6 +39,17 @@ export default defineConfig({
         },
       },
       {
+        // viz core: no console, no throw — but no-try-catch stays OFF: context
+        // values are untrusted input, so formatValue/getter handling and
+        // buildVizGraph's catch of a throwing buildGraph are the sanctioned
+        // untrusted-value boundary (see viz.v2.md §4).
+        files: ["packages/viz/src/core/**"],
+        rules: {
+          "mantaq/no-throw": "error",
+          "mantaq/no-console": "error",
+        },
+      },
+      {
         files: [
           "packages/core/src/virtual-clock.ts",
           "packages/core/src/actor.ts",
@@ -171,6 +182,58 @@ export default defineConfig({
                   name: "@mantaq/test",
                   message: "@mantaq/test imports only @mantaq/core and @mantaq/traversal",
                 },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        files: ["packages/viz/**"],
+        rules: {
+          "eslint/no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                {
+                  name: "@mantaq/sugar",
+                  message:
+                    "@mantaq/viz imports only @mantaq/core, @mantaq/traversal, @mantaq/utils",
+                },
+                {
+                  name: "@mantaq/test",
+                  message:
+                    "@mantaq/viz imports only @mantaq/core, @mantaq/traversal, @mantaq/utils",
+                },
+                { name: "@mantaq/pbt", message: "@mantaq/viz may not import @mantaq/pbt from src" },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        // framework-agnostic guarantee: nothing in viz core may import React,
+        // the flow library, or any DOM-only widget. Typechecking in a node env
+        // would catch most of this; the lint makes it structural.
+        files: ["packages/viz/src/core/**"],
+        rules: {
+          "eslint/no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "react", message: "@mantaq/viz/core is framework-agnostic — no react" },
+                {
+                  name: "react-dom",
+                  message: "@mantaq/viz/core is framework-agnostic — no react-dom",
+                },
+                {
+                  name: "@xyflow/react",
+                  message: "@mantaq/viz/core is framework-agnostic — no @xyflow/react",
+                },
+                {
+                  name: "lucide-react",
+                  message: "@mantaq/viz/core is framework-agnostic — no lucide-react",
+                },
+                { name: "clsx", message: "@mantaq/viz/core is framework-agnostic — no clsx" },
               ],
             },
           ],

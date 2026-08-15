@@ -1,0 +1,82 @@
+{
+  "name": "@mantaq/viz",
+  "version": "0.1.0",
+  "description": "Embeddable live state-machine inspector for mantaq actors.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/viz"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core/index.ts",
+    "./styles.css": "./src/styles/styles.css",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build",
+    "coverage": "vp test run --coverage",
+    "prepack": "vp run build",
+    "browser:build": "vp build --config browser/vite.config.ts",
+    "browser:preview": "vp preview --config browser/vite.config.ts --port 4173 --strictPort",
+    "serve:test": "vp build --config browser/vite.config.ts && vp preview --config browser/vite.config.ts --port 4173 --strictPort",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^3",
+    "@mantaq/core": "workspace:*",
+    "@mantaq/traversal": "workspace:*",
+    "@mantaq/utils": "workspace:*",
+    "@radix-ui/react-dialog": "^1.1",
+    "@radix-ui/react-popover": "^1.1",
+    "@radix-ui/react-select": "^2.2",
+    "@radix-ui/react-slot": "^1.2",
+    "@radix-ui/react-switch": "^1.2",
+    "@radix-ui/react-tabs": "^1.1",
+    "@radix-ui/react-tooltip": "^1.2",
+    "@xyflow/react": "^12.11",
+    "clsx": "^2",
+    "lucide-react": "^1"
+  },
+  "devDependencies": {
+    "@fontsource/ibm-plex-mono": "*",
+    "@fontsource/inter": "*",
+    "@playwright/test": "catalog:",
+    "@testing-library/dom": "*",
+    "@testing-library/react": "*",
+    "@testing-library/user-event": "*",
+    "@tsdown/css": "^0.22",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitejs/plugin-react": "^6",
+    "@vitest/coverage-v8": "catalog:",
+    "happy-dom": "*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "^7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19",
+    "react-dom": "^19"
+  }
+}

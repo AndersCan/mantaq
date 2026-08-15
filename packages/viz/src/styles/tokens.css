@@ -1,0 +1,140 @@
+/*
+ * @mantaq/viz design tokens — the single source of every color, spacing,
+ * radius, font, size, duration, z-index and shadow in the package.
+ *
+ * Consumer contract: override any `--mtq-*` variable on a parent element to
+ * theme the whole viz. No raw values anywhere else in the stylesheet.
+ *
+ * Light values + [data-theme="dark"] overrides. Both blocks set
+ * `color-scheme` so native controls/scrollbars follow the theme.
+ */
+.mtq-viz,
+[data-theme="dark"].mtq-viz {
+  color-scheme: light dark;
+}
+
+.mtq-viz {
+  color-scheme: light;
+
+  /* surfaces */
+  --mtq-bg: #ffffff;
+  --mtq-bg-raised: #fbfbfc;
+  --mtq-bg-hover: #f2f3f5;
+  --mtq-bg-muted: #f6f7f9;
+
+  /* text */
+  --mtq-text: #1b1f27;
+  --mtq-text-muted: #626a78;
+  --mtq-text-on-accent: #ffffff;
+
+  /* borders */
+  --mtq-border: #e3e6eb;
+  --mtq-border-strong: #c8cdd6;
+
+  /* accent */
+  --mtq-accent: #4c6ef5;
+  --mtq-accent-muted: #edf0fe;
+
+  /* status */
+  --mtq-ok: #2f9e44;
+  --mtq-ok-bg: #e6f4e8;
+  --mtq-warn: #e8890c;
+  --mtq-warn-bg: #fdf1e0;
+  --mtq-err: #e03131;
+  --mtq-err-bg: #fdeaec;
+
+  /* graph */
+  --mtq-graph-node-fill: #ffffff;
+  --mtq-graph-node-stroke: #c8cdd6;
+  --mtq-graph-node-label: #1b1f27;
+  --mtq-graph-node-final: #e8890c;
+  --mtq-graph-node-initial: #4c6ef5;
+  --mtq-graph-edge: #9aa3b2;
+  --mtq-graph-edge-active: #4c6ef5;
+  --mtq-graph-edge-internal: #c8cdd6;
+  --mtq-graph-edge-undetermined: #e03131;
+  --mtq-graph-edge-label-bg: #ffffff;
+  --mtq-graph-edge-label: #626a78;
+
+  /* spacing scale */
+  --mtq-sp-1: 4px;
+  --mtq-sp-2: 8px;
+  --mtq-sp-3: 12px;
+  --mtq-sp-4: 16px;
+  --mtq-sp-5: 24px;
+  --mtq-sp-6: 32px;
+
+  /* radii */
+  --mtq-radius-sm: 4px;
+  --mtq-radius-md: 8px;
+  --mtq-radius-lg: 12px;
+  --mtq-radius-full: 999px;
+
+  /* fonts */
+  --mtq-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mtq-font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* font sizes (tool density) */
+  --mtq-font-size-xs: 11px;
+  --mtq-font-size-sm: 12px;
+  --mtq-font-size-md: 13px;
+
+  /* durations */
+  --mtq-duration-fast: 100ms;
+  --mtq-duration-med: 200ms;
+  --mtq-duration-slow: 400ms;
+
+  /* z-index */
+  --mtq-z-popover: 1000;
+  --mtq-z-tooltip: 1100;
+
+  /* shadow */
+  --mtq-shadow: 0 4px 16px rgba(27, 31, 39, 0.12);
+
+  /* React Flow canvas mapping — RF reads its own --xy-* variables */
+  --xy-edge-stroke: var(--mtq-graph-edge);
+  --xy-edge-stroke-selected: var(--mtq-accent);
+  --xy-edge-stroke-width: 1.5;
+  --xy-background-color: var(--mtq-bg);
+  --xy-background-pattern-dots-color: var(--mtq-border);
+}
+
+.mtq-viz[data-theme="dark"] {
+  color-scheme: dark;
+
+  --mtq-bg: #171a20;
+  --mtq-bg-raised: #1e222b;
+  --mtq-bg-hover: #262b36;
+  --mtq-bg-muted: #20242d;
+
+  --mtq-text: #e8eaee;
+  --mtq-text-muted: #98a0af;
+  --mtq-text-on-accent: #ffffff;
+
+  --mtq-border: #2c313d;
+  --mtq-border-strong: #3d4453;
+
+  --mtq-accent: #7c96ff;
+  --mtq-accent-muted: #262f52;
+
+  --mtq-ok: #5ec27a;
+  --mtq-ok-bg: #1d3a27;
+  --mtq-warn: #f0a53c;
+  --mtq-warn-bg: #3d2f1a;
+  --mtq-err: #f06565;
+  --mtq-err-bg: #3d2126;
+
+  --mtq-graph-node-fill: #1e222b;
+  --mtq-graph-node-stroke: #3d4453;
+  --mtq-graph-node-label: #e8eaee;
+  --mtq-graph-node-final: #f0a53c;
+  --mtq-graph-node-initial: #7c96ff;
+  --mtq-graph-edge: #4a5262;
+  --mtq-graph-edge-active: #7c96ff;
+  --mtq-graph-edge-internal: #3d4453;
+  --mtq-graph-edge-undetermined: #f06565;
+  --mtq-graph-edge-label-bg: #1e222b;
+  --mtq-graph-edge-label: #98a0af;
+
+  --mtq-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}

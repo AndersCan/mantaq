@@ -37,5 +37,11 @@ dist-ssr
 # Package reports
 packages/*/reports
 
+# @mantaq/viz browser test artifacts
+packages/viz/browser/test-results/
+packages/viz/browser/playwright-report/
+packages/viz/browser/tests/__snapshots__/darwin/
+packages/viz/browser/tests/__snapshots__/win32/
+
 # Astro cache (auto-generated)
 .astro/

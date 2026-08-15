@@ -1,0 +1,10 @@
+/*
+ * @mantaq/viz base styles — box-sizing reset only. Everything else lives in
+ * tokens.css + components/*.css, token-only values.
+ */
+.mtq-viz,
+.mtq-viz *,
+.mtq-viz *::before,
+.mtq-viz *::after {
+  box-sizing: border-box;
+}
