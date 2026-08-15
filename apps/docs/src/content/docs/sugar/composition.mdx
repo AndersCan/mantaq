@@ -352,9 +352,10 @@ wired into another: the mismatch is a compile error. Forget the anchor and
 
 There is no runtime indirection. Parts register into the same transition and
 effect maps the setup body writes to, so determinism guarantees are
-unchanged. The composed actor is trace-identical to the inline machine —
-see [checkout.actor.test.ts](https://github.com/AndersCan/mantaq/blob/main/packages/examples/checkout.actor.test.ts)
-and the parts trace-equivalence property test (`packages/sugar/tests/parts.property.test.ts`).
+unchanged — the parts trace-equivalence property test
+(`packages/sugar/tests/parts.property.test.ts`) proves `withParts` matches an
+inline setup on identical event sequences. The checkout machine itself stays
+inline in `packages/examples/checkout.actor.test.ts`.
 
 ## When to reach for it
 

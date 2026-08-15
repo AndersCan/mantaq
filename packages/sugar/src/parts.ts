@@ -74,7 +74,11 @@ export function withParts<
     | Part<States, Inputs, Internal, Outputs, ActorContext>
     | readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
 ) {
-  const list = Array.isArray(parts) ? parts : [parts];
+  const list: readonly Part<States, Inputs, Internal, Outputs, ActorContext>[] = Array.isArray(
+    parts,
+  )
+    ? parts
+    : [parts];
   return new Actor({
     ...base,
     setup: (m) => {

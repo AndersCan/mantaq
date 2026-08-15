@@ -136,11 +136,13 @@ All leaf paths. Dot-separated strings.
 ## `definePart(fn)`
 
 ```ts
-function definePart<M extends Machine>(fn: (m: BuilderOf<M>) => void): Fragment<M>;
+function definePart<M extends Machine = never>(fn: (m: BuilderOf<M>) => void): Fragment<M>;
 ```
 
 Wrap a slice of a machine's setup — `m.on`, `m.onAny`, `m.effect` calls — so
-it can live in its own file. Type against the machine options object:
+it can live in its own file. The generic is required: omit the machine anchor
+and `M` defaults to `never`, so registering anything is a compile error rather
+than a silent loss of typing. Type against the machine options object:
 
 ```ts
 const checkoutPart = definePart<typeof checkout>((m) => {
