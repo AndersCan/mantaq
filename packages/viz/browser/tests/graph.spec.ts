@@ -69,12 +69,15 @@ for (const fixture of fixtureList) {
         .evaluateAll((els) => els.map((el) => el.getAttribute("data-node-id")).sort());
       expect(renderedIds).toEqual([...fixture.declares.nodeIds].sort());
 
-      // Exactly one active node, matching the live path.
+      // Active-path truth (plan §9.5.1): the rendered [data-active] set
+      // equals the live path flattened across regions.
       const active = page.locator('[data-active="true"]');
-      await expect(active).toHaveCount(1);
       const path = await page.evaluate(() => window.__viz?.getPath() ?? []);
-      const expectedActive = path[path.length - 1] ?? fixture.declares.nodeIds[0];
-      await expect(active.first()).toHaveAttribute("data-node-id", expectedActive);
+      expect(path.length).toBeGreaterThan(0);
+      const activeIds = await active.evaluateAll((els) =>
+        els.map((el) => el.getAttribute("data-node-id")).sort(),
+      );
+      expect(activeIds).toEqual([...path].sort());
 
       // Finite geometry + no node-node overlap.
       const placed = await readNodeRects(page);

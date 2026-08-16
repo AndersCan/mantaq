@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import type { Snapshot } from "@mantaq/core";
 import { StateGraph } from "../../src/components/state-graph.tsx";
 import type { FixtureDef, FixtureHost as Host, FixtureTheme } from "../fixtures/index.ts";
 import { fixtureList } from "../fixtures/index.ts";
@@ -60,6 +61,18 @@ function isReady(stage: HTMLElement | null, fixture: FixtureDef, host: Host): bo
   return true;
 }
 
+/** Active-path flattening (plan §9.5.1): every region contributes its live
+ * leaf; ids use the graph-model dot scheme (region names only, no root state
+ * prefix). */
+function collectActivePaths(snap: Snapshot, prefix = ""): string[] {
+  const name = snap.path[snap.path.length - 1] ?? "";
+  const here = prefix ? `${prefix}.${name}` : name;
+  const regions = Object.entries(snap.regions).flatMap(([regionName, regionSnap]) =>
+    collectActivePaths(regionSnap, prefix ? `${prefix}.${regionName}` : regionName),
+  );
+  return [here, ...regions];
+}
+
 export function FixtureHost({ fixture, theme }: FixtureHostProps): ReactNode {
   // Pre-script runs during first render — before StateGraph ever mounts.
   const host = useMemo(() => createPreparedHost(fixture), [fixture]);
@@ -83,7 +96,7 @@ export function FixtureHost({ fixture, theme }: FixtureHostProps): ReactNode {
         clock.advance(ms);
       },
       getPath(): string[] {
-        return actor.snapshot().path;
+        return collectActivePaths(actor.snapshot());
       },
       getHistoryLen(): number {
         return 0; // timeline ships in Phase 4

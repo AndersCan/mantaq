@@ -3,8 +3,7 @@
   "ignoreFiles": [
     "packages/core/stryker.vitest.config.ts",
     "packages/sugar/stryker.vitest.config.ts",
-    // Playwright/UI harness configs — not entry modules.
-    "packages/viz/browser/playwright.config.ts",
+    // UI harness build config — not an entry module.
     "packages/viz/browser/vite.config.ts"
   ],
   "workspaces": {
@@ -20,11 +19,8 @@
     "@varlock/bumpy",
     // @mantaq/viz Phase 0: deps land with Phase 1+ code. Remove entries
     // as they become referenced (see packages/viz/package.json).
-    "@radix-ui/react-accordion",
     "@radix-ui/react-dialog",
-    "@radix-ui/react-dropdown-menu",
     "@radix-ui/react-popover",
-    "@radix-ui/react-scroll-area",
     "@radix-ui/react-select",
     "@radix-ui/react-slot",
     "@radix-ui/react-switch",

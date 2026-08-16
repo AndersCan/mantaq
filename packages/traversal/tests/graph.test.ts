@@ -165,6 +165,48 @@ describe("buildGraph", () => {
     expect(regionEdge).toBeDefined();
   });
 
+  test("handler forwarding to a region via the injected actor is a dry run", () => {
+    const childIdle = state("childIdle")();
+    const childActive = state("childActive")();
+    const toggle = event("TOGGLE")();
+
+    const child = new Actor({
+      inputs: [toggle],
+      outputs: [],
+      internal: [],
+      states: [childIdle, childActive],
+      initial: childIdle,
+      context: {} as {},
+      setup: (m) => {
+        m.on(childIdle, toggle, () => ({ state: childActive }));
+      },
+    });
+
+    const parentIdle = state("parentIdle")();
+    const go = event("GO")();
+
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [],
+      internal: [],
+      states: [parentIdle],
+      initial: parentIdle,
+      context: {} as {},
+      regions: { child },
+      setup: (m) => {
+        m.on(parentIdle, go, (_event, opts) => {
+          // The example pattern: forward to a region through the injected
+          // actor. Graph discovery must not let this mutate the live child.
+          opts!.actor.regions.child.send(toggle.create());
+          return { state: parentIdle };
+        });
+      },
+    });
+
+    buildGraph(actor);
+    expect(child.snapshot().path).toEqual(["childIdle"]);
+  });
+
   test("final states are marked", () => {
     const actor = createFinalStateActor();
     const graph = buildGraph(actor);

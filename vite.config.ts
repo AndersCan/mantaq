@@ -116,6 +116,19 @@ export default defineConfig({
         },
       },
       {
+        // Pinned fixture factories are faithful copies of module-private
+        // actors in packages/examples — refactoring them for size would
+        // create drift. Line/param/complexity limits stay on everywhere else.
+        files: ["packages/viz/browser/fixtures/**"],
+        rules: {
+          "eslint/max-lines-per-function": "off",
+          "eslint/max-depth": "off",
+          "eslint/max-params": "off",
+          "eslint/max-nested-callbacks": "off",
+          "eslint/complexity": "off",
+        },
+      },
+      {
         files: ["packages/core/**"],
         rules: {
           "eslint/no-restricted-imports": [

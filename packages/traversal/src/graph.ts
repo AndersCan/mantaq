@@ -1,4 +1,4 @@
-import type { AnyActor, Snapshot } from "@mantaq/core";
+import type { AnyActor, Clock, Snapshot } from "@mantaq/core";
 import { Context } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import type {
@@ -12,6 +12,111 @@ import type {
 } from "./types.ts";
 
 export const INITIAL_NODE_ID = "__initial__";
+
+/**
+ * Sandboxed actor facade for handler dry-runs (plan §6.4 "non-mutating"):
+ * graph discovery executes every transition handler with a synthetic event
+ * to learn its target, so handlers must never touch the live machine.
+ *
+ * Handlers receive `{ context, actor }` — the context setter is already
+ * dropped (synthetic Context). The actor facade neutralizes the remaining
+ * mutation channels: sends (to self or any region), subscriptions, clock
+ * timers, and `recover`. Reads (snapshot, context, state, options, clock
+ * reads) pass through, so handlers that branch on live state still resolve
+ * correctly.
+ *
+ * Without this facade, a handler that forwards to a region
+ * (`opts.actor.regions.health.send(...)`) would corrupt live actor state on
+ * every graph build (v1 audit #11 class bug).
+ */
+const NOOP = (): void => {};
+
+const actorSandboxCache = new WeakMap<object, unknown>();
+const clockSandboxCache = new WeakMap<object, Clock>();
+
+function sandboxClock(clock: Clock): Clock {
+  const cached = clockSandboxCache.get(clock);
+  if (cached !== undefined) return cached;
+  const sandbox: Clock = new Proxy(clock, {
+    get(target, prop) {
+      // Clock writes: timers + the drain hook. `advance` is virtual-only but
+      // neutralize it too — a dry-run must never move time.
+      if (
+        prop === "setTimeout" ||
+        prop === "clearTimeout" ||
+        prop === "setInterval" ||
+        prop === "clearInterval" ||
+        prop === "setDrain" ||
+        prop === "advance"
+      ) {
+        return NOOP;
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  clockSandboxCache.set(clock, sandbox);
+  return sandbox;
+}
+
+function sandboxActor<C>(actor: AnyActor<C>): AnyActor<C> {
+  const cached = actorSandboxCache.get(actor);
+  if (cached !== undefined) return cached as AnyActor<C>;
+  const regions = sandboxRegions(actor.regions);
+  const clock = sandboxClock(actor.clock);
+  const sandbox: AnyActor<C> = new Proxy(actor, {
+    get(target, prop) {
+      if (prop === "send" || prop === "recover") return NOOP;
+      if (prop === "on") return () => NOOP;
+      if (prop === "regions") return regions;
+      if (prop === "clock") return clock;
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+    // A dry-run must never write machine state back through the facade.
+    set(target, prop, value) {
+      if (
+        prop === "state" ||
+        prop === "context" ||
+        prop === "regions" ||
+        prop === "clock" ||
+        prop === "options"
+      ) {
+        return true;
+      }
+      return Reflect.set(target, prop, value, target);
+    },
+  });
+  actorSandboxCache.set(actor, sandbox);
+  return sandbox;
+}
+
+function sandboxRegions(regions: Record<string, AnyActor>): Record<string, AnyActor> {
+  if (!regions) return regions;
+  return new Proxy(regions, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop, target);
+      if (typeof value === "object" && value !== null) {
+        return sandboxActor(value as AnyActor);
+      }
+      return value;
+    },
+    // Object.entries / spread bypass the get trap — return sandboxed actors
+    // through the descriptor path as well.
+    getOwnPropertyDescriptor(target, prop) {
+      const desc = Reflect.getOwnPropertyDescriptor(target, prop);
+      if (
+        desc !== undefined &&
+        "value" in desc &&
+        typeof desc.value === "object" &&
+        desc.value !== null
+      ) {
+        return { ...desc, value: sandboxActor(desc.value as AnyActor) };
+      }
+      return desc;
+    },
+  });
+}
 
 interface GraphTraversal {
   actor: AnyActor<unknown>;
@@ -84,7 +189,10 @@ function invokeHandler(
       () => context,
       () => {},
     );
-    const result = handler(syntheticEvent, { context: syntheticContext, actor });
+    const result = handler(syntheticEvent, {
+      context: syntheticContext,
+      actor: sandboxActor(actor),
+    });
     return {
       targetName: result?.state?.name,
       emitNames:

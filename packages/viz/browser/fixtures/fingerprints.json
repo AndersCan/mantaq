@@ -186,5 +186,77 @@
     "nodeIds": ["__initial__", "ready", "work"],
     "nodeCount": 3,
     "edgeCount": 3
+  },
+  "saga": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": [
+      "__initial__",
+      "compensatingRefund",
+      "compensatingRelease",
+      "completed",
+      "creatingShipment",
+      "failed",
+      "idle",
+      "notifying",
+      "processingPayment",
+      "reservingInventory"
+    ],
+    "nodeCount": 10,
+    "edgeCount": 29
+  },
+  "auth": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": [
+      "__initial__",
+      "checkingAuth",
+      "loggedIn",
+      "loggedOut",
+      "signInError",
+      "signingIn",
+      "signingOut"
+    ],
+    "nodeCount": 7,
+    "edgeCount": 19
+  },
+  "connection-manager": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": [
+      "__initial__",
+      "connected",
+      "connecting",
+      "disconnected",
+      "failed",
+      "health.degraded",
+      "health.healthy",
+      "health.unknown",
+      "reconnecting"
+    ],
+    "nodeCount": 9,
+    "edgeCount": 14
+  },
+  "websocket": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": [
+      "__initial__",
+      "connected",
+      "connecting",
+      "disconnected",
+      "permanentlyDisconnected",
+      "reconnecting"
+    ],
+    "nodeCount": 6,
+    "edgeCount": 22
+  },
+  "cache": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": ["__initial__", "full", "purging", "ready", "tier.l1", "tier.l2"],
+    "nodeCount": 6,
+    "edgeCount": 20
+  },
+  "undo-redo": {
+    "FIXTURE_VERSION": 1,
+    "nodeIds": ["__initial__", "editing", "idle"],
+    "nodeCount": 3,
+    "edgeCount": 16
   }
 }

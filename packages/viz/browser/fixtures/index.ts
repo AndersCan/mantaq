@@ -17,6 +17,37 @@ import {
   submitPayment,
   submitShipping,
 } from "./real/checkout.ts";
+import { createAuthActor, retry as authRetry, signIn as authSignIn, signOut } from "./real/auth.ts";
+import {
+  createCacheActor,
+  get as cacheGet,
+  purge as cachePurge,
+  put as cachePut,
+} from "./real/cache.ts";
+import {
+  connect as cmConnect,
+  createConnectionManager,
+  disconnect as cmDisconnect,
+  healthCheckResult,
+  retry as cmRetry,
+} from "./real/connection-manager.ts";
+import { createSagaActor, cancelOrder, startOrder } from "./real/saga.ts";
+import {
+  clearHistory,
+  createEditorActor,
+  deleteText,
+  insertText,
+  redo,
+  replaceText,
+  undo,
+} from "./real/undo-redo.ts";
+import {
+  connect as wsConnect,
+  connectionFailed,
+  createWsActor,
+  disconnect as wsDisconnect,
+  forceReconnect,
+} from "./real/websocket.ts";
 import {
   createAllFinalActor,
   createDoneActor,
@@ -243,6 +274,176 @@ const fixtures: Record<string, FixtureDef> = {
       nodeCount: 3,
       edgeCount: 3,
     },
+    themes: ["light"],
+  },
+  saga: {
+    id: "saga",
+    label: "saga (compensating)",
+    source: "packages/examples/sagaOrchestrator.actor.test.ts — createSagaActor",
+    version: 1,
+    create: () => createSagaActor(),
+    preScript: ({ actor }) => {
+      // idle → reservingInventory (mid-flight, 100ms service call pending).
+      actor.send(
+        startOrder.create({ order: { orderId: "ORD-1", items: ["widget"], amount: 99.99 } }),
+      );
+    },
+    events: { start: startOrder, cancel: cancelOrder },
+    declares: {
+      nodeIds: [
+        "__initial__",
+        "compensatingRefund",
+        "compensatingRelease",
+        "completed",
+        "creatingShipment",
+        "failed",
+        "idle",
+        "notifying",
+        "processingPayment",
+        "reservingInventory",
+      ],
+      nodeCount: 10,
+      edgeCount: 29,
+    },
+    pendingTimers: 1,
+    themes: ["light"],
+  },
+  auth: {
+    id: "auth",
+    label: "auth (phone sign-in)",
+    source:
+      "packages/examples/authentication.actor.test.ts — createAuthActor (determinism neutralized)",
+    version: 1,
+    create: () => createAuthActor(),
+    preScript: ({ actor }) => {
+      // checkingAuth → signingIn (mid-flight, 2000ms phone-auth call pending).
+      actor.send(authSignIn.create({ phoneNumber: "+1234567890" }));
+    },
+    events: { signIn: authSignIn, signOut, retry: authRetry },
+    declares: {
+      nodeIds: [
+        "__initial__",
+        "checkingAuth",
+        "loggedIn",
+        "loggedOut",
+        "signInError",
+        "signingIn",
+        "signingOut",
+      ],
+      nodeCount: 7,
+      edgeCount: 19,
+    },
+    pendingTimers: 1,
+    themes: ["light"],
+  },
+  "connection-manager": {
+    id: "connection-manager",
+    label: "connection-manager (backoff + health region)",
+    source: "packages/examples/networkConnectionManager.actor.test.ts — createConnectionManager",
+    version: 1,
+    create: () => createConnectionManager(),
+    preScript: ({ actor }) => {
+      // disconnected → connecting (mid-flight, 2000ms connect pending).
+      actor.send(cmConnect.create({ url: "ws://example.com" }));
+    },
+    events: {
+      connect: cmConnect,
+      disconnect: cmDisconnect,
+      retry: cmRetry,
+      healthCheckResult,
+    },
+    declares: {
+      nodeIds: [
+        "__initial__",
+        "connected",
+        "connecting",
+        "disconnected",
+        "failed",
+        "health.degraded",
+        "health.healthy",
+        "health.unknown",
+        "reconnecting",
+      ],
+      nodeCount: 9,
+      edgeCount: 14,
+    },
+    pendingTimers: 1,
+    themes: ["light"],
+  },
+  websocket: {
+    id: "websocket",
+    label: "websocket (retry cycle)",
+    source: "packages/examples/websocketConnection.actor.test.ts — createWsActor",
+    version: 1,
+    create: () => createWsActor(),
+    preScript: ({ actor }) => {
+      // disconnected → connecting (mid-flight, 500ms connect pending).
+      actor.send(wsConnect.create({ url: "ws://example.com" }));
+    },
+    events: {
+      connect: wsConnect,
+      disconnect: wsDisconnect,
+      forceReconnect,
+      connectionFailed,
+    },
+    declares: {
+      nodeIds: [
+        "__initial__",
+        "connected",
+        "connecting",
+        "disconnected",
+        "permanentlyDisconnected",
+        "reconnecting",
+      ],
+      nodeCount: 6,
+      edgeCount: 22,
+    },
+    pendingTimers: 1,
+    themes: ["light"],
+  },
+  cache: {
+    id: "cache",
+    label: "cache (ttl + lru, tier region)",
+    source: "packages/examples/cacheWithTtlAndLru.actor.test.ts — createCacheActor(capacity 2)",
+    version: 1,
+    create: () => {
+      const { actor, clock } = createCacheActor(2);
+      return { actor, clock };
+    },
+    preScript: ({ actor }) => {
+      // capacity 2 → 3 puts trip `full` eviction; synchronous effects settle
+      // back to `ready` with one eviction.
+      actor.send(cachePut.create({ key: "a", value: 1 }));
+      actor.send(cachePut.create({ key: "b", value: 2 }));
+      actor.send(cachePut.create({ key: "c", value: 3 }));
+    },
+    events: { put: cachePut, get: cacheGet, purge: cachePurge },
+    declares: {
+      nodeIds: ["__initial__", "full", "purging", "ready", "tier.l1", "tier.l2"],
+      nodeCount: 6,
+      edgeCount: 20,
+    },
+    pendingTimers: 0,
+    themes: ["light"],
+  },
+  "undo-redo": {
+    id: "undo-redo",
+    label: "undo-redo (editor)",
+    source: "packages/examples/undoRedoEditor.actor.test.ts — createEditorActor",
+    version: 1,
+    create: () => createEditorActor(),
+    preScript: ({ actor }) => {
+      // idle → editing with a populated undo stack (best timeline fixture).
+      actor.send(insertText.create({ text: "h", at: 0 }));
+      actor.send(insertText.create({ text: "i", at: 1 }));
+    },
+    events: { insertText, deleteText, replaceText, undo, redo, clearHistory },
+    declares: {
+      nodeIds: ["__initial__", "editing", "idle"],
+      nodeCount: 3,
+      edgeCount: 16,
+    },
+    pendingTimers: 0,
     themes: ["light"],
   },
 };
