@@ -23,10 +23,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--mtq-sp-1);
-  width: 100%;
-  height: 100%;
-  min-width: var(--mtq-graph-node-min-width);
-  min-height: var(--mtq-graph-node-min-height);
+  /* Fixed node dims (plan §8): the dagre layout assumes exactly these, so
+   * nodes never grow to fit long labels — labels ellipsize instead. */
+  width: var(--mtq-graph-node-min-width);
+  height: var(--mtq-graph-node-min-height);
   padding: var(--mtq-sp-2) var(--mtq-sp-3);
   box-sizing: border-box;
   background: var(--mtq-graph-node-fill);
@@ -71,6 +71,15 @@
 
 .mtq-node:hover {
   background: var(--mtq-bg-hover);
+}
+
+.mtq-node__label {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* keep the badge row from pushing the label — fixed-height anatomy */
+  line-height: 1.2;
 }
 
 .mtq-node__effects {

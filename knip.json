@@ -3,11 +3,15 @@
   "ignoreFiles": [
     "packages/core/stryker.vitest.config.ts",
     "packages/sugar/stryker.vitest.config.ts",
-    // Playwright harness entrypoints not reachable by knip's graph.
+    // Playwright/UI harness configs — not entry modules.
     "packages/viz/browser/playwright.config.ts",
-    "packages/viz/browser/src/main.tsx",
     "packages/viz/browser/vite.config.ts"
   ],
+  "workspaces": {
+    "packages/viz": {
+      "entry": ["browser/src/main.tsx"]
+    }
+  },
   "ignoreDependencies": [
     "vite",
     "@stryker-mutator/core",
@@ -28,8 +32,6 @@
     "@radix-ui/react-tooltip",
     "clsx",
     "lucide-react",
-    "@fontsource/ibm-plex-mono",
-    "@fontsource/inter",
     "@testing-library/user-event",
     "@tsdown/css",
     "@vitejs/plugin-react"

@@ -5,8 +5,8 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
-import { createCheckoutActor } from "../browser/fixtures/checkout.ts";
-import { createTrafficLightActor } from "../browser/fixtures/traffic-light.ts";
+import { createCheckoutActor } from "../browser/fixtures/real/checkout.ts";
+import { createTrafficLightActor } from "../browser/fixtures/synthetic/traffic-light.ts";
 import { layoutGraph, buildVizGraph } from "../src/index.ts";
 import type { VizGraph } from "../src/index.ts";
 

@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
-import { createThrowingContextActor } from "../browser/fixtures/edge-cases.ts";
+import { createThrowingContextActor } from "../browser/fixtures/synthetic/edge-cases.ts";
 import { buildVizGraph } from "../src/index.ts";
 
 describe("buildVizGraph — failure paths", () => {

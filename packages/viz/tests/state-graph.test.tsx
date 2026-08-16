@@ -12,8 +12,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { cleanup, render, screen } from "@testing-library/react";
-import { createCheckoutActor } from "../browser/fixtures/checkout.ts";
-import { createThrowingContextActor } from "../browser/fixtures/edge-cases.ts";
+import { createCheckoutActor } from "../browser/fixtures/real/checkout.ts";
+import { createThrowingContextActor } from "../browser/fixtures/synthetic/edge-cases.ts";
 import { StateGraph } from "../src/components/state-graph.tsx";
 
 afterEach(() => {

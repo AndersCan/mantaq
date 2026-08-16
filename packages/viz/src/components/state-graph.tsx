@@ -67,7 +67,7 @@ function StateGraphCanvas(props: StateGraphProps): ReactNode {
 
   return (
     <div
-      className="mtq-state-graph"
+      className="mtq-state-graph mtq-viz"
       data-node-count={model.graph.nodes.length}
       data-edge-count={model.graph.edges.length}
       data-error={model.error !== undefined ? "true" : undefined}

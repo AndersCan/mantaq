@@ -9,6 +9,7 @@ export default defineConfig({
   retries: CI ? 1 : 0,
   timeout: 60_000,
   use: {
+    baseURL: "http://localhost:4173",
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,
     locale: "en-US",

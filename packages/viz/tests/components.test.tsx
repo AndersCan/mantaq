@@ -15,8 +15,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vite-plus/test";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { createCheckoutActor } from "../browser/fixtures/checkout.ts";
-import { createTrafficLightActor } from "../browser/fixtures/traffic-light.ts";
+import { createCheckoutActor } from "../browser/fixtures/real/checkout.ts";
+import { createTrafficLightActor } from "../browser/fixtures/synthetic/traffic-light.ts";
 import { ActorBadge } from "../src/components/actor-badge.tsx";
 import { ErrorBanner } from "../src/components/error-banner.tsx";
 import type { VizError } from "../src/model/use-actor-model.ts";

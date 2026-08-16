@@ -42,6 +42,8 @@ packages/viz/browser/test-results/
 packages/viz/browser/playwright-report/
 packages/viz/browser/tests/__snapshots__/darwin/
 packages/viz/browser/tests/__snapshots__/win32/
+packages/viz/test-results/
+packages/viz/playwright-report/
 
 # Astro cache (auto-generated)
 .astro/

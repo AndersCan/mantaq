@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
 import { buildVizGraph } from "../src/core/index.ts";
-import { createThrowingContextActor } from "../browser/fixtures/edge-cases.ts";
+import { createThrowingContextActor } from "../browser/fixtures/synthetic/edge-cases.ts";
 import { createVizStore, useVizStore, VizProvider } from "../src/model/viz-provider.tsx";
 import type { VizStore } from "../src/model/viz-provider.tsx";
 import { graphFingerprint, useActorModel } from "../src/model/use-actor-model.ts";

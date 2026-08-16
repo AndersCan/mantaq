@@ -8,10 +8,11 @@
  *   distinguishable from a guard-reject (`{}` → undetermined).
  * - `__error`: a throwing context getter — `buildGraph` rethrows handler
  *   errors, so the graph area renders the error card.
- * - `empty` (harness-level): no `createEmptyActor` — the `Actor` constructor
- *   rejects `initial ∉ states`, so zero-state actors cannot exist. The empty
- *   fixture passes `actor: undefined` to the harness → `missing-actor` →
- *   empty-state render with `data-node-count="0"`.
+ * - `empty` (no harness fixture — deviation): the `Actor` constructor
+ *   rejects `initial ∉ states`, so zero-state actors cannot exist, and
+ *   `StateGraph`'s prop contract requires a real actor. The `missing-actor`
+ *   empty path is unit-covered (`useActorModel`); the empty-state card
+ *   ships with the composite `Viz` (Phase 4).
  */
 
 import { Actor, VirtualClock, state, event } from "@mantaq/core";

@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
-import { createCheckoutActor } from "../browser/fixtures/checkout.ts";
+import { createCheckoutActor } from "../browser/fixtures/real/checkout.ts";
 import { buildVizGraph, layoutGraph } from "../src/core/index.ts";
 import {
   FLOW_EDGE_TYPE,

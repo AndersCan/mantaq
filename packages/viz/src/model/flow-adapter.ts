@@ -20,14 +20,14 @@ export const FLOW_EDGE_TYPE = "mantaqEdge" as const;
 export const FLOW_NODE_WIDTH = DEFAULT_NODE_WIDTH;
 export const FLOW_NODE_HEIGHT = DEFAULT_NODE_HEIGHT;
 
-export interface FlowNodeData {
+interface FlowNodeData {
   node: VizNode;
   /** True when this is the active node during an actor error. */
   error?: boolean;
   [key: string]: unknown;
 }
 
-export interface FlowEdgeData {
+interface FlowEdgeData {
   edge: VizEdge;
   [key: string]: unknown;
 }

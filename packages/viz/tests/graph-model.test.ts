@@ -13,9 +13,13 @@ import {
   submitPayment,
   submitShipping,
   submitting,
-} from "../browser/fixtures/checkout.ts";
-import { createTrafficLightActor, tick } from "../browser/fixtures/traffic-light.ts";
-import { createSelfLoopActor, createSingleActor, loop } from "../browser/fixtures/edge-cases.ts";
+} from "../browser/fixtures/real/checkout.ts";
+import { createTrafficLightActor, tick } from "../browser/fixtures/synthetic/traffic-light.ts";
+import {
+  createSelfLoopActor,
+  createSingleActor,
+  loop,
+} from "../browser/fixtures/synthetic/edge-cases.ts";
 import { buildVizGraph } from "../src/index.ts";
 import { INITIAL_NODE_ID } from "@mantaq/traversal";
 
