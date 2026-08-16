@@ -4,7 +4,9 @@
     "packages/core/stryker.vitest.config.ts",
     "packages/sugar/stryker.vitest.config.ts",
     // UI harness build config — not an entry module.
-    "packages/viz/browser/vite.config.ts"
+    "packages/viz/browser/vite.config.ts",
+    // Static server spawned by the playwright webServer on CI — not an entry.
+    "packages/viz/browser/preview-server.mjs"
   ],
   "workspaces": {
     "packages/viz": {

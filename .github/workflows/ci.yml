@@ -34,6 +34,16 @@ jobs:
         working-directory: packages/viz
       - run: vp run -F @mantaq/viz browser:build
       - run: vp run -F @mantaq/viz test:browser
+      - name: Golden diff report
+        if: failure()
+        run: |
+          for d in test-results/graph-*/; do
+            [ -d "$d" ] || continue
+            echo "=== $d ==="
+            ls "$d" | head -8
+            cat "$d/error-context.md" 2>/dev/null | head -25
+          done
+        working-directory: packages/viz/browser
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
