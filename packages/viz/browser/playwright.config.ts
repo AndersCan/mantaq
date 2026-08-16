@@ -28,7 +28,8 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "vp run serve:test",
+    command:
+      "pwd; echo VP=$(which vp); env | grep -E '^(CI|PATH|VP|VITE|npm_)' | head -8; vp run serve:test",
     url: "http://localhost:4173",
     reuseExistingServer: !CI,
     timeout: 120_000,
