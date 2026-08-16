@@ -43,13 +43,13 @@ jobs:
             ls "$d" | head -8
             cat "$d/error-context.md" 2>/dev/null | head -25
           done
-        working-directory: packages/viz/browser
+        working-directory: packages/viz
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: viz-playwright-report
           path: |
-            packages/viz/browser/test-results/
-            packages/viz/browser/playwright-report/
+            packages/viz/test-results/
+            packages/viz/playwright-report/
           retention-days: 7
           if-no-files-found: ignore
