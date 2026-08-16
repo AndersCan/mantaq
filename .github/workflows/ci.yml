@@ -32,6 +32,9 @@ jobs:
       - run: vp install
       - run: npx playwright install --with-deps chromium
         working-directory: packages/viz
+      - name: Reproduce webServer spawn (diagnostic)
+        working-directory: packages/viz/browser
+        run: timeout 30 vp run serve:test; echo "serve_rc=$?"
       - run: vp run -F @mantaq/viz test:browser
       - uses: actions/upload-artifact@v4
         if: failure()
