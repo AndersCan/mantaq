@@ -17,6 +17,12 @@ export default defineConfig({
     contextOptions: {
       reducedMotion: "reduce",
     },
+    // Grayscale text AA everywhere: the GitHub runner image enables LCD
+    // subpixel rendering, which drifts goldens vs the minimal ubuntu:24.04
+    // container used to generate them.
+    launchOptions: {
+      args: ["--disable-lcd-text"],
+    },
   },
   snapshotPathTemplate: "{testDir}/__snapshots__/{platform}/{testFilePath}/{arg}{ext}",
   expect: {
