@@ -28,12 +28,10 @@ export default defineConfig({
     },
   },
   webServer: {
-    // CI pre-builds via `vp run -F @mantaq/viz browser:build`; `vite preview`
-    // spawns no child processes, so it avoids vp's EINVAL spawn failure when
-    // launched from playwright on GitHub runners.
-    command: CI
-      ? "vite preview --config browser/vite.config.ts --port 4173 --strictPort"
-      : "vp run serve:test",
+    // CI pre-builds via `vp run -F @mantaq/viz browser:build` and serves the
+    // dist with a node static server. Spawning `vp` from playwright fails on
+    // GitHub runners (EINVAL, os error 22) when vp spawns its build child.
+    command: CI ? "node preview-server.mjs" : "vp run serve:test",
     url: "http://localhost:4173",
     reuseExistingServer: !CI,
     timeout: 120_000,
