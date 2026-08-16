@@ -55,6 +55,13 @@ only IDs from it.
 7. **Human voice.** Natural prose. Tight, but written like a person explaining
    to another person — full sentences, no caveman fragments ("Effect. Runs on
    state entry."). Technical terms exact. Matches existing docs.
+8. **Long machine, split it in docs too.** When a page's subject actor runs past
+   a screen of `setup`, show the composition utilities rather than one giant
+   closure: build the static spec with `actorSpec(config)`, wrap each concern in
+   its own `definePart<typeof spec>(fn)` file, wire them with `withParts(spec,
+parts)` (or `use(m, part)` inside a hand-written `setup`). This makes a long
+   state machine readable file by file and threads the same running example —
+   no new IDs. See the Composition page and `packages/sugar/tests/parts.test.ts`.
 
 ## Steps
 

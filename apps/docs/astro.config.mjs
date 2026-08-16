@@ -51,6 +51,7 @@ export default defineConfig({
             { label: "Matching", slug: "sugar/matching" },
             { label: "Dynamic Children", slug: "sugar/dynamic-children" },
             { label: "Effect Helpers", slug: "sugar/effect-helpers" },
+            { label: "Composition", slug: "sugar/composition" },
             { label: "Request / Response", slug: "sugar/request-response" },
           ],
         },
