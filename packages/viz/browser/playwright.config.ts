@@ -28,7 +28,12 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "pwd; echo VP=$(which vp); vp run serve:test",
+    // CI pre-builds via `vp run -F @mantaq/viz browser:build`; `vite preview`
+    // spawns no child processes, so it avoids vp's EINVAL spawn failure when
+    // launched from playwright on GitHub runners.
+    command: CI
+      ? "vite preview --config browser/vite.config.ts --port 4173 --strictPort"
+      : "vp run serve:test",
     url: "http://localhost:4173",
     reuseExistingServer: !CI,
     timeout: 120_000,
