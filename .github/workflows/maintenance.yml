@@ -1,0 +1,89 @@
+name: maintenance
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: true
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install
+
+      - name: Configure git
+        run: |
+          git config --local user.name "cankode-bot"
+          git config --local user.email "cankode-bot@users.noreply.github.com"
+
+      - name: Run opencode maintenance
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: anthropic/claude-sonnet-4-5
+          prompt: |
+            You are running the scheduled library maintenance task for the Mantaq monorepo.
+
+            Context:
+            - pnpm monorepo ("mantaq"), packages under `packages/*` (core, sugar, traversal, utils, pbt, test, examples), docs under `apps/docs`.
+            - Toolchain: Vite+ (global CLI `vp`). Run `vp <cmd>` for built-ins and `vp run <script>` for package scripts.
+            - All rules in `AGENTS.md` apply. The north star in `vision.md` is enforced by machine gates: "If it typechecks, it runs correct", "If it runs, it runs deterministic", "Forcing the compiler quiet = wrong path".
+            - This is a scheduled run with no issue or PR attached. The current checkout is `main`. Create your own branch off the latest `origin/main` (`git fetch origin && git checkout -b chore/maintenance-$(date +%Y%m%d) origin/main`) before you make changes.
+
+            ## Scope
+
+            Only do maintenance that is clearly correct and bounded. If there is nothing to do, exit cleanly with no commit and no PR.
+
+            ### 1. Gates first (fix any failure before looking for new work)
+            - `vp install`
+            - `vp check` (format, lint, typecheck — includes the type-level oracle tests in `packages/core/tests/typecheck.test.ts`)
+            - `vp run guard` (north star gates: type escapes, export budget, impl size ceilings, determinism)
+            - `vp run -r test` (all package tests; property tests replay via the pinned fast-check seed)
+            - `vp run knip` (dead code, unused deps)
+            - `vp run docs:check` (docs example continuity + API truth gates)
+
+            ### 2. Fix what the gates find
+            - Type escapes (`as any`, `as unknown as`, `@ts-*` suppression) in `packages/core/src` are violations — refactor the design, never silence the compiler.
+            - Export budget and impl size ceilings in `packages/core/src` — reduce complexity rather than expand.
+            - Determinism: no `Date.now`, `Math.random`, `performance.now` in core runtime. Only `real-clock.ts` may read the wall clock.
+            - No `throw` in library src anywhere (core, sugar, traversal, test). Errors flow as values (Either), never exceptions.
+            - Knip flags: remove genuinely dead internal code, but never remove public API from `packages/*/src/index.ts` just because knip flags it — public exports are the contract.
+            - Docs gates: update narrative docs or the canonical example so they stay consistent; do not delete documented behavior.
+
+            ### 3. Mutation health
+            Run `vp run mutation:core` and `vp run mutation:sugar` (break thresholds: core 89.5, sugar 90).
+            If below break: `*.test.ts` and `*.error.test.ts` are stable — never edit them to kill mutants. Throw away stale `*.mutation.test.ts`, re-run, add one directed test per surviving mutant. Tighten generators in `@mantaq/pbt` as needed.
+
+            ### 4. Hygiene sweep (low-risk, only if trivially correct)
+            - Remove stale `FIXME`/`TODO` markers that are actually resolved; leave intentional open items alone.
+            - Keep `.bumpy/*.md` bump files consistent with the diff. If your maintenance changes package behavior, add a bump file (`pnpm bumpy add --packages "package:patch" --message "..." --name "maintenance-$(date +%Y%m%d)"`). If it affects no published package, use `pnpm bumpy add --empty --name "maintenance-$(date +%Y%m%d)"`.
+            - Do not chase dependency upgrades. Leave catalog versions alone unless a gate literally blocks on a version.
+
+            ## Constraints
+            - No speculative refactors, renames, or improvements beyond maintenance scope. Small, focused, reversible changes only.
+            - Do NOT delete tests to make gates pass. Fix the implementation.
+            - Do NOT touch `.github/workflows` unless a workflow is objectively broken.
+
+            ## Delivery
+            - No changes after all checks: do nothing. Do not open a PR.
+            - Commits and PR: when there are changes, `vitest` style commit message `chore: library maintenance YYYY-MM-DD`, push your branch, then open a PR against `main` with `gh pr create --title "chore: library maintenance YYYY-MM-DD HH:MM UTC" --body "<brief, precise list of fixes and why, with file references>"`.
