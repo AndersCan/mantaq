@@ -6,6 +6,7 @@ import type {
   AnyEventRef,
   AnyStateRef,
   Clock,
+  InitialState,
 } from "@mantaq/core";
 
 export interface ActorSpec {
@@ -97,7 +98,7 @@ export function actorSpec<
   const Internal extends readonly AnyEventRef[] = readonly [],
   const Outputs extends readonly AnyEventRef[] = readonly [],
   ActorContext = Record<string, unknown>,
-  const Initial extends AnyStateRef | { state: AnyStateRef; payload?: unknown } = AnyStateRef,
+  const Initial extends InitialState<States[number]> = InitialState<States[number]>,
 >(
   spec: SpecValue<States, Inputs, Internal, Outputs, ActorContext, Initial>,
 ): SpecValue<States, Inputs, Internal, Outputs, ActorContext, Initial> {

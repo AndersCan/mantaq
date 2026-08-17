@@ -567,4 +567,36 @@ describe("parts keep full types", () => {
     // @ts-expect-error partA was anchored to the load machine, not "other"
     withParts(other, startPart);
   });
+
+  test("actorSpec rejects an initial state that is not in the states tuple", () => {
+    actorSpec({
+      inputs: [start],
+      internal: [],
+      states: [idle, loading],
+      // @ts-expect-error "done" is not among [idle, loading]
+      initial: done,
+    });
+  });
+
+  test("actorSpec rejects a bare state ref when the state requires an initial payload", () => {
+    const needsPayload = state("needs-payload")<{ seed: number }>();
+    actorSpec({
+      inputs: [],
+      internal: [],
+      states: [needsPayload],
+      // @ts-expect-error needsPayload requires { state: needsPayload, payload: { seed } }
+      initial: needsPayload,
+    });
+  });
+
+  test("actorSpec accepts a payload object for a payload-required initial state", () => {
+    const needsPayload = state("needs-payload")<{ seed: number }>();
+    const spec = actorSpec({
+      inputs: [],
+      internal: [],
+      states: [needsPayload],
+      initial: { state: needsPayload, payload: { seed: 1 } },
+    });
+    expect(spec.initial).toEqual({ state: needsPayload, payload: { seed: 1 } });
+  });
 });
