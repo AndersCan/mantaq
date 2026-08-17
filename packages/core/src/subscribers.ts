@@ -1,14 +1,31 @@
-import type { Snapshot, TransitionInfo } from "./actor-types.ts";
+import type { ErrorInfo, Snapshot, TransitionInfo } from "./actor-types.ts";
 import { Either } from "@mantaq/utils";
 
 export class Subscribers<C> {
   readonly change = new Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>();
   readonly done = new Set<() => void>();
   readonly transition = new Set<(info: TransitionInfo) => void>();
+  readonly error = new Set<(info: ErrorInfo) => void>();
   #last: Snapshot<C> | null = null;
 
   seed(snapshot: Snapshot<C>): void {
     this.#last = snapshot;
+  }
+
+  add(
+    event: "change" | "done" | "transition" | "error",
+    fn: (...args: never[]) => void,
+  ): () => void {
+    if (event === "change") {
+      return this.addChange(fn as (snapshot: Snapshot<C>, prev: Snapshot<C>) => void);
+    }
+    if (event === "done") {
+      return this.addDone(fn as () => void);
+    }
+    if (event === "transition") {
+      return this.addTransition(fn as (info: TransitionInfo) => void);
+    }
+    return this.addError(fn as (info: ErrorInfo) => void);
   }
 
   addChange(fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void {
@@ -28,30 +45,36 @@ export class Subscribers<C> {
     return () => this.transition.delete(fn);
   }
 
+  addError(fn: (info: ErrorInfo) => void): () => void {
+    this.error.add(fn);
+    const last = this.#last?.error;
+    if (last) this.#safe(() => fn(last));
+    return () => this.error.delete(fn);
+  }
+
   emitChange(snapshot: Snapshot<C>): void {
     const prev = this.#last ?? snapshot;
     this.#last = snapshot;
-    for (const fn of this.change) {
-      this.#safe(() => fn(snapshot, prev));
-    }
+    for (const fn of this.change) this.#safe(() => fn(snapshot, prev));
   }
 
   emitDone(): void {
-    for (const fn of this.done) {
-      this.#safe(fn);
-    }
+    for (const fn of this.done) this.#safe(fn);
   }
 
   emitTransition(info: TransitionInfo): void {
-    for (const fn of this.transition) {
-      this.#safe(() => fn(info));
-    }
+    for (const fn of this.transition) this.#safe(() => fn(info));
+  }
+
+  emitError(info: ErrorInfo): void {
+    for (const fn of this.error) this.#safe(() => fn(info));
   }
 
   clear(): void {
     this.change.clear();
     this.done.clear();
     this.transition.clear();
+    this.error.clear();
   }
 
   #safe(fn: () => void): void {

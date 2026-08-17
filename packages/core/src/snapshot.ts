@@ -10,21 +10,14 @@ export function buildSnapshot<C>(
   const path = [s.name];
   const regionSnapshots: Record<string, Snapshot> = {};
 
-  for (const [regionName, child] of Object.entries(regions)) {
+  for (const [regionName, child] of Object.entries(regions))
     regionSnapshots[regionName] = child.snapshot();
-  }
 
   const snap: Snapshot<C> = { path, context, regions: regionSnapshots };
 
-  if (opts.payload !== undefined) {
-    snap.payload = opts.payload;
-  }
-  if (s.isFinal) {
-    snap.done = true;
-  }
-  if (opts.error !== undefined) {
-    snap.error = opts.error;
-  }
+  if (opts.payload !== undefined) snap.payload = opts.payload;
+  if (s.isFinal) snap.done = true;
+  if (opts.error !== undefined) snap.error = opts.error;
 
   return snap;
 }

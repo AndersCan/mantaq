@@ -283,6 +283,16 @@ actor.on("transition", ({ event, from, to, transitioned }) => {
 });
 ```
 
+### on("error", fn)
+
+Death signal. Fired once when the machine enters the universal `__error` state — sync throw, promise rejection, or an internal event with no handler — with the `ErrorInfo` (`{ error, state, context, event, reason }`). Unlike `on("change")` / `on("done")`, which can be reconstructed by inspecting the snapshot, this is a distinct, explicit signal. A death that happened during construction is not missed: the last `ErrorInfo` is stored and seeded to a late subscriber the moment `on("error")` attaches. `actor.recover()` clears the stored error, so no stale delivery follows resurrection.
+
+```ts
+actor.on("error", ({ reason, event, error }) => {
+  console.error(`died during ${event.type}: ${reason}`, error);
+});
+```
+
 ### AnyActor
 
 Structural handle for any actor — regions, `context`, and `options`. `context` is the raw current value; write through the handler `context.set()` instead.
@@ -298,6 +308,7 @@ interface AnyActor<C = Record<string, unknown>> {
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
   recover(target: { state: AnyStateRef; context: C }): void;
   settled(): Promise<void>;
   options?: {

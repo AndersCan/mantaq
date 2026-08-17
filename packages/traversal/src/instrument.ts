@@ -1,4 +1,4 @@
-import type { AnyActor, Snapshot, TransitionInfo } from "@mantaq/core";
+import type { AnyActor, ErrorInfo, Snapshot, TransitionInfo } from "@mantaq/core";
 import { History } from "./history.ts";
 
 export interface InstrumentedActor<C = Record<string, unknown>> {
@@ -12,6 +12,7 @@ export interface InstrumentedActor<C = Record<string, unknown>> {
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
   on(event: "done", fn: () => void): () => void;
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
   recover(target: { state: AnyActor["state"]; context: C }): void;
   settled(): Promise<void>;
   options?: AnyActor["options"];

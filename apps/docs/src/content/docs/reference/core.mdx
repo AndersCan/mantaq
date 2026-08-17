@@ -97,13 +97,14 @@ class Actor<
 
 ### Methods
 
-| Method             | Signature                                    | What                                              |
-| ------------------ | -------------------------------------------- | ------------------------------------------------- |
-| `send(event)`      | `(event: CreatedOf<Inputs[number]>) => void` | Send event                                        |
-| `snapshot()`       | `() => Snapshot`                             | State tree                                        |
-| `on("change", fn)` | `(fn) => () => void`                         | State or context changed (`(snap, prev) => void`) |
-| `on("done", fn)`   | `(fn) => () => void`                         | Final or error state                              |
-| `settled()`        | `() => Promise<void>`                        | Queue drained                                     |
+| Method             | Signature                                    | What                                                        |
+| ------------------ | -------------------------------------------- | ----------------------------------------------------------- |
+| `send(event)`      | `(event: CreatedOf<Inputs[number]>) => void` | Send event                                                  |
+| `snapshot()`       | `() => Snapshot`                             | State tree                                                  |
+| `on("change", fn)` | `(fn) => () => void`                         | State or context changed (`(snap, prev) => void`)           |
+| `on("done", fn)`   | `(fn) => () => void`                         | Final or error state                                        |
+| `on("error", fn)`  | `(fn) => () => void`                         | Death signal, seeded to late subscribers (`(info) => void`) |
+| `settled()`        | `() => Promise<void>`                        | Queue drained                                               |
 
 ### Properties
 
@@ -263,6 +264,7 @@ interface AnyActor<C = Record<string, unknown>> {
   snapshot(): Snapshot<C>;
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
   settled(): Promise<void>;
 }
 ```

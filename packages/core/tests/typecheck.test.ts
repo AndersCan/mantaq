@@ -415,6 +415,30 @@ describe("public type surface — nameable helper types", () => {
     });
   });
 
+  test("on('error') callback receives ErrorInfo", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    actor.on("error", (info) => {
+      expectTypeOf(info).toEqualTypeOf<ErrorInfo>();
+      expectTypeOf(info.error).toBeUnknown();
+      expectTypeOf(info.state).toEqualTypeOf<AnyStateRef>();
+      expectTypeOf(info.context).toBeUnknown();
+      expectTypeOf(info.event).toEqualTypeOf<InternalEvent>();
+      expectTypeOf(info.reason).toEqualTypeOf<ErrorReason>();
+    });
+    const unsub: () => void = actor.on("error", () => {});
+    expectTypeOf(unsub).toBeFunction();
+    // @ts-expect-error error callbacks receive a single ErrorInfo — (snap, prev) is a change callback
+    actor.on("error", (_snap, _prev) => {});
+    // @ts-expect-error the event tag is not free-form
+    actor.on("nope", () => {});
+  });
+
   test("snapshot payload is observable and optional", () => {
     const idle = state("idle")();
     const actor = new Actor({

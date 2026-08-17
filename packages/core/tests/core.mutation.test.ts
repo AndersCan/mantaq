@@ -399,6 +399,73 @@ describe("Subscribers", () => {
   });
 });
 
+describe("on('error') death signal", () => {
+  test("construction-time unhandled death is seeded to a late error subscriber", () => {
+    const idle = state("idle")();
+    const probe = event("PROBE")();
+    const actor = new Actor({
+      inputs: [],
+      outputs: [probe],
+      internal: [probe],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, ({ emit }) => emit(probe.create()));
+      },
+    });
+    expect(actor.snapshot().path[0]).toBe("__error");
+    const seen: string[] = [];
+    const off = actor.on("error", (info) => seen.push(info.reason));
+    expect(seen).toEqual(["unhandled"]);
+    off();
+  });
+
+  test("runtime death fires error subscribers exactly once and recover stops stale seeds", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    let errors = 0;
+    actor.on("error", () => errors++);
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(errors).toBe(1);
+    actor.recover({ state: idle, context: {} });
+    const late: string[] = [];
+    actor.on("error", (info) => late.push(info.reason));
+    expect(late).toEqual([]);
+  });
+
+  test("a throwing error subscriber does not break the death sequence", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    const seen: string[] = [];
+    actor.on("error", () => {
+      throw new Error("sub boom");
+    });
+    actor.on("error", (info) => seen.push(info.reason));
+    expect(() => actor.send(go.create())).not.toThrow();
+    expect(seen).toEqual(["transition"]);
+  });
+});
+
 describe("internal-registry", () => {
   test("registry helpers operate on registered actors", () => {
     const children = new Map<string, never>();

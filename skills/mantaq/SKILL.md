@@ -119,7 +119,7 @@ new Actor({
 
 - `send(event.create(...))` — input events only.
 - `snapshot()` → `{ path, context, regions, done? }`.
-- `on("change", fn)` / `on("done", fn)` → returns unsubscribe.
+- `on("change", fn)` / `on("done", fn)` / `on("error", fn)` → returns unsubscribe.
 - `settled()` → resolves when queue drains. Pending timers are NOT queued events — advance the clock to wait for timer work.
 - `context` — read current.
 - In handlers, `actor.state` is the live StateRef; `.name` is its id. Timing caveat below.

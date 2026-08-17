@@ -21,6 +21,7 @@ export interface AnyActor<C = Record<string, unknown>> {
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
   recover(target: { state: AnyStateRef; context: C }): void;
   settled(): Promise<void>;
   context?: C;
