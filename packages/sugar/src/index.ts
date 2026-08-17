@@ -11,4 +11,6 @@ export {
   type SendableMap,
 } from "./transitions/broadcast.ts";
 export { tag } from "./tags.ts";
+export { actorSpec, definePart, use, withParts } from "./parts.ts";
+export type { ActorSpec, BuilderOf, Fragment, Part } from "./parts.ts";
 export { isIn, activeLeaves } from "./snapshot.ts";

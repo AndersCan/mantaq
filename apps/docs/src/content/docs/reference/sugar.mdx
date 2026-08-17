@@ -132,6 +132,162 @@ All leaf paths. Dot-separated strings.
 
 ---
 
+## `actorSpec(config)`
+
+```ts
+function actorSpec<
+  const States extends readonly AnyStateRef[],
+  const Inputs extends readonly AnyEventRef[],
+  const Internal extends readonly AnyEventRef[] = readonly [],
+  const Outputs extends readonly AnyEventRef[] = readonly [],
+  ActorContext = Record<string, unknown>,
+  const Initial extends AnyStateRef | { state: AnyStateRef; payload?: unknown } = AnyStateRef,
+>(config: {
+  states: States;
+  inputs: Inputs;
+  internal?: Internal;
+  outputs?: Outputs;
+  context?: ActorContext;
+  initial: Initial;
+  clock?: Clock;
+  regions?: Record<string, AnyActor>;
+  internalBudget?: number;
+}): {
+  states: States;
+  inputs: Inputs;
+  internal?: Internal;
+  outputs?: Outputs;
+  context?: ActorContext;
+  initial: Initial;
+  clock?: Clock;
+  regions?: Record<string, AnyActor>;
+  internalBudget?: number;
+};
+```
+
+Build the actor's static spec — states, inputs, internal/output events,
+context, initial state, clock, regions, budget. Returns the value, narrowing
+the state/event arrays to their literals (no `as const`) and keeping the
+context mutable. Feed it to `definePart<typeof x>` and `withParts`.
+
+```ts
+const checkout = actorSpec({
+  inputs: [submitBasicInfo, submitShipping],
+  internal: [paymentOk, paymentFail],
+  states: [basicInfo, shippingAddress, payment, submitting],
+  initial: basicInfo,
+  context: {} as CheckoutContext,
+});
+```
+
+`typeof checkout` is the anchor you pass to `definePart`. `ActorSpec` is the
+type of such a value; `BuilderOf<ActorSpec>` is its builder.
+
+---
+
+## `definePart(fn)`
+
+```ts
+function definePart<S extends ActorSpec = never>(fn: (m: BuilderOf<S>) => void): Fragment<S>;
+```
+
+Wrap a slice of an actor's setup — `m.on`, `m.onAny`, `m.effect` calls — so it
+can live in its own file. The generic is required: omit the spec anchor and
+`S` defaults to `never`, so registering anything is a compile error rather
+than a silent loss of typing. Anchor against an `actorSpec` value:
+
+```ts
+const basicInfoPart = definePart<typeof checkout>((m) => {
+  m.on(basicInfo, submitBasicInfo, (event, opts) => {
+    const cur = opts.context.get();
+    cur.basicInfo = event.payload;
+    opts.context.set(cur);
+    return { state: shippingAddress };
+  });
+});
+```
+
+`typeof checkout` anchors every type in the part: states, events, context,
+outputs. Import it type-only in the part file — `import type { checkout } from
+"./checkout.ts"` — and keep the refs as value imports.
+
+---
+
+## `use(m, part)`
+
+```ts
+function use<S extends ActorSpec>(m: BuilderOf<S>, part: Fragment<S>): void;
+```
+
+Register a part inside a hand-written setup.
+
+```ts
+setup: (m) => {
+  use(m, basicInfoPart);
+  use(m, submittingPart);
+};
+```
+
+`use` is not the React hook. It takes `Fragment`s produced by `definePart` —
+define parts with `definePart`, never annotate the `Part` type by hand.
+
+---
+
+## `withParts(base, parts)`
+
+```ts
+function withParts<
+  const States extends readonly AnyStateRef[],
+  const Inputs extends readonly AnyEventRef[],
+  const Internal extends readonly AnyEventRef[] = readonly [],
+  const Outputs extends readonly AnyEventRef[] = readonly [],
+  ActorContext = Record<string, unknown>,
+>(
+  base: Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup">,
+  parts:
+    | Part<States, Inputs, Internal, Outputs, ActorContext>
+    | readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
+): Actor<States, Inputs, Internal, Outputs, ActorContext>;
+```
+
+Build an actor from a spec plus one part or an array of parts. The `setup` is
+generated — every part runs against the builder in order. `base` takes every
+option `new Actor` takes: `clock`, `regions`, `internalBudget`, and initial
+with payload included.
+
+The parts array shares the actor's generics — `Part<States, ...>`, not any
+actor. A part built against one spec cannot be wired into another.
+
+For the same (state, event), the last registered handler wins — across parts
+and inline code alike. Effects append instead: every effect on a state runs on
+entry.
+
+```ts
+const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
+```
+
+---
+
+## Types
+
+```ts
+type ActorSpec;       // shape of the static actor spec (states/inputs/.../initial)
+type BuilderOf<S>;    // ActorBuilder for that spec
+type Fragment<S>;     // (m: BuilderOf<S>) => void
+type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — withParts array element type
+```
+
+`ActorSpec` is the type `definePart` and `use` accept. `BuilderOf` and
+`Fragment` name the part signature for explicit annotations. `Part` is the
+same shape with explicit generics — what `withParts` takes, one or an array.
+
+`ActorSpec` is a constraint, not a value annotation: annotating the value with
+`ActorSpec` (or `ActorOptions`) erases its literal state/event/context types.
+Build specs with `actorSpec` and pass `typeof <that value>` — never annotate
+the object itself.
+
+---
+
 ## `withPromise(promise, signal, emit, events)`
 
 ```ts

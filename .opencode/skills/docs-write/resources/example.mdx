@@ -359,5 +359,6 @@ at the parent's output edge turns settlements into promises (`waitFor`).
 | matching         | `matches(actor, "payment")`, `isIn`, `activeLeaves`, `tag` on checkout                                        |
 | dynamic-children | shop order workers extension                                                                                  |
 | effect-helpers   | `withPromise` + `withTimeout` on `submitting` effect                                                          |
+| composition      | split the same checkout into `actorSpec` + `definePart` parts + `withParts` (no new entities)                 |
 | request-response | request handler extension: manager + `ActorMap` + `autoReap` + handler outputs + bridge                       |
 | reference/\*     | generic (exempt from registry, snippets still must compile)                                                   |
