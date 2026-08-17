@@ -221,7 +221,20 @@ export class Actor<
     event: "change" | "done" | "transition" | "error",
     fn: (...args: never[]) => void,
   ): () => void {
-    return this.#subs.add(event, fn);
+    if (event === "change") {
+      const cb = fn as (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void;
+      return this.#subs.addChange(cb);
+    }
+    if (event === "done") {
+      const cb = fn as () => void;
+      return this.#subs.addDone(cb);
+    }
+    if (event === "transition") {
+      const cb = fn as (info: TransitionInfo) => void;
+      return this.#subs.addTransition(cb);
+    }
+    const cb = fn as (info: ErrorInfo) => void;
+    return this.#subs.addError(cb);
   }
 
   settled(): Promise<void> {

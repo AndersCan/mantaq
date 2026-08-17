@@ -16,7 +16,9 @@ export class RealClock implements Clock {
     let onAbort: (() => void) | undefined;
     const id = Number(
       globalThis.setTimeout(() => {
-        if (onAbort && options?.signal) options.signal.removeEventListener("abort", onAbort);
+        if (onAbort && options?.signal) {
+          options.signal.removeEventListener("abort", onAbort);
+        }
         cb();
       }, ms),
     );

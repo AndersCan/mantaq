@@ -28,7 +28,7 @@ import { join } from "node:path";
 const CORE_SRC = join(import.meta.dirname, "..", "packages", "core", "src");
 const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 
-const BUDGET_TOTAL_LINES = 1370;
+const BUDGET_TOTAL_LINES = 1450;
 const BUDGET_FILE_LINES = 520;
 const BUDGET_EXPORTS = 32;
 

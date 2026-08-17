@@ -243,16 +243,16 @@ describe("Subscribers directed mutation tests", () => {
     expect(prevSnap).toEqual({ path: ["active"], context: {}, regions: {} });
   });
 
-  test("add routes each event tag to its own hook and unsubscribes independently", () => {
+  test("add* hooks route each event tag and unsubscribe independently", () => {
     const subs = new Subscribers<unknown>();
     let changes = 0;
     let dones = 0;
     let transitions = 0;
     let errors = 0;
-    const offChange = subs.add("change", () => changes++);
-    const offDone = subs.add("done", () => dones++);
-    const offTransition = subs.add("transition", () => transitions++);
-    const offError = subs.add("error", () => errors++);
+    const offChange = subs.addChange(() => changes++);
+    const offDone = subs.addDone(() => dones++);
+    const offTransition = subs.addTransition(() => transitions++);
+    const offError = subs.addError(() => errors++);
     const snap = { path: ["idle"], context: {}, regions: {} };
     const info = {
       error: new Error("boom"),

@@ -19,11 +19,19 @@ export class InternalQueue {
   }
 
   settled(): Promise<void> {
-    if (this.length === 0 && !this.#processing) return Promise.resolve();
-    return new Promise<void>((resolve) => this.#settledResolvers.push(resolve));
+    if (this.length === 0 && !this.#processing) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.#settledResolvers.push(resolve);
+    });
   }
 
   processCancellable(processEvent: CancellableProcessEventFn): void {
+    this.#process(processEvent);
+  }
+
+  #process(processEvent: CancellableProcessEventFn): void {
     if (this.#processing) return;
     this.#processing = true;
     try {
@@ -42,7 +50,9 @@ export class InternalQueue {
       this.#stopped = false;
       if (this.#settledResolvers.length > 0) {
         const resolvers = this.#settledResolvers.splice(0);
-        for (const resolve of resolvers) resolve();
+        for (const resolve of resolvers) {
+          resolve();
+        }
       }
     }
   }

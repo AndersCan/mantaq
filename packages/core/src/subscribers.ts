@@ -12,22 +12,6 @@ export class Subscribers<C> {
     this.#last = snapshot;
   }
 
-  add(
-    event: "change" | "done" | "transition" | "error",
-    fn: (...args: never[]) => void,
-  ): () => void {
-    if (event === "change") {
-      return this.addChange(fn as (snapshot: Snapshot<C>, prev: Snapshot<C>) => void);
-    }
-    if (event === "done") {
-      return this.addDone(fn as () => void);
-    }
-    if (event === "transition") {
-      return this.addTransition(fn as (info: TransitionInfo) => void);
-    }
-    return this.addError(fn as (info: ErrorInfo) => void);
-  }
-
   addChange(fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void {
     this.change.add(fn);
     const last = this.#last;
@@ -48,26 +32,36 @@ export class Subscribers<C> {
   addError(fn: (info: ErrorInfo) => void): () => void {
     this.error.add(fn);
     const last = this.#last?.error;
-    if (last) this.#safe(() => fn(last));
+    if (last) {
+      this.#safe(() => fn(last));
+    }
     return () => this.error.delete(fn);
   }
 
   emitChange(snapshot: Snapshot<C>): void {
     const prev = this.#last ?? snapshot;
     this.#last = snapshot;
-    for (const fn of this.change) this.#safe(() => fn(snapshot, prev));
+    for (const fn of this.change) {
+      this.#safe(() => fn(snapshot, prev));
+    }
   }
 
   emitDone(): void {
-    for (const fn of this.done) this.#safe(fn);
+    for (const fn of this.done) {
+      this.#safe(fn);
+    }
   }
 
   emitTransition(info: TransitionInfo): void {
-    for (const fn of this.transition) this.#safe(() => fn(info));
+    for (const fn of this.transition) {
+      this.#safe(() => fn(info));
+    }
   }
 
   emitError(info: ErrorInfo): void {
-    for (const fn of this.error) this.#safe(() => fn(info));
+    for (const fn of this.error) {
+      this.#safe(() => fn(info));
+    }
   }
 
   clear(): void {
