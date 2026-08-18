@@ -436,7 +436,8 @@ describe("public type surface — nameable helper types", () => {
     // @ts-expect-error error callbacks receive a single ErrorInfo — (snap, prev) is a change callback
     actor.on("error", (_snap, _prev) => {});
     // @ts-expect-error the event tag is not free-form
-    actor.on("nope", () => {});
+    const badTag = (): (() => void) => actor.on("nope", () => {});
+    expectTypeOf(badTag).toBeFunction();
   });
 
   test("snapshot payload is observable and optional", () => {

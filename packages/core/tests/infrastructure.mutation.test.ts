@@ -265,10 +265,7 @@ describe("Subscribers directed mutation tests", () => {
     subs.emitDone();
     subs.emitTransition({ event: { type: "GO" }, from: "a", to: "b", transitioned: true });
     subs.emitError(info);
-    expect(changes).toBe(1);
-    expect(dones).toBe(1);
-    expect(transitions).toBe(1);
-    expect(errors).toBe(1);
+    expect([changes, dones, transitions, errors]).toEqual([1, 1, 1, 1]);
     offChange();
     offDone();
     offTransition();
@@ -277,10 +274,7 @@ describe("Subscribers directed mutation tests", () => {
     subs.emitDone();
     subs.emitTransition({ event: { type: "GO" }, from: "a", to: "b", transitioned: true });
     subs.emitError(info);
-    expect(changes).toBe(1);
-    expect(dones).toBe(1);
-    expect(transitions).toBe(1);
-    expect(errors).toBe(1);
+    expect([changes, dones, transitions, errors]).toEqual([1, 1, 1, 1]);
   });
 
   test("addError seeds the last error stored on the snapshot to late subscribers", () => {
