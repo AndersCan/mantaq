@@ -28,6 +28,7 @@ export default defineConfig({
         {
           label: "Getting Started",
           items: [
+            { label: "State Machines & Statecharts", slug: "getting-started/state-machines" },
             { label: "Introduction", slug: "getting-started/introduction" },
             { label: "Installation", slug: "getting-started/installation" },
           ],
@@ -40,6 +41,7 @@ export default defineConfig({
             { label: "Events", slug: "core-concepts/events" },
             { label: "Effects", slug: "core-concepts/effects" },
             { label: "Context", slug: "core-concepts/context" },
+            { label: "Error Handling", slug: "core-concepts/error-handling" },
             { label: "Testing", slug: "guides/actor-testing" },
           ],
         },

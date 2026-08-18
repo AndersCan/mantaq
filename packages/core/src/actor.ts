@@ -89,6 +89,19 @@ type StepFn<States extends readonly AnyStateRef[], ActorContext> = (
   options: { context: Context<ActorContext>; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
 
+type SubscriberEvent = "change" | "done" | "transition" | "error";
+
+type SubscriberFns<C> = {
+  change: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void;
+  done: () => void;
+  transition: (info: TransitionInfo) => void;
+  error: (info: ErrorInfo) => void;
+};
+
+type SubscriberCase<C> = {
+  [K in SubscriberEvent]: (fn: SubscriberFns<C>[K]) => () => void;
+};
+
 interface StepOutcome {
   emitted: boolean;
   transitioned: boolean;
@@ -216,17 +229,15 @@ export class Actor<
   ): () => void;
   on(event: "done", fn: () => void): () => void;
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
-  on(event: "change" | "done" | "transition", fn: (...args: never[]) => void): () => void {
-    if (event === "change") {
-      const cb = fn as (snapshot: Snapshot<ActorContext>, prev: Snapshot<ActorContext>) => void;
-      return this.#subs.addChange(cb);
-    }
-    if (event === "done") {
-      const cb = fn as () => void;
-      return this.#subs.addDone(cb);
-    }
-    const cb = fn as (info: TransitionInfo) => void;
-    return this.#subs.addTransition(cb);
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on<E extends SubscriberEvent>(event: E, fn: SubscriberFns<ActorContext>[E]): () => void {
+    const dispatch: SubscriberCase<ActorContext> = {
+      change: (fn) => this.#subs.addChange(fn),
+      done: (fn) => this.#subs.addDone(fn),
+      transition: (fn) => this.#subs.addTransition(fn),
+      error: (fn) => this.#subs.addError(fn),
+    };
+    return dispatch[event](fn);
   }
 
   settled(): Promise<void> {
@@ -501,6 +512,7 @@ export class Actor<
     this.#statePayload = undefined;
     this.#lastState = this.#errorState;
     this.#contextWritten = false;
+    this.#subs.emitError(this.#error);
     this.#subs.emitChange(this.snapshot());
     this.#subs.emitDone();
   }

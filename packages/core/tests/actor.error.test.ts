@@ -5,6 +5,7 @@ import { event } from "../src/event.ts";
 import { pushInternal, setOutputHandler } from "../src/internal-registry.ts";
 import type { AnyActor } from "../src/actor-internal.ts";
 import type { AnyStateRef } from "../src/state.ts";
+import type { ErrorInfo } from "../src/actor-types.ts";
 import type { Snapshot } from "../src/index.ts";
 
 describe("Actor error paths", () => {
@@ -189,14 +190,15 @@ describe("Actor error paths", () => {
     expect(() => actor.send(start.create())).not.toThrow();
     expect(effectRuns).toBe(1);
     const snap = actor.snapshot();
-    expect(snap.path[0]).toBe("__error");
-    expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("loading");
-    expect(snap.error?.event.type).toBe("START");
-    expect(snap.error?.error instanceof Error).toBe(true);
-    if (snap.error) {
-      expect((snap.error.error as Error).message).toBe("effect bug");
-    }
+    expect(snap).toMatchObject({
+      path: ["__error"],
+      error: {
+        reason: "effect",
+        state: { name: "loading" },
+        event: { type: "START" },
+        error: expect.objectContaining({ message: "effect bug" }),
+      },
+    });
   });
 
   test("a throwing transition handler routes to the error state and never resurrects", () => {
@@ -221,11 +223,11 @@ describe("Actor error paths", () => {
     expect(() => actor.send(go.create())).not.toThrow();
     expect(() => actor.send(go.create())).not.toThrow();
     const snap = actor.snapshot();
-    expect(snap.path[0]).toBe("__error");
-    expect(snap.done).toBe(true);
-    expect(snap.error?.reason).toBe("transition");
-    expect(snap.error?.event.type).toBe("GO");
-    expect(snap.error?.state.name).toBe("idle");
+    expect(snap).toMatchObject({
+      path: ["__error"],
+      done: true,
+      error: { reason: "transition", event: { type: "GO" }, state: { name: "idle" } },
+    });
     expect(ranAny).toBe(false);
   });
 
@@ -246,10 +248,10 @@ describe("Actor error paths", () => {
     });
     expect(() => actor.send(go.create())).not.toThrow();
     const snap = actor.snapshot();
-    expect(snap.path[0]).toBe("__error");
-    expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("loading");
-    expect(snap.error?.event.type).toBe("GO");
+    expect(snap).toMatchObject({
+      path: ["__error"],
+      error: { reason: "effect", state: { name: "loading" }, event: { type: "GO" } },
+    });
   });
 
   test("error context is the context from before the bad event", () => {
@@ -349,13 +351,14 @@ describe("Actor error paths", () => {
     expect(() => actor.send(go.create())).not.toThrow();
     await actor.settled();
     const snap = actor.snapshot();
-    expect(snap.path[0]).toBe("__error");
-    expect(snap.error?.reason).toBe("effect");
-    expect(snap.error?.state.name).toBe("loading");
-    expect(snap.error?.error instanceof Error).toBe(true);
-    if (snap.error) {
-      expect((snap.error.error as Error).message).toBe("late boom");
-    }
+    expect(snap).toMatchObject({
+      path: ["__error"],
+      error: {
+        reason: "effect",
+        state: { name: "loading" },
+        error: expect.objectContaining({ message: "late boom" }),
+      },
+    });
   });
 
   test("death emits exactly one change and one done", () => {
@@ -463,5 +466,135 @@ describe("Actor error paths", () => {
     actor.send(tick.create());
     expect(ticks).toBe(1);
     expect(actor.snapshot().path[0]).toBe("idle");
+  });
+
+  test("construction-time unhandled internal event reaches a late on('error') subscriber", () => {
+    const idle = state("idle")();
+    const probe = event("PROBE")();
+    const actor = new Actor({
+      inputs: [],
+      outputs: [probe],
+      internal: [probe],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, ({ emit }) => {
+          emit(probe.create());
+        });
+      },
+    });
+    expect(actor.snapshot().path[0]).toBe("__error");
+    const seen: ErrorInfo[] = [];
+    actor.on("error", (info) => seen.push(info));
+    expect(seen).toMatchObject([
+      {
+        reason: "unhandled",
+        state: { name: "idle" },
+        event: { type: "PROBE" },
+        error: expect.any(Error),
+      },
+    ]);
+  });
+
+  test("construction-time throwing initial effect also signals late on('error') subscribers", () => {
+    const idle = state("idle")();
+    const actor = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, () => {
+          throw new Error("init boom");
+        });
+      },
+    });
+    const seen: ErrorInfo[] = [];
+    actor.on("error", (info) => seen.push(info));
+    expect(seen).toMatchObject([
+      {
+        reason: "effect",
+        event: { type: "__init" },
+        error: expect.objectContaining({ message: "init boom" }),
+      },
+    ]);
+  });
+
+  test("runtime death fires a pre-attached on('error') subscriber", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const seen: ErrorInfo[] = [];
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.effect(active, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.on("error", (info) => seen.push(info));
+    actor.send(go.create());
+    expect(seen).toMatchObject([{ reason: "effect", state: { name: "active" } }]);
+    expect(actor.snapshot().error?.reason).toBe("effect");
+  });
+
+  test("recover clears stored error so late subscribers get no stale delivery", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    let ticks = 0;
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+        m.on(idle, tick, () => {
+          ticks++;
+          return {};
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().error?.reason).toBe("transition");
+    const before: ErrorInfo[] = [];
+    actor.on("error", (info) => before.push(info));
+    expect(before.length).toBe(1);
+
+    actor.recover({ state: idle, context: {} });
+    const after: ErrorInfo[] = [];
+    actor.on("error", (info) => after.push(info));
+    expect(after.length).toBe(0);
+    actor.send(tick.create());
+    expect(ticks).toBe(1);
+    expect(after.length).toBe(0);
+  });
+
+  test("on('error') unsubscribe stops further delivery", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    const seen: ErrorInfo[] = [];
+    const off = actor.on("error", (info) => seen.push(info));
+    actor.send(go.create());
+    expect(seen.length).toBe(1);
+    off();
+    actor.recover({ state: idle, context: {} });
+    actor.send(go.create());
+    expect(seen.length).toBe(1);
   });
 });

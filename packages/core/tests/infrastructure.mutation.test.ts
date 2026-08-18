@@ -242,6 +242,89 @@ describe("Subscribers directed mutation tests", () => {
     subs.emitChange({ path: ["active"], context: {}, regions: {} });
     expect(prevSnap).toEqual({ path: ["active"], context: {}, regions: {} });
   });
+
+  test("add* hooks route each event tag and unsubscribe independently", () => {
+    const subs = new Subscribers<unknown>();
+    let changes = 0;
+    let dones = 0;
+    let transitions = 0;
+    let errors = 0;
+    const offChange = subs.addChange(() => changes++);
+    const offDone = subs.addDone(() => dones++);
+    const offTransition = subs.addTransition(() => transitions++);
+    const offError = subs.addError(() => errors++);
+    const snap = { path: ["idle"], context: {}, regions: {} };
+    const info = {
+      error: new Error("boom"),
+      state: state("idle")(),
+      context: {},
+      event: { type: "X" },
+      reason: "effect" as const,
+    };
+    subs.emitChange(snap);
+    subs.emitDone();
+    subs.emitTransition({ event: { type: "GO" }, from: "a", to: "b", transitioned: true });
+    subs.emitError(info);
+    expect([changes, dones, transitions, errors]).toEqual([1, 1, 1, 1]);
+    offChange();
+    offDone();
+    offTransition();
+    offError();
+    subs.emitChange(snap);
+    subs.emitDone();
+    subs.emitTransition({ event: { type: "GO" }, from: "a", to: "b", transitioned: true });
+    subs.emitError(info);
+    expect([changes, dones, transitions, errors]).toEqual([1, 1, 1, 1]);
+  });
+
+  test("addError seeds the last error stored on the snapshot to late subscribers", () => {
+    const subs = new Subscribers<unknown>();
+    const info = {
+      error: new Error("boom"),
+      state: state("idle")(),
+      context: {},
+      event: { type: "X" },
+      reason: "effect" as const,
+    };
+    subs.seed({ path: ["__error"], context: {}, regions: {}, error: info });
+    const seen: unknown[] = [];
+    subs.addError((e) => seen.push(e));
+    expect(seen).toEqual([info]);
+  });
+
+  test("error subscriber throws are contained and other error subscribers still run", () => {
+    const subs = new Subscribers<unknown>();
+    const info = {
+      error: new Error("boom"),
+      state: state("idle")(),
+      context: {},
+      event: { type: "X" },
+      reason: "effect" as const,
+    };
+    const seen: unknown[] = [];
+    subs.addError(() => {
+      throw new Error("sub boom");
+    });
+    subs.addError((e) => seen.push(e));
+    expect(() => subs.emitError(info)).not.toThrow();
+    expect(seen).toEqual([info]);
+  });
+
+  test("clear removes error subscribers", () => {
+    const subs = new Subscribers<unknown>();
+    const info = {
+      error: new Error("boom"),
+      state: state("idle")(),
+      context: {},
+      event: { type: "X" },
+      reason: "effect" as const,
+    };
+    let errors = 0;
+    subs.addError(() => errors++);
+    subs.clear();
+    subs.emitError(info);
+    expect(errors).toBe(0);
+  });
 });
 
 describe("runEffects directed mutation tests", () => {

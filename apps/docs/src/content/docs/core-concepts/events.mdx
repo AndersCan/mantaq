@@ -72,6 +72,53 @@ m.on(shippingAddress, submitShipping, (event, { context }) => {
 
 `event.payload.street`, `event.payload.city` — all typed.
 
+## Conditional transitions (guards)
+
+A conditional transition is a transition that only fires when a condition
+passes. The condition is plain JavaScript — an `if` or a ternary — written in
+the handler, and it picks the `TransitionResult` the handler returns: the
+matching branch returns `{ state: ... }`, the other branches return `{}` to
+stay put.
+
+This is Mantaq's guard. There is no `guard:` option and no condition syntax to
+learn — the `if` in the handler is the guard, written by you, run by the
+machine. One way to do it.
+
+The fraud monitor from [States](/mantaq/core-concepts/states/) decides its next
+state from the event payload:
+
+```ts
+m.on(scanning, scanDone, (event) => ({
+  state: event.payload.risky ? flagged : cleared,
+}));
+```
+
+`scanDone` always fires the handler; the ternary picks which state the handler
+returns. The condition can just as easily read what has happened so far —
+`context.get()` returns the live record, and branching on its fields works the
+same way. The `back` handler in [Any handler](#any-handler) is the same
+pattern, with the condition on the current state instead of data.
+
+A conditional handler still moves the machine exactly once, through exactly one
+branch. When no condition matches and the handler returns `{}`, the machine
+stays put — same state, same context, nothing fired.
+
+Because the branch is plain JS, you test it like plain JS. Cover both branches
+with the actor wrapped in the `@mantaq/test` harness, then assert which
+transitions and states were actually reached:
+
+```ts
+const h = createTestHarness(fraudMonitor);
+h.send(scanDone.create({ risky: true }));
+h.assertTransitionVisited("scanning", "scanDone"); // the handler ran
+h.assertStateVisited("flagged"); // the risky branch won
+h.assertStateNeverVisited("cleared"); // safe branch never fired
+```
+
+`assertAllTransitionsVisited()` after a full run proves every declared
+transition fired at least once — a condition that never passes leaves its
+transition unvisited and fails the assertion.
+
 ## Internal events
 
 Internal events come from effects, not from the outside. They're declared in
