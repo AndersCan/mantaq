@@ -15,12 +15,7 @@ export interface RegistryError {
   message: string;
 }
 
-declare global {
-  var __mantaqCoreInternalRegistry: WeakMap<object, ActorInternal> | undefined;
-}
-
-const registry: WeakMap<object, ActorInternal> = (globalThis.__mantaqCoreInternalRegistry ??=
-  new WeakMap());
+const INTERNAL_KEY = Symbol.for("mantaq.core.internal");
 
 const UNREGISTERED: RegistryError = {
   message: "[mantaq] actor is not registered with the internal registry",
@@ -30,12 +25,12 @@ function withInternal<T>(
   actor: object,
   fn: (internal: ActorInternal) => T,
 ): Either<RegistryError, T> {
-  const internal = registry.get(actor);
+  const internal = (actor as Record<symbol, ActorInternal>)[INTERNAL_KEY];
   return internal === undefined ? Either.left(UNREGISTERED) : [undefined, fn(internal)];
 }
 
 export function registerActor(actor: object, internal: ActorInternal): void {
-  registry.set(actor, internal);
+  (actor as Record<symbol, ActorInternal>)[INTERNAL_KEY] = internal;
 }
 
 export function getChildren(actor: object): Either<RegistryError, Map<string, AnyActor>> {

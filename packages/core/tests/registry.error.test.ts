@@ -1,6 +1,7 @@
 import { expect, test, describe, vi } from "vite-plus/test";
 import type { ActorInternal } from "../src/internal-registry.ts";
 import {
+  registerActor,
   getChildren,
   getOutputHandler,
   pushInternal,
@@ -18,9 +19,8 @@ describe("internal-registry error paths", () => {
     expect(abortEffects(victim)[0]?.message).toMatch(/not registered/);
   });
 
-  test("registry assignment preserves a pre-existing global registry", async () => {
-    const key = "__mantaqCoreInternalRegistry";
-    const original = (globalThis as Record<string, unknown>)[key];
+  test("registration survives module reload so a second core copy sees the internals", async () => {
+    const actor = {};
     const internal: ActorInternal = {
       children: new Map(),
       getOutputHandler: () => null,
@@ -29,26 +29,15 @@ describe("internal-registry error paths", () => {
       drainInternal: () => {},
       abortEffects: () => {},
     };
-    try {
-      (globalThis as Record<string, unknown>)[key] = 1;
-      vi.resetModules();
-      const mod = await import("../src/internal-registry.ts");
-      expect(() => mod.registerActor({}, internal)).toThrow();
-    } finally {
-      (globalThis as Record<string, unknown>)[key] = original;
-    }
+    registerActor(actor, internal);
+    vi.resetModules();
+    const mod = await import("../src/internal-registry.ts");
+    expect(mod.getChildren(actor)[1]).toBe(internal.children);
   });
 
-  test("a fresh registry instance reports the unregistered error message", async () => {
-    const key = "__mantaqCoreInternalRegistry";
-    const original = (globalThis as Record<string, unknown>)[key];
-    try {
-      (globalThis as Record<string, unknown>)[key] = new WeakMap();
-      vi.resetModules();
-      const mod = await import("../src/internal-registry.ts");
-      expect(mod.getChildren({})[0]?.message).toMatch(/not registered/);
-    } finally {
-      (globalThis as Record<string, unknown>)[key] = original;
-    }
+  test("a fresh module load still reports the unregistered error message", async () => {
+    vi.resetModules();
+    const mod = await import("../src/internal-registry.ts");
+    expect(mod.getChildren({})[0]?.message).toMatch(/not registered/);
   });
 });

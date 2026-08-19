@@ -465,17 +465,13 @@ describe("internal-registry directed mutation tests 2", () => {
     expect(abortEffects(victim)).toEqual([{ message: expected }, undefined]);
   });
 
-  test("a pre-existing global registry is preserved on module load", async () => {
-    const key = "__mantaqCoreInternalRegistry";
-    const original = (globalThis as Record<string, unknown>)[key];
-    try {
-      (globalThis as Record<string, unknown>)[key] = 1;
-      vi.resetModules();
-      const mod = await import("../src/internal-registry.ts");
-      expect(() => mod.registerActor({}, makeInternal())).toThrow();
-    } finally {
-      (globalThis as Record<string, unknown>)[key] = original;
-    }
+  test("registration survives module reload so two core copies share the same actor internals", async () => {
+    const actor = {};
+    const internal = makeInternal();
+    registerActor(actor, internal);
+    vi.resetModules();
+    const mod = await import("../src/internal-registry.ts");
+    expect(mod.getChildren(actor)[1]).toBe(internal.children);
   });
 
   test("a fresh module load exposes the exact unregistered message", async () => {
