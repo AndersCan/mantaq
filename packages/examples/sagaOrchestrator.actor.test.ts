@@ -21,26 +21,11 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
-import { pushInternal, drainInternal } from "@mantaq/core/internal";
-import type { RegistryError } from "@mantaq/core/internal";
-import { Either } from "@mantaq/utils";
+import type { AnyActor } from "@mantaq/core";
 import { matches, states, events, withTimeout } from "@mantaq/sugar";
 
-function inject(actor: object, event: { type: string }): void {
-  Either.match(
-    pushInternal(actor, event),
-    (err: RegistryError) => {
-      throw new Error(err.message);
-    },
-    () => {},
-  );
-  Either.match(
-    drainInternal(actor),
-    (err: RegistryError) => {
-      throw new Error(err.message);
-    },
-    () => {},
-  );
+function inject(actor: AnyActor, event: { type: string }): void {
+  actor.inject(event);
 }
 
 // ── Types ────────────────────────────────────────────────────────────

@@ -13,10 +13,6 @@ import type {
   EventTypeOf,
 } from "../src/index.ts";
 import type { ErrorReason } from "../src/actor-types.ts";
-import { setOutputHandler, pushInternal, getChildren } from "../src/internal-registry.ts";
-import type { RegistryError } from "../src/internal-registry.ts";
-import type { Either } from "@mantaq/utils";
-import type { AnyActor } from "../src/actor-internal.ts";
 
 describe("API type safety", () => {
   test("emit to output passes typecheck", () => {
@@ -35,7 +31,7 @@ describe("API type safety", () => {
     });
 
     let received: Array<{ type: string }> = [];
-    setOutputHandler(actor, (e) => {
+    actor.on("output", (e) => {
       received.push(e);
     });
     actor.send(clicked.create({ x: 3 }));
@@ -275,7 +271,7 @@ describe("type level contract — type = behavior", () => {
     ready.create({});
   });
 
-  test("internal registry returns Either — failure is part of the type flow", () => {
+  test("inject, dispose and on('output') are typed on the actor", () => {
     const idle = state("idle")();
     const actor = new Actor({
       inputs: [],
@@ -283,10 +279,12 @@ describe("type level contract — type = behavior", () => {
       initial: idle,
       setup: () => {},
     });
-    const internalEvent = event("GO")();
-    const result = pushInternal(actor, internalEvent.create());
-    expectTypeOf(result).toEqualTypeOf<Either<RegistryError, void>>();
-    expectTypeOf(getChildren(actor)).toEqualTypeOf<Either<RegistryError, Map<string, AnyActor>>>();
+    const off: () => void = actor.on("output", (_e: InternalEvent) => {});
+    void off;
+    const injectSeam = (e: InternalEvent) => actor.inject(e);
+    expectTypeOf(injectSeam).parameters.toEqualTypeOf<[InternalEvent]>();
+    const disposeSeam = () => actor.dispose();
+    expectTypeOf(disposeSeam).toBeFunction();
   });
 });
 

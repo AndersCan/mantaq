@@ -22,6 +22,7 @@ export interface AnyActor<C = Record<string, unknown>> {
   on(event: "done", fn: () => void): () => void;
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
   on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on(event: "output", fn: (event: InternalEvent) => void): () => void;
   recover(target: { state: AnyStateRef; context: C }): void;
   settled(): Promise<void>;
   context?: C;
@@ -30,4 +31,6 @@ export interface AnyActor<C = Record<string, unknown>> {
     effects?: Record<string, unknown[]>;
     states?: ReadonlyArray<{ name: string; isFinal: boolean }>;
   };
+  inject(event: InternalEvent): void;
+  dispose(): void;
 }

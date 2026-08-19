@@ -1,5 +1,4 @@
 import type { AnyActor, InternalEvent } from "@mantaq/core";
-import { setOutputHandler } from "@mantaq/core/internal";
 
 /**
  * Route an actor's emitted outputs to a handler.
@@ -9,5 +8,5 @@ import { setOutputHandler } from "@mantaq/core/internal";
  * factory connects a child's declared outputs to a receiver.
  */
 export function onOutput(actor: AnyActor, handler: (event: InternalEvent) => void): void {
-  setOutputHandler(actor, handler);
+  actor.on("output", handler);
 }

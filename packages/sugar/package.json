@@ -30,8 +30,7 @@
     "prepack": "vp run build"
   },
   "dependencies": {
-    "@mantaq/core": "workspace:*",
-    "@mantaq/utils": "workspace:*"
+    "@mantaq/core": "workspace:*"
   },
   "devDependencies": {
     "@mantaq/pbt": "workspace:*",

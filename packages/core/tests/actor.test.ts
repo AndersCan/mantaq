@@ -1,6 +1,5 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, state, event, VirtualClock } from "../src/index.ts";
-import { setOutputHandler } from "../src/internal-registry.ts";
 
 describe("Actor dispatch resolution", () => {
   test("state handler wins over Any handler for same event", () => {
@@ -43,7 +42,7 @@ describe("Actor dispatch resolution", () => {
     });
 
     const received: string[] = [];
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(tick.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(received).toEqual(["OUT"]);
@@ -203,7 +202,7 @@ describe("Actor effects", () => {
         m.on(running, stop, () => ({ state: idle }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(go.create());
     expect(savedEmit).toBeDefined();
     actor.send(stop.create());

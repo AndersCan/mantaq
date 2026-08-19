@@ -15,7 +15,6 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./internal": "./src/internal-registry.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {

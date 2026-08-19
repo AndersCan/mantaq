@@ -21,13 +21,11 @@ const EXAMPLE_TEST = join(ROOT, "packages/examples/checkout.actor.test.ts");
 const EXAMPLE_MDX = join(ROOT, ".opencode/skills/docs-write/resources/example.mdx");
 const CORE_INDEX = join(ROOT, "packages/core/src/index.ts");
 const SUGAR_INDEX = join(ROOT, "packages/sugar/src/index.ts");
-const INTERNAL_INDEX = join(ROOT, "packages/core/src/internal-registry.ts");
 
 const BUILTIN_ALLOW = new Set(["__error"]);
 const PACKAGE_INDEX = new Map([
   ["@mantaq/core", CORE_INDEX],
   ["@mantaq/sugar", SUGAR_INDEX],
-  ["@mantaq/core/internal", INTERNAL_INDEX],
 ]);
 
 let failures = 0;

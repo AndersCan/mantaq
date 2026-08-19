@@ -140,9 +140,6 @@ importers:
       '@mantaq/sugar':
         specifier: workspace:*
         version: link:../sugar
-      '@mantaq/utils':
-        specifier: workspace:*
-        version: link:../utils
     devDependencies:
       '@types/node':
         specifier: ^26.2.0
@@ -190,9 +187,6 @@ importers:
       '@mantaq/core':
         specifier: workspace:*
         version: link:../core
-      '@mantaq/utils':
-        specifier: workspace:*
-        version: link:../utils
     devDependencies:
       '@mantaq/pbt':
         specifier: workspace:*
