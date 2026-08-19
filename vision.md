@@ -6,7 +6,7 @@ What mantaq is. What mantaq believes. What mantaq rejects. What good looks like.
 
 ## Mantaq Is
 
-Actor-model state machine library. TypeScript. Minimal primitives.
+Actor-model state machine library. TypeScript, ESM only. Minimal primitives.
 
 Kills complexity: state explosion, derived state, concurrency, side effects.
 
@@ -17,6 +17,7 @@ Core primitives: States + Events, Context, Effects, Regions/Composition, Clock.
 Three claims. Each is a machine check, not taste. Divergence is a design bug.
 
 - **If it typechecks, it runs correct.** Type = behavior. Nothing stringly typed. Any gap between type and runtime is a design bug.
+- **ESM only, no dual package.** One module graph, one module instance, one registry. No CJS. No dual-package hazard: dual builds spawn two core copies with two module-scoped registries, and cross-copy reads silently break. ESM-only keeps single-instance guarantees true.
 - **If it runs, it runs deterministic.** Same inputs, same trace, always. The runtime never reads the wall clock, randomness, or environment. One clock, injectable.
 - **If tests pass, behavior is proven.** Virtual clock, mutation-tested. Untestable is unfinished.
 

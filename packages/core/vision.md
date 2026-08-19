@@ -8,6 +8,10 @@ The runtime. The primitives. mantaq, minus ergonomics.
 
 core imports nothing above it. utils — the zero-dependency bottom layer (Either) — is the one exception. core stands alone otherwise.
 
+## ESM only, single instance
+
+core ships ESM only. No CJS build, no dual package. A dual build loads two core copies, each with its own module-scoped registry; a copy registered one way reads `LEFT(UNREGISTERED)` from the other, and region wiring dies silently. ESM-only keeps one module graph, one registry, one instance. The single-instance guarantee is the reason branding is Symbol-keyed: the global symbol registry is shared per agent cluster, so even a stray second copy still reads internals.
+
 ## Testable first
 
 Core can not have bugs. Everything built on top of core. All code must have unit and mutation tests.
