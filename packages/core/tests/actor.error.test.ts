@@ -2,8 +2,6 @@ import { expect, test, describe } from "vite-plus/test";
 import { Actor, VirtualClock } from "../src/index.ts";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
-import { pushInternal, setOutputHandler } from "../src/internal-registry.ts";
-import type { AnyActor } from "../src/actor-internal.ts";
 import type { AnyStateRef } from "../src/state.ts";
 import type { ErrorInfo } from "../src/actor-types.ts";
 import type { Snapshot } from "../src/index.ts";
@@ -31,30 +29,6 @@ describe("Actor error paths", () => {
           setup: () => {},
         }),
     ).toThrow(/a, b/);
-  });
-
-  test("unregistered region child throws a registry error", () => {
-    const idle = state("idle")();
-    const stub: AnyActor = {
-      state: state("s")(),
-      clock: new VirtualClock(),
-      regions: {},
-      send: () => {},
-      snapshot: () => ({ path: ["s"], context: {}, regions: {} }),
-      on: () => () => {},
-      recover: () => {},
-      settled: async () => {},
-    };
-    expect(
-      () =>
-        new Actor({
-          inputs: [],
-          states: [idle],
-          initial: idle,
-          regions: { child: stub },
-          setup: () => {},
-        }),
-    ).toThrow(/not registered/);
   });
 
   test("send is ignored entirely once final", () => {
@@ -160,7 +134,7 @@ describe("Actor error paths", () => {
     });
     actor.send(start.create());
     expect(effectSignal?.aborted).toBe(false);
-    pushInternal(actor, loop.create());
+    actor.inject(loop.create());
     clock.advance(1);
     expect(effectSignal?.aborted).toBe(true);
   });
@@ -309,7 +283,7 @@ describe("Actor error paths", () => {
         m.on(idle, go, () => ({ emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, () => {
+    actor.on("output", () => {
       throw new Error("output boom");
     });
     expect(() => actor.send(go.create())).not.toThrow();

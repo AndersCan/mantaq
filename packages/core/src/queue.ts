@@ -18,6 +18,15 @@ export class InternalQueue {
     this.#queue.push(...events);
   }
 
+  clear(): void {
+    const resolvers = this.#settledResolvers.splice(0);
+    this.#queue.length = 0;
+    this.#index = 0;
+    for (const resolve of resolvers) {
+      resolve();
+    }
+  }
+
   settled(): Promise<void> {
     if (this.length === 0 && !this.#processing) {
       return Promise.resolve();
@@ -48,11 +57,9 @@ export class InternalQueue {
       this.#index = 0;
       this.#processing = false;
       this.#stopped = false;
-      if (this.#settledResolvers.length > 0) {
-        const resolvers = this.#settledResolvers.splice(0);
-        for (const resolve of resolvers) {
-          resolve();
-        }
+      const resolvers = this.#settledResolvers.splice(0);
+      for (const resolve of resolvers) {
+        resolve();
       }
     }
   }

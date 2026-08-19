@@ -1,7 +1,6 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, event, state, VirtualClock } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
-import { setOutputHandler } from "@mantaq/core/internal";
 import { ActorMap } from "../src/actors/actor-map.ts";
 import { broadcast } from "../src/transitions/broadcast.ts";
 
@@ -338,7 +337,7 @@ describe("ActorMap", () => {
           }));
         },
       });
-      setOutputHandler(child, (event) => (parent as AnyActor).send(event));
+      child.on("output", (event) => (parent as AnyActor).send(event));
       return child;
     });
     map.spawn("child");

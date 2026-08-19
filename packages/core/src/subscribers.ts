@@ -1,11 +1,16 @@
 import type { ErrorInfo, Snapshot, TransitionInfo } from "./actor-types.ts";
+import type { InternalEvent } from "./event.ts";
 import { Either } from "@mantaq/utils";
 
 export class Subscribers<C> {
   readonly change = new Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>();
+
   readonly done = new Set<() => void>();
+
   readonly transition = new Set<(info: TransitionInfo) => void>();
+
   readonly error = new Set<(info: ErrorInfo) => void>();
+
   #last: Snapshot<C> | null = null;
 
   seed(snapshot: Snapshot<C>): void {
@@ -69,11 +74,28 @@ export class Subscribers<C> {
     this.done.clear();
     this.transition.clear();
     this.error.clear();
+    this.output.clear();
   }
 
   #safe(fn: () => void): void {
     // A subscriber only watches the machine — it never changes it. Its throw
     // is swallowed so the machine and its callers are unaffected.
     void Either.from(fn);
+  }
+
+  readonly output = new Set<(event: InternalEvent) => void>();
+
+  addOutput(fn: (event: InternalEvent) => void): () => void {
+    this.output.add(fn);
+    return () => this.output.delete(fn);
+  }
+
+  emitOutput(event: InternalEvent): void {
+    // Output delivery is machine-facing: a throwing handler must let the
+    // actor's #safe("output") route it into the error state, so no swallow
+    // here — the actor wraps this call in #safe.
+    for (const fn of this.output) {
+      fn(event);
+    }
   }
 }

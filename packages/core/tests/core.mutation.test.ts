@@ -10,16 +10,6 @@ import { Actor } from "../src/actor.ts";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
 import type { InternalEvent } from "../src/event.ts";
-import {
-  registerActor,
-  getChildren,
-  getOutputHandler,
-  setOutputHandler,
-  pushInternal,
-  drainInternal,
-  abortEffects,
-} from "../src/internal-registry.ts";
-import type { ActorInternal } from "../src/internal-registry.ts";
 import type { AnyStateRef } from "../src/state.ts";
 import type { AnyActor } from "../src/actor-internal.ts";
 
@@ -379,7 +369,7 @@ describe("Actor state entry directed mutation tests", () => {
         m.on(running, stop, () => ({ state: idle }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(go.create());
     actor.send(stop.create());
     savedEmit?.(out.create());
@@ -463,44 +453,6 @@ describe("on('error') death signal", () => {
     actor.on("error", (info) => seen.push(info.reason));
     expect(() => actor.send(go.create())).not.toThrow();
     expect(seen).toEqual(["transition"]);
-  });
-});
-
-describe("internal-registry", () => {
-  test("registry helpers operate on registered actors", () => {
-    const children = new Map<string, never>();
-    let handler: ((event: InternalEvent) => void) | null = null;
-    const pushed: InternalEvent[] = [];
-    let drained = 0;
-    let aborted = 0;
-    const internal: ActorInternal = {
-      children,
-      getOutputHandler: () => handler,
-      setOutputHandler: (fn) => {
-        handler = fn;
-      },
-      pushInternal: (e) => {
-        pushed.push(e);
-      },
-      drainInternal: () => {
-        drained++;
-      },
-      abortEffects: () => {
-        aborted++;
-      },
-    };
-    const actor = {};
-    registerActor(actor, internal);
-    expect(getChildren(actor)[1]).toBe(children);
-    const fn = () => {};
-    setOutputHandler(actor, fn);
-    expect(getOutputHandler(actor)[1]).toBe(fn);
-    pushInternal(actor, { type: "P" });
-    expect(pushed).toEqual([{ type: "P" }]);
-    drainInternal(actor);
-    expect(drained).toBe(1);
-    abortEffects(actor);
-    expect(aborted).toBe(1);
   });
 });
 
@@ -613,7 +565,7 @@ describe("Actor", () => {
         m.onAny(tick, () => ({ state: active }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(tick.create());
     expect(actor.snapshot().path[0]).toBe("active");
     expect(received).toEqual(["OUT"]);
@@ -681,7 +633,7 @@ describe("Actor", () => {
         m.on(idle, go, () => ({ state: active, emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     const warns: string[] = [];
     const original = console.warn;
     console.warn = (...args: unknown[]) => warns.push(String(args[0]));
@@ -711,56 +663,11 @@ describe("Actor", () => {
         m.on(active, stop, () => ({ state: idle, emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(go.create());
     actor.send(stop.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(received).toEqual(["OUT", "OUT"]);
-  });
-
-  test("pushInternal and clock advance drain the queue", () => {
-    const clock = new VirtualClock();
-    const idle = state("idle")();
-    const active = state("active")();
-    const go = event("GO")();
-    const actor = new Actor({
-      clock,
-      inputs: [go],
-      states: [idle, active],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, go, () => ({ state: active }));
-      },
-    });
-    pushInternal(actor, go.create());
-    expect(actor.state.name).toBe("idle");
-    clock.advance(1);
-    expect(actor.state.name).toBe("active");
-  });
-
-  test("pushInternal and drainInternal process queued events", () => {
-    const idle = state("idle")();
-    const active = state("active")();
-    const go = event("GO")();
-    const actor = new Actor({
-      inputs: [go],
-      states: [idle, active],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, go, () => ({ state: active }));
-      },
-    });
-    pushInternal(actor, go.create());
-    drainInternal(actor);
-    expect(actor.state.name).toBe("active");
-  });
-
-  test("getOutputHandler returns the registered handler", () => {
-    const idle = state("idle")();
-    const actor = new Actor({ inputs: [], states: [idle], initial: idle, setup: () => {} });
-    const fn = () => {};
-    setOutputHandler(actor, fn);
-    expect(getOutputHandler(actor)[1]).toBe(fn);
   });
 
   test("effect emit routes events through the queue", () => {
@@ -820,7 +727,7 @@ describe("Actor", () => {
     expect(actor.snapshot().path[0]).toBe("active");
   });
 
-  test("abortEffects via the registry aborts the running effect", () => {
+  test("dispose() aborts the running effect", () => {
     const idle = state("idle")();
     const running = state("running")();
     const start = event("START")();
@@ -838,7 +745,7 @@ describe("Actor", () => {
     });
     actor.send(start.create());
     expect(effectSignal?.aborted).toBe(false);
-    abortEffects(actor);
+    actor.dispose();
     expect(effectSignal?.aborted).toBe(true);
   });
 });
@@ -891,28 +798,28 @@ describe("Actor directed mutation tests", () => {
     ).toThrow(/stray/);
   });
 
-  test("unregistered region child throws a registry error", () => {
+  test("a region child that ignores output subscriptions still snapshots", () => {
     const idle = state("idle")();
     const stub: AnyActor = {
       state: state("s")(),
       clock: new VirtualClock(),
       regions: {},
       send: () => {},
+      inject: () => {},
+      dispose: () => {},
       snapshot: () => ({ path: ["s"], context: {}, regions: {} }),
       on: () => () => {},
       recover: () => {},
       settled: async () => {},
     };
-    expect(
-      () =>
-        new Actor({
-          inputs: [],
-          states: [idle],
-          initial: idle,
-          regions: { child: stub },
-          setup: () => {},
-        }),
-    ).toThrow(/not registered/);
+    const parent = new Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      regions: { child: stub },
+      setup: () => {},
+    });
+    expect(parent.snapshot().regions.child.path[0]).toBe("s");
   });
 
   test("an internal event emitted with no handler routes to the error state", () => {
@@ -925,8 +832,7 @@ describe("Actor directed mutation tests", () => {
       initial: idle,
       setup: () => {},
     });
-    pushInternal(actor, boom.create());
-    drainInternal(actor);
+    actor.inject(boom.create());
     expect(actor.snapshot().path[0]).toBe("__error");
     expect(actor.snapshot().error?.reason).toBe("unhandled");
     expect(actor.snapshot().error?.event.type).toBe("BOOM");
@@ -946,10 +852,10 @@ describe("Actor directed mutation tests", () => {
     expect(actor.snapshot().error).toBeUndefined();
   });
 
-  test("abortEffects on an actor with no running effect does not throw", () => {
+  test("dispose() on an actor with no running effect does not throw", () => {
     const idle = state("idle")();
     const actor = new Actor({ inputs: [], states: [idle], initial: idle, setup: () => {} });
-    expect(() => abortEffects(actor)).not.toThrow();
+    expect(() => actor.dispose()).not.toThrow();
   });
 
   test("transition to a state with no effects leaves the effect abort null", () => {
@@ -966,7 +872,7 @@ describe("Actor directed mutation tests", () => {
     });
     actor.send(go.create());
     expect(actor.snapshot().path[0]).toBe("active");
-    expect(() => abortEffects(actor)).not.toThrow();
+    expect(() => actor.dispose()).not.toThrow();
   });
 
   test("a change subscriber re-sending events drains without reentrancy errors", () => {
@@ -1029,7 +935,7 @@ describe("Actor directed mutation tests", () => {
         m.on(idle, go, () => ({ emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(go.create());
     expect(received).toEqual(["OUT"]);
   });
@@ -1130,7 +1036,7 @@ describe("Actor directed mutation tests 2", () => {
         m.onAny(tick, () => ({ emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(tick.create());
     expect(actor.snapshot().path[0]).toBe("idle");
     expect(received).toEqual(["OUT"]);
@@ -1347,7 +1253,7 @@ describe("Actor error state directed mutation tests", () => {
         m.on(idle, go, () => ({ emit: [out.create()] }));
       },
     });
-    setOutputHandler(actor, () => {
+    actor.on("output", () => {
       throw new Error("output boom");
     });
     expect(() => actor.send(go.create())).not.toThrow();
@@ -1556,7 +1462,7 @@ describe("Actor error state directed mutation tests", () => {
         m.on(idle, go, () => ({ emit: [out.create(), out.create()] }));
       },
     });
-    setOutputHandler(actor, (e) => received.push(e.type));
+    actor.on("output", (e) => received.push(e.type));
     actor.send(go.create());
     expect(received).toEqual(["OUT", "OUT"]);
   });
@@ -1719,11 +1625,10 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: () => {},
     });
-    setOutputHandler(actor, () => {
+    actor.on("output", () => {
       throw new Error("boom");
     });
-    pushInternal(actor, out.create());
-    clock.advance(1);
+    actor.inject(out.create());
     expect(actor.snapshot().error?.reason).toBe("output");
     expect(actor.snapshot().error?.state.name).toBe("idle");
   });
@@ -2009,10 +1914,121 @@ describe("Actor error state directed mutation tests", () => {
       setup: () => {},
     });
     const received: Array<{ type?: string }> = [];
-    setOutputHandler(actor, (e) => received.push(e));
-    pushInternal(actor, { type: undefined } as unknown as InternalEvent);
-    drainInternal(actor);
+    actor.on("output", (e) => received.push(e));
+    actor.inject({ type: undefined } as unknown as InternalEvent);
     expect(received).toHaveLength(1);
     expect(received[0].type).toBeUndefined();
+  });
+});
+
+describe("dispose and inject directed mutation tests", () => {
+  test("dispose makes send and inject no-ops", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const boom = event("BOOM")();
+    const actor = new Actor({
+      inputs: [go],
+      internal: [boom],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => m.on(idle, go, () => ({ state: active })),
+    });
+    actor.dispose();
+    actor.send(go.create());
+    expect(actor.state.name).toBe("idle");
+    actor.inject(boom.create());
+    expect(actor.snapshot().path[0]).toBe("idle");
+    expect(actor.snapshot().error).toBeUndefined();
+  });
+
+  test("dispose inside a transition drops later emits and skips effects", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const boom = event("BOOM")();
+    let effectRan = false;
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [boom],
+      internal: [boom],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, (_e, opts) => {
+          opts.actor.dispose();
+          return { state: active, emit: [boom.create()] };
+        });
+        m.effect(active, () => {
+          effectRan = true;
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.state.name).toBe("active");
+    expect(actor.snapshot().error).toBeUndefined();
+    expect(effectRan).toBe(false);
+  });
+
+  test("an unhandled internal event reports the exact message", () => {
+    const idle = state("idle")();
+    const boom = event("BOOM")();
+    const actor = new Actor({
+      inputs: [],
+      internal: [boom],
+      states: [idle],
+      initial: idle,
+      setup: () => {},
+    });
+    actor.inject(boom.create());
+    expect(actor.snapshot().error?.error).toEqual(
+      new Error('[Actor] internal event "BOOM" emitted but no handler in state "idle"'),
+    );
+  });
+
+  test("an unhandled external send does not emit a change", () => {
+    const idle = state("idle")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [tick],
+      states: [idle],
+      initial: idle,
+      setup: (m) => m.onAny(tick, () => ({})),
+    });
+    let changes = 0;
+    actor.on("change", () => changes++);
+    expect(changes).toBe(1);
+    actor.send(tick.create());
+    expect(changes).toBe(1);
+  });
+
+  test("recover resets the change signal so a later no-op send stays silent", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => {
+          throw new Error("boom");
+        });
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("__error");
+    actor.recover({ state: idle, context: {} });
+    let changes = 0;
+    actor.on("change", () => changes++);
+    expect(changes).toBe(1);
+    actor.send(tick.create());
+    expect(changes).toBe(1);
+  });
+
+  test("snapshots without payloads omit the payload key", () => {
+    const idle = state("idle")();
+    const actor = new Actor({ inputs: [], states: [idle], initial: idle, setup: () => {} });
+    expect("payload" in actor.snapshot()).toBe(false);
   });
 });

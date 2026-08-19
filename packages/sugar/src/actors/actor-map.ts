@@ -1,6 +1,4 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
-import { abortEffects } from "@mantaq/core/internal";
-import { Either } from "@mantaq/utils";
 import type { SendableEvent, SendableMap } from "../transitions/broadcast.ts";
 
 export interface ActorMapOptions {
@@ -52,15 +50,7 @@ export class ActorMap implements SendableMap<SendableEvent> {
 
   kill(key: string): void {
     const actor = this.#actors.get(key);
-    if (actor) {
-      Either.match(
-        abortEffects(actor),
-        (err) => {
-          throw new Error(err.message);
-        },
-        () => {},
-      );
-    }
+    actor?.dispose();
     this.#reapers.get(key)?.();
     this.#reapers.delete(key);
     this.#actors.delete(key);

@@ -1,46 +1,12 @@
-import { expect, test, describe, vi } from "vite-plus/test";
+import { expect, test, describe } from "vite-plus/test";
 import { trackAbort, clearAbort } from "../src/abort-tracker.ts";
-import type { InternalEvent } from "../src/event.ts";
-import type { ActorInternal } from "../src/internal-registry.ts";
-import {
-  registerActor,
-  getChildren,
-  getOutputHandler,
-  setOutputHandler,
-  pushInternal,
-  drainInternal,
-  abortEffects,
-} from "../src/internal-registry.ts";
 import { InternalQueue } from "../src/queue.ts";
 import { Subscribers } from "../src/subscribers.ts";
 import { runEffects } from "../src/effects.ts";
 import { state } from "../src/state.ts";
+import { event } from "../src/event.ts";
 import { Context } from "../src/context.ts";
 import { VirtualClock } from "../src/virtual-clock.ts";
-
-function makeInternal(): ActorInternal {
-  const children = new Map<string, never>();
-  let handler: ((event: InternalEvent) => void) | null = null;
-  let drained = 0;
-  let aborted = 0;
-  const pushed: InternalEvent[] = [];
-  return {
-    children,
-    getOutputHandler: () => handler,
-    setOutputHandler: (fn) => {
-      handler = fn;
-    },
-    pushInternal: (e) => {
-      pushed.push(e);
-    },
-    drainInternal: () => {
-      drained++;
-    },
-    abortEffects: () => {
-      aborted++;
-    },
-  };
-}
 
 describe("abort-tracker directed mutation tests", () => {
   test("trackAbort deletes the entry from the map when the signal aborts", () => {
@@ -70,37 +36,6 @@ describe("abort-tracker directed mutation tests", () => {
 
   test("clearAbort on an entry without a signal does not throw", () => {
     clearAbort({});
-  });
-});
-
-describe("internal-registry directed mutation tests", () => {
-  test("unregistered actors return the not-registered Left for every helper", () => {
-    const victim = {};
-    const message = /not registered/;
-    expect(getChildren(victim)[0]?.message).toMatch(message);
-    expect(getOutputHandler(victim)[0]?.message).toMatch(message);
-    expect(pushInternal(victim, { type: "X" })[0]?.message).toMatch(message);
-    expect(drainInternal(victim)[0]?.message).toMatch(message);
-    expect(abortEffects(victim)[0]?.message).toMatch(message);
-  });
-
-  test("setOutputHandler on an unregistered actor returns Left", () => {
-    const victim = {};
-    expect(setOutputHandler(victim, () => {})[0]?.message).toMatch(/not registered/);
-  });
-
-  test("registered actors route every helper to their internal", () => {
-    const internal = makeInternal();
-    const actor = {};
-    registerActor(actor, internal);
-    expect(getChildren(actor)[1]).toBe(internal.children);
-    const fn = () => {};
-    setOutputHandler(actor, fn);
-    expect(getOutputHandler(actor)[1]).toBe(fn);
-    pushInternal(actor, { type: "P" });
-    drainInternal(actor);
-    abortEffects(actor);
-    expect(internal).toBeDefined();
   });
 });
 
@@ -149,6 +84,40 @@ describe("InternalQueue directed mutation tests", () => {
     });
     expect(seen).toEqual(["A", "B"]);
     expect(queue.length).toBe(0);
+  });
+
+  test("clear drops pending events without draining", () => {
+    const queue = new InternalQueue();
+    queue.push({ type: "A" }, { type: "B" });
+    expect(queue.length).toBe(2);
+    queue.clear();
+    expect(queue.length).toBe(0);
+  });
+
+  test("clear resolves pending settled callers", async () => {
+    const queue = new InternalQueue();
+    queue.push({ type: "A" });
+    const p = queue.settled();
+    queue.clear();
+    await p;
+  });
+
+  test("clear on an empty queue does not throw", () => {
+    const queue = new InternalQueue();
+    expect(() => queue.clear()).not.toThrow();
+  });
+
+  test("clear resets the cursor so later pushes process from the start", () => {
+    const queue = new InternalQueue();
+    queue.push({ type: "A" });
+    queue.clear();
+    queue.push({ type: "B" });
+    const seen: string[] = [];
+    queue.processCancellable((e) => {
+      seen.push(e.type);
+      return true;
+    });
+    expect(seen).toEqual(["B"]);
   });
 });
 
@@ -325,6 +294,39 @@ describe("Subscribers directed mutation tests", () => {
     subs.emitError(info);
     expect(errors).toBe(0);
   });
+
+  test("output subscribers receive every event and unsubscribe independently", () => {
+    const subs = new Subscribers<unknown>();
+    const seen: string[] = [];
+    const offA = subs.addOutput((e) => seen.push(e.type));
+    const offB = subs.addOutput((e) => seen.push(e.type));
+    subs.emitOutput({ type: "X" });
+    expect(seen).toEqual(["X", "X"]);
+    offA();
+    subs.emitOutput({ type: "Y" });
+    expect(seen).toEqual(["X", "X", "Y"]);
+    offB();
+    subs.emitOutput({ type: "Z" });
+    expect(seen).toEqual(["X", "X", "Y"]);
+  });
+
+  test("clear removes output subscribers", () => {
+    const subs = new Subscribers<unknown>();
+    let calls = 0;
+    subs.addOutput(() => calls++);
+    subs.clear();
+    subs.emitOutput({ type: "X" });
+    expect(calls).toBe(0);
+  });
+});
+
+describe("event directed mutation tests", () => {
+  test("creates without a payload carry no payload key", () => {
+    const ref = event("X")();
+    const created = ref.create();
+    expect(created).toEqual({ type: "X" });
+    expect("payload" in created).toBe(false);
+  });
 });
 
 describe("runEffects directed mutation tests", () => {
@@ -451,42 +453,5 @@ describe("runEffects directed mutation tests", () => {
   test("no effects for the state returns an empty pending list", () => {
     const result = runEffects(baseOptions());
     expect(result.pending).toEqual([]);
-  });
-});
-
-describe("internal-registry directed mutation tests 2", () => {
-  test("unregistered actors return the exact not-registered message", () => {
-    const victim = {};
-    const expected = "[mantaq] actor is not registered with the internal registry";
-    expect(getChildren(victim)).toEqual([{ message: expected }, undefined]);
-    expect(getOutputHandler(victim)).toEqual([{ message: expected }, undefined]);
-    expect(pushInternal(victim, { type: "X" })).toEqual([{ message: expected }, undefined]);
-    expect(drainInternal(victim)).toEqual([{ message: expected }, undefined]);
-    expect(abortEffects(victim)).toEqual([{ message: expected }, undefined]);
-  });
-
-  test("a pre-existing global registry is preserved on module load", async () => {
-    const key = "__mantaqCoreInternalRegistry";
-    const original = (globalThis as Record<string, unknown>)[key];
-    try {
-      (globalThis as Record<string, unknown>)[key] = 1;
-      vi.resetModules();
-      const mod = await import("../src/internal-registry.ts");
-      expect(() => mod.registerActor({}, makeInternal())).toThrow();
-    } finally {
-      (globalThis as Record<string, unknown>)[key] = original;
-    }
-  });
-
-  test("a fresh module load exposes the exact unregistered message", async () => {
-    vi.resetModules();
-    const mod = await import("../src/internal-registry.ts");
-    const victim = {};
-    const expected = "[mantaq] actor is not registered with the internal registry";
-    expect(mod.getChildren(victim)).toEqual([{ message: expected }, undefined]);
-    expect(mod.getOutputHandler(victim)).toEqual([{ message: expected }, undefined]);
-    expect(mod.pushInternal(victim, { type: "X" })).toEqual([{ message: expected }, undefined]);
-    expect(mod.drainInternal(victim)).toEqual([{ message: expected }, undefined]);
-    expect(mod.abortEffects(victim)).toEqual([{ message: expected }, undefined]);
   });
 });

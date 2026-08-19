@@ -1,4 +1,4 @@
-import type { AnyActor, ErrorInfo, Snapshot, TransitionInfo } from "@mantaq/core";
+import type { AnyActor, ErrorInfo, InternalEvent, Snapshot, TransitionInfo } from "@mantaq/core";
 import { History } from "./history.ts";
 
 export interface InstrumentedActor<C = Record<string, unknown>> {
@@ -13,9 +13,12 @@ export interface InstrumentedActor<C = Record<string, unknown>> {
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on(event: "output", fn: (event: InternalEvent) => void): () => void;
   recover(target: { state: AnyActor["state"]; context: C }): void;
   settled(): Promise<void>;
   options?: AnyActor["options"];
+  inject(event: InternalEvent): void;
+  dispose(): void;
 }
 
 function wrapWithProxy<C>(actor: AnyActor<C>, history: History): InstrumentedActor<C> {
@@ -50,6 +53,8 @@ function wrapWithProxy<C>(actor: AnyActor<C>, history: History): InstrumentedAct
       return actor.snapshot();
     },
     on: actor.on.bind(actor) as InstrumentedActor<C>["on"],
+    inject: actor.inject.bind(actor),
+    dispose: actor.dispose.bind(actor),
     recover: actor.recover.bind(actor),
     settled: actor.settled.bind(actor),
   };

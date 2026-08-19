@@ -5,7 +5,6 @@ import { RealClock } from "./real-clock.ts";
 import { VirtualClock } from "./virtual-clock.ts";
 import type { Clock } from "./clock.ts";
 import type { Snapshot, AnyActor } from "./actor-internal.ts";
-import { registerActor, setOutputHandler } from "./internal-registry.ts";
 import { InternalQueue } from "./queue.ts";
 import { Subscribers } from "./subscribers.ts";
 import { buildSnapshot } from "./snapshot.ts";
@@ -89,13 +88,14 @@ type StepFn<States extends readonly AnyStateRef[], ActorContext> = (
   options: { context: Context<ActorContext>; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
 
-type SubscriberEvent = "change" | "done" | "transition" | "error";
+type SubscriberEvent = "change" | "done" | "transition" | "error" | "output";
 
 type SubscriberFns<C> = {
   change: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void;
   done: () => void;
   transition: (info: TransitionInfo) => void;
   error: (info: ErrorInfo) => void;
+  output: (event: InternalEvent) => void;
 };
 
 type SubscriberCase<C> = {
@@ -131,15 +131,11 @@ export class Actor<
 
   #regions: Record<string, AnyActor> = {};
 
-  #children = new Map<string, AnyActor>();
-
   #queue = new InternalQueue();
 
   #subs = new Subscribers<ActorContext>();
 
   #effectAbort: AbortController | null = null;
-
-  #outputHandler: ((event: InternalEvent) => void) | null = null;
 
   #internalIds: Set<string>;
 
@@ -162,17 +158,6 @@ export class Actor<
   }
 
   constructor(options: ActorOptions<States, Inputs, Internal, Outputs, ActorContext>) {
-    registerActor(this, {
-      children: this.#children,
-      getOutputHandler: () => this.#outputHandler,
-      setOutputHandler: (fn) => {
-        this.#outputHandler = fn;
-      },
-      pushInternal: (event) => this.#queue.push(event),
-      drainInternal: () => this.#drainInternal(),
-      abortEffects: () => this.#abortEffects(),
-    });
-
     const builder = new ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>();
     options.setup(builder);
     const built = builder.build();
@@ -207,14 +192,10 @@ export class Actor<
     if (options.regions) {
       for (const [key, child] of Object.entries(options.regions)) {
         this.#regions[key] = child;
-        const result = setOutputHandler(child, (event) => {
+        child.on("output", (event) => {
           this.#queue.push(event);
           this.#drainInternal();
         });
-        if (result[0] !== undefined) {
-          throw new Error(result[0].message);
-        }
-        this.#children.set(key, child);
       }
     }
 
@@ -230,12 +211,14 @@ export class Actor<
   on(event: "done", fn: () => void): () => void;
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
   on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on(event: "output", fn: (event: InternalEvent) => void): () => void;
   on<E extends SubscriberEvent>(event: E, fn: SubscriberFns<ActorContext>[E]): () => void {
     const dispatch: SubscriberCase<ActorContext> = {
       change: (fn) => this.#subs.addChange(fn),
       done: (fn) => this.#subs.addDone(fn),
       transition: (fn) => this.#subs.addTransition(fn),
       error: (fn) => this.#subs.addError(fn),
+      output: (fn) => this.#subs.addOutput(fn),
     };
     return dispatch[event](fn);
   }
@@ -245,18 +228,17 @@ export class Actor<
   }
 
   send(event: CreatedOf<Inputs[number]>): void {
+    if (this.#disposed) return;
     this.#dispatch(event);
     this.#emitChangeIfDirty();
   }
 
   /**
-   * Manually restore the actor to a live state after a fatal `__error`.
-   * DANGER: the caller supplies state and context, so the trajectory is no
-   * longer deterministic ("same inputs, same trace"). Effects are not re-run
-   * and timers are not re-armed — processing resumes on the next event.
+   * Restore a live state after `__error`. DANGER: caller supplies state+context,
+   * breaking determinism. Effects not re-run; processing resumes on next event.
    */
   recover(target: { state: States[number]; context: ActorContext }): void {
-    if (this.#error === null) return;
+    if (this.#error === null || this.#disposed) return;
     this.#error = null;
     this.#queue = new InternalQueue();
     this.#effectAbort = null;
@@ -396,11 +378,6 @@ export class Actor<
     });
   }
 
-  #abortEffects(): void {
-    this.#effectAbort?.abort();
-    this.#subs.clear();
-  }
-
   #applyTransition(
     event: InternalEvent,
     step: TransitionResult<States[number], string>,
@@ -425,6 +402,7 @@ export class Actor<
   }
 
   #runEffects(event: InternalEvent, statePayload: unknown): void {
+    if (this.#disposed) return;
     const list = this.#options.effects[this.state.name];
     if (!list) {
       this.#effectAbort = null;
@@ -456,7 +434,7 @@ export class Actor<
   }
 
   #drainInternal(): void {
-    if (this.#draining) return;
+    if (this.#draining || this.#disposed) return;
     this.#draining = true;
     try {
       const budget = this.#internalBudget;
@@ -471,10 +449,7 @@ export class Actor<
         if (this.#internalIds.has(event.type) || this.#inputIds.has(event.type)) {
           this.#dispatch(event);
         } else {
-          const outputHandler = this.#outputHandler;
-          if (outputHandler) {
-            if (!this.#safe("output", event, () => outputHandler(event))) return false;
-          }
+          if (!this.#safe("output", event, () => this.#subs.emitOutput(event))) return false;
         }
         return true;
       });
@@ -485,10 +460,13 @@ export class Actor<
   }
 
   #statePayload: unknown;
+
   #pendingEffects: Array<Promise<void>> = [];
 
   #errorState = new StateRef<"__error", unknown, true>("__error", true);
+
   #error: ErrorInfo | null = null;
+
   #entry: LastKnownState | null = null;
 
   #safe(reason: ErrorReason, event: InternalEvent, fn: () => void): boolean {
@@ -516,4 +494,23 @@ export class Actor<
     this.#subs.emitChange(this.snapshot());
     this.#subs.emitDone();
   }
+
+  /** Push an internal event and drain. Unknown types route to output subscribers. */
+  inject(event: InternalEvent): void {
+    if (this.#disposed) return;
+    this.#queue.push(event);
+    this.#drainInternal();
+  }
+
+  /** Stop for good: abort effect, clear queue and subscribers. Later sends/injects ignored. */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#effectAbort?.abort();
+    this.#effectAbort = null;
+    this.#queue.clear();
+    this.#subs.clear();
+  }
+
+  #disposed = false;
 }
