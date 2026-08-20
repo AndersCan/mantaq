@@ -14,6 +14,8 @@
 
 A TypeScript state machine library built around actors, events, and hierarchical states.
 
+**Docs**: [anderscan.github.io/mantaq](https://anderscan.github.io/mantaq/)
+
 </div>
 
 ## Packages
@@ -105,6 +107,11 @@ with SLSA provenance (`.github/workflows/release.yml`).
 2. When ready: `bumpy version` — bumps versions, writes changelogs,
    consumes bump files.
 3. Commit the version changes, push, open a PR, merge to `main`.
+   A version PR consumes every pending bump file, so the CI
+   `bumpy ci check` step fails with "No bump files found in this PR".
+   Expected — add an empty bump to satisfy it:
+   `vp exec bumpy add --empty --name "version-packages-v0-3-0"` (use the
+   new version number). Same applies to docs-only PRs with no releases.
 4. The publish job builds every package and publishes the versioned ones.
    Publishing uses npm trusted publishing (OIDC) — no token secrets.
 

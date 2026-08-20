@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.3
+
+<sub>2026-08-20</sub>
+
+- _(patch)_
+  Reduced published bundle size of @mantaq/core by minifying dist output and marking packages side-effect-free for consumer tree-shaking.
+
 ## 0.0.2
 
 <sub>2026-08-12</sub>

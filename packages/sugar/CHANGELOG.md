@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+<sub>2026-08-20</sub>
+
+- _(minor)_
+  Added actorSpec, definePart, use, and withParts so a long actor setup can be split across files, with actorSpec building the typed spec that anchors every part.
+- _(patch)_
+  Deleted the internal registry and its `@mantaq/core/internal` entry point. Output fan-out is now a public `on("output")` subscriber hook; actors gained public `inject(event)` and terminal `dispose()`.
+
 ## 0.3.0
 
 <sub>2026-08-13</sub>
