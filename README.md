@@ -14,6 +14,8 @@
 
 A TypeScript state machine library built around actors, events, and hierarchical states.
 
+**Docs**: [anderscan.github.io/mantaq](https://anderscan.github.io/mantaq/)
+
 </div>
 
 ## Packages

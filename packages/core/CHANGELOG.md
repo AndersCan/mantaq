@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+<sub>2026-08-20</sub>
+
+- _(minor)_
+  Added on("error", fn) subscriber hook so the __error death signal is observable, including construction-time deaths (seeded to late subscribers) and cleared by recover().
+- _(minor)_
+  Deleted the internal registry and its `@mantaq/core/internal` entry point. Output fan-out is now a public `on("output")` subscriber hook; actors gained public `inject(event)` and terminal `dispose()`.
+- _(patch)_
+  Reduced published bundle size of @mantaq/core by minifying dist output and marking packages side-effect-free for consumer tree-shaking.
+
 ## 0.2.0
 
 <sub>2026-08-13</sub>

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2
+
+<sub>2026-08-20</sub>
+
+- _(patch)_
+  InstrumentedActor mirrors the new on("error") overload on AnyActor so instrumented actors stay assignable to their originals.
+- _(patch)_
+  Deleted the internal registry and its `@mantaq/core/internal` entry point. Output fan-out is now a public `on("output")` subscriber hook; actors gained public `inject(event)` and terminal `dispose()`.
+
 ## 0.1.1
 
 <sub>2026-08-13</sub>
