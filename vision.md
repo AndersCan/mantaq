@@ -2,7 +2,7 @@
 
 ## What it is
 
-Mantaq is a **100% type-safe, testable state library** (xstate-like in spirit).
+Mantaq is a **100% type-safe, testable state library**.
 It models complex logic as actor-model state machines - states, events,
 context, effects, and composition - so that intricate behavior becomes
 deterministic and provable rather than hidden in ad-hoc code.
