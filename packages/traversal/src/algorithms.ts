@@ -93,6 +93,7 @@ export function findCycles(graph: ActorGraph): string[][] {
     }
     path.pop();
     delete inStack[node];
+    delete visited[node];
   }
 
   for (const node of graph.nodes) {

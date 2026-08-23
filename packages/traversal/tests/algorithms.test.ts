@@ -126,6 +126,31 @@ describe("findCycles", () => {
     const cycles = findCycles(multiCycleGraph());
     expect(cycles.length).toBeGreaterThanOrEqual(2);
   });
+
+  test("cycle reachable only through an already-visited node is found", () => {
+    const graph: ActorGraph = {
+      nodes: [
+        { id: "X", label: "X", isActive: true, isFinal: false },
+        { id: "Y", label: "Y", isActive: false, isFinal: false },
+        { id: "Z", label: "Z", isActive: false, isFinal: false },
+        { id: "W", label: "W", isActive: false, isFinal: false },
+      ],
+      edges: [
+        { id: "x-y", source: "X", target: "Y", label: "A", isActive: true },
+        { id: "x-w", source: "X", target: "W", label: "B", isActive: true },
+        { id: "y-z", source: "Y", target: "Z", label: "C", isActive: true },
+        { id: "z-x", source: "Z", target: "X", label: "D", isActive: true },
+        { id: "w-y", source: "W", target: "Y", label: "E", isActive: true },
+      ],
+    };
+    const cycles = findCycles(graph);
+    const hasShort = cycles.some((c) => c.includes("X") && c.includes("Y") && c.includes("Z"));
+    const hasLong = cycles.some(
+      (c) => c.includes("X") && c.includes("W") && c.includes("Y") && c.includes("Z"),
+    );
+    expect(hasShort).toBe(true);
+    expect(hasLong).toBe(true);
+  });
 });
 
 describe("unreachableNodes", () => {
