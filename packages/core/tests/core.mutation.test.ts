@@ -348,6 +348,41 @@ describe("Actor state entry directed mutation tests", () => {
     expect(actor.snapshot().path[0]).toBe("done");
   });
 
+  test("#pendingEffects is pruned as async effects settle", async () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: idle }));
+        m.effect(idle, () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+      },
+    });
+    for (let i = 0; i < 200; i++) actor.send(go.create());
+    await actor.settled();
+    expect(actor.pendingEffectCount()).toBe(0);
+  });
+
+  test("dispose clears the pending effects set", () => {
+    const idle = state("idle")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: idle }));
+        m.effect(idle, () => new Promise<void>(() => {}));
+      },
+    });
+    for (let i = 0; i < 50; i++) actor.send(go.create());
+    expect(actor.pendingEffectCount()).toBe(51);
+    actor.dispose();
+    expect(actor.pendingEffectCount()).toBe(0);
+  });
+
   test("emit after the effect aborts is a silent no-op", () => {
     const idle = state("idle")();
     const running = state("running")();
