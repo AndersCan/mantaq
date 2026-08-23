@@ -4,6 +4,10 @@ import type { AnyActor } from "@mantaq/core";
 import { ActorMap } from "../src/actors/actor-map.ts";
 import { broadcast } from "../src/transitions/broadcast.ts";
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe("ActorMap", () => {
   function makeActor(id: string) {
     const toggle = event("toggle")();
@@ -292,7 +296,7 @@ describe("ActorMap", () => {
     expect(map.has("a")).toBe(false);
   });
 
-  test("autoReap disposes completed children and unsubscribes the done observer", () => {
+  test("autoReap disposes completed children and unsubscribes the done observer", async () => {
     const toggle = event("toggle")();
     const off = state("off")();
     const on = state("on")().final();
@@ -348,6 +352,7 @@ describe("ActorMap", () => {
     }
 
     expect(map.size).toBe(0);
+    await flush();
     for (const child of children) {
       expect(child.wasDisposed()).toBe(true);
       expect(child.doneSubs()).toBe(0);
