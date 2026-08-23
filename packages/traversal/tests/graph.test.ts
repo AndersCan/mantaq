@@ -213,6 +213,34 @@ describe("buildGraph", () => {
     expect(initialEdge).toBeDefined();
   });
 
+  test("initial pseudo-node is added for object-form initial with payload", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [],
+      internal: [],
+      states: [idle, active],
+      initial: { state: idle, payload: { count: 0 } },
+      context: {} as {},
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+
+    const graph = buildGraph(actor);
+
+    const initialNode = graph.nodes.find((n) => n.isInitial);
+    expect(initialNode).toBeDefined();
+    expect(initialNode!.id).toBe("__initial__");
+
+    const initialEdge = graph.edges.find((e) => e.source === "__initial__");
+    expect(initialEdge).toBeDefined();
+    expect(initialEdge!.target).toContain("idle");
+  });
+
   test("graph updates after transition", () => {
     const actor = createFlatActor();
     let graph = buildGraph(actor);
