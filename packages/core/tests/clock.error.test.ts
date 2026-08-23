@@ -85,6 +85,13 @@ describe("RealClock error paths", () => {
     );
   });
 
+  test("setInterval with an already-aborted signal returns -1", () => {
+    const clock = new RealClock();
+    const controller = new AbortController();
+    controller.abort();
+    expect(clock.setInterval(5, () => {}, { signal: controller.signal })).toBe(-1);
+  });
+
   test("aborting before the first tick cancels the interval", () => {
     const clock = new RealClock();
     const controller = new AbortController();
