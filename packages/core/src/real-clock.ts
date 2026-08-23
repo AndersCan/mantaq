@@ -34,6 +34,7 @@ export class RealClock implements Clock {
   }
 
   setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
+    if (options?.signal?.aborted) return -1;
     const id = Number(globalThis.setInterval(cb, ms));
     if (options?.signal) {
       const onAbort = () => globalThis.clearInterval(id);
