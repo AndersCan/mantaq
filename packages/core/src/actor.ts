@@ -239,9 +239,11 @@ export class Actor<
    */
   recover(target: { state: States[number]; context: ActorContext }): void {
     if (this.#error === null || this.#disposed) return;
-    this.#error = null;
-    this.#queue = new InternalQueue();
+    this.#effectAbort?.abort();
     this.#effectAbort = null;
+    this.#queue.clear();
+    this.#queue = new InternalQueue();
+    this.#error = null;
     this.state = target.state;
     this.#statePayload = undefined;
     this.#context = target.context;
