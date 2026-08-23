@@ -3,7 +3,12 @@ import fc from "fast-check";
 export const SEED_ENV = "MANTAQ_SEED";
 export const DEFAULT_SEED = 0x1a51e;
 
-const seed = Number(process.env[SEED_ENV] ?? DEFAULT_SEED);
+const rawSeed = process.env[SEED_ENV];
+const seed = rawSeed === undefined || rawSeed === "" ? DEFAULT_SEED : Number(rawSeed);
+
+if (!Number.isInteger(seed)) {
+  throw new Error(`${SEED_ENV} must be an integer, got ${JSON.stringify(rawSeed)}`);
+}
 
 fc.configureGlobal({
   seed,
