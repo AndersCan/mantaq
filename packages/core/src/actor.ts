@@ -470,7 +470,7 @@ export class Actor<
   #entry: LastKnownState | null = null;
 
   #safe(reason: ErrorReason, event: InternalEvent, fn: () => void): boolean {
-    const attempt = Either.from(fn);
+    const attempt = Either.from(() => (fn(), true));
     if (attempt[0] === undefined) return true;
     this.#enterError(reason, event, attempt[0]);
     return false;

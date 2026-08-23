@@ -80,7 +80,7 @@ export class Subscribers<C> {
   #safe(fn: () => void): void {
     // A subscriber only watches the machine — it never changes it. Its throw
     // is swallowed so the machine and its callers are unaffected.
-    void Either.from(fn);
+    void Either.from(() => (fn(), true));
   }
 
   readonly output = new Set<(event: InternalEvent) => void>();
