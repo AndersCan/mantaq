@@ -31,21 +31,22 @@ export function runEffects<ActorContext>(
 
   for (const effectFn of list) {
     if (options.abort.signal.aborted) break;
-    const attempt = Either.from(() =>
-      effectFn({
+    let out: unknown;
+    const attempt = Either.from(() => {
+      out = effectFn({
         signal: options.abort.signal,
         state: { name: options.state.name, payload: options.statePayload },
         event: options.event,
         context: options.context,
         emit: options.emit,
         clock: options.clock,
-      }),
-    );
+      });
+      return true;
+    });
     if (attempt[0] !== undefined) {
       options.onError(attempt[0], options.lastGood);
       break;
     }
-    const out = attempt[1];
     if (out instanceof Promise) {
       pending.push(
         out.catch((error: unknown) => {
