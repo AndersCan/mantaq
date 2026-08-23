@@ -11,8 +11,6 @@ import {
   assertContextNever,
   assertEffectRan,
   assertEffectNeverRan,
-  assertReachedState,
-  assertNeverReachedState,
 } from "../src/assertions.ts";
 
 function makeActor() {
@@ -71,8 +69,8 @@ describe("assertions", () => {
       const actor = makeActor();
       const graph = buildGraph(actor);
       const history = historyWith(
-        { type: "state_visit", data: { stateName: "a", timestamp: 1 } },
-        { type: "state_visit", data: { stateName: "b", timestamp: 2 } },
+        { type: "state_visit", data: { stateName: "a" } },
+        { type: "state_visit", data: { stateName: "b" } },
       );
       expect(() => assertAllStatesVisited(graph, history)).not.toThrow();
     });
@@ -80,7 +78,7 @@ describe("assertions", () => {
     test("throws when some missing", () => {
       const actor = makeActor();
       const graph = buildGraph(actor);
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "state_visit", data: { stateName: "a" } });
       expect(() => assertAllStatesVisited(graph, history)).toThrow(/not visited/);
     });
   });
@@ -90,8 +88,8 @@ describe("assertions", () => {
       const actor = makeActor();
       const graph = buildGraph(actor);
       const history = historyWith(
-        { type: "transition", data: { from: "a", event: "GO", to: "b", timestamp: 1 } },
-        { type: "transition", data: { from: "b", event: "STOP", to: "a", timestamp: 2 } },
+        { type: "transition", data: { from: "a", event: "GO", to: "b" } },
+        { type: "transition", data: { from: "b", event: "STOP", to: "a" } },
       );
       expect(() => assertAllTransitionsVisited(graph, history)).not.toThrow();
     });
@@ -101,7 +99,7 @@ describe("assertions", () => {
       const graph = buildGraph(actor);
       const history = historyWith({
         type: "transition",
-        data: { from: "a", event: "GO", to: "b", timestamp: 1 },
+        data: { from: "a", event: "GO", to: "b" },
       });
       expect(() => assertAllTransitionsVisited(graph, history)).toThrow(/not visited/);
     });
@@ -109,24 +107,24 @@ describe("assertions", () => {
 
   describe("assertStateVisited", () => {
     test("passes when visited", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "state_visit", data: { stateName: "a" } });
       expect(() => assertStateVisited(history, "a")).not.toThrow();
     });
 
     test("throws when not visited", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "state_visit", data: { stateName: "a" } });
       expect(() => assertStateVisited(history, "b")).toThrow(/not visited/);
     });
   });
 
   describe("assertStateNeverVisited", () => {
     test("passes when not visited", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "state_visit", data: { stateName: "a" } });
       expect(() => assertStateNeverVisited(history, "b")).not.toThrow();
     });
 
     test("throws when visited", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "state_visit", data: { stateName: "a" } });
       expect(() => assertStateNeverVisited(history, "a")).toThrow(/was visited/);
     });
   });
@@ -135,7 +133,7 @@ describe("assertions", () => {
     test("passes when visited", () => {
       const history = historyWith({
         type: "transition",
-        data: { from: "a", event: "GO", to: "b", timestamp: 1 },
+        data: { from: "a", event: "GO", to: "b" },
       });
       expect(() => assertTransitionVisited(history, "a", "GO")).not.toThrow();
     });
@@ -143,7 +141,7 @@ describe("assertions", () => {
     test("throws when not visited", () => {
       const history = historyWith({
         type: "transition",
-        data: { from: "a", event: "GO", to: "b", timestamp: 1 },
+        data: { from: "a", event: "GO", to: "b" },
       });
       expect(() => assertTransitionVisited(history, "a", "STOP")).toThrow(/not visited/);
     });
@@ -153,7 +151,7 @@ describe("assertions", () => {
     test("passes when not visited", () => {
       const history = historyWith({
         type: "transition",
-        data: { from: "a", event: "GO", to: "b", timestamp: 1 },
+        data: { from: "a", event: "GO", to: "b" },
       });
       expect(() => assertTransitionNeverVisited(history, "a", "STOP")).not.toThrow();
     });
@@ -161,7 +159,7 @@ describe("assertions", () => {
     test("throws when visited", () => {
       const history = historyWith({
         type: "transition",
-        data: { from: "a", event: "GO", to: "b", timestamp: 1 },
+        data: { from: "a", event: "GO", to: "b" },
       });
       expect(() => assertTransitionNeverVisited(history, "a", "GO")).toThrow(/was visited/);
     });
@@ -185,49 +183,25 @@ describe("assertions", () => {
 
   describe("assertEffectRan", () => {
     test("passes when effect ran", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "effect", data: { stateName: "a" } });
       expect(() => assertEffectRan(history, "a")).not.toThrow();
     });
 
     test("throws when effect did not run", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "effect", data: { stateName: "a" } });
       expect(() => assertEffectRan(history, "b")).toThrow(/did not run/);
     });
   });
 
   describe("assertEffectNeverRan", () => {
     test("passes when effect did not run", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "effect", data: { stateName: "a" } });
       expect(() => assertEffectNeverRan(history, "b")).not.toThrow();
     });
 
     test("throws when effect ran", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a", timestamp: 1 } });
+      const history = historyWith({ type: "effect", data: { stateName: "a" } });
       expect(() => assertEffectNeverRan(history, "a")).toThrow(/ran/);
-    });
-  });
-
-  describe("assertReachedState", () => {
-    test("passes when state reached", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
-      expect(() => assertReachedState(history, "a")).not.toThrow();
-    });
-
-    test("throws when state not reached", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
-      expect(() => assertReachedState(history, "b")).toThrow(/not visited/);
-    });
-  });
-
-  describe("assertNeverReachedState", () => {
-    test("passes when state not reached", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
-      expect(() => assertNeverReachedState(history, "b")).not.toThrow();
-    });
-
-    test("throws when state reached", () => {
-      const history = historyWith({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
-      expect(() => assertNeverReachedState(history, "a")).toThrow(/was visited/);
     });
   });
 });

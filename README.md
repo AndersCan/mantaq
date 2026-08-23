@@ -24,6 +24,7 @@ A TypeScript state machine library built around actors, events, and hierarchical
 - **sugar** — Convenience helpers: batch state/event creation, matching, effect utilities, dynamic children.
 - **traversal** — Graph build, coverage instrumentation, and history for testing state machines.
 - **test** — Test harness and coverage assertions for actor behavior.
+- **pbt** — Seeded property-based testing helpers (generators, `runProperty`).
 - **utils** — Shared internal utilities.
 - **examples** — Real working examples (checkout, auth, saga, event sourcing, undo/redo, and more).
 
@@ -51,8 +52,8 @@ const basicInfo = state("basicInfo")();
 const payment = state("payment")();
 const success = state("success")().final();
 
-const submitBasicInfo = event("SUBMIT_BASIC_INFO")();
-const submitPayment = event("SUBMIT_PAYMENT")();
+const submitBasicInfo = event("submitBasicInfo")();
+const submitPayment = event("submitPayment")();
 
 const checkout = new Actor({
   inputs: [submitBasicInfo, submitPayment],

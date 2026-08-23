@@ -44,6 +44,7 @@ const ALLOWED_INTERNAL_EXPORTS = new Set(["InternalEvent"]);
 
 const NONDETERMINISTIC = [
   { name: "Date.now", pattern: /Date\.now/g },
+  { name: "new Date()", pattern: /new\s+Date\s*\(\s*\)/g },
   { name: "Math.random", pattern: /Math\.random/g },
   { name: "performance.now", pattern: /performance\.now/g },
 ];
@@ -58,6 +59,7 @@ function* walk(dir) {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) yield* walk(path);
+    else if (/\.(?:mt|ct)s$/.test(path)) yield path;
     else if (path.endsWith(".ts")) yield path;
   }
 }
@@ -86,8 +88,11 @@ for (const file of files) {
 
 const indexText = readFileSync(join(CORE_SRC, "index.ts"), "utf8");
 const exported = new Set(
-  [...indexText.matchAll(/\bexport\s+(?:type\s+)?\{([^}]*)\}/g)]
-    .flatMap((m) => m[1].split(","))
+  [
+    ...indexText.matchAll(/\bexport\s+(?:type\s+)?\{([^}]*)\}/g),
+    ...indexText.matchAll(/\bexport\s+const\s+(\w+)/g),
+  ]
+    .flatMap((m) => (m[1] ? m[1].split(",") : [m[1]]))
     .map((s) =>
       s
         .trim()

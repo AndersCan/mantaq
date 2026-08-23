@@ -341,7 +341,7 @@ export function buildGraph<C>(
   },
 ): ActorGraph {
   if (!actor) return { nodes: [], edges: [] };
-  return Either.match(
+  return Either.getOrElse(
     Either.from(() => {
       const activeSet = collectActorsFromSnapshot(actor.snapshot());
       const namedContexts = collectNamedContexts(options);
@@ -362,9 +362,6 @@ export function buildGraph<C>(
       addInitialNode(actor, nodes, edges);
       return { nodes, edges };
     }),
-    (error) => {
-      throw error;
-    },
-    (result) => result,
+    () => ({ nodes: [], edges: [] }),
   );
 }

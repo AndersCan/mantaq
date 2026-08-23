@@ -12,8 +12,6 @@ import {
   assertContextNever,
   assertEffectRan,
   assertEffectNeverRan,
-  assertReachedState,
-  assertNeverReachedState,
 } from "./assertions.ts";
 
 export function createTestHarness<C>(actor: AnyActor<C>): TestHarness<C> {
@@ -58,8 +56,6 @@ export function createTestHarness<C>(actor: AnyActor<C>): TestHarness<C> {
       assertContextNever(instrumented, predicate),
     assertEffectRan: (name: string) => assertEffectRan(instrumented.history, name),
     assertEffectNeverRan: (name: string) => assertEffectNeverRan(instrumented.history, name),
-    assertReachedState: (name: string) => assertReachedState(instrumented.history, name),
-    assertNeverReachedState: (name: string) => assertNeverReachedState(instrumented.history, name),
 
     wasStateVisited: (name: string) => instrumented.history.visitedStates().has(name),
     wasTransitionVisited: (from: string, event: string) =>

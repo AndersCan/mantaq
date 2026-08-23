@@ -1,0 +1,157 @@
+---
+title: Testing with Test Harness
+description: Instrument actors, drive with events, assert coverage using @mantaq/test.
+---
+
+## What
+
+`@mantaq/test` instruments an actor for testing: records every state visit,
+transition, and effect. Drive it with events, then assert exactly which parts
+of the graph were exercised.
+
+## Why
+
+Manual assertion — `expect(snapshot().path[0]).toBe("payment")` — checks one
+step. The test harness checks the whole walk. State coverage, transition
+coverage, and effect coverage in one place. If you missed a branch, the
+harness tells you which one.
+
+The checkout machine from [Testing Actors](/mantaq/guides/actor-testing/):
+
+```ts
+import { Actor, state, event } from "@mantaq/core";
+
+const basicInfo = state("basicInfo")();
+const shippingAddress = state("shippingAddress")();
+const payment = state("payment")();
+const submitting = state("submitting")();
+const success = state("success")().final();
+const error = state("error")();
+
+const submitBasicInfo = event("submitBasicInfo")();
+const submitShipping = event("submitShipping")();
+const submitPayment = event("submitPayment")();
+const back = event("back")();
+const paymentOk = event("paymentOk")();
+const paymentFail = event("paymentFail")();
+
+function createCheckoutActor() {
+  return new Actor({
+    inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+    internal: [paymentOk, paymentFail],
+    states: [basicInfo, shippingAddress, payment, submitting, success, error],
+    initial: basicInfo,
+    setup: (m) => {
+      m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
+      m.on(shippingAddress, submitShipping, () => ({ state: payment }));
+      m.on(payment, submitPayment, () => ({ state: submitting }));
+      m.on(submitting, paymentOk, () => ({ state: success }));
+      m.on(submitting, paymentFail, () => ({ state: error }));
+    },
+  });
+}
+```
+
+## Create a test harness
+
+```ts
+import { createTestHarness } from "@mantaq/test";
+
+const harness = createTestHarness(createCheckoutActor());
+```
+
+The harness wraps the actor. Use `harness.send()` instead of
+`actor.send()`. Every send is recorded in the instrumented history.
+
+## Drive and assert
+
+```ts
+harness.send(submitBasicInfo.create());
+harness.send(submitShipping.create());
+harness.send(submitPayment.create());
+harness.send(paymentOk.create());
+
+harness.assertStateVisited("basicInfo");
+harness.assertStateVisited("success");
+harness.assertAllStatesVisited(); // every non-final state + final reached
+```
+
+The graph is built once from the actor definition at construction time. The
+history is the walk. Assertions compare them.
+
+## Assertion helpers
+
+### State assertions
+
+```ts
+harness.assertStateVisited("payment");
+harness.assertStateNeverVisited("error");
+harness.assertStateVisited("success");
+```
+
+### Transition assertions
+
+```ts
+harness.assertTransitionVisited("payment", "submitPayment");
+harness.assertTransitionNeverVisited("basicInfo", "submitPayment");
+```
+
+### Coverage assertions
+
+```ts
+harness.assertAllStatesVisited(); // every graph node hit
+harness.assertAllTransitionsVisited(); // every graph edge hit
+```
+
+### Effect assertions
+
+```ts
+harness.assertEffectRan("submitting");
+harness.assertEffectNeverRan("error");
+```
+
+### Context assertion
+
+```ts
+harness.assertContextNever((ctx) => ctx.cardNumber === "0000");
+```
+
+Fails if the predicate matches the current context.
+
+## Query helpers
+
+Non-throwing checks return booleans:
+
+```ts
+harness.wasStateVisited("payment"); // true/false
+harness.wasTransitionVisited("payment", "submitPayment");
+harness.wasEffectRun("submitting");
+```
+
+## Coverage report
+
+```ts
+const report = harness.coverage();
+// report.percent.states    — 0–100
+// report.percent.transitions — 0–100
+// report.percent.effects     — 0–100
+// report.states.uncovered    — string[]
+// report.transitions.uncovered — Array<{ from, event }>
+// report.effects.unexecuted  — string[]
+```
+
+Use `report.percent` to gate CI. Use `uncovered` to find missing paths.
+
+## Reset between tests
+
+```ts
+harness.reset(); // clear history, start fresh
+```
+
+## Key takeaways
+
+- **`createTestHarness(actor)`** — instruments and builds graph in one call
+- **`harness.send(event)`** — drives the instrumented actor
+- **Assert family** — `assertState*`, `assertTransition*`, `assertAll*`, `assertEffect*`
+- **`harness.coverage()`** — numeric report with uncovered paths
+- **`harness.reset()`** — clear history between test cases

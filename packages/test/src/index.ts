@@ -10,7 +10,5 @@ export {
   assertContextNever,
   assertEffectRan,
   assertEffectNeverRan,
-  assertReachedState,
-  assertNeverReachedState,
 } from "./assertions.ts";
 export type { TestHarness, CoverageReport } from "./types.ts";

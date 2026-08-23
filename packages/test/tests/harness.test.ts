@@ -1,5 +1,6 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, event, state } from "@mantaq/core";
+import { INITIAL_NODE_ID } from "@mantaq/traversal";
 import { createTestHarness } from "../src/index.ts";
 
 function makeToggle() {
@@ -108,7 +109,6 @@ describe("harness", () => {
 
     expect(() => harness.assertStateVisited("a")).not.toThrow();
     expect(() => harness.assertStateVisited("b")).not.toThrow();
-    expect(() => harness.assertReachedState("a")).not.toThrow();
     expect(() => harness.assertTransitionVisited("a", "GO")).not.toThrow();
     expect(() => harness.assertTransitionVisited("b", "STOP")).not.toThrow();
   });
@@ -117,7 +117,7 @@ describe("harness", () => {
     const actor = makeToggle();
     const harness = createTestHarness(actor);
 
-    const stateNodes = harness.graph.nodes.filter((n) => n.id !== "__initial__");
+    const stateNodes = harness.graph.nodes.filter((n) => n.id !== INITIAL_NODE_ID);
     expect(stateNodes.length).toBeGreaterThanOrEqual(2);
     const labels = stateNodes.map((n) => n.label);
     expect(labels).toContain("a");

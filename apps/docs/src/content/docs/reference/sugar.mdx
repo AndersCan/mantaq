@@ -288,6 +288,24 @@ the object itself.
 
 ---
 
+## `onOutput(actor, handler)`
+
+```ts
+function onOutput(actor: AnyActor, handler: (event: InternalEvent) => void): void;
+```
+
+Route an actor's emitted outputs to a handler. `regions` auto-wire child outputs
+into the parent; `ActorMap` children do not. This is the public wrapper for that
+wiring — one call connects a child's declared outputs to a receiver.
+
+```ts
+onOutput(childActor, (event) => {
+  // handle emitted output
+});
+```
+
+---
+
 ## `withPromise(promise, signal, emit, events)`
 
 ```ts
