@@ -508,6 +508,8 @@ export class Actor<
     this.#disposed = true;
     this.#effectAbort?.abort();
     this.#effectAbort = null;
+    for (const child of Object.values(this.#regions)) child.dispose();
+    this.#regions = {};
     this.#queue.clear();
     this.#subs.clear();
   }

@@ -292,6 +292,40 @@ describe("Actor regions", () => {
     expect(parent.snapshot().path[0]).toBe("pactive");
     expect(parent.snapshot().regions.child.path[0]).toBe("cdone");
   });
+
+  test("dispose cascades to region child actors", () => {
+    const childClock = new VirtualClock();
+    const cIdle = state("cidle")();
+    const parentIdle = state("pidle")();
+
+    const child = new Actor({
+      inputs: [],
+      states: [cIdle],
+      initial: cIdle,
+      clock: childClock,
+      setup: (m) => {
+        m.effect(cIdle, (input) => {
+          input.clock.setInterval(10, () => {}, { signal: input.signal });
+        });
+      },
+    });
+
+    const parent = new Actor({
+      inputs: [],
+      states: [parentIdle],
+      initial: parentIdle,
+      regions: { child },
+      setup: () => {},
+    });
+
+    expect(childClock.hasPending()).toBe(true);
+
+    parent.dispose();
+
+    expect(childClock.hasPending()).toBe(false);
+    child.send(cIdle.name as never);
+    expect(child.snapshot().path[0]).toBe("cidle");
+  });
 });
 
 describe("Actor context change detection", () => {
