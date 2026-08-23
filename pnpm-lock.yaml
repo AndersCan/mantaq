@@ -162,6 +162,9 @@ importers:
 
   packages/pbt:
     dependencies:
+      '@mantaq/utils':
+        specifier: workspace:*
+        version: link:../utils
       fast-check:
         specifier: 'catalog:'
         version: 4.9.0
