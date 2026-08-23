@@ -37,8 +37,10 @@ export class ActorMap implements SendableMap<SendableEvent> {
         return;
       }
       const off = child.on("done", () => {
+        off();
         if (this.#actors.get(key) === child) this.#actors.delete(key);
         this.#reapers.delete(key);
+        child.dispose();
       });
       this.#reapers.set(key, off);
     }
