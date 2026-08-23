@@ -34,10 +34,9 @@ export class History {
     return entriesOfType(entriesMap.get(this)!, "effect") as EffectRecord[];
   }
 
-  sends(): Array<{ event: string; timestamp: number }> {
+  sends(): Array<{ event: string }> {
     return entriesOfType(entriesMap.get(this)!, "send") as Array<{
       event: string;
-      timestamp: number;
     }>;
   }
 

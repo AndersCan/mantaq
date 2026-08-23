@@ -1,10 +1,11 @@
 import type { History, ActorGraph } from "@mantaq/traversal";
+import { INITIAL_NODE_ID } from "@mantaq/traversal";
 import type { AnyActor } from "@mantaq/core";
 
 export function assertAllStatesVisited(graph: ActorGraph, history: History): void {
   const visited = history.visitedStates();
   const missing = graph.nodes
-    .filter((n) => n.id !== "__initial__")
+    .filter((n) => n.id !== INITIAL_NODE_ID)
     .filter((n) => !visited.has(n.label))
     .map((n) => n.label);
   if (missing.length > 0) {
@@ -16,8 +17,8 @@ export function assertAllTransitionsVisited(graph: ActorGraph, history: History)
   const fired = history.firedTransitions();
   const edges = graph.edges.filter(
     (e) =>
-      e.source !== "__initial__" &&
-      e.target !== "__initial__" &&
+      e.source !== INITIAL_NODE_ID &&
+      e.target !== INITIAL_NODE_ID &&
       !e.isUndetermined &&
       !e.isInternal,
   );
@@ -77,12 +78,4 @@ export function assertEffectNeverRan(history: History, stateName: string): void 
   if (ran) {
     throw new Error(`assertEffectNeverRan failed: effect for state "${stateName}" ran`);
   }
-}
-
-export function assertReachedState(history: History, stateName: string): void {
-  assertStateVisited(history, stateName);
-}
-
-export function assertNeverReachedState(history: History, stateName: string): void {
-  assertStateNeverVisited(history, stateName);
 }

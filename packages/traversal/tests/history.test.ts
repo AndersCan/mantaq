@@ -4,8 +4,8 @@ import { History } from "../src/history.ts";
 describe("History", () => {
   test("append and retrieve entries", () => {
     const h = new History();
-    h.append({ type: "send", data: { event: "GO", timestamp: 1 } });
-    h.append({ type: "state_visit", data: { stateName: "active", timestamp: 2 } });
+    h.append({ type: "send", data: { event: "GO" } });
+    h.append({ type: "state_visit", data: { stateName: "active" } });
 
     expect(h.entries().length).toBe(2);
     expect(h.entries()[0].type).toBe("send");
@@ -14,9 +14,9 @@ describe("History", () => {
 
   test("stateVisits filters correctly", () => {
     const h = new History();
-    h.append({ type: "send", data: { event: "GO", timestamp: 1 } });
-    h.append({ type: "state_visit", data: { stateName: "active", timestamp: 2 } });
-    h.append({ type: "state_visit", data: { stateName: "done", timestamp: 3 } });
+    h.append({ type: "send", data: { event: "GO" } });
+    h.append({ type: "state_visit", data: { stateName: "active" } });
+    h.append({ type: "state_visit", data: { stateName: "done" } });
 
     const visits = h.stateVisits();
     expect(visits.length).toBe(2);
@@ -28,9 +28,9 @@ describe("History", () => {
     const h = new History();
     h.append({
       type: "transition",
-      data: { from: "idle", event: "GO", to: "active", timestamp: 1 },
+      data: { from: "idle", event: "GO", to: "active" },
     });
-    h.append({ type: "send", data: { event: "GO", timestamp: 2 } });
+    h.append({ type: "send", data: { event: "GO" } });
 
     const t = h.transitions();
     expect(t.length).toBe(1);
@@ -40,8 +40,8 @@ describe("History", () => {
 
   test("effects filters correctly", () => {
     const h = new History();
-    h.append({ type: "effect", data: { stateName: "active", timestamp: 1 } });
-    h.append({ type: "send", data: { event: "GO", timestamp: 2 } });
+    h.append({ type: "effect", data: { stateName: "active" } });
+    h.append({ type: "send", data: { event: "GO" } });
 
     const e = h.effects();
     expect(e.length).toBe(1);
@@ -50,9 +50,9 @@ describe("History", () => {
 
   test("sends filters correctly", () => {
     const h = new History();
-    h.append({ type: "send", data: { event: "GO", timestamp: 1 } });
-    h.append({ type: "send", data: { event: "STOP", timestamp: 2 } });
-    h.append({ type: "state_visit", data: { stateName: "active", timestamp: 3 } });
+    h.append({ type: "send", data: { event: "GO" } });
+    h.append({ type: "send", data: { event: "STOP" } });
+    h.append({ type: "state_visit", data: { stateName: "active" } });
 
     const s = h.sends();
     expect(s.length).toBe(2);
@@ -62,9 +62,9 @@ describe("History", () => {
 
   test("visitedStates returns Set", () => {
     const h = new History();
-    h.append({ type: "state_visit", data: { stateName: "idle", timestamp: 1 } });
-    h.append({ type: "state_visit", data: { stateName: "active", timestamp: 2 } });
-    h.append({ type: "state_visit", data: { stateName: "idle", timestamp: 3 } });
+    h.append({ type: "state_visit", data: { stateName: "idle" } });
+    h.append({ type: "state_visit", data: { stateName: "active" } });
+    h.append({ type: "state_visit", data: { stateName: "idle" } });
 
     const visited = h.visitedStates();
     expect(visited).toBeInstanceOf(Set);
@@ -77,15 +77,15 @@ describe("History", () => {
     const h = new History();
     h.append({
       type: "transition",
-      data: { from: "idle", event: "GO", to: "active", timestamp: 1 },
+      data: { from: "idle", event: "GO", to: "active" },
     });
     h.append({
       type: "transition",
-      data: { from: "active", event: "STOP", to: "idle", timestamp: 2 },
+      data: { from: "active", event: "STOP", to: "idle" },
     });
     h.append({
       type: "transition",
-      data: { from: "idle", event: "GO", to: "active", timestamp: 3 },
+      data: { from: "idle", event: "GO", to: "active" },
     });
 
     const fired = h.firedTransitions();
@@ -97,13 +97,13 @@ describe("History", () => {
 
   test("reset clears everything", () => {
     const h = new History();
-    h.append({ type: "send", data: { event: "GO", timestamp: 1 } });
-    h.append({ type: "state_visit", data: { stateName: "active", timestamp: 2 } });
+    h.append({ type: "send", data: { event: "GO" } });
+    h.append({ type: "state_visit", data: { stateName: "active" } });
     h.append({
       type: "transition",
-      data: { from: "idle", event: "GO", to: "active", timestamp: 3 },
+      data: { from: "idle", event: "GO", to: "active" },
     });
-    h.append({ type: "effect", data: { stateName: "active", timestamp: 4 } });
+    h.append({ type: "effect", data: { stateName: "active" } });
 
     h.reset();
     expect(h.entries().length).toBe(0);

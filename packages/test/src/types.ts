@@ -32,8 +32,6 @@ export interface TestHarness<C = Record<string, unknown>> {
   assertContextNever(predicate: (context: unknown) => boolean): void;
   assertEffectRan(stateName: string): void;
   assertEffectNeverRan(stateName: string): void;
-  assertReachedState(stateName: string): void;
-  assertNeverReachedState(stateName: string): void;
 
   wasStateVisited(stateName: string): boolean;
   wasTransitionVisited(from: string, event: string): boolean;

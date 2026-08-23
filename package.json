@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run guard && vp run knip && vp run -r test && vp run -r build",
+    "ready": "vp check && vp run guard && vp run knip && vp run docs:check && vp run -r test && vp run -r build",
     "guard": "node scripts/vision-guard.mjs",
     "docs:check": "node scripts/docs-check.mjs",
     "knip": "knip",

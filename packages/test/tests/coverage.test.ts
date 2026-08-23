@@ -32,8 +32,8 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
-    history.append({ type: "state_visit", data: { stateName: "b", timestamp: 2 } });
+    history.append({ type: "state_visit", data: { stateName: "a" } });
+    history.append({ type: "state_visit", data: { stateName: "b" } });
 
     const cov = computeCoverage(graph, history);
     expect(cov.states.total).toBeGreaterThanOrEqual(2);
@@ -47,7 +47,7 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "state_visit", data: { stateName: "a", timestamp: 1 } });
+    history.append({ type: "state_visit", data: { stateName: "a" } });
 
     const cov = computeCoverage(graph, history);
     expect(cov.states.visited).toBeGreaterThanOrEqual(1);
@@ -60,10 +60,10 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "transition", data: { from: "a", event: "GO", to: "b", timestamp: 1 } });
+    history.append({ type: "transition", data: { from: "a", event: "GO", to: "b" } });
     history.append({
       type: "transition",
-      data: { from: "b", event: "STOP", to: "a", timestamp: 2 },
+      data: { from: "b", event: "STOP", to: "a" },
     });
 
     const cov = computeCoverage(graph, history);
@@ -77,7 +77,7 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "transition", data: { from: "a", event: "GO", to: "b", timestamp: 1 } });
+    history.append({ type: "transition", data: { from: "a", event: "GO", to: "b" } });
 
     const cov = computeCoverage(graph, history);
     expect(cov.transitions.visited).toBeGreaterThanOrEqual(1);
@@ -103,7 +103,7 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "effect", data: { stateName: "a", timestamp: 1 } });
+    history.append({ type: "effect", data: { stateName: "a" } });
 
     const cov = computeCoverage(graph, history);
     expect(cov.effects.ran).toBeGreaterThanOrEqual(1);
@@ -116,7 +116,7 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "effect", data: { stateName: "a", timestamp: 1 } });
+    history.append({ type: "effect", data: { stateName: "a" } });
 
     const cov = computeCoverage(graph, history);
     expect(cov.effects.unexecuted).toContain("b");

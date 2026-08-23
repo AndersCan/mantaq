@@ -12,6 +12,9 @@ catalogs:
     '@stryker-mutator/vitest-runner':
       specifier: ^9
       version: 9.6.1
+    '@typescript/native-preview':
+      specifier: 7.0.0-dev.20260707.2
+      version: 7.0.0-dev.20260707.2
     '@varlock/bumpy':
       specifier: ^1.18.1
       version: 1.18.1
@@ -42,7 +45,7 @@ overrides:
   vitest: 4.1.10
   typescript: 6.0.3
 
-packageExtensionsChecksum: sha256-jYft4/Fbdor9ktMfjbaQIFLqL6/HPNc1s+dqOnZr588=
+packageExtensionsChecksum: sha256-x2P9INPuHxh56mhXePZeRAHSJiaGH7rFUqESRZrJINI=
 
 importers:
 
@@ -114,7 +117,7 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260707.2
+        specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -145,7 +148,7 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260707.2
+        specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       typescript:
         specifier: 6.0.3
@@ -167,7 +170,7 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260707.2
+        specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -201,7 +204,7 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260707.2
+        specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -232,7 +235,7 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260707.2
+        specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -260,7 +263,7 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260707.2
+        specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -281,7 +284,7 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20260707.2
+        specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
       typescript:
         specifier: 6.0.3

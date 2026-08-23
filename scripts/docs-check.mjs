@@ -22,12 +22,16 @@ const EXAMPLE_MDX = join(ROOT, ".opencode/skills/docs-write/resources/example.md
 const CORE_INDEX = join(ROOT, "packages/core/src/index.ts");
 const SUGAR_INDEX = join(ROOT, "packages/sugar/src/index.ts");
 const PBT_INDEX = join(ROOT, "packages/pbt/src/index.ts");
+const TEST_INDEX = join(ROOT, "packages/test/src/index.ts");
+const TRAVERSAL_INDEX = join(ROOT, "packages/traversal/src/index.ts");
 
 const BUILTIN_ALLOW = new Set(["__error"]);
 const PACKAGE_INDEX = new Map([
   ["@mantaq/core", CORE_INDEX],
   ["@mantaq/sugar", SUGAR_INDEX],
   ["@mantaq/pbt", PBT_INDEX],
+  ["@mantaq/test", TEST_INDEX],
+  ["@mantaq/traversal", TRAVERSAL_INDEX],
 ]);
 
 let failures = 0;

@@ -1,4 +1,4 @@
-import type { ActorGraph, History } from "@mantaq/traversal";
+import { INITIAL_NODE_ID, type ActorGraph, type History } from "@mantaq/traversal";
 import type { CoverageReport } from "./types.ts";
 
 export function computeCoverage(graph: ActorGraph, history: History): CoverageReport {
@@ -6,11 +6,11 @@ export function computeCoverage(graph: ActorGraph, history: History): CoverageRe
   const firedTransitions = history.firedTransitions();
   const effects = history.effects();
 
-  const graphNodes = graph.nodes.filter((n) => n.id !== "__initial__");
+  const graphNodes = graph.nodes.filter((n) => n.id !== INITIAL_NODE_ID);
   const graphEdges = graph.edges.filter(
     (e) =>
-      e.source !== "__initial__" &&
-      e.target !== "__initial__" &&
+      e.source !== INITIAL_NODE_ID &&
+      e.target !== INITIAL_NODE_ID &&
       !e.isUndetermined &&
       !e.isInternal,
   );

@@ -72,17 +72,17 @@ function recordTransition(
 ) {
   history.append({
     type: "transition",
-    data: { from: rec.from, event: rec.event, to: rec.to, timestamp: Date.now() },
+    data: { from: rec.from, event: rec.event, to: rec.to },
   });
   if (!rec.transitioned) return;
   history.append({
     type: "state_visit",
-    data: { stateName: rec.to, timestamp: Date.now() },
+    data: { stateName: rec.to },
   });
   if ((rec.effects[rec.to] ?? []).length > 0) {
     history.append({
       type: "effect",
-      data: { stateName: rec.to, timestamp: Date.now() },
+      data: { stateName: rec.to },
     });
   }
 }
@@ -92,7 +92,7 @@ function trackSendEvent(history: History, event: unknown): void {
   const eventId = evt?.type ?? "unknown";
   history.append({
     type: "send",
-    data: { event: eventId, timestamp: Date.now() },
+    data: { event: eventId },
   });
 }
 
@@ -101,7 +101,7 @@ export function instrument<C>(actor: AnyActor<C>): InstrumentedActor<C> {
 
   history.append({
     type: "state_visit",
-    data: { stateName: actor.state.name, timestamp: Date.now() },
+    data: { stateName: actor.state.name },
   });
 
   const wrapped = wrapWithProxy(actor, history);

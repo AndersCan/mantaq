@@ -6,8 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "vp test",
-    "check": "vp check",
-    "mutation": "stryker run"
+    "check": "vp check"
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",
@@ -15,8 +14,8 @@
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "typescript": "^7.0.2",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }

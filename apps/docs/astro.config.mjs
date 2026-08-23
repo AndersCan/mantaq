@@ -28,8 +28,8 @@ export default defineConfig({
         {
           label: "Getting Started",
           items: [
-            { label: "State Machines & Statecharts", slug: "getting-started/state-machines" },
             { label: "Introduction", slug: "getting-started/introduction" },
+            { label: "State Machines & Statecharts", slug: "getting-started/state-machines" },
             { label: "Installation", slug: "getting-started/installation" },
           ],
         },
@@ -43,6 +43,7 @@ export default defineConfig({
             { label: "Context", slug: "core-concepts/context" },
             { label: "Error Handling", slug: "core-concepts/error-handling" },
             { label: "Testing", slug: "guides/actor-testing" },
+            { label: "Test Harness", slug: "guides/testing-guide" },
           ],
         },
         {
@@ -62,6 +63,8 @@ export default defineConfig({
           items: [
             { label: "@mantaq/core", slug: "reference/core" },
             { label: "@mantaq/sugar", slug: "reference/sugar" },
+            { label: "@mantaq/test", slug: "reference/test" },
+            { label: "@mantaq/traversal", slug: "reference/traversal" },
           ],
         },
       ],

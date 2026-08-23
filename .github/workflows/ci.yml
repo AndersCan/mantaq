@@ -16,7 +16,26 @@ jobs:
           node-version: "24"
           cache: true
       - run: vp install
-      - run: vp run mutation:core
-      - run: vp run mutation:sugar
       - run: vp run ready
-      - run: vp run knip
+
+  mutation-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+      - run: vp install
+      - run: vp run mutation:core
+
+  mutation-sugar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+      - run: vp install
+      - run: vp run mutation:sugar

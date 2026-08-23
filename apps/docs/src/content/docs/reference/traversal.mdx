@@ -1,0 +1,237 @@
+---
+title: "@mantaq/traversal"
+description: Graph building, instrumentation, history, and graph algorithms.
+---
+
+## `buildGraph(actor, options?)`
+
+```ts
+function buildGraph<C>(
+  actor: AnyActor<C>,
+  options?: {
+    internalIds?: Set<string>;
+    sampleContext?: Record<string, unknown>;
+    sampleContexts?: Record<string, Record<string, unknown>>;
+  },
+): ActorGraph;
+```
+
+Builds a graph from an actor definition. Nodes are states, edges are
+transitions. Effect self-loops and region children are included.
+
+`internalIds` marks event types as internal — their edges are excluded from
+coverage. `sampleContexts` provides context values for handler evaluation.
+
+```ts
+import { buildGraph } from "@mantaq/traversal";
+
+const graph = buildGraph(checkout, { internalIds: new Set(["paymentOk"]) });
+graph.nodes.length; // number of states
+graph.edges.length; // number of transitions
+```
+
+---
+
+## `collectActiveStates(snapshot, prefix, activeSet)`
+
+```ts
+function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<string>): void;
+```
+
+Recursively walks a snapshot tree and adds active state node IDs to the set.
+Used internally by `buildGraph` to mark which nodes are active.
+
+---
+
+## `instrument(actor)`
+
+```ts
+function instrument<C>(actor: AnyActor<C>): InstrumentedActor<C>;
+```
+
+Wraps an actor to record every state visit, transition, and effect in a
+`History` instance. Returns an `InstrumentedActor` with the same API plus a
+`history` property.
+
+```ts
+import { instrument } from "@mantaq/traversal";
+
+const wrapped = instrument(checkout);
+wrapped.send(submitBasicInfo.create());
+wrapped.history.visitedStates(); // Set<string>
+```
+
+---
+
+## `History`
+
+```ts
+class History {
+  append(entry: HistoryEntry): void;
+  entries(): readonly HistoryEntry[];
+  stateVisits(): StateVisit[];
+  transitions(): TransitionRecord[];
+  effects(): EffectRecord[];
+  sends(): Array<{ event: string }>;
+  visitedStates(): Set<string>;
+  firedTransitions(): Set<string>;
+  reset(): void;
+}
+```
+
+Append-only log of actor activity. Query by type or get derived sets.
+
+- `visitedStates()` — unique state names entered
+- `firedTransitions()` — `"from:event"` strings for fired transitions
+- `reset()` — clear all entries
+
+---
+
+## Graph algorithms
+
+### `reachable(graph, fromId, toId)`
+
+```ts
+function reachable(graph: ActorGraph, fromId: string, toId: string): boolean;
+```
+
+BFS reachability. Can `fromId` reach `toId`?
+
+### `allPaths(graph, fromId, toId)`
+
+```ts
+function allPaths(graph: ActorGraph, fromId: string, toId: string): string[][];
+```
+
+All acyclic paths between two nodes. Returns arrays of node IDs.
+
+### `findCycles(graph)`
+
+```ts
+function findCycles(graph: ActorGraph): string[][];
+```
+
+Returns all cycles in the graph as arrays of node IDs.
+
+### `unreachableNodes(graph, fromId)`
+
+```ts
+function unreachableNodes(graph: ActorGraph, fromId: string): string[];
+```
+
+Node IDs not reachable from `fromId`.
+
+### `shortestPath(graph, fromId, toId)`
+
+```ts
+function shortestPath(graph: ActorGraph, fromId: string, toId: string): string[] | null;
+```
+
+Shortest path by edge count. `null` if unreachable.
+
+---
+
+## Types
+
+### `ActorGraph`
+
+```ts
+interface ActorGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+```
+
+### `GraphNode`
+
+```ts
+interface GraphNode {
+  id: string;
+  label: string;
+  isActive: boolean;
+  isFinal: boolean;
+  isInitial?: boolean;
+}
+```
+
+### `GraphEdge`
+
+```ts
+interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  isActive: boolean;
+  isInternal?: boolean;
+  isUndetermined?: boolean;
+  payload?: { action?: string };
+  contexts?: string[];
+}
+```
+
+### `HistoryEntry`
+
+```ts
+interface HistoryEntry {
+  type: "state_visit" | "transition" | "effect" | "send";
+  data: StateVisit | TransitionRecord | EffectRecord | { event: string };
+}
+```
+
+### `StateVisit`
+
+```ts
+interface StateVisit {
+  stateName: string;
+}
+```
+
+### `TransitionRecord`
+
+```ts
+interface TransitionRecord {
+  from: string;
+  event: string;
+  to: string | undefined;
+}
+```
+
+### `EffectRecord`
+
+```ts
+interface EffectRecord {
+  stateName: string;
+}
+```
+
+### `InstrumentedActor`
+
+```ts
+interface InstrumentedActor<C> {
+  history: History;
+  send(event: unknown): void;
+  state: AnyActor["state"];
+  snapshot(): Snapshot<C>;
+  regions: Record<string, AnyActor>;
+  context?: C;
+  clock: AnyActor["clock"];
+  on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
+  on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
+  on(event: "done", fn: () => void): () => void;
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on(event: "output", fn: (event: InternalEvent) => void): () => void;
+  recover(target: { state: AnyActor["state"]; context: C }): void;
+  settled(): Promise<void>;
+  inject(event: InternalEvent): void;
+  dispose(): void;
+}
+```
+
+---
+
+## Constants
+
+| Constant          | Value           | What                          |
+| ----------------- | --------------- | ----------------------------- |
+| `INITIAL_NODE_ID` | `"__initial__"` | Synthetic graph entry node ID |

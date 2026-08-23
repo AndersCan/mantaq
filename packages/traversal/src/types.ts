@@ -51,22 +51,19 @@ export interface ActorGraph {
 
 export interface StateVisit {
   stateName: string;
-  timestamp: number;
 }
 
 export interface TransitionRecord {
   from: string;
   event: string;
   to: string | undefined;
-  timestamp: number;
 }
 
 export interface EffectRecord {
   stateName: string;
-  timestamp: number;
 }
 
 export interface HistoryEntry {
   type: "state_visit" | "transition" | "effect" | "send";
-  data: StateVisit | TransitionRecord | EffectRecord | { event: string; timestamp: number };
+  data: StateVisit | TransitionRecord | EffectRecord | { event: string };
 }

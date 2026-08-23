@@ -1,0 +1,129 @@
+---
+title: "@mantaq/test"
+description: Test harness and coverage assertions for actor behavior.
+---
+
+## `createTestHarness(actor)`
+
+```ts
+function createTestHarness<C>(actor: AnyActor<C>): TestHarness<C>;
+```
+
+Instruments an actor for testing. Builds the state graph from the actor
+definition and wraps `send` to record history.
+
+Returns a `TestHarness` — send events through it, then assert against the
+recorded history.
+
+```ts
+import { createTestHarness } from "@mantaq/test";
+
+const harness = createTestHarness(checkout);
+harness.send(submitBasicInfo.create());
+harness.assertStateVisited("shippingAddress");
+```
+
+---
+
+## `computeCoverage(graph, history)`
+
+```ts
+function computeCoverage(graph: ActorGraph, history: History): CoverageReport;
+```
+
+Compare a graph against a history. Returns state, transition, and effect
+coverage as totals, visited counts, and uncovered paths. Used internally by
+`harness.coverage()`.
+
+```ts
+import { computeCoverage } from "@mantaq/test";
+
+const report = computeCoverage(graph, history);
+report.percent.states; // 0–100
+```
+
+---
+
+## `TestHarness`
+
+```ts
+interface TestHarness<C> {
+  actor: AnyActor<C>;
+  graph: ActorGraph;
+  history: History;
+
+  send(event: { type: string; payload?: unknown }): void;
+  state: AnyActor["state"];
+  snapshot(): Snapshot<C>;
+  context: C | undefined;
+
+  assertAllStatesVisited(): void;
+  assertAllTransitionsVisited(): void;
+  assertStateVisited(stateName: string): void;
+  assertStateNeverVisited(stateName: string): void;
+  assertTransitionVisited(from: string, event: string): void;
+  assertTransitionNeverVisited(from: string, event: string): void;
+  assertContextNever(predicate: (context: unknown) => boolean): void;
+  assertEffectRan(stateName: string): void;
+  assertEffectNeverRan(stateName: string): void;
+
+  wasStateVisited(stateName: string): boolean;
+  wasTransitionVisited(from: string, event: string): boolean;
+  wasEffectRun(stateName: string): boolean;
+
+  coverage(): CoverageReport;
+  reset(): void;
+}
+```
+
+### Assert methods
+
+All throw on failure.
+
+| Method                                      | What                                                  |
+| ------------------------------------------- | ----------------------------------------------------- |
+| `assertAllStatesVisited()`                  | Every graph node (non-`__initial__`) was hit          |
+| `assertAllTransitionsVisited()`             | Every graph edge (non-internal, non-undetermined) hit |
+| `assertStateVisited(name)`                  | Named state was entered at least once                 |
+| `assertStateNeverVisited(name)`             | Named state was never entered                         |
+| `assertTransitionVisited(from, event)`      | `(from, event)` pair fired                            |
+| `assertTransitionNeverVisited(from, event)` | Pair never fired                                      |
+| `assertContextNever(fn)`                    | Predicate does not match current context              |
+| `assertEffectRan(name)`                     | Effect for named state ran                            |
+| `assertEffectNeverRan(name)`                | Effect for named state never ran                      |
+
+### Query methods
+
+Boolean checks — no throw.
+
+| Method                              | What              |
+| ----------------------------------- | ----------------- |
+| `wasStateVisited(name)`             | State entered?    |
+| `wasTransitionVisited(from, event)` | Transition fired? |
+| `wasEffectRun(name)`                | Effect ran?       |
+
+---
+
+## `CoverageReport`
+
+```ts
+interface CoverageReport {
+  states: { total: number; visited: number; uncovered: string[] };
+  transitions: {
+    total: number;
+    visited: number;
+    uncovered: Array<{ from: string; event: string }>;
+  };
+  effects: { total: number; ran: number; unexecuted: string[] };
+  percent: { states: number; transitions: number; effects: number };
+}
+```
+
+---
+
+## Types
+
+| Type             | What                                            |
+| ---------------- | ----------------------------------------------- |
+| `TestHarness`    | Instrumented actor with assertions and coverage |
+| `CoverageReport` | Numeric coverage with uncovered paths           |
