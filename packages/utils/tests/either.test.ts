@@ -42,6 +42,40 @@ describe("Either runtime", () => {
     expect((Either.getLeft(caught) as Error).message).toMatch(/thrown value was undefined/);
   });
 
+  test("from rejects undefined as a Right (#208)", () => {
+    const e = Either.from(() => undefined);
+    expect(Either.isLeft(e)).toBe(true);
+    expect(Either.isRight(e)).toBe(false);
+    expect(
+      Either.match(
+        e,
+        () => "L",
+        () => "R",
+      ),
+    ).toBe("L");
+    expect(Either.getRight(e)).toBeUndefined();
+  });
+
+  test("from rejects null as a Right (#208)", () => {
+    const e = Either.from(() => null);
+    expect(Either.isLeft(e)).toBe(true);
+    expect(Either.isRight(e)).toBe(false);
+    expect(
+      Either.match(
+        e,
+        () => "L",
+        () => "R",
+      ),
+    ).toBe("L");
+  });
+
+  test("from keeps valid falsy Right values", () => {
+    expect(Either.from(() => 0)).toEqual([undefined, 0]);
+    expect(Either.from(() => false)).toEqual([undefined, false]);
+    expect(Either.from(() => "")).toEqual([undefined, ""]);
+    expect(Either.isRight(Either.from(() => 0))).toBe(true);
+  });
+
   test("getLeft / getRight expose the value or undefined", () => {
     expect(Either.getLeft(Either.left("e"))).toBe("e");
     expect(Either.getLeft(Either.right(1))).toBeUndefined();
