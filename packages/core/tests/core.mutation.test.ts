@@ -2070,22 +2070,22 @@ describe("ActorBuilder registration invariants", () => {
     expect(actor.snapshot().path[0]).toBe("idle");
   });
 
-  test("duplicate on(state, event) throws with the registered names", () => {
+  test("a later on(state, event) overrides the earlier handler", () => {
     const idle = state("idle")();
     const active = state("active")();
+    const done = state("done")();
     const go = event("GO")();
-    expect(
-      () =>
-        new Actor({
-          inputs: [go],
-          states: [idle, active],
-          initial: idle,
-          setup: (m) => {
-            m.on(idle, go, () => ({ state: active }));
-            m.on(idle, go, () => ({ state: active }));
-          },
-        }),
-    ).toThrow(/duplicate transition handler for state "idle" event "GO"/);
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active, done],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.on(idle, go, () => ({ state: done }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("done");
   });
 
   test("a single valid onAny() registers and dispatches", () => {
@@ -2105,21 +2105,21 @@ describe("ActorBuilder registration invariants", () => {
     expect(actor.snapshot().path[0]).toBe("active");
   });
 
-  test("duplicate onAny(event) throws with the registered name", () => {
+  test("a later onAny(event) overrides the earlier handler", () => {
     const idle = state("idle")();
     const active = state("active")();
+    const done = state("done")();
     const go = event("GO")();
-    expect(
-      () =>
-        new Actor({
-          inputs: [go],
-          states: [idle, active],
-          initial: idle,
-          setup: (m) => {
-            m.onAny(go, () => ({ state: active }));
-            m.onAny(go, () => ({ state: active }));
-          },
-        }),
-    ).toThrow(/duplicate Any-handler for event "GO"/);
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active, done],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(go, () => ({ state: active }));
+        m.onAny(go, () => ({ state: done }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("done");
   });
 });
