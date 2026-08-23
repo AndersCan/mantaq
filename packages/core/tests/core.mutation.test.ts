@@ -2032,3 +2032,94 @@ describe("dispose and inject directed mutation tests", () => {
     expect("payload" in actor.snapshot()).toBe(false);
   });
 });
+
+describe("ActorBuilder registration invariants", () => {
+  test("a single valid on() registers and dispatches", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("active");
+  });
+
+  test("two distinct events on the same state both register", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const stop = event("STOP")();
+    const actor = new Actor({
+      inputs: [go, stop],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.on(active, stop, () => ({ state: idle }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("active");
+    actor.send(stop.create());
+    expect(actor.snapshot().path[0]).toBe("idle");
+  });
+
+  test("a later on(state, event) overrides the earlier handler", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const done = state("done")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active, done],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.on(idle, go, () => ({ state: done }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("done");
+  });
+
+  test("a single valid onAny() registers and dispatches", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(tick, () => ({ state: active }));
+      },
+    });
+    actor.send(tick.create());
+    expect(actor.snapshot().path[0]).toBe("active");
+  });
+
+  test("a later onAny(event) overrides the earlier handler", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const done = state("done")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active, done],
+      initial: idle,
+      setup: (m) => {
+        m.onAny(go, () => ({ state: active }));
+        m.onAny(go, () => ({ state: done }));
+      },
+    });
+    actor.send(go.create());
+    expect(actor.snapshot().path[0]).toBe("done");
+  });
+});

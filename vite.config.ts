@@ -42,6 +42,7 @@ export default defineConfig({
         files: [
           "packages/core/src/virtual-clock.ts",
           "packages/core/src/actor.ts",
+          "packages/core/src/builder.ts",
           "packages/sugar/src/actors/actor-map.ts",
           "packages/traversal/src/graph.ts",
         ],

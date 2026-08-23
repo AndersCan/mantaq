@@ -294,15 +294,16 @@ describe("transition contract — type = behavior", () => {
     const active = state("active")();
     const alien = state("alien")();
     const clicked = event("CLICKED")();
+    const other = event("OTHER")();
 
     new Actor({
-      inputs: [clicked],
+      inputs: [clicked, other],
       states: [idle, active],
       initial: idle,
       setup: (m) => {
         m.on(idle, clicked, () => ({ state: active }));
         // @ts-expect-error transition target must be a declared state
-        m.on(idle, clicked, () => ({ state: alien }));
+        m.on(idle, other, () => ({ state: alien }));
       },
     });
 
