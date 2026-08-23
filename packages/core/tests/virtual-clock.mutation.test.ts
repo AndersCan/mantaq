@@ -214,4 +214,29 @@ describe("VirtualClock directed mutation tests", () => {
     clock.advance(25);
     expect(count).toBe(2);
   });
+
+  test("a timer that re-arms a 0ms timer terminates instead of hanging", () => {
+    const clock = new VirtualClock();
+    let fires = 0;
+    const id = clock.setTimeout(0, () => {
+      fires++;
+      clock.setTimeout(0, () => {});
+    });
+    expect(id).toBe(1);
+    expect(() => clock.advance(1000)).not.toThrow();
+    expect(fires).toBe(1);
+  });
+
+  test("a same-deadline re-arm chain is bounded by the iteration cap", () => {
+    const clock = new VirtualClock();
+    let fires = 0;
+    const arm = () => {
+      fires++;
+      clock.setTimeout(0, arm);
+    };
+    clock.setTimeout(0, arm);
+    expect(() => clock.advance(1000)).not.toThrow();
+    expect(fires).toBeGreaterThan(0);
+    expect(clock.now()).toBe(1000);
+  });
 });

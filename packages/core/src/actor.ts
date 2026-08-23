@@ -227,6 +227,11 @@ export class Actor<
     return Promise.all([this.#queue.settled(), ...this.#pendingEffects]).then(() => undefined);
   }
 
+  /** Count of async-effect promises still awaiting settlement. Introspection. */
+  pendingEffectCount(): number {
+    return this.#pendingEffects.length;
+  }
+
   send(event: CreatedOf<Inputs[number]>): void {
     if (this.#disposed) return;
     this.#dispatch(event);
@@ -432,7 +437,15 @@ export class Actor<
       lastGood,
       onError: (error: unknown) => this.#enterError("effect", event, error, lastGood),
     });
-    this.#pendingEffects.push(...result.pending);
+    for (const p of result.pending) {
+      this.#pendingEffects.push(p);
+      void p
+        .finally(() => {
+          const i = this.#pendingEffects.indexOf(p);
+          if (i !== -1) this.#pendingEffects.splice(i, 1);
+        })
+        .catch(() => {});
+    }
   }
 
   #drainInternal(): void {
@@ -514,6 +527,7 @@ export class Actor<
     this.#regions = {};
     this.#queue.clear();
     this.#subs.clear();
+    this.#pendingEffects = [];
   }
 
   #disposed = false;
