@@ -39,6 +39,11 @@ export class ActorBuilder<
   ): this {
     const sName = stateRef.name;
     const eType = eventRef.type;
+    if (this.#transitions[sName]?.[eType]) {
+      throw new Error(
+        `[ActorBuilder] duplicate transition handler for state "${sName}" event "${eType}"`,
+      );
+    }
     (this.#transitions[sName] ??= {})[eType] = fn as (
       event: unknown,
       opts: { context: Context<ActorContext>; actor: AnyActor },
@@ -54,6 +59,9 @@ export class ActorBuilder<
     ) => TransitionResult<States[number], EventTypeOf<Outputs[number]>>,
   ): this {
     const eType = eventRef.type;
+    if (this.#transitions["Any"]?.[eType]) {
+      throw new Error(`[ActorBuilder] duplicate Any-handler for event "${eType}"`);
+    }
     (this.#transitions["Any"] ??= {})[eType] = fn as (
       event: unknown,
       opts: { context: Context<ActorContext>; actor: AnyActor },
