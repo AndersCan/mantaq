@@ -416,6 +416,52 @@ describe("Actor context change detection", () => {
     expect(kinds[2]).toBe("context");
   });
 
+  test("snapshot hands out a copy of the live context, not the reference (#226)", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+      },
+    });
+    const snap = actor.snapshot();
+    expect(snap.context).not.toBe(actor.context);
+    (snap.context as { n: number }).n = 99;
+    expect(actor.context.n).toBe(0);
+  });
+
+  test("context identity is stable across unchanged snapshots (#226)", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const tick = event("TICK")();
+    const actor = new Actor({
+      inputs: [go, tick],
+      states: [idle, active],
+      initial: idle,
+      context: { n: 0 },
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.onAny(tick, (_e, { context }) => {
+          context.set({ n: 5 });
+          return {};
+        });
+      },
+    });
+    const a = actor.snapshot().context;
+    actor.send(go.create()); // state change only
+    const b = actor.snapshot().context;
+    expect(b).toBe(a); // unchanged context keeps the same reference
+    actor.send(tick.create()); // context change
+    const c = actor.snapshot().context;
+    expect(c).not.toBe(b); // changed context gets a new reference
+  });
+
   test("set plus transition in one handler emits a single coalesced change", () => {
     const idle = state("idle")();
     const active = state("active")();

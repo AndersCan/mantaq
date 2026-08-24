@@ -6,6 +6,7 @@ import { trackAbort, clearAbort } from "../src/abort-tracker.ts";
 import { runEffects } from "../src/effects.ts";
 import { Subscribers } from "../src/subscribers.ts";
 import { buildSnapshot } from "../src/snapshot.ts";
+import type { ErrorInfo, Snapshot } from "../src/actor-types.ts";
 import { parseTarget } from "../src/dispatch.ts";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
@@ -502,6 +503,32 @@ describe("buildSnapshot", () => {
   test("marks done for final states", () => {
     const snap = buildSnapshot(state("done")().final(), {}, {});
     expect(snap.done).toBe(true);
+  });
+
+  test("returns a copy of error.context, not the live reference (#226)", () => {
+    const ctx = { count: 0 };
+    const err: ErrorInfo = {
+      error: new Error("boom"),
+      state: state("root")(),
+      context: ctx,
+      event: { type: "GO" },
+      reason: "transition",
+    };
+    const snap = buildSnapshot(state("root")(), {}, {}, { error: err });
+    (snap.error!.context as { count: number }).count = 99;
+    expect(ctx.count).toBe(0);
+  });
+
+  test("region snapshots keep their identity (public contract)", () => {
+    const sub = { path: ["leaf"], context: {}, regions: {} } as Snapshot;
+    const snap = buildSnapshot(
+      state("root")(),
+      {
+        sub: { snapshot: () => sub },
+      },
+      {},
+    );
+    expect(snap.regions.sub).toBe(sub);
   });
 });
 
