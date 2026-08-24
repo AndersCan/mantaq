@@ -150,3 +150,52 @@ describe("harness", () => {
     expect(harness.snapshot().context.count).toBe(1);
   });
 });
+
+describe("harness with regions", () => {
+  test("coverage and assertions observe region child states and transitions", () => {
+    const childGo = event("CGO")();
+    const childIdle = state("cidle")();
+    const childDone = state("cdone")();
+    const doneEvt = event("CHILD_DONE")();
+
+    const child = new Actor({
+      inputs: [childGo],
+      outputs: [doneEvt],
+      states: [childIdle, childDone],
+      initial: childIdle,
+      setup: (m) => {
+        m.on(childIdle, childGo, () => ({ state: childDone, emit: [doneEvt.create()] }));
+      },
+    });
+
+    const parentIdle = state("pidle")();
+    const parentActive = state("pactive")();
+
+    const actor = new Actor({
+      inputs: [doneEvt],
+      states: [parentIdle, parentActive],
+      initial: parentIdle,
+      regions: { child },
+      setup: (m) => {
+        m.on(parentIdle, doneEvt, () => ({ state: parentActive }));
+      },
+    });
+
+    const harness = createTestHarness(actor);
+    harness.actor.regions.child.send(childGo.create());
+
+    expect(harness.history.visitedStates().has("child.cidle")).toBe(true);
+    expect(harness.history.visitedStates().has("child.cdone")).toBe(true);
+    expect(harness.history.firedTransitions().has("child.cidle:CGO")).toBe(true);
+
+    harness.assertAllStatesVisited();
+    harness.assertAllTransitionsVisited();
+
+    const cov = harness.coverage();
+    expect(cov.states.uncovered).not.toContain("child.cidle");
+    expect(cov.states.uncovered).not.toContain("child.cdone");
+    expect(cov.transitions.uncovered).not.toContain(
+      expect.objectContaining({ from: "child.cidle", event: "CGO" }),
+    );
+  });
+});

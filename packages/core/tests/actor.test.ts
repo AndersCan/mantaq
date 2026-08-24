@@ -1,6 +1,41 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, state, event, VirtualClock } from "../src/index.ts";
 
+describe("Actor.settled", () => {
+  test("settled waits for async effects spawned by other effects", async () => {
+    const idle = state("idle")();
+    const a = state("a")();
+    const b = state("b")();
+    const go = event("GO")();
+    const next = event("NEXT")();
+    const clock = new VirtualClock();
+    let bEffectRan = false;
+
+    const actor = new Actor({
+      clock,
+      inputs: [go],
+      internal: [next],
+      states: [idle, a, b],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: a }));
+        m.effect(a, ({ emit }) => Promise.resolve().then(() => emit(next.create())));
+        m.on(a, next, () => ({ state: b }));
+        m.effect(b, () =>
+          Promise.resolve().then(() => {
+            bEffectRan = true;
+          }),
+        );
+      },
+    });
+
+    actor.send(go.create());
+    await actor.settled();
+    expect(bEffectRan).toBe(true);
+    expect(actor.state.name).toBe("b");
+  });
+});
+
 describe("Actor dispatch resolution", () => {
   test("state handler wins over Any handler for same event", () => {
     const idle = state("idle")();
@@ -291,6 +326,40 @@ describe("Actor regions", () => {
     child.send(childGo.create());
     expect(parent.snapshot().path[0]).toBe("pactive");
     expect(parent.snapshot().regions.child.path[0]).toBe("cdone");
+  });
+
+  test("dispose cascades to region child actors", () => {
+    const childClock = new VirtualClock();
+    const cIdle = state("cidle")();
+    const parentIdle = state("pidle")();
+
+    const child = new Actor({
+      inputs: [],
+      states: [cIdle],
+      initial: cIdle,
+      clock: childClock,
+      setup: (m) => {
+        m.effect(cIdle, (input) => {
+          input.clock.setInterval(10, () => {}, { signal: input.signal });
+        });
+      },
+    });
+
+    const parent = new Actor({
+      inputs: [],
+      states: [parentIdle],
+      initial: parentIdle,
+      regions: { child },
+      setup: () => {},
+    });
+
+    expect(childClock.hasPending()).toBe(true);
+
+    parent.dispose();
+
+    expect(childClock.hasPending()).toBe(false);
+    child.send(cIdle.name as never);
+    expect(child.snapshot().path[0]).toBe("cidle");
   });
 });
 

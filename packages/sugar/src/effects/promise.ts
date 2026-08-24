@@ -8,8 +8,8 @@ export function withPromise<T>(
     success: (data: T) => { type: string; payload?: unknown };
     error: (err: unknown) => { type: string; payload?: unknown };
   },
-): void {
-  promise
+): Promise<void> {
+  return promise
     .then((data) => {
       if (!signal.aborted) emit(events.success(data));
     })

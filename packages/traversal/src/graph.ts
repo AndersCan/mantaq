@@ -1,5 +1,5 @@
 import type { AnyActor, Snapshot } from "@mantaq/core";
-import { Context } from "@mantaq/core";
+import { Context, StateRef } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import type {
   ActorGraph,
@@ -296,7 +296,11 @@ function buildForActor(
 
 function addInitialNode(actor: AnyActor<unknown>, nodes: GraphNode[], edges: GraphEdge[]): void {
   // AnyActor.options type lacks `initial` field — cast required (see actor-internal.ts)
-  const initialName = (actor.options as { initial?: { name?: string } })?.initial?.name;
+  const initial = (actor.options as { initial?: unknown })?.initial;
+  if (!initial) return;
+  const initialRef =
+    initial instanceof StateRef ? initial : (initial as { state?: { name?: string } })?.state;
+  const initialName = initialRef?.name;
   if (!initialName) return;
   const initNodeId = nodeId("", INITIAL_NODE_ID);
   const targetId = nodeId("", initialName);

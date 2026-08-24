@@ -33,7 +33,16 @@ export const Either = {
 
   from<R>(fn: () => R): Either<unknown, R> {
     try {
-      return [undefined, fn()];
+      const value = fn();
+      if (value === undefined || value === null) {
+        return [
+          new Error(
+            `[mantaq/utils] Either.from received ${value}; null and undefined are not valid Right values`,
+          ),
+          undefined,
+        ];
+      }
+      return [undefined, value];
     } catch (error) {
       return [error ?? new Error("thrown value was undefined"), undefined];
     }

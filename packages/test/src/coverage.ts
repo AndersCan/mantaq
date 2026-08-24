@@ -16,8 +16,8 @@ export function computeCoverage(graph: ActorGraph, history: History): CoverageRe
   );
 
   const statesTotal = graphNodes.length;
-  const statesVisited = graphNodes.filter((n) => visitedStates.has(n.label)).length;
-  const statesUncovered = graphNodes.filter((n) => !visitedStates.has(n.label)).map((n) => n.label);
+  const statesVisited = graphNodes.filter((n) => visitedStates.has(n.id)).length;
+  const statesUncovered = graphNodes.filter((n) => !visitedStates.has(n.id)).map((n) => n.id);
 
   const transitionsTotal = graphEdges.length;
   const transitionsVisited = graphEdges.filter((e) =>

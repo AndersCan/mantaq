@@ -223,8 +223,24 @@ export class Actor<
     return dispatch[event](fn);
   }
 
+  /**
+   * Resolve once the queue is drained and every in-flight async effect has
+   * settled — including effects spawned by other effects. Because an async
+   * effect can emit an internal event that transitions into a state whose own
+   * effect is also async (and is therefore pushed onto `#pendingEffects` after
+   * this call captured its snapshot), `settled()` re-checks and keeps awaiting
+   * while new effects are added.
+   */
   settled(): Promise<void> {
-    return Promise.all([this.#queue.settled(), ...this.#pendingEffects]).then(() => undefined);
+    return this.#queue.settled().then(() => {
+      if (this.#pendingEffects.length === 0) return;
+      return Promise.all(this.#pendingEffects).then(() => this.settled());
+    });
+  }
+
+  /** Count of async-effect promises still awaiting settlement. Introspection. */
+  pendingEffectCount(): number {
+    return this.#pendingEffects.length;
   }
 
   send(event: CreatedOf<Inputs[number]>): void {
@@ -239,9 +255,11 @@ export class Actor<
    */
   recover(target: { state: States[number]; context: ActorContext }): void {
     if (this.#error === null || this.#disposed) return;
-    this.#error = null;
-    this.#queue = new InternalQueue();
+    this.#effectAbort?.abort();
     this.#effectAbort = null;
+    this.#queue.clear();
+    this.#queue = new InternalQueue();
+    this.#error = null;
     this.state = target.state;
     this.#statePayload = undefined;
     this.#context = target.context;
@@ -430,7 +448,15 @@ export class Actor<
       lastGood,
       onError: (error: unknown) => this.#enterError("effect", event, error, lastGood),
     });
-    this.#pendingEffects.push(...result.pending);
+    for (const p of result.pending) {
+      this.#pendingEffects.push(p);
+      void p
+        .finally(() => {
+          const i = this.#pendingEffects.indexOf(p);
+          if (i !== -1) this.#pendingEffects.splice(i, 1);
+        })
+        .catch(() => {});
+    }
   }
 
   #drainInternal(): void {
@@ -470,7 +496,7 @@ export class Actor<
   #entry: LastKnownState | null = null;
 
   #safe(reason: ErrorReason, event: InternalEvent, fn: () => void): boolean {
-    const attempt = Either.from(fn);
+    const attempt = Either.from(() => (fn(), true));
     if (attempt[0] === undefined) return true;
     this.#enterError(reason, event, attempt[0]);
     return false;
@@ -508,8 +534,11 @@ export class Actor<
     this.#disposed = true;
     this.#effectAbort?.abort();
     this.#effectAbort = null;
+    for (const child of Object.values(this.#regions)) child.dispose();
+    this.#regions = {};
     this.#queue.clear();
     this.#subs.clear();
+    this.#pendingEffects = [];
   }
 
   #disposed = false;

@@ -6,8 +6,8 @@ export function assertAllStatesVisited(graph: ActorGraph, history: History): voi
   const visited = history.visitedStates();
   const missing = graph.nodes
     .filter((n) => n.id !== INITIAL_NODE_ID)
-    .filter((n) => !visited.has(n.label))
-    .map((n) => n.label);
+    .filter((n) => !visited.has(n.id))
+    .map((n) => n.id);
   if (missing.length > 0) {
     throw new Error(`assertAllStatesVisited failed: states not visited: ${missing.join(", ")}`);
   }

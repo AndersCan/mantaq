@@ -29,6 +29,7 @@
     "prepack": "vp run build"
   },
   "dependencies": {
+    "@mantaq/utils": "workspace:*",
     "fast-check": "catalog:"
   },
   "devDependencies": {

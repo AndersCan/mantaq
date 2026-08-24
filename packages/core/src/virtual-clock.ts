@@ -1,6 +1,15 @@
 import type { Clock } from "./clock.ts";
 import { trackAbort, clearAbort, type Abortable } from "./abort-tracker.ts";
 
+/**
+ * Safety net for `advance()`: a timer callback that synchronously re-arms a
+ * same-deadline (e.g. `setTimeout(0)`) timer would otherwise keep the firing
+ * loop spinning forever. Legitimate schedules resolve in far fewer iterations,
+ * so this bound only ever trips on a pathological re-arm chain and lets
+ * `advance()` return, leaving the surplus timers for a later advance.
+ */
+const MAX_ADVANCE_ITERATIONS = 1_000_000;
+
 interface TimerEntry extends Abortable {
   deadline: number;
   cb: () => void;
@@ -143,7 +152,8 @@ export class VirtualClock implements Clock {
     }
     const target = this.#now + Math.max(0, ms);
 
-    while (true) {
+    let iterations = 0;
+    while (iterations++ < MAX_ADVANCE_ITERATIONS) {
       const deadline = this.#findEarliestDeadline(target);
       if (deadline === null) break;
       this.#now = deadline;

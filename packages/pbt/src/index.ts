@@ -1,16 +1,36 @@
 import fc from "fast-check";
+import { Either } from "@mantaq/utils";
 
 export const SEED_ENV = "MANTAQ_SEED";
 export const DEFAULT_SEED = 0x1a51e;
 
-const seed = Number(process.env[SEED_ENV] ?? DEFAULT_SEED);
+export interface SeedError {
+  readonly kind: "invalid-seed";
+  readonly raw: string;
+  readonly message: string;
+}
 
-fc.configureGlobal({
-  seed,
-  numRuns: 100,
-  endOnFailure: true,
-  verbose: 1,
-});
+export function parseSeed(raw: string | undefined): Either<SeedError, number> {
+  if (raw === undefined || raw === "") return Either.right(DEFAULT_SEED);
+  const n = Number(raw);
+  if (!Number.isInteger(n)) {
+    return Either.left<SeedError>({
+      kind: "invalid-seed",
+      raw,
+      message: `MANTAQ_SEED must be an integer, got ${JSON.stringify(raw)}`,
+    });
+  }
+  return Either.right(n);
+}
+
+const seedResult = parseSeed(process.env[SEED_ENV]);
+
+export const seedError = Either.getLeft(seedResult);
+
+const globalConfig = { numRuns: 100, endOnFailure: true, verbose: 1 } as const;
+
+const validSeed = Either.getRight(seedResult);
+fc.configureGlobal(validSeed === undefined ? globalConfig : { seed: validSeed, ...globalConfig });
 
 export { fc };
 export type { Arbitrary } from "fast-check";

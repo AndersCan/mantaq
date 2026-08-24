@@ -4,6 +4,10 @@ import type { AnyActor } from "@mantaq/core";
 import { ActorMap } from "../src/actors/actor-map.ts";
 import { broadcast } from "../src/transitions/broadcast.ts";
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe("ActorMap", () => {
   function makeActor(id: string) {
     const toggle = event("toggle")();
@@ -290,6 +294,113 @@ describe("ActorMap", () => {
     map.spawn("a");
     map.send("a", toggle.create());
     expect(map.has("a")).toBe(false);
+  });
+
+  test("autoReap disposes completed children and unsubscribes the done observer", async () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")().final();
+
+    const children: Array<{
+      actor: AnyActor;
+      wasDisposed: () => boolean;
+      doneSubs: () => number;
+    }> = [];
+
+    const map = new ActorMap(
+      (id) => {
+        const actor = new Actor({
+          inputs: [toggle],
+          context: { id },
+          states: [off, on],
+          initial: off,
+          setup: (m) => m.on(off, toggle, () => ({ state: on })),
+        });
+        let disposed = false;
+        let doneSubs = 0;
+        const origOn = actor.on.bind(actor);
+        actor.on = ((event: string, fn: () => void) => {
+          const off = origOn(event as "done", fn);
+          if (event === "done") {
+            doneSubs++;
+            return () => {
+              off();
+              doneSubs--;
+            };
+          }
+          return off;
+        }) as typeof actor.on;
+        const origDispose = actor.dispose.bind(actor);
+        actor.dispose = () => {
+          disposed = true;
+          origDispose();
+        };
+        const tracked = {
+          actor,
+          wasDisposed: () => disposed,
+          doneSubs: () => doneSubs,
+        };
+        children.push(tracked);
+        return actor;
+      },
+      { autoReap: true },
+    );
+
+    for (let i = 0; i < 10; i++) {
+      map.spawn(`h${i}`);
+      map.send(`h${i}`, toggle.create());
+    }
+
+    expect(map.size).toBe(0);
+    await flush();
+    for (const child of children) {
+      expect(child.wasDisposed()).toBe(true);
+      expect(child.doneSubs()).toBe(0);
+    }
+  });
+
+  test("autoReap does not dispose a child that is still running", () => {
+    const toggle = event("toggle")();
+    const off = state("off")();
+    const on = state("on")().final();
+
+    let disposed = false;
+    let doneSubs = 0;
+    const map = new ActorMap(
+      (id) => {
+        const actor = new Actor({
+          inputs: [toggle],
+          context: {},
+          states: [off, on],
+          initial: off,
+          setup: (m) => m.on(off, toggle, () => ({ state: on })),
+        });
+        const origOn = actor.on.bind(actor);
+        actor.on = ((event: string, fn: () => void) => {
+          const off = origOn(event as "done", fn);
+          if (event === "done") {
+            doneSubs++;
+            return () => {
+              off();
+              doneSubs--;
+            };
+          }
+          return off;
+        }) as typeof actor.on;
+        const origDispose = actor.dispose.bind(actor);
+        actor.dispose = () => {
+          disposed = true;
+          origDispose();
+        };
+        return actor;
+      },
+      { autoReap: true },
+    );
+
+    map.spawn("a");
+    expect(disposed).toBe(false);
+    expect(doneSubs).toBe(1);
+    expect(map.has("a")).toBe(true);
   });
 
   test("broadcast sends event to all children", () => {
