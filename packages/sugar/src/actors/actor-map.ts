@@ -34,6 +34,7 @@ export class ActorMap implements SendableMap<SendableEvent> {
     if (this.#autoReap) {
       if (child.snapshot().done) {
         this.#actors.delete(key);
+        void Promise.resolve().then(() => child.dispose());
         return;
       }
       const off = child.on("done", () => {
