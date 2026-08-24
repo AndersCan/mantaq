@@ -97,17 +97,19 @@ class Actor<
 
 ### Methods
 
-| Method             | Signature                                    | What                                                        |
-| ------------------ | -------------------------------------------- | ----------------------------------------------------------- |
-| `send(event)`      | `(event: CreatedOf<Inputs[number]>) => void` | Send event                                                  |
-| `inject(event)`    | `(event: InternalEvent) => void`             | Push an internal event and drain (tests/embedders)          |
-| `dispose()`        | `() => void`                                 | Stop: abort effect, clear queue + subscribers               |
-| `snapshot()`       | `() => Snapshot`                             | State tree                                                  |
-| `on("change", fn)` | `(fn) => () => void`                         | State or context changed (`(snap, prev) => void`)           |
-| `on("done", fn)`   | `(fn) => () => void`                         | Final or error state                                        |
-| `on("error", fn)`  | `(fn) => () => void`                         | Death signal, seeded to late subscribers (`(info) => void`) |
-| `on("output", fn)` | `(fn) => () => void`                         | Emitted output event (`(event) => void`)                    |
-| `settled()`        | `() => Promise<void>`                        | Queue drained                                               |
+| Method                 | Signature                                    | What                                                        |
+| ---------------------- | -------------------------------------------- | ----------------------------------------------------------- |
+| `send(event)`          | `(event: CreatedOf<Inputs[number]>) => void` | Send event                                                  |
+| `inject(event)`        | `(event: InternalEvent) => void`             | Push an internal event and drain (tests/embedders)          |
+| `dispose()`            | `() => void`                                 | Stop: abort effect, clear queue + subscribers               |
+| `recover(target)`      | `(target: { state; context }) => void`       | Restart a dead machine from caller-supplied state           |
+| `snapshot()`           | `() => Snapshot`                             | State tree                                                  |
+| `on("change", fn)`     | `(fn) => () => void`                         | State or context changed (`(snap, prev) => void`)           |
+| `on("done", fn)`       | `(fn) => () => void`                         | Final or error state                                        |
+| `on("error", fn)`      | `(fn) => () => void`                         | Death signal, seeded to late subscribers (`(info) => void`) |
+| `on("output", fn)`     | `(fn) => () => void`                         | Emitted output event (`(event) => void`)                    |
+| `settled()`            | `() => Promise<void>`                        | Queue drained                                               |
+| `pendingEffectCount()` | `() => number`                               | In-flight effects not yet settled (introspection)           |
 
 ### Properties
 
