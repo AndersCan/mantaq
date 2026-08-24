@@ -66,6 +66,18 @@ describe("VirtualClock directed mutation tests", () => {
     expect(drained).toBe(1);
   });
 
+  test("setDrain runs every registered drain, not just the last", () => {
+    const clock = new VirtualClock();
+    let a = 0;
+    let b = 0;
+    clock.setDrain(() => a++);
+    clock.setDrain(() => b++);
+    clock.setTimeout(10, () => {});
+    clock.advance(100);
+    expect(a).toBe(1);
+    expect(b).toBe(1);
+  });
+
   test("pendingTimers reports remaining ms after partial advance", () => {
     const clock = new VirtualClock();
     clock.advance(5);

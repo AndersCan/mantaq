@@ -27,7 +27,7 @@ export class VirtualClock implements Clock {
   #timers = new Map<number, TimerEntry>();
   #intervals = new Map<number, IntervalEntry>();
   #nextId = 1;
-  #drain: (() => void) | null = null;
+  #drains = new Set<() => void>();
 
   now(): number {
     return this.#now;
@@ -162,7 +162,7 @@ export class VirtualClock implements Clock {
     }
 
     this.#now = target;
-    this.#drain?.();
+    for (const drain of this.#drains) drain();
   }
 
   hasPending(): boolean {
@@ -177,7 +177,12 @@ export class VirtualClock implements Clock {
     return result;
   }
 
+  /**
+   * Register a post-advance drain callback. Multiple actors can share one
+   * `VirtualClock`; every registered drain runs (not just the last one), so
+   * each actor is flushed regardless of construction order.
+   */
   setDrain(fn: () => void): void {
-    this.#drain = fn;
+    this.#drains.add(fn);
   }
 }
