@@ -67,19 +67,36 @@ export function allPaths(graph: ActorGraph, fromId: string, toId: string): strin
   return results;
 }
 
-// FIXME: dfsWalk dedup for allPaths/findCycles — path-tracking diverges, needs param
 export function findCycles(graph: ActorGraph): string[][] {
   const adj = buildAdjacency(graph);
   const cycles: string[][] = [];
+  const seen = new Set<string>();
   const visited: Record<string, boolean> = {};
   const inStack: Record<string, boolean> = {};
   const path: string[] = [];
+
+  function rotateToMin(cycle: string[]): string {
+    // `cycle` ends with its start node (e.g. ["a","b","a"]); the body is every
+    // element but the last. Rotate the body so it starts at the lexicographically
+    // smallest id, giving every rotation of a cycle the same canonical key.
+    const body = cycle.slice(0, -1);
+    let min = 0;
+    for (let i = 1; i < body.length; i++) {
+      if (body[i] < body[min]) min = i;
+    }
+    return body.slice(min).concat(body.slice(0, min)).join(":");
+  }
 
   function dfs(node: string): void {
     if (inStack[node]) {
       const cycleStart = path.indexOf(node);
       if (cycleStart !== -1) {
-        cycles.push(path.slice(cycleStart).concat(node));
+        const cycle = path.slice(cycleStart).concat(node);
+        const key = rotateToMin(cycle);
+        if (!seen.has(key)) {
+          seen.add(key);
+          cycles.push(cycle);
+        }
       }
       return;
     }

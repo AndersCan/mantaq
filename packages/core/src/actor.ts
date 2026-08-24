@@ -223,8 +223,19 @@ export class Actor<
     return dispatch[event](fn);
   }
 
+  /**
+   * Resolve once the queue is drained and every in-flight async effect has
+   * settled — including effects spawned by other effects. Because an async
+   * effect can emit an internal event that transitions into a state whose own
+   * effect is also async (and is therefore pushed onto `#pendingEffects` after
+   * this call captured its snapshot), `settled()` re-checks and keeps awaiting
+   * while new effects are added.
+   */
   settled(): Promise<void> {
-    return Promise.all([this.#queue.settled(), ...this.#pendingEffects]).then(() => undefined);
+    return this.#queue.settled().then(() => {
+      if (this.#pendingEffects.length === 0) return;
+      return Promise.all(this.#pendingEffects).then(() => this.settled());
+    });
   }
 
   /** Count of async-effect promises still awaiting settlement. Introspection. */

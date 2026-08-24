@@ -4,9 +4,10 @@ import { trackAbort, clearAbort, type Abortable } from "./abort-tracker.ts";
 /**
  * Safety net for `advance()`: a timer callback that synchronously re-arms a
  * same-deadline (e.g. `setTimeout(0)`) timer would otherwise keep the firing
- * loop spinning forever. Legitimate schedules resolve in far fewer iterations,
- * so this bound only ever trips on a pathological re-arm chain and lets
- * `advance()` return, leaving the surplus timers for a later advance.
+ * loop spinning forever. The bound therefore counts *consecutive* firings at
+ * the same deadline — legitimate schedules (timers/intervals with distinct,
+ * ever-advancing deadlines) fire in full, while a pathological same-deadline
+ * re-arm chain is cut off so `advance()` can return.
  */
 const MAX_ADVANCE_ITERATIONS = 1_000_000;
 
@@ -27,7 +28,7 @@ export class VirtualClock implements Clock {
   #timers = new Map<number, TimerEntry>();
   #intervals = new Map<number, IntervalEntry>();
   #nextId = 1;
-  #drain: (() => void) | null = null;
+  #drains = new Set<() => void>();
 
   now(): number {
     return this.#now;
@@ -152,17 +153,24 @@ export class VirtualClock implements Clock {
     }
     const target = this.#now + Math.max(0, ms);
 
-    let iterations = 0;
-    while (iterations++ < MAX_ADVANCE_ITERATIONS) {
+    let lastDeadline = -1;
+    let sameDeadlineIterations = 0;
+    while (true) {
       const deadline = this.#findEarliestDeadline(target);
       if (deadline === null) break;
+      if (deadline === lastDeadline) {
+        if (++sameDeadlineIterations >= MAX_ADVANCE_ITERATIONS) break;
+      } else {
+        sameDeadlineIterations = 0;
+        lastDeadline = deadline;
+      }
       this.#now = deadline;
       this.#fireTimersAt(deadline);
       this.#fireIntervalsAt(deadline);
     }
 
     this.#now = target;
-    this.#drain?.();
+    for (const drain of this.#drains) drain();
   }
 
   hasPending(): boolean {
@@ -177,7 +185,12 @@ export class VirtualClock implements Clock {
     return result;
   }
 
+  /**
+   * Register a post-advance drain callback. Multiple actors can share one
+   * `VirtualClock`; every registered drain runs (not just the last one), so
+   * each actor is flushed regardless of construction order.
+   */
   setDrain(fn: () => void): void {
-    this.#drain = fn;
+    this.#drains.add(fn);
   }
 }

@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, afterEach } from "vite-plus/test";
-import { Actor, event, state } from "@mantaq/core";
+import { Actor, event, state, type AnyActor } from "@mantaq/core";
 import { ActorMap } from "../src/actors/actor-map.ts";
 
 describe("ActorMap mutation tests", () => {
@@ -379,5 +379,37 @@ describe("ActorMap autoReap directed mutation tests", () => {
     map.spawn("a");
     map.send("a", toggle.create());
     expect(map.has("a")).toBe(false);
+  });
+
+  test("autoReap disposes a child already final at spawn", async () => {
+    const start = state("start")();
+    const done = state("done")().final();
+    const go = event("GO")();
+    let child: AnyActor | undefined;
+    const disposed = vi.fn();
+    const map = new ActorMap(
+      () => {
+        child = new Actor({
+          inputs: [],
+          internal: [go],
+          context: {},
+          states: [start, done],
+          initial: start,
+          setup: (m) => {
+            m.on(start, go, () => ({ state: done }));
+            m.effect(start, ({ emit }) => emit(go.create()));
+          },
+        });
+        return child;
+      },
+      { autoReap: true },
+    );
+    map.spawn("x");
+    if (child) vi.spyOn(child, "dispose").mockImplementation(disposed);
+    expect(map.has("x")).toBe(false);
+    // disposal is deferred to a microtask to avoid reentrancy during spawn
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(disposed).toHaveBeenCalled();
   });
 });

@@ -122,6 +122,21 @@ describe("findCycles", () => {
     expect(hasABC).toBe(true);
   });
 
+  test("a 2-node cycle is reported once, not once per rotation", () => {
+    const graph: ActorGraph = {
+      nodes: [
+        { id: "A", label: "A", isActive: true, isFinal: false },
+        { id: "B", label: "B", isActive: false, isFinal: false },
+      ],
+      edges: [
+        { id: "a-b", source: "A", target: "B", label: "x", isActive: true },
+        { id: "b-a", source: "B", target: "A", label: "y", isActive: false },
+      ],
+    };
+    const cycles = findCycles(graph);
+    expect(cycles.length).toBe(1);
+  });
+
   test("multiple cycles", () => {
     const cycles = findCycles(multiCycleGraph());
     expect(cycles.length).toBeGreaterThanOrEqual(2);
