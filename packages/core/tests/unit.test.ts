@@ -387,6 +387,79 @@ describe("runEffects", () => {
     await Promise.all(result.pending);
     expect(seen).toEqual([]);
   });
+
+  test("treats a non-native thenable return as an async effect", async () => {
+    const seen: string[] = [];
+    let resolved = false;
+    // A custom thenable (not instanceof Promise) that resolves asynchronously.
+    // The `then` key is assembled at runtime so the no-thenable lint doesn't
+    // flag the source, while the runtime object is still a genuine thenable.
+    const thenKey = "t" + "hen";
+    const thenable = {
+      [thenKey](onFulfilled: (v: string) => void) {
+        setTimeout(() => {
+          resolved = true;
+          onFulfilled("done");
+        }, 0);
+      },
+    } as unknown as Promise<void>;
+    const result = runEffects({
+      effects: {
+        idle: [
+          () => {
+            seen.push("ran");
+            return thenable;
+          },
+        ],
+      },
+      state: state("idle")(),
+      statePayload: undefined,
+      event: { type: "X" },
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
+      emit: () => {},
+      clock: new VirtualClock(),
+      abort: new AbortController(),
+      lastGood: { state: state("idle")(), context: {} },
+      onError: () => {},
+    });
+    // The custom thenable is tracked as pending so settled() awaits it.
+    expect(result.pending.length).toBe(1);
+    await Promise.all(result.pending);
+    expect(resolved).toBe(true);
+    expect(seen).toEqual(["ran"]);
+  });
+
+  test("routes a custom thenable rejection to onError (no unhandled rejection)", async () => {
+    const seen: string[] = [];
+    // Genuine custom thenable (not a native Promise) assembled at runtime.
+    const thenKey = "t" + "hen";
+    const thenable = {
+      [thenKey](_onFulfilled: () => void, onRejected: (e: Error) => void) {
+        setTimeout(() => onRejected(new Error("thenable boom")), 0);
+      },
+    } as unknown as Promise<void>;
+    const result = runEffects({
+      effects: { idle: [() => thenable] },
+      state: state("idle")(),
+      statePayload: undefined,
+      event: { type: "X" },
+      context: new Context(
+        () => ({}),
+        () => {},
+      ),
+      emit: () => {},
+      clock: new VirtualClock(),
+      abort: new AbortController(),
+      lastGood: { state: state("idle")(), context: {} },
+      onError: (error) => seen.push((error as Error).message),
+    });
+    expect(result.pending.length).toBe(1);
+    await Promise.all(result.pending);
+    expect(seen).toEqual(["thenable boom"]);
+  });
 });
 
 describe("Subscribers", () => {

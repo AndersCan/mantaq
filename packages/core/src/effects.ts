@@ -47,13 +47,29 @@ export function runEffects<ActorContext>(
       options.onError(attempt[0], options.lastGood);
       break;
     }
-    if (out instanceof Promise) {
-      pending.push(
-        out.catch((error: unknown) => {
+    // A native Promise or any thenable (custom implementation, e.g. a library
+    // deferred) is an async effect: it must be awaited by settled(), have its
+    // rejection handled (no unhandled rejection), and route to onError.
+    // `Promise.resolve` adopts a custom thenable without re-wrapping a native
+    // Promise.
+    const isThenable =
+      out instanceof Promise ||
+      (typeof out === "object" &&
+        out !== null &&
+        typeof (out as { then?: unknown }).then === "function");
+    if (isThenable) {
+      // `Promise.resolve` adopts a custom thenable without re-wrapping a native
+      // Promise. The rejection handler routes to onError (and is swallowed when
+      // the effect was aborted), so a rejecting thenable can't become an
+      // unhandled rejection.
+      const effectPromise = Promise.resolve(out as Promise<unknown>).then(
+        () => undefined,
+        (error: unknown) => {
           if (options.abort.signal.aborted) return;
           options.onError(error, options.lastGood);
-        }),
+        },
       );
+      pending.push(effectPromise);
     }
   }
   return { pending };
