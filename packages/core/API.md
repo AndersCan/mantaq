@@ -47,8 +47,12 @@ class Actor<
     event: "transition",
     fn: (info: { event: InternalEvent; from: string; to: string }) => void,
   ): () => void;
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on(event: "output", fn: (event: InternalEvent) => void): () => void;
+  inject(event: InternalEvent): void;
   recover(target: { state: States[number]; context: ActorContext }): void;
   settled(): Promise<void>;
+  dispose(): void;
 }
 const a = new Actor({
   inputs: [click],
@@ -283,6 +287,44 @@ actor.on("transition", ({ event, from, to, transitioned }) => {
 });
 ```
 
+### on("error", fn)
+
+Fired once when the machine dies into the error state, with the `ErrorInfo` describing why. Pair it with `recover` for app-level recovery, or with `snapshot().error` for read-only observation (the error state is terminal — `done` is also set). Like all subscribers, a throw inside the handler is swallowed and never affects the machine.
+
+```ts
+actor.on("error", (info) => {
+  console.error(`died on ${info.event.type}:`, info.error);
+});
+```
+
+### on("output", fn)
+
+Fires for **output** events — events whose type is not a declared input or internal event. The primary source is regions: a parent actor automatically receives each child's declared outputs here (the child→parent wiring is built in). Any event pushed via `inject` whose type is neither an input nor an internal type also routes to output subscribers. This is the seam for fanning child work back up to a coordinator.
+
+```ts
+actor.on("output", (event) => {
+  console.log(`child emitted ${event.type}`, event.payload);
+});
+```
+
+### inject
+
+Push an event into the machine's internal queue and drain. If the event's type is a declared input or internal event it is dispatched like any other event; otherwise it routes to `on("output")` subscribers. It is the external bridge for feeding the machine events that originate outside the normal `send` path — e.g. a timer, a network callback, or a test harness. No-op once the actor is `dispose`d.
+
+```ts
+actor.inject(sync.create({ peer: "alice" })); // declared internal/input -> dispatched
+actor.inject(custom.create()); // undeclared type -> on("output")
+```
+
+### dispose
+
+Permanently stop the actor: abort the effect signal, clear the queue and every subscriber, and dispose all child regions. After disposal, `send` and `inject` are no-ops. Call it when the machine is no longer needed (for example, on UI unmount in an app built with justus) so effect resources and child actors are released.
+
+```ts
+actor.dispose();
+actor.send(click.create()); // ignored
+```
+
 ### AnyActor
 
 Structural handle for any actor — regions, `context`, and `options`. `context` is the raw current value; write through the handler `context.set()` instead.
@@ -298,8 +340,12 @@ interface AnyActor<C = Record<string, unknown>> {
   on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
   on(event: "done", fn: () => void): () => void;
   on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
+  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on(event: "output", fn: (event: InternalEvent) => void): () => void;
+  inject(event: InternalEvent): void;
   recover(target: { state: AnyStateRef; context: C }): void;
   settled(): Promise<void>;
+  dispose(): void;
   options?: {
     transitions?: Record<string, Record<string, unknown>>;
     effects?: Record<string, unknown[]>;
