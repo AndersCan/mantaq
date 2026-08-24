@@ -1,6 +1,41 @@
 import { expect, test, describe } from "vite-plus/test";
 import { Actor, state, event, VirtualClock } from "../src/index.ts";
 
+describe("Actor.settled", () => {
+  test("settled waits for async effects spawned by other effects", async () => {
+    const idle = state("idle")();
+    const a = state("a")();
+    const b = state("b")();
+    const go = event("GO")();
+    const next = event("NEXT")();
+    const clock = new VirtualClock();
+    let bEffectRan = false;
+
+    const actor = new Actor({
+      clock,
+      inputs: [go],
+      internal: [next],
+      states: [idle, a, b],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: a }));
+        m.effect(a, ({ emit }) => Promise.resolve().then(() => emit(next.create())));
+        m.on(a, next, () => ({ state: b }));
+        m.effect(b, () =>
+          Promise.resolve().then(() => {
+            bEffectRan = true;
+          }),
+        );
+      },
+    });
+
+    actor.send(go.create());
+    await actor.settled();
+    expect(bEffectRan).toBe(true);
+    expect(actor.state.name).toBe("b");
+  });
+});
+
 describe("Actor dispatch resolution", () => {
   test("state handler wins over Any handler for same event", () => {
     const idle = state("idle")();
