@@ -239,4 +239,15 @@ describe("VirtualClock directed mutation tests", () => {
     expect(fires).toBeGreaterThan(0);
     expect(clock.now()).toBe(1000);
   });
+
+  test("a long advance with a short interval fires every period, not just up to the cap", () => {
+    const clock = new VirtualClock();
+    let fires = 0;
+    clock.setInterval(1, () => {
+      fires++;
+    });
+    clock.advance(2_000_000);
+    expect(fires).toBe(2_000_000);
+    expect(clock.now()).toBe(2_000_000);
+  });
 });
