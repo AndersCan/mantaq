@@ -102,6 +102,85 @@ describe("ActorMap", () => {
     expect(() => map.kill("nonexistent")).not.toThrow();
   });
 
+  test("dispose tears down every live child and clears the map", () => {
+    const tracked: Array<{ wasDisposed: () => boolean }> = [];
+    const map = new ActorMap((id) => {
+      const actor = makeActor(id).actor;
+      let disposed = false;
+      const orig = actor.dispose.bind(actor);
+      actor.dispose = () => {
+        disposed = true;
+        orig();
+      };
+      tracked.push({ wasDisposed: () => disposed });
+      return actor;
+    });
+    map.spawn("a");
+    map.spawn("b");
+    expect(map.size).toBe(2);
+
+    map.dispose();
+
+    expect(map.size).toBe(0);
+    expect(map.keys()).toEqual([]);
+    for (const child of tracked) {
+      expect(child.wasDisposed()).toBe(true);
+    }
+  });
+
+  test("dispose unsubscribes autoReap done observers", () => {
+    const off = state("off")();
+    const on = state("on")().final();
+    const toggle = event("toggle")();
+    let doneSubs = 0;
+    const map = new ActorMap(
+      () => {
+        const actor = new Actor({
+          inputs: [toggle],
+          context: {},
+          states: [off, on],
+          initial: off,
+          setup: (m) => m.on(off, toggle, () => ({ state: on })),
+        });
+        const origOn = actor.on.bind(actor);
+        actor.on = ((event: string, fn: () => void) => {
+          const off = origOn(event as "done", fn);
+          if (event === "done") {
+            doneSubs++;
+            return () => {
+              off();
+              doneSubs--;
+            };
+          }
+          return off;
+        }) as typeof actor.on;
+        return actor;
+      },
+      { autoReap: true },
+    );
+    map.spawn("a");
+    expect(doneSubs).toBe(1);
+
+    map.dispose();
+
+    expect(doneSubs).toBe(0);
+    expect(map.size).toBe(0);
+  });
+
+  test("dispose is safe to call on an empty map", () => {
+    const map = actorMap();
+    expect(() => map.dispose()).not.toThrow();
+    expect(map.size).toBe(0);
+  });
+
+  test("dispose is idempotent", () => {
+    const map = actorMap();
+    map.spawn("a");
+    map.dispose();
+    expect(() => map.dispose()).not.toThrow();
+    expect(map.size).toBe(0);
+  });
+
   test("kill aborts child effects", () => {
     const clock = new VirtualClock();
     const toggle = event("toggle")();
