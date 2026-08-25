@@ -1,4 +1,4 @@
-import { test, describe } from "vite-plus/test";
+import { test, describe, expect } from "vite-plus/test";
 import { fc, anyName, anyPayload, anySnapshot, runProperty } from "@mantaq/pbt";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
@@ -27,6 +27,50 @@ describe("event ref property tests", () => {
       if (ref.is(42)) return false;
       return true;
     });
+  });
+
+  // Soundness of the per-type symbol brand (#262): the brand must be the only
+  // thing `is()` trusts, so only envelopes minted by `create()` pass — and only
+  // for their own type. These directed assertions back the mutation gate.
+  test("same-type ref accepts its own create() and rejects another type's", () => {
+    const a = event("A")<void>();
+    const b = event("B")<void>();
+    expect(a.is(a.create())).toBe(true);
+    expect(b.is(b.create())).toBe(true);
+    // A must not accept B's envelope (brand is per-type, not just `type` string)
+    expect(a.is(b.create())).toBe(false);
+    expect(b.is(a.create())).toBe(false);
+  });
+
+  test("two refs of the same type share one cached brand", () => {
+    const a1 = event("A")<void>();
+    const a2 = event("A")<void>();
+    expect(a1.is(a2.create())).toBe(true);
+    expect(a2.is(a1.create())).toBe(true);
+  });
+
+  test("is() rejects non-objects and untyped hand-built objects", () => {
+    const a = event("A")<void>();
+    expect(a.is(null)).toBe(false);
+    expect(a.is(42)).toBe(false);
+    expect(a.is("A")).toBe(false);
+    expect(a.is({})).toBe(false);
+    // hand-built envelope has no brand, so it must be rejected
+    expect(a.is({ type: "A" })).toBe(false);
+  });
+
+  test("create() keeps payload semantics for with/without payload", () => {
+    const a = event("A")<{ n: number }>();
+    expect(a.create()).toEqual({ type: "A" });
+    expect(a.create({ n: 1 })).toEqual({ type: "A", payload: { n: 1 } });
+    expect(a.is(a.create({ n: 1 }))).toBe(true);
+  });
+
+  test("brand is non-enumerable (stays out of the observable shape)", () => {
+    const a = event("A")<void>();
+    const env = a.create();
+    expect(Object.keys(env)).toEqual(["type"]);
+    expect(JSON.parse(JSON.stringify(env))).toEqual({ type: "A" });
   });
 });
 

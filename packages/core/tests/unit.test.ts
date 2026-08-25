@@ -596,7 +596,10 @@ describe("event ref", () => {
 
   test("is matches by id", () => {
     const a = event("A")<{ x: number }>();
-    expect(a.is({ type: "A", x: 1 })).toBe(true);
+    // Only envelopes produced by create() carry the private brand, so is() is
+    // sound: a hand-built object fails the guard (see #240 / #262).
+    expect(a.is(a.create({ x: 1 }))).toBe(true);
+    expect(a.is({ type: "A", x: 1 })).toBe(false);
     expect(a.is({ type: "B" })).toBe(false);
     expect(a.is(null)).toBe(false);
     expect(a.is(42)).toBe(false);
