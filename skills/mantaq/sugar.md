@@ -29,7 +29,6 @@ const dangerous = tag(state("attack")(), state("regen")());
 dangerous.has(actor.snapshot());
 ```
 
-
 ## Dynamic Children (ActorMap)
 
 Spawn/kill actors by key at runtime. Children wire output → parent.

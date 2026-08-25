@@ -189,7 +189,6 @@ for event "X" in state "Y". Event dropped.` warning. That warning =
 - Model errors as states and events, not exceptions. Recoverable errors → non-final states with retry. Terminal failures → final states.
 - Test with the VirtualClock and the `@mantaq/test` harness. See `testing.md`.
 
-
 ## Sugar (pointer)
 
 Helpers: `states()`, `events()`, `matches()`, `ActorMap`, `broadcast()`, `withTimeout()`, `withPromise()`, `tag()`, `isIn()`, `activeLeaves()`. Signatures in `sugar.md`.
