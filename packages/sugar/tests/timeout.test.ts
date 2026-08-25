@@ -191,8 +191,11 @@ describe("withTimeout — timer lifecycle", () => {
     m.on(idle, start, () => ({ state: loading }));
   });
   const timeoutPart = definePart<typeof spec>((m) => {
-    m.effect(loading, (input) => {
-      withTimeout(1000, input, () => slow.create());
+    m.effect(loading, {
+      name: "startTimeoutTimer",
+      fn: (input) => {
+        withTimeout(1000, input, () => slow.create());
+      },
     });
     m.on(loading, slow, () => ({ state: failed }));
   });

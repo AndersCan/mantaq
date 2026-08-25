@@ -61,6 +61,7 @@ export interface TransitionRecord {
 
 export interface EffectRecord {
   stateName: string;
+  effectName: string;
 }
 
 export interface HistoryEntry {

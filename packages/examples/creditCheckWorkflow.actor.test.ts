@@ -116,9 +116,12 @@ function createCreditCheckActor(clock?: VirtualClock) {
     clock: c,
     context: { retryCount: 0 } as CreditCheckContext,
     setup: (m) => {
-      m.effect(checkingCreditState, checkCreditEffect);
-      m.effect(processingPaymentState, processPaymentEffect);
-      m.effect(notifyingWarehouseState, notifyWarehouseEffect);
+      m.effect(checkingCreditState, { name: "checkCredit", fn: checkCreditEffect });
+      m.effect(processingPaymentState, { name: "processPayment", fn: processPaymentEffect });
+      m.effect(notifyingWarehouseState, {
+        name: "notifyWarehouse",
+        fn: notifyWarehouseEffect,
+      });
       m.onAny(cancelEvent, () => ({ state: idleState }));
       m.on(idleState, startOrderEvent, (event, opts) => {
         const s = opts!.context.get();

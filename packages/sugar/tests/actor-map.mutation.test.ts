@@ -44,8 +44,11 @@ describe("ActorMap mutation tests", () => {
           initial: off,
           setup: (m) => {
             m.on(off, toggle, () => ({ state: on }));
-            m.effect(on, ({ signal: s }) => {
-              signal = s;
+            m.effect(on, {
+              name: "captureSignal",
+              fn: ({ signal: s }) => {
+                signal = s;
+              },
             });
           },
         }),
@@ -72,8 +75,11 @@ describe("ActorMap mutation tests", () => {
           initial: off,
           setup: (m) => {
             m.on(off, toggle, () => ({ state: on }));
-            m.effect(on, ({ signal: s }) => {
-              signal = s;
+            m.effect(on, {
+              name: "captureSignal",
+              fn: ({ signal: s }) => {
+                signal = s;
+              },
             });
           },
         }),
@@ -130,8 +136,11 @@ describe("ActorMap mutation tests", () => {
           initial: off,
           setup: (m) => {
             m.on(off, toggle, () => ({ state: on }));
-            m.effect(on, () => {
-              effectCount++;
+            m.effect(on, {
+              name: "countEffect",
+              fn: () => {
+                effectCount++;
+              },
             });
           },
         }),
@@ -176,8 +185,11 @@ describe("ActorMap mutation tests", () => {
             initial: off,
             setup: (m) => {
               m.on(off, toggle, () => ({ state: on }));
-              m.effect(on, ({ signal: s }) => {
-                signal = s;
+              m.effect(on, {
+                name: "captureSignal",
+                fn: ({ signal: s }) => {
+                  signal = s;
+                },
               });
             },
           }),
@@ -359,7 +371,7 @@ describe("ActorMap autoReap directed mutation tests", () => {
           states: [init, done],
           initial: init,
           setup: (m) => {
-            m.effect(init, ({ emit }) => emit(tick.create()));
+            m.effect(init, { name: "emitTick", fn: ({ emit }) => emit(tick.create()) });
             m.on(init, tick, () => ({ state: done }));
           },
         }),
@@ -397,7 +409,7 @@ describe("ActorMap autoReap directed mutation tests", () => {
           initial: start,
           setup: (m) => {
             m.on(start, go, () => ({ state: done }));
-            m.effect(start, ({ emit }) => emit(go.create()));
+            m.effect(start, { name: "emitGo", fn: ({ emit }) => emit(go.create()) });
           },
         });
         return child;

@@ -54,14 +54,18 @@ export function createTestHarness<C>(actor: AnyActor<C>): TestHarness<C> {
       assertTransitionNeverVisited(instrumented.history, from, event),
     assertContextNever: (predicate: (context: unknown) => boolean) =>
       assertContextNever(instrumented, predicate),
-    assertEffectRan: (name: string) => assertEffectRan(instrumented.history, name),
-    assertEffectNeverRan: (name: string) => assertEffectNeverRan(instrumented.history, name),
+    assertEffectRan: (stateName: string, effectName: string) =>
+      assertEffectRan(instrumented.history, stateName, effectName),
+    assertEffectNeverRan: (stateName: string, effectName: string) =>
+      assertEffectNeverRan(instrumented.history, stateName, effectName),
 
     wasStateVisited: (name: string) => instrumented.history.visitedStates().has(name),
     wasTransitionVisited: (from: string, event: string) =>
       instrumented.history.firedTransitions().has(`${from}:${event}`),
-    wasEffectRun: (name: string) =>
-      instrumented.history.effects().some((e) => e.stateName === name),
+    wasEffectRun: (stateName: string, effectName: string) =>
+      instrumented.history
+        .effects()
+        .some((e) => e.stateName === stateName && e.effectName === effectName),
 
     reset: () => instrumented.history.reset(),
   };

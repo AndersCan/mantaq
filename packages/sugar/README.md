@@ -32,7 +32,10 @@ const machine = new Actor({
   clock,
   setup: (m) => {
     m.on(s.idle, e.fetch, () => ({ state: s.loading }));
-    m.effect(s.loading, (input) => withTimeout(2000, input, () => e.resolve.create()));
+    m.effect(s.loading, {
+      name: "startFetchTimeout",
+      fn: (input) => withTimeout(2000, input, () => e.resolve.create()),
+    });
     m.on(s.loading, e.resolve, () => ({ state: s.success }));
     m.on(s.loading, e.fail, () => ({ state: s.error }));
   },

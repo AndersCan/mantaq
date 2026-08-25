@@ -20,8 +20,8 @@ function makeActor(effects?: Record<string, EffectFn<{}>>) {
     setup: (m) => {
       m.on(a, go, () => ({ state: b }));
       m.on(b, stop, () => ({ state: a }));
-      if (effects?.a) m.effect(a, effects.a);
-      if (effects?.b) m.effect(b, effects.b);
+      if (effects?.a) m.effect(a, { name: "aEffect", fn: effects.a });
+      if (effects?.b) m.effect(b, { name: "bEffect", fn: effects.b });
     },
   });
 }
@@ -103,7 +103,7 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "effect", data: { stateName: "a" } });
+    history.append({ type: "effect", data: { stateName: "a", effectName: "aEffect" } });
 
     const cov = computeCoverage(graph, history);
     expect(cov.effects.ran).toBeGreaterThanOrEqual(1);
@@ -116,7 +116,7 @@ describe("computeCoverage", () => {
     const graph = buildGraph(actor);
     const history = new History();
 
-    history.append({ type: "effect", data: { stateName: "a" } });
+    history.append({ type: "effect", data: { stateName: "a", effectName: "aEffect" } });
 
     const cov = computeCoverage(graph, history);
     expect(cov.effects.unexecuted).toContain("b");

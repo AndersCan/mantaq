@@ -14,9 +14,14 @@ export type TransitionHandler<States extends readonly AnyStateRef[], ActorContex
   opts: { context: Context<ActorContext>; actor: AnyActor },
 ) => TransitionResult<States[number], string>;
 
+export interface EffectEntry<ActorContext> {
+  name: string;
+  fn: EffectFn<ActorContext>;
+}
+
 export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
   transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
-  effects: Record<string, Array<EffectFn<ActorContext>>>;
+  effects: Record<string, Array<EffectEntry<ActorContext>>>;
 }
 
 export class ActorBuilder<
@@ -61,8 +66,14 @@ export class ActorBuilder<
     return this;
   }
 
-  effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext, PayloadOf<S>>): this {
-    (this.#effects[stateRef.name] ??= []).push(fn as EffectFn<ActorContext>);
+  effect<S extends States[number]>(
+    stateRef: S,
+    def: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
+  ): this {
+    (this.#effects[stateRef.name] ??= []).push({
+      name: def.name,
+      fn: def.fn as EffectFn<ActorContext>,
+    });
     return this;
   }
 

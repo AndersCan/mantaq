@@ -169,10 +169,13 @@ const checkout = new Actor({
     m.on(shippingAddress, submitShipping, () => ({ state: payment }));
     m.on(payment, submitPayment, () => ({ state: submitting }));
     m.on(submitting, submittingDone, () => ({ state: success }));
-    m.effect(submitting, ({ signal, emit, clock }) => {
-      clock.setTimeout(800, () => {
-        if (!signal.aborted) emit(submittingDone.create());
-      });
+    m.effect(submitting, {
+      name: "startSubmitTimeout",
+      fn: ({ signal, emit, clock }) => {
+        clock.setTimeout(800, () => {
+          if (!signal.aborted) emit(submittingDone.create());
+        });
+      },
     });
   },
 });
@@ -206,10 +209,13 @@ function createCheckoutWithCharge() {
       m.on(shippingAddress, submitShipping, () => ({ state: payment }));
       m.on(payment, submitPayment, () => ({ state: submitting }));
       m.on(submitting, paymentOk, () => ({ state: success }));
-      m.effect(submitting, ({ signal, emit }) => {
-        Promise.resolve("ord_1").then((orderId) => {
-          if (!signal.aborted) emit(paymentOk.create({ orderId }));
-        });
+      m.effect(submitting, {
+        name: "chargeCard",
+        fn: ({ signal, emit }) => {
+          Promise.resolve("ord_1").then((orderId) => {
+            if (!signal.aborted) emit(paymentOk.create({ orderId }));
+          });
+        },
       });
     },
   });
@@ -232,6 +238,7 @@ expect(checkout.snapshot().path[0]).toBe("success");
 - **Transitions are the graph** — `(state, event) → newState` maps edges
 - **Context is memory** — survives transitions, holds accumulated data
 - **Effects are side effects** — run on state entry, abort on exit
+- **Effect names** — every effect takes a required camelCase `name`; assert it ran with `harness.assertEffectRan(stateName, effectName)` (or `assertEffectNeverRan` / `wasEffectRun`)
 - **`snapshot().path[0]`** — check current state name in graph
 - **`VirtualClock`** — deterministically test time-dependent transitions
 - **`settled()`** — wait for promise effects before asserting

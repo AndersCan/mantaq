@@ -65,10 +65,9 @@ function recordTransition(
   rec: {
     from: string;
     to: string;
-    toName: string;
     event: string;
     transitioned: boolean;
-    effects: Record<string, unknown[]>;
+    effectNames: string[];
   },
 ) {
   history.append({
@@ -80,10 +79,10 @@ function recordTransition(
     type: "state_visit",
     data: { stateName: rec.to },
   });
-  if ((rec.effects[rec.toName] ?? []).length > 0) {
+  for (const effectName of rec.effectNames) {
     history.append({
       type: "effect",
-      data: { stateName: rec.to },
+      data: { stateName: rec.to, effectName },
     });
   }
 }
@@ -104,33 +103,27 @@ function prefixId(prefix: string, name: string): string {
 export function instrument<C>(actor: AnyActor<C>): InstrumentedActor<C> {
   const history = new History();
   const wrapped = wrapWithProxy(actor, history);
-  attach<C>(actor, history, "", actor.options?.effects ?? {});
+  attach<C>(actor, history, "");
   return wrapped;
 }
 
-function attach<C>(
-  actor: AnyActor<C>,
-  history: History,
-  prefix: string,
-  effectsByState: Record<string, unknown[]>,
-): void {
+function attach<C>(actor: AnyActor<C>, history: History, prefix: string): void {
   history.append({
     type: "state_visit",
     data: { stateName: prefixId(prefix, actor.state.name) },
   });
 
-  actor.on("transition", ({ event, from, to, transitioned }) => {
+  actor.on("transition", ({ event, from, to, transitioned, effects }) => {
     recordTransition(history, {
       from: prefixId(prefix, from),
       to: prefixId(prefix, to),
-      toName: to,
       event: event.type,
       transitioned,
-      effects: effectsByState,
+      effectNames: effects,
     });
   });
 
   for (const [regionName, child] of Object.entries(actor.regions ?? {})) {
-    attach(child, history, prefixId(prefix, regionName), child.options?.effects ?? {});
+    attach(child, history, prefixId(prefix, regionName));
   }
 }

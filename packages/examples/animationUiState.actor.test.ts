@@ -122,12 +122,14 @@ function createAnimationActor(clock?: VirtualClock) {
       sidebar: sidebarRegion,
     },
     setup: (m) => {
-      m.effect(drawer.drawerOpening, (input) =>
-        withTimeout(300, input, () => ({ type: "DRAWER_OPEN_DONE" })),
-      );
-      m.effect(drawer.drawerClosing, (input) =>
-        withTimeout(300, input, () => ({ type: "DRAWER_CLOSE_DONE" })),
-      );
+      m.effect(drawer.drawerOpening, {
+        name: "timeDrawerOpen",
+        fn: (input) => withTimeout(300, input, () => ({ type: "DRAWER_OPEN_DONE" })),
+      });
+      m.effect(drawer.drawerClosing, {
+        name: "timeDrawerClose",
+        fn: (input) => withTimeout(300, input, () => ({ type: "DRAWER_CLOSE_DONE" })),
+      });
       m.on(drawer.drawerRoot, mainEvents.OPEN_DRAWER, () => ({ state: drawer.drawerOpening }));
       m.on(drawer.drawerRoot, mainEvents.CLOSE_DRAWER, () => ({ state: drawer.drawerClosing }));
       m.on(drawer.drawerOpening, doneEvents.DRAWER_OPEN_DONE, () => ({ state: drawer.drawerRoot }));

@@ -126,8 +126,11 @@ describe("Actor error paths", () => {
       internalBudget: 2,
       setup: (m) => {
         m.on(idle, start, () => ({ state: running }));
-        m.effect(running, ({ signal }) => {
-          effectSignal = signal;
+        m.effect(running, {
+          name: "captureSignal",
+          fn: ({ signal }) => {
+            effectSignal = signal;
+          },
         });
         m.on(running, loop, () => ({ emit: [loop.create()] }));
       },
@@ -154,9 +157,12 @@ describe("Actor error paths", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, start, () => ({ state: loading, emit: [finish.create(), finish.create()] }));
-        m.effect(loading, () => {
-          effectRuns++;
-          throw new Error("effect bug");
+        m.effect(loading, {
+          name: "throwEffectBug",
+          fn: () => {
+            effectRuns++;
+            throw new Error("effect bug");
+          },
         });
         m.on(loading, finish, () => ({ state: done }));
       },
@@ -215,8 +221,11 @@ describe("Actor error paths", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, () => {
-          throw new Error("effect boom");
+        m.effect(loading, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("effect boom");
+          },
         });
       },
     });
@@ -317,8 +326,11 @@ describe("Actor error paths", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, async () => {
-          throw new Error("late boom");
+        m.effect(loading, {
+          name: "rejectAsync",
+          fn: async () => {
+            throw new Error("late boom");
+          },
         });
       },
     });
@@ -347,8 +359,11 @@ describe("Actor error paths", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: active }));
-        m.effect(active, () => {
-          throw new Error("boom");
+        m.effect(active, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("boom");
+          },
         });
       },
     });
@@ -419,8 +434,11 @@ describe("Actor error paths", () => {
       context: { n: 0 },
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, () => {
-          throw new Error("effect boom");
+        m.effect(loading, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("effect boom");
+          },
         });
         m.on(loading, tick, () => {
           ticks++;
@@ -452,8 +470,11 @@ describe("Actor error paths", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.effect(idle, ({ emit }) => {
-          emit(probe.create());
+        m.effect(idle, {
+          name: "emitProbe",
+          fn: ({ emit }) => {
+            emit(probe.create());
+          },
         });
       },
     });
@@ -477,8 +498,11 @@ describe("Actor error paths", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.effect(idle, () => {
-          throw new Error("init boom");
+        m.effect(idle, {
+          name: "throwOnInit",
+          fn: () => {
+            throw new Error("init boom");
+          },
         });
       },
     });
@@ -504,8 +528,11 @@ describe("Actor error paths", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: active }));
-        m.effect(active, () => {
-          throw new Error("boom");
+        m.effect(active, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("boom");
+          },
         });
       },
     });

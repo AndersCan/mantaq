@@ -66,16 +66,28 @@ export function assertContextNever<C>(
   }
 }
 
-export function assertEffectRan(history: History, stateName: string): void {
-  const ran = history.effects().some((e) => e.stateName === stateName);
+export function assertEffectRan(history: History, stateName: string, effectName: string): void {
+  const ran = history
+    .effects()
+    .some((e) => e.stateName === stateName && e.effectName === effectName);
   if (!ran) {
-    throw new Error(`assertEffectRan failed: effect for state "${stateName}" did not run`);
+    throw new Error(
+      `assertEffectRan failed: effect "${effectName}" for state "${stateName}" did not run`,
+    );
   }
 }
 
-export function assertEffectNeverRan(history: History, stateName: string): void {
-  const ran = history.effects().some((e) => e.stateName === stateName);
+export function assertEffectNeverRan(
+  history: History,
+  stateName: string,
+  effectName: string,
+): void {
+  const ran = history
+    .effects()
+    .some((e) => e.stateName === stateName && e.effectName === effectName);
   if (ran) {
-    throw new Error(`assertEffectNeverRan failed: effect for state "${stateName}" ran`);
+    throw new Error(
+      `assertEffectNeverRan failed: effect "${effectName}" for state "${stateName}" ran`,
+    );
   }
 }

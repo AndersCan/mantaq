@@ -29,12 +29,15 @@ The charge effect, sugar style:
 import { withPromise } from "@mantaq/sugar";
 
 setup: (m) => {
-  m.effect(submitting, (input) => {
-    const s = input.context.get();
-    withPromise(chargeCard(s.paymentInfo!.cardNumber), input.signal, input.emit, {
-      success: (orderId) => paymentOk.create({ orderId }),
-      error: (reason) => paymentFail.create({ reason: String(reason) }),
-    });
+  m.effect(submitting, {
+    name: "chargeCard",
+    fn: (input) => {
+      const s = input.context.get();
+      withPromise(chargeCard(s.paymentInfo!.cardNumber), input.signal, input.emit, {
+        success: (orderId) => paymentOk.create({ orderId }),
+        error: (reason) => paymentFail.create({ reason: String(reason) }),
+      });
+    },
   });
 };
 ```
@@ -50,14 +53,17 @@ Without sugar:
 
 ```ts
 setup: (m) => {
-  m.effect(submitting, ({ signal, emit }) => {
-    chargeCard(s.paymentInfo!.cardNumber)
-      .then((orderId) => {
-        if (!signal.aborted) emit(paymentOk.create({ orderId }));
-      })
-      .catch((reason) => {
-        if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
-      });
+  m.effect(submitting, {
+    name: "chargeCard",
+    fn: ({ signal, emit }) => {
+      chargeCard(s.paymentInfo!.cardNumber)
+        .then((orderId) => {
+          if (!signal.aborted) emit(paymentOk.create({ orderId }));
+        })
+        .catch((reason) => {
+          if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
+        });
+    },
   });
 };
 ```
@@ -86,8 +92,11 @@ The fallback effect. The charge hangs → 800ms → `submittingDone` → `succes
 import { withTimeout } from "@mantaq/sugar";
 
 setup: (m) => {
-  m.effect(submitting, (input) => {
-    withTimeout(800, input, () => submittingDone.create());
+  m.effect(submitting, {
+    name: "startSubmitTimeout",
+    fn: (input) => {
+      withTimeout(800, input, () => submittingDone.create());
+    },
   });
 };
 ```
@@ -104,10 +113,13 @@ Without sugar:
 
 ```ts
 setup: (m) => {
-  m.effect(submitting, ({ clock, signal, emit }) => {
-    clock.setTimeout(800, () => {
-      if (!signal.aborted) emit(submittingDone.create());
-    });
+  m.effect(submitting, {
+    name: "startSubmitTimeout",
+    fn: ({ clock, signal, emit }) => {
+      clock.setTimeout(800, () => {
+        if (!signal.aborted) emit(submittingDone.create());
+      });
+    },
   });
 };
 ```
@@ -134,7 +146,10 @@ const checkout = new Actor({
   initial: payment,
   clock,
   setup: (m) => {
-    m.effect(submitting, (input) => withTimeout(800, input, () => submittingDone.create()));
+    m.effect(submitting, {
+      name: "startSubmitTimeout",
+      fn: (input) => withTimeout(800, input, () => submittingDone.create()),
+    });
     m.on(payment, submitPayment, () => ({ state: submitting }));
     m.on(submitting, submittingDone, () => ({ state: success }));
   },

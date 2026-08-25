@@ -27,8 +27,11 @@ describe("Actor property tests", () => {
             m.on(idle, start, () => ({ state: waiting }));
             m.on(waiting, stop, () => ({ state: idle }));
             m.on(waiting, tick, () => ({ state: done }));
-            m.effect(waiting, ({ signal, clock: c, emit }) => {
-              c.setTimeout(timeoutMs, () => emit(tick.create()), { signal });
+            m.effect(waiting, {
+              name: "armDeadlineTimer",
+              fn: ({ signal, clock: c, emit }) => {
+                c.setTimeout(timeoutMs, () => emit(tick.create()), { signal });
+              },
             });
           },
         });

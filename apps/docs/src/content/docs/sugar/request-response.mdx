@@ -65,8 +65,11 @@ function createRequestHandler(orderId: string, clock: Clock) {
         opts.context.set(s);
         return { state: pending };
       });
-      m.effect(pending, (input) => {
-        withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
+      m.effect(pending, {
+        name: "startResponseTimeout",
+        fn: (input) => {
+          withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
+        },
       });
       m.on(pending, answer, (event) => ({
         state: answered,

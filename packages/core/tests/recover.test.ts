@@ -22,20 +22,23 @@ describe("recover() resource cleanup", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, ({ signal, emit }) => {
-          effectSignal = signal;
-          return new Promise<void>((resolve) => {
-            signal.addEventListener("abort", () => resolve());
-            clock.setTimeout(
-              1000,
-              () => {
-                lateEmits++;
-                emit(tick.create());
-                resolve();
-              },
-              { signal },
-            );
-          });
+        m.effect(loading, {
+          name: "scheduleLateEmit",
+          fn: ({ signal, emit }) => {
+            effectSignal = signal;
+            return new Promise<void>((resolve) => {
+              signal.addEventListener("abort", () => resolve());
+              clock.setTimeout(
+                1000,
+                () => {
+                  lateEmits++;
+                  emit(tick.create());
+                  resolve();
+                },
+                { signal },
+              );
+            });
+          },
         });
         m.on(loading, boom, () => {
           throw new Error("boom");
@@ -79,11 +82,14 @@ describe("recover() resource cleanup", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, ({ signal }) => {
-          return new Promise<void>((resolve) => {
-            signal.addEventListener("abort", () => resolve());
-            clock.setTimeout(1000, () => resolve(), { signal });
-          });
+        m.effect(loading, {
+          name: "resolveOnAbort",
+          fn: ({ signal }) => {
+            return new Promise<void>((resolve) => {
+              signal.addEventListener("abort", () => resolve());
+              clock.setTimeout(1000, () => resolve(), { signal });
+            });
+          },
         });
         m.on(loading, boom, () => {
           throw new Error("boom");

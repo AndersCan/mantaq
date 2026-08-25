@@ -63,21 +63,26 @@ Context is user land — mutate it freely. `set()` is the write signal: any
 
 ### Effects
 
-Side effects run on state entry via transition — async work, timers, I/O. Never on the initial state: the constructor runs no effects. Work that must run at boot starts in a state the first event transitions out of.
+Side effects run on state entry via transition — async work, timers, I/O. Each takes a required camelCase `name` describing what it does. Never on the initial state: the constructor runs no effects. Work that must run at boot starts in a state the first event transitions out of.
 
 Aborted (AbortSignal) on state exit. Check `signal.aborted` before emitting.
 
 ```ts
-m.effect(submittingState, (input) => {
-  const { signal, clock, emit } = input;
-  clock.setTimeout(800, () => {
-    if (signal.aborted) return;
-    emit({ type: "SUBMITTING_DONE" });
-  });
+m.effect(submittingState, {
+  name: "startSubmitTimeout",
+  fn: (input) => {
+    const { signal, clock, emit } = input;
+    clock.setTimeout(800, () => {
+      if (signal.aborted) return;
+      emit({ type: "SUBMITTING_DONE" });
+    });
+  },
 });
 ```
 
 `emit` accepts a created event or a raw `{ type }`. A type declared in `internal` (or `inputs`) dispatches back into the actor; anything else routes to the output handler (parent queue) or is dropped if no parent. Full routing in Transitions below.
+
+Executed effects are recorded in history as `{ stateName, effectName }`; assert with `harness.assertEffectRan(stateName, effectName)` / `assertEffectNeverRan` / `wasEffectRun` (see `testing.md`).
 
 ### Clock
 
@@ -129,7 +134,7 @@ new Actor({
 ```ts
 m.on(stateRef, eventRef, (event, { context, actor }) => TransitionResult);
 m.onAny(eventRef, (event, { context, actor }) => TransitionResult); // any non-final state
-m.effect(stateRef, (input) => void);
+m.effect(stateRef, { name, fn }); // name is a required camelCase string
 ```
 
 Result — all optional:

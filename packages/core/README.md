@@ -198,12 +198,15 @@ const actor = new Actor({
   states: [idleState, loadingState, loadedState],
   initial: idleState,
   setup: (m) => {
-    m.effect(loadingState, ({ state, emit, clock }) => {
-      // state.payload is typed to the state's declared payload: { url: string }
-      const url = state.payload.url;
-      clock.setTimeout(1000, () => {
-        emit(doneEvent.create());
-      });
+    m.effect(loadingState, {
+      name: "fetchUrl",
+      fn: ({ state, emit, clock }) => {
+        // state.payload is typed to the state's declared payload: { url: string }
+        const url = state.payload.url;
+        clock.setTimeout(1000, () => {
+          emit(doneEvent.create());
+        });
+      },
     });
     m.on(idleState, fetchEvent, (event) => {
       return { state: loadingState.create({ url: event.payload.url }) };
@@ -229,9 +232,12 @@ return { state: loadingState };
 **Anti-pattern — depending on `event` in effects:**
 
 ```ts
-m.effect(loadingState, ({ event, emit }) => {
-  // ❌ event is InternalEvent — payload is unknown, not the triggering event's payload
-  emit(doneEvent.create()); // fine — but event.payload.url would be a type error
+m.effect(loadingState, {
+  name: "fetchUrl",
+  fn: ({ event, emit }) => {
+    // ❌ event is InternalEvent — payload is unknown, not the triggering event's payload
+    emit(doneEvent.create()); // fine — but event.payload.url would be a type error
+  },
 });
 ```
 
@@ -255,10 +261,13 @@ const actor = new Actor({
   states: [idleState, connectedState],
   initial: idleState,
   setup: (m) => {
-    m.effect(idleState, ({ emit, clock }) => {
-      clock.setTimeout(1000, () => {
-        emit(tickEvent.create()); // goes to internal queue
-      });
+    m.effect(idleState, {
+      name: "scheduleTick",
+      fn: ({ emit, clock }) => {
+        clock.setTimeout(1000, () => {
+          emit(tickEvent.create()); // goes to internal queue
+        });
+      },
     });
     m.on(idleState, connectEvent, () => ({ state: connectedState })); // external handler
     m.on(idleState, tickEvent, () => ({})); // internal handler
@@ -280,7 +289,7 @@ inputs: [connectEvent],
 
 ### Effect Pattern
 
-Effects run on state entry. They receive typed context, an AbortSignal, and an emit function.
+Effects run on state entry. They receive typed context, an AbortSignal, and an emit function. Each effect carries a required camelCase `name` describing what it does — tests can assert on it (`harness.assertEffectRan(stateName, effectName)`) and executed effects appear in history as `{ stateName, effectName }`.
 
 ```ts
 type MyContext = { retryCount: number; maxRetries: number };
@@ -297,17 +306,20 @@ function createActor() {
     initial: idleState,
     context: { retryCount: 0, maxRetries: 3 } as MyContext,
     setup: (m) => {
-      m.effect(workingState, ({ signal, context, emit, clock }) => {
-        // context is MyContext — typed from the constructor generic
-        if (context.retryCount >= context.maxRetries) {
-          emit(failedEvent.create({ error: "Max retries exceeded" }));
-          return;
-        }
+      m.effect(workingState, {
+        name: "attemptWork",
+        fn: ({ signal, context, emit, clock }) => {
+          // context is MyContext — typed from the constructor generic
+          if (context.retryCount >= context.maxRetries) {
+            emit(failedEvent.create({ error: "Max retries exceeded" }));
+            return;
+          }
 
-        clock.setTimeout(2000, () => {
-          if (signal.aborted) return; // ✅ check signal before emitting
-          emit(doneEvent.create());
-        });
+          clock.setTimeout(2000, () => {
+            if (signal.aborted) return; // ✅ check signal before emitting
+            emit(doneEvent.create());
+          });
+        },
       });
       m.on(idleState, startEvent, () => ({ state: workingState }));
       m.on(workingState, doneEvent, () => ({ state: doneState }));
@@ -325,21 +337,27 @@ function createActor() {
 **Anti-pattern — not checking `signal.aborted`:**
 
 ```ts
-m.effect(workingState, ({ signal, emit, clock }) => {
-  // ❌ if state changes before timeout, this still fires
-  clock.setTimeout(2000, () => {
-    emit(doneEvent.create());
-  });
+m.effect(workingState, {
+  name: "attemptWork",
+  fn: ({ signal, emit, clock }) => {
+    // ❌ if state changes before timeout, this still fires
+    clock.setTimeout(2000, () => {
+      emit(doneEvent.create());
+    });
+  },
 });
 ```
 
 ```ts
-m.effect(workingState, ({ signal, emit, clock }) => {
-  // ✅ guard with abort check
-  clock.setTimeout(2000, () => {
-    if (signal.aborted) return;
-    emit(doneEvent.create());
-  });
+m.effect(workingState, {
+  name: "attemptWork",
+  fn: ({ signal, emit, clock }) => {
+    // ✅ guard with abort check
+    clock.setTimeout(2000, () => {
+      if (signal.aborted) return;
+      emit(doneEvent.create());
+    });
+  },
 });
 ```
 
@@ -458,17 +476,20 @@ const doneEvent = event("WORK_DONE")();
 const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
 setup: (m) => {
-  m.effect(workingState, ({ signal, emit, clock }) => {
-    clock.setTimeout(100, () => {
-      if (signal.aborted) return;
-      try {
-        const result = riskyOperation();
-        emit(doneEvent.create());
-      } catch (err) {
-        // ✅ emit error as internal event — lets transition handle it
-        emit(failedEvent.create({ error: String(err) }));
-      }
-    });
+  m.effect(workingState, {
+    name: "runRiskyOperation",
+    fn: ({ signal, emit, clock }) => {
+      clock.setTimeout(100, () => {
+        if (signal.aborted) return;
+        try {
+          const result = riskyOperation();
+          emit(doneEvent.create());
+        } catch (err) {
+          // ✅ emit error as internal event — lets transition handle it
+          emit(failedEvent.create({ error: String(err) }));
+        }
+      });
+    },
   });
   m.on(workingState, doneEvent, () => ({ state: doneState }));
   m.on(workingState, failedEvent, (event) => {
@@ -574,8 +595,11 @@ const actor = new Actor({
   initial: idle,
   clock,
   setup: (m) => {
-    m.effect(idle, ({ emit, clock }) => {
-      clock.setTimeout(5000, () => emit(timer.create()));
+    m.effect(idle, {
+      name: "armIdleTimeout",
+      fn: ({ emit, clock }) => {
+        clock.setTimeout(5000, () => emit(timer.create()));
+      },
     });
     m.on(idle, timer, () => ({ state: timedOut }));
   },
@@ -618,11 +642,14 @@ const actor = new Actor({
   initial: loading,
   clock,
   setup: (m) => {
-    m.effect(loading, ({ signal, clock }) => {
-      const id = clock.setTimeout(5000, () => {
-        /* ... */
-      });
-      signal.addEventListener("abort", () => clock.clearTimeout(id));
+    m.effect(loading, {
+      name: "scheduleWork",
+      fn: ({ signal, clock }) => {
+        const id = clock.setTimeout(5000, () => {
+          /* ... */
+        });
+        signal.addEventListener("abort", () => clock.clearTimeout(id));
+      },
     });
     m.on(loading, cancel, () => ({ state: success }));
   },
@@ -651,8 +678,11 @@ const actor = new Actor({
   initial: active,
   clock,
   setup: (m) => {
-    m.effect(active, ({ emit, clock }) => {
-      clock.setInterval(1000, () => emit(tick.create()));
+    m.effect(active, {
+      name: "startTicker",
+      fn: ({ emit, clock }) => {
+        clock.setInterval(1000, () => emit(tick.create()));
+      },
     });
     m.on(active, tick, () => {
       count++;

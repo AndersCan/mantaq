@@ -33,7 +33,12 @@ const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 // core/src by +38 and +15 respectively (merged total 1498) and push actor.ts
 // from 545 to 564 (>550 file ceiling). Raised to absorb that legitimate,
 // reviewed growth without weakening the small-core north star.
-const BUDGET_TOTAL_LINES = 1510;
+// Raised again 2026-08-25 (same day): named effects. `m.effect` takes
+// `{ name, fn }`, runEffects reports which named effects actually ran, and
+// TransitionInfo carries them — truthful per-effect recording replaces
+// registration-based inference in @mantaq/traversal. Net +25 across four
+// files; every file stays under its per-file ceiling.
+const BUDGET_TOTAL_LINES = 1540;
 const BUDGET_FILE_LINES = 580;
 const BUDGET_EXPORTS = 32;
 

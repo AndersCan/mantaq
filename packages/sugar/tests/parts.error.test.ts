@@ -18,8 +18,11 @@ const machine = actorSpec({
 
 const emitBoomPart = definePart<typeof machine>((m) => {
   m.on(idle, start, () => ({ state: loading }));
-  m.effect(loading, (input) => {
-    input.emit(boom.create());
+  m.effect(loading, {
+    name: "emitBoom",
+    fn: (input) => {
+      input.emit(boom.create());
+    },
   });
 });
 
@@ -58,10 +61,13 @@ describe("parts error paths", () => {
     const floodPart = definePart<typeof flood>((m) => {
       m.on(idle, start, () => ({ state: loading }));
       m.on(loading, loop, () => ({ state: loading }));
-      m.effect(loading, (input) => {
-        input.emit(loop.create());
-        input.emit(loop.create());
-        input.emit(loop.create());
+      m.effect(loading, {
+        name: "floodLoopEvents",
+        fn: (input) => {
+          input.emit(loop.create());
+          input.emit(loop.create());
+          input.emit(loop.create());
+        },
       });
     });
     const actor = withParts(flood, floodPart);

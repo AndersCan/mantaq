@@ -12,9 +12,8 @@ import { runEffects } from "./effects.ts";
 import { parseTarget } from "./dispatch.ts";
 import { Context } from "./context.ts";
 import { ActorBuilder } from "./builder.ts";
-import type { SetupFn } from "./builder.ts";
+import type { EffectEntry, SetupFn } from "./builder.ts";
 import type {
-  EffectFn,
   ErrorInfo,
   ErrorReason,
   ErrorState,
@@ -68,7 +67,7 @@ export interface InternalActorOptions<
   ActorContext = Record<string, unknown>,
 > extends Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup"> {
   transitions: TransitionDispatch<States, ActorContext>;
-  effects: Record<string, Array<EffectFn<ActorContext>>>;
+  effects: Record<string, Array<EffectEntry<ActorContext>>>;
 }
 
 type TransitionDispatch<States extends readonly AnyStateRef[], ActorContext> = Record<
@@ -106,6 +105,7 @@ interface StepOutcome {
   emitted: boolean;
   transitioned: boolean;
   target?: string;
+  effects?: string[];
 }
 
 export class Actor<
@@ -343,6 +343,7 @@ export class Actor<
         emitted: anyOutcome.emitted,
         transitioned: stateOutcome.applied || anyOutcome.transitioned,
         target: stateOutcome.target ?? anyOutcome.target,
+        effects: stateOutcome.effects ?? anyOutcome.effects,
       };
     }
     return { emitted: false, transitioned: false };
@@ -361,24 +362,28 @@ export class Actor<
       from,
       to: outcome.target ?? this.state.name,
       transitioned: outcome.transitioned,
+      effects: outcome.effects ?? [],
     });
   }
 
   #applyStateStep(
     event: InternalEvent,
     transition: StepFn<States, ActorContext>,
-  ): { applied: boolean; target?: string } {
+  ): { applied: boolean; target?: string; effects?: string[] } {
     let applied = false;
     let target: string | undefined;
+    let effects: string[] | undefined;
     this.#safe("transition", event, () => {
       const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
       if (step.emit) this.#queue.push(...step.emit);
       if (step.state) {
-        target = this.#applyTransition(event, step);
+        const entered = this.#applyTransition(event, step);
+        target = entered.target;
+        effects = entered.effects;
         applied = true;
       }
     });
-    return { applied, target };
+    return { applied, target, effects };
   }
 
   #applyAnyStep(
@@ -390,10 +395,13 @@ export class Actor<
     let emitted = false;
     let transitioned = false;
     let target: string | undefined;
+    let effects: string[] | undefined;
     this.#safe("transition", event, () => {
       const step = transition(event, { context: this.#contextHandle, actor: this as AnyActor });
       if (step.state && allowTransition) {
-        target = this.#applyTransition(event, step);
+        const entered = this.#applyTransition(event, step);
+        target = entered.target;
+        effects = entered.effects;
         transitioned = true;
       }
       if (step.emit) {
@@ -401,7 +409,7 @@ export class Actor<
         emitted = true;
       }
     });
-    return { emitted, transitioned, target };
+    return { emitted, transitioned, target, effects };
   }
 
   snapshot(): Snapshot<ActorContext> {
@@ -418,32 +426,32 @@ export class Actor<
   #applyTransition(
     event: InternalEvent,
     step: TransitionResult<States[number], string>,
-  ): string | undefined {
-    if (this.#error !== null || !step.state) return undefined;
+  ): { target?: string; effects?: string[] } {
+    if (this.#error !== null || !step.state) return {};
     const resolved = parseTarget<States[number]>(step);
-    if (!resolved) return undefined;
+    if (!resolved) return {};
     if (!(resolved.state instanceof StateRef)) {
       this.#enterError("transition", event, new Error("invalid transition target"));
-      return undefined;
+      return {};
     }
     this.#effectAbort?.abort();
     this.state = resolved.state;
     const target = this.state.name;
     this.#statePayload = resolved.payload;
     this.#entry = { state: this.state, context: this.#context };
-    this.#runEffects(event, resolved.payload);
+    const ran = this.#runEffects(event, resolved.payload);
     if (resolved.state.isFinal && this.#error === null) {
       this.#subs.emitDone();
     }
-    return target;
+    return { target, effects: ran };
   }
 
-  #runEffects(event: InternalEvent, statePayload: unknown): void {
-    if (this.#disposed) return;
+  #runEffects(event: InternalEvent, statePayload: unknown): string[] {
+    if (this.#disposed) return [];
     const list = this.#options.effects[this.state.name];
     if (!list) {
       this.#effectAbort = null;
-      return;
+      return [];
     }
     const abort = new AbortController();
     this.#effectAbort = abort;
@@ -476,6 +484,7 @@ export class Actor<
         })
         .catch(() => {});
     }
+    return result.ran;
   }
 
   #drainInternal(): void {

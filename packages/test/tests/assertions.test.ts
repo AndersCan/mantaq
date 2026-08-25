@@ -183,25 +183,53 @@ describe("assertions", () => {
 
   describe("assertEffectRan", () => {
     test("passes when effect ran", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a" } });
-      expect(() => assertEffectRan(history, "a")).not.toThrow();
+      const history = historyWith({
+        type: "effect",
+        data: { stateName: "a", effectName: "loadA" },
+      });
+      expect(() => assertEffectRan(history, "a", "loadA")).not.toThrow();
     });
 
-    test("throws when effect did not run", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a" } });
-      expect(() => assertEffectRan(history, "b")).toThrow(/did not run/);
+    test("throws when state has no effects", () => {
+      const history = historyWith({
+        type: "effect",
+        data: { stateName: "a", effectName: "loadA" },
+      });
+      expect(() => assertEffectRan(history, "b", "loadB")).toThrow(/did not run/);
+    });
+
+    test("throws when effect name does not match", () => {
+      const history = historyWith({
+        type: "effect",
+        data: { stateName: "a", effectName: "loadA" },
+      });
+      expect(() => assertEffectRan(history, "a", "otherEffect")).toThrow(/did not run/);
     });
   });
 
   describe("assertEffectNeverRan", () => {
     test("passes when effect did not run", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a" } });
-      expect(() => assertEffectNeverRan(history, "b")).not.toThrow();
+      const history = historyWith({
+        type: "effect",
+        data: { stateName: "a", effectName: "loadA" },
+      });
+      expect(() => assertEffectNeverRan(history, "b", "loadB")).not.toThrow();
     });
 
     test("throws when effect ran", () => {
-      const history = historyWith({ type: "effect", data: { stateName: "a" } });
-      expect(() => assertEffectNeverRan(history, "a")).toThrow(/ran/);
+      const history = historyWith({
+        type: "effect",
+        data: { stateName: "a", effectName: "loadA" },
+      });
+      expect(() => assertEffectNeverRan(history, "a", "loadA")).toThrow(/ran/);
+    });
+
+    test("passes when same state ran different effect", () => {
+      const history = historyWith({
+        type: "effect",
+        data: { stateName: "a", effectName: "loadA" },
+      });
+      expect(() => assertEffectNeverRan(history, "a", "otherEffect")).not.toThrow();
     });
   });
 });

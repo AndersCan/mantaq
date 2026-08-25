@@ -80,26 +80,31 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
       error: undefined,
     } as WsContext,
     setup: (m) => {
-      m.effect(connectingState, (input) =>
-        withTimeout(500, input, () => ({ type: "CONNECTION_ESTABLISHED" })),
-      );
-      m.effect(connectedState, (input) =>
-        withTimeout(5000, input, () => ({ type: "HEARTBEAT_TIMEOUT" })),
-      );
-      m.effect(reconnectingState, ({ signal, context, emit, clock }) => {
-        const s = context.get();
-        if (s.retryCount >= s.maxRetries) {
-          clock.setTimeout(100, () => {
-            if (signal.aborted) return;
-            emit({ type: "MAX_RETRIES_REACHED" });
-          });
-        } else {
-          const delay = 1000 * Math.pow(2, s.retryCount);
-          clock.setTimeout(delay, () => {
-            if (signal.aborted) return;
-            emit({ type: "RECONNECT_TIMEOUT" });
-          });
-        }
+      m.effect(connectingState, {
+        name: "timeConnect",
+        fn: (input) => withTimeout(500, input, () => ({ type: "CONNECTION_ESTABLISHED" })),
+      });
+      m.effect(connectedState, {
+        name: "startHeartbeatTimer",
+        fn: (input) => withTimeout(5000, input, () => ({ type: "HEARTBEAT_TIMEOUT" })),
+      });
+      m.effect(reconnectingState, {
+        name: "scheduleReconnect",
+        fn: ({ signal, context, emit, clock }) => {
+          const s = context.get();
+          if (s.retryCount >= s.maxRetries) {
+            clock.setTimeout(100, () => {
+              if (signal.aborted) return;
+              emit({ type: "MAX_RETRIES_REACHED" });
+            });
+          } else {
+            const delay = 1000 * Math.pow(2, s.retryCount);
+            clock.setTimeout(delay, () => {
+              if (signal.aborted) return;
+              emit({ type: "RECONNECT_TIMEOUT" });
+            });
+          }
+        },
       });
       m.onAny(disconnect, () => ({ state: disconnectedState }));
       m.onAny(forceReconnect, (_event, opts) => {

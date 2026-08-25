@@ -1,12 +1,13 @@
 import type { AnyStateRef } from "./state.ts";
 import type { InternalEvent } from "./event.ts";
 import type { Clock } from "./clock.ts";
-import type { EffectFn, LastKnownState } from "./actor-types.ts";
+import type { LastKnownState } from "./actor-types.ts";
+import type { EffectEntry } from "./builder.ts";
 import type { Context } from "./context.ts";
 import { Either } from "@mantaq/utils";
 
 export interface EffectRunnerOptions<ActorContext> {
-  effects: Record<string, Array<EffectFn<ActorContext>>>;
+  effects: Record<string, Array<EffectEntry<ActorContext>>>;
   state: AnyStateRef;
   statePayload: unknown;
   event: InternalEvent;
@@ -20,20 +21,23 @@ export interface EffectRunnerOptions<ActorContext> {
 
 export interface EffectRunResult {
   pending: Array<Promise<void>>;
+  /** Names of effects invoked synchronously by this run, in registration order. */
+  ran: string[];
 }
 
 export function runEffects<ActorContext>(
   options: EffectRunnerOptions<ActorContext>,
 ): EffectRunResult {
   const pending: Array<Promise<void>> = [];
+  const ran: string[] = [];
   const list = options.effects[options.state.name];
-  if (!list) return { pending };
+  if (!list) return { pending, ran };
 
-  for (const effectFn of list) {
+  for (const { name, fn } of list) {
     if (options.abort.signal.aborted) break;
     let out: unknown;
     const attempt = Either.from(() => {
-      out = effectFn({
+      out = fn({
         signal: options.abort.signal,
         state: { name: options.state.name, payload: options.statePayload },
         event: options.event,
@@ -47,6 +51,7 @@ export function runEffects<ActorContext>(
       options.onError(attempt[0], options.lastGood);
       break;
     }
+    ran.push(name);
     // A native Promise or any thenable (custom implementation, e.g. a library
     // deferred) is an async effect: it must be awaited by settled(), have its
     // rejection handled (no unhandled rejection), and route to onError.
@@ -72,5 +77,5 @@ export function runEffects<ActorContext>(
       pending.push(effectPromise);
     }
   }
-  return { pending };
+  return { pending, ran };
 }

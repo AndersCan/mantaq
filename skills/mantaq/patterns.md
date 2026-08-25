@@ -18,7 +18,10 @@ new Actor({
   initial: idle,
   clock: new VirtualClock(),
   setup: (m) => {
-    m.effect(submitting, (input) => withTimeout(800, input, () => submittingDone.create()));
+    m.effect(submitting, {
+      name: "startSubmitTimeout",
+      fn: (input) => withTimeout(800, input, () => submittingDone.create()),
+    });
     m.on(submitting, submittingDone, () => ({ state: success }));
   },
 });

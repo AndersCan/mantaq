@@ -191,11 +191,11 @@ The full state tree. It nests for actors with children.
 
 ### `setup` builder
 
-| Method                   | What                                        |
-| ------------------------ | ------------------------------------------- |
-| `m.on(state, event, fn)` | Transition handler for one state/event pair |
-| `m.onAny(event, fn)`     | Handler for an event in every state         |
-| `m.effect(state, fn)`    | Run `fn` on state entry                     |
+| Method                          | What                                        |
+| ------------------------------- | ------------------------------------------- |
+| `m.on(state, event, fn)`        | Transition handler for one state/event pair |
+| `m.onAny(event, fn)`            | Handler for an event in every state         |
+| `m.effect(state, { name, fn })` | Run `fn` on state entry; `name` is required |
 
 A handler returns `{ state }` (optionally with `payload`, or `emit:
 [{ type }]`) to transition, or `{}` to stay in place.
