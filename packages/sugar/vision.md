@@ -4,13 +4,13 @@ Extension of root `vision.md` for sugar package
 
 ## sugar Is
 
-Sugar provide sugar syntax. Core verbose, sugar consise
+Sugar provides sugar syntax. Core verbose, sugar concise
 
 sugar is ergonomics for mantaq and mantaq only - no sugar that could be standalone npm package.
 
 ## Testable First
 
-sugar sits between user and core — mistakes leak through. All code must have unit and mutation tests.
+sugar sits between user and core. Mistakes leak through. All code must have unit and mutation tests.
 
 ## Earned Surface
 

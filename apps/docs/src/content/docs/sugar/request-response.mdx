@@ -1,11 +1,11 @@
 ---
 title: Request / Response
-description: One parent machine, many short-lived request handlers. Handlers reply through outputs.
+description: One parent machine, many short-lived request handlers. Handlers reply through outputs
 ---
 
 ## What
 
-One parent machine owns an `ActorMap` of short-lived request handlers — one per
+One parent machine owns an `ActorMap` of short-lived request handlers, one per
 order. Each handler is armed with its own timeout and settles exactly once,
 answered or timed out, and reports back through declared outputs.
 
@@ -14,7 +14,7 @@ answered or timed out, and reports back through declared outputs.
 The checkout story continues. The shop fulfills orders, but fulfillment needs
 answers: the shipping partner must confirm the order ships. The shop fires many
 requests at once, and each order needs its own request, its own timeout, and
-exactly one outcome — answered or timed out.
+exactly one outcome, answered or timed out.
 
 [Dynamic Children](/mantaq/sugar/dynamic-children/) gave workers that answered
 nothing. [Effect Helpers](/mantaq/sugar/effect-helpers/) gave the timeout. This
@@ -23,7 +23,7 @@ page: workers answer back.
 ## The request handler
 
 **What:** one short-lived machine per request. `idle` until told to work, then
-`pending` — armed with its own timeout — then one final state: `answered` or
+`pending`, armed with its own timeout, then one final state: `answered` or
 `timedOut`.
 
 **Why:** the child IS the bookkeeping. Exactly once, by construction: a final
@@ -102,7 +102,7 @@ It routes answers to the right handler and collects settlements. The bridge
 watches the parent's outputs and turns settlements into promises.
 
 **Why:** many requests in flight, keyed by correlation id. The map gives
-per-key routing for free. The parent is a thin coordinator — it does not track
+per-key routing for free. The parent is a thin coordinator. It does not track
 pending requests; the handler lifecycle does. Promises live at the boundary,
 never in the machine.
 
@@ -186,7 +186,7 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
     },
     waitFor: (orderId: string): Promise<Settled> => {
       const settled = manager.snapshot().context.results[orderId];
-      if (settled) return Promise.resolve(settled); // already done — idempotent
+      if (settled) return Promise.resolve(settled); // already done, idempotent
       return new Promise((resolve) => {
         const list = pending.get(orderId);
         if (list) list.push(resolve);
@@ -198,14 +198,14 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
 ```
 
 Three transitions. `request` spawns a handler and hands it the request.
-`answer` forwards to the keyed handler. `requestSettled` — the handler's
-output, received as an input — records the result and re-emits it outward as
+`answer` forwards to the keyed handler. `requestSettled`, the handler's
+output, received as an input, records the result and re-emits it outward as
 `orderSettled`.
 
 ### The wiring line
 
 `regions` wire child outputs into the parent automatically. `ActorMap`
-children do not — one explicit line in the factory does it:
+children do not. One explicit line in the factory does it:
 
 ```ts
 onOutput(child, (e) => {
@@ -213,14 +213,14 @@ onOutput(child, (e) => {
 });
 ```
 
-`onOutput` is sugar's public wrapper for the output seam — no internal import
+`onOutput` is sugar's public wrapper for the output seam. No internal import
 needed. The `is()` guard narrows the child's output to the parent's declared
 input. No cast, no parent pointer, no hand-rolled routing.
 
-[Dynamic Children](/mantaq/sugar/dynamic-children/) taught `reportTo` — the
+[Dynamic Children](/mantaq/sugar/dynamic-children/) taught `reportTo`, the
 receiver carried in the child's context. It works. But context is state: a
 live actor reference in it is not serializable, and the child learns its
-listener's name. Declared outputs keep the child parent-agnostic — it emits
+listener's name. Declared outputs keep the child parent-agnostic. It emits
 `requestSettled` and walks away. One wiring line replaces the pointer. The map
 still wires nothing.
 
@@ -235,7 +235,7 @@ final → done → removed. Timeout fires → same. No cleanup code.
 manager.send(request.create({ orderId: "ord_1", timeoutMs: 1000 }));
 manager.send(answer.create({ orderId: "ord_1", result: "shipped" }));
 
-requests.size; // 0 — handler reported and reaped
+requests.size; // 0, handler reported and reaped
 ```
 
 Late answers are dropped the same way: the handler is gone, so forwarding is a
@@ -251,7 +251,7 @@ no-op. Settles exactly once.
 
 ```ts
 clock.advance(1001); // unanswered → timedOut
-clock.hasPending(); // false — the timer is gone
+clock.hasPending(); // false, the timer is gone
 ```
 
 Each request has its own timeout (`timeoutMs` in the payload). Independent
@@ -263,11 +263,11 @@ deadlines, one clock.
 settles.
 
 **Why:** the caller gets an `await`, the machine stays pure. No callbacks in
-events, no resolvers in context — the bridge in `createRequester` maps the
+events, no resolvers in context. The bridge in `createRequester` maps the
 `orderSettled` output to a resolver keyed by order id.
 
 `waitFor` reads the parent context first. A call after settlement resolves
-immediately — idempotent. Re-dispatching an order clears its settled result, so
+immediately, idempotent. Re-dispatching an order clears its settled result, so
 `waitFor` waits for the new attempt instead of returning stale data:
 
 ```ts
@@ -277,7 +277,7 @@ requester.request("ord_1", 1000);
 requester.answer("ord_1", "shipped");
 
 await requester.waitFor("ord_1"); // { orderId: "ord_1", status: "answered", result: "shipped" }
-await requester.waitFor("ord_1"); // same — already settled
+await requester.waitFor("ord_1"); // same, already settled
 ```
 
 ## Testing
@@ -300,6 +300,6 @@ it("times out an unanswered request", async () => {
 });
 ```
 
-Same clock, same inputs, same trace. The full journey — answer, timeout, late
-answer, duplicate answer, many in flight, re-dispatch — runs in
+Same clock, same inputs, same trace. The full journey, answer, timeout, late
+answer, duplicate answer, many in flight, re-dispatch, runs in
 `packages/examples/requestResponse.actor.test.ts`.

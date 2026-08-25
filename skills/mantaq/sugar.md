@@ -29,7 +29,21 @@ const dangerous = tag(state("attack")(), state("regen")());
 dangerous.has(actor.snapshot());
 ```
 
-## Dynamic Children — ActorMap
+
+## Dynamic Children (ActorMap)
+
+Spawn/kill actors by key at runtime. Children wire output → parent.
+
+```ts
+const map = new ActorMap(parentActor);
+map.spawn("order-1", () => new Actor({ ... }));
+map.send("order-1", someEvent.create());
+map.kill("order-1");              // aborts child effects
+map.ensure("order-2", factory);   // spawn if missing
+map.snapshot("order-1");
+```
+
+## Dynamic Children (ActorMap)
 
 Spawn/kill actors by key at runtime. Children wire output → parent.
 
@@ -66,9 +80,11 @@ withPromise(promise, signal, emit, {
 });
 ```
 
-`withTimeout`'s timer is NOT removed on abort — the callback no-ops via `signal.aborted`. For immediate removal, pass the signal to `clock.setTimeout` or clear in an abort listener.
+`withTimeout`'s timer is NOT removed on abort. The callback no-ops via
+`signal.aborted`. For immediate removal, pass the signal to
+`clock.setTimeout` or clear in an abort listener.
 
 ## Conventions
 
-- Prefer sugar over raw core — less ceremony, same semantics.
+- Prefer sugar over raw core. Less ceremony, same semantics.
 - `ActorMap`, `broadcast`, `tag` are newer; reach for them when the need arises, not preemptively.

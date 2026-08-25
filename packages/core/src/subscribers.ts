@@ -78,7 +78,7 @@ export class Subscribers<C> {
   }
 
   #safe(fn: () => void): void {
-    // A subscriber only watches the machine — it never changes it. Its throw
+    // A subscriber only watches the machine. It never changes it. Its throw
     // is swallowed so the machine and its callers are unaffected.
     void Either.from(() => (fn(), true));
   }
@@ -93,7 +93,7 @@ export class Subscribers<C> {
   emitOutput(event: InternalEvent): void {
     // Output delivery is machine-facing: a throwing handler must let the
     // actor's #safe("output") route it into the error state, so no swallow
-    // here — the actor wraps this call in #safe.
+    // here. The actor wraps this call in #safe.
     for (const fn of this.output) {
       fn(event);
     }

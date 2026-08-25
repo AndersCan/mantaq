@@ -45,12 +45,12 @@ const back = event("back")();
 
 ### `EventRef<T, Payload>`
 
-| Property           | Type                            | What                          |
-| ------------------ | ------------------------------- | ----------------------------- |
-| `type`             | `T`                             | Event type (discriminant)     |
-| `.is(event)`       | `boolean`                       | Identity check. Type guard    |
-| `.create()`        | `{ type: T }`                   | Void-payload events only      |
-| `.create(payload)` | `{ type: T; payload: Payload }` | Payload events — arg required |
+| Property           | Type                            | What                         |
+| ------------------ | ------------------------------- | ---------------------------- |
+| `type`             | `T`                             | Event type (discriminant)    |
+| `.is(event)`       | `boolean`                       | Identity check. Type guard   |
+| `.create()`        | `{ type: T }`                   | Void-payload events only     |
+| `.create(payload)` | `{ type: T; payload: Payload }` | Payload events. Arg required |
 
 ---
 
@@ -125,7 +125,7 @@ class Actor<
 
 ## `ActorBuilder`
 
-The type-safe registrar passed to `setup`. Targets validate against declared states, inputs, internal, and output events — an undeclared state, event, or emit fails to compile.
+The type-safe registrar passed to `setup`. Targets validate against declared states, inputs, internal, and output events. An undeclared state, event, or emit fails to compile.
 
 ```ts
 setup: (m) => {
@@ -203,7 +203,7 @@ interface Snapshot<C = unknown> {
 }
 ```
 
-`done` is set when the actor reaches a final state — including the terminal
+`done` is set when the actor reaches a final state, including the terminal
 `__error` state, so a died machine reports both `done: true` and `error`.
 `done` alone means successful completion; `error` means it died. Either way
 sends are ignored.
@@ -286,6 +286,6 @@ interface AnyActor<C = Record<string, unknown>> {
 | `CreatedOf<E>`             | Event instance type for `E`: `{ type }` or `{ type; payload }` |
 | `CreatedOfEvent<Id, P>`    | Same, explicit id and payload                                  |
 | `EffectFn<C, P>`           | `(input: EffectInput<C, P>) => void \| Promise<void>`          |
-| `ErrorInfo`                | `{ error; state; context; event; reason }` — last failure      |
-| `ErrorState`               | `StateRef<"__error", unknown, true>` — terminal error state    |
-| `SetupFn<...>`             | `(m: ActorBuilder<...>) => void` — the `setup` option type     |
+| `ErrorInfo`                | `{ error; state; context; event; reason }`. Last failure       |
+| `ErrorState`               | `StateRef<"__error", unknown, true>`. Terminal error state     |
+| `SetupFn<...>`             | `(m: ActorBuilder<...>) => void`. The `setup` option type      |

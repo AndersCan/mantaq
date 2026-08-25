@@ -5,7 +5,7 @@ description: Nodes in the state graph.
 
 ## What
 
-A state is a node in the machine's graph — one step of your flow, named and
+A state is a node in the machine's graph: one step of your flow, named and
 typed. `state("basicInfo")()` creates one.
 
 ## Why
@@ -16,8 +16,8 @@ in sync is exactly where flows rot. A state machine makes each step a
 first-class node: where you are is a property of the machine, not a variable
 you must remember to update.
 
-State is not data. The values you collect along the way — the email, the
-address, the card number — live in context, covered on the
+State is not data. The values you collect along the way, the email, the
+address, and the card number, live in context, covered on the
 [Context](/mantaq/core-concepts/context/) page. State answers "where am I?";
 context answers "what do I know?".
 
@@ -39,7 +39,7 @@ basicInfo.name; // "basicInfo"
 basicInfo.isFinal; // false
 ```
 
-Each step of the form is a node. No boolean flags, no `currentStep` variable —
+Each step of the form is a node. No boolean flags, no `currentStep` variable;
 the state _is_ the step.
 
 ## Final states

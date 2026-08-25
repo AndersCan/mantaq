@@ -15,8 +15,8 @@ generated cases reproducible.
 ## Why
 
 A hand-written test covers the deadline case you thought of. A property covers
-_all_ deadline cases — including `advanceMs` exactly equal to `timeoutMs`, zero
-timeouts, and aborted runs — in one test. When a property fails, the runner
+_all_ deadline cases in one test, including `advanceMs` exactly equal to
+`timeoutMs`, zero timeouts, and aborted runs. When a property fails, the runner
 prints the shrunk minimal counterexample, seeded and reproducible.
 
 ## The runner
@@ -32,12 +32,12 @@ import { fc, runProperty } from "@mantaq/pbt";
 `fc` is fast-check's full API; `@mantaq/pbt` also provides ready-made
 arbitraries (`anyDuration`, `anySmallDuration`, `anyPayload`, …).
 
-## Property 1 — deadlines are exact
+## Property 1: deadlines are exact
 
 An actor in `submitting` schedules its own completion: a timer effect emits
 `submittingDone` after `timeoutMs`, moving it to `success`. The invariant:
 **the machine is in `success` if and only if the clock advanced at least
-`timeoutMs`** — never before, never "stuck" after.
+`timeoutMs`**, never before, never "stuck" after.
 
 ```ts
 import { Actor, VirtualClock } from "@mantaq/core";
@@ -75,7 +75,7 @@ Two details carry the weight: `VirtualClock` means the timer fires only when
 you advance past it, and `internal: [submittingDone]` marks the event as
 machine-internal so external sends cannot fake the deadline.
 
-## Property 2 — back-navigation never reaches a final state
+## Property 2: back-navigation never reaches a final state
 
 From any pre-payment step, mashing `back` must always land in a live step and
 never touch `success` or `error`:
@@ -115,12 +115,12 @@ runProperty(fc.integer({ min: 0, max: 10 }), (presses) => {
 - Set `MANTAQ_SEED=<n>` to explore new input regions locally after a fix, or
   to replay a reported counterexample exactly.
 - Keep `numRuns` at its default (100). If a property is too slow, shrink the
-  machine or the arbitrary — do not lower coverage silently.
+  machine or the arbitrary. Do not lower coverage silently.
 
 ## When properties vs. examples
 
 Reach for **examples** when you are documenting behavior ("back from payment
-returns to shipping") — they read like specs. Reach for **properties** when
+returns to shipping"). They read like specs. Reach for **properties** when
 you are defending an invariant over an input space ("timers fire exactly at
 their deadline", "subscribers see one change per transition"). Mature machines
 carry both: examples for readability, properties for the edges no human thinks

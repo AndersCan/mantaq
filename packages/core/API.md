@@ -1,4 +1,4 @@
-# `@mantaq/core` — Public API Contract
+# `@mantaq/core` Public API Contract
 
 The frozen, hand-curated public surface of `@mantaq/core`. Everything here is
 stable; anything not here is not public.
@@ -143,7 +143,7 @@ if (move.is(evt)) evt.payload.x; // narrowed
 
 ### Context
 
-User land. The record you pass to the constructor, mutated freely in handlers. The handle passed to transition handlers and effects as `{ context }`. `get()` returns the live record; `set(value)` is the write signal — calling `set()` emits a `change` event even when the reference is unchanged (so an object mutated in place still signals by being passed to `set`). Context is never deep-compared.
+User land. The record you pass to the constructor, mutated freely in handlers. The handle passed to transition handlers and effects as `{ context }`. `get()` returns the live record; `set(value)` is the write signal. Calling `set()` emits a `change` event even when the reference is unchanged (so an object mutated in place still signals by being passed to `set`). Context is never deep-compared.
 
 ```ts
 class Context<T> {
@@ -162,7 +162,7 @@ m.on(idle, tick, (_e, { context }) => {
 
 ### Snapshot
 
-Read-only view of actor state: `path` is the state-name chain from the root, `context` is the current context reference, `payload` is the payload the current state was entered with (present only when the transition carried one), `regions` nests child snapshots, `done` appears once a final state is reached. `error` appears once the machine dies into the error state — the actor stops processing and every later `send` is a no-op.
+Read-only view of actor state: `path` is the state-name chain from the root, `context` is the current context reference, `payload` is the payload the current state was entered with (present only when the transition carried one), `regions` nests child snapshots, `done` appears once a final state is reached. `error` appears once the machine dies into the error state. The actor stops processing and every later `send` is a no-op.
 
 ```ts
 interface Snapshot<C = unknown> {
@@ -175,11 +175,11 @@ interface Snapshot<C = unknown> {
 }
 ```
 
-`done` and `error` are not mutually exclusive: the machine sets `error` when it dies, and the error state is itself terminal, so `done` is also set. `done` alone means the machine completed successfully; `error` means it died. The machine is dead either way — sends are ignored.
+`done` and `error` are not mutually exclusive: the machine sets `error` when it dies, and the error state is itself terminal, so `done` is also set. `done` alone means the machine completed successfully; `error` means it died. The machine is dead either way. Sends are ignored.
 
 ### ErrorInfo
 
-What the machine records when it dies into the error state: the thrown value, the state and context at the point of failure (the state being entered when its effect or handler threw — post-step, so error reports reflect what actually ran), the bad event, and why the machine died.
+What the machine records when it dies into the error state: the thrown value, the state and context at the point of failure (the state being entered when its effect or handler threw, post-step, so error reports reflect what actually ran), the bad event, and why the machine died.
 
 ```ts
 interface ErrorInfo {
@@ -199,16 +199,16 @@ if (snap.error) {
 
 ### ErrorState
 
-The built-in terminal state the machine enters on any runtime error: a user handler or effect threw; the internal budget was exhausted; an output handler threw; or an internal event was emitted with no handler. It is not a declared state — it is synthesized by the actor. It is final: `snapshot().done` is true and the `done` event fires, so parents and maps can reap it. The machine is dead: remaining queued events are dropped, effects are aborted, and every subsequent `send` is a no-op.
+The built-in terminal state the machine enters on any runtime error: a user handler or effect threw; the internal budget was exhausted; an output handler threw; or an internal event was emitted with no handler. It is not a declared state. It is synthesized by the actor. It is final: `snapshot().done` is true and the `done` event fires, so parents and maps can reap it. The machine is dead: remaining queued events are dropped, effects are aborted, and every subsequent `send` is a no-op.
 
-Subscribers are watchers — they only read snapshots, never change the machine — so a subscriber throw is swallowed and never affects the machine or its callers. External events with no handler in the current state are likewise ignored by design (broadcast fan-out, cross-state sends). Every other failure is loud: misconfiguration throws at construction, invalid clock input is clamped platform-style, and runtime user-code errors route to the error state.
+Subscribers are watchers. They only read snapshots, never change the machine, so a subscriber throw is swallowed and never affects the machine or its callers. External events with no handler in the current state are likewise ignored by design (broadcast fan-out, cross-state sends). Every other failure is loud: misconfiguration throws at construction, invalid clock input is clamped platform-style, and runtime user-code errors route to the error state.
 
 ```ts
 type ErrorState = StateRef<"__error", unknown, true>;
 const dead = actor.snapshot().path[0] === "__error";
 ```
 
-Errors never escape `send()` — they become the error state. Check `snapshot().error` to observe a failure; it is deterministic (same inputs, same trace).
+Errors never escape `send()`. They become the error state. Check `snapshot().error` to observe a failure. It is deterministic (same inputs, same trace).
 
 ### ErrorReason
 
@@ -268,9 +268,9 @@ type InitialState<S extends AnyStateRef> =
 
 ### recover
 
-`actor.recover({ state, context })` manually restores a dead machine. It is **inherently dangerous** — the caller injects state and context, so the trajectory is no longer deterministic ("same inputs, same trace" no longer holds). It is an explicit escape hatch for app-level recovery, not part of the normal flow; prefer fixing the root cause and recreating the actor.
+`actor.recover({ state, context })` manually restores a dead machine. It is **inherently dangerous**. The caller injects state and context, so the trajectory is no longer deterministic ("same inputs, same trace" no longer holds). It is an explicit escape hatch for app-level recovery, not part of the normal flow. Prefer fixing the root cause and recreating the actor.
 
-Recovery does **not** re-run the target state's effects and does not re-arm its timers — the machine resumes event processing only. Send an event (or transition through the state) to re-trigger effects. Recovering into the same state whose effect killed the machine is safe because nothing re-runs.
+Recovery does **not** re-run the target state's effects and does not re-arm its timers. The machine resumes event processing only. Send an event (or transition through the state) to re-trigger effects. Recovering into the same state whose effect killed the machine is safe because nothing re-runs.
 
 ```ts
 actor.recover({ state: idle, context: { retries: 0 } });
@@ -278,7 +278,7 @@ actor.recover({ state: idle, context: { retries: 0 } });
 
 ### on("transition", fn)
 
-Observability hook fired for every **handled** event (matched a state or `onAny` handler), including self-transitions and no-op results, with the real event — internal events from effects included. `from` is the state before dispatch, `to` is the event's own transition target (captured before any cascade runs, so cascaded internal events each report their own `from`/`to` correctly). `transitioned` is true when a state step was applied (including self-transitions, whose effects re-run). `effects` lists the names of the target state's effects that actually ran on entry, in registration order. Not fired for dropped events. This is the instrumentation primitive behind `@mantaq/test`'s coverage.
+Observability hook fired for every **handled** event (matched a state or `onAny` handler), including self-transitions and no-op results, with the real event, internal events from effects included. `from` is the state before dispatch, `to` is the event's own transition target (captured before any cascade runs, so cascaded internal events each report their own `from`/`to` correctly). `transitioned` is true when a state step was applied (including self-transitions, whose effects re-run). `effects` lists the names of the target state's effects that actually ran on entry, in registration order. Not fired for dropped events. This is the instrumentation primitive behind `@mantaq/test`'s coverage.
 
 ```ts
 actor.on("transition", ({ event, from, to, transitioned, effects }) => {
@@ -288,7 +288,7 @@ actor.on("transition", ({ event, from, to, transitioned, effects }) => {
 
 ### on("error", fn)
 
-Fired once when the machine dies into the error state, with the `ErrorInfo` describing why. Pair it with `recover` for app-level recovery, or with `snapshot().error` for read-only observation (the error state is terminal — `done` is also set). Like all subscribers, a throw inside the handler is swallowed and never affects the machine.
+Fired once when the machine dies into the error state, with the `ErrorInfo` describing why. Pair it with `recover` for app-level recovery, or with `snapshot().error` for read-only observation (the error state is terminal, `done` is also set). Like all subscribers, a throw inside the handler is swallowed and never affects the machine.
 
 ```ts
 actor.on("error", (info) => {
@@ -298,7 +298,7 @@ actor.on("error", (info) => {
 
 ### on("output", fn)
 
-Fires for **output** events — events whose type is not a declared input or internal event. The primary source is regions: a parent actor automatically receives each child's declared outputs here (the child→parent wiring is built in). Any event pushed via `inject` whose type is neither an input nor an internal type also routes to output subscribers. This is the seam for fanning child work back up to a coordinator.
+Fires for **output** events. Events whose type is not a declared input or internal event. The primary source is regions: a parent actor automatically receives each child's declared outputs here (the child→parent wiring is built in). Any event pushed via `inject` whose type is neither an input nor an internal type also routes to output subscribers. This is the seam for fanning child work back up to a coordinator.
 
 ```ts
 actor.on("output", (event) => {
@@ -308,7 +308,7 @@ actor.on("output", (event) => {
 
 ### inject
 
-Push an event into the machine's internal queue and drain. If the event's type is a declared input or internal event it is dispatched like any other event; otherwise it routes to `on("output")` subscribers. It is the external bridge for feeding the machine events that originate outside the normal `send` path — e.g. a timer, a network callback, or a test harness. No-op once the actor is `dispose`d.
+Push an event into the machine's internal queue and drain. If the event's type is a declared input or internal event it is dispatched like any other event; otherwise it routes to `on("output")` subscribers. It is the external bridge for feeding the machine events that originate outside the normal `send` path. E.g. a timer, a network callback, or a test harness. No-op once the actor is `dispose`d.
 
 ```ts
 actor.inject(sync.create({ peer: "alice" })); // declared internal/input -> dispatched
@@ -326,7 +326,7 @@ actor.send(click.create()); // ignored
 
 ### AnyActor
 
-Structural handle for any actor — regions, `context`, and `options`. `context` is the raw current value; write through the handler `context.set()` instead.
+Structural handle for any actor. Regions, `context`, and `options`. `context` is the raw current value; write through the handler `context.set()` instead.
 
 ```ts
 interface AnyActor<C = Record<string, unknown>> {
@@ -374,7 +374,7 @@ interface Clock {
 
 ### ActorBuilder
 
-The type-safe transition/effect registrar passed to `setup`. Targets validate against declared `States`/`Inputs`/`Internal`/`Outputs` — an undeclared target fails to compile.
+The type-safe transition/effect registrar passed to `setup`. Targets validate against declared `States`/`Inputs`/`Internal`/`Outputs`. An undeclared target fails to compile.
 
 ```ts
 class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
@@ -426,7 +426,7 @@ interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
 
 ### PayloadOf
 
-Lifts a `StateRef` to its declared payload type — the type `m.effect` infers for `state.payload`.
+Lifts a `StateRef` to its declared payload type. The type `m.effect` infers for `state.payload`.
 
 ```ts
 type PayloadOf<S extends AnyStateRef> =
@@ -435,7 +435,7 @@ type PayloadOf<S extends AnyStateRef> =
 
 ### EventTypeOf
 
-Lifts an `EventRef` to its declared `type` literal — the constraint on `emit` entries.
+Lifts an `EventRef` to its declared `type` literal. The constraint on `emit` entries.
 
 ```ts
 type EventTypeOf<E extends AnyEventRef> =
@@ -471,7 +471,7 @@ type AnyEventRef = EventRef<string, object | void>;
 
 ### InternalEvent
 
-Runtime event shape: `{ type: string; payload?: unknown }` — the structural contract the queue, effects, and region wiring move. Public despite the prefix; it is the allowlist exception. Handlers always receive a `payload` — a payload-less event is normalized to `payload: {}` at the dispatch boundary, so payload-reading handlers never hit `undefined`.
+Runtime event shape: `{ type: string; payload?: unknown }`. The structural contract the queue, effects, and region wiring move. Public despite the prefix; it is the allowlist exception. Handlers always receive a `payload`. A payload-less event is normalized to `payload: {}` at the dispatch boundary, so payload-reading handlers never hit `undefined`.
 
 ```ts
 type InternalEvent = { type: string; payload?: unknown };
@@ -487,7 +487,7 @@ type CreatedOfEvent<T extends string, P> = P extends void ? { type: T } : { type
 
 ### EffectInput
 
-Argument to every effect. `signal` ties lifetime to state exit; `emit` sends events back into the machine; `state` is the entered state, `event` caused it. Effects run exactly once per state entry — the initial state runs its effects at construction (`event` is the synthetic `{ type: "__init" }`), and terminal states run theirs on entry.
+Argument to every effect. `signal` ties lifetime to state exit; `emit` sends events back into the machine; `state` is the entered state, `event` caused it. Effects run exactly once per state entry. The initial state runs its effects at construction (`event` is the synthetic `{ type: "__init" }`), and terminal states run theirs on entry.
 
 ```ts
 interface EffectInput<ActorContext, Payload = unknown> {
@@ -501,12 +501,12 @@ interface EffectInput<ActorContext, Payload = unknown> {
 ```
 
 `Payload` is inferred from the state's declared payload when the effect is registered with
-`m.effect(stateRef, { name, fn })` — `state.payload` is typed, no cast needed. States declared without a
+`m.effect(stateRef, { name, fn })`. `state.payload` is typed, no cast needed. States declared without a
 payload generic (`state("idle")()`) keep `payload: unknown`.
 
 ### EffectFn
 
-An effect function, run on state entry; the signal aborts on state exit or actor halt. May return a promise for async work — a rejected promise is contained the same way as a synchronous throw and kills the machine.
+An effect function, run on state entry; the signal aborts on state exit or actor halt. May return a promise for async work. A rejected promise is contained the same way as a synchronous throw and kills the machine.
 
 ```ts
 type EffectFn<ActorContext, Payload = unknown> = (
@@ -524,7 +524,7 @@ m.effect(loading, {
 
 ### NonFinalStateRef
 
-Extracts only non-final members of a states array — the states you may still transition to.
+Extracts only non-final members of a states array. The states you may still transition to.
 
 ```ts
 type NonFinalStateRef<States extends AnyStateRef[]> = Extract<States[number], { isFinal: false }>;
@@ -541,20 +541,28 @@ type CreatedOf<E extends AnyEventRef> =
 
 ## Surface rules
 
-The north star, restated for the public surface. `scripts/vision-guard.mjs`
+The goal, restated for the public surface. `scripts/vision-guard.mjs`
 enforces these mechanically; `typecheck.test.ts` enforces type = behavior. This
-document is the oracle for API taste — the product.
+document is the oracle for API taste. The product.
 
 - **Small surface.** `index.ts` is capped by an export budget. Every addition
   pays: it must earn its place and update this document.
 - **No `Internal*` leaks.** Nothing named `Internal*` may be public except the
-  allowlist — currently `InternalEvent`. `__`-prefixed members are internal
+  allowlist, currently `InternalEvent`. `__`-prefixed members are internal
   plumbing, not API; treat as absent.
 - **One way to do things.** No aliases, no competing APIs. If two exports do the
   same thing, one is a bug. Recipes compose primitives; they add no surface.
 - **Type = behavior.** If it typechecks, it runs correct. The names, payloads,
   and literals above are the truth; runtime must match exactly. Forcing the
-  compiler quiet is the wrong path — refactor, never cast.
+  compiler quiet is the wrong path. Refactor, never cast.
 - **Freeze discipline.** Every entry above is a promise. Changing a signature or
   removing a name is breaking; do it deliberately, update this document in the
   same commit, and let the guard prove both in sync.
+
+# `@mantaq/core` Public API Contract
+
+The frozen, hand-curated public surface of `@mantaq/core`. Everything here is
+stable; anything not here is not public.
+
+Single entry point: `packages/core/src/index.ts`. A name exported there and
+absent here is a guard violation, and vice versa.

@@ -18,4 +18,4 @@ Either.getRight(ok); // { done: true }
 Either.map(ok, (v) => v.done); // [undefined, true]
 ```
 
-Errors flow as values — no exceptions.
+Errors flow as values. No exceptions.

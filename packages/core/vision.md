@@ -6,7 +6,7 @@ Extension of root `vision.md` for core package
 
 The runtime. The primitives. mantaq, minus ergonomics.
 
-core imports nothing above it. utils — the zero-dependency bottom layer (Either) — is the one exception. core stands alone otherwise.
+core imports nothing above it. utils, the zero-dependency bottom layer (Either), is the one exception. core stands alone otherwise.
 
 ## Testable first
 
@@ -34,8 +34,8 @@ No casts to force the compiler quiet. No stringly-typed ids. Type flow carries f
 
 Children compose through regions. Outputs route upward. No silent loss.
 
-A pattern belongs in a recipe, not a primitive — until it proves it cannot compose its way out.
+A pattern belongs in a recipe, not a primitive, until it proves it cannot compose its way out.
 
 ## Small Impl
 
-Runtime code stays trivial. No surprises for the user — surprise = bug.
+Runtime code stays trivial. No surprises for the user. Surprise = bug.

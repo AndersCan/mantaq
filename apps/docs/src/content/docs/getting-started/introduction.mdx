@@ -5,8 +5,8 @@ description: What is Mantaq.
 
 ## What
 
-Mantaq is a state machine library for TypeScript. You model a flow — a
-checkout form, an order pipeline, a game — as states and the events that move
+Mantaq is a state machine library for TypeScript. You model a flow, a
+checkout form or an order pipeline or a game, as states and the events that move
 between them. Mantaq runs the machine: it tracks where the flow is, fires
 transitions, runs side effects, and cleans up after itself.
 
@@ -19,17 +19,17 @@ flow the source of truth: every state and every possible transition is declared
 up front, typed, and testable.
 
 Reach for Mantaq whenever you have a flow with a known set of steps and clear
-transitions between them. It is not a general-purpose state container — it
+transitions between them. It is not a general-purpose state container. It
 models _where a process is_, not every piece of data your app holds.
 
 ## Core ideas
 
-- **Actor** — one running state machine. Holds the current state, context,
+- **Actor.** One running state machine. Holds the current state, context,
   effects, transitions, and clock.
-- **State** — a node in the flow. A state can be marked final.
-- **Event** — a typed message. Events trigger transitions.
-- **Effect** — code that runs on state entry and aborts on state exit.
-- **Context** — the data the machine carries. Survives transitions.
+- **State.** A node in the flow. A state can be marked final.
+- **Event.** A typed message. Events trigger transitions.
+- **Effect.** Code that runs on state entry and aborts on state exit.
+- **Context.** The data the machine carries. Survives transitions.
 
 ## Packages
 
@@ -86,7 +86,7 @@ checkout.snapshot().path[0]; // "payment"
 subscribers.
 
 :::tip[Sugar exists]
-Core is verbose on purpose — it shows what happens under the hood.
+Core is verbose on purpose. It shows what happens under the hood.
 
 `@mantaq/sugar` has helpers: `matches(checkout, "payment")` instead of
 `snapshot().path[0] === "payment"`. Batch creation, effect helpers, state

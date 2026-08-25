@@ -1,22 +1,22 @@
 ---
 title: Dynamic Children
-description: Dynamic child management with ActorMap and broadcast.
+description: Dynamic child management with ActorMap and broadcast
 ---
 
 ## What
 
-`ActorMap` and `broadcast()` manage children that arrive at runtime — the same
+`ActorMap` and `broadcast()` manage children that arrive at runtime. The same
 actor shape, an unknown count, keyed by id. `ActorMap` is the keyed registry;
 `broadcast()` sends one event to every child.
 
 ## Why
 
-Static children — `regions` — are known at construction. Real systems spawn
+Static children, `regions`, are known at construction. Real systems spawn
 work at runtime: an order arrives, a worker starts. Something must create those
 workers, track them, and address them by id. That something is `ActorMap`.
 
 The checkout story continues. The order is placed; the shop fulfills it. Orders
-arrive at runtime — how many, unknown. One worker per order.
+arrive at runtime, how many unknown. One worker per order.
 
 ## ActorMap
 
@@ -25,8 +25,8 @@ instances, keyed by id.
 
 The point is fan-out: one order → one worker → one key.
 
-**Not a map of things.** The constructor argument is a **factory** — the actor
-to replicate — never a parent, never a collection type. `new ActorMap(shop)`
+**Not a map of things.** The constructor argument is a **factory**, the actor
+to replicate, never a parent, never a collection type. `new ActorMap(shop)`
 does not mean "a map of shops." It means "spawn copies of `shop`-shaped
 actors."
 
@@ -46,7 +46,7 @@ of that one actor. `options: { autoReap }` is covered below.
 ### One actor, many instances
 
 The map holds one actor shape. Keys are the ids. `spawn("ord_1")` runs the
-factory with `"ord_1"` — the key lands in the child's context, so each worker
+factory with `"ord_1"`. The key lands in the child's context, so each worker
 knows which order it owns.
 
 ```ts
@@ -67,7 +67,7 @@ const orders = new ActorMap(
 
 Same actor, fresh per key. `spawn("ord_1")` twice → two independent workers.
 
-A child that answers back holds its receiver in context — the map does no
+A child that answers back holds its receiver in context. The map does no
 wiring. The worker reports, the receiver listens:
 
 ```ts
@@ -164,7 +164,7 @@ receiver.
 
 Ship an order → the worker reaches `shipped` → done. By default the worker
 lingers in the map until `kill`. With `autoReap`, the map removes it the moment
-a child completes — or dies into `__error`.
+a child completes or dies into `__error`.
 
 ```ts
 const orders = new ActorMap(createOrderWorker, { autoReap: true });
@@ -233,4 +233,4 @@ orders.kill("ord_1");
 // Actor exits. Effects abort. Context gone.
 ```
 
-No manual cleanup — the actor handles it.
+No manual cleanup. The actor handles it.

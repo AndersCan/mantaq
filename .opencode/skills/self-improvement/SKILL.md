@@ -54,8 +54,8 @@ Every PR created must have auto-merge enabled: `gh pr merge $PR --auto --merge`
 ### Phase 0: Setup
 
 ```
-rtk git checkout main && rtk git pull
-git checkout -b self-improvement/<short-description>
+git fetch origin
+rtk git checkout -b self-improvement/<short-description> origin/main
 ```
 
 > See [`rtk` command](../command/rtk.md) for docs.

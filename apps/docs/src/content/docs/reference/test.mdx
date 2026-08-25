@@ -12,7 +12,7 @@ function createTestHarness<C>(actor: AnyActor<C>): TestHarness<C>;
 Instruments an actor for testing. Builds the state graph from the actor
 definition and wraps `send` to record history.
 
-Returns a `TestHarness` — send events through it, then assert against the
+Returns a `TestHarness`. Send events through it, then assert against the
 recorded history.
 
 ```ts
@@ -94,7 +94,7 @@ All throw on failure.
 
 ### Query methods
 
-Boolean checks — no throw.
+Boolean checks, no throw.
 
 | Method                              | What              |
 | ----------------------------------- | ----------------- |

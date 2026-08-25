@@ -1,6 +1,6 @@
 ---
 title: Matching
-description: State matching, grouping, and leaf detection.
+description: State matching, grouping, and leaf detection
 ---
 
 ## What
@@ -12,7 +12,7 @@ The matching helpers answer one question: where is the machine right now?
 ## Why
 
 `checkout.snapshot().path[0] === "payment"` works, but it reads badly, and it
-gets worse as machines nest — the fraud region pushes every child state one
+gets worse as machines nest. The fraud region pushes every child state one
 level deeper, and hand-joined path checks start compounding. The helpers give
 readable, intent-naming checks and handle the path joining for you.
 
@@ -30,7 +30,7 @@ matches(checkout, "basicInfo"); // top-level
 ```
 
 It starts at the top-level state and descends only through region names, in
-order, ending at a state or region boundary. It is NOT a whole-tree search — a
+order, ending at a state or region boundary. It is NOT a whole-tree search. A
 nested `"payment"` under a different top state fails `matches(actor,
 "payment")`. Use `isIn` for that.
 

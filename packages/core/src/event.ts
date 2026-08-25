@@ -1,7 +1,7 @@
 // Per-type brand registry. A unique symbol is minted for each event type so
 // that `create()`-produced envelopes carry a private marker that only the
 // matching `EventRef` can verify. A hand-built `{ type: "x" }` has no brand,
-// so `is()` rejects it — making the type guard sound without walking the
+// so `is()` rejects it, making the type guard sound without walking the
 // payload at runtime (see #240 / #262).
 const brandByType = new Map<string, symbol>();
 

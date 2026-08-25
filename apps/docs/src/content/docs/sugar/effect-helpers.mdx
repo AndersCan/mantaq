@@ -1,6 +1,6 @@
 ---
 title: Effect Helpers
-description: Promise bridging and timeout helpers for effects.
+description: Promise bridging and timeout helpers for effects
 ---
 
 ## What
@@ -12,7 +12,7 @@ fires an event.
 ## Why
 
 Both patterns share a footgun: the abort check. A promise resolves after the
-user left the state, or a timer fires after exit — without the check, you emit
+user left the state, or a timer fires after exit. Without the check, you emit
 into a machine that has already moved on. The helpers do the check for you, and
 they read the actor's clock, so tests stay deterministic on a `VirtualClock`.
 
@@ -79,8 +79,8 @@ withPromise(promise, signal, emit, {
 });
 ```
 
-The return value is emitted as an event. The actor dispatches it — internal or
-input events trigger a transition, anything else goes out as an output.
+The return value is emitted as an event. The actor dispatches it. Internal or
+input events trigger a transition. Anything else goes out as an output.
 
 ## withTimeout
 
@@ -160,7 +160,7 @@ clock.advance(800); // triggers timeout
 matches(checkout, "success"); // true
 ```
 
-The test stays deterministic — same as core, less boilerplate.
+The test stays deterministic. Same as core, less boilerplate.
 
 ## Abort safety
 

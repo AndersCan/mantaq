@@ -19,7 +19,7 @@ function buildGraph<C>(
 Builds a graph from an actor definition. Nodes are states, edges are
 transitions. Effect self-loops and region children are included.
 
-`internalIds` marks event types as internal — their edges are excluded from
+`internalIds` marks event types as internal. Their edges are excluded from
 coverage. `sampleContexts` provides context values for handler evaluation.
 
 ```ts
@@ -81,9 +81,9 @@ class History {
 
 Append-only log of actor activity. Query by type or get derived sets.
 
-- `visitedStates()` — unique state names entered
-- `firedTransitions()` — `"from:event"` strings for fired transitions
-- `reset()` — clear all entries
+- `visitedStates()`: unique state names entered
+- `firedTransitions()`: `"from:event"` strings for fired transitions
+- `reset()`: clear all entries
 
 ---
 

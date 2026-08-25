@@ -11,7 +11,7 @@ of the graph were exercised.
 
 ## Why
 
-Manual assertion — `expect(snapshot().path[0]).toBe("payment")` — checks one
+Manual assertion with `expect(snapshot().path[0]).toBe("payment")` checks one
 step. The test harness checks the whole walk. State coverage, transition
 coverage, and effect coverage in one place. If you missed a branch, the
 harness tells you which one.
@@ -150,8 +150,8 @@ harness.reset(); // clear history, start fresh
 
 ## Key takeaways
 
-- **`createTestHarness(actor)`** — instruments and builds graph in one call
-- **`harness.send(event)`** — drives the instrumented actor
-- **Assert family** — `assertState*`, `assertTransition*`, `assertAll*`, `assertEffect*`
-- **`harness.coverage()`** — numeric report with uncovered paths
-- **`harness.reset()`** — clear history between test cases
+- **`createTestHarness(actor)`** instruments and builds graph in one call
+- **`harness.send(event)`** drives the instrumented actor
+- **Assert family** `assertState*`, `assertTransition*`, `assertAll*`, `assertEffect*`
+- **`harness.coverage()`** numeric report with uncovered paths
+- **`harness.reset()`** clear history between test cases

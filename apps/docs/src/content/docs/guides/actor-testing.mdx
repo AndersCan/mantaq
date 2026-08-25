@@ -6,13 +6,13 @@ description: How to test the checkout machine using graph traversal patterns.
 ## What
 
 Testing an actor means driving it with events and asserting where it lands. The
-machine is a graph — states are nodes, transitions are edges — so a test is a
+machine is a graph: states are nodes, transitions are edges. A test is a
 walk through that graph.
 
 ## Why
 
 Mantaq is deterministic: same inputs, same trace, every time. That makes flows
-assertable without flakiness — no sleeps, no "wait 100ms and hope". Time-based
+assertable without flakiness: no sleeps, no "wait 100ms and hope". Time-based
 transitions run on a `VirtualClock`, so you fast-forward instead of waiting.
 
 The checkout machine from [Context](/mantaq/core-concepts/context/). Full flow:
@@ -189,7 +189,7 @@ clock.advance(800); // fast-forward time
 expect(checkout.snapshot().path[0]).toBe("success");
 ```
 
-Deterministic and fast: no fake timers, no sleeps — same inputs, same trace.
+Deterministic and fast: no fake timers, no sleeps. Same inputs, same trace.
 
 ### Assert Promise Effects with settled
 
@@ -233,13 +233,13 @@ expect(checkout.snapshot().path[0]).toBe("success");
 
 ## Key Takeaways
 
-- **States are nodes** — `state("basicInfo")()` creates a node in the graph
-- **Events are edges** — `event("submitBasicInfo")()` defines a possible transition
-- **Transitions are the graph** — `(state, event) → newState` maps edges
-- **Context is memory** — survives transitions, holds accumulated data
-- **Effects are side effects** — run on state entry, abort on exit
-- **Effect names** — every effect takes a required camelCase `name`; assert it ran with `harness.assertEffectRan(stateName, effectName)` (or `assertEffectNeverRan` / `wasEffectRun`)
-- **`snapshot().path[0]`** — check current state name in graph
-- **`VirtualClock`** — deterministically test time-dependent transitions
-- **`settled()`** — wait for promise effects before asserting
-- **`snapshot().done`** — check if actor reached a final state
+- **States are nodes.** `state("basicInfo")()` creates a node in the graph
+- **Events are edges.** `event("submitBasicInfo")()` defines a possible transition
+- **Transitions are the graph.** `(state, event) → newState` maps edges
+- **Context is memory.** Survives transitions, holds accumulated data
+- **Effects are side effects.** Run on state entry, abort on exit
+- **Effect names.** Every effect takes a required camelCase `name`; assert it ran with `harness.assertEffectRan(stateName, effectName)` (or `assertEffectNeverRan` / `wasEffectRun`)
+- **`snapshot().path[0]`.** Current state name in graph
+- **`VirtualClock`.** Deterministically test time-dependent transitions
+- **`settled()`.** Wait for promise effects before asserting
+- **`snapshot().done`.** True when actor reached a final state

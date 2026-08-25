@@ -85,16 +85,16 @@ Last task every run: improve this skill. Commit to same branch. Non-negotiable. 
 
 ```
 git fetch origin
-git checkout ralph/improvements || git checkout -b ralph/improvements main
+git checkout ralph/improvements || git checkout -b ralph/improvements origin/main
 git pull origin ralph/improvements || true
 ```
 
 Branch persists across runs. No new branches.
 
-Optional rebase on main (stay fresh). Skip if conflicts:
+Optional rebase on `origin/main` (stay fresh). Skip if conflicts:
 
 ```
-git rebase main || git rebase --abort
+git rebase origin/main || git rebase --abort
 ```
 
 ### Phase 1: Discover (AGENT-DRIVEN)

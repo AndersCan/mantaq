@@ -12,7 +12,7 @@ effects, the clock, and any child actors.
 ## Why
 
 States, events, and effects are declarations until an Actor runs them. The
-Actor is what makes the machine live — it accepts events, applies transitions,
+Actor is what makes the machine live. It accepts events, applies transitions,
 runs effects, and reports what it is doing. When you test a flow, you test an
 Actor.
 
@@ -121,7 +121,7 @@ basicInfo → shippingAddress → payment → submitting → success
 `back` is handled in every state with `onAny`. A state-specific handler runs
 first; `onAny` only transitions if no state handler fired.
 
-Note that nothing emits `paymentOk` yet. Effects do that — the
+Nothing emits `paymentOk` yet. Effects do that. The
 [Effects page](/mantaq/core-concepts/effects/) adds them.
 
 ## Send events

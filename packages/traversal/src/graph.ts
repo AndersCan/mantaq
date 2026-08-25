@@ -230,7 +230,7 @@ function addEdgesForActor(actor: AnyActor<unknown>, traversal: GraphTraversal): 
   const states = (actor.options?.states ?? []) as ReadonlyArray<StateDef>;
   return buildEdgesFromTransitions(
     states,
-    // AnyActor.options.types transitions values as unknown — actual type is handler functions (TransitionDispatch in actor.ts)
+    // AnyActor.options.types transitions values as unknown. Actual type is handler functions (TransitionDispatch in actor.ts)
     actor.options?.transitions as TransitionDispatchMap | undefined,
     traversal,
   );
@@ -295,7 +295,7 @@ function buildForActor(
 }
 
 function addInitialNode(actor: AnyActor<unknown>, nodes: GraphNode[], edges: GraphEdge[]): void {
-  // AnyActor.options type lacks `initial` field — cast required (see actor-internal.ts)
+  // AnyActor.options type lacks `initial` field. Cast required (see actor-internal.ts)
   const initial = (actor.options as { initial?: unknown })?.initial;
   if (!initial) return;
   const initialRef =

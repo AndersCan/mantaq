@@ -17,7 +17,7 @@ matches(checkout, "basicInfo.fraud.scanning"); // hierarchical
 matches(checkout, "basicInfo.fraud.cleared"); // parallel region
 ```
 
-Prefix match. Checks top-level state name first, then descends only through region names in order. Ends at a state boundary. `matches(actor, "connected")` → true only if top-level state is `connected`. Not "anywhere inside" — that's `isIn`.
+Prefix match. Checks top-level state name first, then descends only through region names in order. Ends at a state boundary. `matches(actor, "connected")` → true only if top-level state is `connected`. Not "anywhere inside". That's `isIn`.
 
 ---
 
@@ -30,7 +30,7 @@ function states(
 ```
 
 Batch state creation. Entries are strings, or objects with `final: true` for a
-terminal state. `success` is final right at creation — no `.final()` call.
+terminal state. `success` is final right at creation. No `.final()` call.
 
 ```ts
 const s = states("basicInfo", "payment", { name: "success", final: true }, "error");
@@ -83,9 +83,9 @@ map.send("ord_1", ship.create());
 map.kill("ord_1");
 ```
 
-`new ActorMap(factory, options?)` — `factory` builds the actor, receiving the
+`new ActorMap(factory, options?)`. `factory` builds the actor, receiving the
 key: `(id: string) => Actor`. Every `spawn(key)` creates a fresh instance of
-the same actor, keyed by id. `options: { autoReap? }` — `true` removes a child
+the same actor, keyed by id. `options: { autoReap? }`: `true` removes a child
 once it reaches a final state (or dies into `__error`). Off by default;
 completed children linger until `kill`.
 
@@ -165,7 +165,7 @@ function actorSpec<
 };
 ```
 
-Build the actor's static spec — states, inputs, internal/output events,
+Build the actor's static spec: states, inputs, internal/output events,
 context, initial state, clock, regions, budget. Returns the value, narrowing
 the state/event arrays to their literals (no `as const`) and keeping the
 context mutable. Feed it to `definePart<typeof x>` and `withParts`.
@@ -191,7 +191,7 @@ type of such a value; `BuilderOf<ActorSpec>` is its builder.
 function definePart<S extends ActorSpec = never>(fn: (m: BuilderOf<S>) => void): Fragment<S>;
 ```
 
-Wrap a slice of an actor's setup — `m.on`, `m.onAny`, `m.effect` calls — so it
+Wrap a slice of an actor's setup (`m.on`, `m.onAny`, `m.effect` calls) so it
 can live in its own file. The generic is required: omit the spec anchor and
 `S` defaults to `never`, so registering anything is a compile error rather
 than a silent loss of typing. Anchor against an `actorSpec` value:
@@ -208,8 +208,8 @@ const basicInfoPart = definePart<typeof checkout>((m) => {
 ```
 
 `typeof checkout` anchors every type in the part: states, events, context,
-outputs. Import it type-only in the part file — `import type { checkout } from
-"./checkout.ts"` — and keep the refs as value imports.
+outputs. Import it type-only in the part file, `import type { checkout } from
+"./checkout.ts"`, and keep the refs as value imports.
 
 ---
 
@@ -228,7 +228,7 @@ setup: (m) => {
 };
 ```
 
-`use` is not the React hook. It takes `Fragment`s produced by `definePart` —
+`use` is not the React hook. It takes `Fragment`s produced by `definePart`.
 define parts with `definePart`, never annotate the `Part` type by hand.
 
 ---
@@ -251,14 +251,14 @@ function withParts<
 ```
 
 Build an actor from a spec plus one part or an array of parts. The `setup` is
-generated — every part runs against the builder in order. `base` takes every
+generated. Every part runs against the builder in order. `base` takes every
 option `new Actor` takes: `clock`, `regions`, `internalBudget`, and initial
 with payload included.
 
-The parts array shares the actor's generics — `Part<States, ...>`, not any
+The parts array shares the actor's generics: `Part<States, ...>`, not any
 actor. A part built against one spec cannot be wired into another.
 
-For the same (state, event), the last registered handler wins — across parts
+For the same (state, event), the last registered handler wins, across parts
 and inline code alike. Effects append instead: every effect on a state runs on
 entry.
 
@@ -279,11 +279,11 @@ type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — wi
 
 `ActorSpec` is the type `definePart` and `use` accept. `BuilderOf` and
 `Fragment` name the part signature for explicit annotations. `Part` is the
-same shape with explicit generics — what `withParts` takes, one or an array.
+same shape with explicit generics: what `withParts` takes, one or an array.
 
 `ActorSpec` is a constraint, not a value annotation: annotating the value with
 `ActorSpec` (or `ActorOptions`) erases its literal state/event/context types.
-Build specs with `actorSpec` and pass `typeof <that value>` — never annotate
+Build specs with `actorSpec` and pass `typeof <that value>`; never annotate
 the object itself.
 
 ---
@@ -296,7 +296,7 @@ function onOutput(actor: AnyActor, handler: (event: InternalEvent) => void): voi
 
 Route an actor's emitted outputs to a handler. `regions` auto-wire child outputs
 into the parent; `ActorMap` children do not. This is the public wrapper for that
-wiring — one call connects a child's declared outputs to a receiver.
+wiring. One call connects a child's declared outputs to a receiver.
 
 ```ts
 onOutput(childActor, (event) => {

@@ -1,6 +1,6 @@
 ---
 title: Batch Creation
-description: Create multiple states and events in one call.
+description: Create multiple states and events in one call
 ---
 
 ## What
@@ -10,8 +10,8 @@ return a typed record keyed by name.
 
 ## Why
 
-A real machine has many states and events. Creating them one by one —
-`state("basicInfo")()`, `state("shippingAddress")()`, and so on — is
+A real machine has many states and events. Creating them one by one,
+`state("basicInfo")()`, `state("shippingAddress")()`, and so on, is
 repetitive noise that buries the flow. Two calls replace thirteen. Reach for it
 when the boilerplate outweighs the one-line-per-ref form; for a handful of
 refs, the plain form stays clearer.
@@ -79,7 +79,7 @@ Two calls. Typed names as keys.
 
 ## Return type
 
-`states()` returns a typed record keyed by the literal names — `{ [K in T]:
+`states()` returns a typed record keyed by the literal names: `{ [K in T]:
 StateRef<K> }`. Not a plain `Record<string, ...>`.
 
 `events()` has the same shape for `EventRef`.
@@ -138,5 +138,5 @@ basicInfo.isFinal; // false
 success.isFinal; // true
 ```
 
-Finality is declared at creation — `{ name, final: true }`. No `.final()` call
+Finality is declared at creation, `{ name, final: true }`. No `.final()` call
 to remember or discard. Names are inferred as string literals.

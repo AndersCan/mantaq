@@ -1,27 +1,27 @@
 ---
 title: Composition
-description: Split a checkout's setup across files with actorSpec, definePart and withParts.
+description: Split a checkout's setup across files with actorSpec, definePart and withParts
 ---
 
 ## What
 
 `actorSpec`, `definePart`, and `withParts` slice one actor's `setup` into
-parts. Each part registers its own transitions and effects — in its own file,
+parts. Each part registers its own transitions and effects, in its own file,
 under its own name. The actor composes them with a single call.
 
 ## Why
 
 The checkout from the [Effects](/mantaq/core-concepts/effects/) and
 [Context](/mantaq/core-concepts/context/) pages has a setup that fits in one
-function. This page shows the same actor at full size — the whole
-`submitBasicInfo` → `success` flow with effects — then splits it apart. A real
-actor — a dozen states, a couple of effects per state, a cross-state handler
-or two — does not. Everything lives in one closure, in one file, in one
+function. This page shows the same actor at full size, the whole
+`submitBasicInfo` → `success` flow with effects, then splits it apart. A real
+actor, a dozen states, a couple of effects per state, a cross-state handler
+or two, does not. Everything lives in one closure, in one file, in one
 `new Actor` call. There is no seam: either the setup body grows, or the whole
 actor moves to another file wholesale.
 
-Parts give you that seam. Group handlers by concern — one part per state, per
-flow, per effect — and keep every file small. TypeScript still checks each part
+Parts give you that seam. Group handlers by concern, one part per state, per
+flow, per effect, and keep every file small. TypeScript still checks each part
 against the actor's real states and events: a wrong transition target in any
 part file is a compile error, the same as writing the handler inline.
 
@@ -29,12 +29,12 @@ Parts are not child actors. They run in the same actor, share the same
 context, and dispatch through the same event loop. They reorganize `setup`;
 they do not change how the actor behaves.
 
-## Before — one setup body
+## Before: one setup body
 
 The full checkout, effects and all, in one `setup`. The injectable
 `chargeCardImpl` from the canonical example is a plain function here, and the
-`onAny` handler reads the actor through `opts.actor` instead of a closure —
-the split below is the point:
+`onAny` handler reads the actor through `opts.actor` instead of a closure.
+The split below is the point:
 
 ```ts
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
@@ -139,7 +139,7 @@ function createCheckoutActor(clock = new VirtualClock()) {
 Every transition, every effect, in one closure. It reads fine at six states.
 It does not at twenty.
 
-## After — parts
+## After: parts
 
 ### 1. Declare the actor spec as a value
 
@@ -190,14 +190,14 @@ export const checkout = actorSpec({
 });
 ```
 
-`actorSpec` narrows the state and event arrays to their literals — no `as
-const` needed — and keeps the context mutable, so part handlers read and write
+`actorSpec` narrows the state and event arrays to their literals, no `as
+const` needed, and keeps the context mutable, so part handlers read and write
 `context` with no casts.
 
 ### 2. One file per part
 
 `definePart` wraps a setup slice. The builder it receives is the actor's
-own — `m.on`, `m.onAny`, and `m.effect` work exactly as they do inline. The
+own. `m.on`, `m.onAny`, and `m.effect` work exactly as they do inline. The
 spec is imported `type`-only as the part's anchor; the refs come in as values.
 
 ```ts
@@ -259,7 +259,7 @@ export const submittingPart = definePart<typeof checkout>((m) => {
 ```
 
 Cross-state handlers go in their own part too. The handler still reaches the
-actor — through `opts.actor`, no closure needed. `back` unwinds one step:
+actor, through `opts.actor`, no closure needed. `back` unwinds one step:
 `payment` → `shippingAddress`, `shippingAddress` → `basicInfo`, and from
 `error` it retries by returning to `payment`:
 
@@ -306,7 +306,7 @@ import { backPart } from "./parts/back.ts";
 export const checkoutActor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
 ```
 
-`base` (here `checkout`) is the actor spec — pass `clock`, `regions`, or
+`base` (here `checkout`) is the actor spec. Pass `clock`, `regions`, or
 `internalBudget` through it the same way you would to `new Actor`. A
 `VirtualClock` in the base keeps the determinism story from
 [Testing](/mantaq/guides/actor-testing/) intact:
@@ -321,7 +321,7 @@ const checkoutActor = withParts({ ...checkout, clock: new VirtualClock() }, [
 
 ### 4. Hand-written setups still work
 
-`withParts` takes every option `new Actor` takes — clock, regions, budget
+`withParts` takes every option `new Actor` takes: clock, regions, budget
 included. Reach for a hand-written setup when you want parts and inline code
 side by side. `use` registers a part exactly where you call it:
 
@@ -350,17 +350,17 @@ const actor = new Actor({
 });
 ```
 
-Parts compose too — a part can call another part's builder (`subPart(m)`)
+Parts compose too. A part can call another part's builder (`subPart(m)`)
 before its own registrations. Inline registrations and parts are ordered: a
 handler for the same (state, event) replaces the one before it, whatever
-registered it. Effects append instead — both effects run on state entry. An
+registered it. Effects append instead. Both effects run on state entry. An
 `onAny` handler is a separate registration: it runs alongside a specific
 state handler rather than replacing it.
 
 ## Type safety
 
 `definePart<typeof checkout>` anchors the part to the actor. Inside the part,
-the builder carries the full actor types — event payloads, context, and
+the builder carries the full actor types. Event payloads, context, and
 transition targets are all checked, exactly as inline. The same
 `typeof checkout` anchor means a part built against one actor cannot be wired
 into another: the mismatch is a compile error. Forget the anchor and
@@ -368,14 +368,14 @@ into another: the mismatch is a compile error. Forget the anchor and
 
 There is no runtime indirection. Parts register into the same transition and
 effect maps the setup body writes to, so determinism guarantees are
-unchanged — the parts trace-equivalence property test
+unchanged. The parts trace-equivalence property test
 (`packages/sugar/tests/parts.property.test.ts`) proves `withParts` matches an
 inline setup on identical event sequences. The checkout itself stays inline in
 `packages/examples/checkout.actor.test.ts`.
 
 ## When to reach for it
 
-A handful of states, a few transitions — keep the inline setup. When the
+A handful of states, a few transitions: keep the inline setup. When the
 setup body grows past what fits on a screen, split by concern: state files
 for state-local handlers, a file for cross-state handlers, a file for effects.
 Each file stays readable, and the actor reads as a list of parts.

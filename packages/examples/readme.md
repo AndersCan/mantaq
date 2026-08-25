@@ -1,8 +1,8 @@
 # `@mantaq/examples`
 
 A suite of runnable actor-model examples that demonstrate Mantaq's core
-idioms — `state()`, `event()`, context mutation, effects, timers, regions, and
-recovery — by reimplementing familiar state-machine patterns (multi-step forms,
+idioms, `state()`, `event()`, context mutation, effects, timers, regions, and
+recovery, by reimplementing familiar state-machine patterns (multi-step forms,
 async workflows, auth sessions, caches, undo/redo, event sourcing, and more) in
 Mantaq.
 
@@ -20,7 +20,7 @@ pnpm test checkout     # run a single file by name
 ```
 
 The canonical, heavily-commented entry point is
-[`checkout.actor.test.ts`](./checkout.actor.test.ts) — start there. The
+[`checkout.actor.test.ts`](./checkout.actor.test.ts). Start there. The
 top-level docs site also builds this file as its single running example, so a
 change that breaks it breaks the docs build.
 

@@ -322,7 +322,7 @@ export class Actor<
           );
         }
         // external events with no handler in this state are ignored by design
-        // (broadcast fan-out, cross-state sends) — silent, documented pattern.
+        // (broadcast fan-out, cross-state sends). Silent, documented pattern.
       }
     } finally {
       this.#entry = prev;

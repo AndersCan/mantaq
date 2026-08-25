@@ -1,6 +1,6 @@
 ---
 title: Sugar
-description: Convenience helpers for common patterns.
+description: Convenience helpers for common patterns
 ---
 
 ## What
@@ -11,11 +11,11 @@ creation, state matching, effect timeouts, dynamic children.
 
 ## Why
 
-Core is deliberately small and explicit — it shows what happens under the hood.
+Core is deliberately small and explicit. It shows what happens under the hood.
 But the boilerplate adds up: thirteen `state(...)`/`event(...)` calls, a manual
 abort check in every promise effect, hand-rolled path joins. Sugar cuts that
 without hiding anything. Every helper compiles to the same behavior you could
-write yourself — sugar just saves the typing.
+write yourself. Sugar just saves the typing.
 
 The sugar pages apply each helper to the checkout machine from
 [Actors](/mantaq/core-concepts/actors/).
@@ -70,8 +70,8 @@ helper yourself.
 
 ## Pages
 
-- [Batch Creation](/mantaq/sugar/batch-creation/) — `states()` and `events()` on the checkout machine
-- [Matching](/mantaq/sugar/matching/) — `matches()`, `isIn()`, `activeLeaves()`, `tag()`
-- [Dynamic Children](/mantaq/sugar/dynamic-children/) — `ActorMap` and `broadcast()` for shop order workers
-- [Effect Helpers](/mantaq/sugar/effect-helpers/) — `withPromise()` and `withTimeout()` for the charge effect
-- [Request / Response](/mantaq/sugar/request-response/) — short-lived request handlers answering back through outputs
+- [Batch Creation](/mantaq/sugar/batch-creation/): `states()` and `events()` on the checkout machine
+- [Matching](/mantaq/sugar/matching/): `matches()`, `isIn()`, `activeLeaves()`, `tag()`
+- [Dynamic Children](/mantaq/sugar/dynamic-children/): `ActorMap` and `broadcast()` for shop order workers
+- [Effect Helpers](/mantaq/sugar/effect-helpers/): `withPromise()` and `withTimeout()` for the charge effect
+- [Request / Response](/mantaq/sugar/request-response/): short-lived request handlers answering back through outputs
