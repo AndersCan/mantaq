@@ -59,6 +59,22 @@ export class ActorMap implements SendableMap<SendableEvent> {
     this.#actors.delete(key);
   }
 
+  /**
+   * Tear down the map and every live child. Without this, dropping an
+   * `ActorMap` (e.g. when its owning actor is disposed) leaks every child
+   * actor whose effects/timers/reapers keep running. Idempotent.
+   */
+  dispose(): void {
+    for (const child of this.#actors.values()) {
+      child.dispose();
+    }
+    for (const off of this.#reapers.values()) {
+      off();
+    }
+    this.#reapers.clear();
+    this.#actors.clear();
+  }
+
   get size(): number {
     return this.#actors.size;
   }
