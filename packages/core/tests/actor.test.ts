@@ -19,13 +19,18 @@ describe("Actor.settled", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: a }));
-        m.effect(a, ({ emit }) => Promise.resolve().then(() => emit(next.create())));
+        m.effect(a, {
+          name: "chainToNext",
+          fn: ({ emit }) => Promise.resolve().then(() => emit(next.create())),
+        });
         m.on(a, next, () => ({ state: b }));
-        m.effect(b, () =>
-          Promise.resolve().then(() => {
-            bEffectRan = true;
-          }),
-        );
+        m.effect(b, {
+          name: "flagArrival",
+          fn: () =>
+            Promise.resolve().then(() => {
+              bEffectRan = true;
+            }),
+        });
       },
     });
 
@@ -120,10 +125,13 @@ describe("Actor effects", () => {
       states: [idle, done],
       initial: idle,
       setup: (m) => {
-        m.effect(idle, ({ event, emit }) => {
-          effectRuns++;
-          expect(event.type).toBe("__init");
-          emit(tick.create());
+        m.effect(idle, {
+          name: "tickOnInit",
+          fn: ({ event, emit }) => {
+            effectRuns++;
+            expect(event.type).toBe("__init");
+            emit(tick.create());
+          },
         });
         m.on(idle, tick, () => ({ state: done }));
       },
@@ -145,10 +153,13 @@ describe("Actor effects", () => {
       states: [idle, done],
       initial: idle,
       setup: (m) => {
-        m.effect(idle, ({ emit }) => {
-          clock.setTimeout(500, () => emit(tick.create()), {
-            signal: new AbortController().signal,
-          });
+        m.effect(idle, {
+          name: "armTickTimer",
+          fn: ({ emit }) => {
+            clock.setTimeout(500, () => emit(tick.create()), {
+              signal: new AbortController().signal,
+            });
+          },
         });
         m.on(idle, tick, () => ({ state: done }));
       },
@@ -172,8 +183,11 @@ describe("Actor effects", () => {
       initial: pending,
       setup: (m) => {
         m.on(pending, finish, () => ({ state: done }));
-        m.effect(done, () => {
-          finalEffectRuns++;
+        m.effect(done, {
+          name: "countFinalEntry",
+          fn: () => {
+            finalEffectRuns++;
+          },
         });
       },
     });
@@ -197,7 +211,7 @@ describe("Actor effects", () => {
       initial: childIdle,
       setup: (m) => {
         m.on(childIdle, childGo, () => ({ state: childDone }));
-        m.effect(childDone, ({ emit }) => emit(childOut.create()));
+        m.effect(childDone, { name: "emitChildOut", fn: ({ emit }) => emit(childOut.create()) });
       },
     });
 
@@ -230,8 +244,11 @@ describe("Actor effects", () => {
       states: [idle, running],
       initial: idle,
       setup: (m) => {
-        m.effect(running, ({ emit }) => {
-          savedEmit = emit;
+        m.effect(running, {
+          name: "captureEmit",
+          fn: ({ emit }) => {
+            savedEmit = emit;
+          },
         });
         m.on(idle, go, () => ({ state: running }));
         m.on(running, stop, () => ({ state: idle }));
@@ -257,8 +274,11 @@ describe("Actor effects", () => {
       states: [idle, running],
       initial: idle,
       setup: (m) => {
-        m.effect(running, ({ signal }) => {
-          effectSignal = signal;
+        m.effect(running, {
+          name: "captureSignal",
+          fn: ({ signal }) => {
+            effectSignal = signal;
+          },
         });
         m.on(idle, go, () => ({ state: running }));
         m.on(running, stop, () => ({ state: idle }));
@@ -282,8 +302,11 @@ describe("Actor effects", () => {
       states: [idle, running],
       initial: idle,
       setup: (m) => {
-        m.effect(running, ({ state }) => {
-          payload = state.payload;
+        m.effect(running, {
+          name: "capturePayload",
+          fn: ({ state }) => {
+            payload = state.payload;
+          },
         });
         m.on(idle, go, () => ({ state: running.create({ url: "https://x" }) }));
       },
@@ -339,8 +362,11 @@ describe("Actor regions", () => {
       initial: cIdle,
       clock: childClock,
       setup: (m) => {
-        m.effect(cIdle, (input) => {
-          input.clock.setInterval(10, () => {}, { signal: input.signal });
+        m.effect(cIdle, {
+          name: "startHeartbeat",
+          fn: (input) => {
+            input.clock.setInterval(10, () => {}, { signal: input.signal });
+          },
         });
       },
     });
@@ -714,7 +740,7 @@ describe("Actor transition observability", () => {
       initial: a,
       setup: (m) => {
         m.on(a, start, () => ({ state: b }));
-        m.effect(b, ({ emit }) => emit(next.create()));
+        m.effect(b, { name: "emitNext", fn: ({ emit }) => emit(next.create()) });
         m.on(b, next, () => ({ state: c }));
       },
     });

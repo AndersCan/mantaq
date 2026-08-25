@@ -93,6 +93,34 @@ describe("harness", () => {
     expect(harness.wasTransitionVisited("a", "STOP")).toBe(false);
   });
 
+  test("effect assertions match state and effect name", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      outputs: [],
+      internal: [],
+      context: {},
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.effect(active, { name: "logVisit", fn: () => {} });
+      },
+    });
+    const harness = createTestHarness(actor);
+    harness.send(go.create(undefined));
+
+    expect(harness.wasEffectRun("active", "logVisit")).toBe(true);
+    expect(harness.wasEffectRun("idle", "logVisit")).toBe(false);
+    expect(harness.wasEffectRun("active", "other")).toBe(false);
+    expect(() => harness.assertEffectRan("active", "logVisit")).not.toThrow();
+    expect(() => harness.assertEffectRan("active", "other")).toThrow(/did not run/);
+    expect(() => harness.assertEffectNeverRan("active", "other")).not.toThrow();
+    expect(() => harness.assertEffectNeverRan("active", "logVisit")).toThrow(/ran/);
+  });
+
   test("full lifecycle: create → send → coverage → assert", () => {
     const actor = makeToggle();
     const harness = createTestHarness(actor);

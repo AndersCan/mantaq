@@ -40,12 +40,13 @@ describe("History", () => {
 
   test("effects filters correctly", () => {
     const h = new History();
-    h.append({ type: "effect", data: { stateName: "active" } });
+    h.append({ type: "effect", data: { stateName: "active", effectName: "fetchProfile" } });
     h.append({ type: "send", data: { event: "GO" } });
 
     const e = h.effects();
     expect(e.length).toBe(1);
     expect(e[0].stateName).toBe("active");
+    expect(e[0].effectName).toBe("fetchProfile");
   });
 
   test("sends filters correctly", () => {
@@ -103,7 +104,7 @@ describe("History", () => {
       type: "transition",
       data: { from: "idle", event: "GO", to: "active" },
     });
-    h.append({ type: "effect", data: { stateName: "active" } });
+    h.append({ type: "effect", data: { stateName: "active", effectName: "fetchProfile" } });
 
     h.reset();
     expect(h.entries().length).toBe(0);

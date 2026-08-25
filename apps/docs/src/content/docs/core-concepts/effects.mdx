@@ -8,6 +8,10 @@ description: Side effects on state entry.
 An effect is a function the actor runs every time it enters a state. It
 receives an `EffectInput` — the current state, the context, an `emit` function,
 a clock, and an abort signal — and it can emit events back into the machine.
+Each effect carries a required `name`, a camelCase string describing what it
+does. Executed effects are recorded in history as `{ stateName, effectName }`,
+so tests can assert on them by name
+(`harness.assertEffectRan(stateName, effectName)`).
 
 ## Why
 
@@ -30,12 +34,15 @@ result back to the machine as internal events.
 
 ```ts
 setup: (m) => {
-  m.effect(submitting, (input) => {
-    const s = input.context.get();
-    chargeCard(s.paymentInfo!.cardNumber).then(
-      (orderId) => input.emit(paymentOk.create({ orderId })),
-      (reason) => input.emit(paymentFail.create({ reason: String(reason) })),
-    );
+  m.effect(submitting, {
+    name: "chargeCard",
+    fn: (input) => {
+      const s = input.context.get();
+      chargeCard(s.paymentInfo!.cardNumber).then(
+        (orderId) => input.emit(paymentOk.create({ orderId })),
+        (reason) => input.emit(paymentFail.create({ reason: String(reason) })),
+      );
+    },
   });
 };
 ```
@@ -70,10 +77,13 @@ in-flight promises must check it before emitting.
 
 ```ts
 setup: (m) => {
-  m.effect(submitting, ({ signal, emit }) => {
-    chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
-      if (!signal.aborted) emit(paymentOk.create({ orderId }));
-    });
+  m.effect(submitting, {
+    name: "chargeCard",
+    fn: ({ signal, emit }) => {
+      chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
+        if (!signal.aborted) emit(paymentOk.create({ orderId }));
+      });
+    },
   });
 };
 ```
@@ -89,14 +99,20 @@ Call `m.effect` multiple times for the same state. Effects run in order.
 
 ```ts
 setup: (m) => {
-  m.effect(submitting, ({ signal }) => {
-    /* charge */
+  m.effect(submitting, {
+    name: "chargeCard",
+    fn: ({ signal }) => {
+      /* charge */
+    },
   });
-  m.effect(submitting, (input) => {
-    // fallback: if charge hangs, time out
-    input.clock.setTimeout(800, () => {
-      if (!input.signal.aborted) input.emit(submittingDone.create());
-    });
+  m.effect(submitting, {
+    name: "startSubmitTimeout",
+    fn: (input) => {
+      // fallback: if charge hangs, time out
+      input.clock.setTimeout(800, () => {
+        if (!input.signal.aborted) input.emit(submittingDone.create());
+      });
+    },
   });
 };
 ```
@@ -118,14 +134,17 @@ built-in terminal `__error` state, and the thrown value lands in
 
 ```ts
 setup: (m) => {
-  m.effect(submitting, ({ signal, emit }) => {
-    chargeCard(s.paymentInfo!.cardNumber)
-      .then((orderId) => {
-        if (!signal.aborted) emit(paymentOk.create({ orderId }));
-      })
-      .catch((reason) => {
-        if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
-      });
+  m.effect(submitting, {
+    name: "chargeCard",
+    fn: ({ signal, emit }) => {
+      chargeCard(s.paymentInfo!.cardNumber)
+        .then((orderId) => {
+          if (!signal.aborted) emit(paymentOk.create({ orderId }));
+        })
+        .catch((reason) => {
+          if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
+        });
+    },
   });
 };
 ```

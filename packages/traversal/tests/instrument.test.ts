@@ -184,7 +184,7 @@ describe("instrument", () => {
       context: {},
       setup: (m) => {
         m.on(a, start, () => ({ state: b }));
-        m.effect(b, ({ emit }) => emit(next.create()));
+        m.effect(b, { name: "emitNext", fn: ({ emit }) => emit(next.create()) });
         m.on(b, next, () => ({ state: c }));
       },
     });
@@ -196,7 +196,9 @@ describe("instrument", () => {
     expect(seen.has("a:START->b")).toBe(true);
     expect(seen.has("b:NEXT->c")).toBe(true);
     expect(inst.history.visitedStates()).toEqual(new Set(["a", "b", "c"]));
-    expect(inst.history.effects().map((e) => e.stateName)).toEqual(["b"]);
+    expect(inst.history.effects().map((e) => `${e.stateName}:${e.effectName}`)).toEqual([
+      "b:emitNext",
+    ]);
   });
 
   test("self-transitions into an effect-less state record no effect", () => {

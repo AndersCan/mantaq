@@ -131,21 +131,25 @@ The type-safe registrar passed to `setup`. Targets validate against declared sta
 setup: (m) => {
   m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
   m.onAny(back, () => ({ state: basicInfo }));
-  m.effect(payment, ({ signal, emit }) => {});
+  m.effect(payment, { name: "chargePayment", fn: ({ signal, emit }) => {} });
 };
 ```
 
-| Method                 | Signature                          | What                    |
-| ---------------------- | ---------------------------------- | ----------------------- |
-| `on(state, event, fn)` | `(stateRef, eventRef, fn) => this` | Transition for one pair |
-| `onAny(event, fn)`     | `(eventRef, fn) => this`           | Handler in every state  |
-| `effect(state, fn)`    | `(stateRef, fn) => this`           | Run `fn` on state entry |
+| Method                        | Signature                          | What                    |
+| ----------------------------- | ---------------------------------- | ----------------------- |
+| `on(state, event, fn)`        | `(stateRef, eventRef, fn) => this` | Transition for one pair |
+| `onAny(event, fn)`            | `(eventRef, fn) => this`           | Handler in every state  |
+| `effect(state, { name, fn })` | `(stateRef, { name, fn }) => this` | Run `fn` on state entry |
 
 Handler return: `{ state?; payload?; emit? }` or `{}` to stay in place.
 
-Effects run on every state entry. The initial state runs its effects at
-construction with the synthetic event `{ type: "__init" }`; terminal states run
-theirs on entry (useful for emitting a completion output to a parent).
+Effects run on every state entry. `name` is a required camelCase string
+describing what the effect does — executed effects are recorded in history as
+`{ stateName, effectName }`, and tests can assert on them by name
+(`harness.assertEffectRan(stateName, effectName)`). The initial state runs its
+effects at construction with the synthetic event `{ type: "__init" }`; terminal
+states run theirs on entry (useful for emitting a completion output to a
+parent).
 
 ---
 

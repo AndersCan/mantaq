@@ -167,6 +167,7 @@ describe("Subscribers directed mutation tests", () => {
         event: { type: "GO" },
         from: "a",
         to: "b",
+        effects: [],
         transitioned: true,
       }),
     ).not.toThrow();
@@ -232,7 +233,13 @@ describe("Subscribers directed mutation tests", () => {
     };
     subs.emitChange(snap);
     subs.emitDone();
-    subs.emitTransition({ event: { type: "GO" }, from: "a", to: "b", transitioned: true });
+    subs.emitTransition({
+      event: { type: "GO" },
+      from: "a",
+      to: "b",
+      effects: [],
+      transitioned: true,
+    });
     subs.emitError(info);
     expect([changes, dones, transitions, errors]).toEqual([1, 1, 1, 1]);
     offChange();
@@ -241,7 +248,13 @@ describe("Subscribers directed mutation tests", () => {
     offError();
     subs.emitChange(snap);
     subs.emitDone();
-    subs.emitTransition({ event: { type: "GO" }, from: "a", to: "b", transitioned: true });
+    subs.emitTransition({
+      event: { type: "GO" },
+      from: "a",
+      to: "b",
+      effects: [],
+      transitioned: true,
+    });
     subs.emitError(info);
     expect([changes, dones, transitions, errors]).toEqual([1, 1, 1, 1]);
   });
@@ -351,18 +364,27 @@ describe("runEffects directed mutation tests", () => {
 
   test("a synchronous effect throw is routed to onError and stops the rest", () => {
     const seen: string[] = [];
-    runEffects({
+    const result = runEffects({
       ...baseOptions(),
       effects: {
         idle: [
-          () => {
-            seen.push("one");
+          {
+            name: "pushOne",
+            fn: () => {
+              seen.push("one");
+            },
           },
-          () => {
-            throw new Error("boom");
+          {
+            name: "thrower",
+            fn: () => {
+              throw new Error("boom");
+            },
           },
-          () => {
-            seen.push("three");
+          {
+            name: "pushThree",
+            fn: () => {
+              seen.push("three");
+            },
           },
         ],
       },
@@ -371,6 +393,7 @@ describe("runEffects directed mutation tests", () => {
       },
     });
     expect(seen).toEqual(["one"]);
+    expect(result.ran).toEqual(["pushOne"]);
   });
 
   test("an async rejection is routed to onError", async () => {
@@ -379,8 +402,11 @@ describe("runEffects directed mutation tests", () => {
       ...baseOptions(),
       effects: {
         idle: [
-          async () => {
-            throw new Error("late boom");
+          {
+            name: "lateThrow",
+            fn: async () => {
+              throw new Error("late boom");
+            },
           },
         ],
       },
@@ -400,10 +426,13 @@ describe("runEffects directed mutation tests", () => {
       abort,
       effects: {
         idle: [
-          async ({ signal }) => {
-            await new Promise((_, reject) => {
-              signal.addEventListener("abort", () => reject(new Error("aborted")));
-            });
+          {
+            name: "rejectOnAbort",
+            fn: async ({ signal }) => {
+              await new Promise((_, reject) => {
+                signal.addEventListener("abort", () => reject(new Error("aborted")));
+              });
+            },
           },
         ],
       },
@@ -420,18 +449,22 @@ describe("runEffects directed mutation tests", () => {
     const seen: string[] = [];
     const abort = new AbortController();
     abort.abort();
-    runEffects({
+    const result = runEffects({
       ...baseOptions(),
       abort,
       effects: {
         idle: [
-          () => {
-            seen.push("ran");
+          {
+            name: "pushRan",
+            fn: () => {
+              seen.push("ran");
+            },
           },
         ],
       },
     });
     expect(seen).toEqual([]);
+    expect(result.ran).toEqual([]);
   });
 
   test("effects receive the entered state payload and event", () => {
@@ -441,8 +474,11 @@ describe("runEffects directed mutation tests", () => {
       statePayload: { x: 5 },
       effects: {
         idle: [
-          ({ state, event }) => {
-            seen.push(`${state.name}:${(state.payload as { x: number }).x}:${event.type}`);
+          {
+            name: "recordPayloadAndEvent",
+            fn: ({ state, event }) => {
+              seen.push(`${state.name}:${(state.payload as { x: number }).x}:${event.type}`);
+            },
           },
         ],
       },

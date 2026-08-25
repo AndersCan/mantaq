@@ -55,8 +55,11 @@ runProperty(
       initial: submitting,
       setup: (m) => {
         m.on(submitting, submittingDone, () => ({ state: success }));
-        m.effect(submitting, ({ signal, clock: c, emit }) => {
-          c.setTimeout(timeoutMs, () => emit(submittingDone.create()), { signal });
+        m.effect(submitting, {
+          name: "startSubmitTimeout",
+          fn: ({ signal, clock: c, emit }) => {
+            c.setTimeout(timeoutMs, () => emit(submittingDone.create()), { signal });
+          },
         });
       },
     });

@@ -98,11 +98,14 @@ function createCharacter(clock?: VirtualClock) {
       movement: movementRegion,
     },
     setup: (m) => {
-      m.effect(lifeStates.alive, ({ signal, clock, emit }: EffectInput<CharacterContext>) => {
-        const id = clock.setInterval(500, () => {
-          emit(e.REGEN.create(undefined));
-        });
-        signal.addEventListener("abort", () => clock.clearInterval(id));
+      m.effect(lifeStates.alive, {
+        name: "regenHealthAndStamina",
+        fn: ({ signal, clock, emit }: EffectInput<CharacterContext>) => {
+          const id = clock.setInterval(500, () => {
+            emit(e.REGEN.create(undefined));
+          });
+          signal.addEventListener("abort", () => clock.clearInterval(id));
+        },
       });
       m.on(lifeStates.alive, e.START_SPRINT, (_event, { context }) => {
         const cur = context.get();

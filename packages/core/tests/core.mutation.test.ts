@@ -257,8 +257,11 @@ describe("runEffects", () => {
     const result = runEffects({
       effects: {
         done: [
-          () => {
-            seen.push("ran");
+          {
+            name: "recordRun",
+            fn: () => {
+              seen.push("ran");
+            },
           },
         ],
       },
@@ -311,9 +314,12 @@ describe("Actor state entry directed mutation tests", () => {
       states: [idle, done],
       initial: idle,
       setup: (m) => {
-        m.effect(idle, ({ event: e, emit }) => {
-          sawEvent = e;
-          emit(tick.create());
+        m.effect(idle, {
+          name: "recordInitEvent",
+          fn: ({ event: e, emit }) => {
+            sawEvent = e;
+            emit(tick.create());
+          },
         });
         m.on(idle, tick, () => ({ state: done }));
       },
@@ -335,8 +341,11 @@ describe("Actor state entry directed mutation tests", () => {
       states: [idle, done],
       initial: idle,
       setup: (m) => {
-        m.effect(idle, ({ clock: c, emit }) => {
-          c.setTimeout(100, () => emit(tick.create()));
+        m.effect(idle, {
+          name: "armDeadlineTimer",
+          fn: ({ clock: c, emit }) => {
+            c.setTimeout(100, () => emit(tick.create()));
+          },
         });
         m.on(idle, tick, () => ({ state: done }));
       },
@@ -357,7 +366,10 @@ describe("Actor state entry directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: idle }));
-        m.effect(idle, () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+        m.effect(idle, {
+          name: "settleAsync",
+          fn: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+        });
       },
     });
     for (let i = 0; i < 200; i++) actor.send(go.create());
@@ -374,7 +386,10 @@ describe("Actor state entry directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: idle }));
-        m.effect(idle, () => new Promise<void>(() => {}));
+        m.effect(idle, {
+          name: "hangAsync",
+          fn: () => new Promise<void>(() => {}),
+        });
       },
     });
     for (let i = 0; i < 50; i++) actor.send(go.create());
@@ -397,8 +412,11 @@ describe("Actor state entry directed mutation tests", () => {
       states: [idle, running],
       initial: idle,
       setup: (m) => {
-        m.effect(running, ({ emit }) => {
-          savedEmit = emit;
+        m.effect(running, {
+          name: "captureEmit",
+          fn: ({ emit }) => {
+            savedEmit = emit;
+          },
         });
         m.on(idle, go, () => ({ state: running }));
         m.on(running, stop, () => ({ state: idle }));
@@ -435,7 +453,7 @@ describe("on('error') death signal", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.effect(idle, ({ emit }) => emit(probe.create()));
+        m.effect(idle, { name: "emitProbe", fn: ({ emit }) => emit(probe.create()) });
       },
     });
     expect(actor.snapshot().path[0]).toBe("__error");
@@ -717,8 +735,11 @@ describe("Actor", () => {
       states: [init, idle, done],
       initial: init,
       setup: (m) => {
-        m.effect(idle, ({ emit }) => {
-          emit(tick.create());
+        m.effect(idle, {
+          name: "emitTick",
+          fn: ({ emit }) => {
+            emit(tick.create());
+          },
         });
         m.on(init, start, () => ({ state: idle }));
         m.on(idle, tick, () => ({ state: done }));
@@ -773,8 +794,11 @@ describe("Actor", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, start, () => ({ state: running }));
-        m.effect(running, ({ signal }) => {
-          effectSignal = signal;
+        m.effect(running, {
+          name: "captureSignal",
+          fn: ({ signal }) => {
+            effectSignal = signal;
+          },
         });
       },
     });
@@ -1131,8 +1155,11 @@ describe("Actor directed mutation tests 2", () => {
       initial: init,
       setup: (m) => {
         m.on(init, start, () => ({ state: init }));
-        m.effect(init, ({ emit }) => {
-          emit(tick.create());
+        m.effect(init, {
+          name: "emitTick",
+          fn: ({ emit }) => {
+            emit(tick.create());
+          },
         });
         m.on(init, tick, () => ({ state: done }));
       },
@@ -1261,12 +1288,18 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, () => {
-          seen.push("first");
-          throw new Error("boom");
+        m.effect(loading, {
+          name: "failFirst",
+          fn: () => {
+            seen.push("first");
+            throw new Error("boom");
+          },
         });
-        m.effect(loading, () => {
-          seen.push("second");
+        m.effect(loading, {
+          name: "recordSecond",
+          fn: () => {
+            seen.push("second");
+          },
         });
       },
     });
@@ -1334,8 +1367,11 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: active }));
-        m.effect(active, () => {
-          throw new Error("boom");
+        m.effect(active, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("boom");
+          },
         });
       },
     });
@@ -1357,8 +1393,11 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, async () => {
-          throw new Error("late boom");
+        m.effect(loading, {
+          name: "rejectAsync",
+          fn: async () => {
+            throw new Error("late boom");
+          },
         });
       },
     });
@@ -1414,9 +1453,12 @@ describe("Actor error state directed mutation tests", () => {
         m.on(loading, boom, () => {
           throw new Error("nested");
         });
-        m.effect(loading, ({ emit }) => {
-          emit(boom.create());
-          throw new Error("outer");
+        m.effect(loading, {
+          name: "emitBoomThenThrow",
+          fn: ({ emit }) => {
+            emit(boom.create());
+            throw new Error("outer");
+          },
         });
       },
     });
@@ -1579,9 +1621,12 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, async () => {
-          await Promise.resolve();
-          settled = true;
+        m.effect(loading, {
+          name: "settleAfterMicrotasks",
+          fn: async () => {
+            await Promise.resolve();
+            settled = true;
+          },
         });
       },
     });
@@ -1602,10 +1647,13 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, async () => {
-          await Promise.resolve();
-          await Promise.resolve();
-          throw new Error("delayed boom");
+        m.effect(loading, {
+          name: "rejectDelayed",
+          fn: async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+            throw new Error("delayed boom");
+          },
         });
       },
     });
@@ -1702,8 +1750,11 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, () => {
-          throw new Error("boom");
+        m.effect(loading, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("boom");
+          },
         });
       },
     });
@@ -1754,6 +1805,62 @@ describe("Actor error state directed mutation tests", () => {
     expect(seen[0].transitioned).toBe(true);
   });
 
+  test("transition info carries the exact names of effects that ran on entry", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, active],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: active }));
+        m.effect(active, { name: "markReady", fn: () => {} });
+        m.effect(active, { name: "logEntry", fn: () => {} });
+      },
+    });
+    const seen: Array<{ to: string; effects: string[] }> = [];
+    actor.on("transition", (info) => seen.push({ to: info.to, effects: [...info.effects] }));
+    actor.send(go.create());
+    expect(seen).toHaveLength(1);
+    expect(seen[0].effects).toEqual(["markReady", "logEntry"]);
+  });
+
+  test("transition into a state without effects reports an empty effects list", () => {
+    const idle = state("idle")();
+    const bare = state("bare")();
+    const go = event("GO")();
+    const actor = new Actor({
+      inputs: [go],
+      states: [idle, bare],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, go, () => ({ state: bare }));
+      },
+    });
+    const seen: Array<string[]> = [];
+    actor.on("transition", (info) => seen.push([...info.effects]));
+    actor.send(go.create());
+    expect(seen).toEqual([[]]);
+  });
+
+  test("a handled no-op event reports an empty effects list", () => {
+    const idle = state("idle")();
+    const ping = event("PING")();
+    const actor = new Actor({
+      inputs: [ping],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, ping, () => ({}));
+      },
+    });
+    const seen: Array<string[]> = [];
+    actor.on("transition", (info) => seen.push([...info.effects]));
+    actor.send(ping.create());
+    expect(seen).toEqual([[]]);
+  });
+
   test("transition hook does not fire for dropped events", () => {
     const idle = state("idle")();
     const stray = event("STRAY")();
@@ -1799,8 +1906,11 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, () => {
-          throw new Error("effect boom");
+        m.effect(loading, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("effect boom");
+          },
         });
       },
     });
@@ -1843,8 +1953,11 @@ describe("Actor error state directed mutation tests", () => {
       context: { n: 0 },
       setup: (m) => {
         m.on(idle, go, () => ({ state: loading }));
-        m.effect(loading, () => {
-          throw new Error("effect boom");
+        m.effect(loading, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("effect boom");
+          },
         });
         m.on(loading, tick, () => {
           ticks++;
@@ -1928,8 +2041,11 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, go, () => ({ state: ready, payload: { items: ["a"] } }));
-        m.effect(ready, () => {
-          throw new Error("boom");
+        m.effect(ready, {
+          name: "throwOnEnter",
+          fn: () => {
+            throw new Error("boom");
+          },
         });
       },
     });
@@ -1994,8 +2110,11 @@ describe("dispose and inject directed mutation tests", () => {
           opts.actor.dispose();
           return { state: active, emit: [boom.create()] };
         });
-        m.effect(active, () => {
-          effectRan = true;
+        m.effect(active, {
+          name: "markEffectRan",
+          fn: () => {
+            effectRan = true;
+          },
         });
       },
     });

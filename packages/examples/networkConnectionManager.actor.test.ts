@@ -116,19 +116,25 @@ function createConnectionManager(clock?: VirtualClock) {
       health: healthMonitor,
     },
     setup: (m) => {
-      m.effect(connectionStates.connecting, ({ signal, clock, emit }) => {
-        const id = clock.setTimeout(2000, () => {
-          emit(e.CONNECTION_ESTABLISHED.create());
-        });
-        signal.addEventListener("abort", () => clock.clearTimeout(id));
+      m.effect(connectionStates.connecting, {
+        name: "startConnectionTimeout",
+        fn: ({ signal, clock, emit }) => {
+          const id = clock.setTimeout(2000, () => {
+            emit(e.CONNECTION_ESTABLISHED.create());
+          });
+          signal.addEventListener("abort", () => clock.clearTimeout(id));
+        },
       });
-      m.effect(connectionStates.reconnecting, ({ signal, clock, emit, context }) => {
-        const s = context.get();
-        const delay = s.backoffMs * Math.pow(2, s.retryCount);
-        const id = clock.setTimeout(delay, () => {
-          emit(e.CONNECTION_ESTABLISHED.create());
-        });
-        signal.addEventListener("abort", () => clock.clearTimeout(id));
+      m.effect(connectionStates.reconnecting, {
+        name: "scheduleReconnect",
+        fn: ({ signal, clock, emit, context }) => {
+          const s = context.get();
+          const delay = s.backoffMs * Math.pow(2, s.retryCount);
+          const id = clock.setTimeout(delay, () => {
+            emit(e.CONNECTION_ESTABLISHED.create());
+          });
+          signal.addEventListener("abort", () => clock.clearTimeout(id));
+        },
       });
       m.on(connectionStates.disconnected, connectEvent, (event, opts) => {
         const s = opts!.context.get();

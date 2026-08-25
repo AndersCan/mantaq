@@ -75,13 +75,16 @@ function createCheckoutActor(
     clock: c,
     context: {} as CheckoutContext,
     setup: (m) => {
-      m.effect(submitting, (input) => {
-        const s = input.context.get();
-        withTimeout(800, input, () => submittingDone.create());
-        return withPromise(chargeCardImpl(s.paymentInfo!.cardNumber), input.signal, input.emit, {
-          success: (orderId) => paymentOk.create({ orderId }),
-          error: (reason) => paymentFail.create({ reason: String(reason) }),
-        });
+      m.effect(submitting, {
+        name: "chargeCard",
+        fn: (input) => {
+          const s = input.context.get();
+          withTimeout(800, input, () => submittingDone.create());
+          return withPromise(chargeCardImpl(s.paymentInfo!.cardNumber), input.signal, input.emit, {
+            success: (orderId) => paymentOk.create({ orderId }),
+            error: (reason) => paymentFail.create({ reason: String(reason) }),
+          });
+        },
       });
       m.onAny(back, (_event, opts) => {
         const s = actor.state.name;

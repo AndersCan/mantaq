@@ -201,9 +201,12 @@ describe("type level contract — type = behavior", () => {
           expectTypeOf(context.get()).toEqualTypeOf<{ count: number }>();
           return {};
         });
-        m.effect(idle, ({ context }) => {
-          expectTypeOf(context).toEqualTypeOf<Context<{ count: number }>>();
-          expectTypeOf(context.get()).toEqualTypeOf<{ count: number }>();
+        m.effect(idle, {
+          name: "readContext",
+          fn: ({ context }) => {
+            expectTypeOf(context).toEqualTypeOf<Context<{ count: number }>>();
+            expectTypeOf(context.get()).toEqualTypeOf<{ count: number }>();
+          },
         });
       },
     });
@@ -228,15 +231,21 @@ describe("type level contract — type = behavior", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.effect(loading, ({ state }) => {
-          expectTypeOf(state.payload).toEqualTypeOf<{ url: string }>();
-          expectTypeOf(state.payload.url).toBeString();
-          // @ts-expect-error payload is the declared shape, not arbitrary keys
-          expectTypeOf(state.payload.nope).toBeUnknown();
+        m.effect(loading, {
+          name: "readPayload",
+          fn: ({ state }) => {
+            expectTypeOf(state.payload).toEqualTypeOf<{ url: string }>();
+            expectTypeOf(state.payload.url).toBeString();
+            // @ts-expect-error payload is the declared shape, not arbitrary keys
+            expectTypeOf(state.payload.nope).toBeUnknown();
+          },
         });
         // a state without a payload generic keeps payload unknown
-        m.effect(idle, ({ state }) => {
-          expectTypeOf(state.payload).toBeUnknown();
+        m.effect(idle, {
+          name: "observePayload",
+          fn: ({ state }) => {
+            expectTypeOf(state.payload).toBeUnknown();
+          },
         });
       },
     });
@@ -411,6 +420,7 @@ describe("public type surface — nameable helper types", () => {
       expectTypeOf(info.from).toBeString();
       expectTypeOf(info.to).toBeString();
       expectTypeOf(info.transitioned).toBeBoolean();
+      expectTypeOf(info.effects).toEqualTypeOf<string[]>();
     });
   });
 

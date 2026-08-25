@@ -61,8 +61,11 @@ const retryPart = definePart<typeof load>((m) => {
 });
 
 const timeoutPart = definePart<typeof load>((m) => {
-  m.effect(loading, (input) => {
-    withTimeout(5, input, () => slow.create());
+  m.effect(loading, {
+    name: "startSlowTimer",
+    fn: (input) => {
+      withTimeout(5, input, () => slow.create());
+    },
   });
   m.on(loading, slow, (_event, _opts) => ({ state: failed }));
 });
@@ -236,8 +239,11 @@ describe("withParts", () => {
     const part = definePart<typeof machine>((m) => {
       m.on(idle, start, () => ({ state: loading }));
       m.on(loading, bounce, () => ({ state: loading }));
-      m.effect(loading, (input) => {
-        withTimeout(5, input, () => slow.create());
+      m.effect(loading, {
+        name: "restartBounceTimer",
+        fn: (input) => {
+          withTimeout(5, input, () => slow.create());
+        },
       });
       m.on(loading, slow, (_event, opts) => {
         const cur = opts.context.get();
@@ -394,10 +400,13 @@ describe("withParts", () => {
   test("effects from different parts accumulate on the same state", async () => {
     const clock = new VirtualClock();
     const countEffect = definePart<typeof load>((m) => {
-      m.effect(loading, (input) => {
-        const cur = input.context.get();
-        cur.attempts += 1;
-        input.context.set(cur);
+      m.effect(loading, {
+        name: "countAttempts",
+        fn: (input) => {
+          const cur = input.context.get();
+          cur.attempts += 1;
+          input.context.set(cur);
+        },
       });
     });
     const actor = withParts({ ...newLoad(), clock }, [startPart, countEffect, timeoutPart]);

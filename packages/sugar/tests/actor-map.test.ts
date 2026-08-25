@@ -200,8 +200,11 @@ describe("ActorMap", () => {
           initial: off,
           setup: (m) => {
             m.on(off, toggle, () => ({ state: on }));
-            m.effect(on, () => {
-              effectRan = true;
+            m.effect(on, {
+              name: "markEffectRan",
+              fn: () => {
+                effectRan = true;
+              },
             });
           },
         }),
@@ -342,7 +345,7 @@ describe("ActorMap", () => {
           states: [init, done],
           initial: init,
           setup: (m) => {
-            m.effect(init, ({ emit }) => emit(tick.create()));
+            m.effect(init, { name: "emitTick", fn: ({ emit }) => emit(tick.create()) });
             m.on(init, tick, () => ({ state: done }));
           },
         }),

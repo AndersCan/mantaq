@@ -138,14 +138,17 @@ keeping it alive: catch the failure and emit an internal error event, and let a
 transition handle it — the checkout's `paymentFail` path does exactly this.
 
 ```ts
-m.effect(submitting, ({ signal, emit }) => {
-  chargeCard(s.paymentInfo!.cardNumber)
-    .then((orderId) => {
-      if (!signal.aborted) emit(paymentOk.create({ orderId }));
-    })
-    .catch((reason) => {
-      if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
-    });
+m.effect(submitting, {
+  name: "chargeCard",
+  fn: ({ signal, emit }) => {
+    chargeCard(s.paymentInfo!.cardNumber)
+      .then((orderId) => {
+        if (!signal.aborted) emit(paymentOk.create({ orderId }));
+      })
+      .catch((reason) => {
+        if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
+      });
+  },
 });
 ```
 

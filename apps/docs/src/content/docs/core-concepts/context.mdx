@@ -91,14 +91,17 @@ writes the order id on success.
 
 ```ts
 setup: (m) => {
-  m.effect(submitting, ({ context, emit }) => {
-    const s = context.get();
-    chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
-      const cur = context.get();
-      cur.orderId = orderId;
-      context.set(cur);
-      emit(paymentOk.create({ orderId }));
-    });
+  m.effect(submitting, {
+    name: "chargeCard",
+    fn: ({ context, emit }) => {
+      const s = context.get();
+      chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
+        const cur = context.get();
+        cur.orderId = orderId;
+        context.set(cur);
+        emit(paymentOk.create({ orderId }));
+      });
+    },
   });
 };
 ```

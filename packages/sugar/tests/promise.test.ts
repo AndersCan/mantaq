@@ -45,11 +45,14 @@ describe("withPromise", () => {
       initial: loading,
       clock: new VirtualClock(),
       setup: (m) => {
-        m.effect(loading, (input) => {
-          return withPromise(Promise.resolve("ok"), input.signal, input.emit, {
-            success: () => done.create(),
-            error: (e) => done.create(),
-          });
+        m.effect(loading, {
+          name: "resolvePromise",
+          fn: (input) => {
+            return withPromise(Promise.resolve("ok"), input.signal, input.emit, {
+              success: () => done.create(),
+              error: (e) => done.create(),
+            });
+          },
         });
         m.on(loading, done, () => ({ state: ready }));
       },

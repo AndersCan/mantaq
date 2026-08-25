@@ -49,6 +49,8 @@ export interface TransitionInfo {
   from: string;
   to: string;
   transitioned: boolean;
+  /** Names of effects invoked on entry into `to`, in registration order. */
+  effects: string[];
 }
 export type ErrorState = StateRef<"__error", unknown, true>;
 

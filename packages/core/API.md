@@ -278,11 +278,11 @@ actor.recover({ state: idle, context: { retries: 0 } });
 
 ### on("transition", fn)
 
-Observability hook fired for every **handled** event (matched a state or `onAny` handler), including self-transitions and no-op results, with the real event — internal events from effects included. `from` is the state before dispatch, `to` is the event's own transition target (captured before any cascade runs, so cascaded internal events each report their own `from`/`to` correctly). `transitioned` is true when a state step was applied (including self-transitions, whose effects re-run). Not fired for dropped events. This is the instrumentation primitive behind `@mantaq/test`'s coverage.
+Observability hook fired for every **handled** event (matched a state or `onAny` handler), including self-transitions and no-op results, with the real event — internal events from effects included. `from` is the state before dispatch, `to` is the event's own transition target (captured before any cascade runs, so cascaded internal events each report their own `from`/`to` correctly). `transitioned` is true when a state step was applied (including self-transitions, whose effects re-run). `effects` lists the names of the target state's effects that actually ran on entry, in registration order. Not fired for dropped events. This is the instrumentation primitive behind `@mantaq/test`'s coverage.
 
 ```ts
-actor.on("transition", ({ event, from, to, transitioned }) => {
-  console.log(`${from} --${event.type}--> ${to}${transitioned ? "" : " (no-op)"}`);
+actor.on("transition", ({ event, from, to, transitioned, effects }) => {
+  console.log(`${from} --${event.type}--> ${to}${transitioned ? "" : " (no-op)"}`, effects);
 });
 ```
 
@@ -384,16 +384,22 @@ class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
     fn: Handler,
   ): this;
   onAny<E extends Inputs[number] | Internal[number]>(eventRef: E, fn: Handler): this;
-  effect<S extends States[number]>(stateRef: S, fn: EffectFn<ActorContext, PayloadOf<S>>): this;
+  effect<S extends States[number]>(
+    stateRef: S,
+    def: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
+  ): this;
 }
 // Handler = (event, opts: { context: Context<ActorContext>; actor: AnyActor }) =>
 //   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ type: string; payload?: unknown }> }
 m.on(idle, click, () => ({ state: active, emit: [pong.create()] }));
 m.onAny(click, () => ({ state: idle }));
-m.effect(active, ({ context }) => {
-  const s = context.get();
-  s.ready = true;
-  context.set(s);
+m.effect(active, {
+  name: "markReady",
+  fn: ({ context }) => {
+    const s = context.get();
+    s.ready = true;
+    context.set(s);
+  },
 });
 ```
 
@@ -414,7 +420,7 @@ The built transition/effect registries produced by `ActorBuilder.build()`. Expos
 ```ts
 interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
   transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
-  effects: Record<string, Array<EffectFn<ActorContext>>>;
+  effects: Record<string, Array<{ name: string; fn: EffectFn<ActorContext> }>>;
 }
 ```
 
@@ -495,7 +501,7 @@ interface EffectInput<ActorContext, Payload = unknown> {
 ```
 
 `Payload` is inferred from the state's declared payload when the effect is registered with
-`m.effect(stateRef, fn)` — `state.payload` is typed, no cast needed. States declared without a
+`m.effect(stateRef, { name, fn })` — `state.payload` is typed, no cast needed. States declared without a
 payload generic (`state("idle")()`) keep `payload: unknown`.
 
 ### EffectFn
@@ -506,10 +512,13 @@ An effect function, run on state entry; the signal aborts on state exit or actor
 type EffectFn<ActorContext, Payload = unknown> = (
   input: EffectInput<ActorContext, Payload>,
 ) => void | Promise<void>;
-m.effect(loading, ({ signal, emit, state }) => {
-  state.payload.url; // typed to loading's payload
-  const t = setTimeout(() => emit(done.create()), 1000);
-  signal.addEventListener("abort", () => clearTimeout(t));
+m.effect(loading, {
+  name: "fetchUrl",
+  fn: ({ signal, emit, state }) => {
+    state.payload.url; // typed to loading's payload
+    const t = setTimeout(() => emit(done.create()), 1000);
+    signal.addEventListener("abort", () => clearTimeout(t));
+  },
 });
 ```
 

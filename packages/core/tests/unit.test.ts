@@ -264,14 +264,17 @@ describe("runEffects", () => {
     const result = runEffects({
       effects: {
         idle: [
-          ({ signal, state, event, context, emit, clock: c }) => {
-            expect(signal.aborted).toBe(false);
-            expect(state.name).toBe("idle");
-            expect(event.type).toBe("X");
-            expect(context.get()).toEqual({ n: 1 });
-            expect(c).toBe(clock);
-            emit({ type: "OUT" });
-            seen.push("ran");
+          {
+            name: "emitAndRecord",
+            fn: ({ signal, state, event, context, emit, clock: c }) => {
+              expect(signal.aborted).toBe(false);
+              expect(state.name).toBe("idle");
+              expect(event.type).toBe("X");
+              expect(context.get()).toEqual({ n: 1 });
+              expect(c).toBe(clock);
+              emit({ type: "OUT" });
+              seen.push("ran");
+            },
           },
         ],
       },
@@ -297,14 +300,23 @@ describe("runEffects", () => {
     runEffects({
       effects: {
         idle: [
-          () => {
-            seen.push("one");
+          {
+            name: "pushOne",
+            fn: () => {
+              seen.push("one");
+            },
           },
-          () => {
-            throw new Error("boom");
+          {
+            name: "thrower",
+            fn: () => {
+              throw new Error("boom");
+            },
           },
-          () => {
-            seen.push("three");
+          {
+            name: "pushThree",
+            fn: () => {
+              seen.push("three");
+            },
           },
         ],
       },
@@ -332,8 +344,11 @@ describe("runEffects", () => {
     const result = runEffects({
       effects: {
         idle: [
-          async () => {
-            throw new Error("late boom");
+          {
+            name: "lateThrow",
+            fn: async () => {
+              throw new Error("late boom");
+            },
           },
         ],
       },
@@ -362,10 +377,13 @@ describe("runEffects", () => {
     const result = runEffects({
       effects: {
         idle: [
-          async ({ signal }) => {
-            await new Promise((_, reject) => {
-              signal.addEventListener("abort", () => reject(new Error("aborted")));
-            });
+          {
+            name: "rejectOnAbort",
+            fn: async ({ signal }) => {
+              await new Promise((_, reject) => {
+                signal.addEventListener("abort", () => reject(new Error("aborted")));
+              });
+            },
           },
         ],
       },
@@ -407,9 +425,12 @@ describe("runEffects", () => {
     const result = runEffects({
       effects: {
         idle: [
-          () => {
-            seen.push("ran");
-            return thenable;
+          {
+            name: "returnThenable",
+            fn: () => {
+              seen.push("ran");
+              return thenable;
+            },
           },
         ],
       },
@@ -443,7 +464,7 @@ describe("runEffects", () => {
       },
     } as unknown as Promise<void>;
     const result = runEffects({
-      effects: { idle: [() => thenable] },
+      effects: { idle: [{ name: "returnRejectingThenable", fn: () => thenable }] },
       state: state("idle")(),
       statePayload: undefined,
       event: { type: "X" },

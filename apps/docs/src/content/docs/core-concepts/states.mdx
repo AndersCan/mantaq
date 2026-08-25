@@ -80,8 +80,11 @@ m.on(submitting, paymentFail, (_event) => ({
 An effect on `error` reads it:
 
 ```ts
-m.effect(error, ({ state }) => {
-  console.log("Checkout failed:", state.payload.reason);
+m.effect(error, {
+  name: "logFailure",
+  fn: ({ state }) => {
+    console.log("Checkout failed:", state.payload.reason);
+  },
 });
 ```
 

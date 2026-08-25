@@ -85,37 +85,43 @@ function createCacheActor(capacity = 3, clock?: VirtualClock) {
     context,
     regions: { tier: tierActor },
     setup: (m) => {
-      m.effect(cacheStates.purging, (input) => {
-        const now = input.clock.now();
-        const s = input.context.get();
-        const expired: string[] = [];
-        for (const [key, entry] of s.entries) {
-          if (entry.expiresAt !== null && entry.expiresAt <= now) {
-            expired.push(key);
+      m.effect(cacheStates.purging, {
+        name: "purgeExpired",
+        fn: (input) => {
+          const now = input.clock.now();
+          const s = input.context.get();
+          const expired: string[] = [];
+          for (const [key, entry] of s.entries) {
+            if (entry.expiresAt !== null && entry.expiresAt <= now) {
+              expired.push(key);
+            }
           }
-        }
-        for (const key of expired) {
-          s.entries.delete(key);
-          s.accessOrder = s.accessOrder.filter((k) => k !== key);
-        }
-        s.expires += expired.length;
-        input.context.set(s);
-        input.emit(e.PURGE_DONE.create(undefined));
+          for (const key of expired) {
+            s.entries.delete(key);
+            s.accessOrder = s.accessOrder.filter((k) => k !== key);
+          }
+          s.expires += expired.length;
+          input.context.set(s);
+          input.emit(e.PURGE_DONE.create(undefined));
+        },
       });
-      m.effect(cacheStates.full, (input) => {
-        const s = input.context.get();
-        if (s.accessOrder.length >= s.capacity) {
-          const accessOrder = [...s.accessOrder];
-          const lruKey = accessOrder.shift();
-          if (lruKey) {
-            s.entries = new Map(s.entries);
-            s.entries.delete(lruKey);
-            s.accessOrder = accessOrder;
-            s.evictions += 1;
-            input.context.set(s);
+      m.effect(cacheStates.full, {
+        name: "evictLeastRecentlyUsed",
+        fn: (input) => {
+          const s = input.context.get();
+          if (s.accessOrder.length >= s.capacity) {
+            const accessOrder = [...s.accessOrder];
+            const lruKey = accessOrder.shift();
+            if (lruKey) {
+              s.entries = new Map(s.entries);
+              s.entries.delete(lruKey);
+              s.accessOrder = accessOrder;
+              s.evictions += 1;
+              input.context.set(s);
+            }
           }
-        }
-        input.emit(e.EVICTION_DONE.create(undefined));
+          input.emit(e.EVICTION_DONE.create(undefined));
+        },
       });
       m.onAny(getEvent, (event, opts) => {
         const { context } = opts!;

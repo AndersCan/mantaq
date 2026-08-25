@@ -101,10 +101,10 @@ function createAuthActor(clock?: VirtualClock) {
     clock: c,
     context: {} as AuthContext,
     setup: (m) => {
-      m.effect(s.checkingAuth, monitorAuthStateEffect);
-      m.effect(s.loggedIn, monitorAuthStateEffect);
-      m.effect(s.signingIn, signInWithPhoneEffect);
-      m.effect(s.signingOut, signingOutEffect);
+      m.effect(s.checkingAuth, { name: "monitorCheckingAuth", fn: monitorAuthStateEffect });
+      m.effect(s.loggedIn, { name: "monitorLoggedIn", fn: monitorAuthStateEffect });
+      m.effect(s.signingIn, { name: "signInWithPhone", fn: signInWithPhoneEffect });
+      m.effect(s.signingOut, { name: "signOut", fn: signingOutEffect });
       m.onAny(e.MONITOR_TICK, () => ({}));
       m.on(s.checkingAuth, signInEvent, (event, opts) => {
         const cur = opts!.context.get();

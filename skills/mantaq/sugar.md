@@ -54,7 +54,10 @@ broadcast(map, shutdownEvent); // SendableEvent = EventRef | { type, payload? }
 
 ```ts
 // fire one event after ms (injected clock — deterministic in tests)
-m.effect(submittingState, (input) => withTimeout(800, input, () => ({ type: "SUBMITTING_DONE" })));
+m.effect(submittingState, {
+  name: "startSubmitTimeout",
+  fn: (input) => withTimeout(800, input, () => ({ type: "SUBMITTING_DONE" })),
+});
 
 // resolve a promise → emit success/error event (guarded by abort signal)
 withPromise(promise, signal, emit, {

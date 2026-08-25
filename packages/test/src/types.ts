@@ -30,12 +30,12 @@ export interface TestHarness<C = Record<string, unknown>> {
   assertTransitionVisited(from: string, event: string): void;
   assertTransitionNeverVisited(from: string, event: string): void;
   assertContextNever(predicate: (context: unknown) => boolean): void;
-  assertEffectRan(stateName: string): void;
-  assertEffectNeverRan(stateName: string): void;
+  assertEffectRan(stateName: string, effectName: string): void;
+  assertEffectNeverRan(stateName: string, effectName: string): void;
 
   wasStateVisited(stateName: string): boolean;
   wasTransitionVisited(from: string, event: string): boolean;
-  wasEffectRun(stateName: string): boolean;
+  wasEffectRun(stateName: string, effectName: string): boolean;
 
   reset(): void;
 }

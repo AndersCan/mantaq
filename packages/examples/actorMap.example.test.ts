@@ -21,10 +21,13 @@ function createWorker(id: string, clock: VirtualClock, reportTo: AnyActor) {
     clock,
     setup: (m) => {
       m.on(idle, doWork, () => ({ state: working }));
-      m.effect(working, ({ context, clock }) => {
-        clock.setTimeout(10, () => {
-          context.get().reportTo.send(workResult.create({ id: context.get().id, ok: true }));
-        });
+      m.effect(working, {
+        name: "doWork",
+        fn: ({ context, clock }) => {
+          clock.setTimeout(10, () => {
+            context.get().reportTo.send(workResult.create({ id: context.get().id, ok: true }));
+          });
+        },
       });
     },
   });

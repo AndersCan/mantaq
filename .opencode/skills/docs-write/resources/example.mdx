@@ -120,13 +120,16 @@ function createCheckoutActor(
     clock: c,
     context: {} as CheckoutContext,
     setup: (m) => {
-      m.effect(submitting, (input) => {
-        const s = input.context.get();
-        withPromise(chargeCardImpl(s.paymentInfo!.cardNumber), input.signal, input.emit, {
-          success: (orderId) => paymentOk.create({ orderId }),
-          error: (reason) => paymentFail.create({ reason: String(reason) }),
-        });
-        withTimeout(800, input, () => submittingDone.create());
+      m.effect(submitting, {
+        name: "chargeCard",
+        fn: (input) => {
+          const s = input.context.get();
+          withPromise(chargeCardImpl(s.paymentInfo!.cardNumber), input.signal, input.emit, {
+            success: (orderId) => paymentOk.create({ orderId }),
+            error: (reason) => paymentFail.create({ reason: String(reason) }),
+          });
+          withTimeout(800, input, () => submittingDone.create());
+        },
       });
       m.onAny(back, (_event, opts) => {
         const s = actor.state.name;
@@ -320,8 +323,11 @@ function createRequestHandler(orderId: string, clock) {
         opts.context.set(s);
         return { state: pending };
       });
-      m.effect(pending, (input) => {
-        withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
+      m.effect(pending, {
+        name: "startResponseTimeout",
+        fn: (input) => {
+          withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
+        },
       });
       m.on(pending, answer, (event) => ({
         state: answered,

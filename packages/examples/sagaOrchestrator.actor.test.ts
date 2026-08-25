@@ -114,35 +114,53 @@ function createSagaActor(clock?: VirtualClock) {
     clock: c,
     context: { completedSteps: [] } as SagaContext,
     setup: (m) => {
-      m.effect(s.reservingInventory, (input) => {
-        withTimeout(100, input, () =>
-          INVENTORY_RESERVED.create({
-            result: { reservationId: `RES-${input.context.get().order?.orderId ?? "unknown"}` },
-          }),
-        );
+      m.effect(s.reservingInventory, {
+        name: "reserveInventory",
+        fn: (input) => {
+          withTimeout(100, input, () =>
+            INVENTORY_RESERVED.create({
+              result: { reservationId: `RES-${input.context.get().order?.orderId ?? "unknown"}` },
+            }),
+          );
+        },
       });
-      m.effect(s.processingPayment, (input) => {
-        withTimeout(200, input, () =>
-          PAYMENT_PROCESSED.create({
-            result: { transactionId: `TXN-${input.context.get().order?.orderId ?? "unknown"}` },
-          }),
-        );
+      m.effect(s.processingPayment, {
+        name: "processPayment",
+        fn: (input) => {
+          withTimeout(200, input, () =>
+            PAYMENT_PROCESSED.create({
+              result: { transactionId: `TXN-${input.context.get().order?.orderId ?? "unknown"}` },
+            }),
+          );
+        },
       });
-      m.effect(s.creatingShipment, (input) => {
-        withTimeout(150, input, () =>
-          SHIPMENT_CREATED.create({
-            result: { trackingNumber: `TRK-${input.context.get().order?.orderId ?? "unknown"}` },
-          }),
-        );
+      m.effect(s.creatingShipment, {
+        name: "createShipment",
+        fn: (input) => {
+          withTimeout(150, input, () =>
+            SHIPMENT_CREATED.create({
+              result: { trackingNumber: `TRK-${input.context.get().order?.orderId ?? "unknown"}` },
+            }),
+          );
+        },
       });
-      m.effect(s.notifying, (input) => {
-        withTimeout(50, input, () => NOTIFICATION_SENT.create(undefined));
+      m.effect(s.notifying, {
+        name: "sendNotification",
+        fn: (input) => {
+          withTimeout(50, input, () => NOTIFICATION_SENT.create(undefined));
+        },
       });
-      m.effect(s.compensatingRefund, (input) => {
-        withTimeout(100, input, () => REFUND_DONE.create(undefined));
+      m.effect(s.compensatingRefund, {
+        name: "runRefund",
+        fn: (input) => {
+          withTimeout(100, input, () => REFUND_DONE.create(undefined));
+        },
       });
-      m.effect(s.compensatingRelease, (input) => {
-        withTimeout(80, input, () => RELEASE_DONE.create(undefined));
+      m.effect(s.compensatingRelease, {
+        name: "releaseInventory",
+        fn: (input) => {
+          withTimeout(80, input, () => RELEASE_DONE.create(undefined));
+        },
       });
       m.onAny(CANCEL, (_event, opts) => {
         const cur = opts!.context.get();
