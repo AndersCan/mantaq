@@ -7,7 +7,7 @@ import type { Clock } from "./clock.ts";
 import type { Snapshot, AnyActor } from "./actor-internal.ts";
 import { InternalQueue } from "./queue.ts";
 import { Subscribers } from "./subscribers.ts";
-import { buildSnapshot } from "./snapshot.ts";
+import { buildSnapshot, cloneValue } from "./snapshot.ts";
 import { runEffects } from "./effects.ts";
 import { parseTarget } from "./dispatch.ts";
 import { Context } from "./context.ts";
@@ -125,6 +125,18 @@ export class Actor<
 
   #contextWritten = false;
 
+  /**
+   * Last context object handed to subscribers. The actor never exposes the
+   * live `#context`; it clones it and caches the copy so that unchanged
+   * snapshots keep a stable identity (subscribers rely on `prev.context ===
+   * snap.context` to detect context changes) while a mutated snapshot cannot
+   * reach the live state (issue #226).
+   */
+  #deliveredContext: ActorContext | null = null;
+
+  /** Set when `#context` has changed since the last delivered snapshot. */
+  #contextDirty = true;
+
   #lastState: AnyStateRef;
 
   #options: InternalActorOptions<States, Inputs, Internal, Outputs, ActorContext>;
@@ -186,6 +198,7 @@ export class Actor<
       (value: ActorContext) => {
         this.#context = value;
         this.#contextWritten = true;
+        this.#contextDirty = true;
       },
     );
 
@@ -265,6 +278,8 @@ export class Actor<
     this.#context = target.context;
     this.#lastState = target.state;
     this.#contextWritten = false;
+    this.#contextDirty = true;
+    this.#deliveredContext = null;
     this.#entry = null;
     this.#pendingEffects = [];
     this.#subs.emitChange(this.snapshot());
@@ -390,7 +405,11 @@ export class Actor<
   }
 
   snapshot(): Snapshot<ActorContext> {
-    return buildSnapshot(this.state, this.#regions, this.#context, {
+    if (this.#deliveredContext === null || this.#contextDirty) {
+      this.#deliveredContext = cloneValue(this.#context);
+      this.#contextDirty = false;
+    }
+    return buildSnapshot(this.state, this.#regions, this.#deliveredContext, {
       error: this.#error ?? undefined,
       payload: this.#statePayload,
     });

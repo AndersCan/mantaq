@@ -5,7 +5,8 @@ import { InternalQueue } from "../src/queue.ts";
 import { trackAbort, clearAbort } from "../src/abort-tracker.ts";
 import { runEffects } from "../src/effects.ts";
 import { Subscribers } from "../src/subscribers.ts";
-import { buildSnapshot } from "../src/snapshot.ts";
+import { buildSnapshot, cloneValue } from "../src/snapshot.ts";
+import type { ErrorInfo, Snapshot } from "../src/actor-types.ts";
 import { parseTarget } from "../src/dispatch.ts";
 import { state } from "../src/state.ts";
 import { event } from "../src/event.ts";
@@ -502,6 +503,65 @@ describe("buildSnapshot", () => {
   test("marks done for final states", () => {
     const snap = buildSnapshot(state("done")().final(), {}, {});
     expect(snap.done).toBe(true);
+  });
+
+  test("returns a copy of error.context, not the live reference (#226)", () => {
+    const ctx = { count: 0 };
+    const myError = new Error("boom");
+    const err: ErrorInfo = {
+      error: myError,
+      state: state("root")(),
+      context: ctx,
+      event: { type: "GO" },
+      reason: "transition",
+    };
+    const snap = buildSnapshot(state("root")(), {}, {}, { error: err });
+    // Every ErrorInfo field is preserved (the spread must not be dropped).
+    expect(snap.error!.error).toBe(myError);
+    expect(snap.error!.state).toBe(err.state);
+    expect(snap.error!.event).toEqual({ type: "GO" });
+    expect(snap.error!.reason).toBe("transition");
+    // error.context is a deep copy, so mutating it cannot reach the live context.
+    (snap.error!.context as { count: number }).count = 99;
+    expect(ctx.count).toBe(0);
+  });
+});
+
+describe("cloneValue", () => {
+  test("deep-clones via structuredClone, isolating nested mutations", () => {
+    const src = { a: 1, nested: { b: [1, 2, 3] } };
+    const out = cloneValue(src);
+    expect(out).toEqual(src);
+    expect(out).not.toBe(src);
+    out.nested.b.push(4);
+    expect(src.nested.b).toEqual([1, 2, 3]);
+  });
+
+  test("falls back to a JSON round-trip when structuredClone is unavailable", () => {
+    const original = (globalThis as { structuredClone?: unknown }).structuredClone;
+    (globalThis as { structuredClone?: unknown }).structuredClone = undefined;
+    try {
+      const src = { a: 1, nested: { b: [1, 2, 3] } };
+      const out = cloneValue(src);
+      expect(out).toEqual(src);
+      expect(out).not.toBe(src);
+      out.nested.b.push(4);
+      expect(src.nested.b).toEqual([1, 2, 3]);
+    } finally {
+      (globalThis as { structuredClone?: unknown }).structuredClone = original;
+    }
+  });
+
+  test("region snapshots keep their identity (public contract)", () => {
+    const sub = { path: ["leaf"], context: {}, regions: {} } as Snapshot;
+    const snap = buildSnapshot(
+      state("root")(),
+      {
+        sub: { snapshot: () => sub },
+      },
+      {},
+    );
+    expect(snap.regions.sub).toBe(sub);
   });
 });
 
