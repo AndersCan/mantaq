@@ -3,19 +3,7 @@ title: Testing Actors
 description: How to test the checkout machine using graph traversal patterns.
 ---
 
-## What
-
-Testing an actor means driving it with events and asserting where it lands. The
-machine is a graph: states are nodes, transitions are edges. A test is a
-walk through that graph.
-
-## Why
-
-Mantaq is deterministic: same inputs, same trace, every time. That makes flows
-assertable without flakiness: no sleeps, no "wait 100ms and hope". Time-based
-transitions run on a `VirtualClock`, so you fast-forward instead of waiting.
-
-The checkout machine from [Context](/mantaq/core-concepts/context/). Full flow:
+States are nodes, transitions are edges, a test is a walk. Mantaq is deterministic: same inputs, same trace, no sleeps.
 
 ```
 basicInfo → shippingAddress → payment → submitting → success (final)
@@ -42,15 +30,8 @@ const submitting = state("submitting")();
 const success = state("success")().final();
 const error = state("error")();
 
-const submitBasicInfo = event("submitBasicInfo")<{
-  email: string;
-  name: string;
-}>();
-const submitShipping = event("submitShipping")<{
-  street: string;
-  city: string;
-  zip: string;
-}>();
+const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
+const submitShipping = event("submitShipping")<{ street: string; city: string; zip: string }>();
 const submitPayment = event("submitPayment")<{ cardNumber: string }>();
 const back = event("back")();
 const paymentOk = event("paymentOk")<{ orderId: string }>();
@@ -65,22 +46,16 @@ function createCheckoutActor() {
     initial: basicInfo,
     context: {} as CheckoutContext,
     setup: (m) => {
-      m.on(basicInfo, submitBasicInfo, (event, { context }) => {
-        const s = context.get();
-        s.basicInfo = event.payload;
-        context.set(s);
+      m.on(basicInfo, submitBasicInfo, (e, { context }) => {
+        context.set({ ...context.get(), basicInfo: e.payload });
         return { state: shippingAddress };
       });
-      m.on(shippingAddress, submitShipping, (event, { context }) => {
-        const s = context.get();
-        s.shippingAddress = event.payload;
-        context.set(s);
+      m.on(shippingAddress, submitShipping, (e, { context }) => {
+        context.set({ ...context.get(), shippingAddress: e.payload });
         return { state: payment };
       });
-      m.on(payment, submitPayment, (event, { context }) => {
-        const s = context.get();
-        s.paymentInfo = event.payload;
-        context.set(s);
+      m.on(payment, submitPayment, (e, { context }) => {
+        context.set({ ...context.get(), paymentInfo: e.payload });
         return { state: submitting };
       });
       m.on(submitting, paymentOk, () => ({ state: success }));
@@ -91,56 +66,22 @@ function createCheckoutActor() {
 }
 ```
 
-The happy-path pieces work without time or promises, so they can be tested
-directly.
-
-## Testing Patterns
-
-### Assert Initial State
+## Happy path
 
 ```ts
 const checkout = createCheckoutActor();
 expect(checkout.snapshot().path[0]).toBe("basicInfo");
-expect(checkout.snapshot().done).toBeFalsy();
-```
 
-### Assert Transition Path
-
-```ts
-checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
-expect(checkout.snapshot().path[0]).toBe("shippingAddress");
-
-checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
-expect(checkout.snapshot().path[0]).toBe("payment");
-```
-
-### Assert Context Changes
-
-```ts
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 expect(checkout.context.basicInfo).toEqual({ email: "a@b.com", name: "A" });
-expect(checkout.context.shippingAddress).toBeUndefined();
-```
+expect(checkout.snapshot().path[0]).toBe("shippingAddress");
 
-The data lands in context, step by step.
-
-### Assert Back Navigation
-
-`back` in `payment` returns to `shippingAddress`:
-
-```ts
-checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
 expect(checkout.snapshot().path[0]).toBe("payment");
 
 checkout.send(back.create());
 expect(checkout.snapshot().path[0]).toBe("shippingAddress");
-```
 
-### Assert Final State
-
-```ts
-checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
 checkout.send(submitPayment.create({ cardNumber: "1111222233334444" }));
 checkout.send(paymentOk.create({ orderId: "ord_1" }));
@@ -148,22 +89,18 @@ expect(checkout.snapshot().path[0]).toBe("success");
 expect(checkout.snapshot().done).toBe(true);
 ```
 
-### Assert Side Effects with VirtualClock
+## Assert side effects with VirtualClock
 
-In production the machine charges a card via a promise effect. In tests, control
-time instead. Give the actor a `VirtualClock`, then advance.
-
-Charge hangs → the 800ms timeout fires → `submittingDone` → `success`:
+`VirtualClock.advance(ms)` is synchronous, fires timers, drains queue. No fake timers, no sleeps.
 
 ```ts
 const clock = new VirtualClock();
 const checkout = new Actor({
   inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-  internal: [paymentOk, paymentFail, submittingDone],
+  internal: [submittingDone],
   states: [basicInfo, shippingAddress, payment, submitting, success, error],
   initial: basicInfo,
   clock,
-  context: {} as CheckoutContext,
   setup: (m) => {
     m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
     m.on(shippingAddress, submitShipping, () => ({ state: payment }));
@@ -185,43 +122,36 @@ checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150
 checkout.send(submitPayment.create({ cardNumber: "1111222233334444" }));
 expect(checkout.snapshot().path[0]).toBe("submitting");
 
-clock.advance(800); // fast-forward time
+clock.advance(800);
 expect(checkout.snapshot().path[0]).toBe("success");
 ```
 
-Deterministic and fast: no fake timers, no sleeps. Same inputs, same trace.
+## Assert promise effects with settled
 
-### Assert Promise Effects with settled
-
-The charge resolves → `paymentOk` is emitted → `success`. The emit happens in a
-microtask, so `settled()` waits for it:
+Promise effects emit in a microtask. `settled()` waits for them.
 
 ```ts
-function createCheckoutWithCharge() {
-  return new Actor({
-    inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, submittingDone],
-    states: [basicInfo, shippingAddress, payment, submitting, success, error],
-    initial: basicInfo,
-    context: {} as CheckoutContext,
-    setup: (m) => {
-      m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
-      m.on(shippingAddress, submitShipping, () => ({ state: payment }));
-      m.on(payment, submitPayment, () => ({ state: submitting }));
-      m.on(submitting, paymentOk, () => ({ state: success }));
-      m.effect(submitting, {
-        name: "chargeCard",
-        fn: ({ signal, emit }) => {
-          Promise.resolve("ord_1").then((orderId) => {
-            if (!signal.aborted) emit(paymentOk.create({ orderId }));
-          });
-        },
-      });
-    },
-  });
-}
-
-const checkout = createCheckoutWithCharge();
+const checkout = new Actor({
+  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+  internal: [paymentOk, paymentFail],
+  states: [basicInfo, shippingAddress, payment, submitting, success, error],
+  initial: basicInfo,
+  context: {} as CheckoutContext,
+  setup: (m) => {
+    m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
+    m.on(shippingAddress, submitShipping, () => ({ state: payment }));
+    m.on(payment, submitPayment, () => ({ state: submitting }));
+    m.on(submitting, paymentOk, () => ({ state: success }));
+    m.effect(submitting, {
+      name: "chargeCard",
+      fn: ({ signal, emit }) => {
+        Promise.resolve("ord_1").then((orderId) => {
+          if (!signal.aborted) emit(paymentOk.create({ orderId }));
+        });
+      },
+    });
+  },
+});
 
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
@@ -230,16 +160,3 @@ checkout.send(submitPayment.create({ cardNumber: "1111222233334444" }));
 await checkout.settled();
 expect(checkout.snapshot().path[0]).toBe("success");
 ```
-
-## Key Takeaways
-
-- **States are nodes.** `state("basicInfo")()` creates a node in the graph
-- **Events are edges.** `event("submitBasicInfo")()` defines a possible transition
-- **Transitions are the graph.** `(state, event) → newState` maps edges
-- **Context is memory.** Survives transitions, holds accumulated data
-- **Effects are side effects.** Run on state entry, abort on exit
-- **Effect names.** Every effect takes a required camelCase `name`; assert it ran with `harness.assertEffectRan(stateName, effectName)` (or `assertEffectNeverRan` / `wasEffectRun`)
-- **`snapshot().path[0]`.** Current state name in graph
-- **`VirtualClock`.** Deterministically test time-dependent transitions
-- **`settled()`.** Wait for promise effects before asserting
-- **`snapshot().done`.** True when actor reached a final state

@@ -8,58 +8,30 @@ description: Messages that trigger transitions.
 An event is a typed message that triggers a transition. `event("back")()`
 declares one.
 
-## Why
-
-Actors react to messages, not direct calls. You send an event, and any handler
-registered for the current state and that event fires. Because events carry
-their payload type, handlers read typed data without casting.
-
-Events are the only thing that moves a machine. Driving a flow with a fixed,
-declared set of messages keeps it predictable and testable. The set of
-possible inputs is written down in the `inputs` array, and the compiler
-enforces it.
-
-The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its events
-move the form.
-
-## Basic events
+## Declare
 
 ```ts
-import { event } from "@mantaq/core";
-
 const back = event("back")();
 const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
-const submitShipping = event("submitShipping")<{ street: string; city: string; zip: string }>();
-
 back.type; // "back"
 ```
 
-A payload must be `object | void`. By default there is no payload, `back` has
-none. The submit events carry form data.
+Payload must be `object | void`. Default: no payload.
 
 ## Create instances
 
 ```ts
 back.create(); // { type: "back" }
 submitBasicInfo.create({ email: "a@b.com", name: "A" });
-// { type: "submitBasicInfo", payload: { email: "a@b.com", name: "A" } }
 ```
-
-`.create()` builds the event you send. Events with a payload need the payload
-argument.
 
 ## Check identity
 
 ```ts
-back.is(someEvent); // boolean
+back.is(someEvent); // boolean (type guard)
 ```
 
-True if `someEvent.type === "back"`. It doubles as a type guard.
-
 ## Use in transitions
-
-Handlers receive the typed event, and the payload type comes from the event
-ref.
 
 ```ts
 m.on(shippingAddress, submitShipping, (event, { context }) => {
@@ -70,22 +42,12 @@ m.on(shippingAddress, submitShipping, (event, { context }) => {
 });
 ```
 
-`event.payload.street`, `event.payload.city`, all typed.
+`event.payload` is typed from the event ref.
 
-## Conditional transitions (guards)
+## Guards (conditional transitions)
 
-A conditional transition is a transition that only fires when a condition
-passes. The condition is plain JavaScript, an `if` or a ternary, written in
-the handler, and it picks the `TransitionResult` the handler returns: the
-matching branch returns `{ state: ... }`, the other branches return `{}` to
-stay put.
-
-This is Mantaq's guard. There is no `guard:` option and no condition syntax to
-learn. The `if` in the handler is the guard, written by you, run by the
-machine. One way to do it.
-
-The fraud monitor from [States](/mantaq/core-concepts/states/) decides its next
-state from the event payload:
+No guard syntax. Plain `if` in the handler picks which `{ state }` to return.
+Return `{}` to stay put.
 
 ```ts
 m.on(scanning, scanDone, (event) => ({
@@ -93,68 +55,20 @@ m.on(scanning, scanDone, (event) => ({
 }));
 ```
 
-`scanDone` always fires the handler; the ternary picks which state the handler
-returns. The condition can just as easily read what has happened so far.
-`context.get()` returns the live record, and branching on its fields works the
-same way. The `back` handler in [Any handler](#any-handler) is the same
-pattern, with the condition on the current state instead of data.
-
-A conditional handler still moves the machine exactly once, through exactly one
-branch. When no condition matches and the handler returns `{}`, the machine
-stays put, same state, same context, nothing fired.
-
-Because the branch is plain JS, you test it like plain JS. Cover both branches
-with the actor wrapped in the `@mantaq/test` harness, then assert which
-transitions and states were actually reached:
-
-```ts
-const h = createTestHarness(fraudMonitor);
-h.send(scanDone.create({ risky: true }));
-h.assertTransitionVisited("scanning", "scanDone"); // the handler ran
-h.assertStateVisited("flagged"); // the risky branch won
-h.assertStateNeverVisited("cleared"); // safe branch never fired
-```
-
-`assertAllTransitionsVisited()` after a full run proves every declared
-transition fired at least once. A condition that never passes leaves its
-transition unvisited and fails the assertion.
-
 ## Internal events
 
-Internal events come from effects, not from the outside. They're declared in
-`internal`, not `inputs`, and they're processed after the current transition.
-Effects emit them; nothing external can send them through `send()`.
-
-Checkout's internal events: the charge and timeout results:
+Declared in `internal`, not `inputs`. Emitted by effects. Processed after the
+current transition. Nothing external can send them via `send()`.
 
 ```ts
 const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
-const submittingDone = event("submittingDone")();
-
-const checkout = new Actor({
-  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-  internal: [paymentOk, paymentFail, submittingDone],
-  states: [basicInfo, shippingAddress, payment, submitting, success, error],
-  initial: basicInfo,
-  setup: (m) => {
-    m.on(submitting, paymentOk, (event, { context }) => {
-      const s = context.get();
-      s.orderId = event.payload.orderId;
-      context.set(s);
-      return { state: success };
-    });
-    m.on(submitting, paymentFail, () => ({ state: error }));
-    m.on(submitting, submittingDone, () => ({ state: success }));
-  },
-});
 ```
 
-Nothing emits these yet. [Effects](/mantaq/core-concepts/effects/) do.
+## `onAny`
 
-## Any handler
-
-`m.onAny` intercepts an event in every state. Checkout's `back`:
+Intercepts an event in every state. State-specific handler runs first;
+`onAny` only fires if no state handler matched.
 
 ```ts
 m.onAny(back, (_event, { context }) => {
@@ -169,7 +83,3 @@ m.onAny(back, (_event, { context }) => {
   return {};
 });
 ```
-
-A state-specific handler runs first; `onAny` only transitions if no
-state-specific handler fired. `back` from `payment` returns to
-`shippingAddress`; from `error` it retries at `payment`; elsewhere it stays put.

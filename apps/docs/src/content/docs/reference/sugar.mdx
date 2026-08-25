@@ -9,7 +9,7 @@ description: Convenience helpers.
 function matches(actor: { snapshot(): Snapshot }, pattern: string): boolean;
 ```
 
-Dot-separated pattern. Snapshot tree.
+Dot-separated pattern match against snapshot tree.
 
 ```ts
 matches(checkout, "payment"); // flat
@@ -17,7 +17,7 @@ matches(checkout, "basicInfo.fraud.scanning"); // hierarchical
 matches(checkout, "basicInfo.fraud.cleared"); // parallel region
 ```
 
-Prefix match. Checks top-level state name first, then descends only through region names in order. Ends at a state boundary. `matches(actor, "connected")` → true only if top-level state is `connected`. Not "anywhere inside". That's `isIn`.
+Prefix match. Checks top-level state name first, descends through region names in order, ends at state boundary. `matches(actor, "connected")` is true only if top-level state is `connected`, not anywhere inside. That is `isIn`.
 
 ---
 
@@ -29,8 +29,7 @@ function states(
 ): Record<string, StateRef>;
 ```
 
-Batch state creation. Entries are strings, or objects with `final: true` for a
-terminal state. `success` is final right at creation. No `.final()` call.
+Batch state creation. Entries are strings, or objects with `final: true` for a terminal state.
 
 ```ts
 const s = states("basicInfo", "payment", { name: "success", final: true }, "error");
@@ -61,7 +60,7 @@ e.submitBasicInfo.create(); // { type: "submitBasicInfo" }
 function tag(...stateRefs: StateRef<string, unknown>[]): Tag;
 ```
 
-Group states. `tag.has(snapshot)` → true if any active.
+Group states. `tag.has(snapshot)` returns true if any active.
 
 ```ts
 const busy = tag(s.payment, s.submitting);
@@ -76,29 +75,23 @@ Keyed registry of one actor type.
 
 ```ts
 const map = new ActorMap(createOrderWorker);
-
 map.spawn("ord_1");
-map.spawn("ord_2");
 map.send("ord_1", ship.create());
 map.kill("ord_1");
 ```
 
-`new ActorMap(factory, options?)`. `factory` builds the actor, receiving the
-key: `(id: string) => Actor`. Every `spawn(key)` creates a fresh instance of
-the same actor, keyed by id. `options: { autoReap? }`: `true` removes a child
-once it reaches a final state (or dies into `__error`). Off by default;
-completed children linger until `kill`.
+`new ActorMap(factory, options?)`. Factory builds actor, receiving key: `(id: string) => Actor`. `spawn(key)` creates fresh instance keyed by id. `options: { autoReap? }`: `true` removes child once it reaches final state or dies into `__error`. Off by default.
 
-| Method             | What                                   |
-| ------------------ | -------------------------------------- |
-| `spawn(key)`       | Fresh instance via the factory.        |
-| `ensure(key)`      | No-op if exists.                       |
-| `send(key, event)` | Send to child.                         |
-| `kill(key)`        | Abort. Remove.                         |
-| `has(key)`         | Exists?                                |
-| `keys()`           | List keys.                             |
-| `snapshot(key)`    | Child snapshot. `undefined` if absent. |
-| `size`             | Count.                                 |
+| Method             | What                                  |
+| ------------------ | ------------------------------------- |
+| `spawn(key)`       | Fresh instance via factory            |
+| `ensure(key)`      | No-op if exists                       |
+| `send(key, event)` | Send to child                         |
+| `kill(key)`        | Abort and remove                      |
+| `has(key)`         | Exists?                               |
+| `keys()`           | List keys                             |
+| `snapshot(key)`    | Child snapshot. `undefined` if absent |
+| `size`             | Count                                 |
 
 ---
 
@@ -118,7 +111,7 @@ Send to all children.
 function isIn(snapshot: Snapshot, stateRefName: string): boolean;
 ```
 
-Recursive search. Snapshot tree. State name.
+Recursive search of snapshot tree for state name.
 
 ---
 
@@ -128,7 +121,7 @@ Recursive search. Snapshot tree. State name.
 function activeLeaves(snapshot: Snapshot): string[];
 ```
 
-All leaf paths. Dot-separated strings.
+All leaf paths as dot-separated strings.
 
 ---
 
@@ -165,10 +158,7 @@ function actorSpec<
 };
 ```
 
-Build the actor's static spec: states, inputs, internal/output events,
-context, initial state, clock, regions, budget. Returns the value, narrowing
-the state/event arrays to their literals (no `as const`) and keeping the
-context mutable. Feed it to `definePart<typeof x>` and `withParts`.
+Builds static actor spec. Narrows state/event arrays to literals (no `as const`), keeps context mutable. Feed to `definePart<typeof x>` and `withParts`.
 
 ```ts
 const checkout = actorSpec({
@@ -180,8 +170,7 @@ const checkout = actorSpec({
 });
 ```
 
-`typeof checkout` is the anchor you pass to `definePart`. `ActorSpec` is the
-type of such a value; `BuilderOf<ActorSpec>` is its builder.
+`typeof checkout` is the anchor for `definePart`. `ActorSpec` is the type of such a value; `BuilderOf<ActorSpec>` is its builder.
 
 ---
 
@@ -191,10 +180,7 @@ type of such a value; `BuilderOf<ActorSpec>` is its builder.
 function definePart<S extends ActorSpec = never>(fn: (m: BuilderOf<S>) => void): Fragment<S>;
 ```
 
-Wrap a slice of an actor's setup (`m.on`, `m.onAny`, `m.effect` calls) so it
-can live in its own file. The generic is required: omit the spec anchor and
-`S` defaults to `never`, so registering anything is a compile error rather
-than a silent loss of typing. Anchor against an `actorSpec` value:
+Wrap a slice of setup (`m.on`, `m.onAny`, `m.effect`) for its own file. Generic required: omit spec anchor and `S` defaults to `never`, so registering anything is a compile error.
 
 ```ts
 const basicInfoPart = definePart<typeof checkout>((m) => {
@@ -207,9 +193,7 @@ const basicInfoPart = definePart<typeof checkout>((m) => {
 });
 ```
 
-`typeof checkout` anchors every type in the part: states, events, context,
-outputs. Import it type-only in the part file, `import type { checkout } from
-"./checkout.ts"`, and keep the refs as value imports.
+Anchor with `typeof <spec value>`. Import spec type-only in part file, refs as value imports.
 
 ---
 
@@ -219,7 +203,7 @@ outputs. Import it type-only in the part file, `import type { checkout } from
 function use<S extends ActorSpec>(m: BuilderOf<S>, part: Fragment<S>): void;
 ```
 
-Register a part inside a hand-written setup.
+Register a part inside hand-written setup.
 
 ```ts
 setup: (m) => {
@@ -228,8 +212,7 @@ setup: (m) => {
 };
 ```
 
-`use` is not the React hook. It takes `Fragment`s produced by `definePart`.
-define parts with `definePart`, never annotate the `Part` type by hand.
+Not a React hook. Takes `Fragment`s from `definePart`. Never annotate `Part` type by hand.
 
 ---
 
@@ -250,17 +233,9 @@ function withParts<
 ): Actor<States, Inputs, Internal, Outputs, ActorContext>;
 ```
 
-Build an actor from a spec plus one part or an array of parts. The `setup` is
-generated. Every part runs against the builder in order. `base` takes every
-option `new Actor` takes: `clock`, `regions`, `internalBudget`, and initial
-with payload included.
+Build actor from spec plus parts. Setup generated. Parts run against builder in order. `base` takes every option `new Actor` takes.
 
-The parts array shares the actor's generics: `Part<States, ...>`, not any
-actor. A part built against one spec cannot be wired into another.
-
-For the same (state, event), the last registered handler wins, across parts
-and inline code alike. Effects append instead: every effect on a state runs on
-entry.
+Parts array shares actor generics: `Part<States, ...>`. A part built against one spec cannot wire into another. For same (state, event), last registered handler wins, across parts and inline code. Effects append: every effect on a state runs on entry.
 
 ```ts
 const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
@@ -277,14 +252,7 @@ type Fragment<S>;     // (m: BuilderOf<S>) => void
 type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — withParts array element type
 ```
 
-`ActorSpec` is the type `definePart` and `use` accept. `BuilderOf` and
-`Fragment` name the part signature for explicit annotations. `Part` is the
-same shape with explicit generics: what `withParts` takes, one or an array.
-
-`ActorSpec` is a constraint, not a value annotation: annotating the value with
-`ActorSpec` (or `ActorOptions`) erases its literal state/event/context types.
-Build specs with `actorSpec` and pass `typeof <that value>`; never annotate
-the object itself.
+`ActorSpec` is a constraint, not a value annotation: annotating with `ActorSpec` (or `ActorOptions`) erases literal types. Build with `actorSpec`, pass `typeof <that value>`. Never annotate the object itself.
 
 ---
 
@@ -294,9 +262,7 @@ the object itself.
 function onOutput(actor: AnyActor, handler: (event: InternalEvent) => void): void;
 ```
 
-Route an actor's emitted outputs to a handler. `regions` auto-wire child outputs
-into the parent; `ActorMap` children do not. This is the public wrapper for that
-wiring. One call connects a child's declared outputs to a receiver.
+Route actor emitted outputs to a handler. `regions` auto-wire child outputs to parent; `ActorMap` children do not. One call connects declared outputs to a receiver.
 
 ```ts
 onOutput(childActor, (event) => {
@@ -320,7 +286,7 @@ function withPromise<T>(
 ): void;
 ```
 
-Promise → actor events. Checks `signal.aborted`.
+Promise to actor events. Checks `signal.aborted`.
 
 ---
 
@@ -334,4 +300,4 @@ function withTimeout<ActorContext>(
 ): void;
 ```
 
-Timeout. Actor's clock. Checks abort signal.
+Timeout using actor's clock. Checks abort signal.

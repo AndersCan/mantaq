@@ -5,29 +5,30 @@ description: Promise bridging and timeout helpers for effects
 
 ## What
 
-`withPromise()` and `withTimeout()` wrap the two effect patterns every machine
-ends up needing: bridging a promise into events, and arming a timeout that
-fires an event.
-
-## Why
-
-Both patterns share a footgun: the abort check. A promise resolves after the
-user left the state, or a timer fires after exit. Without the check, you emit
-into a machine that has already moved on. The helpers do the check for you, and
-they read the actor's clock, so tests stay deterministic on a `VirtualClock`.
-
-The checkout machine from [Effects](/mantaq/core-concepts/effects/). The
-`submitting` effect charges the card and falls back on timeout. Sugar versions.
+`withPromise()` bridges a promise to actor events. `withTimeout()` arms a
+timeout that fires an event. Both check `signal.aborted` before emitting, so
+promises resolving after state exit and timers firing after exit produce no
+side effects. Both use the actor's clock, so tests stay deterministic on
+`VirtualClock`.
 
 ## withPromise
 
-Bridge a promise to actor events. Abort-safe.
+```ts
+withPromise(promise, signal, emit, {
+  success: (data) => ({ type: "paymentOk", payload: data }),
+  error: (err) => ({ type: "paymentFail", payload: err }),
+});
+```
 
-The charge effect, sugar style:
+- Awaits the promise
+- On resolve: calls `success`, emits resulting event
+- On reject: calls `error`, emits resulting event
+- Checks `signal.aborted` before each emit
+- Mapper return value must be `{ type, payload? }` envelope
+
+Sugar equivalent:
 
 ```ts
-import { withPromise } from "@mantaq/sugar";
-
 setup: (m) => {
   m.effect(submitting, {
     name: "chargeCard",
@@ -42,131 +43,46 @@ setup: (m) => {
 };
 ```
 
-### What it does
-
-1. Awaits the promise
-2. On resolve → calls `success` → emits the resulting event
-3. On reject → calls `error` → emits the resulting event
-4. Checks `signal.aborted` before emitting
-
-Without sugar:
+## withTimeout
 
 ```ts
-setup: (m) => {
-  m.effect(submitting, {
-    name: "chargeCard",
-    fn: ({ signal, emit }) => {
-      chargeCard(s.paymentInfo!.cardNumber)
-        .then((orderId) => {
-          if (!signal.aborted) emit(paymentOk.create({ orderId }));
-        })
-        .catch((reason) => {
-          if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
-        });
-    },
-  });
-};
+withTimeout(ms, input, () => submittingDone.create());
 ```
 
-Same logic, more code, and the abort check is easy to forget.
+- Schedules timeout on the actor's clock
+- On fire: checks `signal.aborted`, calls `eventFn`, emits resulting event
+- State exit aborts the effect signal, no emit after exit
+- Warns on invalid `ms`
 
-### Mapper functions
+Equivalent without sugar:
 
 ```ts
-withPromise(promise, signal, emit, {
-  success: (data) => ({ type: "paymentOk", payload: data }), // must return envelope: { type, payload? }
-  error: (err) => ({ type: "paymentFail", payload: err }), // same
+m.effect(submitting, ({ clock, signal, emit }) => {
+  clock.setTimeout(800, () => {
+    if (!signal.aborted) emit(submittingDone.create());
+  });
 });
 ```
 
-The return value is emitted as an event. The actor dispatches it. Internal or
-input events trigger a transition. Anything else goes out as an output.
-
-## withTimeout
-
-A timeout on the actor's clock. Abort-safe.
-
-The fallback effect. The charge hangs → 800ms → `submittingDone` → `success`.
+## VirtualClock testing
 
 ```ts
-import { withTimeout } from "@mantaq/sugar";
-
-setup: (m) => {
-  m.effect(submitting, {
-    name: "startSubmitTimeout",
-    fn: (input) => {
-      withTimeout(800, input, () => submittingDone.create());
-    },
-  });
-};
-```
-
-### What it does
-
-1. Schedules the timeout on the actor's clock
-2. On fire → checks `signal.aborted` → calls `eventFn` → emits the resulting event
-3. State exit aborts the effect signal → no emit after exit
-
-Warns on invalid `ms`.
-
-Without sugar:
-
-```ts
-setup: (m) => {
-  m.effect(submitting, {
-    name: "startSubmitTimeout",
-    fn: ({ clock, signal, emit }) => {
-      clock.setTimeout(800, () => {
-        if (!signal.aborted) emit(submittingDone.create());
-      });
-    },
-  });
-};
-```
-
-Sugar checks the signal for you.
-
-### VirtualClock testing
-
-```ts
-import { Actor, VirtualClock, state, event } from "@mantaq/core";
-import { matches, withTimeout } from "@mantaq/sugar";
-
-const payment = state("payment")();
-const submitting = state("submitting")();
-const success = state("success")().final();
-const submitPayment = event("submitPayment")();
-const submittingDone = event("submittingDone")();
 const clock = new VirtualClock();
-
 const checkout = new Actor({
-  inputs: [submitPayment],
-  internal: [submittingDone],
-  states: [payment, submitting, success],
-  initial: payment,
+  // ...
   clock,
   setup: (m) => {
     m.effect(submitting, {
       name: "startSubmitTimeout",
       fn: (input) => withTimeout(800, input, () => submittingDone.create()),
     });
-    m.on(payment, submitPayment, () => ({ state: submitting }));
-    m.on(submitting, submittingDone, () => ({ state: success }));
+    // ...
   },
 });
 
-checkout.send(submitPayment.create()); // → submitting, effect schedules timeout
-clock.advance(800); // triggers timeout
+checkout.send(submitPayment.create());
+clock.advance(800); // triggers timeout synchronously
 matches(checkout, "success"); // true
 ```
 
-The test stays deterministic. Same as core, less boilerplate.
-
-## Abort safety
-
-Both helpers check `signal.aborted`. State exit aborts the effect.
-
-A promise that resolves after state exit → no emit. A timer that fires after
-exit → no emit.
-
-No manual checks needed. Sugar handles it.
+Same clock, same inputs, same trace.

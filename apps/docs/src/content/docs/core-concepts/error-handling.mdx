@@ -5,225 +5,80 @@ description: Errors as values, not exceptions.
 
 ## What
 
-Failures in Mantaq are data, not exceptions. A runtime error: a throwing handler or effect, a rejected promise, an internal
-event nobody handles, never escapes `send()`. Instead the actor enters the
-built-in terminal `__error` state, and the failure is recorded in
-`snapshot().error` as an `ErrorInfo` tagged with an `ErrorReason`.
+Failures are data, not exceptions. A throwing handler, rejected promise, or
+unhandled internal event never escapes `send()`. The actor enters the built-in
+terminal `__error` state and records the failure in `snapshot().error`.
 
-## Why
+## No-exception rule
 
-Mantaq's whole contract is "same inputs, same trace": the machine behaves
-deterministically, and the machine is the oracle: what the snapshot says
-happened is what happened. An exception breaks both. It unwinds the stack out
-of `send()`, and the caller sees a failure the machine never recorded. Two
-stories about the same run. Making errors part of the machine's observable
-state keeps one story, and it keeps `send()` total: it cannot throw, so callers
-need no try/catch around it.
+- `send()` never throws. Worst case: machine dies to `__error`.
+- Subscribers that throw are swallowed; machine and other subscribers carry on.
+- Constructor is the only exception. Bad setup throws immediately (programmer
+  error, not runtime).
 
-That's why throw is banned in library code, and why a throwing handler is a
-last-resort safety net, not the intended way to handle errors. The
-intended way is an internal error event and a transition that handles it. The
-machine stays in control.
+## `__error` state
 
-The checkout machine from [Context](/mantaq/core-concepts/context/). The card
-charge can fail, and the machine already knows how to say so: the effect emits
-`paymentFail` and a transition lands in `error`. This page is about the
-failures you don't plan for: the handler that throws, the promise that
-rejects, the internal event no state handles.
+Synthesized by the actor, not in your `states` list. Terminal.
 
-```ts
-const checkout = new Actor({
-  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-  internal: [paymentOk, paymentFail, submittingDone],
-  states: [basicInfo, shippingAddress, payment, submitting, success, error],
-  initial: basicInfo,
-  context: {} as CheckoutContext,
-  setup: (m) => {
-    // ...unchanged — transitions from the Actors page, effects from the Effects page
-  },
-});
-```
+- Thrown value recorded alongside last state, context, triggering event, and
+  `ErrorReason`
+- All queued events dropped, pending effects aborted
+- Every subsequent `send` is a no-op
+- `snapshot().done` is `true`; `change` and `done` lifecycle events fire
 
-## The no-exception rule
+## `snapshot().error`
 
-Library code never throws at runtime. Every handler, effect, output callback,
-and subscriber is wrapped in a catch-all, and the failure is routed inward.
+`undefined` while alive. When set, carries `ErrorInfo`:
 
-- `send()` never throws. The worst case is that the machine dies, covered
-  below.
-- Subscribers never break the machine. A subscriber that throws is swallowed,
-  and the machine and the other subscribers carry on.
-- Errors flow as values: `ErrorInfo` on the snapshot, `Either` in
-  `@mantaq/utils` for the pieces that return instead of report.
+| Field     | Meaning                                     |
+| --------- | ------------------------------------------- |
+| `error`   | thrown value or rejection                   |
+| `state`   | last known good state                       |
+| `context` | context at that state                       |
+| `event`   | triggering event (`__init` at construction) |
+| `reason`  | `ErrorReason` tag                           |
 
-The one exception is the constructor. A misbuilt machine can't run at all, so
-an undeclared initial state or an unregistered region throws immediately. That
-is a programmer error caught at the factory, not a runtime failure.
+`ErrorReason` values: `transition`, `effect`, `unhandled`, `budget`, `output`,
+`internal`, `async`.
 
-## The universal `__error` state
+## Prefer catch and emit
 
-If user code throws anyway, the machine dies, deterministically, into one
-built-in terminal state. `__error` is not a declared state; it is synthesized
-by the actor and not in your `states` list.
-
-```
-submitting ──(handled)──▶ success
-      │
-      └──(effect throws)──▶ __error   (terminal, synthesized)
-```
-
-A throwing transition handler:
-
-```ts
-m.on(submitting, paymentOk, () => {
-  throw new Error("paymentOk arrived twice");
-});
-```
-
-`send()` returns normally. But the actor is now in `__error`:
-
-- the thrown value is recorded, alongside the last known good state, the
-  context at that point, the triggering event, and a reason;
-- all queued events are dropped and pending effects are aborted;
-- every subsequent `send` is a no-op; `__error` is terminal;
-- death fires the usual life-cycle events, `change` and `done`.
-
-Because `__error` is final, `snapshot().done` is `true`. A dead actor reads
-like a completed one, plus an `error` field. A parent or `ActorMap` reaps a
-died child the same way it reaps a finished one.
-
-## Reading the failure
-
-`snapshot().error` is `undefined` while the actor is alive. When it is set, it
-carries the full story:
-
-```ts
-const snap = checkout.snapshot();
-if (snap.error) {
-  console.log(`died with ${snap.error.reason} on ${snap.error.event.type}`);
-  console.log("last known state:", snap.error.state.name);
-  console.error("thrown value:", snap.error.error);
-}
-```
-
-`snap.error` is an `ErrorInfo`:
-
-| field     | meaning                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------ |
-| `error`   | the thrown value (or rejection)                                                                                    |
-| `state`   | last known good state, for a throwing handler, the state it ran in; for a throwing effect, the state being entered |
-| `context` | the context as it was at that state                                                                                |
-| `event`   | the triggering event (`{ type: "__init" }` for an error at construction)                                           |
-| `reason`  | an `ErrorReason`, where the failure started                                                                        |
-
-`reason` tells you where the failure started:
-
-| reason              | meaning                                                                          |
-| ------------------- | -------------------------------------------------------------------------------- |
-| `transition`        | a transition handler threw, or returned an invalid target state                  |
-| `effect`            | an effect threw, or the promise it returned rejected                             |
-| `unhandled`         | an internal event was emitted, but no transition in the current state handles it |
-| `budget`            | the internal event budget (default 10,000) was exhausted, a runaway emit loop    |
-| `output`            | a parent's output handler threw while forwarding an output event                 |
-| `internal`, `async` | complete the `ErrorReason` union, reserved for future use                        |
-
-`ErrorInfo`, `ErrorReason`, and the `Snapshot.error` field are listed in the
-[core reference](/mantaq/reference/core/).
-
-## The preferred path: catch and emit
-
-`__error` is terminal. The machine you spent pages building is dead. Prefer
-keeping it alive: catch the failure and emit an internal error event, and let a
-transition handle it. The checkout's `paymentFail` path does exactly this.
+`__error` kills the machine. Better: catch, emit an internal error event, let a
+transition handle it. The `error` state can leave via a `back` handler or
+similar.
 
 ```ts
 m.effect(submitting, {
   name: "chargeCard",
   fn: ({ signal, emit }) => {
-    chargeCard(s.paymentInfo!.cardNumber)
-      .then((orderId) => {
-        if (!signal.aborted) emit(paymentOk.create({ orderId }));
+    chargeCard(cardNumber)
+      .then((id) => {
+        if (!signal.aborted) emit(paymentOk.create({ orderId: id }));
       })
-      .catch((reason) => {
-        if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
+      .catch((r) => {
+        if (!signal.aborted) emit(paymentFail.create({ reason: String(r) }));
       });
   },
 });
 ```
 
-`error` is a state like any other, which means it can leave. `paymentFail`
-lands the machine in `error`, and the back handler returns from there to
-`payment`. A recoverable failure stays recoverable. Throw only when recovery is
-impossible or the code itself is broken. The `__error` safety net catches what
-you didn't plan for.
+## `on("error")`
 
-## Watch deaths with `on("error")`
-
-Death is a first-class observable. Subscribe to `error` to be told exactly
-once, with the full `ErrorInfo`:
+Subscribe to death. Fired with the full `ErrorInfo`. Seeded: if the machine
+died before you subscribed, the last `ErrorInfo` replays immediately.
 
 ```ts
-const off = checkout.on("error", (info) => {
+checkout.on("error", (info) => {
   console.error(`${info.reason} on ${info.event.type}:`, info.error);
 });
-// call off() to stop listening
 ```
 
-The subscription is seeded: if the machine died during construction, say the
-initial-state effect threw, or emitted an internal event no state handles,
-the last `ErrorInfo` is replayed the moment `on("error")` attaches, so you
-never miss a death the machine had before you were listening.
+## `recover()`
+
+Bring a dead machine back. Caller supplies state and context. Breaks
+determinism (no longer "same inputs, same trace"). Effects not re-run, timers
+not re-armed. No-op on a live machine.
 
 ```ts
-const checkout = new Actor({
-  // ... initial-state effect emits paymentFail while in basicInfo — no handler there
-});
-
-checkout.on("error", (info) => {
-  // still fires: reason "unhandled"
-});
+checkout.recover({ state: payment, context: { paymentInfo: { cardNumber: "..." } } });
 ```
-
-The construction-time death does not throw out of `new Actor(...)`.
-The initial-state effects run inside the same catch-all as any other. And
-`recover()` clears the stored error, so a death that was recovered never
-replays to a later subscriber.
-
-If you're driving parents, a child's death arrives the same way any completion
-does: the child raises its `done` signal, which `ActorMap` and the request
-handler bridge read as "reap me". See [Dynamic Children](/mantaq/sugar/dynamic-children/)
-and [Request / Response](/mantaq/sugar/request-response/).
-
-## `recover()`: restart with a caller-supplied state
-
-A dead machine can be brought back, but only by you, explicitly. `recover()`
-takes the state and the context the machine should resume with:
-
-```ts
-if (checkout.snapshot().error) {
-  checkout.recover({
-    state: payment,
-    context: { paymentInfo: { cardNumber: "1111222233334444" } },
-  });
-  checkout.send(submitPayment.create({ cardNumber: "1111222233334444" }));
-}
-```
-
-The killer detail: `recover()` is not the machine fixing itself. The caller
-supplies both state and context, so the trajectory is no longer
-deterministic. "same inputs, same trace" cannot be promised once an operator
-intervenes. Effects are not re-run and timers are not re-armed; processing
-resumes on the next event. And `recover()` on a live machine is a no-op.
-
-Use it as an escape hatch for an operator or a supervisor, not as something
-the machine's own states do.
-
-## Errors as values elsewhere
-
-The same philosophy runs through the rest of the library. Effects get their
-input through an `Either`-style catch inside the runtime, and `@mantaq/utils`
-exposes `Either`, an `[error, value]` pair, for code that returns failures
-instead of throwing them. The state machine layers one more on top: internal
-error events like `paymentFail` are the flow-level way to say "this step
-failed," while `__error` is the machine-level way. Neither is an exception, and
-both keep the run deterministic and inspectable.

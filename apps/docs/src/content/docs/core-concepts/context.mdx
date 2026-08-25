@@ -5,32 +5,14 @@ description: Data that survives transitions.
 
 ## What
 
-Context is the actor's data: a record you define, pass in at construction,
-and read and replace while the machine runs.
+Context is the actor's mutable data record. Pass it in at construction, read
+and replace it during the run. It survives transitions.
 
-## Why
+State decides where the machine is. Context decides what it knows.
 
-A flow accumulates data. The buyer enters their email, then their address, then
-their payment details, and all of it needs to be around at the end when the
-card is charged. Context is that place: it survives transitions, so each step
-can add to what the previous steps collected.
-
-Context is not state. It doesn't decide where the machine is. The state does.
-It is user land: Mantaq just stores the record you give it, with no
-immutability or freezing. Mutate it however you like.
-
-The checkout machine from [Actors](/mantaq/core-concepts/actors/). Context
-holds the form data as the buyer moves through the steps.
-
-## Define context
-
-Pass an object to the Actor constructor.
+## Define
 
 ```ts
-type BasicInfo = { email: string; name: string };
-type ShippingAddress = { street: string; city: string; zip: string };
-type PaymentInfo = { cardNumber: string };
-
 type CheckoutContext = {
   basicInfo?: BasicInfo;
   shippingAddress?: ShippingAddress;
@@ -41,19 +23,18 @@ type CheckoutContext = {
 const checkout = new Actor({
   // ...
   context: {} as CheckoutContext,
-  setup: (m) => {
-    /* ... */
-  },
 });
 ```
 
-It's typed. The shape is known from the start, with no runtime cost.
+Typed at compile time. No runtime cost.
 
-## Context in transitions
+## Read and write
 
-Handlers get a `context` handle. `get()` returns the live record; `set()` is
-the write signal. Any `set()` call triggers a `change` event, even if you
-pass the same reference. Mutate what `get()` gave you, then `set()` it:
+Handlers get a `context` handle:
+
+- `context.get()` returns the live record
+- `context.set(s)` writes it back (any call triggers `change`, even same reference)
+- Mutate what `get()` returned, then `set()` it
 
 ```ts
 m.on(basicInfo, submitBasicInfo, (event, { context }) => {
@@ -64,62 +45,19 @@ m.on(basicInfo, submitBasicInfo, (event, { context }) => {
 });
 ```
 
-Each step adds one field. Earlier fields survive. Context carries across
-transitions.
+Nested mutations work the same way (`s.items.push(item); context.set(s)`).
 
-Nested values work the same way. Context is your record, mutate it:
-
-```ts
-const s = context.get();
-s.items.push(item);
-context.set(s);
-```
-
-## Read context
+## Read outside transitions
 
 ```ts
-checkout.context.basicInfo?.email; // current value
+checkout.context.basicInfo?.email;
 ```
 
-Always read through `actor.context`. It reflects whatever the handlers
-wrote.
+## Effects
 
-## Context in effects
+Effects get the same handle. Read, mutate, `set()`, then `emit()`.
 
-Effects get the same handle. The charge effect reads the payment info and
-writes the order id on success.
+## Children
 
-```ts
-setup: (m) => {
-  m.effect(submitting, {
-    name: "chargeCard",
-    fn: ({ context, emit }) => {
-      const s = context.get();
-      chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
-        const cur = context.get();
-        cur.orderId = orderId;
-        context.set(cur);
-        emit(paymentOk.create({ orderId }));
-      });
-    },
-  });
-};
-```
-
-## Context in children
-
-Child actors (regions) have their own context and communicate via events. See
-[States](/mantaq/core-concepts/states/).
-
-## Test context
-
-```ts
-checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
-checkout.context.basicInfo; // { email: "a@b.com", name: "A" }
-checkout.context.shippingAddress; // undefined
-
-checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
-checkout.context.shippingAddress; // { street: "1 Main", city: "Oslo", zip: "0150" }
-```
-
-It accumulates, step by step.
+Child actors (regions) have their own context. They communicate via events.
+See [States](/mantaq/core-concepts/states/).

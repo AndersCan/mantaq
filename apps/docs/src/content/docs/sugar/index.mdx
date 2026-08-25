@@ -5,29 +5,18 @@ description: Convenience helpers for common patterns
 
 ## What
 
-`@mantaq/sugar` is an optional companion package. It wraps core primitives with
-convenience helpers for the patterns every machine ends up repeating: batch
-creation, state matching, effect timeouts, dynamic children.
+`@mantaq/sugar` wraps core primitives with convenience helpers. Every helper
+compiles to the same behavior you could write yourself.
 
-## Why
+## Helpers
 
-Core is deliberately small and explicit. It shows what happens under the hood.
-But the boilerplate adds up: thirteen `state(...)`/`event(...)` calls, a manual
-abort check in every promise effect, hand-rolled path joins. Sugar cuts that
-without hiding anything. Every helper compiles to the same behavior you could
-write yourself. Sugar just saves the typing.
-
-The sugar pages apply each helper to the checkout machine from
-[Actors](/mantaq/core-concepts/actors/).
-
-## What's inside
-
-| Helper                                           | What                        |
+| Helper                                           | Purpose                     |
 | ------------------------------------------------ | --------------------------- |
 | `states()`, `events()`                           | Batch create states/events  |
 | `matches()`, `isIn()`, `activeLeaves()`, `tag()` | State matching and grouping |
 | `ActorMap`, `broadcast()`                        | Dynamic child management    |
 | `withPromise()`, `withTimeout()`                 | Effect helpers              |
+| `actorSpec`, `definePart`, `withParts`           | Split setup across files    |
 
 ## Install
 
@@ -35,43 +24,25 @@ The sugar pages apply each helper to the checkout machine from
 npm install @mantaq/sugar
 ```
 
-Needs `@mantaq/core` installed.
-
-## Import
+Requires `@mantaq/core`. Single entry point:
 
 ```ts
 import { matches, states, events } from "@mantaq/sugar";
 ```
 
-All exports come from one entry point.
-
 ## When to use
 
-Use sugar when:
+Use sugar when many states/events, frequent state checks, dynamic children,
+or promise effects. Skip when few states, minimal checks, no dynamic children,
+or custom effect patterns.
 
-- Many states/events → `states()` saves lines
-- Frequent state checks → `matches()` cleaner than path inspection
-- Dynamic children → `ActorMap` handles registry
-- Promises in effects → `withPromise()` bridges them
-
-Skip sugar when:
-
-- Few states/events
-- Minimal state checks
-- No dynamic children
-- Custom effect patterns
-
-## Philosophy
-
-Sugar is not required. Core is sufficient for everything.
-
-Sugar means less code for common patterns, nothing hidden. You could write every
-helper yourself.
+Core is sufficient for everything. Sugar saves typing.
 
 ## Pages
 
-- [Batch Creation](/mantaq/sugar/batch-creation/): `states()` and `events()` on the checkout machine
+- [Batch Creation](/mantaq/sugar/batch-creation/): `states()` and `events()`
 - [Matching](/mantaq/sugar/matching/): `matches()`, `isIn()`, `activeLeaves()`, `tag()`
-- [Dynamic Children](/mantaq/sugar/dynamic-children/): `ActorMap` and `broadcast()` for shop order workers
-- [Effect Helpers](/mantaq/sugar/effect-helpers/): `withPromise()` and `withTimeout()` for the charge effect
-- [Request / Response](/mantaq/sugar/request-response/): short-lived request handlers answering back through outputs
+- [Composition](/mantaq/sugar/composition/): `actorSpec`, `definePart`, `withParts`
+- [Dynamic Children](/mantaq/sugar/dynamic-children/): `ActorMap` and `broadcast()`
+- [Effect Helpers](/mantaq/sugar/effect-helpers/): `withPromise()` and `withTimeout()`
+- [Request / Response](/mantaq/sugar/request-response/): short-lived request handlers

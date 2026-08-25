@@ -5,128 +5,61 @@ description: What a state machine is, and what a statechart adds.
 
 ## What
 
-A state machine is a plan for something that moves through a set of known
-situations. At any moment the thing is in exactly one of those situations, its
-state, and it can only change when one of a declared set of things happens. A
-statechart is the richer kind of state machine: states can contain other
-states, several parts can run at the same time, and the machine carries data
-alongside its current state. Every machine built with Mantaq is a statechart.
+A state machine: one machine in exactly one state at a time, moving only on declared events. A statechart adds nesting, parallelism, and data. Every machine built with Mantaq is a statechart.
 
 ## Why
 
-Flows written as plain code rot. The current step lives in a `currentStep`
-variable, an "is it valid?" flag sits in another variable, a "did we submit?"
-boolean in a third, and keeping them in sync is exactly where the bugs live.
-The machine removes the question: the situation is the state, defined once, and
-the only way to change it is a declared transition triggered by a declared
-event. No hidden in-between situations exist, because they were never defined.
-And because the same state, the same event, and the same data always produce
-the same result, the machine is predictable before you ever run it.
+Plain flows use scattered flags (`currentStep`, booleans) that drift out of sync. A state machine removes that: the situation is the state, the only way to change it is a declared transition triggered by a declared event. No hidden in-between situations exist because they were never defined.
 
-## The basics, on the running example
+## Basics
 
-These docs follow one running example: a multi-step checkout form. The buyer
-fills in basic info, a shipping address, and payment details; the system
-charges the card and shows the result. It fits the model exactly.
+A **state** is one known situation. The checkout has `basicInfo`, `payment`, `success`. Always exactly one.
 
-A **state** is one known situation in the flow. The checkout has six of them:
-`basicInfo`, `shippingAddress`, `payment`, `submitting`, `success`, and
-`error`. The form is always in exactly one, never two at once, never one that
-wasn't declared.
+An **event** is something that happens and can move the machine (`submitPayment`, `back`). Only events move the machine.
 
-An **event** is something that happens and can move the machine. Submitting a
-step is an event (`submitPayment`); going back is an event (`back`). Events are
-the only thing that moves a machine. Nothing jumps to a state on its own.
+A **transition** is a move from one state to another, triggered by an event.
 
-A **transition** is a move from one state to another, triggered by an event. One
-example: `payment` receives `submitPayment` and moves to `submitting`.
-
-A **guard** is a condition a transition must pass before it fires. Mantaq has no
-separate guard syntax: the guard lives inside the handler, reads the situation,
-and decides whether to move or stay put. `back` is guarded. It only moves the
-form to an earlier step, so a `back` pressed in `submitting` changes nothing.
-
-A machine is these four ideas and nothing more. States say where the flow is,
-events say what happened, transitions say what happens next, and guards decide
-whether a transition is allowed.
+A **guard** decides whether a transition fires. In Mantaq, the guard lives inside the handler (no separate guard syntax).
 
 ## One state at a time
 
-Every flow is in exactly one state at a time. The checkout is collecting a
-shipping address _or_ charging the card. Being in `payment` means it is not in
-`submitting`. Parallel parts, further down this page, each run their own flow
-and follow the same rule: one flow, one state. This is what makes a state
-machine different from a bag of flags: the flags can disagree with each other,
-but the machine can't disagree with itself.
+The machine is always in exactly one state. Being in `payment` means not in `submitting`. This is what makes it different from a bag of flags: flags can disagree, a machine cannot.
 
-Two states have special meaning. The **initial state** is where the machine
-starts. The checkout begins in `basicInfo`. A **final state** is the end: the
-machine is done and won't accept anything else. `success` is the checkout's
-final state.
+- **Initial state**: where the machine starts (`basicInfo`).
+- **Final state**: the machine is done and won't accept anything else (`success`).
 
 ## The checkout, drawn as a chart
 
 ```
 basicInfo → shippingAddress → payment → submitting → success (final)
-                  ↕ (back) ↕                  ↕ (back)
+                   ↕ (back) ↕                  ↕ (back)
                                             error
 ```
 
-Read it left to right: the buyer fills in basic info, submits it, and lands in
-`shippingAddress`. The three arrows from step to step are each a submission
-event: `submitBasicInfo`, `submitShipping`, `submitPayment`. `back` loops the machine
-to an earlier step, and from `error` it returns to `payment` so a failed charge
-can be tried again. In `submitting` the card is charged; on success the machine
-reaches `success` and stops, and on failure it falls back to `error`. Every
-arrow is a transition and every box is a state. Drawn once, the whole flow fits
-on one page.
+Each arrow is a transition. Each box is a state. `back` moves to an earlier step. From `error` the machine returns to `payment` for a retry.
 
 ## What a statechart adds
 
-A bare state machine is a flat list of states. Real flows are not flat, and
-flattening them is painful. A statechart adds three powers:
+- **Nesting.** A state contains a whole sub-machine. Parent and child each keep their own states.
+- **Parallelism.** Several child flows run at once. Neither blocks the other.
+- **Extended state.** Data alongside the current state. Without it you'd need a separate state for every data combination.
 
-**Nesting** lets a machine contain a whole machine of its own. The checkout runs
-a child flow that watches for fraud while the form moves on. The parent and
-child each keep their own states, and the child's states nest beneath the
-parent's. Structure is expressed, not flattened.
+## Terms
 
-**Parallelism** lets several child flows run at the same time. A checkout can
-collect payment while a separate monitor tracks analytics, and neither blocks
-the other.
+| Term                   | Meaning                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| **State**              | One known situation the machine can be in.                 |
+| **Statechart**         | State machine with nesting, parallelism, and data.         |
+| **Event**              | Something that happens and can move the machine.           |
+| **Transition**         | A move from one state to another, triggered by an event.   |
+| **Guard**              | Condition a transition must pass to fire.                  |
+| **Initial state**      | Where the machine starts.                                  |
+| **Final state**        | End of the machine; nothing accepted after it.             |
+| **Extended state**     | Data the machine carries alongside its current state.      |
+| **Entry action**       | Runs when a state is entered.                              |
+| **Exit action**        | Runs when a state is left; leaving cancels in-flight work. |
+| **Compound state**     | A state containing its own nested flow.                    |
+| **Orthogonal regions** | Parallel parts of a machine, running at once.              |
+| **Determinism**        | Same state + event + data = same result, always.           |
 
-**Extended state** is the data the machine carries alongside its current state.
-The state answers "where am I?"; the data answers "what do I know?" The
-email, the address, the card number. Without extended state you'd invent a new
-named state for every combination of situation and data, and the machine would
-explode into dozens of states that differ only by data. Separating the two
-keeps the machine small: six states, not forty.
-
-Nesting, parallelism, and extended state are what turn a small state machine
-into a statechart, and they're what make the machine model survive contact
-with real software.
-
-## Terms at a glance
-
-| Term                   | What it means                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| **State**              | One known situation the machine can be in.                                             |
-| **Statechart**         | A richer state machine: nesting, parallelism, and data.                                |
-| **Event**              | Something that happens and can move the machine.                                       |
-| **Transition**         | A move from one state to another, triggered by an event.                               |
-| **Guard**              | A condition a transition must pass to fire.                                            |
-| **Initial state**      | Where the machine starts.                                                              |
-| **Final state**        | The end of the machine; nothing is accepted after it.                                  |
-| **Extended state**     | The data the machine carries alongside its current state.                              |
-| **Entry action**       | What runs when a state is entered.                                                     |
-| **Exit action**        | What runs when a state is left; in Mantaq, leaving cancels the state's in-flight work. |
-| **Compound state**     | A state that contains its own nested flow.                                             |
-| **Orthogonal regions** | Parallel parts of a machine, running at once.                                          |
-| **Determinism**        | Same situation, same event, same data. Same result, always.                            |
-
-Every other page in these docs grows this one checkout machine. The model you
-built here is the whole vocabulary: states, events, transitions, guards.
-
-For a full glossary of state machine and statechart terms, see
-[GLOSSARY.md](https://github.com/anderscan/mantaq/blob/main/GLOSSARY.md) in
-the repo.
+For a full glossary, see [GLOSSARY.md](https://github.com/anderscan/mantaq/blob/main/GLOSSARY.md).
