@@ -16,7 +16,21 @@ export class EventRef<const T extends string, Payload extends object | void = vo
     this.type = type;
   }
 
-  is(anyEvent: unknown): anyEvent is CreatedOfEvent<T, Payload> {
+  /**
+   * Type guard that matches an event by its `type` tag **only**.
+   *
+   * `is()` does **not** validate the payload. The `Payload` generic is erased at
+   * runtime, so there is no way to confirm the payload's shape — or even its
+   * presence — here. Narrowing is therefore limited to the type tag
+   * (`{ type: T }`). After `if (ref.is(e))`, `e` is narrowed to `{ type: T }`;
+   * reading `e.payload` is a compile error rather than a runtime surprise.
+   *
+   * This keeps the guard sound. Code that needs the payload must read it from an
+   * event that is already correctly typed (e.g. one produced by `create()`) or
+   * validate it explicitly. A guard that can't inspect the payload must not
+   * promise one — that is the very soundness gap this closes.
+   */
+  is(anyEvent: unknown): anyEvent is { type: T } {
     return (
       !!anyEvent &&
       typeof anyEvent === "object" &&
