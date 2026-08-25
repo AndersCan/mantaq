@@ -1,6 +1,6 @@
 # @mantaq/core
 
-State machine library. Small API surface — cook the primitives, not the framework.
+State machine library. Small API surface. Cook the primitives, not the framework.
 
 ## Install
 
@@ -81,7 +81,7 @@ See [anderscan.github.io/mantaq](https://anderscan.github.io/mantaq) for full do
 
 ### Typed Actor Context
 
-Cast the context type once at the constructor level. Handlers receive the typed context automatically — no casting needed per-handler.
+Cast the context type once at the constructor level. Handlers receive the typed context automatically. No casting needed per-handler.
 
 ```ts
 interface AuthContext {
@@ -106,7 +106,7 @@ const actor = new Actor({
 });
 ```
 
-Context is user land — mutate it freely. `set()` is the write signal: any `set()` triggers `change`, even with the same reference. Call it after you mutate:
+Context is user land. Mutate it freely. `set()` is the write signal: any `set()` triggers `change`, even with the same reference. Call it after you mutate:
 
 ```ts
 const s = opts.context.get();
@@ -121,7 +121,7 @@ opts.context.set(s);
 opts!.context.phoneNumber = event.payload.phoneNumber;
 ```
 
-**Anti-pattern — casting in every handler:**
+**Anti-pattern. Casting in every handler:**
 
 ```ts
 setup: (m) => {
@@ -160,7 +160,7 @@ setup: (m) => {
 },
 ```
 
-**Anti-pattern — skipping the generic parameter:**
+**Anti-pattern. Skipping the generic parameter:**
 
 ```ts
 // ❌ payload is `unknown`, no type safety
@@ -170,7 +170,7 @@ const badEvent = event("SIGN_IN")();
 const goodEvent = event("SIGN_IN")<{ phoneNumber: string }>();
 ```
 
-**Anti-pattern — sending raw objects instead of using `.create()`:**
+**Anti-pattern. Sending raw objects instead of using `.create()`:**
 
 ```ts
 // ✅ typed
@@ -182,7 +182,7 @@ actor.send({ type: "SIGN_IN", payload: { phoneNumber: "+1234567890" } });
 
 ### Effects and Event Typing
 
-Effects run when entering a state. The `event` parameter in effects is typed `InternalEvent` — `{ type, payload? }` with `payload: unknown` — not the specific event that triggered the transition. This is by design: effects live on states, not transitions. Multiple transitions can lead to the same state, so the effect cannot know which event caused entry.
+Effects run when entering a state. The `event` parameter in effects is typed `InternalEvent`, `{ type, payload? }` with `payload: unknown`, not the specific event that triggered the transition. This is by design: effects live on states, not transitions. Multiple transitions can lead to the same state, so the effect cannot know which event caused entry.
 
 **Pass data to effects via state payload.** Set the payload in the transition return, read it from `state.payload` in the effect.
 
@@ -216,7 +216,7 @@ const actor = new Actor({
 });
 ```
 
-**Context is also possible but less precise.** Context is shared across all states — writing to context in one state leaks into others. Prefer state payload for data that belongs to a specific state entry.
+**Context is also possible but less precise.** Context is shared across all states. Writing to context in one state leaks into others. Prefer state payload for data that belongs to a specific state entry.
 
 ```ts
 // ✅ state payload — scoped to this state entry
@@ -229,7 +229,7 @@ opts!.context.set(s);
 return { state: loadingState };
 ```
 
-**Anti-pattern — depending on `event` in effects:**
+**Anti-pattern. Depending on `event` in effects:**
 
 ```ts
 m.effect(loadingState, {
@@ -247,9 +247,9 @@ The `event` parameter exists for convenience (e.g., logging), not for business l
 
 Mantaq uses two event queues: **external** (user-sent) and **internal** (effect-emitted). Understanding the difference prevents subtle bugs.
 
-**External events** are sent via `actor.send()` — they trigger transitions on the current state.
+**External events** are sent via `actor.send()`. They trigger transitions on the current state.
 
-**Internal events** are emitted from effects via `emit()` — they are queued and processed after the current transition completes.
+**Internal events** are emitted from effects via `emit()`. They are queued and processed after the current transition completes.
 
 ```ts
 const tickEvent = event("TICK")();
@@ -275,9 +275,9 @@ const actor = new Actor({
 });
 ```
 
-**Ordering:** External events process one at a time. Internal events emitted during a transition process depth-first after that transition. Internal events from effects process after the effect completes — this is a common source of bugs. If an effect emits an internal event and the actor is in a different state by the time that event processes, the handler may not exist or may behave unexpectedly.
+**Ordering:** External events process one at a time. Internal events emitted during a transition process depth-first after that transition. Internal events from effects process after the effect completes. This is a common source of bugs. If an effect emits an internal event and the actor is in a different state by the time that event processes, the handler may not exist or may behave unexpectedly.
 
-**Anti-pattern — mixing internal/external incorrectly:**
+**Anti-pattern. Mixing internal/external incorrectly:**
 
 ```ts
 // ❌ declaring a user-sent event as internal
@@ -334,7 +334,7 @@ function createActor() {
 }
 ```
 
-**Anti-pattern — not checking `signal.aborted`:**
+**Anti-pattern. Not checking `signal.aborted`:**
 
 ```ts
 m.effect(workingState, {
@@ -363,7 +363,7 @@ m.effect(workingState, {
 
 ### Snapshot & Restore
 
-`actor.snapshot()` returns a `Snapshot` — `{ path, context, payload?, regions, done?, error? }`. Context is included; `payload` is the payload the current state was entered with (present only when the transition carried one). Use it to save/restore actor state across sessions.
+`actor.snapshot()` returns a `Snapshot`: `{ path, context, payload?, regions, done?, error? }`. Context is included; `payload` is the payload the current state was entered with (present only when the transition carried one). Use it to save/restore actor state across sessions.
 
 ```ts
 // Snapshot carries path, context, and regions — serialize it directly
@@ -377,7 +377,7 @@ if (raw) {
 }
 ```
 
-**Anti-pattern — re-serializing context by hand:**
+**Anti-pattern. Re-serializing context by hand:**
 
 ```ts
 // ❌ snapshot() already includes context — no manual step needed
@@ -428,7 +428,7 @@ const manager = new Actor({
 matches(manager, "connected.health.healthy"); // ✅
 ```
 
-**Anti-pattern — child outputs not declared as parent internal events:**
+**Anti-pattern. Child outputs not declared as parent internal events:**
 
 ```ts
 const child = new Actor({
@@ -451,7 +451,7 @@ const parent = new Actor({
 
 ### Error Handling
 
-Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. If user code throws anyway, the machine does **not** misbehave silently: it dies into a built-in terminal `__error` state, records `snapshot().error` (the thrown value, the state/context at the point of failure, the bad event), drops remaining events, and ignores later `send`s. Errors never escape `send()` and the machine stays deterministic — same inputs, same trace.
+Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. If user code throws anyway, the machine does **not** misbehave silently: it dies into a built-in terminal `__error` state, records `snapshot().error` (the thrown value, the state/context at the point of failure, the bad event), drops remaining events, and ignores later `send`s. Errors never escape `send()` and the machine stays deterministic. Same inputs, same trace.
 
 ```ts
 const snap = actor.snapshot();
@@ -464,10 +464,10 @@ if (snap.error) {
 
 Two deliberate exceptions to "every failure is loud":
 
-- **Subscribers only watch.** They read snapshots and never change the machine, so a throwing `on("change")`/`on("done")`/`on("transition")`/`on("error")` callback is swallowed — the machine and its callers are unaffected.
+- **Subscribers only watch.** They read snapshots and never change the machine, so a throwing `on("change")`/`on("done")`/`on("transition")`/`on("error")` callback is swallowed. The machine and its callers are unaffected.
 - **Unhandled external events are ignored.** An event with no handler in the current state is dropped by design (broadcast fan-out, cross-state sends). An **internal** event with no handler, however, is a machine-authoring bug and routes to the error state (`reason: "unhandled"`).
 
-A dead machine can be manually resumed with `actor.recover({ state, context })` — an explicit, **inherently dangerous** escape hatch (the caller injects state and context, so determinism no longer holds). Effects are not re-run and timers are not re-armed; processing resumes on the next event. Prefer fixing the root cause and recreating the actor.
+A dead machine can be manually resumed with `actor.recover({ state, context })`. An explicit, **inherently dangerous** escape hatch (the caller injects state and context, so determinism no longer holds). Effects are not re-run and timers are not re-armed; processing resumes on the next event. Prefer fixing the root cause and recreating the actor.
 
 Catch errors inside effects and emit recovery events:
 
@@ -499,7 +499,7 @@ setup: (m) => {
 },
 ```
 
-**Anti-pattern — re-throwing in effects:**
+**Anti-pattern. Re-throwing in effects:**
 
 ```ts
 try {
@@ -510,7 +510,7 @@ try {
 }
 ```
 
-**Anti-pattern — throwing in transition handlers:**
+**Anti-pattern. Throwing in transition handlers:**
 
 ```ts
 m.on(idleState, submitEvent, (event) => {
@@ -535,7 +535,7 @@ m.on(idleState, submitEvent, (event, opts) => {
 
 ### Any Handler
 
-Use `onAny` to intercept events across all states — useful for universal error handling, cleanup, or logging.
+Use `onAny` to intercept events across all states. Useful for universal error handling, cleanup, or logging.
 
 ```ts
 setup: (m) => {
@@ -551,7 +551,7 @@ setup: (m) => {
 },
 ```
 
-**Anti-pattern — using `onAny` for everything:**
+**Anti-pattern. Using `onAny` for everything:**
 
 ```ts
 setup: (m) => {
@@ -612,7 +612,7 @@ expect(actor.state.name).toBe("timedOut");
 expect(clock.hasPending()).toBe(false);
 ```
 
-**Anti-pattern — using `new Date()` or `setTimeout` directly:**
+**Anti-pattern. Using `new Date()` or `setTimeout` directly:**
 
 ```ts
 // ❌ real timers — slow, flaky, non-deterministic
@@ -695,7 +695,7 @@ clock.advance(3500);
 expect(count).toBe(3); // fired at 1000, 2000, 3000
 ```
 
-**Anti-pattern — expecting single `advance` to fire interval once:**
+**Anti-pattern. Expecting single `advance` to fire interval once:**
 
 ```ts
 // ❌ advance(5000) fires interval at 1000, 2000, 3000, 4000, 5000
@@ -727,12 +727,12 @@ vp run mutation:core   # mutation score must stay ≥ 90
 
 **Test contract.** Behavior is pinned by four kinds of tests, split by filename:
 
-- `*.test.ts` — features and happy paths, hand-maintained.
-- `*.error.test.ts` — failure paths: warnings, budgets, abort, unregistered, the `__error` state.
-- `*.property.test.ts` — property-based invariants against a reference model (fast-check, replayable via `MANTAQ_SEED`).
-- `*.mutation.test.ts` — directed tests that kill specific mutants; regenerable and thrown away between stryker runs.
+- `*.test.ts`. Features and happy paths, hand-maintained.
+- `*.error.test.ts`. Failure paths: warnings, budgets, abort, unregistered, the `__error` state.
+- `*.property.test.ts`. Property-based invariants against a reference model (fast-check, replayable via `MANTAQ_SEED`).
+- `*.mutation.test.ts`. Directed tests that kill specific mutants. Regenerable and thrown away between stryker runs.
 
-Coverage is analyzed per test (stryker `perTest` coverage analysis) so every mutant is attributed to the test that pins it. The mutation break threshold is 90 — a change that drops the score below 90 fails the build.
+Coverage is analyzed per test (stryker `perTest` coverage analysis) so every mutant is attributed to the test that pins it. The mutation break threshold is 90. A change that drops the score below 90 fails the build.
 
 ## License
 

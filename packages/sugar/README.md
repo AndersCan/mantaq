@@ -175,7 +175,7 @@ if (matches(actor, "idle") || matches(actor, "loading")) {
 // Breaks when hierarchy changes, verbose, error-prone
 ```
 
-`tag()` searches recursively through parallel regions and nested hierarchies — works regardless of depth.
+`tag()` searches recursively through parallel regions and nested hierarchies. Works regardless of depth.
 
 ### ActorMap patterns
 
@@ -209,7 +209,7 @@ map.spawn("child1", () => createChild());
 map.spawn("child1", () => createChild()); // warns, aborts the previous child, replaces
 ```
 
-`ensure()` is idempotent — safe to call repeatedly. `spawn()` always replaces.
+`ensure()` is idempotent. Safe to call repeatedly. `spawn()` always replaces.
 
 ### Effect utilities: `withPromise` vs manual handling
 
@@ -282,7 +282,7 @@ if (snap && isIn(snap, "active")) {
 }
 ```
 
-**`ensure(key, factory)`** — spawn only if key missing:
+**`ensure(key, factory)`**. Spawn only if key missing:
 
 ```ts
 map.ensure("child1", () => childActor); // no-op if exists
@@ -313,7 +313,7 @@ Works with `ActorMap` or any object implementing `{ keys(): string[]; send(key, 
 ### `onOutput(actor, handler)`
 
 Route an actor's emitted outputs to a handler. `regions` auto-wire child
-outputs into the parent; ActorMap children do not — this is the public
+outputs into the parent; ActorMap children do not. This is the public
 wrapper for that wiring seam, no internal import needed:
 
 ```ts
@@ -376,7 +376,7 @@ e.click.is(emittedEvent); // boolean
 
 ### `withPromise(promise, signal, emit, events)`
 
-Bridge a promise into actor events. Emits `success` on resolve, `error` on reject. Respects `AbortSignal` — skips emit if aborted before settlement.
+Bridge a promise into actor events. Emits `success` on resolve, `error` on reject. Respects `AbortSignal`. Skips emit if aborted before settlement.
 
 ```ts
 import { withPromise } from "@mantaq/sugar";
@@ -437,7 +437,7 @@ const busy = tag(s.idle, s.loading);
 busy.has(actor.snapshot()); // recursive
 ```
 
-No migration needed. Sugar wraps core — use both side by side.
+No migration needed. Sugar wraps core. Use both side by side.
 
 ## License
 

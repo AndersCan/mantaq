@@ -3,19 +3,6 @@ title: Installation
 description: Install Mantaq.
 ---
 
-## What
-
-Two packages, one required. `@mantaq/core` is the runtime — `Actor`, the
-`state`/`event` factories, and the clocks. `@mantaq/sugar` is an optional layer
-of convenience helpers that wrap common patterns.
-
-## Why
-
-Core stays small on purpose: every helper you might not need lives in a
-separate package. If you only need the runtime, you install one package. Add
-sugar later when a pattern (batch creation, matching, effect timeouts) starts
-costing you typing.
-
 ## Requirements
 
 - Node.js >= 22.12.0
@@ -29,7 +16,7 @@ npm install @mantaq/core
 pnpm add @mantaq/core
 ```
 
-Want the helpers?
+Optional helpers:
 
 ```bash
 npm install @mantaq/sugar
@@ -39,16 +26,14 @@ pnpm add @mantaq/sugar
 
 ## What you get
 
-```
-@mantaq/core       →  Actor, Context, state, event, VirtualClock, RealClock
-@mantaq/sugar      →  Optional helpers. matches, states, events, tag, isIn, activeLeaves, ActorMap, broadcast, onOutput, withPromise, withTimeout, actorSpec, definePart, use, withParts
-```
+- `@mantaq/core`: `Actor`, `Context`, `state`, `event`, `VirtualClock`, `RealClock`
+- `@mantaq/sugar`: `matches`, `states`, `events`, `tag`, `isIn`, `activeLeaves`, `ActorMap`, `onOutput`, `withPromise`, `withTimeout`, `actorSpec`, `definePart`, `use`, `withParts`
 
 `sugar` needs `core`. Only `core` is required.
 
 ## TypeScript config
 
-A standard config works. Nothing special is needed:
+Nothing special required. Standard works:
 
 ```json
 {

@@ -74,49 +74,49 @@ Internal `TransitionMap` type can stay (runtime compiled form) but users never w
 
 Current `on("error", fn)` callback is separate error flow. Vision: "errors are events and states." Contradiction.
 
-Fix: drop `on("error")`. Errors become reserved internal event `@error` with `{error: unknown}` payload. Transitions handle via `Any: { "@error": ... }`. Parent receives via output handler — bubbles up. One pipe, one philosophy.
+Fix: drop `on("error")`. Errors become reserved internal event `@error` with `{error: unknown}` payload. Transitions handle via `Any: { "@error": ... }`. Parent receives via output handler. Bubbles up. One pipe, one philosophy.
 
-Keep `on("change")` + `on("done")` — observation only, derived from state. Not control flow.
+Keep `on("change")` + `on("done")`. Observation only, derived from state. Not control flow.
 
 ## Conversion Plan
 
 Small steps, verify each.
 
-### Step 1 — Re-add builder to core
+### Step 1. Re-add builder to core
 
 - New `packages/core/src/builder.ts`: `ActorBuilder` class with `on(s, e, fn)`, `onAny(e, fn)`, `effect(s, fn)` methods. Each call stores into internal `transitions`/`effects` maps.
 - `Actor` constructor accepts `setup?: (m: ActorBuilder) => void` as alternative to `transitions`/`effects`. If `setup` provided, run it, collect maps.
-- `setup` and `transitions` mutually exclusive. One or the other. Vision: "one way to do things" — but builder is the one way for typed handlers; `transitions` map stays as internal/runtime form only, not user-facing.
+- `setup` and `transitions` mutually exclusive. One or the other. Vision: "one way to do things". But builder is the one way for typed handlers; `transitions` map stays as internal/runtime form only, not user-facing.
 - Keep `ActorBuilder` private to core. Export only `setup` callback shape.
 
-### Step 2 — Fix error channel
+### Step 2. Fix error channel
 
 - Remove `on("error", fn)` overload + `Subscribers.emitError` + `#subs.emitError` calls.
 - Add reserved `@error` internal event. `#runEffects` catch + budget-exceeded push `{id: "@error", error: err}` to queue instead of callback.
 - Drain handles `@error` like any internal event → transitions → `Any: {"@error": fn}` or bubbles to parent via output handler.
 - Update `AnyActor` interface: drop `on("error")`.
 
-### Step 3 — Migrate tests back to builder
+### Step 3. Migrate tests back to builder
 
 - All 22 test files + 11 example files currently use direct `transitions: {}` map (from checkpoint commit). Revert to `setup: (m) => m.on(...)` form.
 - Workers can do this mechanically: `transitions: {idle: {START: fn}}` → `setup: (m) => { m.on(idle, start, fn) }`. Same fn bodies.
 - Remove every `event as any` / `context as X` cast. Builder infers types, casts unneeded.
 - Verify: `vp check` clean (0 tsc errors), `vp test` 405/405.
 
-### Step 4 — Update sugar/traversal/viz
+### Step 4. Update sugar/traversal/viz
 
 - `sugar/src/effects/timeout.ts`: revert `EffectInput<Ctx>` 1-generic → keep 1-generic (builder passes same `EffectInput` shape). No change likely.
-- `traversal/src/graph.ts`: reads `actor.options.transitions` — still works, builder produces same internal map. May need `actor.options` type widen.
+- `traversal/src/graph.ts`: reads `actor.options.transitions`. Still works, builder produces same internal map. May need `actor.options` type widen.
 - `viz`: reads `actor.options` for graph building. Same.
 
-### Step 5 — Drop static-map user API
+### Step 5. Drop static-map user API
 
 - Remove `transitions` from `ActorOptions` public type. Keep internal.
 - Remove `TransitionMap` export from `index.ts`. Internal only.
 - Update `packages/core/tests/smoke.test.ts` + `typecheck.test.ts` to use `setup`.
 - Vision: one way to declare actor = builder.
 
-### Step 6 — Verify vision
+### Step 6. Verify vision
 
 - `vp check`: 0 tsc errors, 0 lint errors.
 - `vp test`: 405/405 (or new count).

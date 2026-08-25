@@ -14,7 +14,6 @@ fi
 git config --global user.name "${GIT_USER_NAME:-OpenCode Server}"
 git config --global user.email "${GIT_USER_EMAIL:-opencode@localhost}"
 git config --global credential.helper "!gh auth git-credential"
-icm --version >/dev/null 2>&1 && echo "ICM ok" || echo "ICM not found"
 rtk --version >/dev/null 2>&1 && echo "RTK ok" || echo "RTK not found"
 exec "$@"
 ```
@@ -55,13 +54,12 @@ data
 ```
 ~/.agents/skills/add-change/  →  .opencode/skills/add-change/
 ~/.agents/skills/find-skills/ →  .opencode/skills/find-skills/
-~/.agents/skills/save-changes/ → .opencode/skills/save-changes/
 ~/.agents/skills/self-improvement/ → .opencode/skills/self-improvement/
 ```
 
 ### 7. Command files
 
-`.opencode/command/icm.md` and `.opencode/command/rtk.md`
+`.opencode/command/rtk.md`
 
 ### 8. Test files
 

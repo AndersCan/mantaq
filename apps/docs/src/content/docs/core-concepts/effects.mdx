@@ -5,146 +5,76 @@ description: Side effects on state entry.
 
 ## What
 
-An effect is a function the actor runs every time it enters a state. It
-receives an `EffectInput` — the current state, the context, an `emit` function,
-a clock, and an abort signal — and it can emit events back into the machine.
-Each effect carries a required `name`, a camelCase string describing what it
-does. Executed effects are recorded in history as `{ stateName, effectName }`,
-so tests can assert on them by name
-(`harness.assertEffectRan(stateName, effectName)`).
-
-## Why
-
-Real machines do real work: charge a card, call an API, start a timer. That
-work has to start somewhere, and it has to stop when the flow moves on. Effects
-solve both. They run on entry, and their `AbortSignal` fires on exit, so
-in-flight work knows when to give up. No manual cleanup code.
-
-An effect is not a transition. It doesn't move the machine — it emits events,
-and those events trigger transitions.
-
-The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its
-`submitting` state needs two things: charge the card, and bail out if it takes
-too long. Both are effects.
-
-## Basic effect
-
-The `submitting` effect. Entry starts the charge, and `emit` carries the
-result back to the machine as internal events.
-
-```ts
-setup: (m) => {
-  m.effect(submitting, {
-    name: "chargeCard",
-    fn: (input) => {
-      const s = input.context.get();
-      chargeCard(s.paymentInfo!.cardNumber).then(
-        (orderId) => input.emit(paymentOk.create({ orderId })),
-        (reason) => input.emit(paymentFail.create({ reason: String(reason) })),
-      );
-    },
-  });
-};
-```
-
-`chargeCard` is your payment provider — a promise. Resolve → `paymentOk` →
-`submitting` transitions to `success`. Reject → `paymentFail` → `error`.
-
-The effect's return value is ignored. Effects emit; the machine reacts.
+An effect is a function that runs every time the actor enters a state. It does
+side-effect work and emits events back into the machine. It does not transition
+the machine directly.
 
 ## EffectInput
 
 ```ts
 {
-  signal: AbortSignal;           // abort on state exit
-  state: { name: string; payload: unknown };  // payload typed from state ref
-  event: InternalEvent;  // trigger event (`{ type: "__init" }` at construction)
-  context: Context<ActorContext>; // handle: get() reads, set() replaces
-  emit: (event) => void;        // emit event: internal, input, or output
-  clock: Clock;                 // timers
+  signal: AbortSignal;
+  state: { name: string; payload: unknown };
+  event: InternalEvent;
+  context: Context<ActorContext>;
+  emit: (event) => void;
+  clock: Clock;
 }
 ```
 
-Effects run on every state entry — the initial state included. An effect on the
-initial state fires at construction, armed like any other entry. Its `event` is
-the synthetic `{ type: "__init" }`. Terminal states run their entry effects too,
-so a final state can `emit` a completion output to a parent.
+## Rules
+
+- Run on every entry, initial state included (`event.type` is `"__init"` at construction)
+- Terminal states run entry effects too (emit completion outputs to parents)
+- Return value is ignored. Effects emit; the machine reacts.
+- Never throw. Catch and emit an internal error event instead.
 
 ## Auto-abort
 
-An effect aborts when the actor leaves the state: the `signal` fires, and
-in-flight promises must check it before emitting.
+`signal` fires when the actor leaves the state. Check it before emitting.
 
 ```ts
-setup: (m) => {
-  m.effect(submitting, {
-    name: "chargeCard",
-    fn: ({ signal, emit }) => {
-      chargeCard(s.paymentInfo!.cardNumber).then((orderId) => {
-        if (!signal.aborted) emit(paymentOk.create({ orderId }));
-      });
-    },
-  });
-};
+m.effect(submitting, {
+  name: "chargeCard",
+  fn: ({ signal, emit }) => {
+    chargeCard(cardNumber).then((orderId) => {
+      if (!signal.aborted) emit(paymentOk.create({ orderId }));
+    });
+  },
+});
 ```
 
-No manual cleanup — the `AbortSignal` handles it. If the charge returns after
-the user backed out, nothing is emitted. The guard is belt-and-braces: an
-`emit` called after abort is a silent no-op anyway. The guard just skips the
-wasted call.
+Post-abort `emit` is a silent no-op anyway. The guard skips the wasted call.
 
 ## Multiple effects
 
-Call `m.effect` multiple times for the same state. Effects run in order.
+Call `m.effect` multiple times for one state. They run in order.
 
 ```ts
-setup: (m) => {
-  m.effect(submitting, {
-    name: "chargeCard",
-    fn: ({ signal }) => {
-      /* charge */
-    },
-  });
-  m.effect(submitting, {
-    name: "startSubmitTimeout",
-    fn: (input) => {
-      // fallback: if charge hangs, time out
-      input.clock.setTimeout(800, () => {
-        if (!input.signal.aborted) input.emit(submittingDone.create());
-      });
-    },
-  });
-};
+m.effect(submitting, {
+  name: "chargeCard",
+  fn: ({ signal, emit }) => {
+    chargeCard(cardNumber).then(
+      (id) => {
+        if (!signal.aborted) emit(paymentOk.create({ orderId: id }));
+      },
+      (err) => {
+        if (!signal.aborted) emit(paymentFail.create({ reason: String(err) }));
+      },
+    );
+  },
+});
+m.effect(submitting, {
+  name: "startSubmitTimeout",
+  fn: ({ signal, emit, clock }) => {
+    clock.setTimeout(800, () => {
+      if (!signal.aborted) emit(submittingDone.create());
+    });
+  },
 ```
-
-`submittingDone` transitions to `success` — the timeout fallback. See
-[Effect Helpers](/mantaq/sugar/effect-helpers/) for the sugar version of both
-patterns.
 
 ## Error handling
 
-Never throw in an effect. Catch and emit an internal error event; a transition
-handles it. `paymentFail` lands the machine in `error` — the transition already
-exists.
-
-An uncaught error still can't crash `send()`. The actor transitions to the
-built-in terminal `__error` state, and the thrown value lands in
-`snapshot().error`. `__error` is final — `snapshot().done` is `true` and the
-`"done"` event fires, so a parent or `ActorMap` can reap a died child.
-
-```ts
-setup: (m) => {
-  m.effect(submitting, {
-    name: "chargeCard",
-    fn: ({ signal, emit }) => {
-      chargeCard(s.paymentInfo!.cardNumber)
-        .then((orderId) => {
-          if (!signal.aborted) emit(paymentOk.create({ orderId }));
-        })
-        .catch((reason) => {
-          if (!signal.aborted) emit(paymentFail.create({ reason: String(reason) }));
-        });
-    },
-  });
-};
-```
+An uncaught error moves the actor to the built-in terminal `__error` state.
+`snapshot().done` becomes `true`, `snapshot().error` carries the failure. The
+actor stops accepting events.

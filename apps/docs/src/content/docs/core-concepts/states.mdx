@@ -5,24 +5,11 @@ description: Nodes in the state graph.
 
 ## What
 
-A state is a node in the machine's graph — one step of your flow, named and
-typed. `state("basicInfo")()` creates one.
+A state is a named, typed node in the machine's graph. `state("basicInfo")()`
+creates one.
 
-## Why
-
-The current step of a flow needs a home. The naive approach is a
-`currentStep` variable plus a handful of boolean flags, and keeping all of them
-in sync is exactly where flows rot. A state machine makes each step a
-first-class node: where you are is a property of the machine, not a variable
-you must remember to update.
-
-State is not data. The values you collect along the way — the email, the
-address, the card number — live in context, covered on the
-[Context](/mantaq/core-concepts/context/) page. State answers "where am I?";
-context answers "what do I know?".
-
-The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six
-states:
+State is not data. Data lives in [Context](/mantaq/core-concepts/context/).
+State answers "where am I?". Context answers "what do I know?".
 
 ## Basic states
 
@@ -30,79 +17,47 @@ states:
 import { state } from "@mantaq/core";
 
 const basicInfo = state("basicInfo")();
-const shippingAddress = state("shippingAddress")();
-const payment = state("payment")();
 const submitting = state("submitting")();
-const error = state("error")();
-
 basicInfo.name; // "basicInfo"
 basicInfo.isFinal; // false
 ```
 
-Each step of the form is a node. No boolean flags, no `currentStep` variable —
-the state _is_ the step.
-
 ## Final states
-
-A final state marks the machine done and signals completion.
 
 ```ts
 const success = state("success")().final();
-
 success.isFinal; // true
 ```
 
-When the actor enters `success`, the `"done"` subscribers fire and
-`snapshot().done` becomes `true`.
-
-```ts
-checkout.on("done", () => {
-  console.log("Order placed!");
-});
-```
-
-A final state means the machine stops accepting events. Done.
+Entering a final state fires `"done"` subscribers, sets `snapshot().done` to
+`true`, and stops the actor from accepting events.
 
 ## Payloads
 
-States carry an optional payload, passed in when the state is entered. Effects
-read it.
-
-`error` can carry the failure reason:
+States carry an optional payload, passed on entry, read by effects.
 
 ```ts
-m.on(submitting, paymentFail, (_event) => ({
+m.on(submitting, paymentFail, () => ({
   state: error,
   payload: { reason: "card declined" },
 }));
 ```
 
-An effect on `error` reads it:
-
 ```ts
 m.effect(error, {
   name: "logFailure",
   fn: ({ state }) => {
-    console.log("Checkout failed:", state.payload.reason);
+    console.log(state.payload.reason);
   },
 });
 ```
 
-## Hierarchical states (regions)
+## Regions (hierarchical states)
 
-Sub-actors. You pass them as `regions` to the Actor constructor. The child runs
-alongside the parent, and the snapshot nests.
-
-Story extension: the checkout machine also runs a fraud monitor. A child named
-`fraud`:
+Sub-actors passed as `regions` to the Actor constructor. Child runs alongside
+parent. Snapshot nests.
 
 ```ts
-const scanning = state("scanning")();
-const cleared = state("cleared")();
-const flagged = state("flagged")();
-
-const scanDone = event("scanDone")<{ risky: boolean }>();
-
 const fraudMonitor = new Actor({
   inputs: [scanDone],
   states: [scanning, cleared, flagged],
@@ -114,57 +69,20 @@ const fraudMonitor = new Actor({
   },
 });
 
-const checkoutWithFraud = new Actor({
-  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-  internal: [paymentOk, paymentFail, submittingDone],
-  states: [basicInfo, shippingAddress, payment, submitting, success, error],
-  initial: basicInfo,
+const checkout = new Actor({
+  // ...
   regions: { fraud: fraudMonitor },
-  setup: () => {},
 });
 ```
 
-The snapshot nests:
-
-```ts
-// { path: ["basicInfo"], context: {...},
-//   regions: { fraud: { path: ["scanning"], context: {...}, regions: {} } } }
-```
-
-The child runs its own flow. Parent and child don't block each other.
-
-`matches(checkoutWithFraud, "basicInfo.fraud.cleared")` checks a specific child
-state.
+`matches(checkout, "basicInfo.fraud.cleared")` checks a child state.
 
 ## Parallel states
 
-Multiple regions run at the same time. Add a second child: an analytics
-monitor.
+Multiple regions run simultaneously:
 
 ```ts
-const tracking = state("tracking")();
-
-const analyticsMonitor = new Actor({
-  inputs: [],
-  states: [tracking],
-  initial: tracking,
-  setup: () => {},
-});
+regions: { fraud: fraudMonitor, analytics: analyticsMonitor }
 ```
 
-```ts
-regions: {
-  fraud: fraudMonitor,
-  analytics: analyticsMonitor, // second child
-}
-```
-
-Each region is its own actor, and both run. `matches(actor,
-"basicInfo.fraud.scanning")` and `matches(actor, "basicInfo.analytics.tracking")`
-both work.
-
-## State vs context
-
-State answers "where am I?" Context answers "what do I know?" The step is a
-state; the entered data is context. Covered in
-[Context](/mantaq/core-concepts/context/).
+Each is its own actor. Both run independently.

@@ -9,7 +9,7 @@ description: Core API reference.
 function state<const T extends string>(id: T): <Payload = unknown>() => StateRef<T, Payload, false>;
 ```
 
-State reference. Two calls. First: id. Second: payload type.
+Two calls: id, then payload type.
 
 ```ts
 const basicInfo = state("basicInfo")();
@@ -18,13 +18,13 @@ const payment = state("payment")<{ cardNumber: string }>();
 
 ### `StateRef<T, Payload, IsFinal>`
 
-| Property            | Type                         | What                                                          |
-| ------------------- | ---------------------------- | ------------------------------------------------------------- |
-| `name`              | `T`                          | State id                                                      |
-| `isFinal`           | `IsFinal`                    | Terminal state?                                               |
-| `.final()`          | `StateRef<T, Payload, true>` | Mark final                                                    |
-| `.create(payload)`  | `{ state, payload }`         | Make state entry. Payload required                            |
-| `.regions(options)` | `this`                       | Declared but not yet wired (currently a no-op; kept internal) |
+| Property            | Type                         | What                                          |
+| ------------------- | ---------------------------- | --------------------------------------------- |
+| `name`              | `T`                          | State id                                      |
+| `isFinal`           | `IsFinal`                    | Terminal state?                               |
+| `.final()`          | `StateRef<T, Payload, true>` | Mark final                                    |
+| `.create(payload)`  | `{ state, payload }`         | Make state entry. Payload required            |
+| `.regions(options)` | `this`                       | Declared but not wired (no-op; kept internal) |
 
 ---
 
@@ -36,7 +36,7 @@ function event<const T extends string>(
 ): <Payload extends object | void = void>() => EventRef<T, Payload>;
 ```
 
-Event reference. Two calls. First: id. Second: payload type. Payload must be `object | void`.
+Two calls: id, then payload type. Payload must be `object | void`.
 
 ```ts
 const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
@@ -45,12 +45,12 @@ const back = event("back")();
 
 ### `EventRef<T, Payload>`
 
-| Property           | Type                            | What                          |
-| ------------------ | ------------------------------- | ----------------------------- |
-| `type`             | `T`                             | Event type (discriminant)     |
-| `.is(event)`       | `boolean`                       | Identity check. Type guard    |
-| `.create()`        | `{ type: T }`                   | Void-payload events only      |
-| `.create(payload)` | `{ type: T; payload: Payload }` | Payload events — arg required |
+| Property           | Type                            | What                         |
+| ------------------ | ------------------------------- | ---------------------------- |
+| `type`             | `T`                             | Event type (discriminant)    |
+| `.is(event)`       | `boolean`                       | Identity check. Type guard   |
+| `.create()`        | `{ type: T }`                   | Void-payload events only     |
+| `.create(payload)` | `{ type: T; payload: Payload }` | Payload events. Arg required |
 
 ---
 
@@ -100,9 +100,9 @@ class Actor<
 | Method                 | Signature                                    | What                                                        |
 | ---------------------- | -------------------------------------------- | ----------------------------------------------------------- |
 | `send(event)`          | `(event: CreatedOf<Inputs[number]>) => void` | Send event                                                  |
-| `inject(event)`        | `(event: InternalEvent) => void`             | Push an internal event and drain (tests/embedders)          |
+| `inject(event)`        | `(event: InternalEvent) => void`             | Push internal event and drain (tests/embedders)             |
 | `dispose()`            | `() => void`                                 | Stop: abort effect, clear queue + subscribers               |
-| `recover(target)`      | `(target: { state; context }) => void`       | Restart a dead machine from caller-supplied state           |
+| `recover(target)`      | `(target: { state; context }) => void`       | Restart dead machine from caller-supplied state             |
 | `snapshot()`           | `() => Snapshot`                             | State tree                                                  |
 | `on("change", fn)`     | `(fn) => () => void`                         | State or context changed (`(snap, prev) => void`)           |
 | `on("done", fn)`       | `(fn) => () => void`                         | Final or error state                                        |
@@ -125,7 +125,7 @@ class Actor<
 
 ## `ActorBuilder`
 
-The type-safe registrar passed to `setup`. Targets validate against declared states, inputs, internal, and output events — an undeclared state, event, or emit fails to compile.
+Type-safe registrar passed to `setup`. Targets validate against declared states, inputs, internal, and outputs. Undeclared state, event, or emit fails to compile.
 
 ```ts
 setup: (m) => {
@@ -143,13 +143,11 @@ setup: (m) => {
 
 Handler return: `{ state?; payload?; emit? }` or `{}` to stay in place.
 
-Effects run on every state entry. `name` is a required camelCase string
-describing what the effect does — executed effects are recorded in history as
-`{ stateName, effectName }`, and tests can assert on them by name
-(`harness.assertEffectRan(stateName, effectName)`). The initial state runs its
-effects at construction with the synthetic event `{ type: "__init" }`; terminal
-states run theirs on entry (useful for emitting a completion output to a
-parent).
+Effects run on every state entry. Each takes a required camelCase `name`;
+executed effects are recorded in history as `{ stateName, effectName }`, and
+tests can assert on them by name (`harness.assertEffectRan(stateName,
+effectName)`). Initial state runs effects at construction with synthetic event
+`{ type: "__init" }`. Terminal states run theirs on entry.
 
 ---
 
@@ -169,7 +167,7 @@ class VirtualClock implements Clock {
 }
 ```
 
-Deterministic. Testing. `advance(ms)` fires all due timers instantly. Aborted signal passed to `setTimeout`/`setInterval` → returns `-1`.
+Deterministic. `advance(ms)` fires all due timers instantly. Aborted signal passed to `setTimeout`/`setInterval` returns `-1`.
 
 ---
 
@@ -185,7 +183,7 @@ class RealClock implements Clock {
 }
 ```
 
-Real timers. `globalThis.setTimeout`. Default for actors.
+Real timers via `globalThis.setTimeout`. Default for actors.
 
 ---
 
@@ -203,10 +201,7 @@ interface Snapshot<C = unknown> {
 }
 ```
 
-`done` is set when the actor reaches a final state — including the terminal
-`__error` state, so a died machine reports both `done: true` and `error`.
-`done` alone means successful completion; `error` means it died. Either way
-sends are ignored.
+`done` set on final state including `__error`, so a died machine reports `done: true` and `error`. `done` alone means successful completion. `error` means it died. Either way sends are ignored.
 
 ### `Clock`
 
@@ -286,6 +281,6 @@ interface AnyActor<C = Record<string, unknown>> {
 | `CreatedOf<E>`             | Event instance type for `E`: `{ type }` or `{ type; payload }` |
 | `CreatedOfEvent<Id, P>`    | Same, explicit id and payload                                  |
 | `EffectFn<C, P>`           | `(input: EffectInput<C, P>) => void \| Promise<void>`          |
-| `ErrorInfo`                | `{ error; state; context; event; reason }` — last failure      |
-| `ErrorState`               | `StateRef<"__error", unknown, true>` — terminal error state    |
-| `SetupFn<...>`             | `(m: ActorBuilder<...>) => void` — the `setup` option type     |
+| `ErrorInfo`                | `{ error; state; context; event; reason }`. Last failure       |
+| `ErrorState`               | `StateRef<"__error", unknown, true>`. Terminal error state     |
+| `SetupFn<...>`             | `(m: ActorBuilder<...>) => void`. The `setup` option type      |

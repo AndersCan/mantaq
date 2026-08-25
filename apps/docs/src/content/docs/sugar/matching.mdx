@@ -1,173 +1,67 @@
 ---
 title: Matching
-description: State matching, grouping, and leaf detection.
+description: State matching, grouping, and leaf detection
 ---
 
 ## What
 
-The matching helpers answer one question: where is the machine right now?
-`matches()` checks a top-level path, `isIn()` searches the whole tree,
-`activeLeaves()` lists the leaf states, and `tag()` groups states for one check.
-
-## Why
-
-`checkout.snapshot().path[0] === "payment"` works, but it reads badly, and it
-gets worse as machines nest — the fraud region pushes every child state one
-level deeper, and hand-joined path checks start compounding. The helpers give
-readable, intent-naming checks and handle the path joining for you.
-
-The checkout machine from [Actors](/mantaq/core-concepts/actors/).
+Four helpers that answer: where is the machine right now?
 
 ## matches
 
-Dot-notation path check. Prefix match.
+Dot-notation path check. Prefix match, top-level only.
 
 ```ts
-import { matches } from "@mantaq/sugar";
-
 matches(checkout, "payment"); // top-level
 matches(checkout, "basicInfo"); // top-level
 ```
 
-It starts at the top-level state and descends only through region names, in
-order, ending at a state or region boundary. It is NOT a whole-tree search — a
-nested `"payment"` under a different top state fails `matches(actor,
-"payment")`. Use `isIn` for that.
-
-Without sugar:
-
-```ts
-checkout.snapshot().path[0] === "payment";
-```
-
-`matches` handles the path joining.
-
-### Nested path
-
-The fraud monitor from [States](/mantaq/core-concepts/states/) runs as region
-`fraud`:
+With fraud region, the path includes region names:
 
 ```ts
 matches(checkoutWithFraud, "basicInfo"); // true
-matches(checkoutWithFraud, "basicInfo.fraud.scanning"); // true
-matches(checkoutWithFraud, "basicInfo.fraud.cleared"); // false (not yet cleared)
+matches(checkoutWithFraud, "basicInfo.scanning"); // true (region child)
+matches(checkoutWithFraud, "basicInfo.cleared"); // false
 ```
 
-Without sugar:
+Not a whole-tree search. A nested `"payment"` under a different top state
+fails. Use `isIn` for recursive search.
 
-```ts
-const snap = checkoutWithFraud.snapshot();
-snap.path[0] === "basicInfo" && snap.regions["fraud"]?.path[0] === "scanning";
-```
+Without sugar: `checkout.snapshot().path[0] === "payment"`.
 
 ## isIn
 
 Recursive search. Is a state anywhere in the snapshot tree?
 
 ```ts
-import { isIn } from "@mantaq/sugar";
-
 isIn(checkoutWithFraud.snapshot(), "cleared"); // true if "cleared" anywhere
 ```
 
-Useful with hierarchical states:
-
-```ts
-// snapshot: { path: ["basicInfo"], regions: { fraud: { path: ["scanning"], regions: {} } } }
-isIn(snapshot, "basicInfo"); // true
-isIn(snapshot, "scanning"); // true
-isIn(snapshot, "payment"); // false
-```
+Checks the full path and all regions.
 
 ## activeLeaves
 
 All leaf states in the current path.
 
 ```ts
-import { activeLeaves } from "@mantaq/sugar";
-
-// plain checkout: { path: ["payment"], regions: {} }
 activeLeaves(checkout.snapshot()); // ["payment"]
-
-// with fraud region: { path: ["basicInfo"], regions: { fraud: { path: ["scanning"] } } }
-activeLeaves(checkoutWithFraud.snapshot()); // ["basicInfo.fraud.scanning"]
+activeLeaves(checkoutWithFraud.snapshot()); // ["basicInfo.scanning"]
 ```
 
-With parallel regions, it returns multiple leaves.
+Returns multiple leaves with parallel regions.
 
 ## tag
 
 Group states. Check membership.
 
 ```ts
-import { tag } from "@mantaq/sugar";
-
 const busy = tag(submitting, payment);
 busy.has(checkout.snapshot()); // true if in submitting or payment
-```
 
-Use for bulk checks:
-
-```ts
 const failed = tag(error, flagged);
-
-if (failed.has(checkout.snapshot())) {
-  showRetryUI();
-}
+if (failed.has(checkout.snapshot())) showRetryUI();
 ```
 
-Without sugar:
-
-```ts
-const path = checkout.snapshot().path[0];
-if (path === "error" || path === "flagged") {
-  showRetryUI();
-}
-```
-
-`tag` matches at the top level only, but `tag.has` searches the whole tree. And
-it scales: many states, one check.
-
-## Before/after
-
-### Check state
-
-```ts
-// Before (core only)
-checkout.snapshot().path[0] === "payment";
-
-// After (sugar)
-matches(checkout, "payment");
-```
-
-### Check nested state
-
-```ts
-// Before
-import type { Snapshot } from "@mantaq/core";
-
-function inTree(snap: Snapshot, name: string): boolean {
-  if (snap.path[0] === name) return true;
-  return Object.values(snap.regions).some((r) => inTree(r, name));
-}
-inTree(checkoutWithFraud.snapshot(), "cleared");
-
-// After
-isIn(checkoutWithFraud.snapshot(), "cleared");
-```
-
-### Group errors
-
-```ts
-import { state } from "@mantaq/core";
-import { tag } from "@mantaq/sugar";
-
-const failed1 = state("error")();
-const failed2 = state("flagged")();
-
-// Before
-const isFailed = [failed1, failed2].some((s) => s.name === checkout.snapshot().path[0]);
-
-// After
-const isFailed = tag(failed1, failed2).has(checkout.snapshot());
-```
+- `tag` groups at the top level
+- `.has()` searches the whole tree
+- Scales: many states, one check

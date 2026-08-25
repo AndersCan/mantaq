@@ -31,3 +31,23 @@ is proven.
 - Small, stable surface; complexity stays in trivial implementations.
 - Success = justus's logic is expressed almost entirely in Mantaq with proven,
   mutation-tested behavior - demonstrating the library in production.
+
+## What we will not do
+
+**We trust the type system.** A user lying about types - hand-building a value
+that claims a type it does not have - is incorrect usage of Mantaq and out of
+scope. We do not add machinery to make lying safe.
+
+- **Lying about types is out of scope.** If a value was not produced by Mantaq's
+  constructors but asserts an event/state shape, `is()` narrowing it anyway is
+  not a library bug.
+- **Trivial runtime checks are fine.** A cheap guard on visible data
+  (e.g. checking `type` or payload fields) is welcome. What is not welcome:
+  hidden state added only to make guards bulletproof against liars.
+- **No brands, symbols, or non-enumerable stamps.** Guards must be justified by
+  the value's observable shape. Never stamp secret state onto objects.
+- **No invisible state.** Two values that are `toEqual`, serialize identically,
+  and spread identically must behave identically.
+- **Fixes must shrink, not grow.** A "fix" that adds a registry, caching, or new
+  invariants to defend against a scenario the types already prevent is rejected,
+  however principled it sounds.

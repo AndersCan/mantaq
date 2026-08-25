@@ -5,41 +5,15 @@ description: Core runtime unit.
 
 ## What
 
-An Actor is one running state machine instance. It owns everything the machine
-needs: the current state, the mutable context, the registered transitions and
-effects, the clock, and any child actors.
+An Actor is one running state machine. It owns the current state, mutable
+context, registered transitions and effects, clock, and child actors.
 
-## Why
+States, events, and effects are declarations until an Actor runs them.
 
-States, events, and effects are declarations until an Actor runs them. The
-Actor is what makes the machine live — it accepts events, applies transitions,
-runs effects, and reports what it is doing. When you test a flow, you test an
-Actor.
-
-It's not a class you subclass per state. One Actor per flow, with its
-transitions and effects registered together in `setup`.
-
-The checkout form from [Introduction](/mantaq/getting-started/introduction/)
-is now full: all six states, all seven events.
-
-## Make an actor
-
-Transitions and effects are registered in a `setup` callback. The builder is
-type-safe: a target state or event you didn't declare won't compile.
+## Create
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
-
-type BasicInfo = { email: string; name: string };
-type ShippingAddress = { street: string; city: string; zip: string };
-type PaymentInfo = { cardNumber: string };
-
-type CheckoutContext = {
-  basicInfo?: BasicInfo;
-  shippingAddress?: ShippingAddress;
-  paymentInfo?: PaymentInfo;
-  orderId?: string;
-};
 
 const basicInfo = state("basicInfo")();
 const shippingAddress = state("shippingAddress")();
@@ -69,92 +43,40 @@ const checkout = new Actor({
       context.set(s);
       return { state: shippingAddress };
     });
-    m.on(shippingAddress, submitShipping, (event, { context }) => {
-      const s = context.get();
-      s.shippingAddress = event.payload;
-      context.set(s);
-      return { state: payment };
-    });
-    m.on(payment, submitPayment, (event, { context }) => {
-      const s = context.get();
-      s.paymentInfo = event.payload;
-      context.set(s);
-      return { state: submitting };
-    });
-    m.on(submitting, paymentOk, (event, { context }) => {
-      const s = context.get();
-      s.orderId = event.payload.orderId;
-      context.set(s);
-      return { state: success };
-    });
-    m.on(submitting, paymentFail, () => ({ state: error }));
-    m.on(submitting, submittingDone, () => ({ state: success }));
-    m.onAny(back, (_event, { context }) => {
-      const s = checkout.state.name;
-      if (s === "payment") {
-        const cur = context.get();
-        cur.paymentInfo = undefined;
-        context.set(cur);
-        return { state: shippingAddress };
-      }
-      if (s === "shippingAddress") {
-        const cur = context.get();
-        cur.shippingAddress = undefined;
-        context.set(cur);
-        return { state: basicInfo };
-      }
-      if (s === "error") return { state: payment };
-      return {};
-    });
+    // ...other transitions, effects
   },
 });
 ```
 
-The flow:
-
 ```
-basicInfo → shippingAddress → payment → submitting → success
-                  ↕ (back) ↕                   ↕ (back)
-                                            error
+basicInfo -> shippingAddress -> payment -> submitting -> success
+                  ^ (back) v                   v (back)
+                                              error
 ```
-
-`back` is handled in every state with `onAny`. A state-specific handler runs
-first; `onAny` only transitions if no state handler fired.
-
-Note that nothing emits `paymentOk` yet. Effects do that — the
-[Effects page](/mantaq/core-concepts/effects/) adds them.
 
 ## Send events
 
 ```ts
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
-checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
 ```
 
-`.create()` builds the event you send. Events with a payload need the payload
-argument.
-
-## Check the state
+## Check state
 
 ```ts
 checkout.snapshot().path[0]; // "payment"
+matches(checkout, "payment"); // from @mantaq/sugar
 ```
-
-For cleaner checks, `@mantaq/sugar` has `matches(checkout, "payment")`. See
-[Matching](/mantaq/sugar/matching/).
 
 ## Listen for changes
 
 ```ts
-const unsub = checkout.on("change", (snapshot) => {
-  console.log("New state:", snapshot.path);
+const unsub = checkout.on("change", (snap) => {
+  /* ... */
 });
-
-// Call unsub() to stop
+// unsub() to stop
 ```
 
-The handler fires immediately with the current snapshot, then on every state
-or context change.
+Fires immediately with current snapshot, then on every state or context change.
 
 ## Settled
 
@@ -162,8 +84,7 @@ or context change.
 await checkout.settled();
 ```
 
-Waits until internal events are drained and pending effects are done. Use it
-after effects before asserting.
+Waits for internal events to drain and pending effects to finish.
 
 ## Snapshot
 
@@ -171,8 +92,6 @@ after effects before asserting.
 checkout.snapshot();
 // { path: ["payment"], context: {...}, regions: {} }
 ```
-
-The full state tree. It nests for actors with children.
 
 ## Constructor options
 
@@ -189,7 +108,7 @@ The full state tree. It nests for actors with children.
 | `regions`        | `Record<string, AnyActor>`          | Static children                      |
 | `internalBudget` | `number`                            | Max internal events (default: 10000) |
 
-### `setup` builder
+## Setup builder
 
 | Method                          | What                                        |
 | ------------------------------- | ------------------------------------------- |
@@ -197,5 +116,5 @@ The full state tree. It nests for actors with children.
 | `m.onAny(event, fn)`            | Handler for an event in every state         |
 | `m.effect(state, { name, fn })` | Run `fn` on state entry; `name` is required |
 
-A handler returns `{ state }` (optionally with `payload`, or `emit:
-[{ type }]`) to transition, or `{}` to stay in place.
+Handlers return `{ state }` (with optional `payload` or `emit`) to transition,
+or `{}` to stay put.

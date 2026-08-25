@@ -16,15 +16,11 @@ function buildGraph<C>(
 ): ActorGraph;
 ```
 
-Builds a graph from an actor definition. Nodes are states, edges are
-transitions. Effect self-loops and region children are included.
+Builds graph from actor definition. Nodes are states, edges are transitions. Effect self-loops and region children included.
 
-`internalIds` marks event types as internal — their edges are excluded from
-coverage. `sampleContexts` provides context values for handler evaluation.
+`internalIds` marks event types as internal. Their edges excluded from coverage. `sampleContexts` provides context values for handler evaluation.
 
 ```ts
-import { buildGraph } from "@mantaq/traversal";
-
 const graph = buildGraph(checkout, { internalIds: new Set(["paymentOk"]) });
 graph.nodes.length; // number of states
 graph.edges.length; // number of transitions
@@ -38,8 +34,7 @@ graph.edges.length; // number of transitions
 function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<string>): void;
 ```
 
-Recursively walks a snapshot tree and adds active state node IDs to the set.
-Used internally by `buildGraph` to mark which nodes are active.
+Recursively walks snapshot tree, adds active state node IDs to set. Used internally by `buildGraph`.
 
 ---
 
@@ -49,13 +44,9 @@ Used internally by `buildGraph` to mark which nodes are active.
 function instrument<C>(actor: AnyActor<C>): InstrumentedActor<C>;
 ```
 
-Wraps an actor to record every state visit, transition, and effect in a
-`History` instance. Returns an `InstrumentedActor` with the same API plus a
-`history` property.
+Wraps actor to record every state visit, transition, and effect in a `History` instance. Returns `InstrumentedActor` with same API plus `history` property.
 
 ```ts
-import { instrument } from "@mantaq/traversal";
-
 const wrapped = instrument(checkout);
 wrapped.send(submitBasicInfo.create());
 wrapped.history.visitedStates(); // Set<string>
@@ -79,11 +70,11 @@ class History {
 }
 ```
 
-Append-only log of actor activity. Query by type or get derived sets.
+Append-only log. Query by type or get derived sets.
 
-- `visitedStates()` — unique state names entered
-- `firedTransitions()` — `"from:event"` strings for fired transitions
-- `reset()` — clear all entries
+- `visitedStates()`: unique state names entered
+- `firedTransitions()`: `"from:event"` strings for fired transitions
+- `reset()`: clear all entries
 
 ---
 
@@ -95,7 +86,7 @@ Append-only log of actor activity. Query by type or get derived sets.
 function reachable(graph: ActorGraph, fromId: string, toId: string): boolean;
 ```
 
-BFS reachability. Can `fromId` reach `toId`?
+BFS reachability check.
 
 ### `allPaths(graph, fromId, toId)`
 
@@ -111,7 +102,7 @@ All acyclic paths between two nodes. Returns arrays of node IDs.
 function findCycles(graph: ActorGraph): string[][];
 ```
 
-Returns all cycles in the graph as arrays of node IDs.
+All cycles as arrays of node IDs.
 
 ### `unreachableNodes(graph, fromId)`
 

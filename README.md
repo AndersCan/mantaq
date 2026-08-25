@@ -20,13 +20,13 @@ A TypeScript state machine library built around actors, events, and hierarchical
 
 ## Packages
 
-- **core** — State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock for testing.
-- **sugar** — Convenience helpers: batch state/event creation, matching, effect utilities, dynamic children.
-- **traversal** — Graph build, coverage instrumentation, and history for testing state machines.
-- **test** — Test harness and coverage assertions for actor behavior.
-- **pbt** — Seeded property-based testing helpers (generators, `runProperty`).
-- **utils** — Shared internal utilities.
-- **examples** — Real working examples (checkout, auth, saga, event sourcing, undo/redo, and more).
+- **core**. State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock for testing.
+- **sugar**. Convenience helpers: batch state/event creation, matching, effect utilities, dynamic children.
+- **traversal**. Graph build, coverage instrumentation, and history for testing state machines.
+- **test**. Test harness and coverage assertions for actor behavior.
+- **pbt**. Seeded property-based testing helpers (generators, `runProperty`).
+- **utils**. Shared internal utilities.
+- **examples**. Real working examples (checkout, auth, saga, event sourcing, undo/redo, and more).
 
 ## Getting Started
 
@@ -43,7 +43,7 @@ vp run ready
 
 ## Usage
 
-The docs tell one story — a multi-step checkout form. Same machine here.
+The docs tell one story: a multi-step checkout form. Same machine here.
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
@@ -73,17 +73,17 @@ checkout.snapshot().path[0]; // "payment"
 
 The documentation site (`apps/docs`) builds **one running example** from start to
 finish: the checkout form. Each page expands the machine from the previous
-page. Entity IDs are fixed — the same states and events everywhere.
+page. Entity IDs are fixed: the same states and events everywhere.
 
 - Canonical example: `packages/examples/checkout.actor.test.ts`
-- `vp run docs:check` — verifies docs use only canonical IDs, imports match real
+- `vp run docs:check`. Verifies docs use only canonical IDs, imports match real
   package exports, and the canonical example typechecks.
-- `.opencode/skills/docs-write/` — agent skill for writing docs: single-example
+- `.opencode/skills/docs-write/`. Agent skill for writing docs: single-example
   rules and a five-persona review loop (from `ux-research/personas-and-journeys.md`).
 
 ## Skills
 
-Agent skills for **end users** building with `@mantaq/core` — writing, testing, and reviewing actor-model code. These are **not** for developing the library itself.
+Agent skills for **end users** building with `@mantaq/core`. Writing, testing, and reviewing actor-model code. These are **not** for developing the library itself.
 
 ```bash
 npx skills add AndersCan/mantaq
@@ -105,16 +105,16 @@ Versioning is manual; publishing runs in CI via npm trusted publishing (OIDC)
 with SLSA provenance (`.github/workflows/release.yml`).
 
 1. Accumulate bump files in `.bumpy/` as changes land.
-2. When ready: `bumpy version` — bumps versions, writes changelogs,
+2. When ready: `bumpy version`. Bumps versions, writes changelogs,
    consumes bump files.
 3. Commit the version changes, push, open a PR, merge to `main`.
    A version PR consumes every pending bump file, so the CI
    `bumpy ci check` step fails with "No bump files found in this PR".
-   Expected — add an empty bump to satisfy it:
+   Expected. Add an empty bump to satisfy it:
    `vp exec bumpy add --empty --name "version-packages-v0-3-0"` (use the
    new version number). Same applies to docs-only PRs with no releases.
 4. The publish job builds every package and publishes the versioned ones.
-   Publishing uses npm trusted publishing (OIDC) — no token secrets.
+   Publishing uses npm trusted publishing (OIDC). No token secrets.
 
 ## Project Structure
 

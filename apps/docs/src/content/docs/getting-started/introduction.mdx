@@ -5,58 +5,34 @@ description: What is Mantaq.
 
 ## What
 
-Mantaq is a state machine library for TypeScript. You model a flow — a
-checkout form, an order pipeline, a game — as states and the events that move
-between them. Mantaq runs the machine: it tracks where the flow is, fires
-transitions, runs side effects, and cleans up after itself.
+Mantaq is a state machine library for TypeScript. Model flows as states and events; Mantaq runs transitions, side effects, and cleanup.
 
 ## Why
 
-Multi-step flows are hard to keep correct in plain code. Booleans, nested
-conditionals, and a `currentStep` variable drift apart as the flow grows, and
-there is no compiler help when you forget a branch. A state machine makes the
-flow the source of truth: every state and every possible transition is declared
-up front, typed, and testable.
+Booleans and nested conditionals drift apart as flows grow. A state machine makes the flow the source of truth: every state and transition declared upfront, typed, and testable.
 
-Reach for Mantaq whenever you have a flow with a known set of steps and clear
-transitions between them. It is not a general-purpose state container — it
-models _where a process is_, not every piece of data your app holds.
+Use Mantaq for flows with known steps and clear transitions. It models where a process is, not every piece of data in your app.
 
 ## Core ideas
 
-- **Actor** — one running state machine. Holds the current state, context,
-  effects, transitions, and clock.
-- **State** — a node in the flow. A state can be marked final.
-- **Event** — a typed message. Events trigger transitions.
-- **Effect** — code that runs on state entry and aborts on state exit.
-- **Context** — the data the machine carries. Survives transitions.
+- **Actor.** One running machine. Holds current state, context, effects, transitions, clock.
+- **State.** A node in the flow. May be final.
+- **Event.** A typed message that triggers transitions.
+- **Effect.** Code that runs on state entry and aborts on state exit.
+- **Context.** Data the machine carries. Survives transitions.
 
 ## Packages
 
-| Package             | What                                                                                                                         |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `@mantaq/core`      | Runtime. `Actor`, `state`, `event`, `VirtualClock`                                                                           |
-| `@mantaq/sugar`     | Helpers. `matches`, `states`, `events`, `tag`, `isIn`, `activeLeaves`, `ActorMap`, `broadcast`, `withPromise`, `withTimeout` |
-| `@mantaq/test`      | Test harness and coverage assertions. `createTestHarness`, state/transition/effect assertions                                |
-| `@mantaq/traversal` | Graph building, instrumentation, history, and graph algorithms. `buildGraph`, `instrument`, `History`                        |
-
-## The docs story
-
-The whole docs build **one example**: a multi-step checkout form.
-
-The buyer fills in basic info, a shipping address, and payment details. The
-system charges the card and shows the result. Every page adds a piece to the
-same machine.
-
-```
-basicInfo → payment → success (final)
-```
-
-Later pages add more states, more events, effects, and testing.
+| Package             | Exports                                                                                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@mantaq/core`      | `Actor`, `state`, `event`, `VirtualClock`, `RealClock`, `Context`                                                                                                 |
+| `@mantaq/sugar`     | `matches`, `states`, `events`, `tag`, `isIn`, `activeLeaves`, `ActorMap`, `onOutput`, `withPromise`, `withTimeout`, `actorSpec`, `definePart`, `use`, `withParts` |
+| `@mantaq/test`      | `createTestHarness`, state/transition/effect assertions                                                                                                           |
+| `@mantaq/traversal` | `buildGraph`, `instrument`, `History`                                                                                                                             |
 
 ## Quick example
 
-The checkout form, cut to bone: three states and two events.
+Three states, two events:
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
@@ -82,15 +58,8 @@ checkout.send(submitBasicInfo.create());
 checkout.snapshot().path[0]; // "payment"
 ```
 
-`success` is final. The actor stops there, and entering it fires the `"done"`
-subscribers.
+`success` is final. Actor stops there; entering it fires `"done"` subscribers.
 
 :::tip[Sugar exists]
-Core is verbose on purpose — it shows what happens under the hood.
-
-`@mantaq/sugar` has helpers: `matches(checkout, "payment")` instead of
-`snapshot().path[0] === "payment"`. Batch creation, effect helpers, state
-grouping.
-
-Learn core first. Sugar second. You'll know _why_ each helper exists.
+`@mantaq/sugar` has helpers: `matches(checkout, "payment")` instead of `snapshot().path[0] === "payment"`. Learn core first, sugar second.
 :::

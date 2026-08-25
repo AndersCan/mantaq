@@ -81,7 +81,6 @@ Skills listed in system prompt `available_skills` may be stale. Load from disk:
 
 - `.opencode/skills/add-change/SKILL.md`
 - `.opencode/skills/find-skills/SKILL.md`
-- `.opencode/skills/save-changes/SKILL.md`
 - `.opencode/skills/self-improvement/SKILL.md`
 - `.opencode/skills/self-improvement-worker/SKILL.md`
 

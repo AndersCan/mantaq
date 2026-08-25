@@ -1,51 +1,17 @@
 ---
 title: Batch Creation
-description: Create multiple states and events in one call.
+description: Create multiple states and events in one call
 ---
 
 ## What
 
-`states()` and `events()` create many state or event refs in one call, and
-return a typed record keyed by name.
+`states()` and `events()` create many refs in one call, returning a typed
+record keyed by name.
 
-## Why
-
-A real machine has many states and events. Creating them one by one —
-`state("basicInfo")()`, `state("shippingAddress")()`, and so on — is
-repetitive noise that buries the flow. Two calls replace thirteen. Reach for it
-when the boilerplate outweighs the one-line-per-ref form; for a handful of
-refs, the plain form stays clearer.
-
-The checkout machine from [Actors](/mantaq/core-concepts/actors/). Its six
-states and seven events, created in two calls.
-
-## Without sugar
+## states
 
 ```ts
-import { state, event } from "@mantaq/core";
-
-const basicInfo = state("basicInfo")();
-const shippingAddress = state("shippingAddress")();
-const payment = state("payment")();
-const submitting = state("submitting")();
-const success = state("success")().final();
-const error = state("error")();
-
-const submitBasicInfo = event("submitBasicInfo")();
-const submitShipping = event("submitShipping")();
-const submitPayment = event("submitPayment")();
-const back = event("back")();
-const paymentOk = event("paymentOk")();
-const paymentFail = event("paymentFail")();
-const submittingDone = event("submittingDone")();
-```
-
-Thirteen calls. Repetitive.
-
-## With sugar
-
-```ts
-import { states, events } from "@mantaq/sugar";
+import { states } from "@mantaq/sugar";
 
 const { basicInfo, shippingAddress, payment, submitting, success, error } = states(
   "basicInfo",
@@ -55,6 +21,14 @@ const { basicInfo, shippingAddress, payment, submitting, success, error } = stat
   { name: "success", final: true },
   "error",
 );
+```
+
+Finality declared at creation via `{ name: "<id>", final: true }`. No `.final()` call.
+
+## events
+
+```ts
+import { events } from "@mantaq/sugar";
 
 const {
   submitBasicInfo,
@@ -75,41 +49,25 @@ const {
 );
 ```
 
-Two calls. Typed names as keys.
-
 ## Return type
 
-`states()` returns a typed record keyed by the literal names — `{ [K in T]:
-StateRef<K> }`. Not a plain `Record<string, ...>`.
-
-`events()` has the same shape for `EventRef`.
-
-Keys are the names you passed. Dot or bracket access:
+`states()` returns `{ [K in T]: StateRef<K> }`. Dot or bracket access:
 
 ```ts
-const s = states("basicInfo", "payment", "success");
+const s = states("basicInfo", "payment");
 s.basicInfo; // StateRef<"basicInfo">
 s["payment"]; // StateRef<"payment">
-
-const e = events("submitBasicInfo", "submitPayment");
-e.submitBasicInfo; // EventRef<"submitBasicInfo">
 ```
 
 Destructure or keep the record:
 
 ```ts
-const s = states("basicInfo", "payment", "success");
-const { basicInfo, payment, success } = s;
+const { basicInfo, payment } = states("basicInfo", "payment");
 ```
 
-## Real example
-
-The same checkout machine, fewer lines.
+## With an actor
 
 ```ts
-import { Actor } from "@mantaq/core";
-import { states, events } from "@mantaq/sugar";
-
 const { basicInfo, payment, success } = states("basicInfo", "payment", {
   name: "success",
   final: true,
@@ -127,16 +85,7 @@ const checkout = new Actor({
 });
 ```
 
-## Type safety
+## When to use
 
-```ts
-const { basicInfo, success } = states("basicInfo", { name: "success", final: true });
-
-// TypeScript knows:
-basicInfo.name; // "basicInfo"
-basicInfo.isFinal; // false
-success.isFinal; // true
-```
-
-Finality is declared at creation — `{ name, final: true }`. No `.final()` call
-to remember or discard. Names are inferred as string literals.
+Many states/events: two calls replace thirteen. Few refs: the plain
+`state("basicInfo")()` form stays clearer.

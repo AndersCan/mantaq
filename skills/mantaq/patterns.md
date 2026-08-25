@@ -1,6 +1,8 @@
 # Patterns
 
-Proven recipes. Each pattern is self-contained; full working versions live in the mantaq repo under `packages/examples/` (e.g. `checkout.actor.test.ts`) if you want to see them in context.
+Proven recipes. Each pattern is self-contained. Full working versions live
+in the mantaq repo under `packages/examples/` (e.g.
+`checkout.actor.test.ts`).
 
 ## Async Work → Effect + Internal Event
 
@@ -27,11 +29,16 @@ new Actor({
 });
 ```
 
-For real promises use `withPromise` (see `sugar.md`). Effects never run on the initial state — boot work starts in a boot state the first event transitions out of.
+For real promises use `withPromise` (see `sugar.md`). Effects never run
+on the initial state. Boot work starts in a boot state the first event
+transitions out of.
 
 ## Retry / Exponential Backoff
 
-Retry count + backoff live in context. Effect schedules `clock.setTimeout(backoffMs * 2^retryCount)`. Failed attempt increments counter, re-emits the fail event or transitions to a retry state. Clear the timer on abort:
+Retry count + backoff live in context. Effect schedules
+`clock.setTimeout(backoffMs * 2^retryCount)`. Failed attempt increments
+counter, re-emits the fail event or transitions to a retry state. Clear
+the timer on abort:
 
 ```ts
 const id = clock.setTimeout(delay, () => emit(retryDone.create()));
@@ -65,8 +72,10 @@ Independent sub-behaviors as child actors. Parent + children in one snapshot; `m
 new Actor({ regions: { health: healthMonitor, movement: movementActor }, ... });
 ```
 
-- Child output events route to parent's queue automatically. The parent must declare the child's output event in its `internal` (or `inputs`) to dispatch it — undeclared, it routes outward again or drops.
-- Forward events INTO a region manually — there is no declarative parent→child wiring:
+- Child output events route to parent's queue automatically. The parent
+  must declare the child's output event in its `internal` (or `inputs`)
+  to dispatch it. Undeclared, it routes outward again or drops.
+- Forward events INTO a region manually. No declarative parent→child wiring:
 
 ```ts
 m.onAny(toggleEvent, ({ actor }) => {
@@ -77,7 +86,8 @@ m.onAny(toggleEvent, ({ actor }) => {
 
 ## Event Sourcing → Context as Log + Fold
 
-Events append to a log in context. State derived by folding the log — not stored. Snapshot + rebuild for replay.
+Events append to a log in context. State derived by folding the log, not
+stored. Snapshot + rebuild for replay.
 
 ```ts
 // concrete state ref — m.on takes a StateRef, not "any state"
@@ -106,8 +116,10 @@ Decide per failure arc, not per actor. Never model errors as booleans in context
 
 ## State Payload vs Context
 
-- **State payload** — data tied to the moment of entry, via `StateRef.create(payload)`. Read in the effect via `input.state.payload`.
-- **Context** — accumulated data across transitions, mutated in handlers.
+- **State payload.** Data tied to the moment of entry, via
+  `StateRef.create(payload)`. Read in the effect via
+  `input.state.payload`.
+- **Context.** Accumulated data across transitions, mutated in handlers.
 - Rule: transient per-visit data → payload. Data persisting across steps → context.
 
 ## Undo/Redo → Snapshot + Restore

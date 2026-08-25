@@ -9,15 +9,9 @@ description: Test harness and coverage assertions for actor behavior.
 function createTestHarness<C>(actor: AnyActor<C>): TestHarness<C>;
 ```
 
-Instruments an actor for testing. Builds the state graph from the actor
-definition and wraps `send` to record history.
-
-Returns a `TestHarness` — send events through it, then assert against the
-recorded history.
+Instruments actor for testing. Builds state graph, wraps `send` to record history.
 
 ```ts
-import { createTestHarness } from "@mantaq/test";
-
 const harness = createTestHarness(checkout);
 harness.send(submitBasicInfo.create());
 harness.assertStateVisited("shippingAddress");
@@ -31,13 +25,9 @@ harness.assertStateVisited("shippingAddress");
 function computeCoverage(graph: ActorGraph, history: History): CoverageReport;
 ```
 
-Compare a graph against a history. Returns state, transition, and effect
-coverage as totals, visited counts, and uncovered paths. Used internally by
-`harness.coverage()`.
+Compares graph against history. Returns state, transition, and effect coverage as totals, visited counts, and uncovered paths. Used internally by `harness.coverage()`.
 
 ```ts
-import { computeCoverage } from "@mantaq/test";
-
 const report = computeCoverage(graph, history);
 report.percent.states; // 0–100
 ```
@@ -94,7 +84,7 @@ All throw on failure.
 
 ### Query methods
 
-Boolean checks — no throw.
+Boolean checks, no throw.
 
 | Method                              | What              |
 | ----------------------------------- | ----------------- |

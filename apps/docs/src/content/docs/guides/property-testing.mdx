@@ -3,41 +3,18 @@ title: Property-Based Testing
 description: Prove checkout-machine invariants across generated inputs instead of single examples.
 ---
 
-## What
-
-Example tests (see [Testing Actors](/guides/actor-testing)) assert one path
-per test. Property tests assert an **invariant** that must hold for _every_
-generated input: every timeout value, every sequence of events, every payload.
-Mantaq ships a property runner (`@mantaq/pbt`) built on fast-check, and the
-determinism of actors (injectable clock, no wall-clock reads) is what makes
-generated cases reproducible.
-
-## Why
-
-A hand-written test covers the deadline case you thought of. A property covers
-_all_ deadline cases — including `advanceMs` exactly equal to `timeoutMs`, zero
-timeouts, and aborted runs — in one test. When a property fails, the runner
-prints the shrunk minimal counterexample, seeded and reproducible.
+Property tests assert an invariant over every generated input, not one path.
 
 ## The runner
 
-`runProperty(arb, predicate)` generates values from `arb`, feeds each to the
-predicate, and fails on the first `false`. The global seed comes from
-`MANTAQ_SEED` (default fixed), so a failure replays identically:
+`runProperty(arb, predicate)` generates values, feeds each to the predicate, fails on first `false`. Import from `@mantaq/pbt`.
 
-```ts
-import { fc, runProperty } from "@mantaq/pbt";
-```
+- `fc` is fast-check's full API. `@mantaq/pbt` adds: `anyDuration`, `anySmallDuration`, `anyPayload`, `anyName`, `anyActorSnapshot`.
+- `MANTAQ_SEED` env var overrides the fixed default seed. Default `numRuns`: 100.
 
-`fc` is fast-check's full API; `@mantaq/pbt` also provides ready-made
-arbitraries (`anyDuration`, `anySmallDuration`, `anyPayload`, …).
+## Deadline-exactness invariant
 
-## Property 1 — deadlines are exact
-
-An actor in `submitting` schedules its own completion: a timer effect emits
-`submittingDone` after `timeoutMs`, moving it to `success`. The invariant:
-**the machine is in `success` if and only if the clock advanced at least
-`timeoutMs`** — never before, never "stuck" after.
+Machine in `submitting` schedules `submittingDone` after `timeoutMs`. `VirtualClock.advance(ms)` is synchronous, fires timers, drains queue.
 
 ```ts
 import { Actor, VirtualClock } from "@mantaq/core";
@@ -63,7 +40,6 @@ runProperty(
         });
       },
     });
-
     clock.advance(advanceMs);
     const inSuccess = actor.snapshot().path[0] === "success";
     return advanceMs >= timeoutMs ? inSuccess : !inSuccess;
@@ -71,14 +47,11 @@ runProperty(
 );
 ```
 
-Two details carry the weight: `VirtualClock` means the timer fires only when
-you advance past it, and `internal: [submittingDone]` marks the event as
-machine-internal so external sends cannot fake the deadline.
+`internal: [submittingDone]` marks it machine-internal so external sends cannot fake the deadline.
 
-## Property 2 — back-navigation never reaches a final state
+## Back-navigation invariant
 
-From any pre-payment step, mashing `back` must always land in a live step and
-never touch `success` or `error`:
+From any pre-payment step, mashing `back` never reaches a final state.
 
 ```ts
 runProperty(fc.integer({ min: 0, max: 10 }), (presses) => {
@@ -98,11 +71,8 @@ runProperty(fc.integer({ min: 0, max: 10 }), (presses) => {
   for (let i = 0; i < presses; i++) {
     const current = actor.snapshot().path[0];
     actor.send(back.create());
-    // Invariant: back never advances toward payment/success/error.
     if (actor.snapshot().path[0] === "payment") return false;
-    if (current === "basicInfo" && actor.snapshot().path[0] !== "basicInfo") {
-      return false;
-    }
+    if (current === "basicInfo" && actor.snapshot().path[0] !== "basicInfo") return false;
   }
   return actor.snapshot().done !== true;
 });
@@ -110,18 +80,5 @@ runProperty(fc.integer({ min: 0, max: 10 }), (presses) => {
 
 ## Seeding and CI
 
-- Default seed is fixed → CI runs are deterministic; a red property is always
-  reproducible by re-running.
-- Set `MANTAQ_SEED=<n>` to explore new input regions locally after a fix, or
-  to replay a reported counterexample exactly.
-- Keep `numRuns` at its default (100). If a property is too slow, shrink the
-  machine or the arbitrary — do not lower coverage silently.
-
-## When properties vs. examples
-
-Reach for **examples** when you are documenting behavior ("back from payment
-returns to shipping") — they read like specs. Reach for **properties** when
-you are defending an invariant over an input space ("timers fire exactly at
-their deadline", "subscribers see one change per transition"). Mature machines
-carry both: examples for readability, properties for the edges no human thinks
-to write down.
+- Default seed is fixed. CI runs are deterministic, failures reproducible.
+- Set `MANTAQ_SEED=<n>` to explore new input regions or replay a counterexample.

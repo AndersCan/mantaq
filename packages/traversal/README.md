@@ -5,11 +5,11 @@ Graph extraction, traversal algorithms, and runtime coverage tracking for
 
 Use it to:
 
-- **Inspect** a state machine statically — turn an actor into a
+- **Inspect** a state machine statically. Turn an actor into a
   `nodes`/`edges` graph of its states and transitions.
-- **Reason** about that graph — which states are reachable, what paths exist
+- **Reason** about that graph. Which states are reachable, what paths exist
   between two states, and whether any declared transition can never fire.
-- **Verify** coverage at runtime — wrap an actor so every visited state,
+- **Verify** coverage at runtime. Wrap an actor so every visited state,
   fired transition, and executed effect is recorded as it runs.
 
 All three pieces work on the same `ActorGraph` shape, so you can build the
@@ -69,12 +69,12 @@ can tell which branches belong to which context. With a single context, use
 
 ### Constants
 
-- `INITIAL_NODE_ID` — the synthetic id of the graph's entry node (the edge
+- `INITIAL_NODE_ID`. The synthetic id of the graph's entry node (the edge
   from it points to the actor's initial state).
 
 ## Walking the graph
 
-The algorithms module operates on an `ActorGraph` and is pure — no actor
+The algorithms module operates on an `ActorGraph` and is pure. No actor
 needed:
 
 ```ts
@@ -125,7 +125,7 @@ history.entries(); // HistoryEntry[] — the raw, ordered record
 `History` records state visits, transitions, effects, and sends. Call
 `history.reset()` to reuse a wrapper across independent runs.
 
-Combine static and runtime views to assert coverage — e.g. that every
+Combine static and runtime views to assert coverage. E.g. that every
 reachable state in the graph was actually visited by a scenario:
 
 ```ts
