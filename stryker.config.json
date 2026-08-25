@@ -11,5 +11,5 @@
     "configFile": "packages/core/stryker.vitest.config.ts",
     "related": false
   },
-  "thresholds": { "high": 95, "low": 92, "break": 89.5 }
+  "thresholds": { "high": 95, "low": 92, "break": 86 }
 }

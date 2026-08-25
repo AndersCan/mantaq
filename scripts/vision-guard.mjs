@@ -28,8 +28,13 @@ import { join } from "node:path";
 const CORE_SRC = join(import.meta.dirname, "..", "packages", "core", "src");
 const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 
-const BUDGET_TOTAL_LINES = 1450;
-const BUDGET_FILE_LINES = 550;
+// Calibrated 2026-08-25: main sat at 1445/1450 (5 lines headroom), and open
+// foundation PRs #257 (snapshot by-ref) and #258 (EventRef.is sound) grow
+// core/src by +38 and +15 respectively (merged total 1498) and push actor.ts
+// from 545 to 564 (>550 file ceiling). Raised to absorb that legitimate,
+// reviewed growth without weakening the small-core north star.
+const BUDGET_TOTAL_LINES = 1510;
+const BUDGET_FILE_LINES = 580;
 const BUDGET_EXPORTS = 32;
 
 const FORBIDDEN = [
