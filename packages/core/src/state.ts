@@ -20,6 +20,7 @@ export class StateRef<T extends string, Payload = unknown, IsFinal extends boole
     this.isFinal = isFinal;
   }
 
+  /** @internal Not yet wired: declared regions are stored on `_regions` but never instantiated by the Actor, so calling this is currently a no-op. Kept internal until region instantiation lands. */
   regions(options: RegionsOptions): this {
     this._regions = options;
     return this;

@@ -18,13 +18,13 @@ const payment = state("payment")<{ cardNumber: string }>();
 
 ### `StateRef<T, Payload, IsFinal>`
 
-| Property            | Type                         | What                               |
-| ------------------- | ---------------------------- | ---------------------------------- |
-| `name`              | `T`                          | State id                           |
-| `isFinal`           | `IsFinal`                    | Terminal state?                    |
-| `.final()`          | `StateRef<T, Payload, true>` | Mark final                         |
-| `.create(payload)`  | `{ state, payload }`         | Make state entry. Payload required |
-| `.regions(options)` | `this`                       | Attach sub-regions                 |
+| Property            | Type                         | What                                                          |
+| ------------------- | ---------------------------- | ------------------------------------------------------------- |
+| `name`              | `T`                          | State id                                                      |
+| `isFinal`           | `IsFinal`                    | Terminal state?                                               |
+| `.final()`          | `StateRef<T, Payload, true>` | Mark final                                                    |
+| `.create(payload)`  | `{ state, payload }`         | Make state entry. Payload required                            |
+| `.regions(options)` | `this`                       | Declared but not yet wired (currently a no-op; kept internal) |
 
 ---
 

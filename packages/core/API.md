@@ -109,7 +109,6 @@ class StateRef<T extends string, Payload = unknown, IsFinal extends boolean = fa
   readonly isFinal: IsFinal;
   final(): StateRef<T, Payload, true>;
   create(payload: Payload): { state: StateRef<T, Payload, IsFinal>; payload: Payload };
-  regions(options: Record<string, { initial: string; states: Record<string, AnyStateRef> }>): this;
 }
 const done = state("done")().final();
 const entered = ready.create({ n: 1 });
