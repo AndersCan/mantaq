@@ -23,7 +23,7 @@
 
 import { describe, it, expect } from "vite-plus/test";
 import { Actor, VirtualClock, RealClock, state, event } from "@mantaq/core";
-import type { Clock, CreatedOfEvent } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import { ActorMap, states, events, withTimeout, onOutput } from "@mantaq/sugar";
 
 type Settled = {
@@ -118,12 +118,7 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
     (orderId) => {
       const child = createRequestHandler(orderId, clock);
       onOutput(child, (e) => {
-        // `is()` narrows the type tag only, so forward via an explicit cast once
-        // the tag is confirmed. `requestSettled` is only emitted with a `Settled`
-        // payload in this wiring, making the cast sound.
-        if (e.type === requestSettled.type) {
-          manager.send(e as CreatedOfEvent<"requestSettled", Settled>);
-        }
+        if (requestSettled.is(e)) manager.send(e);
       });
       return child;
     },
@@ -131,15 +126,11 @@ export function createRequester(clock: Clock = new RealClock(), defaultTimeoutMs
   );
 
   onOutput(manager, (e) => {
-    // `is()` narrows the type tag only; the payload is read from the already
-    // correctly-typed output event. `orderSettled` is only ever emitted with a
-    // `Settled` payload, so this cast is sound in this wiring.
-    if (e.type !== orderSettled.type) return;
-    const payload = e.payload as Settled;
-    const resolvers = pending.get(payload.orderId);
+    if (!orderSettled.is(e)) return;
+    const resolvers = pending.get(e.payload.orderId);
     if (!resolvers) return;
-    pending.delete(payload.orderId);
-    for (const resolve of resolvers) resolve(payload);
+    pending.delete(e.payload.orderId);
+    for (const resolve of resolvers) resolve(e.payload);
   });
 
   return {

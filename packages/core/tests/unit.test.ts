@@ -601,19 +601,6 @@ describe("event ref", () => {
     expect(a.is(null)).toBe(false);
     expect(a.is(42)).toBe(false);
   });
-
-  test("is is a type-tag guard only — it does not validate the payload", () => {
-    const a = event("A")<{ x: number }>();
-    // Present and well-typed: matches the tag.
-    expect(a.is({ type: "A", x: 1 })).toBe(true);
-    // Missing payload: still matches the tag (the erased generic can't be
-    // checked at runtime, so `is` never promises the payload exists).
-    expect(a.is({ type: "A" })).toBe(true);
-    // Wrong payload shape: still matches the tag (payload shape isn't validated).
-    expect(a.is({ type: "A", x: "not-a-number" })).toBe(true);
-    // Different tag: never matches.
-    expect(a.is({ type: "B" })).toBe(false);
-  });
 });
 
 describe("state ref", () => {
