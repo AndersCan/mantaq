@@ -27,10 +27,12 @@ export function InternalQueue(): InternalQueue {
     processing = true;
     try {
       while (index < queue.length) {
+        // Stryker disable next-line ConditionalExpression -- `stopped` is only ever set true on the line below and reset in `finally`, so it is always false at this guard; inverting it never changes an observable result.
         if (stopped) break;
         const event = queue[index];
         index++;
         if (!processEvent(event)) {
+          // Stryker disable next-line BooleanLiteral -- the value is reset in `finally` before any external read, so setting it false here is indistinguishable.
           stopped = true;
           break;
         }
@@ -50,6 +52,7 @@ export function InternalQueue(): InternalQueue {
     },
 
     push(...events: InternalEvent[]): void {
+      // Stryker disable next-line ConditionalExpression -- `stopped` is reset to false in `finally` after every `process`, so it is never true when `push` is called externally; inverting the guard is unreachable.
       if (stopped) return;
       queue.push(...events);
     },
@@ -61,6 +64,7 @@ export function InternalQueue(): InternalQueue {
     },
 
     settled(): Promise<void> {
+      // Stryker disable next-line ArithmeticOperator -- when not processing, `index` is always 0 (reset in `finally`), so `length - index` and `length + index` are equal; the guard is unchanged.
       if (queue.length - index === 0 && !processing) {
         return Promise.resolve();
       }

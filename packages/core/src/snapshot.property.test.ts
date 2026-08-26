@@ -1,6 +1,7 @@
 import { Actor, VirtualClock, state, event } from "./index.ts";
+import { cloneValue } from "./snapshot.ts";
 import { fc, runProperty } from "@mantaq/pbt";
-import { test, describe } from "vite-plus/test";
+import { test, describe, expect } from "vite-plus/test";
 
 /**
  * A handler/subscriber explosion is a programmer bug, i.e. an assert-style bad
@@ -9,6 +10,25 @@ import { test, describe } from "vite-plus/test";
 function isErrorBomb(message: string): never {
   throw new Error(message);
 }
+
+describe("cloneValue preserves non-JSON-serializable values", () => {
+  test("structured-clone path keeps Date and Map identity that JSON would lose", () => {
+    const date = new Date(0);
+    const clonedDate = cloneValue(date);
+    expect(clonedDate).toBeInstanceOf(Date);
+    expect((clonedDate as Date).getTime()).toBe(0);
+
+    const map = new Map<string, number>([["a", 1]]);
+    const clonedMap = cloneValue(map);
+    expect(clonedMap).toBeInstanceOf(Map);
+    expect((clonedMap as Map<string, number>).get("a")).toBe(1);
+
+    // A value holding `undefined` must survive (JSON drops keys with undefined values).
+    const withUndefined = { a: 1, b: undefined as number | undefined };
+    const cloned = cloneValue(withUndefined);
+    expect(cloned).toEqual(withUndefined);
+  });
+});
 
 describe("Snapshot context isolation property tests", () => {
   test("the delivered context is a deep copy that keeps live state isolated (#226)", () => {

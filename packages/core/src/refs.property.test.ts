@@ -2,7 +2,7 @@ import type { Snapshot } from "./actor-internal.ts";
 import { parseTarget } from "./dispatch.ts";
 import { event } from "./event.ts";
 import { buildSnapshot } from "./snapshot.ts";
-import { state } from "./state.ts";
+import { state, isStateRef } from "./state.ts";
 import { Subscribers } from "./subscribers.ts";
 import { fc, anyName, anyPayload, anySnapshot, runProperty } from "@mantaq/pbt";
 import { test, describe, expect } from "vite-plus/test";
@@ -64,6 +64,15 @@ describe("event ref property tests", () => {
     expect(a.is({ type: "A" })).toBe(false);
   });
 
+  test("is() guard is sound: an unbranded object is rejected (brand is the only trust)", () => {
+    const a = event("A")<void>();
+    // An object literal is `typeof === "object"`, so only the brand check separates it
+    // from a real envelope; the `&&` guard must stay an AND, not an OR.
+    expect(a.is({ type: "A" })).toBe(false);
+    expect(a.is(null)).toBe(false);
+    expect(a.is(42)).toBe(false);
+  });
+
   test("create() keeps payload semantics for with/without payload", () => {
     const a = event("A")<{ n: number }>();
     expect(a.create()).toEqual({ type: "A" });
@@ -80,6 +89,15 @@ describe("event ref property tests", () => {
 });
 
 describe("state ref property tests", () => {
+  test("isStateRef rejects null and primitives, accepts a real ref", () => {
+    // `null` is `typeof === "object"`, so the `&&` guard must stay an AND.
+    expect(isStateRef(null)).toBe(false);
+    expect(isStateRef(42)).toBe(false);
+    expect(isStateRef({})).toBe(false);
+    const ref = state("x")<unknown>();
+    expect(isStateRef(ref)).toBe(true);
+  });
+
   test("create returns { state, payload } and final copies name and regions", () => {
     runProperty(
       fc.tuple(anyName, anyPayload, fc.array(anyName, { minLength: 1, maxLength: 3 })),

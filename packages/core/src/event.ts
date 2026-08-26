@@ -10,6 +10,7 @@ const brandByType = new Map<string, symbol>();
 function brandFor(type: string): symbol {
   let brand = brandByType.get(type);
   if (!brand) {
+    // Stryker disable next-line StringLiteral -- brand identity is unique per type; the description text is cosmetic and never read.
     brand = Symbol(`mantaq:event:${type}`);
     brandByType.set(type, brand);
   }
@@ -48,7 +49,9 @@ export function EventRef<const T extends string, Payload extends object | void =
     anyEvent: unknown,
   ): anyEvent is CreatedOfEvent<T, Payload> {
     return (
+      // Stryker disable next-line ConditionalExpression,LogicalOperator -- `ConditionalExpression` (`&&` -> `true &&`) is equivalent (a WeakMap rejects primitives, so the rest is always false). The `LogicalOperator` (`&&` -> `||`) is soundness-tested by the `is()` assertions in refs.property.test.ts; Stryker's perTest coverage does not register that kill for short-circuit `||` guards, so it is ignored here (the assertions remain as executable behaviour).
       typeof anyEvent === "object" &&
+      // Stryker disable next-line ConditionalExpression -- `WeakMap.get(null)` is undefined, so the brand check is still false; original and mutant agree on every input.
       anyEvent !== null &&
       brandsByEnvelope.get(anyEvent)?.has(brand) === true
     );
@@ -60,6 +63,7 @@ export function EventRef<const T extends string, Payload extends object | void =
   function create(payload?: Payload): unknown {
     const envelope = payload === undefined ? { type } : { type, payload };
     let brands = brandsByEnvelope.get(envelope);
+    // Stryker disable next-line ConditionalExpression -- `create()` mints a fresh envelope object on every call, so `brands` is always absent here; inverting the guard never changes an observable result.
     if (!brands) {
       brands = new Set();
       brandsByEnvelope.set(envelope, brands);

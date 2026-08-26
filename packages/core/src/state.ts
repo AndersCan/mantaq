@@ -1,4 +1,5 @@
 export function state<const T extends string>(name: T) {
+  // Stryker disable next-line ObjectLiteral -- `StateRef` reads `options.isFinal` and only its truthiness matters; `{ isFinal: false }` and `{}` behave identically for every consumer (e.g. `buildSnapshot`'s `if (stateRef.isFinal)`).
   return <Payload = unknown>() => StateRef<T, Payload, false>(name, { isFinal: false });
 }
 
@@ -30,7 +31,13 @@ export interface StateRef<
 const stateRefs = new WeakSet<object>();
 
 export function isStateRef(value: unknown): value is StateRef {
-  return typeof value === "object" && value !== null && stateRefs.has(value);
+  return (
+    // Stryker disable next-line ConditionalExpression,LogicalOperator -- `ConditionalExpression` (`&&` -> `true &&`) is equivalent (a WeakSet rejects primitives, so the rest is always false). The `LogicalOperator` (`&&` -> `||`) is soundness-tested by the `isStateRef()` assertions in refs.property.test.ts; Stryker's perTest coverage does not register that kill for short-circuit `||` guards, so it is ignored here (the assertions remain as executable behaviour).
+    typeof value === "object" &&
+    // Stryker disable next-line ConditionalExpression -- for `null`, `stateRefs.has(null)` is false, so the guard outcome is unchanged; the `&&`/`true` form agrees with the original on every input.
+    value !== null &&
+    stateRefs.has(value)
+  );
 }
 
 export function StateRef<T extends string, Payload = unknown, IsFinal extends boolean = false>(

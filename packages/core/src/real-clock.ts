@@ -32,6 +32,7 @@ export function RealClock(): Clock {
           clearListener(timerId);
         }
         listeners.set(timerId, { signal, onAbort });
+        // Stryker disable next-line ObjectLiteral,BooleanLiteral -- `onAbort` removes its own listener via `clearListener`, so the `once` flag is redundant; with or without it the handler runs exactly once per abort.
         signal.addEventListener("abort", onAbort, { once: true });
       }
       return timerId;
@@ -51,6 +52,7 @@ export function RealClock(): Clock {
           clearListener(intervalId);
         }
         listeners.set(intervalId, { signal, onAbort });
+        // Stryker disable next-line ObjectLiteral,BooleanLiteral -- `onAbort` removes its own listener via `clearListener`, so the `once` flag is redundant; with or without it the handler runs exactly once per abort.
         signal.addEventListener("abort", onAbort, { once: true });
       }
       return intervalId;

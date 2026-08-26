@@ -131,4 +131,14 @@ describe("RealClock directed mutation tests 2", () => {
     controller.abort();
     expect(clock.setTimeout(5, { signal: controller.signal, cb: () => {} })).toBe(-1);
   });
+
+  test("setInterval with an already-aborted signal returns -1 and never fires", () => {
+    const clock = RealClock();
+    const controller = new AbortController();
+    controller.abort();
+    let fired = 0;
+    expect(clock.setInterval(5, { signal: controller.signal, cb: () => fired++ })).toBe(-1);
+    // The aborted guard must prevent any interval from being scheduled.
+    expect(fired).toBe(0);
+  });
 });
