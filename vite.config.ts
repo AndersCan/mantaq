@@ -66,6 +66,7 @@ export default defineConfig({
           "packages/core/src/recover.test.ts",
           "packages/core/src/snapshot.property.test.ts",
           "packages/core/src/unit.test.ts",
+          "packages/sugar/src/effects/promise.test.ts",
           "packages/traversal/src/graph.test.ts",
         ],
         rules: {

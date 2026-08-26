@@ -7,7 +7,7 @@ import {
   states,
   events,
   onOutput,
-} from "./main.ts";
+} from "./index.ts";
 import { Actor, event, state } from "@mantaq/core";
 import type { Snapshot } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";

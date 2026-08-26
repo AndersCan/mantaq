@@ -13,7 +13,7 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/main.ts",
+    ".": "./src/index.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
