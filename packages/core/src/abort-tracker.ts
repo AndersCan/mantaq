@@ -5,12 +5,11 @@ export interface Abortable {
 
 export function trackAbort(
   signal: AbortSignal | undefined,
-  id: number,
-  map: Map<number, Abortable>,
+  options: { timerId: number; entries: Map<number, Abortable> },
 ): (() => void) | undefined {
   const onAbort = signal
     ? () => {
-        map.delete(id);
+        options.entries.delete(options.timerId);
       }
     : undefined;
   if (signal && onAbort) {

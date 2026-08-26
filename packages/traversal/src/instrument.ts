@@ -1,19 +1,30 @@
+import { createHistory } from "./history.ts";
+import type { History } from "./history.ts";
 import type { AnyActor, ErrorInfo, InternalEvent, Snapshot, TransitionInfo } from "@mantaq/core";
-import { History } from "./history.ts";
+
+type SubscriberEventName = "change" | "done" | "transition" | "error" | "output";
+
+type SubscriberHandler<C, E extends SubscriberEventName> = E extends "change"
+  ? (snapshot: Snapshot<C>, prev: Snapshot<C>) => void
+  : E extends "done"
+    ? () => void
+    : E extends "transition"
+      ? (info: TransitionInfo) => void
+      : E extends "error"
+        ? (info: ErrorInfo) => void
+        : E extends "output"
+          ? (event: InternalEvent) => void
+          : never;
 
 export interface InstrumentedActor<C = Record<string, unknown>> {
   history: History;
-  send(event: unknown): void;
+  send(event: InternalEvent): void;
   state: AnyActor["state"];
   snapshot(): Snapshot<C>;
   regions: Record<string, AnyActor>;
   context?: C;
   clock: AnyActor["clock"];
-  on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
-  on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
-  on(event: "done", fn: () => void): () => void;
-  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
-  on(event: "output", fn: (event: InternalEvent) => void): () => void;
+  on<E extends SubscriberEventName>(event: E, options: { fn: SubscriberHandler<C, E> }): () => void;
   recover(target: { state: AnyActor["state"]; context: C }): void;
   settled(): Promise<void>;
   options?: AnyActor["options"];
@@ -21,12 +32,17 @@ export interface InstrumentedActor<C = Record<string, unknown>> {
   dispose(): void;
 }
 
-function wrapWithProxy<C>(actor: AnyActor<C>, history: History): InstrumentedActor<C> {
-  const origSend = actor.send.bind(actor);
+function wrapWithProxy<C>(actor: AnyActor<C>, wrapped: { history: History }): InstrumentedActor<C> {
+  function forwardOn<E extends SubscriberEventName>(
+    event: E,
+    options: { fn: SubscriberHandler<C, E> },
+  ): () => void {
+    return actor.on(event, options);
+  }
 
   return {
     get history() {
-      return history;
+      return wrapped.history;
     },
     get state() {
       return actor.state;
@@ -44,15 +60,15 @@ function wrapWithProxy<C>(actor: AnyActor<C>, history: History): InstrumentedAct
       return actor.options;
     },
 
-    send(event: unknown) {
-      trackSendEvent(history, event);
-      origSend(event as Parameters<typeof origSend>[0]);
+    send(event) {
+      trackSendEvent({ history: wrapped.history, sentEvent: event });
+      actor.send(event);
     },
 
     snapshot() {
       return actor.snapshot();
     },
-    on: actor.on.bind(actor) as InstrumentedActor<C>["on"],
+    on: forwardOn,
     inject: actor.inject.bind(actor),
     dispose: actor.dispose.bind(actor),
     recover: actor.recover.bind(actor),
@@ -60,70 +76,82 @@ function wrapWithProxy<C>(actor: AnyActor<C>, history: History): InstrumentedAct
   };
 }
 
-function recordTransition(
-  history: History,
-  rec: {
+function recordTransition(recorder: {
+  history: History;
+  record: {
     from: string;
     to: string;
     event: string;
     transitioned: boolean;
     effectNames: string[];
-  },
-) {
-  history.append({
+  };
+}): void {
+  recorder.history.append({
     type: "transition",
-    data: { from: rec.from, event: rec.event, to: rec.to },
+    data: { from: recorder.record.from, event: recorder.record.event, to: recorder.record.to },
   });
-  if (!rec.transitioned) return;
-  history.append({
+  if (!recorder.record.transitioned) return;
+  recorder.history.append({
     type: "state_visit",
-    data: { stateName: rec.to },
+    data: { stateName: recorder.record.to },
   });
-  for (const effectName of rec.effectNames) {
-    history.append({
+  for (const effectName of recorder.record.effectNames) {
+    recorder.history.append({
       type: "effect",
-      data: { stateName: rec.to, effectName },
+      data: { stateName: recorder.record.to, effectName },
     });
   }
 }
 
-function trackSendEvent(history: History, event: unknown): void {
-  const evt = event as { type?: string };
-  const eventId = evt?.type ?? "unknown";
-  history.append({
+function trackSendEvent(tracking: { history: History; sentEvent: unknown }): void {
+  const eventType =
+    typeof tracking.sentEvent === "object" &&
+    tracking.sentEvent !== null &&
+    "type" in tracking.sentEvent
+      ? tracking.sentEvent.type
+      : "unknown";
+  tracking.history.append({
     type: "send",
-    data: { event: eventId },
+    data: { event: String(eventType) },
   });
 }
 
-function prefixId(prefix: string, name: string): string {
-  return prefix ? `${prefix}.${name}` : name;
+function prefixId(identity: { prefix: string; name: string }): string {
+  return identity.prefix ? `${identity.prefix}.${identity.name}` : identity.name;
 }
 
 export function instrument<C>(actor: AnyActor<C>): InstrumentedActor<C> {
-  const history = new History();
-  const wrapped = wrapWithProxy(actor, history);
-  attach<C>(actor, history, "");
+  const history = createHistory();
+  const wrapped = wrapWithProxy(actor, { history });
+  attach(actor, { history, prefix: "" });
   return wrapped;
 }
 
-function attach<C>(actor: AnyActor<C>, history: History, prefix: string): void {
-  history.append({
+function attach(childActor: AnyActor<unknown>, branch: { history: History; prefix: string }): void {
+  branch.history.append({
     type: "state_visit",
-    data: { stateName: prefixId(prefix, actor.state.name) },
+    data: { stateName: prefixId({ prefix: branch.prefix, name: childActor.state.name }) },
   });
 
-  actor.on("transition", ({ event, from, to, transitioned, effects }) => {
-    recordTransition(history, {
-      from: prefixId(prefix, from),
-      to: prefixId(prefix, to),
-      event: event.type,
-      transitioned,
-      effectNames: effects,
+  childActor.on("transition", {
+    fn: ({ event, from, to, transitioned, effects }) => {
+      recordTransition({
+        history: branch.history,
+        record: {
+          from: prefixId({ prefix: branch.prefix, name: from }),
+          to: prefixId({ prefix: branch.prefix, name: to }),
+          event: event.type,
+          transitioned,
+          effectNames: effects,
+        },
+      });
+    },
+  });
+
+  for (const [regionName, regionChild] of Object.entries(childActor.regions ?? {})) {
+    attach(regionChild, {
+      history: branch.history,
+      prefix: prefixId({ prefix: branch.prefix, name: regionName }),
     });
-  });
-
-  for (const [regionName, child] of Object.entries(actor.regions ?? {})) {
-    attach(child, history, prefixId(prefix, regionName));
   }
 }

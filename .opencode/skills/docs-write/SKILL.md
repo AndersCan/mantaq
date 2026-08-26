@@ -16,7 +16,7 @@ Write docs with ONE running example threaded through every page. Review with fiv
 The docs tell one story: a **multi-step checkout form**.
 
 - Canonical example: `.opencode/skills/docs-write/resources/example.mdx`
-- Runnable source of truth: `packages/examples/checkout.actor.test.ts`
+- Runnable source of truth: `packages/examples/checkout.test.ts`
 - Entity registry, full machine, page→slice map: see `resources/example.mdx`
 
 Before writing, read both files. The registry is law: every narrative page uses
@@ -61,7 +61,7 @@ only IDs from it.
    its own `definePart<typeof spec>(fn)` file, wire them with `withParts(spec,
 parts)` (or `use(m, part)` inside a hand-written `setup`). This makes a long
    state machine readable file by file and threads the same running example —
-   no new IDs. See the Composition page and `packages/sugar/tests/parts.test.ts`.
+   no new IDs. See the Composition page and `packages/sugar/src/parts.test.ts`.
 
 ## Steps
 
@@ -76,7 +76,7 @@ left off and hand off to the next.
 ### 2. Write or edit
 
 Follow the expansion contract. Use only canonical IDs. Mirror the canonical
-machine structure from `checkout.actor.test.ts` — handler shapes, `get()` /
+machine structure from `checkout.test.ts` — handler shapes, `get()` /
 `set()` calls, effect wiring.
 
 ### 3. Run automated gates
@@ -105,7 +105,7 @@ violations. Re-run the failed pass.
 
 - Run `vp check` (format, lint, type).
 - Run `vp test` (canonical example runs).
-- If you changed `packages/examples/checkout.actor.test.ts`, update
+- If you changed `packages/examples/checkout.test.ts`, update
   `resources/example.mdx` to match, and re-run examples tests.
 - Record the change with a bump file (`add-change` skill) if it affects
   publishable packages.

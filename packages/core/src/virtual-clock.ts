@@ -1,5 +1,5 @@
-import type { Clock } from "./clock.ts";
 import { trackAbort, clearAbort, type Abortable } from "./abort-tracker.ts";
+import type { ClockIntervalOptions, ClockTimerOptions } from "./clock.ts";
 
 /**
  * Safety net for `advance()`: a timer callback that synchronously re-arms a
@@ -7,7 +7,7 @@ import { trackAbort, clearAbort, type Abortable } from "./abort-tracker.ts";
  * loop spinning forever. The bound therefore counts *consecutive* firings at
  * the same deadline — legitimate schedules (timers/intervals with distinct,
  * ever-advancing deadlines) fire in full, while a pathological same-deadline
- * re-arm chain is cut off so `advance()` can return.
+ * re-arm chain is cut off so `advance()` can return
  */
 const MAX_ADVANCE_ITERATIONS = 1_000_000;
 
@@ -23,174 +23,194 @@ interface IntervalEntry extends Abortable {
   cb: () => void;
 }
 
-export class VirtualClock implements Clock {
-  #now = 0;
-  #timers = new Map<number, TimerEntry>();
-  #intervals = new Map<number, IntervalEntry>();
-  #nextId = 1;
-  #drains = new Set<() => void>();
+export interface VirtualClock {
+  now(): number;
+  setTimeout(ms: number, options: ClockTimerOptions): number;
+  clearTimeout(id: number): void;
+  setInterval(ms: number, options: ClockIntervalOptions): number;
+  clearInterval(id: number): void;
+  advance(ms: number): void;
+  hasPending(): boolean;
+  pendingTimers(): Array<{ id: number; deadline: number; ms: number; eventName?: string }>;
+  setDrain(fn: () => void): void;
+}
 
-  now(): number {
-    return this.#now;
-  }
+export function VirtualClock(): VirtualClock {
+  let now = 0;
+  const timers = new Map<number, TimerEntry>();
+  const intervals = new Map<number, IntervalEntry>();
+  let nextId = 1;
+  const drains = new Set<() => void>();
 
   /**
-   * Delay normalization: NaN and ±Infinity throw (programmer error); negative
-   * and 0 clamp to 0 for timeouts like the platform, to a 1ms floor for
-   * intervals (a 0ms interval would spin the synchronous advance loop
-   * forever). Finite positive values schedule at their real deadline.
+   * Precondition guard for programmer errors. NaN and infinite delays are
+   * unreachable-by-design inputs (an assert-style bad state), so they stop the
+   * machine instead of flowing through as Either values.
    */
-  #delay(ms: number, method: string, interval: boolean): number {
-    if (!Number.isFinite(ms)) {
-      throw new RangeError(`[VirtualClock] invalid ${method} ms value: ${ms}`);
+  function isFiniteDelay(delay: number, options: { method: string }): true {
+    if (!Number.isFinite(delay)) {
+      throw new RangeError(`[VirtualClock] invalid ${options.method} ms value: ${delay}`);
     }
-    return ms <= 0 ? (interval ? 1 : 0) : ms;
+    return true;
   }
 
-  setTimeout(
-    ms: number,
-    cb: () => void,
-    options?: { signal?: AbortSignal; eventName?: string },
-  ): number {
-    const signal = options?.signal;
-    if (signal?.aborted) return -1;
-    const id = this.#nextId++;
-    const onAbort = trackAbort(signal, id, this.#timers);
-    this.#timers.set(id, {
-      deadline: this.#now + this.#delay(ms, "setTimeout", false),
-      cb,
-      signal,
-      onAbort,
-      eventName: options?.eventName,
-    });
-    return id;
+  function normalizeDelay(delay: number, options: { method: string; interval: boolean }): number {
+    isFiniteDelay(delay, { method: options.method });
+    /**
+     * Negative and zero values clamp like the platform: to 0 for timeouts, to
+     * a 1ms floor for intervals (a 0ms interval would spin the synchronous
+     * advance loop forever). Finite positive values schedule as requested.
+     */
+    return delay <= 0 ? (options.interval ? 1 : 0) : delay;
   }
 
-  clearTimeout(id: number): void {
-    const timer = this.#timers.get(id);
-    if (timer) {
-      clearAbort(timer);
-      this.#timers.delete(id);
-    }
-  }
-
-  setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    const signal = options?.signal;
-    if (signal?.aborted) return -1;
-    const id = this.#nextId++;
-    const onAbort = trackAbort(signal, id, this.#intervals);
-    const d = this.#delay(ms, "setInterval", true);
-    this.#intervals.set(id, {
-      ms: d,
-      next: this.#now + d,
-      cb,
-      signal,
-      onAbort,
-    });
-    return id;
-  }
-
-  clearInterval(id: number): void {
-    const interval = this.#intervals.get(id);
-    if (interval) {
-      clearAbort(interval);
-      this.#intervals.delete(id);
-    }
-  }
-
-  #findEarliestDeadline(target: number): number | null {
+  function findEarliestDeadline(target: number): number | undefined {
     let earliest = target;
     let found = false;
-    for (const t of this.#timers.values()) {
-      if (t.deadline <= target && t.deadline <= earliest) {
-        earliest = t.deadline;
+    for (const timer of timers.values()) {
+      if (timer.deadline <= target && timer.deadline <= earliest) {
+        earliest = timer.deadline;
         found = true;
       }
     }
-    for (const t of this.#intervals.values()) {
-      if (t.next <= target && t.next <= earliest) {
-        earliest = t.next;
+    for (const interval of intervals.values()) {
+      if (interval.next <= target && interval.next <= earliest) {
+        earliest = interval.next;
         found = true;
       }
     }
-    return found ? earliest : null;
+    return found ? earliest : undefined;
   }
 
-  #fireTimersAt(deadline: number): void {
-    const ids: number[] = [];
-    for (const [id, t] of this.#timers) {
-      if (t.deadline === deadline) ids.push(id);
+  function fireTimersAt(deadline: number): void {
+    const dueIds: number[] = [];
+    for (const [timerId, timer] of timers) {
+      if (timer.deadline === deadline) dueIds.push(timerId);
     }
-    for (const id of ids) {
-      const timer = this.#timers.get(id);
+    for (const timerId of dueIds) {
+      const timer = timers.get(timerId);
       if (timer) {
         clearAbort(timer);
-        this.#timers.delete(id);
+        timers.delete(timerId);
         timer.cb();
       }
     }
   }
 
-  #fireIntervalsAt(deadline: number): void {
-    const ids: number[] = [];
-    for (const [id, t] of this.#intervals) {
-      if (t.next === deadline) ids.push(id);
+  function fireIntervalsAt(deadline: number): void {
+    const dueIds: number[] = [];
+    for (const [intervalId, interval] of intervals) {
+      if (interval.next === deadline) dueIds.push(intervalId);
     }
-    for (const id of ids) {
-      const interval = this.#intervals.get(id);
+    for (const intervalId of dueIds) {
+      const interval = intervals.get(intervalId);
       if (interval) {
         interval.cb();
-        if (this.#intervals.has(id)) {
-          interval.next = this.#now + interval.ms;
+        if (intervals.has(intervalId)) {
+          interval.next = now + interval.ms;
         }
       }
     }
   }
 
-  advance(ms: number): void {
-    if (!Number.isFinite(ms)) {
-      throw new RangeError(`[VirtualClock] invalid advance ms value: ${ms}`);
-    }
-    const target = this.#now + Math.max(0, ms);
+  return {
+    now(): number {
+      return now;
+    },
 
-    let lastDeadline = -1;
-    let sameDeadlineIterations = 0;
-    while (true) {
-      const deadline = this.#findEarliestDeadline(target);
-      if (deadline === null) break;
-      if (deadline === lastDeadline) {
-        if (++sameDeadlineIterations >= MAX_ADVANCE_ITERATIONS) break;
-      } else {
-        sameDeadlineIterations = 0;
-        lastDeadline = deadline;
+    setTimeout(delay: number, { signal, cb, eventName }: ClockTimerOptions): number {
+      if (signal?.aborted) return -1;
+      const timerId = nextId++;
+      const onAbort = trackAbort(signal, { timerId, entries: timers });
+      timers.set(timerId, {
+        deadline: now + normalizeDelay(delay, { method: "setTimeout", interval: false }),
+        cb,
+        signal,
+        onAbort,
+        eventName,
+      });
+      return timerId;
+    },
+
+    clearTimeout(timerId: number): void {
+      const timer = timers.get(timerId);
+      if (timer) {
+        clearAbort(timer);
+        timers.delete(timerId);
       }
-      this.#now = deadline;
-      this.#fireTimersAt(deadline);
-      this.#fireIntervalsAt(deadline);
-    }
+    },
 
-    this.#now = target;
-    for (const drain of this.#drains) drain();
-  }
+    setInterval(delay: number, { signal, cb }: ClockIntervalOptions): number {
+      if (signal?.aborted) return -1;
+      const intervalId = nextId++;
+      const onAbort = trackAbort(signal, { timerId: intervalId, entries: intervals });
+      const normalized = normalizeDelay(delay, { method: "setInterval", interval: true });
+      intervals.set(intervalId, {
+        ms: normalized,
+        next: now + normalized,
+        cb,
+        signal,
+        onAbort,
+      });
+      return intervalId;
+    },
 
-  hasPending(): boolean {
-    return this.#timers.size > 0 || this.#intervals.size > 0;
-  }
+    clearInterval(intervalId: number): void {
+      const interval = intervals.get(intervalId);
+      if (interval) {
+        clearAbort(interval);
+        intervals.delete(intervalId);
+      }
+    },
 
-  pendingTimers(): Array<{ id: number; deadline: number; ms: number; eventName?: string }> {
-    const result: Array<{ id: number; deadline: number; ms: number; eventName?: string }> = [];
-    for (const [id, t] of this.#timers) {
-      result.push({ id, deadline: t.deadline, ms: t.deadline - this.#now, eventName: t.eventName });
-    }
-    return result;
-  }
+    advance(delay: number): void {
+      isFiniteDelay(delay, { method: "advance" });
+      const target = now + Math.max(0, delay);
 
-  /**
-   * Register a post-advance drain callback. Multiple actors can share one
-   * `VirtualClock`; every registered drain runs (not just the last one), so
-   * each actor is flushed regardless of construction order.
-   */
-  setDrain(fn: () => void): void {
-    this.#drains.add(fn);
-  }
+      let lastDeadline = -1;
+      let sameDeadlineIterations = 0;
+      while (true) {
+        const deadline = findEarliestDeadline(target);
+        if (deadline === undefined) break;
+        if (deadline === lastDeadline) {
+          if (++sameDeadlineIterations >= MAX_ADVANCE_ITERATIONS) break;
+        } else {
+          sameDeadlineIterations = 0;
+          lastDeadline = deadline;
+        }
+        now = deadline;
+        fireTimersAt(deadline);
+        fireIntervalsAt(deadline);
+      }
+
+      now = target;
+      for (const drain of drains) drain();
+    },
+
+    hasPending(): boolean {
+      return timers.size > 0 || intervals.size > 0;
+    },
+
+    pendingTimers(): Array<{ id: number; deadline: number; ms: number; eventName?: string }> {
+      const result: Array<{ id: number; deadline: number; ms: number; eventName?: string }> = [];
+      for (const [timerId, timer] of timers) {
+        result.push({
+          id: timerId,
+          deadline: timer.deadline,
+          ms: timer.deadline - now,
+          eventName: timer.eventName,
+        });
+      }
+      return result;
+    },
+
+    /**
+     * Register a post-advance drain callback. Multiple actors can share one
+     * virtual clock, every registered drain runs (not just the last one), so
+     * each actor is flushed regardless of construction order
+     */
+    setDrain(fn: () => void): void {
+      drains.add(fn);
+    },
+  };
 }

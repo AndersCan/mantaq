@@ -1,9 +1,10 @@
-import type { AnyStateRef } from "./state.ts";
-import type { InternalEvent } from "./event.ts";
-import type { Clock } from "./clock.ts";
 import type { LastKnownState } from "./actor-types.ts";
 import type { EffectEntry } from "./builder.ts";
+import type { Clock } from "./clock.ts";
 import type { Context } from "./context.ts";
+import type { InternalEvent } from "./index.ts";
+import { isThenable } from "./is-thenable.ts";
+import type { AnyStateRef } from "./state.ts";
 import { Either } from "@mantaq/utils";
 
 export interface EffectRunnerOptions<ActorContext> {
@@ -52,22 +53,19 @@ export function runEffects<ActorContext>(
       break;
     }
     ran.push(name);
-    // A native Promise or any thenable (custom implementation, e.g. a library
-    // deferred) is an async effect: it must be awaited by settled(), have its
-    // rejection handled (no unhandled rejection), and route to onError.
-    // `Promise.resolve` adopts a custom thenable without re-wrapping a native
-    // Promise.
-    const isThenable =
-      out instanceof Promise ||
-      (typeof out === "object" &&
-        out !== null &&
-        typeof (out as { then?: unknown }).then === "function");
-    if (isThenable) {
-      // `Promise.resolve` adopts a custom thenable without re-wrapping a native
-      // Promise. The rejection handler routes to onError (and is swallowed when
-      // the effect was aborted), so a rejecting thenable can't become an
-      // unhandled rejection.
-      const effectPromise = Promise.resolve(out as Promise<unknown>).then(
+    /**
+     * A thenable output marks an async effect: it must be awaited by
+     * settled(), have its rejection handled (no unhandled rejection), and be
+     * routed to onError.
+     */
+    if (isThenable(out)) {
+      /**
+       * `Promise.resolve` adopts a custom thenable without re-wrapping a
+       * native Promise. The rejection handler routes to onError (and is
+       * swallowed when the effect was aborted), so a rejecting thenable can't
+       * become an unhandled rejection.
+       */
+      const effectPromise = Promise.resolve(out).then(
         () => undefined,
         (error: unknown) => {
           if (options.abort.signal.aborted) return;

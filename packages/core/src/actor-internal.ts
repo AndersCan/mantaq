@@ -1,7 +1,7 @@
-import type { AnyStateRef } from "./state.ts";
-import type { AnyEventRef, InternalEvent } from "./event.ts";
-import type { Clock } from "./clock.ts";
 import type { ErrorInfo, TransitionInfo } from "./actor-types.ts";
+import type { Clock } from "./clock.ts";
+import type { InternalEvent } from "./index.ts";
+import type { AnyStateRef } from "./state.ts";
 
 export interface Snapshot<C = unknown> {
   path: string[];
@@ -12,17 +12,27 @@ export interface Snapshot<C = unknown> {
   error?: ErrorInfo;
 }
 
+export type SubscriberEventName = "change" | "done" | "transition" | "error" | "output";
+
+export type SubscriberHandler<C, E extends SubscriberEventName> = E extends "change"
+  ? (snapshot: Snapshot<C>, prev: Snapshot<C>) => void
+  : E extends "done"
+    ? () => void
+    : E extends "transition"
+      ? (info: TransitionInfo) => void
+      : E extends "error"
+        ? (info: ErrorInfo) => void
+        : E extends "output"
+          ? (event: InternalEvent) => void
+          : never;
+
 export interface AnyActor<C = Record<string, unknown>> {
   state: AnyStateRef;
   clock: Clock;
   regions: Record<string, AnyActor>;
-  send(event: AnyEventRef | InternalEvent): void;
+  send(event: InternalEvent): void;
   snapshot(): Snapshot<C>;
-  on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
-  on(event: "done", fn: () => void): () => void;
-  on(event: "transition", fn: (info: TransitionInfo) => void): () => void;
-  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
-  on(event: "output", fn: (event: InternalEvent) => void): () => void;
+  on<E extends SubscriberEventName>(event: E, options: { fn: SubscriberHandler<C, E> }): () => void;
   recover(target: { state: AnyStateRef; context: C }): void;
   settled(): Promise<void>;
   context?: C;

@@ -1,13 +1,12 @@
-import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
-import type { AnyStateRef, StateRef } from "./state.ts";
 import type { Clock } from "./clock.ts";
 import type { Context } from "./context.ts";
+import type { EventRef, CreatedOfEvent, InternalEvent } from "./index.ts";
+import type { AnyStateRef, StateRef } from "./state.ts";
 
 export type { Snapshot } from "./actor-internal.ts";
+export type { Context };
 
-export type { Context } from "./context.ts";
-
-export type CreatedOf<E extends AnyEventRef> =
+export type CreatedOf<E extends EventRef<string, object | void>> =
   E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never;
 
 export type NonFinalStateRef<States extends AnyStateRef[]> = Extract<
@@ -26,7 +25,7 @@ export interface EffectInput<ActorContext, Payload = unknown> {
 
 export type EffectFn<ActorContext, Payload = unknown> = (
   input: EffectInput<ActorContext, Payload>,
-) => void | Promise<void>;
+) => void | Promise<void> | { then(onFulfilled: unknown, onRejected: unknown): unknown };
 export type ErrorReason =
   | "transition"
   | "effect"

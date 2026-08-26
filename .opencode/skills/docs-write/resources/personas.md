@@ -66,7 +66,7 @@ that exist, exports that match docs, no phantom features.
 **Violations**
 
 - Import of a symbol not exported by the package (check `packages/*/src/index.ts`).
-- API usage that differs from the canonical `checkout.actor.test.ts`.
+- API usage that differs from the canonical `checkout.test.ts`.
 - Claim about behavior not backed by the test suite.
 - IDs that exist in the snippet but not in the canonical registry.
 

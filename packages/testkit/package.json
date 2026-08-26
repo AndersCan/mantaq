@@ -1,0 +1,43 @@
+{
+  "name": "@mantaq/test",
+  "version": "0.1.2",
+  "description": "Test harness and assertion utilities for verifying mantaq actor behavior.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/testkit"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build",
+    "coverage": "vp test run --coverage",
+    "prepack": "vp run build"
+  },
+  "dependencies": {
+    "@mantaq/core": "workspace:*",
+    "@mantaq/traversal": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@typescript/native-preview": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

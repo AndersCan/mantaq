@@ -1,63 +1,92 @@
-import type { HistoryEntry, StateVisit, TransitionRecord, EffectRecord } from "./types.ts";
+import type {
+  EffectRecord,
+  HistoryEntry,
+  SendRecord,
+  StateVisit,
+  TransitionRecord,
+} from "./types.ts";
 
-const entriesMap = new WeakMap<History, HistoryEntry[]>();
-
-function entriesOfType(
-  entries: readonly HistoryEntry[],
-  type: HistoryEntry["type"],
-): HistoryEntry["data"][] {
-  return entries.filter((e) => e.type === type).map((e) => e.data);
+export interface History {
+  append(entry: HistoryEntry): void;
+  entries(): readonly HistoryEntry[];
+  stateVisits(): StateVisit[];
+  transitions(): TransitionRecord[];
+  effects(): EffectRecord[];
+  sends(): SendRecord[];
+  visitedStates(): Set<string>;
+  firedTransitions(): Set<string>;
+  reset(): void;
 }
 
-export class History {
-  constructor() {
-    entriesMap.set(this, []);
+function entriesOfType<Type extends HistoryEntry["type"]>(
+  recordedEntries: readonly HistoryEntry[],
+  options: { type: Type },
+): Extract<HistoryEntry, { type: Type }>["data"][] {
+  return recordedEntries
+    .filter((entry): entry is Extract<HistoryEntry, { type: Type }> => entry.type === options.type)
+    .map((entry) => entry.data);
+}
+
+/**
+ * History records the runtime trace of an instrumented actor. A closure over
+ * the entry list keeps the recorder mutable without exposing the raw array.
+ */
+export function createHistory(): History {
+  const recordedEntries: HistoryEntry[] = [];
+
+  function append(entry: HistoryEntry): void {
+    recordedEntries.push(entry);
   }
 
-  append(entry: HistoryEntry): void {
-    entriesMap.get(this)!.push(entry);
+  function entries(): readonly HistoryEntry[] {
+    return recordedEntries;
   }
 
-  entries(): readonly HistoryEntry[] {
-    return entriesMap.get(this)!;
+  function stateVisits(): StateVisit[] {
+    return entriesOfType(recordedEntries, { type: "state_visit" });
   }
 
-  stateVisits(): StateVisit[] {
-    return entriesOfType(entriesMap.get(this)!, "state_visit") as StateVisit[];
+  function transitions(): TransitionRecord[] {
+    return entriesOfType(recordedEntries, { type: "transition" });
   }
 
-  transitions(): TransitionRecord[] {
-    return entriesOfType(entriesMap.get(this)!, "transition") as TransitionRecord[];
+  function effects(): EffectRecord[] {
+    return entriesOfType(recordedEntries, { type: "effect" });
   }
 
-  effects(): EffectRecord[] {
-    return entriesOfType(entriesMap.get(this)!, "effect") as EffectRecord[];
+  function sends(): SendRecord[] {
+    return entriesOfType(recordedEntries, { type: "send" });
   }
 
-  sends(): Array<{ event: string }> {
-    return entriesOfType(entriesMap.get(this)!, "send") as Array<{
-      event: string;
-    }>;
-  }
-
-  visitedStates(): Set<string> {
-    const result = new Set<string>();
-    for (const visit of this.stateVisits()) {
-      result.add(visit.stateName);
+  function visitedStates(): Set<string> {
+    const visited = new Set<string>();
+    for (const visit of stateVisits()) {
+      visited.add(visit.stateName);
     }
-    return result;
+    return visited;
   }
 
-  firedTransitions(): Set<string> {
-    const result = new Set<string>();
-    for (const t of this.transitions()) {
-      result.add(`${t.from}:${t.event}`);
+  function firedTransitions(): Set<string> {
+    const fired = new Set<string>();
+    for (const record of transitions()) {
+      fired.add(`${record.from}:${record.event}`);
     }
-    return result;
+    return fired;
   }
 
-  reset(): void {
-    const arr = entriesMap.get(this)!;
-    arr.length = 0;
+  function reset(): void {
+    recordedEntries.length = 0;
   }
+
+  return {
+    append,
+    entries,
+    stateVisits,
+    transitions,
+    effects,
+    sends,
+    visitedStates,
+    firedTransitions,
+    reset,
+  };
 }

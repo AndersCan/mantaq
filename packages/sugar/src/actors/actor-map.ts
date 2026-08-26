@@ -1,99 +1,123 @@
-import type { AnyActor, Snapshot } from "@mantaq/core";
 import type { SendableEvent, SendableMap } from "../transitions/broadcast.ts";
+import type { Snapshot } from "@mantaq/core";
 
-export interface ActorMapOptions {
-  /**
-   * When true, a child that reaches a final state (or dies into `__error`)
-   * is removed from the map automatically. Without it, completed children
-   * linger until explicitly `kill`ed.
-   */
-  autoReap?: boolean;
+/**
+ * Minimal actor surface the map needs. Real actors satisfy this
+ * structurally — tests can substitute tiny fakes.
+ */
+export interface ActorMapChild {
+  snapshot(): Snapshot;
+  on(event: "done", listener: { fn: () => void }): () => void;
+  send(...events: [event: SendableEvent]): void;
+  dispose(): void;
 }
 
 /**
  * Keyed registry of one actor type. `spawn(key)` builds a fresh instance via
  * the factory — same actor shape, keyed by id. The factory receives the key.
+ *
+ * With autoReap enabled, a child that reaches a final state (or dies into
+ * `__error`) is removed from the map automatically. Without it, completed
+ * children linger until explicitly killed.
  */
-export class ActorMap implements SendableMap<SendableEvent> {
-  #actors = new Map<string, AnyActor>();
-  #reapers = new Map<string, () => void>();
-  #factory: (id: string) => AnyActor;
-  #autoReap: boolean;
+export interface ActorMap extends SendableMap<SendableEvent> {
+  spawn(key: string): void;
+  kill(key: string): void;
+  dispose(): void;
+  ensure(key: string): void;
+  has(key: string): boolean;
+  keys(): string[];
+  snapshot(key: string): Snapshot | undefined;
+  readonly size: number;
+}
 
-  constructor(factory: (id: string) => AnyActor, options: ActorMapOptions = {}) {
-    this.#factory = factory;
-    this.#autoReap = options.autoReap === true;
-  }
+export function createActorMap(
+  factory: (id: string) => ActorMapChild,
+  { autoReap }: { autoReap?: boolean } = {},
+): ActorMap {
+  const actors = new Map<string, ActorMapChild>();
+  const reapers = new Map<string, () => void>();
+  const reap = autoReap === true;
 
-  spawn(key: string): void {
-    if (this.#actors.has(key)) {
-      this.kill(key);
+  function spawn(key: string): void {
+    if (actors.has(key)) {
+      kill(key);
     }
-    const child = this.#factory(key);
-    this.#actors.set(key, child);
-    if (this.#autoReap) {
-      if (child.snapshot().done) {
-        this.#actors.delete(key);
-        void Promise.resolve().then(() => child.dispose());
-        return;
-      }
-      const off = child.on("done", () => {
+    const child = factory(key);
+    actors.set(key, child);
+    if (!reap) return;
+    if (child.snapshot().done) {
+      actors.delete(key);
+      void Promise.resolve().then(() => child.dispose());
+      return;
+    }
+    const off = child.on("done", {
+      fn: () => {
         off();
-        if (this.#actors.get(key) === child) this.#actors.delete(key);
-        this.#reapers.delete(key);
+        if (actors.get(key) === child) actors.delete(key);
+        reapers.delete(key);
         void Promise.resolve().then(() => child.dispose());
-      });
-      this.#reapers.set(key, off);
-    }
+      },
+    });
+    reapers.set(key, off);
   }
 
-  send(key: string, event: SendableEvent): void {
-    this.#actors.get(key)?.send(event);
-  }
-
-  kill(key: string): void {
-    const actor = this.#actors.get(key);
-    actor?.dispose();
-    this.#reapers.get(key)?.();
-    this.#reapers.delete(key);
-    this.#actors.delete(key);
+  function kill(key: string): void {
+    actors.get(key)?.dispose();
+    reapers.get(key)?.();
+    reapers.delete(key);
+    actors.delete(key);
   }
 
   /**
    * Tear down the map and every live child. Without this, dropping an
-   * `ActorMap` (e.g. when its owning actor is disposed) leaks every child
+   * actor map (e.g. when its owning actor is disposed) leaks every child
    * actor whose effects/timers/reapers keep running. Idempotent.
    */
-  dispose(): void {
-    for (const child of this.#actors.values()) {
+  function dispose(): void {
+    for (const child of actors.values()) {
       child.dispose();
     }
-    for (const off of this.#reapers.values()) {
+    for (const off of reapers.values()) {
       off();
     }
-    this.#reapers.clear();
-    this.#actors.clear();
+    reapers.clear();
+    actors.clear();
   }
 
-  get size(): number {
-    return this.#actors.size;
-  }
-
-  has(key: string): boolean {
-    return this.#actors.has(key);
-  }
-
-  keys(): string[] {
-    return [...this.#actors.keys()];
-  }
-
-  ensure(key: string): void {
-    if (!this.#actors.has(key)) {
-      this.spawn(key);
+  function ensure(key: string): void {
+    if (!actors.has(key)) {
+      spawn(key);
     }
   }
 
-  snapshot(key: string): Snapshot | undefined {
-    return this.#actors.get(key)?.snapshot();
+  function has(key: string): boolean {
+    return actors.has(key);
   }
+
+  function keys(): string[] {
+    return [...actors.keys()];
+  }
+
+  function snapshotOf(key: string): Snapshot | undefined {
+    return actors.get(key)?.snapshot();
+  }
+
+  return {
+    spawn,
+    kill,
+    dispose,
+    ensure,
+    has,
+    keys,
+    snapshot: snapshotOf,
+    send(key, ...events) {
+      for (const event of events) {
+        actors.get(key)?.send(event);
+      }
+    },
+    get size(): number {
+      return actors.size;
+    },
+  };
 }

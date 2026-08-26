@@ -30,7 +30,7 @@ export default defineConfig({
           "packages/core/src/**",
           "packages/sugar/src/**",
           "packages/traversal/src/**",
-          "packages/test/src/**",
+          "packages/testkit/src/**",
         ],
         rules: {
           "mantaq/no-try-catch": "error",
@@ -55,7 +55,26 @@ export default defineConfig({
         },
       },
       {
-        files: ["packages/test/src/**"],
+        // Directed tests simulate programmer-bug explosions inside handlers to
+        // prove the machine contains them; the throw lives in a guard-shaped
+        // isErrorBomb helper in each of these files.
+        files: [
+          "packages/core/src/actor-error.property.test.ts",
+          "packages/core/src/actor.error.test.ts",
+          "packages/core/src/core.mutation.test.ts",
+          "packages/core/src/infrastructure.mutation.test.ts",
+          "packages/core/src/recover.test.ts",
+          "packages/core/src/snapshot.property.test.ts",
+          "packages/core/src/unit.test.ts",
+          "packages/sugar/src/effects/promise.test.ts",
+          "packages/traversal/src/graph.test.ts",
+        ],
+        rules: {
+          "mantaq/no-throw": "off",
+        },
+      },
+      {
+        files: ["packages/testkit/src/**"],
         // assertion APIs must throw to fail the test — that is their error flow
         rules: {
           "mantaq/no-throw": "off",
@@ -139,6 +158,26 @@ export default defineConfig({
         },
       },
       {
+        // Colocated sugar tests keep the old packages/sugar/tests semantics:
+        // @mantaq/core and @mantaq/pbt allowed, everything else banned.
+        files: ["packages/sugar/src/**/*.test.ts"],
+        rules: {
+          "eslint/no-restricted-imports": [
+            "error",
+            {
+              paths: [
+                { name: "@mantaq/sugar", message: "@mantaq/sugar imports only @mantaq/core" },
+                {
+                  name: "@mantaq/traversal",
+                  message: "@mantaq/sugar may not import @mantaq/traversal",
+                },
+                { name: "@mantaq/test", message: "@mantaq/sugar may not import @mantaq/test" },
+              ],
+            },
+          ],
+        },
+      },
+      {
         files: ["packages/traversal/**"],
         rules: {
           "eslint/no-restricted-imports": [
@@ -161,7 +200,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["packages/test/**"],
+        files: ["packages/testkit/**"],
         rules: {
           "eslint/no-restricted-imports": [
             "error",
@@ -195,8 +234,23 @@ export default defineConfig({
         },
       },
       {
-        files: ["packages/core/tests/**"],
+        // functions-first: stateful resources (Actor, VirtualClock) became
+        // factory functions whose helpers share closure state. The whole
+        // resource is intentionally one function; per-function line limits
+        // do not apply to it.
+        files: ["packages/core/src/actor.ts", "packages/core/src/virtual-clock.ts"],
         rules: {
+          "eslint/max-lines-per-function": "off",
+        },
+      },
+      {
+        // Colocated tests live beside their source now. They keep the old
+        // packages/core/tests semantics: @mantaq/pbt allowed (property tests),
+        // no-console allowed (mutation fixtures observe output), structure
+        // limits off.
+        files: ["packages/core/src/**/*.test.ts"],
+        rules: {
+          "mantaq/no-console": "off",
           "eslint/no-restricted-imports": [
             "error",
             {
@@ -213,16 +267,17 @@ export default defineConfig({
         },
       },
       {
-        files: ["packages/sugar/tests/**"],
+        files: ["packages/core/tests/**"],
         rules: {
           "eslint/no-restricted-imports": [
             "error",
             {
               paths: [
-                { name: "@mantaq/sugar", message: "@mantaq/sugar imports only @mantaq/core" },
+                { name: "@mantaq/core", message: "@mantaq/core may not import itself" },
+                { name: "@mantaq/sugar", message: "@mantaq/core may not import @mantaq/sugar" },
                 {
                   name: "@mantaq/traversal",
-                  message: "@mantaq/sugar may not import @mantaq/traversal",
+                  message: "@mantaq/core may not import @mantaq/traversal",
                 },
               ],
             },

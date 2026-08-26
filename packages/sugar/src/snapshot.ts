@@ -1,11 +1,18 @@
 import type { Snapshot } from "@mantaq/core";
 
-export function isIn(snapshot: Snapshot, stateRefName: string): boolean {
-  if (snapshot.path[0] === stateRefName) return true;
-  for (const region of Object.values(snapshot.regions)) {
-    if (isIn(region, stateRefName)) return true;
+function isInState(options: { snapshot: Snapshot; stateName: string }): boolean {
+  if (options.snapshot.path[0] === options.stateName) return true;
+  for (const region of Object.values(options.snapshot.regions)) {
+    if (isInState({ snapshot: region, stateName: options.stateName })) return true;
   }
   return false;
+}
+
+/**
+ * True when any of the named states is active anywhere in the snapshot tree.
+ */
+export function isIn(snapshot: Snapshot, ...stateNames: [stateName: string]): boolean {
+  return stateNames.some((stateName) => isInState({ snapshot, stateName }));
 }
 
 export function activeLeaves(snapshot: Snapshot): string[] {

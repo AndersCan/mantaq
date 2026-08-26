@@ -222,7 +222,7 @@ RULES:
 - Before deleting: grep imports. Confirm unused.
 - If touching public API: check callers across packages
 - Found issue but not fixing this task? Leave '// FIXME: <specific desc>' at location
-- New sugar helper? Add to packages/sugar/src/, export from index.ts, add test in packages/sugar/tests/
+- New sugar helper? Add to packages/sugar/src/, export from index.ts, add test beside it in packages/sugar/src/
 
 CHECK before commit:
 - vp check --fix

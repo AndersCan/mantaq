@@ -1,7 +1,9 @@
-import type { AnyStateRef, StateRef } from "./state.ts";
-import type { AnyEventRef, EventRef, InternalEvent, CreatedOfEvent } from "./event.ts";
 import type { AnyActor } from "./actor-internal.ts";
 import type { Context, EffectFn, TransitionResult } from "./actor-types.ts";
+import type { AnyEventRef, EventRef, CreatedOfEvent } from "./index.ts";
+import type { RuntimeTransitionHandler } from "./parse-handler.ts";
+import { parseEffectFn, parseTransitionHandler } from "./parse-handler.ts";
+import type { AnyStateRef, StateRef } from "./state.ts";
 
 export type EventTypeOf<E extends AnyEventRef> =
   E extends EventRef<infer Type, object | void> ? Type : never;
@@ -9,10 +11,10 @@ export type EventTypeOf<E extends AnyEventRef> =
 export type PayloadOf<S extends AnyStateRef> =
   S extends StateRef<infer _Name, infer Payload, infer _IsFinal> ? Payload : never;
 
-export type TransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
-  event: InternalEvent,
-  opts: { context: Context<ActorContext>; actor: AnyActor },
-) => TransitionResult<States[number], string>;
+export type TransitionHandler<
+  States extends readonly AnyStateRef[],
+  ActorContext,
+> = RuntimeTransitionHandler<States, ActorContext>;
 
 export interface EffectEntry<ActorContext> {
   name: string;
@@ -24,62 +26,83 @@ export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> 
   effects: Record<string, Array<EffectEntry<ActorContext>>>;
 }
 
-export class ActorBuilder<
+type HandlerFn<
+  States extends readonly AnyStateRef[],
+  InputsInternal extends readonly AnyEventRef[],
+  Outputs extends readonly AnyEventRef[],
+  ActorContext,
+  E extends AnyEventRef,
+> = (
+  event: E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never,
+  opts: { context: Context<ActorContext>; actor: AnyActor<ActorContext> },
+) => TransitionResult<States[number], EventTypeOf<Outputs[number]>>;
+
+export interface ActorBuilder<
   States extends readonly AnyStateRef[],
   Inputs extends readonly AnyEventRef[],
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext,
 > {
-  #transitions: BuiltMaps<States, ActorContext>["transitions"] = {};
-  #effects: BuiltMaps<States, ActorContext>["effects"] = {};
-
   on<S extends States[number], E extends Inputs[number] | Internal[number]>(
     stateRef: S,
-    eventRef: E,
-    fn: (
-      event: E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never,
-      opts: { context: Context<ActorContext>; actor: AnyActor },
-    ) => TransitionResult<States[number], EventTypeOf<Outputs[number]>>,
-  ): this {
-    const sName = stateRef.name;
-    const eType = eventRef.type;
-    (this.#transitions[sName] ??= {})[eType] = fn as (
-      event: unknown,
-      opts: { context: Context<ActorContext>; actor: AnyActor },
-    ) => TransitionResult<States[number], string>;
-    return this;
-  }
-
-  onAny<E extends Inputs[number] | Internal[number]>(
-    eventRef: E,
-    fn: (
-      event: E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never,
-      opts: { context: Context<ActorContext>; actor: AnyActor },
-    ) => TransitionResult<States[number], EventTypeOf<Outputs[number]>>,
-  ): this {
-    const eType = eventRef.type;
-    (this.#transitions["Any"] ??= {})[eType] = fn as (
-      event: unknown,
-      opts: { context: Context<ActorContext>; actor: AnyActor },
-    ) => TransitionResult<States[number], string>;
-    return this;
-  }
-
+    options: {
+      eventRef: E;
+      handler: HandlerFn<States, Inputs | Internal, Outputs, ActorContext, E>;
+    },
+  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
+  onAny<E extends Inputs[number] | Internal[number]>(options: {
+    eventRef: E;
+    handler: HandlerFn<States, Inputs | Internal, Outputs, ActorContext, E>;
+  }): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
   effect<S extends States[number]>(
     stateRef: S,
-    def: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
-  ): this {
-    (this.#effects[stateRef.name] ??= []).push({
-      name: def.name,
-      fn: def.fn as EffectFn<ActorContext>,
-    });
-    return this;
-  }
+    definition: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
+  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
+  /** @internal */
+  build(): BuiltMaps<States, ActorContext>;
+}
 
-  /** @internal */ build(): BuiltMaps<States, ActorContext> {
-    return { transitions: this.#transitions, effects: this.#effects };
-  }
+export function ActorBuilder<
+  States extends readonly AnyStateRef[],
+  Inputs extends readonly AnyEventRef[],
+  Internal extends readonly AnyEventRef[],
+  Outputs extends readonly AnyEventRef[],
+  ActorContext,
+>(): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
+  const transitions: BuiltMaps<States, ActorContext>["transitions"] = {};
+  const effects: BuiltMaps<States, ActorContext>["effects"] = {};
+
+  const self: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> = {
+    on(
+      stateRef,
+      { eventRef, handler },
+    ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
+      const stateName = stateRef.name;
+      const eventType = eventRef.type;
+      (transitions[stateName] ??= {})[eventType] = parseTransitionHandler(handler);
+      return self;
+    },
+
+    onAny(options): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
+      const eventType = options.eventRef.type;
+      (transitions["Any"] ??= {})[eventType] = parseTransitionHandler(options.handler);
+      return self;
+    },
+
+    effect(stateRef, { name, fn }) {
+      (effects[stateRef.name] ??= []).push({
+        name,
+        fn: parseEffectFn(fn),
+      });
+      return self;
+    },
+
+    build(): BuiltMaps<States, ActorContext> {
+      return { transitions, effects };
+    },
+  };
+  return self;
 }
 
 export type SetupFn<

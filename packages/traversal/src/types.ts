@@ -12,17 +12,16 @@ interface HandlerResult {
   emit?: Array<{ type?: string }>;
 }
 
-/** State definition — matches AnyActor.options.states element type */
-export type StateDef = { name: string; isFinal: boolean };
-
-/** Transition handler signature for graph introspection */
 export type TransitionHandler = (
   event: SyntheticEvent,
   options: { context: Context<Record<string, unknown>>; actor: AnyActor<unknown> },
 ) => HandlerResult | undefined;
 
 /** Map of state/Any → event → handler */
-export type TransitionDispatchMap = Record<string, Record<string, TransitionHandler | undefined>>;
+export type TransitionDispatchMap = Record<string, Record<string, TransitionHandler>>;
+
+/** State definition — matches AnyActor.options.states element type */
+export type StateDef = { name: string; isFinal: boolean };
 
 export interface GraphNode {
   id: string;
@@ -41,7 +40,7 @@ export interface GraphEdge {
   isInternal?: boolean;
   isUndetermined?: boolean;
   payload?: { action?: string };
-  contexts?: string[];
+  contexts: string[];
 }
 
 export interface ActorGraph {
@@ -64,7 +63,9 @@ export interface EffectRecord {
   effectName: string;
 }
 
+export type SendRecord = { event: string };
+
 export interface HistoryEntry {
   type: "state_visit" | "transition" | "effect" | "send";
-  data: StateVisit | TransitionRecord | EffectRecord | { event: string };
+  data: StateVisit | TransitionRecord | EffectRecord | SendRecord;
 }
