@@ -83,7 +83,7 @@ export interface ActorOptions<
   regions?: Record<string, AnyActor>;
 }
 
-export interface InternalActorOptions<
+interface InternalActorOptions<
   States extends readonly AnyStateRef[],
   Inputs extends readonly AnyEventRef[],
   Internal extends readonly AnyEventRef[],

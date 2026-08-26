@@ -1,6 +1,6 @@
 import type { InternalEvent } from "./index.ts";
 
-export type CancellableProcessEventFn = (event: InternalEvent) => boolean;
+type CancellableProcessEventFn = (event: InternalEvent) => boolean;
 
 export interface InternalQueue {
   readonly length: number;

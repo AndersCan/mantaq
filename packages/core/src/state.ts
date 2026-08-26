@@ -8,7 +8,7 @@ interface RegionOptions {
   initial: string;
   states: Record<string, AnyStateRef>;
 }
-export type RegionsOptions = Record<string, RegionOptions>;
+type RegionsOptions = Record<string, RegionOptions>;
 
 export interface StateRef<
   T extends string = string,
