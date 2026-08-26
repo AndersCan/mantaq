@@ -455,6 +455,12 @@ describe("Actor error paths", () => {
     expect(actor.snapshot().error).toBeUndefined();
     expect(actor.snapshot().path[0]).toBe("loading");
     expect(actor.context).toEqual({ n: 7 });
+    // The recovered context must be handed out by the copy-on-read snapshot API
+    // (issue #269): `recover` invalidates the cached snapshot clone
+    // (`#contextDirty = true`, `#deliveredContext = null`) before emitting, so a
+    // subscriber reading `snapshot().context` sees { n: 7 }, not the pre-error
+    // cached context.
+    expect(actor.snapshot().context).toEqual({ n: 7 });
     actor.send(tick.create());
     expect(ticks).toBe(1);
     expect(actor.snapshot().path[0]).toBe("idle");
