@@ -122,4 +122,24 @@ describe("withPromise", () => {
     await Promise.resolve();
     expect(emitted).toEqual([]);
   });
+
+  test("does not swallow a success-path throw as an error event (#268)", async () => {
+    const emitted: unknown[] = [];
+    const emit = (e: unknown) => emitted.push(e);
+    const signal = new AbortController().signal;
+
+    // The success callback throws — a real failure in the success path. With
+    // the original `.then(...).catch(...)` chain this throw was caught by the
+    // `.catch` and re-emitted as a spurious `error` event. The two-argument
+    // `then` leaves the success callback's throw uncaught (as it should be).
+    const result = withPromise(Promise.resolve(1), signal, emit, {
+      success: () => {
+        throw new Error("boom in success");
+      },
+      error: (err) => ({ type: "err", message: String(err) }),
+    });
+
+    await expect(result).rejects.toThrow("boom in success");
+    expect(emitted).toEqual([]);
+  });
 });
