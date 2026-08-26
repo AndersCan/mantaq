@@ -9,11 +9,16 @@ export function withPromise<T>(
     error: (err: unknown) => { type: string; payload?: unknown };
   },
 ): Promise<void> {
-  return promise
-    .then((data) => {
+  // Use the two-argument `then` so the rejection handler is bound ONLY to the
+  // original `promise`. With `.then(...).catch(...)` the `.catch` also swallows
+  // a throw from the success callback, mislabeling a success-path failure as a
+  // promise rejection (issue #268).
+  return promise.then(
+    (data) => {
       if (!signal.aborted) emit(events.success(data));
-    })
-    .catch((err) => {
+    },
+    (err) => {
       if (!signal.aborted) emit(events.error(err));
-    });
+    },
+  );
 }
