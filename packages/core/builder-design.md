@@ -113,7 +113,7 @@ Small steps, verify each.
 
 - Remove `transitions` from `ActorOptions` public type. Keep internal.
 - Remove `TransitionMap` export from `index.ts`. Internal only.
-- Update `packages/core/tests/smoke.test.ts` + `typecheck.test.ts` to use `setup`.
+- Update `packages/core/src/smoke.test.ts` + `typecheck.test.ts` to use `setup`.
 - Vision: one way to declare actor = builder.
 
 ### Step 6. Verify vision

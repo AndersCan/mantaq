@@ -1,3 +1,4 @@
+import { parseStateRefs } from "./parse-refs.ts";
 import { state, StateRef } from "@mantaq/core";
 
 interface StatesEntry {
@@ -21,5 +22,5 @@ export function states<const T extends StatesArg[]>(...entries: T): StatesRecord
     const ref = state(name)();
     result[name] = typeof entry === "object" && entry.final ? ref.final() : ref;
   }
-  return result as StatesRecord<T>;
+  return parseStateRefs<StatesRecord<T>>(result);
 }

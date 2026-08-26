@@ -2,7 +2,7 @@
 
 Proven recipes. Each pattern is self-contained. Full working versions live
 in the mantaq repo under `packages/examples/` (e.g.
-`checkout.actor.test.ts`).
+`checkout.test.ts`).
 
 ## Async Work → Effect + Internal Event
 

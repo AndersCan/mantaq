@@ -47,16 +47,22 @@ export type BuilderOf<S extends ActorSpec> = ActorBuilder<
   ContextOf<S>
 >;
 
-export type Fragment<S extends ActorSpec> = (m: BuilderOf<S>) => void;
+export type Fragment<S extends ActorSpec> = (builder: BuilderOf<S>) => void;
 
 export function definePart<S extends ActorSpec = never>(
-  fn: (m: BuilderOf<S>) => void,
+  part: (builder: BuilderOf<S>) => void,
 ): Fragment<S> {
-  return fn;
+  return part;
 }
 
-export function use<S extends ActorSpec>(m: BuilderOf<S>, part: Fragment<S>): void {
-  part(m);
+/** Apply one or more parts to a builder, in order. */
+export function use<S extends ActorSpec>(
+  builder: BuilderOf<S>,
+  ...parts: [Fragment<S>, ...Fragment<S>[]]
+): void {
+  for (const part of parts) {
+    part(builder);
+  }
 }
 
 export type Part<
@@ -65,7 +71,7 @@ export type Part<
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext,
-> = (m: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>) => void;
+> = (builder: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>) => void;
 
 type SpecValue<
   States extends readonly AnyStateRef[],
@@ -89,7 +95,7 @@ type SpecValue<
 /**
  * Construct the actor's static spec — states, inputs, internal/output events,
  * context, initial state, clock, regions and budget. State/event tuples and
- * the initial ref narrow to literals; the context stays mutable, so
+ * the initial ref narrow to literals while the context stays mutable, so
  * `definePart` handlers read and write it with no `as` casts.
  */
 export function actorSpec<
@@ -105,6 +111,10 @@ export function actorSpec<
   return spec;
 }
 
+/**
+ * Build an actor whose setup applies every given part in order. Pass parts
+ * as separate arguments — single part or many.
+ */
 export function withParts<
   const States extends readonly AnyStateRef[],
   const Inputs extends readonly AnyEventRef[],
@@ -113,19 +123,12 @@ export function withParts<
   ActorContext = Record<string, unknown>,
 >(
   base: Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup">,
-  parts:
-    | Part<States, Inputs, Internal, Outputs, ActorContext>
-    | readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
+  ...parts: Part<States, Inputs, Internal, Outputs, ActorContext>[]
 ) {
-  const list: readonly Part<States, Inputs, Internal, Outputs, ActorContext>[] = Array.isArray(
-    parts,
-  )
-    ? parts
-    : [parts];
-  return new Actor({
+  return Actor({
     ...base,
-    setup: (m) => {
-      for (const part of list) part(m);
+    setup: (builder) => {
+      for (const part of parts) part(builder);
     },
   });
 }

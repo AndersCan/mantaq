@@ -1,101 +1,129 @@
 import type { ErrorInfo, Snapshot, TransitionInfo } from "./actor-types.ts";
-import type { InternalEvent } from "./event.ts";
+import type { InternalEvent } from "./index.ts";
 import { Either } from "@mantaq/utils";
 
-export class Subscribers<C> {
-  readonly change = new Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>();
+export interface Subscribers<C> {
+  readonly change: Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>;
+  readonly done: Set<() => void>;
+  readonly transition: Set<(info: TransitionInfo) => void>;
+  readonly error: Set<(info: ErrorInfo) => void>;
+  readonly output: Set<(event: InternalEvent) => void>;
+  seed(snapshot: Snapshot<C>): void;
+  addChange(fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
+  addDone(fn: () => void): () => void;
+  addTransition(fn: (info: TransitionInfo) => void): () => void;
+  addError(fn: (info: ErrorInfo) => void): () => void;
+  addOutput(fn: (event: InternalEvent) => void): () => void;
+  emitChange(snapshot: Snapshot<C>): void;
+  emitDone(): void;
+  emitTransition(info: TransitionInfo): void;
+  emitError(info: ErrorInfo): void;
+  emitOutput(event: InternalEvent): void;
+  clear(): void;
+}
 
-  readonly done = new Set<() => void>();
+export function Subscribers<C>(): Subscribers<C> {
+  const change = new Set<(snapshot: Snapshot<C>, prev: Snapshot<C>) => void>();
+  const done = new Set<() => void>();
+  const transition = new Set<(info: TransitionInfo) => void>();
+  const error = new Set<(info: ErrorInfo) => void>();
+  const output = new Set<(event: InternalEvent) => void>();
 
-  readonly transition = new Set<(info: TransitionInfo) => void>();
+  let last: Snapshot<C> | undefined;
 
-  readonly error = new Set<(info: ErrorInfo) => void>();
-
-  #last: Snapshot<C> | null = null;
-
-  seed(snapshot: Snapshot<C>): void {
-    this.#last = snapshot;
+  /**
+   * A subscriber only watches the machine. It never changes it. A throwing
+   * subscriber is swallowed so the machine and its callers are unaffected.
+   */
+  function safe(callback: () => void): void {
+    void Either.from(() => (callback(), true));
   }
 
-  addChange(fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void {
-    this.change.add(fn);
-    const last = this.#last;
-    if (last) this.#safe(() => fn(last, last));
-    return () => this.change.delete(fn);
-  }
+  return {
+    change,
+    done,
+    transition,
+    error,
+    output,
 
-  addDone(fn: () => void): () => void {
-    this.done.add(fn);
-    return () => this.done.delete(fn);
-  }
+    seed(snapshot: Snapshot<C>): void {
+      last = snapshot;
+    },
 
-  addTransition(fn: (info: TransitionInfo) => void): () => void {
-    this.transition.add(fn);
-    return () => this.transition.delete(fn);
-  }
+    addChange(fn): () => void {
+      change.add(fn);
+      const seeded = last;
+      if (seeded) safe(() => fn(seeded, seeded));
+      return () => change.delete(fn);
+    },
 
-  addError(fn: (info: ErrorInfo) => void): () => void {
-    this.error.add(fn);
-    const last = this.#last?.error;
-    if (last) {
-      this.#safe(() => fn(last));
-    }
-    return () => this.error.delete(fn);
-  }
+    addDone(fn): () => void {
+      done.add(fn);
+      return () => done.delete(fn);
+    },
 
-  emitChange(snapshot: Snapshot<C>): void {
-    const prev = this.#last ?? snapshot;
-    this.#last = snapshot;
-    for (const fn of this.change) {
-      this.#safe(() => fn(snapshot, prev));
-    }
-  }
+    addTransition(fn): () => void {
+      transition.add(fn);
+      return () => transition.delete(fn);
+    },
 
-  emitDone(): void {
-    for (const fn of this.done) {
-      this.#safe(fn);
-    }
-  }
+    addError(fn): () => void {
+      error.add(fn);
+      const seeded = last?.error;
+      if (seeded) {
+        safe(() => fn(seeded));
+      }
+      return () => error.delete(fn);
+    },
 
-  emitTransition(info: TransitionInfo): void {
-    for (const fn of this.transition) {
-      this.#safe(() => fn(info));
-    }
-  }
+    addOutput(fn): () => void {
+      output.add(fn);
+      return () => output.delete(fn);
+    },
 
-  emitError(info: ErrorInfo): void {
-    for (const fn of this.error) {
-      this.#safe(() => fn(info));
-    }
-  }
+    emitChange(snapshot: Snapshot<C>): void {
+      const prev = last ?? snapshot;
+      last = snapshot;
+      for (const callback of change) {
+        safe(() => callback(snapshot, prev));
+      }
+    },
 
-  clear(): void {
-    this.change.clear();
-    this.done.clear();
-    this.transition.clear();
-    this.error.clear();
-    this.output.clear();
-  }
+    emitDone(): void {
+      for (const callback of done) {
+        safe(callback);
+      }
+    },
 
-  #safe(fn: () => void): void {
-    // A subscriber only watches the machine. It never changes it. Its throw
-    // is swallowed so the machine and its callers are unaffected.
-    void Either.from(() => (fn(), true));
-  }
+    emitTransition(info: TransitionInfo): void {
+      for (const callback of transition) {
+        safe(() => callback(info));
+      }
+    },
 
-  readonly output = new Set<(event: InternalEvent) => void>();
+    emitError(info: ErrorInfo): void {
+      for (const callback of error) {
+        safe(() => callback(info));
+      }
+    },
 
-  addOutput(fn: (event: InternalEvent) => void): () => void {
-    this.output.add(fn);
-    return () => this.output.delete(fn);
-  }
+    /**
+     * Output delivery is machine-facing: a throwing handler must let the
+     * actor's safety wrapper route it into the error state, so no swallow
+     * here. The actor wraps this call in its own guard.
+     */
+    emitOutput(event: InternalEvent): void {
+      for (const callback of output) {
+        callback(event);
+      }
+    },
 
-  emitOutput(event: InternalEvent): void {
-    // Output delivery is machine-facing: a throwing handler must let the
-    // actor's #safe("output") route it into the error state, so no swallow
-    // here. The actor wraps this call in #safe.
-    for (const fn of this.output) {
-      fn(event);
-    }
-  }
+    clear(): void {
+      change.clear();
+      done.clear();
+      transition.clear();
+      error.clear();
+      output.clear();
+    },
+  };
 }

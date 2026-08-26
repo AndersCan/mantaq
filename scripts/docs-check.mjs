@@ -11,19 +11,19 @@
  * Reference pages are exempt from Gate A but still checked by Gate B.
  */
 
+import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { spawnSync } from "node:child_process";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const DOCS_DIR = join(ROOT, "apps/docs/src/content/docs");
-const EXAMPLE_TEST = join(ROOT, "packages/examples/checkout.actor.test.ts");
+const EXAMPLE_TEST = join(ROOT, "packages/examples/checkout.test.ts");
 const EXAMPLE_MDX = join(ROOT, ".opencode/skills/docs-write/resources/example.mdx");
 const CORE_INDEX = join(ROOT, "packages/core/src/index.ts");
-const SUGAR_INDEX = join(ROOT, "packages/sugar/src/index.ts");
+const SUGAR_INDEX = join(ROOT, "packages/sugar/src/main.ts");
 const PBT_INDEX = join(ROOT, "packages/pbt/src/index.ts");
-const TEST_INDEX = join(ROOT, "packages/test/src/index.ts");
-const TRAVERSAL_INDEX = join(ROOT, "packages/traversal/src/index.ts");
+const TEST_INDEX = join(ROOT, "packages/testkit/src/main.ts");
+const TRAVERSAL_INDEX = join(ROOT, "packages/traversal/src/main.ts");
 
 const BUILTIN_ALLOW = new Set(["__error"]);
 const PACKAGE_INDEX = new Map([
@@ -41,7 +41,7 @@ function fail(message) {
   console.error(`  ✗ ${message}`);
 }
 
-function ok(message) {
+function pass(message) {
   console.log(`  ✓ ${message}`);
 }
 
@@ -61,14 +61,14 @@ function read(file) {
 
 function extractIds(source) {
   const ids = new Set();
-  for (const m of source.matchAll(/state\("([^"]+)"\)/g)) ids.add(m[1]);
-  for (const m of source.matchAll(/event\("([^"]+)"\)/g)) ids.add(m[1]);
-  for (const m of source.matchAll(/(?:states|events)\("([^"]+)"\)/g)) ids.add(m[1]);
-  for (const m of source.matchAll(/(?:states|events)\("[^"]+"(,\s*"([^"]+)"\s*)+\)/g)) {
-    for (const arg of m[0].matchAll(/"([^"]+)"/g)) ids.add(arg[1]);
+  for (const match of source.matchAll(/state\("([^"]+)"\)/g)) ids.add(match[1]);
+  for (const match of source.matchAll(/event\("([^"]+)"\)/g)) ids.add(match[1]);
+  for (const match of source.matchAll(/(?:states|events)\("([^"]+)"\)/g)) ids.add(match[1]);
+  for (const match of source.matchAll(/(?:states|events)\("[^"]+"(,\s*"([^"]+)"\s*)+\)/g)) {
+    for (const arg of match[0].matchAll(/"([^"]+)"/g)) ids.add(arg[1]);
   }
-  for (const m of source.matchAll(/matches\(\s*[^,]+,\s*"([^"]+)"/g)) {
-    for (const token of m[1].split(".")) ids.add(token);
+  for (const match of source.matchAll(/matches\(\s*[^,]+,\s*"([^"]+)"/g)) {
+    for (const token of match[1].split(".")) ids.add(token);
   }
   return ids;
 }
@@ -76,33 +76,33 @@ function extractIds(source) {
 function extractExports(file) {
   const source = read(file);
   const exports = new Set();
-  for (const m of source.matchAll(/export\s+(?:type\s+)?\{([^}]+)\}/g)) {
-    for (const raw of m[1].split(",")) {
+  for (const match of source.matchAll(/export\s+(?:type\s+)?\{([^}]+)\}/g)) {
+    for (const raw of match[1].split(",")) {
       let name = raw.trim().replace(/^type\s+/, "");
       name = name.split(" as ")[0].trim();
       if (name) exports.add(name);
     }
   }
-  for (const m of source.matchAll(
+  for (const match of source.matchAll(
     /export\s+(?:type\s+)?(?:class|function|const|interface|type)\s+(\w+)/g,
   )) {
-    exports.add(m[1]);
+    exports.add(match[1]);
   }
   return exports;
 }
 
 function extractImports(source) {
   const imports = new Map();
-  for (const m of source.matchAll(/import\s+type\s*\{([^}]+)\}\s*from\s*"(@mantaq\/[^"]+)"/g)) {
-    for (const name of splitImportNames(m[1])) {
-      if (!imports.has(m[2])) imports.set(m[2], new Set());
-      imports.get(m[2]).add(name);
+  for (const match of source.matchAll(/import\s+type\s*\{([^}]+)\}\s*from\s*"(@mantaq\/[^"]+)"/g)) {
+    for (const name of splitImportNames(match[1])) {
+      if (!imports.has(match[2])) imports.set(match[2], new Set());
+      imports.get(match[2]).add(name);
     }
   }
-  for (const m of source.matchAll(/import\s*\{([^}]+)\}\s*from\s*"(@mantaq\/[^"]+)"/g)) {
-    for (const name of splitImportNames(m[1])) {
-      if (!imports.has(m[2])) imports.set(m[2], new Set());
-      imports.get(m[2]).add(name);
+  for (const match of source.matchAll(/import\s*\{([^}]+)\}\s*from\s*"(@mantaq\/[^"]+)"/g)) {
+    for (const name of splitImportNames(match[1])) {
+      if (!imports.has(match[2])) imports.set(match[2], new Set());
+      imports.get(match[2]).add(name);
     }
   }
   return imports;
@@ -123,15 +123,15 @@ console.log("");
 console.log("Gate A — example continuity");
 
 const registry = new Set(BUILTIN_ALLOW);
-for (const id of extractIds(read(EXAMPLE_TEST))) registry.add(id);
-for (const id of extractIds(read(EXAMPLE_MDX))) registry.add(id);
+for (const entityId of extractIds(read(EXAMPLE_TEST))) registry.add(entityId);
+for (const entityId of extractIds(read(EXAMPLE_MDX))) registry.add(entityId);
 
 function extractRegionKeys(source) {
   const keys = new Set();
-  for (const m of source.matchAll(/regions\s*:\s*\{([^}]*)\}/g)) {
-    for (const arg of m[1].matchAll(/(\w+)\s*:/g)) keys.add(arg[1]);
+  for (const match of source.matchAll(/regions\s*:\s*\{([^}]*)\}/g)) {
+    for (const arg of match[1].matchAll(/(\w+)\s*:/g)) keys.add(arg[1]);
   }
-  for (const m of source.matchAll(/regions\["(\w+)"\]/g)) keys.add(m[1]);
+  for (const match of source.matchAll(/regions\["(\w+)"\]/g)) keys.add(match[1]);
   return keys;
 }
 
@@ -148,9 +148,9 @@ for (const page of narrative) {
   if (bad.length > 0) {
     fail(`${relative(ROOT, page)} — non-canonical IDs: ${bad.join(", ")}`);
   } else if (used.size > 0) {
-    ok(`${relative(ROOT, page)} — ${[...used].sort((a, b) => a.localeCompare(b)).join(", ")}`);
+    pass(`${relative(ROOT, page)} — ${[...used].sort().join(", ")}`);
   } else {
-    ok(`${relative(ROOT, page)} — no entities`);
+    pass(`${relative(ROOT, page)} — no entities`);
   }
 }
 if (checkedPages === 0) fail("no narrative docs pages found");
@@ -181,7 +181,7 @@ for (const page of pages) {
     }
   }
 }
-if (importViolations === 0) ok("all @mantaq/* imports match real exports");
+if (importViolations === 0) pass("all @mantaq/* imports match real exports");
 
 // ── Gate C: canonical example typechecks ──────────────────────────────────
 console.log("Gate C — canonical example typechecks");
@@ -191,7 +191,7 @@ const tsc = spawnSync("npx", ["tsc", "--noEmit"], {
   encoding: "utf8",
 });
 if (tsc.status === 0) {
-  ok("packages/examples typechecks");
+  pass("packages/examples typechecks");
 } else {
   fail("packages/examples failed typecheck:\n" + tsc.stdout + tsc.stderr);
 }

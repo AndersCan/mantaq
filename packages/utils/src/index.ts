@@ -6,12 +6,12 @@ export type Either<L, R> = Left<L> | Right<R>;
 type LeftOf<E> = E extends readonly [infer L, undefined] ? L : never;
 type RightOf<E> = E extends readonly [undefined, infer R] ? R : never;
 
-function isLeft<L, R>(e: Either<L, R>): e is Left<L> {
-  return e[0] !== undefined;
+function isLeft<L, R>(either: Either<L, R>): either is Left<L> {
+  return either[0] !== undefined;
 }
 
-function isRight<L, R>(e: Either<L, R>): e is Right<R> {
-  return e[1] !== undefined;
+function isRight<L, R>(either: Either<L, R>): either is Right<R> {
+  return either[1] !== undefined;
 }
 
 /**
@@ -48,77 +48,67 @@ export const Either = {
     }
   },
 
-  isLeft<L, R>(e: Either<L, R>): e is Left<L> {
-    return e[0] !== undefined;
+  isLeft,
+
+  isRight,
+
+  getLeft<E extends Either<LeftOf<E>, RightOf<E>>>(either: E): LeftOf<E> | undefined {
+    return either[0];
   },
 
-  isRight<L, R>(e: Either<L, R>): e is Right<R> {
-    return e[1] !== undefined;
-  },
-
-  getLeft<E extends Either<LeftOf<E>, RightOf<E>>>(e: E): LeftOf<E> | undefined {
-    return e[0];
-  },
-
-  getRight<E extends Either<LeftOf<E>, RightOf<E>>>(e: E): RightOf<E> | undefined {
-    return e[1];
-  },
-
-  leftOrThrow<E extends Either<LeftOf<E>, RightOf<E>>>(e: E): LeftOf<E> {
-    if (isLeft<LeftOf<E>, RightOf<E>>(e)) return e[0];
-    throw new Error("[mantaq/utils] expected Either left, got right");
-  },
-
-  rightOrThrow<E extends Either<LeftOf<E>, RightOf<E>>>(e: E): RightOf<E> {
-    if (isRight<LeftOf<E>, RightOf<E>>(e)) return e[1];
-    throw new Error("[mantaq/utils] expected Either right, got left");
+  getRight<E extends Either<LeftOf<E>, RightOf<E>>>(either: E): RightOf<E> | undefined {
+    return either[1];
   },
 
   match<E extends Either<LeftOf<E>, RightOf<E>>, T>(
-    e: E,
-    onLeft: (value: LeftOf<E>) => T,
-    onRight: (value: RightOf<E>) => T,
+    either: E,
+    handlers: { onLeft: (value: LeftOf<E>) => T; onRight: (value: RightOf<E>) => T },
   ): T {
-    return isLeft<LeftOf<E>, RightOf<E>>(e) ? onLeft(e[0]) : onRight(e[1]);
+    return isLeft<LeftOf<E>, RightOf<E>>(either)
+      ? handlers.onLeft(either[0])
+      : handlers.onRight(either[1]);
   },
 
   map<E extends Either<LeftOf<E>, RightOf<E>>, T>(
-    e: E,
-    fn: (value: RightOf<E>) => T,
+    either: E,
+    transform: { onRight: (value: RightOf<E>) => T },
   ): Either<LeftOf<E>, T> {
-    if (isLeft<LeftOf<E>, RightOf<E>>(e)) return e;
-    return [undefined, fn(e[1])];
+    if (isLeft<LeftOf<E>, RightOf<E>>(either)) return either;
+    return [undefined, transform.onRight(either[1])];
   },
 
   mapLeft<E extends Either<LeftOf<E>, RightOf<E>>, T>(
-    e: E,
-    fn: (value: LeftOf<E>) => T,
+    either: E,
+    transform: { onLeft: (value: LeftOf<E>) => T },
   ): Either<T, RightOf<E>> {
-    if (isLeft<LeftOf<E>, RightOf<E>>(e)) return [fn(e[0]), undefined];
-    return e;
+    if (isLeft<LeftOf<E>, RightOf<E>>(either)) return [transform.onLeft(either[0]), undefined];
+    return either;
   },
 
   chain<E extends Either<LeftOf<E>, RightOf<E>>, T>(
-    e: E,
-    fn: (value: RightOf<E>) => Either<LeftOf<E>, T>,
+    either: E,
+    step: { onRight: (value: RightOf<E>) => Either<LeftOf<E>, T> },
   ): Either<LeftOf<E>, T> {
-    if (isLeft<LeftOf<E>, RightOf<E>>(e)) return e;
-    return fn(e[1]);
+    if (isLeft<LeftOf<E>, RightOf<E>>(either)) return either;
+    return step.onRight(either[1]);
   },
 
   getOrElse<E extends Either<LeftOf<E>, RightOf<E>>>(
-    e: E,
-    onLeft: (value: LeftOf<E>) => RightOf<E>,
+    either: E,
+    fallback: { onLeft: (value: LeftOf<E>) => RightOf<E> },
   ): RightOf<E> {
-    return isLeft<LeftOf<E>, RightOf<E>>(e) ? onLeft(e[0]) : e[1];
+    return isLeft<LeftOf<E>, RightOf<E>>(either) ? fallback.onLeft(either[0]) : either[1];
   },
 
-  swap<E extends Either<LeftOf<E>, RightOf<E>>>(e: E): Either<RightOf<E>, LeftOf<E>> {
-    return isLeft<LeftOf<E>, RightOf<E>>(e) ? [undefined, e[0]] : [e[1], undefined];
+  swap<E extends Either<LeftOf<E>, RightOf<E>>>(either: E): Either<RightOf<E>, LeftOf<E>> {
+    return isLeft<LeftOf<E>, RightOf<E>>(either) ? [undefined, either[0]] : [either[1], undefined];
   },
 
-  tap<E extends Either<LeftOf<E>, RightOf<E>>>(e: E, fn: (value: RightOf<E>) => void): E {
-    if (isRight<LeftOf<E>, RightOf<E>>(e)) fn(e[1]);
-    return e;
+  tap<E extends Either<LeftOf<E>, RightOf<E>>>(
+    either: E,
+    visitor: { onRight: (value: RightOf<E>) => void },
+  ): E {
+    if (isRight<LeftOf<E>, RightOf<E>>(either)) visitor.onRight(either[1]);
+    return either;
   },
-} as const;
+};

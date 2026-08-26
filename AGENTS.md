@@ -133,7 +133,7 @@ Those are machine checks, not taste. The harness is the oracle. Four gates:
 3. **Impl size ceiling** — `packages/core/src` is capped per file and in total. Growing past the ceiling fails, so "reduce complexity" has a gradient.
 4. **Determinism** — no `Date.now`, `Math.random`, or `performance.now` in core runtime. Only `real-clock.ts` reads the wall clock. Same inputs, same trace, always.
 
-Type-level tests live in `packages/core/tests/typecheck.test.ts` (`expectTypeOf` + `@ts-expect-error`). Wrong usage fails `vp check`; the runtime tests and the type oracle are the same file.
+Type-level tests live in `packages/core/src/typecheck.test.ts` (`expectTypeOf` + `@ts-expect-error`). Wrong usage fails `vp check`; the runtime tests and the type oracle are the same file.
 
 ## Review Checklist
 

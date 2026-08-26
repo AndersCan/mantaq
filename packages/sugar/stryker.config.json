@@ -2,7 +2,7 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
   "mutate": ["src/**/*.ts"],
-  "testFiles": ["tests/*.property.test.ts", "tests/*.mutation.test.ts"],
+  "testFiles": ["src/**/*.property.test.ts", "src/**/*.mutation.test.ts"],
   "coverageAnalysis": "perTest",
   "reporters": ["html", "clear-text", "progress"],
   "plugins": ["@stryker-mutator/vitest-runner"],

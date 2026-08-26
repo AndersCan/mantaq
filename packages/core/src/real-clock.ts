@@ -1,69 +1,64 @@
-import type { Clock } from "./clock.ts";
+import type { Clock, ClockIntervalOptions, ClockTimerOptions } from "./clock.ts";
 
 type ListenerEntry = { signal: AbortSignal; onAbort: () => void };
 
-export class RealClock implements Clock {
-  #start = Date.now();
-  #listeners = new Map<number, ListenerEntry>();
+export function RealClock(): Clock {
+  const start = Date.now();
+  const listeners = new Map<number, ListenerEntry>();
 
-  now(): number {
-    return Date.now() - this.#start;
-  }
-
-  setTimeout(
-    ms: number,
-    cb: () => void,
-    options?: { signal?: AbortSignal; eventName?: string },
-  ): number {
-    if (options?.signal?.aborted) return -1;
-    const signal = options?.signal;
-    const id = Number(
-      globalThis.setTimeout(() => {
-        this.#clearListener(id);
-        cb();
-      }, ms),
-    );
-    if (signal) {
-      const onAbort = () => {
-        globalThis.clearTimeout(id);
-        this.#clearListener(id);
-      };
-      this.#listeners.set(id, { signal, onAbort });
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
-    return id;
-  }
-
-  clearTimeout(id: number): void {
-    globalThis.clearTimeout(id);
-    this.#clearListener(id);
-  }
-
-  setInterval(ms: number, cb: () => void, options?: { signal?: AbortSignal }): number {
-    if (options?.signal?.aborted) return -1;
-    const signal = options?.signal;
-    const id = Number(globalThis.setInterval(cb, ms));
-    if (signal) {
-      const onAbort = () => {
-        globalThis.clearInterval(id);
-        this.#clearListener(id);
-      };
-      this.#listeners.set(id, { signal, onAbort });
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
-    return id;
-  }
-
-  clearInterval(id: number): void {
-    globalThis.clearInterval(id);
-    this.#clearListener(id);
-  }
-
-  /** Detach the abort listener we registered for a timer, if any. */
-  #clearListener(id: number): void {
-    const entry = this.#listeners.get(id);
+  function clearListener(listenerId: number): void {
+    const entry = listeners.get(listenerId);
     if (!entry) return;
     entry.signal.removeEventListener("abort", entry.onAbort);
-    this.#listeners.delete(id);
+    listeners.delete(listenerId);
   }
+
+  return {
+    now(): number {
+      return Date.now() - start;
+    },
+
+    setTimeout(delay: number, { signal, cb }: ClockTimerOptions): number {
+      if (signal?.aborted) return -1;
+      const timerId = Number(
+        globalThis.setTimeout(() => {
+          clearListener(timerId);
+          cb();
+        }, delay),
+      );
+      if (signal) {
+        function onAbort(): void {
+          globalThis.clearTimeout(timerId);
+          clearListener(timerId);
+        }
+        listeners.set(timerId, { signal, onAbort });
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+      return timerId;
+    },
+
+    clearTimeout(timerId: number): void {
+      globalThis.clearTimeout(timerId);
+      clearListener(timerId);
+    },
+
+    setInterval(delay: number, { signal, cb }: ClockIntervalOptions): number {
+      if (signal?.aborted) return -1;
+      const intervalId = Number(globalThis.setInterval(cb, delay));
+      if (signal) {
+        function onAbort(): void {
+          globalThis.clearInterval(intervalId);
+          clearListener(intervalId);
+        }
+        listeners.set(intervalId, { signal, onAbort });
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+      return intervalId;
+    },
+
+    clearInterval(intervalId: number): void {
+      globalThis.clearInterval(intervalId);
+      clearListener(intervalId);
+    },
+  };
 }

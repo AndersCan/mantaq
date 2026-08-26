@@ -1,66 +1,76 @@
-import type { InternalEvent } from "./event.ts";
+import type { InternalEvent } from "./index.ts";
 
 export type CancellableProcessEventFn = (event: InternalEvent) => boolean;
 
-export class InternalQueue {
-  #queue: InternalEvent[] = [];
-  #index = 0;
-  #processing = false;
-  #stopped = false;
-  #settledResolvers: Array<() => void> = [];
+export interface InternalQueue {
+  readonly length: number;
+  push(...events: InternalEvent[]): void;
+  clear(): void;
+  settled(): Promise<void>;
+  processCancellable(processEvent: CancellableProcessEventFn): void;
+}
 
-  get length(): number {
-    return this.#queue.length - this.#index;
+export function InternalQueue(): InternalQueue {
+  let queue: InternalEvent[] = [];
+  let index = 0;
+  let processing = false;
+  let stopped = false;
+  let settledResolvers: Array<() => void> = [];
+
+  function flushResolvers(): void {
+    const resolvers = settledResolvers.splice(0);
+    for (const resolve of resolvers) resolve();
   }
 
-  push(...events: InternalEvent[]): void {
-    if (this.#stopped) return;
-    this.#queue.push(...events);
-  }
-
-  clear(): void {
-    const resolvers = this.#settledResolvers.splice(0);
-    this.#queue.length = 0;
-    this.#index = 0;
-    for (const resolve of resolvers) {
-      resolve();
-    }
-  }
-
-  settled(): Promise<void> {
-    if (this.length === 0 && !this.#processing) {
-      return Promise.resolve();
-    }
-    return new Promise<void>((resolve) => {
-      this.#settledResolvers.push(resolve);
-    });
-  }
-
-  processCancellable(processEvent: CancellableProcessEventFn): void {
-    this.#process(processEvent);
-  }
-
-  #process(processEvent: CancellableProcessEventFn): void {
-    if (this.#processing) return;
-    this.#processing = true;
+  function process(processEvent: CancellableProcessEventFn): void {
+    if (processing) return;
+    processing = true;
     try {
-      while (this.#index < this.#queue.length) {
-        if (this.#stopped) break;
-        const event = this.#queue[this.#index++];
+      while (index < queue.length) {
+        if (stopped) break;
+        const event = queue[index];
+        index++;
         if (!processEvent(event)) {
-          this.#stopped = true;
+          stopped = true;
           break;
         }
       }
     } finally {
-      this.#queue.length = 0;
-      this.#index = 0;
-      this.#processing = false;
-      this.#stopped = false;
-      const resolvers = this.#settledResolvers.splice(0);
-      for (const resolve of resolvers) {
-        resolve();
-      }
+      queue.length = 0;
+      index = 0;
+      processing = false;
+      stopped = false;
+      flushResolvers();
     }
   }
+
+  return {
+    get length(): number {
+      return queue.length - index;
+    },
+
+    push(...events: InternalEvent[]): void {
+      if (stopped) return;
+      queue.push(...events);
+    },
+
+    clear(): void {
+      queue.length = 0;
+      index = 0;
+      flushResolvers();
+    },
+
+    settled(): Promise<void> {
+      if (queue.length - index === 0 && !processing) {
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => {
+        settledResolvers.push(resolve);
+      });
+    },
+
+    processCancellable(processEvent: CancellableProcessEventFn): void {
+      process(processEvent);
+    },
+  };
 }

@@ -280,7 +280,7 @@ Timeline proves the actor behaves predictably. "I sent START, it went to reservi
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  ✓ 34 tests passing    ✓ 100% type-safe    v0.3.0     │
-│  Source: checkout.actor.test.ts:58                      │
+│  Source: checkout.test.ts:58                      │
 └─────────────────────────────────────────────────────────┘
 ```
 

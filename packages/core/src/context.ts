@@ -1,17 +1,12 @@
-export class Context<T> {
-  #get: () => T;
-  #set: (value: T) => void;
+export interface Context<T> {
+  get(): T;
+  set(value: T): void;
+}
 
-  constructor(get: () => T, set: (value: T) => void) {
-    this.#get = get;
-    this.#set = set;
-  }
-
-  get(): T {
-    return this.#get();
-  }
-
-  set(value: T): void {
-    this.#set(value);
-  }
+/** Two-way handle over an owner's context: reads see live values, writes flag dirty state upstream. */
+export function Context<T>(options: { get: () => T; set: (value: T) => void }): Context<T> {
+  return {
+    get: options.get,
+    set: options.set,
+  };
 }

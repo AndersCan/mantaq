@@ -114,6 +114,16 @@ const done = state("done")().final();
 const entered = ready.create({ n: 1 });
 ```
 
+### isStateRef
+
+Type guard: narrows `unknown` to `AnyStateRef` without touching the class prototype, so fakes and structural refs pass.
+
+```ts
+function isStateRef(anyValue: unknown): anyValue is AnyStateRef;
+isStateRef(idle); // true
+isStateRef({ name: "fake" }); // false
+```
+
 ### event
 
 Factory for `EventRef`. Same curry shape as `state`; payload must be `object | void`, payload-less by default.
