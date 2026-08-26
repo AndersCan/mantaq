@@ -1,7 +1,11 @@
 {
   "$schema": "./packages/core/node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
-  "mutate": ["packages/core/src/**/*.ts", "!packages/core/src/virtual-clock.ts"],
+  "mutate": [
+    "packages/core/src/**/*.ts",
+    "!packages/core/src/virtual-clock.ts",
+    "!packages/core/src/**/*.test.ts"
+  ],
   "testFiles": ["packages/core/src/*.property.test.ts", "packages/core/src/*.mutation.test.ts"],
   "coverageAnalysis": "perTest",
   "reporters": ["clear-text", "progress"],
