@@ -13,39 +13,13 @@ States, events, and effects are declarations until an Actor runs them.
 ## Create
 
 ```ts
-import { Actor, state, event } from "@mantaq/core";
+import { checkout } from "../checkout.ts";
 
-const basicInfo = state("basicInfo")();
-const shippingAddress = state("shippingAddress")();
-const payment = state("payment")();
-const submitting = state("submitting")();
-const success = state("success")().final();
-const error = state("error")();
-
-const submitBasicInfo = event("submitBasicInfo")<BasicInfo>();
-const submitShipping = event("submitShipping")<ShippingAddress>();
-const submitPayment = event("submitPayment")<PaymentInfo>();
-const back = event("back")();
-const paymentOk = event("paymentOk")<{ orderId: string }>();
-const paymentFail = event("paymentFail")<{ reason: string }>();
-const submittingDone = event("submittingDone")();
-
-const checkout = new Actor({
-  inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-  internal: [paymentOk, paymentFail, submittingDone],
-  states: [basicInfo, shippingAddress, payment, submitting, success, error],
-  initial: basicInfo,
-  context: {} as CheckoutContext,
-  setup: (m) => {
-    m.on(basicInfo, submitBasicInfo, (event, { context }) => {
-      const s = context.get();
-      s.basicInfo = event.payload;
-      context.set(s);
-      return { state: shippingAddress };
-    });
-    // ...other transitions, effects
-  },
-});
+// `checkout` is the canonical multi-step checkout machine (see ./checkout.ts):
+//
+//   basicInfo -> shippingAddress -> payment -> submitting -> success (final)
+//                                      ^ (back) v                  v (back)
+//                                                               error
 ```
 
 ```

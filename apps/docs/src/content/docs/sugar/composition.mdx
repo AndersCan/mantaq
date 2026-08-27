@@ -54,7 +54,7 @@ the spec `type`-only as anchor, refs as values.
 ```ts
 import { definePart } from "@mantaq/sugar";
 import type { checkout } from "../checkout.ts";
-import { basicInfo, shippingAddress, submitBasicInfo } from "../checkout.ts";
+import { basicInfo, shippingAddress, submitBasicInfo, chargeCard } from "../checkout.ts";
 
 export const basicInfoPart = definePart<typeof checkout>((m) => {
   m.on(basicInfo, submitBasicInfo, (event, opts) => {
@@ -96,7 +96,7 @@ Cross-state handlers go in their own part too. Reach the actor through
 
 ```ts
 import { withParts } from "@mantaq/sugar";
-import { checkout } from "./checkout.ts";
+import { checkout } from "../checkout.ts";
 import { basicInfoPart } from "./parts/basic-info.ts";
 import { submittingPart } from "./parts/submitting.ts";
 

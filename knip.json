@@ -2,7 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreFiles": [
     "packages/core/stryker.vitest.config.ts",
-    "packages/sugar/stryker.vitest.config.ts"
+    "packages/sugar/stryker.vitest.config.ts",
+    "apps/docs/src/content/docs/checkout.ts"
   ],
   "ignoreDependencies": [
     "vite",
