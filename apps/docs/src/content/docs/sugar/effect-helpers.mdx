@@ -67,19 +67,10 @@ m.effect(submitting, ({ clock, signal, emit }) => {
 ## VirtualClock testing
 
 ```ts
-const clock = new VirtualClock();
-const checkout = new Actor({
-  // ...
-  clock,
-  setup: (m) => {
-    m.effect(submitting, {
-      name: "startSubmitTimeout",
-      fn: (input) => withTimeout(800, input, () => submittingDone.create()),
-    });
-    // ...
-  },
-});
+import { checkout } from "../checkout.ts";
+import { VirtualClock } from "@mantaq/core";
 
+const clock = VirtualClock();
 checkout.send(submitPayment.create());
 clock.advance(800); // triggers timeout synchronously
 matches(checkout, "success"); // true

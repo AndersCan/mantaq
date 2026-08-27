@@ -13,17 +13,9 @@ State decides where the machine is. Context decides what it knows.
 ## Define
 
 ```ts
-type CheckoutContext = {
-  basicInfo?: BasicInfo;
-  shippingAddress?: ShippingAddress;
-  paymentInfo?: PaymentInfo;
-  orderId?: string;
-};
+import { checkout, type CheckoutContext } from "./checkout.ts";
 
-const checkout = new Actor({
-  // ...
-  context: {} as CheckoutContext,
-});
+const c: CheckoutContext = checkout.context;
 ```
 
 Typed at compile time. No runtime cost.

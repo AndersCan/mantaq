@@ -54,7 +54,7 @@ the spec `type`-only as anchor, refs as values.
 ```ts
 import { definePart } from "@mantaq/sugar";
 import type { checkout } from "../checkout.ts";
-import { basicInfo, shippingAddress, submitBasicInfo } from "../checkout.ts";
+import { basicInfo, shippingAddress, submitBasicInfo, chargeCard } from "../checkout.ts";
 
 export const basicInfoPart = definePart<typeof checkout>((m) => {
   m.on(basicInfo, submitBasicInfo, (event, opts) => {

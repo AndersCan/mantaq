@@ -58,6 +58,8 @@ Sub-actors passed as `regions` to the Actor constructor. Child runs alongside
 parent. Snapshot nests.
 
 ```ts
+import { checkout } from "./checkout.ts";
+
 const fraudMonitor = new Actor({
   inputs: [scanDone],
   states: [scanning, cleared, flagged],
