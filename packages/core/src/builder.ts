@@ -28,7 +28,7 @@ export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> 
 
 type HandlerFn<
   States extends readonly AnyStateRef[],
-  InputsInternal extends readonly AnyEventRef[],
+  _InputsInternal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext,
   E extends AnyEventRef,

@@ -20,12 +20,42 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: "24"
           cache: true
       - run: vp install
-      - run: vp exec bumpy ci check --comment
+      - name: bumpy check (allow version bump PRs)
+        run: |
+          set +e
+          vp exec bumpy ci check --comment
+          code=$?
+          set -e
+          if [ $code -eq 0 ]; then
+            exit 0
+          fi
+          # Version PRs from `bumpy version` bump package.json versions and
+          # remove .bumpy files, so "no bump files" is expected. Detect a
+          # version bump by diffing package.json against the PR base.
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          if [ -n "$base" ] && [ -n "$head" ]; then
+            if git diff --name-only "$base" "$head" | grep -q "package.json"; then
+              echo "Version bump detected (package.json changed), ignoring bumpy check failure"
+              # Re-run with --no-fail to still post the PR comment as warning
+              vp exec bumpy ci check --comment --no-fail || true
+              exit 0
+            fi
+          fi
+          # Fallback: also check working tree diff for local runs
+          if git diff --name-only HEAD | grep -q "package.json" || git diff --name-only origin/main...HEAD 2>/dev/null | grep -q "package.json"; then
+            echo "Version bump detected, ignoring bumpy check failure"
+            vp exec bumpy ci check --comment --no-fail || true
+            exit 0
+          fi
+          exit $code
         env:
           GH_TOKEN: ${{ github.token }}
 
