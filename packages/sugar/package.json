@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/sugar",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "Userland sugar for mantaq actors — matches, effect helpers, transition utilities.",
   "license": "MIT",
   "repository": {
@@ -13,7 +13,7 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
+    ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {

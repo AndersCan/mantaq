@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0
+
+<sub>2026-09-04</sub>
+
+- _(minor)_
+  Export INITIAL_NODE_ID from @mantaq/traversal; buildGraph returns empty graph instead of throwing; drop Date.now timestamps from history; remove dead assertReachedState/assertNeverReachedState aliases from @mantaq/test.
+- _(minor)_
+  Named effects: `m.effect(stateRef, { name, fn })` — the name is required and identifies
+  the effect in tests and history. Effects are now recorded when they actually run:
+  `TransitionInfo` carries `effects: string[]`, and `@mantaq/traversal` history effect
+  records are `{ stateName, effectName }` instead of being inferred from registration.
+  Test harness assertions take both names: `assertEffectRan(stateName, effectName)`,
+  `assertEffectNeverRan(stateName, effectName)`, `wasEffectRun(stateName, effectName)`.
+  Breaking: all `m.effect(stateRef, fn)` call sites must pass `{ name, fn }`.
+- _(patch)_ Harness observes region child states and transitions (#199).
+- _(patch)_ buildGraph keeps the initial-state edge for object-form initial (#201).
+- _(patch)_ findCycles finds cycles reachable through already-visited nodes (#209).
+- _(patch)_ findCycles reports each cycle once (#232).
+- _(patch)_ Cleaned AI writing tells from docs and code comments; removed prose em dashes repo-wide.
+
 ## 0.1.2
 
 <sub>2026-08-20</sub>

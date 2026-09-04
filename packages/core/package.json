@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock.",
   "license": "MIT",
   "repository": {
@@ -14,7 +14,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
+    ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {

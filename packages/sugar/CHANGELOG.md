@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.0
+
+<sub>2026-09-04</sub>
+
+- _(major)_
+  apply mechanical style rules across all packages
+
+  `withPromise` now takes a single options object (`WithPromiseOptions`) instead
+  of positional arguments; this is a breaking change to the public sugar API.
+
+- _(patch)_
+  Export INITIAL_NODE_ID from @mantaq/traversal; buildGraph returns empty graph instead of throwing; drop Date.now timestamps from history; remove dead assertReachedState/assertNeverReachedState aliases from @mantaq/test.
+- _(patch)_ ActorMap.autoReap disposes completed children and unsubscribes its done observer (#204).
+- _(patch)_ withPromise returns the promise so settled () awaits async effects (#202).
+- _(patch)_
+  ActorMap.autoReap disposes children already done at spawn (#231); withTimeout clears its timer on fire/transition/dispose (#242).
+- _(patch)_ ActorMap.dispose tears down all child actors (#229).
+- _(patch)_
+  `withPromise` binds its error handler only to the original promise: the success
+  and rejection handlers now use the two-argument `then`, so a throw in the
+  success callback is no longer swallowed and mislabeled as a promise rejection
+  (#268). A success-path failure now propagates uncaught as it should.
+
 ## 0.4.0
 
 <sub>2026-08-20</sub>
