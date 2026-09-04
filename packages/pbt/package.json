@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/pbt",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Seeded fast-check property-based testing helpers and shared generators.",
   "license": "MIT",
   "repository": {

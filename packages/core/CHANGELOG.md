@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.4.0
+
+<sub>2026-09-04</sub>
+
+- _(minor)_
+  Named effects: `m.effect(stateRef, { name, fn })` — the name is required and identifies
+  the effect in tests and history. Effects are now recorded when they actually run:
+  `TransitionInfo` carries `effects: string[]`, and `@mantaq/traversal` history effect
+  records are `{ stateName, effectName }` instead of being inferred from registration.
+  Test harness assertions take both names: `assertEffectRan(stateName, effectName)`,
+  `assertEffectNeverRan(stateName, effectName)`, `wasEffectRun(stateName, effectName)`.
+  Breaking: all `m.effect(stateRef, fn)` call sites must pass `{ name, fn }`.
+- _(patch)_
+  Export INITIAL_NODE_ID from @mantaq/traversal; buildGraph returns empty graph instead of throwing; drop Date.now timestamps from history; remove dead assertReachedState/assertNeverReachedState aliases from @mantaq/test.
+- _(patch)_ Actor.dispose cascades to region child actors (#207).
+- _(patch)_ recover () aborts in-flight effect AbortController and resolves old queue settled () resolvers (#206 #203).
+- _(patch)_ RealClock.setInterval honors already-aborted signal (#211).
+- _(patch)_ Throw on duplicate on () /onAny () registration (#200).
+- _(patch)_ VirtualClock.advance() terminates when a timer callback re-arms a same-deadline timer (#197).
+- _(patch)_ Actor.#pendingEffects is pruned as async effects settle and cleared on dispose() (#198).
+- _(patch)_
+  Fix core clock and effect issues: RealClock.setInterval honors an already-aborted signal (#211); VirtualClock.setDrain supports multiple drains (#230); RealClock.clearTimeout/clearInterval detach their abort listener (#235); settled() awaits effects spawned by other effects (#237); VirtualClock.advance fires every distinct deadline (#238); non-native thenables are treated as async effects (#239).
+- _(patch)_
+  Snapshot hands subscribers a defensive copy of the actor context instead of the live reference (#226). `Snapshot.context` and `Snapshot.error.context` are deep-cloned; unchanged snapshots keep a stable context identity so `prev.context === snap.context` still signals "no context change".
+- _(patch)_
+  Revert #258: restore `EventRef.is()` to its pre-#258 contract that narrows to the
+  full `CreatedOfEvent<T, Payload>` (payload stays in scope), instead of the
+  type-tag-only guard. The tag-only guard over-promised soundness while breaking
+  callers that read `e.payload` (red-CI-class friction across consumers). A sound
+  symbol-brand replacement is tracked in #262.
+- _(patch)_
+  Make `EventRef.is()` a sound type guard via a per-type symbol brand (#262).
+  `create()` stamps a non-enumerable brand onto the envelope; `is()` verifies it,
+  so only `create()`-produced events satisfy the guard and payload narrowing is
+  preserved without a runtime payload walk or `@ts-*` escapes.
+- _(patch)_
+  Mark `StateRef.regions()` as `@internal` and drop it from the public API docs
+  (#241). It stores region config on `_regions` but the runtime never reads it, so
+  calling it is a silent no-op; the method stays callable (non-breaking) but is no
+  longer advertised as working in `API.md` or the `core.mdx` reference table.
+- _(patch)_ Cleaned AI writing tells from docs and code comments; removed prose em dashes repo-wide.
+
 ## 0.3.0
 
 <sub>2026-08-20</sub>

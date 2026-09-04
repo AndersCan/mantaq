@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.3
+
+<sub>2026-09-04</sub>
+
+- _(patch)_
+  Export INITIAL_NODE_ID from @mantaq/traversal; buildGraph returns empty graph instead of throwing; drop Date.now timestamps from history; remove dead assertReachedState/assertNeverReachedState aliases from @mantaq/test.
+- _(patch)_ MANTAQ_SEED validated ; non-numeric rejected as Left instead of silent fallback (#205).
+
 ## 0.0.2
 
 <sub>2026-08-09</sub>

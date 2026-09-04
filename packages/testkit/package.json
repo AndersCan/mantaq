@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/test",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "description": "Test harness and assertion utilities for verifying mantaq actor behavior.",
   "license": "MIT",
   "repository": {
