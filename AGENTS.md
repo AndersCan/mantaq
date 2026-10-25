@@ -1,56 +1,33 @@
 # Caveman Mode
 
-## Core Rule
+Terse. Drop articles, filler, pleasantries, hedging. Fragments ok. Short synonyms (big not extensive). Technical terms exact. Code blocks unchanged. Error messages quoted exact.
 
-Respond like smart caveman. Cut articles, filler, pleasantries. Keep all technical substance.
+Pattern: `[thing] [action] [reason]. [next step].`
 
-## Grammar
-
-- Drop articles (a, an, the)
-- Drop filler (just, really, basically, actually, simply)
-- Drop pleasantries (sure, certainly, of course, happy to)
-- Short synonyms (big not extensive, fix not "implement a solution for")
-- No hedging (skip "it might be worth considering")
-- Fragments fine. No need full sentence
-- Technical terms stay exact. "Polymorphism" stays "polymorphism"
-- Code blocks unchanged. Caveman speak around code, not in code
-- Error messages quoted exact. Caveman only for explanation
-
-## Pattern
-
-```
-[thing] [action] [reason]. [next step].
-```
-
-Not:
-
-> Sure! I'd be happy to help you with that. The issue you're experiencing is likely caused by...
-
-Yes:
-
-> Bug in auth middleware. Token expiry check use `<` not `<=`. Fix:
+Bad: "Sure! I'd be happy to help. The issue is likely caused by..."
+Good: "Bug in auth middleware. Token expiry check uses `<` not `<=`. Fix:"
 
 ## Starting Work
 
-Always start from newest `origin/main`. Local `main` goes stale — branching off it means building on deleted files, old APIs, dead branches.
+Branch from `origin/main`, never local `main` (goes stale: deleted files, old APIs, dead branches).
 
 ```
 git fetch origin
-git checkout -b <branch> origin/main   # not `main`
+git checkout -b <branch> origin/main
 ```
 
-Before touching anything, confirm the base is current:
+Before touching anything:
 
-- `git rev-parse main origin/main` — differ? Local main stale. `git reset --hard origin/main`, or branch from `origin/main` directly.
-- `git log main..origin/main --oneline` — output? Local main behind. Start from `origin/main`, never `main`.
-- Merged PRs only reach you via `origin/main`. Fetch first, always.
+- `git rev-parse main origin/main` differs → local main stale. Fix: `git reset --hard origin/main` or branch from `origin/main`.
+- `git log main..origin/main --oneline` has output → local main behind.
+- Merged PRs reach you only via `origin/main`. Fetch first.
 
 Rules:
 
-1. Branch off `origin/main`, never local `main`.
+1. Branch off `origin/main`.
 2. No edits on a base older than `origin/main`.
-3. `origin/main` advanced mid-task? Rebase, or re-do work on new base.
-4. Rename stale local main: `git branch -m main main-stale`.
+3. `origin/main` advances mid-task → rebase, or redo work on new base.
+4. Stale local main: `git branch -m main main-stale`.
 
 <!--VITE PLUS START-->
 
@@ -75,56 +52,29 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 <!--SKILLS START-->
 
-# Skills
-
-Skills listed in system prompt `available_skills` may be stale. Load from disk:
-
-- `.opencode/skills/add-change/SKILL.md`
-- `.opencode/skills/find-skills/SKILL.md`
-- `.opencode/skills/self-improvement/SKILL.md`
-- `.opencode/skills/self-improvement-worker/SKILL.md`
-
-Use `skill` tool with name matching the directory. Disk versions supersede system prompt.
-
-<!--SKILLS END-->
-
-<!--TEST TAXONOMY START-->
-
-# Bump Files (bumpy)
-
-Every PR needs a bump file in `.bumpy/` or CI fails: "No bump files found in this PR."
-
-- Releasable change (public API, behavior, fix): `bumpy add` (interactive; pick packages + level).
-- No release needed (refactor, docs, scripts, tests, CI): `bumpy add --empty --name <branch-slug>`.
-- Commit the file in the PR. One per PR.
-
 # Test Taxonomy
 
-Tests split by filename. The split is **what survives a refactor**, not what tests what:
+Split by filename. The split is **what survives a refactor**, not what it tests:
 
-| Suffix               | Purpose                                                      | Feeds stryker? | Refactor story                      |
-| -------------------- | ------------------------------------------------------------ | -------------- | ----------------------------------- |
-| `*.test.ts`          | features, happy paths                                        | no             | stable, hand-edited                 |
-| `*.error.test.ts`    | failure paths: `Left`, warnings, budget, abort, unregistered | no             | stable, hand-edited                 |
-| `*.property.test.ts` | PBT invariants against a reference model                     | **yes**        | regenerable, kept broad not precise |
-| `*.mutation.test.ts` | directed tests for stubborn surviving mutants                | **yes**        | throw away and recreate             |
+| Suffix               | Purpose                                                      | Stryker? | Refactor story                 |
+| -------------------- | ------------------------------------------------------------ | -------- | ------------------------------ |
+| `*.test.ts`          | features, happy paths                                        | no       | stable, hand-edited            |
+| `*.error.test.ts`    | failure paths: `Left`, warnings, budget, abort, unregistered | no       | stable, hand-edited            |
+| `*.property.test.ts` | PBT invariants vs reference model                            | **yes**  | regenerable, broad not precise |
+| `*.mutation.test.ts` | directed tests for stubborn surviving mutants                | **yes**  | throw away, recreate           |
 
-Property tests are the quantitative engine. fast-check runs them with a pinned seed
-(`MANTAQ_SEED` env var overrides; default in `@mantaq/pbt`), so runs replay identically.
-Shared generators and `runProperty` live in `@mantaq/pbt` (`anyName`, `anyDuration`,
-`anyActorSnapshot`, ...).
+Property tests = quantitative engine. fast-check uses pinned seed (`MANTAQ_SEED` env overrides; default in `@mantaq/pbt`), so runs replay identically. Shared generators + `runProperty` live in `@mantaq/pbt` (`anyName`, `anyDuration`, `anyActorSnapshot`, ...).
 
 ## Refactor workflow
 
-1. Refactor impl. `vp test` runs feature + error + property tests (fast qualitative gate).
-2. `stryker run` runs only `*.property.test.ts` + `*.mutation.test.ts` (config `testFiles`).
-3. Score below break? Throw away `*.mutation.test.ts`, re-run, tighten generators or add
-   one directed test per surviving mutant.
-4. Feature and error tests are never edited for mutant-killing.
+1. Refactor impl. `vp test` = feature + error + property (fast qualitative gate).
+2. `stryker run` = property + mutation tests only (config `testFiles`).
+3. Score below break → delete `*.mutation.test.ts`, re-run, tighten generators or add one directed test per surviving mutant.
+4. Never edit feature/error tests to kill mutants.
 
 ## Thresholds
 
-Stryker break is 89.5 for core (root `stryker.config.json`, virtual-clock excluded), 90 for sugar (`packages/sugar/stryker.config.json`); low 92, high 95 both.
+Stryker break: core 89.5 (root `stryker.config.json`, virtual-clock excluded), sugar 90 (`packages/sugar/stryker.config.json`). Low 92, high 95 both.
 
 <!--TEST TAXONOMY END-->
 
@@ -132,23 +82,37 @@ Stryker break is 89.5 for core (root `stryker.config.json`, virtual-clock exclud
 
 # North Star Enforcement
 
-`vision.md` says: _"If it typechecks, it runs correct"_, _"If it runs, it runs deterministic"_, and _"Forcing the compiler quiet = wrong path."_
+`vision.md`: _"If it typechecks, it runs correct"_, _"If it runs, it runs deterministic"_, _"Forcing the compiler quiet = wrong path."_
 
-Those are machine checks, not taste. The harness is the oracle. Four gates:
+Machine checks, not taste. Harness is the oracle. Four gates:
 
-1. **Zero type escapes in `packages/core/src`** — `as any`, `as unknown as`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck` fail `vp run guard`. Plus `typescript/no-explicit-any` is an error repo-wide. No `throw` in library src either (`mantaq/no-throw` oxlint rule, core/sugar/traversal/test). Errors flow as values (Either), never exceptions.
-2. **Export budget** — `packages/core/src/index.ts` is capped (see `scripts/vision-guard.mjs`). Nothing named `Internal*` may be public except the allowlist (`InternalEvent` is the public event contract).
-3. **Impl size ceiling** — `packages/core/src` is capped per file and in total. Growing past the ceiling fails, so "reduce complexity" has a gradient.
-4. **Determinism** — no `Date.now`, `Math.random`, or `performance.now` in core runtime. Only `real-clock.ts` reads the wall clock. Same inputs, same trace, always.
+1. **No type escapes in `packages/core/src`**: `as any`, `as unknown as`, `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck` fail `vp run guard`. `typescript/no-explicit-any` = error repo-wide. No `throw` in library src (`mantaq/no-throw`: core/sugar/traversal/test). Errors = values (Either).
+2. **Export budget**: `packages/core/src/index.ts` capped (`scripts/vision-guard.mjs`). No public `Internal*` except allowlist (`InternalEvent` = public event contract).
+3. **Impl size ceiling**: `packages/core/src` capped per file and total. Growth fails → "reduce complexity" has gradient.
+4. **Determinism**: no `Date.now`, `Math.random`, `performance.now` in core runtime. Only `real-clock.ts` reads wall clock. Same inputs → same trace.
 
-Type-level tests live in `packages/core/src/typecheck.test.ts` (`expectTypeOf` + `@ts-expect-error`). Wrong usage fails `vp check`; the runtime tests and the type oracle are the same file.
+Type-level tests: `packages/core/src/typecheck.test.ts` (`expectTypeOf` + `@ts-expect-error`). Wrong usage fails `vp check`. Runtime tests and type oracle = same file.
 
 ## Review Checklist
 
-- [ ] Run `vp check` — format, lint, type errors, including the type-level assertions.
-- [ ] Run `vp run guard` — north star gates (part of `vp run ready`).
-- [ ] Never silence the compiler. If a change needs `as any`, `as unknown as`, or `@ts-*`, the design is wrong, not the types. Refactor instead.
-- [ ] `@mantaq/core` stays small. New exports and new impl lines cost budget; measure before adding.
-- [ ] Run `vp run mutation:core` and `vp run mutation:sugar` — mutation score must stay above the break threshold (89.5 core, 90 sugar).
+- [ ] `vp check`: format, lint, types, incl. type-level assertions.
+- [ ] `vp run guard`: north star gates (part of `vp run ready`).
+- [ ] Never silence compiler. Needs `as any` / `as unknown as` / `@ts-*` → design wrong. Refactor.
+- [ ] `@mantaq/core` stays small. New exports and impl lines cost budget; measure first.
+- [ ] `vp run mutation:core` + `vp run mutation:sugar`: score ≥ break (89.5 core, 90 sugar).
 
 <!--VISION ENFORCEMENT END-->
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`AndersCan/mantaq`) via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
