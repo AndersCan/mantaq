@@ -78,8 +78,7 @@ page. Entity IDs are fixed: the same states and events everywhere.
 - Canonical example: `packages/examples/checkout.test.ts`
 - `vp run docs:check`. Verifies docs use only canonical IDs, imports match real
   package exports, and the canonical example typechecks.
-- `.opencode/skills/docs-write/`. Agent skill for writing docs: single-example
-  rules and a five-persona review loop (from `ux-research/personas-and-journeys.md`).
+- `docs/canonical-example.mdx`. Entity-ID registry the docs check reads.
 
 ## Skills
 

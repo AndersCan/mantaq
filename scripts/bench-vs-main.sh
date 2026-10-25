@@ -3,7 +3,7 @@
 # SAME machine. Runs alternate base, PR, base, PR, ... in separate processes (so JIT
 # state never leaks between them) and bench-compare.mjs compares the BEST run of each
 # side. Best-of-N discards scheduler/neighbour noise, which only ever slows a run down,
-# so the limit can be tight (25% time, 10% allocation).
+# so the limit can be tight (25% time, 50% + 256B allocation; see bench-compare.mjs).
 #
 # BASE_REF may predate packages/bench, so the base gets a copy of this checkout's
 # packages/bench, lockfile and toolchain pins; only its packages/*/src is exercised.

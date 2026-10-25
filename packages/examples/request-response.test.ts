@@ -4,7 +4,7 @@
  * Source of truth for the request/response example in the Mantaq docs
  * (apps/docs/src/content/docs/sugar/request-response.mdx). The docs must
  * use ONLY the entity IDs declared here and registered in the registry
- * (.opencode/skills/docs-write/resources/example.mdx).
+ * (docs/canonical-example.mdx).
  *
  * Story: checkout story continues. After checkout the shop asks a shipping
  * partner to confirm each order. One parent machine owns an ActorMap of

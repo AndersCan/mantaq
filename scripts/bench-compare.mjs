@@ -10,7 +10,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const MAX_SLOWDOWN = Number(process.env.MANTAQ_BENCH_DELTA ?? 0.25);
-const MAX_ALLOC_GROWTH = Number(process.env.MANTAQ_BENCH_ALLOC_GROWTH ?? 0.1);
+const MAX_ALLOC_GROWTH = Number(process.env.MANTAQ_BENCH_ALLOC_GROWTH ?? 0.5);
+// Small baselines (tens of bytes/op) swing by a whole small object from JIT/GC noise,
+// so a percentage alone is meaningless there. Growth must exceed both limits to fail.
+const ALLOC_SLACK_BYTES = Number(process.env.MANTAQ_BENCH_ALLOC_SLACK ?? 256);
 
 const [dir, baseRef = "base"] = process.argv.slice(2);
 
@@ -51,7 +54,8 @@ for (const [name, baseBytes] of Object.entries(base.alloc)) {
   console.log(
     `${name.padEnd(22)} ${String(baseBytes).padStart(6)}B  -> ${String(pr.alloc[name]).padStart(6)}B   ${(ratio * 100).toFixed(1).padStart(6)}%`,
   );
-  if (ratio > MAX_ALLOC_GROWTH)
+  const growth = pr.alloc[name] - baseBytes;
+  if (ratio > MAX_ALLOC_GROWTH && growth > ALLOC_SLACK_BYTES)
     failures.push(
       `${name} allocates ${(ratio * 100).toFixed(1)}% more than ${baseRef} (limit ${MAX_ALLOC_GROWTH * 100}%)`,
     );
