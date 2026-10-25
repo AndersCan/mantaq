@@ -76,4 +76,31 @@ describe("validateAtlas rejects", () => {
       "$.machines[0].fuzz.corpus[0].steps[1].payload: expected JSON value",
     ]);
   });
+
+  test("explanation: unknown status and bad branch target", () => {
+    const doc = valid();
+    if (typeof doc !== "object" || doc === null || !("machines" in doc)) return;
+    const machines = doc.machines;
+    if (!Array.isArray(machines)) return;
+    machines[0].edges[1].explanation = { status: "guessed" };
+    machines[0].edges[2].explanation = {
+      status: "analyzed",
+      location: { file: "a.ts", line: 1, column: 1 },
+      registration: "on",
+      branches: [{ conditions: [], target: { kind: "teleport" } }],
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    };
+    expect(issues(doc)).toEqual([
+      "$.machines[0].edges[1].explanation.status: expected one of analyzed, not_analyzed",
+      "$.machines[0].edges[1].explanation.location: expected null or object",
+      "$.machines[0].edges[1].explanation.reason: expected string",
+      "$.machines[0].edges[1].explanation.snippet: expected string",
+      "$.machines[0].edges[2].explanation.branches[0].target.kind: expected one of state, stay, unresolved",
+    ]);
+  });
 });

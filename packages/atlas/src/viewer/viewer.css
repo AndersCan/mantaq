@@ -255,3 +255,32 @@ body {
 .load-error {
   color: var(--unknown);
 }
+
+.muted {
+  color: var(--muted);
+}
+
+.explanation p {
+  margin: 2px 0;
+}
+
+.explanation pre {
+  overflow-x: auto;
+  font-size: 12px;
+  background: var(--region-bg);
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.branches {
+  padding-left: 16px;
+}
+
+.branch[data-branch-status="not in graph"] .branch-status {
+  color: var(--unknown);
+  font-weight: 600;
+}
+
+.branch[data-branch-status="this edge"] .branch-status {
+  color: var(--accent);
+}

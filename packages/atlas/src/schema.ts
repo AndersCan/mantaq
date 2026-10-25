@@ -2,7 +2,7 @@
  * Atlas document schema. Bump `ATLAS_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const ATLAS_SCHEMA_VERSION = 2;
+export const ATLAS_SCHEMA_VERSION = 3;
 
 export interface AtlasCoverage {
   hits: number;
@@ -36,8 +36,61 @@ export type AtlasEdgeKind = "initial" | "transition" | "effect" | "stay";
 /** `probe`: found by synthetic traversal. `fuzz`: observed only while fuzzing. */
 export type AtlasEdgeOrigin = "probe" | "fuzz";
 
-/** Placeholder for Phase 4 (AST annotation). Always null in v2. */
-export type AtlasExplanation = null;
+export interface AtlasLocation {
+  /** POSIX path relative to the analysis root. */
+  file: string;
+  /** 1-based. */
+  line: number;
+  /** 1-based. */
+  column: number;
+}
+
+/** Where a handler return path goes. `stay` = no `state` in the result. */
+export type AtlasBranchTarget =
+  | { kind: "state"; state: string }
+  | { kind: "stay" }
+  | { kind: "unresolved"; text: string };
+
+export interface AtlasBranch {
+  /** Source text of each condition on the path, outermost first; `!(...)` = else side. */
+  conditions: string[];
+  target: AtlasBranchTarget;
+}
+
+/** `payload.amount > 50000` style comparison against a literal, for search guidance. */
+export interface AtlasComparison {
+  source: "payload" | "context";
+  /** Dotted path below payload / context, e.g. `result.reservationId`. */
+  path: string;
+  operator: "<" | "<=" | ">" | ">=" | "===" | "!==" | "==" | "!=";
+  literal: number | string | boolean;
+}
+
+/**
+ * Static reading of the handler behind an edge (TypeScript compiler API).
+ * Annotates runtime edges; never creates them.
+ */
+export type AtlasExplanation =
+  | {
+      status: "analyzed";
+      location: AtlasLocation;
+      registration: "on" | "onAny";
+      branches: AtlasBranch[];
+      payloadReads: string[];
+      contextReads: string[];
+      contextWrites: string[];
+      /** Reads `<actor>.state`: target depends on live state, which probing cannot see. */
+      readsActorState: boolean;
+      comparisons: AtlasComparison[];
+      literals: Array<number | string>;
+    }
+  | {
+      status: "not_analyzed";
+      location: AtlasLocation | null;
+      reason: string;
+      /** First lines of the source, when there is any. */
+      snippet: string | null;
+    };
 
 export interface AtlasEdge {
   id: string;
@@ -51,7 +104,8 @@ export interface AtlasEdge {
   emits: string[];
   /** Sample-context names under which this edge was observed. */
   contexts: string[];
-  explanation: AtlasExplanation;
+  /** null = no handler behind this edge (initial, effect) or analysis not run. */
+  explanation: AtlasExplanation | null;
   /** null = no run supplied; otherwise transition count. */
   coverage: AtlasCoverage | null;
 }

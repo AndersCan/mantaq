@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { toAtlas } from "../atlas.ts";
-import { exampleInputs, exampleTargets } from "../examples.ts";
+import { toAtlas, toAtlasMachine } from "../atlas.ts";
+import { annotateMachine } from "../ast/annotate.ts";
+import { EXAMPLE_ROOT, exampleInputs, exampleTargets } from "../examples.ts";
 import { createCheckoutActor, submitBasicInfo } from "../fixtures/checkout.ts";
 import type { AtlasDocument } from "../schema.ts";
 import { fuzz } from "../fuzz/fuzz.ts";
@@ -224,5 +225,45 @@ describe("viewer: fuzz results", () => {
     expect(root.querySelector(".fuzz-summary")).not.toBeNull();
     expect(field(root, "seed")).toBe("1");
     expect(field(root, "handler errors")).toBe("none");
+  });
+});
+
+describe("viewer: AST explanations", () => {
+  function annotatedCredit(): AtlasDocument {
+    const credit = exampleTargets().find((each) => each.id === "credit");
+    if (!credit) return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [] };
+    const machine = annotateMachine(
+      toAtlasMachine({ id: "credit", actor: credit.create().actor }),
+      {
+        file: credit.source,
+        root: EXAMPLE_ROOT,
+      },
+    );
+    return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] };
+  }
+
+  test("branches the graph lacks are flagged 'not in graph'", () => {
+    const atlas = annotatedCredit();
+    const root = mount(atlas);
+    const apply = atlas.machines[0]?.edges.find((edge) => edge.event === "apply");
+    edgeElement(root, apply?.id ?? "").dispatchEvent(new Event("click"));
+    const statuses = [...root.querySelectorAll<HTMLElement>(".panel .branch")].map(
+      (item) => item.dataset["branchStatus"],
+    );
+    expect(statuses).toEqual(["not in graph", "not in graph", "this edge"]);
+    expect(root.querySelector('.panel [data-explain="comparisons"]')?.textContent).toContain(
+      "payload.amount > 50000",
+    );
+  });
+
+  test("not analyzed shows reason and snippet", () => {
+    const atlas = annotatedCredit();
+    const root = mount(atlas);
+    const reset = atlas.machines[0]?.edges.find((edge) => edge.event === "reset");
+    edgeElement(root, reset?.id ?? "").dispatchEvent(new Event("click"));
+    expect(root.querySelector('.panel [data-explain="not analyzed"]')?.textContent).toContain(
+      "resetHandler",
+    );
+    expect(root.querySelector(".panel pre")?.textContent).toBe("resetHandler");
   });
 });

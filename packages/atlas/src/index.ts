@@ -9,10 +9,16 @@ export { eventCatalog, execute } from "./fuzz/run.ts";
 export type { FuzzTarget, Observation, RunError, Trace } from "./fuzz/run.ts";
 export type { LiteralPool } from "./fuzz/mutate.ts";
 export { fuzzedMachine } from "./fuzz/to-atlas.ts";
+export { analyzeSource, annotateMachine } from "./ast/annotate.ts";
+export type { HandlerSite } from "./ast/annotate.ts";
+export type { AnalysisSource } from "./ast/program.ts";
 export { ATLAS_SCHEMA_VERSION } from "./schema.ts";
 export type {
   AtlasCoverage,
   AtlasDocument,
+  AtlasBranch,
+  AtlasBranchTarget,
+  AtlasComparison,
   AtlasEdge,
   AtlasEdgeKind,
   AtlasEdgeOrigin,
@@ -22,6 +28,7 @@ export type {
   AtlasFuzzError,
   AtlasFuzzSequence,
   AtlasJson,
+  AtlasLocation,
   AtlasMachine,
   AtlasState,
   AtlasStep,

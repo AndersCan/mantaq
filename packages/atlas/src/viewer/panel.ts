@@ -1,5 +1,6 @@
 import type { AtlasEdge, AtlasMachine, AtlasState, AtlasStep } from "../schema.ts";
 import { activatable, html } from "./dom.ts";
+import { renderExplanation } from "./explanation.ts";
 import type { Selection } from "./graph.ts";
 
 type Row = [label: string, value: Node | string];
@@ -100,7 +101,7 @@ function edgePanel(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLE
       ["emits", joined(edge.emits)],
       ["contexts", joined(edge.contexts)],
       ["hits", hitsText(edge.coverage)],
-      ["explanation", "not analyzed"],
+      ["explanation", renderExplanation(doc, { edge, machine })],
       ["reached by", reachedBy(doc, edge, machine)],
     ]),
   ]);

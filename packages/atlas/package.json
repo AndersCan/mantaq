@@ -21,14 +21,14 @@
     "@mantaq/core": "workspace:*",
     "@mantaq/pbt": "workspace:*",
     "@mantaq/traversal": "workspace:*",
-    "@mantaq/utils": "workspace:*"
+    "@mantaq/utils": "workspace:*",
+    "typescript": "catalog:"
   },
   "devDependencies": {
     "@mantaq/sugar": "workspace:*",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "catalog:",
     "happy-dom": "catalog:",
-    "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }

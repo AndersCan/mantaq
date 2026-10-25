@@ -1,10 +1,12 @@
 import type { AtlasInput } from "./atlas.ts";
 import { createAuthActor } from "./fixtures/auth.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { createCreditActor } from "./fixtures/credit.ts";
 import { createSagaActor } from "./fixtures/saga.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import type { AtlasJson, AtlasStep } from "./schema.ts";
 import { VirtualClock } from "@mantaq/core";
+import { join, resolve } from "node:path";
 import type { AnyActor } from "@mantaq/core";
 
 /**
@@ -39,13 +41,30 @@ const sagaPayloads: Record<string, AtlasJson[]> = {
   RELEASE_FAILED: [{ error: "Release declined" }],
 };
 
+const creditPayloads: Record<string, AtlasJson[]> = {
+  setTier: [{ tier: "silver" }],
+  apply: [{ score: 720, amount: 1000 }],
+  decide: [{ approve: true }],
+};
+
+/** Repo root: AST locations are reported relative to it. */
+export const EXAMPLE_ROOT = resolve(import.meta.dirname, "..", "..", "..");
+
+const FIXTURES = join(import.meta.dirname, "fixtures");
+
+/** An example machine: fuzz target plus the file that registers its handlers. */
+export interface Example extends FuzzTarget {
+  source: string;
+}
+
 function target(
   id: string,
   create: (clock: VirtualClock) => AnyActor<unknown>,
   payloads: Record<string, AtlasJson[]>,
-): FuzzTarget {
+): Example {
   return {
     id,
+    source: join(FIXTURES, `${id}.ts`),
     create: () => {
       const clock = VirtualClock();
       return { actor: create(clock), clock };
@@ -54,11 +73,12 @@ function target(
   };
 }
 
-export function exampleTargets(): FuzzTarget[] {
+export function exampleTargets(): Example[] {
   return [
     target("checkout", createCheckoutActor, checkoutPayloads),
     target("auth", createAuthActor, authPayloads),
     target("saga", createSagaActor, sagaPayloads),
+    target("credit", createCreditActor, creditPayloads),
   ];
 }
 
@@ -79,6 +99,7 @@ export function handWrittenBaselines(): Record<string, AtlasStep[][]> {
   const c = (events: string[]) => sequence(events, checkoutPayloads);
   const a = (events: string[]) => sequence(events, authPayloads);
   const s = (events: string[]) => sequence(events, sagaPayloads);
+  const cr = (events: string[]) => sequence(events, creditPayloads);
   const signedIn = ["SIGN_IN", "SIGN_IN_DONE"];
   const reserved = ["START", "INVENTORY_RESERVED"];
   const paid = [...reserved, "PAYMENT_PROCESSED"];
@@ -110,10 +131,12 @@ export function handWrittenBaselines(): Record<string, AtlasStep[][]> {
       s([...reserved, "CANCEL", "RELEASE_DONE"]),
       s([...shipped, "NOTIFICATION_FAILED"]),
     ],
+    // No example test file: the sample path a reader would write first.
+    credit: [cr(["apply", "reset"]), cr(["setTier"])],
   };
 }
 
-/** Structure-only inputs for the three examples (fresh actors, no run). */
+/** Structure-only inputs for the examples (fresh actors, no run). */
 export function exampleInputs(): AtlasInput[] {
   return exampleTargets().map((each) => ({ id: each.id, actor: each.create().actor }));
 }

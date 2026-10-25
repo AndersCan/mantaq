@@ -8,6 +8,7 @@ import type {
   AtlasMachine,
   AtlasState,
 } from "./schema.ts";
+import { readExplanation } from "./validate-explanation.ts";
 import { readFuzz } from "./validate-fuzz.ts";
 import {
   isRecord,
@@ -27,13 +28,6 @@ export type { AtlasIssue } from "./validate-read.ts";
 
 const EDGE_KINDS: ReadonlyArray<AtlasEdgeKind> = ["initial", "transition", "effect", "stay"];
 const EDGE_ORIGINS: ReadonlyArray<AtlasEdgeOrigin> = ["probe", "fuzz"];
-
-function readExplanation(reader: Reader, at: { record: JsonObject; path: string }): null {
-  if (at.record["explanation"] !== null) {
-    report(reader, { path: `${at.path}.explanation`, message: "expected null" });
-  }
-  return null;
-}
 
 function readState(reader: Reader, record: JsonObject, path: string): AtlasState {
   return {
