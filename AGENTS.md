@@ -90,6 +90,14 @@ Use `skill` tool with name matching the directory. Disk versions supersede syste
 
 <!--TEST TAXONOMY START-->
 
+# Bump Files (bumpy)
+
+Every PR needs a bump file in `.bumpy/` or CI fails: "No bump files found in this PR."
+
+- Releasable change (public API, behavior, fix): `bumpy add` (interactive; pick packages + level).
+- No release needed (refactor, docs, scripts, tests, CI): `bumpy add --empty --name <branch-slug>`.
+- Commit the file in the PR. One per PR.
+
 # Test Taxonomy
 
 Tests split by filename. The split is **what survives a refactor**, not what tests what:
