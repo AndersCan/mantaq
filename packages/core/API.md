@@ -226,7 +226,13 @@ The `reason` field of `ErrorInfo`: which boundary the machine died on.
 
 ```ts
 type ErrorReason =
-  "transition" | "effect" | "budget" | "output" | "internal" | "async" | "unhandled";
+  | "transition"
+  | "effect"
+  | "budget"
+  | "output"
+  | "internal"
+  | "async"
+  | "unhandled";
 ```
 
 ### TransitionResult

@@ -39,3 +39,4 @@ packages/*/reports
 
 # Astro cache (auto-generated)
 .astro/
+.vitest/

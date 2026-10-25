@@ -176,7 +176,7 @@ Semantics:
   `internal` → dispatch to self. Id in `inputs` → dispatch to self.
   Else → output handler (parent queue), or dropped if no parent.
 - No handler for an event in the current state → `[Actor] no transition
-for event "X" in state "Y". Event dropped.` warning. That warning =
+  for event "X" in state "Y". Event dropped.` warning. That warning =
   wiring bug. Anything you emit must have a handler in the state that
   receives it.
 - `internalBudget` (default 10,000) guards emit loops. Exceeded → current drain aborted (effects aborted, queued events dropped), warning. Actor still processes future sends.

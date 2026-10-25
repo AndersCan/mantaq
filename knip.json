@@ -11,5 +11,6 @@
     "@stryker-mutator/vitest-runner",
     "@typescript/native-preview",
     "@varlock/bumpy"
-  ]
+  ],
+  "entry": ["scripts/bench-compare.mjs"]
 }

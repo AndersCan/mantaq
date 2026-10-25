@@ -1,0 +1,23 @@
+{
+  "name": "@mantaq/bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Performance budgets for core features, gated against a committed baseline.",
+  "type": "module",
+  "scripts": {
+    "bench": "vp test bench",
+    "bench:baseline": "MANTAQ_BENCH_WRITE_BASELINE=1 vp test bench",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@mantaq/core": "workspace:*",
+    "@mantaq/sugar": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
