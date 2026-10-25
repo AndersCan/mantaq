@@ -12,3 +12,5 @@ export type {
   AtlasMachine,
   AtlasState,
 } from "./schema.ts";
+export { parseAtlas, validateAtlas } from "./validate.ts";
+export type { AtlasIssue } from "./validate.ts";

@@ -19,6 +19,10 @@ import {
 
 export interface AtlasInput {
   id: string;
+  /**
+   * Fresh actor to probe for structure. Handlers that read live actor state
+   * see this actor's current state, so pass one that has not been driven.
+   */
   actor: AnyActor<unknown>;
   /** History from `instrument(actor)`; omit for a structure-only document. */
   history?: History;

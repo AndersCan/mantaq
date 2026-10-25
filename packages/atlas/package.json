@@ -10,17 +10,23 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "atlas:export": "node src/cli.ts export"
   },
   "dependencies": {
+    "@dagrejs/dagre": "catalog:",
     "@mantaq/core": "workspace:*",
-    "@mantaq/traversal": "workspace:*"
+    "@mantaq/traversal": "workspace:*",
+    "@mantaq/utils": "workspace:*"
   },
   "devDependencies": {
     "@mantaq/sugar": "workspace:*",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "catalog:",
+    "happy-dom": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

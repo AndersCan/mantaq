@@ -1,4 +1,5 @@
 import { toAtlas } from "./atlas.ts";
+import { exampleInputs } from "./examples.ts";
 import { createAuthActor } from "./fixtures/auth.ts";
 import { createCheckoutActor, submitBasicInfo } from "./fixtures/checkout.ts";
 import { createSagaActor } from "./fixtures/saga.ts";
@@ -83,11 +84,19 @@ describe("determinism", () => {
 });
 
 describe("coverage", () => {
+  test("example export keeps back undetermined (structure from a fresh actor)", () => {
+    const machine = toAtlas(exampleInputs()).machines.find((m) => m.id === "checkout");
+    const back = machine?.edges.filter((e) => e.event === "back") ?? [];
+    expect(back.length).toBeGreaterThan(0);
+    expect(back.every((e) => e.to === null)).toBe(true);
+  });
+
   test("counts state visits and edge hits from instrumented run", () => {
-    const actor = createCheckoutActor();
-    const run = instrument(actor);
+    const run = instrument(createCheckoutActor());
     run.send(submitBasicInfo.create({ email: "a@b.c" }));
-    const machine = toAtlas([{ id: "checkout", actor, history: run.history }]).machines[0];
+    const machine = toAtlas([
+      { id: "checkout", actor: createCheckoutActor(), history: run.history },
+    ]).machines[0];
     expect(machine?.states.find((s) => s.id === "shippingAddress")?.coverage).toEqual({ hits: 1 });
     expect(machine?.states.find((s) => s.id === "payment")?.coverage).toEqual({ hits: 0 });
     const edge = machine?.edges.find(

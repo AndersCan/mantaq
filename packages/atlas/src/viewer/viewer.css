@@ -1,0 +1,235 @@
+:root {
+  --bg: #fbfbfa;
+  --fg: #1d1d1f;
+  --muted: #6b6b70;
+  --line: #4a4a52;
+  --state-bg: #ffffff;
+  --state-border: #3b3b44;
+  --region-bg: #f1f1ef;
+  --accent: #2463eb;
+  --unknown: #a35c00;
+  --banner-bg: #fff6e0;
+  --banner-fg: #5a3e00;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141416;
+    --fg: #ececf0;
+    --muted: #9a9aa3;
+    --line: #b4b4bf;
+    --state-bg: #1f1f23;
+    --state-border: #c9c9d2;
+    --region-bg: #1a1a1e;
+    --accent: #7aa7ff;
+    --unknown: #f0a742;
+    --banner-bg: #2e2510;
+    --banner-fg: #f3d58c;
+    color-scheme: dark;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    14px/1.4 system-ui,
+    sans-serif;
+}
+
+.toolbar {
+  margin-bottom: 12px;
+}
+
+.atlas-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.atlas-header h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.banner {
+  background: var(--banner-bg);
+  color: var(--banner-fg);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.atlas-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+}
+
+@media (max-width: 760px) {
+  .atlas-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.canvas {
+  overflow: auto;
+}
+
+.panel {
+  border-left: 1px solid var(--region-bg);
+  padding-left: 16px;
+}
+
+.panel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+}
+
+.panel dt {
+  color: var(--muted);
+}
+
+.panel dd {
+  margin: 0;
+}
+
+.panel ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.link {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.graph {
+  width: 100%;
+  height: auto;
+}
+
+.graph text {
+  fill: var(--fg);
+  font-size: 12px;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.graph .arrow-head {
+  fill: var(--line);
+}
+
+.region rect {
+  fill: var(--region-bg);
+  stroke: var(--muted);
+  stroke-dasharray: 2 3;
+}
+
+.region text {
+  fill: var(--muted);
+}
+
+.state .frame {
+  fill: var(--state-bg);
+  stroke: var(--state-border);
+  stroke-width: 1.5;
+}
+
+.state.final .inner {
+  fill: none;
+}
+
+.state,
+.edge {
+  cursor: pointer;
+  outline: none;
+}
+
+.edge path {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.edge.internal path {
+  stroke-dasharray: 1 3;
+  stroke-linecap: round;
+}
+
+.edge.internal text {
+  font-style: italic;
+}
+
+.edge.effect {
+  opacity: 0.45;
+}
+
+.edge.undetermined path {
+  stroke: var(--unknown);
+  stroke-dasharray: 6 4;
+}
+
+.unknown-node circle {
+  fill: var(--state-bg);
+  stroke: var(--unknown);
+  stroke-dasharray: 4 3;
+}
+
+.unknown-node text {
+  fill: var(--unknown);
+  font-weight: 700;
+}
+
+.entry circle {
+  fill: var(--line);
+}
+
+.entry path {
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.coverage-on .unreached {
+  opacity: 0.35;
+}
+
+.coverage-on .state.unreached .frame,
+.coverage-on .edge.unreached path {
+  stroke-dasharray: 3 3;
+}
+
+.highlight path,
+.highlight .frame,
+.highlight circle,
+.selected path,
+.selected .frame {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.state:focus-visible .frame,
+.edge:focus-visible path {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.load-error {
+  color: var(--unknown);
+}
