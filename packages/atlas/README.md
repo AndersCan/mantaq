@@ -81,11 +81,11 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 
 **Probe** (`toAtlas`, Phase 1): `@mantaq/traversal` calls each handler with payload `{}` and a sample context. Fast, total, shallow.
 
-**Fuzzer** (`fuzz`, Phase 3): a fresh actor and `VirtualClock` per run, so it is synchronous and deterministic. Mutations: insert, delete, swap, payload leaf tweak, time advance. A run is kept when it reaches a new feature (`state:x`, `edge:a>e>b`, `stay:a>e`, `error:a>e`), then shrunk to 1-minimal. Internal events are injected only when the current state handles them, as a live effect would (core rejects the rest). Payloads come from the per-machine samples and are mutated leaf by leaf, keeping each leaf's JSON type and never dropping keys. So a handler that throws is a real finding, not a type violation the compiler would reject.
+**Fuzzer** (`fuzz`, Phase 3): a fresh actor and `VirtualClock` per run, so it is synchronous and deterministic. Mutations: insert, delete, swap, payload leaf tweak, time advance, and **loop**. Loop repeats, 2–13 times or a compared literal's count, a step that changed the actor's context, so counter guards like `if (attempts > 10)` become reachable. A step that changes nothing is never looped. A run is kept when it reaches a new feature (`state:x`, `edge:a>e>b`, `stay:a>e`, `error:a>e`), then shrunk to 1-minimal. Internal events are injected only when the current state handles them, as a live effect would (core rejects the rest). Payloads come from the per-machine samples and are mutated leaf by leaf, keeping each leaf's JSON type and never dropping keys. So a handler that throws is a real finding, not a type violation the compiler would reject.
 
 **AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { eventRef, handler })` / `m.onAny({ eventRef, handler })` and resolves names from the literal types of `state.name` / `eventRef.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. A specific `on` wins over `onAny`, as at runtime.
 
-**Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons. It only helps when handlers compare payload fields against literals far from the samples. See `docs/atlas/phase5-comparison.md`.
+**Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See `docs/atlas/phase5-comparison.md`.
 
 ## What it cannot show
 
@@ -100,4 +100,4 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 
 ## Fixtures
 
-`src/fixtures/{checkout,auth,saga}.ts` copy the handlers of `packages/examples/*.test.ts` verbatim, with effects stubbed. The examples live in test files and cannot be imported, so the copies can drift from them. `credit.ts` (conditional handlers, far literals) and `switchy.ts` (unsupported control flow) exist for the AST and guidance tests.
+`src/fixtures/{checkout,auth,saga}.ts` copy the handlers of `packages/examples/*.test.ts` verbatim, with effects stubbed. The examples live in test files and cannot be imported, so the copies can drift from them. `credit.ts` (conditional handlers, far literals), `retry.ts` (context counter, `attempts > 10`) and `switchy.ts` (unsupported control flow) exist for the AST, loop and guidance tests.

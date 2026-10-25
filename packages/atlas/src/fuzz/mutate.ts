@@ -14,7 +14,18 @@ export interface MutationContext {
   payloads: Readonly<Record<string, ReadonlyArray<AtlasJson>>>;
   literals: LiteralPool;
   maxLength: number;
+  /** Allow the repeat (loop) operator. On by default; off only for comparisons. */
+  repeat: boolean;
 }
+
+/** A corpus entry as the mutator sees it: steps plus which of them changed context. */
+export interface Parent {
+  steps: ReadonlyArray<AtlasStep>;
+  contextSteps: ReadonlyArray<number>;
+}
+
+const REPEAT_COUNTS = [2, 3, 5, 8, 13];
+const MAX_REPEAT = 64;
 
 const ADVANCES = [1, 10, 100, 500, 1000, 5000];
 
@@ -123,10 +134,38 @@ function advance(steps: AtlasStep[], context: MutationContext): AtlasStep[] {
 
 const OPERATORS = [insert, insert, insert, remove, swap, mutatePayload, mutatePayload, advance];
 
-/** Apply 1-3 random operators: insert, delete, swap, payload tweak, time advance. */
-export function mutate(steps: ReadonlyArray<AtlasStep>, context: MutationContext): AtlasStep[] {
-  let child = [...steps];
-  const rounds = 1 + context.rng.int(3);
+/** Loop lengths to try: small counts plus any integer literal a handler compares against. */
+function repeatCounts(context: MutationContext): number[] {
+  const fromLiterals = context.literals.numbers.filter(
+    (value) => Number.isInteger(value) && value >= 2 && value <= MAX_REPEAT,
+  );
+  return [...REPEAT_COUNTS, ...fromLiterals];
+}
+
+/**
+ * Loop a step that changed the actor's context (a counter, an accumulating
+ * list): `if (retries > 10)` needs the same event many times, and repeating
+ * a step that changes nothing would only add noise. Inserts `count` copies.
+ */
+function repeat(parent: Parent, context: MutationContext): AtlasStep[] {
+  const at = context.rng.pick(parent.contextSteps);
+  const step = at === undefined ? undefined : parent.steps[at];
+  if (at === undefined || step === undefined) return [...parent.steps];
+  const room = context.maxLength * 4 - parent.steps.length;
+  const count = Math.min(context.rng.pick(repeatCounts(context)) ?? 2, room);
+  if (count <= 0) return [...parent.steps];
+  const copies: AtlasStep[] = Array.from({ length: count }, () => step);
+  return [...parent.steps.slice(0, at + 1), ...copies, ...parent.steps.slice(at + 1)];
+}
+
+/**
+ * Apply 1-3 random operators: insert, delete, swap, payload tweak, time
+ * advance. Sometimes first loops a context-changing step of the parent.
+ */
+export function mutate(parent: Parent, context: MutationContext): AtlasStep[] {
+  const loop = context.repeat && parent.contextSteps.length > 0 && context.rng.chance(0.2);
+  let child = loop ? repeat(parent, context) : [...parent.steps];
+  const rounds = (loop ? 0 : 1) + context.rng.int(3);
   for (let round = 0; round < rounds; round += 1) {
     const operator = context.rng.pick(OPERATORS) ?? insert;
     child = operator(child, context);

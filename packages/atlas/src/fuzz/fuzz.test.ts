@@ -168,3 +168,34 @@ describe("test coverage", () => {
     expect(Either.getRight(parseAtlas(text))?.machines[0]).toEqual(machine);
   });
 });
+
+describe("loops over context-changing steps", () => {
+  const retry = exampleTargets().find((target) => target.id === "retry");
+  const lockout = "edge:connecting>failed>lockedOut";
+
+  test("only steps that changed context are loop candidates", () => {
+    if (!retry) return;
+    const step = (event: string) => ({ kind: "event" as const, event, payload: null });
+    const failed = { kind: "event" as const, event: "failed", payload: { reason: "x" } };
+    // connect: state change, no context change. failed: attempts += 1. reset: unhandled in connecting.
+    const trace = execute(retry, [step("connect"), failed, step("reset"), failed]);
+    expect(trace.contextSteps).toEqual([1, 3]);
+  });
+
+  test("`attempts > 10` is reached by looping; plain mutation misses it (same seed)", () => {
+    if (!retry) return;
+    const looped = fuzz(retry, { seed: DEFAULT_SEED, iterations: 2000 });
+    const plain = fuzz(retry, { seed: DEFAULT_SEED, iterations: 2000, repeat: false });
+    expect(looped.firstHit.has(lockout)).toBe(true);
+    expect(plain.firstHit.has(lockout)).toBe(false);
+  });
+
+  test("the kept sequence shrinks to connect + exactly 11 failures", () => {
+    if (!retry) return;
+    const entry = fuzz(retry, { seed: DEFAULT_SEED, iterations: 2000 }).corpus.find((each) =>
+      each.discovered.includes(lockout),
+    );
+    const events = entry?.steps.map((step) => (step.kind === "event" ? step.event : "advance"));
+    expect(events).toEqual(["connect", ...Array.from({ length: 11 }, () => "failed")]);
+  });
+});

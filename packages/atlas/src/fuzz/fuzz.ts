@@ -11,6 +11,8 @@ export interface FuzzOptions {
   /** Longest sequence the mutator will grow. Default 24. */
   maxLength?: number;
   literals?: LiteralPool;
+  /** Loop context-changing steps (default true). False reproduces plain Phase 3 mutation. */
+  repeat?: boolean;
   /**
    * Optional search guidance (Phase 5). Sees every run; returning true keeps
    * the run in the corpus as a stepping stone even without new coverage.
@@ -65,6 +67,7 @@ function mutationContext(target: FuzzTarget, options: FuzzOptions): MutationCont
     payloads: target.payloads ?? {},
     literals: options.literals ?? { numbers: [], strings: [] },
     maxLength: options.maxLength ?? 24,
+    repeat: options.repeat ?? true,
   };
 }
 
@@ -93,6 +96,8 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   const seen = new Set<string>();
   const firstHit = new Map<string, number>();
   const corpus: CorpusEntry[] = [];
+  /** Parallel to `corpus`: which steps of each entry changed context. */
+  const contextSteps: number[][] = [];
 
   function consider(steps: AtlasStep[], iteration: number): void {
     const trace = execute(target, steps);
@@ -102,12 +107,16 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
       seen.add(feature);
       firstHit.set(feature, iteration);
     }
-    if (discovered.length > 0 || guided) corpus.push({ steps, discovered, iteration });
+    if (discovered.length > 0 || guided) {
+      corpus.push({ steps, discovered, iteration });
+      contextSteps.push(trace.contextSteps);
+    }
   }
 
   consider([], 0);
   for (let iteration = 1; iteration <= options.iterations; iteration += 1) {
-    const parent = context.rng.pick(corpus)?.steps ?? [];
+    const at = context.rng.int(corpus.length);
+    const parent = { steps: corpus[at]?.steps ?? [], contextSteps: contextSteps[at] ?? [] };
     consider(mutate(parent, context), iteration);
   }
 

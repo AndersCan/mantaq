@@ -3,7 +3,7 @@ import type { FuzzOptions } from "./fuzz.ts";
 import type { LiteralPool } from "./mutate.ts";
 import type { Trace } from "./run.ts";
 
-/** A payload comparison in a specific handler, from the AST explanation. */
+/** A payload or context comparison in a specific handler, from the AST explanation. */
 interface Probe {
   /** null = onAny handler, applies in every state. */
   state: string | null;
@@ -39,7 +39,6 @@ function probesOf(machine: AtlasMachine): Probe[] {
     if (explanation?.status !== "analyzed") continue;
     const state = explanation.registration === "onAny" ? null : edge.from;
     for (const comparison of explanation.comparisons) {
-      if (comparison.source !== "payload") continue;
       const key = `${state}>${edge.event}>${JSON.stringify(comparison)}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -124,7 +123,9 @@ export function branchDistanceGuide(machine: AtlasMachine): (trace: Trace) => bo
     for (const observation of trace.observations) {
       probes.forEach((probe, index) => {
         if (!applies(probe, observation)) return;
-        const value = valueAt(observation.payload, probe.comparison.path);
+        const source =
+          probe.comparison.source === "payload" ? observation.payload : observation.context;
+        const value = valueAt(source, probe.comparison.path);
         for (const outcome of [true, false]) {
           const key = `${index}:${outcome}`;
           const distance = branchDistance(probe.comparison, { value, outcome });

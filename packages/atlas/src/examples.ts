@@ -2,6 +2,7 @@ import type { AtlasInput } from "./atlas.ts";
 import { createAuthActor } from "./fixtures/auth.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createCreditActor } from "./fixtures/credit.ts";
+import { createRetryActor } from "./fixtures/retry.ts";
 import { createSagaActor } from "./fixtures/saga.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import type { AtlasJson, AtlasStep } from "./schema.ts";
@@ -47,6 +48,10 @@ const creditPayloads: Record<string, AtlasJson[]> = {
   decide: [{ approve: true }],
 };
 
+const retryPayloads: Record<string, AtlasJson[]> = {
+  failed: [{ reason: "timeout" }],
+};
+
 /** Repo root: AST locations are reported relative to it. */
 export const EXAMPLE_ROOT = resolve(import.meta.dirname, "..", "..", "..");
 
@@ -79,6 +84,7 @@ export function exampleTargets(): Example[] {
     target("auth", createAuthActor, authPayloads),
     target("saga", createSagaActor, sagaPayloads),
     target("credit", createCreditActor, creditPayloads),
+    target("retry", createRetryActor, retryPayloads),
   ];
 }
 
@@ -100,6 +106,7 @@ export function handWrittenBaselines(): Record<string, AtlasStep[][]> {
   const a = (events: string[]) => sequence(events, authPayloads);
   const s = (events: string[]) => sequence(events, sagaPayloads);
   const cr = (events: string[]) => sequence(events, creditPayloads);
+  const r = (events: string[]) => sequence(events, retryPayloads);
   const signedIn = ["SIGN_IN", "SIGN_IN_DONE"];
   const reserved = ["START", "INVENTORY_RESERVED"];
   const paid = [...reserved, "PAYMENT_PROCESSED"];
@@ -133,6 +140,7 @@ export function handWrittenBaselines(): Record<string, AtlasStep[][]> {
     ],
     // No example test file: the sample path a reader would write first.
     credit: [cr(["apply", "reset"]), cr(["setTier"])],
+    retry: [r(["connect", "failed", "opened"])],
   };
 }
 

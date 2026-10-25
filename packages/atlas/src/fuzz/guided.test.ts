@@ -97,7 +97,13 @@ describe("comparison report", () => {
       seeds: [1, 2],
       checkpoints: [10, 50],
     });
-    expect(row.arms.map((arm) => arm.arm)).toEqual(["blind", "literals", "distance", "guided"]);
+    expect(row.arms.map((arm) => arm.arm)).toEqual([
+      "no-loop",
+      "blind",
+      "literals",
+      "distance",
+      "guided",
+    ]);
     const report = renderComparison([row]);
     expect(report).toContain("### credit");
     expect(report).toMatch(/^\| guided \| /m);

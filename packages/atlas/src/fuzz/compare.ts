@@ -5,12 +5,13 @@ import { branchDistanceGuide, guidance, literalPool } from "./guided.ts";
 import type { FuzzTarget } from "./run.ts";
 
 /**
- * blind: Phase 3. literals: + AST literal seeding. distance: + branch-distance
- * guide only. guided: literals + distance (Phase 5).
+ * no-loop: Phase 3 mutation only. blind: + looping context-changing steps.
+ * literals: + AST literal seeding. distance: + branch-distance guide only.
+ * guided: literals + distance (what atlas:export uses).
  */
-type Arm = "blind" | "literals" | "distance" | "guided";
+type Arm = "no-loop" | "blind" | "literals" | "distance" | "guided";
 
-const ARMS: ReadonlyArray<Arm> = ["blind", "literals", "distance", "guided"];
+const ARMS: ReadonlyArray<Arm> = ["no-loop", "blind", "literals", "distance", "guided"];
 
 interface ArmSummary {
   arm: Arm;
@@ -36,6 +37,7 @@ function options(
   context: { machine: AtlasMachine; seed: number; iterations: number },
 ): FuzzOptions {
   const base = { seed: context.seed, iterations: context.iterations };
+  if (arm === "no-loop") return { ...base, repeat: false };
   if (arm === "blind") return base;
   if (arm === "distance") return { ...base, guide: branchDistanceGuide(context.machine) };
   if (arm === "literals") return { ...base, literals: literalPool(context.machine) };

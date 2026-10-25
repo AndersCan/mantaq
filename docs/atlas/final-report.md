@@ -18,7 +18,7 @@ Schema went v1 → v2 (edge `origin`, kind `stay`, `machine.fuzz`) → v3 (`expl
 
 Coverage overlay: the viewer picks between "example tests" (dimmed = untested; the default) and "fuzz runs" (dimmed = never observed; on probe edges, likely an impossible prediction, and the panel says so).
 
-Tests: 81 in `packages/atlas`. They cover schema validation (round-trip plus one error test per section), deterministic output (snapshots, byte-identical export per seed), fuzzer replay (every kept sequence reproduces its features; kept sequences are 1-minimal), fuzzer ≥ hand-written coverage on every example, AST on conditional / ternary / stay / by-reference / switch / missing-source handlers, and viewer DOM assertions (no screenshots).
+Tests: 85 in `packages/atlas`. They cover schema validation (round-trip plus one error test per section), deterministic output (snapshots, byte-identical export per seed), fuzzer replay (every kept sequence reproduces its features; kept sequences are 1-minimal), fuzzer ≥ hand-written coverage on every example, AST on conditional / ternary / stay / by-reference / switch / missing-source handlers, and viewer DOM assertions (no screenshots).
 
 ## Acceptance numbers
 
@@ -54,7 +54,7 @@ Fuzzer vs hand-written example tests (features = states + edges + stays reached,
 
 ## Uncertain
 
-- **Is branch distance worth keeping?** It gives no gain alone, and a 2× faster first hit only when combined with literals, on one synthetic fixture. Recommendation: keep the AST and literal seeding, and remove branch distance first if code budget matters (`phase5-comparison.md`).
+- **Is guidance worth keeping?** Looping is required for counter guards: on `retry`, no seed reaches `lockedOut` without it, and all do with it. Literal seeding is required for far payload literals (`credit`). Branch distance pays off on counters (131 → 61 iterations) but not on payload jumps. Looping slows `credit` (guided 61 → 106 iterations) and spends some budget on the real examples. The evidence for benefit comes from two fixtures I wrote; the real examples show none (`phase5-comparison.md`).
 - **`stay` edges from fuzzing vs probe-undetermined edges.** For auth's `MONITOR_TICK`, probing says "undetermined" (the handler returns `{}`), while fuzzing adds a `stay` per state. Both are shown. It might be cleaner for traversal to report `{}` as "stays" rather than undetermined, but that is a traversal change.
 - **History-based coverage on probe edges** still conflates stay and self-loop (limitation 5) for probe-origin self-loops. Fuzz-origin edges do not.
 - **Viewer at scale.** It was only tried on machines of up to 9 states and ~40 edges. Dagre layering is fine there; it is unknown beyond that.

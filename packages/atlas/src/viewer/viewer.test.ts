@@ -201,7 +201,7 @@ describe("viewer: coverage and switching", () => {
 function fuzzedCheckout(): AtlasDocument {
   const target = exampleTargets().find((each) => each.id === "checkout");
   if (!target) return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [] };
-  const machine = fuzzedMachine(target, fuzz(target, { seed: 1, iterations: 1000 }));
+  const machine = fuzzedMachine(target, fuzz(target, { seed: DEFAULT_SEED, iterations: 2000 }));
   return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] };
 }
 
@@ -235,7 +235,7 @@ describe("viewer: fuzz results", () => {
   test("idle panel shows the fuzz run summary", () => {
     const root = mount(fuzzedCheckout());
     expect(root.querySelector(".fuzz-summary")).not.toBeNull();
-    expect(field(root, "seed")).toBe("1");
+    expect(field(root, "seed")).toBe(String(DEFAULT_SEED));
     expect(field(root, "handler errors")).toBe("none");
   });
 });
