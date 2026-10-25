@@ -28,6 +28,20 @@ Keep the AST layer and literal seeding. Keep looping: it is the only arm that un
 
 Caveat on evidence: `credit` and `retry` are fixtures written to have far literals and counters. The three real examples show no benefit from any arm. Treat those two as "the mechanism works", not "typical machines benefit".
 
+## Tried and removed: learned operator schedule
+
+A deterministic bandit (after AFL's MOpt) picked mutation operators by their smoothed rate of producing kept runs, instead of fixed weights. Same 30 seeds, on top of `guided`:
+
+| variant                    | checkout end | auth end | saga end | credit → manualReview | retry → lockedOut |
+| -------------------------- | -----------: | -------: | -------: | --------------------: | ----------------: |
+| fixed weights (`guided`)   |         10.9 |     14.0 |     18.4 |                   106 |                55 |
+| bandit, uniform prior      |         10.9 |     14.0 |     17.1 |                   107 |                41 |
+| bandit, fixed-weight prior |         11.0 |     14.0 |     18.1 |                   162 |                40 |
+
+"end" = handler outcomes at 2000 iterations. The other columns are the median iteration of first hit.
+
+The bandit is faster on `retry`, worse on `saga` (uniform prior) or `credit` (fixed-weight prior), and within noise on the rest. A run keeps only ~10–20 children, which is too little reward to learn from, and credit assignment to 1–3 stacked operators is coarse. It doesn't beat fixed weights, so it was deleted. This is the measured answer to "can a GA/RL learner do the testing": on machines this size, what blocks coverage is missing information (constants, counters, payload shapes), not the choice of search policy.
+
 ## Full report
 
 ### checkout
