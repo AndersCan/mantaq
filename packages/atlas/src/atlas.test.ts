@@ -93,7 +93,7 @@ describe("coverage", () => {
 
   test("counts state visits and edge hits from instrumented run", () => {
     const run = instrument(createCheckoutActor());
-    run.send(submitBasicInfo.create({ email: "a@b.c" }));
+    run.send(submitBasicInfo.create({ email: "a@b.c", name: "A" }));
     const machine = toAtlas([
       { id: "checkout", actor: createCheckoutActor(), history: run.history },
     ]).machines[0];

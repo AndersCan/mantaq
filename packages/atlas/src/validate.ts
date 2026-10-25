@@ -1,113 +1,32 @@
 import { ATLAS_SCHEMA_VERSION } from "./schema.ts";
 import type {
-  AtlasCoverage,
   AtlasDocument,
   AtlasEdge,
   AtlasEdgeKind,
+  AtlasEdgeOrigin,
   AtlasEvent,
   AtlasMachine,
   AtlasState,
 } from "./schema.ts";
+import { readFuzz } from "./validate-fuzz.ts";
+import {
+  isRecord,
+  readBoolean,
+  readCoverage,
+  readEnum,
+  readList,
+  readNullableString,
+  readString,
+  readStrings,
+  report,
+} from "./validate-read.ts";
+import type { AtlasIssue, JsonObject, Reader } from "./validate-read.ts";
 import { Either } from "@mantaq/utils";
 
-/** One problem found while reading a document, with a JSON-path-like location. */
-export interface AtlasIssue {
-  path: string;
-  message: string;
-}
+export type { AtlasIssue } from "./validate-read.ts";
 
-type JsonObject = Record<string, unknown>;
-
-interface Reader {
-  issues: AtlasIssue[];
-}
-
-function isRecord(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function report(reader: Reader, issue: AtlasIssue): void {
-  reader.issues.push(issue);
-}
-
-function readString(reader: Reader, at: { record: JsonObject; key: string; path: string }): string {
-  const value = at.record[at.key];
-  if (typeof value === "string") return value;
-  report(reader, { path: `${at.path}.${at.key}`, message: "expected string" });
-  return "";
-}
-
-function readNullableString(
-  reader: Reader,
-  at: { record: JsonObject; key: string; path: string },
-): string | null {
-  const value = at.record[at.key];
-  if (value === null) return null;
-  return readString(reader, at);
-}
-
-function readBoolean(
-  reader: Reader,
-  at: { record: JsonObject; key: string; path: string },
-): boolean {
-  const value = at.record[at.key];
-  if (typeof value === "boolean") return value;
-  report(reader, { path: `${at.path}.${at.key}`, message: "expected boolean" });
-  return false;
-}
-
-function readStrings(
-  reader: Reader,
-  at: { record: JsonObject; key: string; path: string },
-): string[] {
-  const value = at.record[at.key];
-  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
-    return value.filter((item): item is string => typeof item === "string");
-  }
-  report(reader, { path: `${at.path}.${at.key}`, message: "expected string[]" });
-  return [];
-}
-
-function readCoverage(
-  reader: Reader,
-  at: { record: JsonObject; key: string; path: string },
-): AtlasCoverage | null {
-  const value = at.record[at.key];
-  if (value === null) return null;
-  if (isRecord(value) && Number.isInteger(value["hits"]) && typeof value["hits"] === "number") {
-    return { hits: value["hits"] };
-  }
-  report(reader, { path: `${at.path}.${at.key}`, message: "expected null or { hits: integer }" });
-  return null;
-}
-
-function readList<T>(
-  reader: Reader,
-  at: { record: JsonObject; key: string; path: string },
-  item: (record: JsonObject, path: string) => T,
-): T[] {
-  const value = at.record[at.key];
-  if (!Array.isArray(value)) {
-    report(reader, { path: `${at.path}.${at.key}`, message: "expected array" });
-    return [];
-  }
-  return value.flatMap((entry, index) => {
-    const path = `${at.path}.${at.key}[${index}]`;
-    if (isRecord(entry)) return [item(entry, path)];
-    report(reader, { path, message: "expected object" });
-    return [];
-  });
-}
-
-const EDGE_KINDS: ReadonlyArray<AtlasEdgeKind> = ["initial", "transition", "effect"];
-
-function readEdgeKind(reader: Reader, at: { record: JsonObject; path: string }): AtlasEdgeKind {
-  const value = at.record["kind"];
-  const kind = EDGE_KINDS.find((candidate) => candidate === value);
-  if (kind) return kind;
-  report(reader, { path: `${at.path}.kind`, message: `expected one of ${EDGE_KINDS.join(", ")}` });
-  return "transition";
-}
+const EDGE_KINDS: ReadonlyArray<AtlasEdgeKind> = ["initial", "transition", "effect", "stay"];
+const EDGE_ORIGINS: ReadonlyArray<AtlasEdgeOrigin> = ["probe", "fuzz"];
 
 function readExplanation(reader: Reader, at: { record: JsonObject; path: string }): null {
   if (at.record["explanation"] !== null) {
@@ -144,7 +63,8 @@ function readEdge(reader: Reader, record: JsonObject, path: string): AtlasEdge {
     from: readString(reader, { record, key: "from", path }),
     event: readString(reader, { record, key: "event", path }),
     to: readNullableString(reader, { record, key: "to", path }),
-    kind: readEdgeKind(reader, { record, path }),
+    kind: readEnum(reader, { record, key: "kind", path }, EDGE_KINDS) ?? "transition",
+    origin: readEnum(reader, { record, key: "origin", path }, EDGE_ORIGINS) ?? "probe",
     emits: readStrings(reader, { record, key: "emits", path }),
     contexts: readStrings(reader, { record, key: "contexts", path }),
     explanation: readExplanation(reader, { record, path }),
@@ -186,6 +106,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): AtlasMac
     edges: readList(reader, { record, key: "edges", path }, (item, at) =>
       readEdge(reader, item, at),
     ),
+    fuzz: readFuzz(reader, { record, path }),
   };
   checkReferences(reader, machine, path);
   return machine;

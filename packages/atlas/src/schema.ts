@@ -2,7 +2,7 @@
  * Atlas document schema. Bump `ATLAS_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const ATLAS_SCHEMA_VERSION = 1;
+export const ATLAS_SCHEMA_VERSION = 2;
 
 export interface AtlasCoverage {
   hits: number;
@@ -23,13 +23,20 @@ export interface AtlasState {
 export interface AtlasEvent {
   id: string;
   internal: boolean;
-  /** Payload types are erased at runtime; always null in v1. */
+  /** Payload types are erased at runtime; always null. */
   payloadType: null;
 }
 
-export type AtlasEdgeKind = "initial" | "transition" | "effect";
+/**
+ * `stay`: the event was handled but the state did not change (handler returned
+ * no target). Only observed by running the machine, never by probing.
+ */
+export type AtlasEdgeKind = "initial" | "transition" | "effect" | "stay";
 
-/** Placeholder for Phase 4 (AST annotation). Always null in v1. */
+/** `probe`: found by synthetic traversal. `fuzz`: observed only while fuzzing. */
+export type AtlasEdgeOrigin = "probe" | "fuzz";
+
+/** Placeholder for Phase 4 (AST annotation). Always null in v2. */
 export type AtlasExplanation = null;
 
 export interface AtlasEdge {
@@ -40,6 +47,7 @@ export interface AtlasEdge {
   /** null = handler target depends on payload or context (undetermined). */
   to: string | null;
   kind: AtlasEdgeKind;
+  origin: AtlasEdgeOrigin;
   emits: string[];
   /** Sample-context names under which this edge was observed. */
   contexts: string[];
@@ -56,6 +64,43 @@ export interface AtlasMachine {
   states: AtlasState[];
   events: AtlasEvent[];
   edges: AtlasEdge[];
+  /** null = not fuzzed. */
+  fuzz: AtlasFuzz | null;
+}
+
+export type AtlasJson =
+  | null
+  | boolean
+  | number
+  | string
+  | AtlasJson[]
+  | { [key: string]: AtlasJson };
+
+/** One input to a machine: an event (`send` for inputs, `inject` for internal) or a clock advance. */
+export type AtlasStep =
+  | { kind: "event"; event: string; payload: AtlasJson }
+  | { kind: "advance"; ms: number };
+
+export interface AtlasFuzzSequence {
+  /** Shrunk replayable sequence, starting from a fresh actor. */
+  steps: AtlasStep[];
+  /** Coverage features this sequence was kept for, e.g. `edge:a>go>b`. */
+  discovered: string[];
+}
+
+/** A handler that threw: the actor entered its error state. */
+export interface AtlasFuzzError {
+  from: string;
+  event: string;
+  message: string;
+  steps: AtlasStep[];
+}
+
+export interface AtlasFuzz {
+  seed: number;
+  iterations: number;
+  corpus: AtlasFuzzSequence[];
+  errors: AtlasFuzzError[];
 }
 
 export interface AtlasDocument {

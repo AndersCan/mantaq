@@ -1,4 +1,4 @@
-import type { AtlasEdge, AtlasMachine, AtlasState } from "../schema.ts";
+import type { AtlasEdge, AtlasMachine, AtlasState, AtlasStep } from "../schema.ts";
 import { activatable, html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 
@@ -22,6 +22,40 @@ function joined(values: ReadonlyArray<string>): string {
 
 function hitsText(coverage: { hits: number } | null): string {
   return coverage === null ? "no run supplied" : String(coverage.hits);
+}
+
+function stepText(step: AtlasStep): string {
+  if (step.kind === "advance") return `advance ${step.ms}ms`;
+  return step.payload === null ? step.event : `${step.event} ${JSON.stringify(step.payload)}`;
+}
+
+function featureOf(edge: AtlasEdge): string | null {
+  if (edge.kind === "stay") return `stay:${edge.from}>${edge.event}`;
+  if (edge.kind !== "transition" || edge.to === null) return null;
+  return `edge:${edge.from}>${edge.event}>${edge.to}`;
+}
+
+/** Shortest kept fuzz sequence that first reached this edge, as a numbered list. */
+function reachedBy(doc: Document, edge: AtlasEdge, machine: AtlasMachine): Node | string {
+  const feature = featureOf(edge);
+  if (machine.fuzz === null) return "not fuzzed";
+  const sequences = machine.fuzz.corpus.filter(
+    (sequence) => feature !== null && sequence.discovered.includes(feature),
+  );
+  const shortest = sequences.sort((left, right) => left.steps.length - right.steps.length)[0];
+  if (shortest === undefined) return "no kept sequence";
+  if (shortest.steps.length === 0) return "initial state";
+  return html(
+    doc,
+    "ol",
+    { class: "steps" },
+    shortest.steps.map((step) => html(doc, "li", {}, [stepText(step)])),
+  );
+}
+
+function targetText(edge: AtlasEdge): string {
+  if (edge.kind === "stay") return `${edge.to ?? edge.from} (handled, no state change)`;
+  return edge.to ?? "undetermined";
 }
 
 function edgeLink(
@@ -60,12 +94,14 @@ function edgePanel(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLE
         "event",
         edge.kind === "initial" ? "(initial)" : `${edge.event}${internal ? " (internal)" : ""}`,
       ],
-      ["target", edge.to ?? "undetermined"],
+      ["target", targetText(edge)],
       ["kind", edge.kind],
+      ["origin", edge.origin === "fuzz" ? "fuzz (observed, not probed)" : "probe"],
       ["emits", joined(edge.emits)],
       ["contexts", joined(edge.contexts)],
       ["hits", hitsText(edge.coverage)],
       ["explanation", "not analyzed"],
+      ["reached by", reachedBy(doc, edge, machine)],
     ]),
   ]);
 }
@@ -92,6 +128,34 @@ function statePanel(
   ]);
 }
 
+function fuzzSummary(doc: Document, machine: AtlasMachine): HTMLElement | null {
+  const { fuzz } = machine;
+  if (fuzz === null) return null;
+  const errors: Node | string =
+    fuzz.errors.length === 0
+      ? "none"
+      : html(
+          doc,
+          "ul",
+          {},
+          fuzz.errors.map((error) =>
+            html(doc, "li", { class: "fuzz-error" }, [
+              `${error.from} on ${error.event}: ${error.message} — `,
+              html(doc, "code", {}, [error.steps.map(stepText).join(" → ")]),
+            ]),
+          ),
+        );
+  return html(doc, "section", { class: "fuzz-summary" }, [
+    html(doc, "h2", {}, ["Fuzz run"]),
+    list(doc, [
+      ["seed", String(fuzz.seed)],
+      ["iterations", String(fuzz.iterations)],
+      ["kept sequences", String(fuzz.corpus.length)],
+      ["handler errors", errors],
+    ]),
+  ]);
+}
+
 /** Side-panel body for the current selection, or a hint when nothing is selected. */
 export function renderPanel(
   doc: Document,
@@ -107,5 +171,8 @@ export function renderPanel(
     const state = machine.states.find((candidate) => candidate.id === selection.id);
     if (state) return statePanel(doc, state, { machine, select: context.select });
   }
-  return html(doc, "p", { class: "hint" }, ["Select a state or edge."]);
+  return html(doc, "div", {}, [
+    html(doc, "p", { class: "hint" }, ["Select a state or edge."]),
+    fuzzSummary(doc, machine),
+  ]);
 }

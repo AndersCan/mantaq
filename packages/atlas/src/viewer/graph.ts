@@ -111,7 +111,7 @@ function edgeGroup(
 ): SVGGElement {
   const { edge } = placed;
   const internal = context.machine.events.find((event) => event.id === edge.event)?.internal;
-  // v1 effect edges carry the state name, not the effect name: label them generically.
+  // Effect edges carry the state name, not the effect name: label them generically.
   const text = edge.kind === "effect" ? "effect" : edge.event;
   const group = svg(
     doc,
@@ -120,6 +120,8 @@ function edgeGroup(
       class: classes({
         edge: true,
         effect: edge.kind === "effect",
+        stay: edge.kind === "stay",
+        fuzz: edge.origin === "fuzz",
         undetermined: edge.to === null,
         internal: internal === true,
         unreached: isUnreached(edge.coverage),
@@ -127,7 +129,10 @@ function edgeGroup(
       "data-edge-id": edge.id,
       "data-from": edge.from,
       "data-to": placed.target,
-      "aria-label": `${edge.from} on ${text} to ${edge.to ?? "undetermined"}`,
+      "aria-label":
+        edge.kind === "stay"
+          ? `${edge.from} on ${text} stays`
+          : `${edge.from} on ${text} to ${edge.to ?? "undetermined"}`,
     },
     [
       svg(doc, "path", { d: placed.path, "marker-end": "url(#atlas-arrow)" }),

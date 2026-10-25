@@ -112,6 +112,9 @@ importers:
       '@mantaq/core':
         specifier: workspace:*
         version: link:../core
+      '@mantaq/pbt':
+        specifier: workspace:*
+        version: link:../pbt
       '@mantaq/traversal':
         specifier: workspace:*
         version: link:../traversal

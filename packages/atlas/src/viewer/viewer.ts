@@ -7,6 +7,9 @@ import { renderPanel } from "./panel.ts";
 export const PROBE_BANNER =
   "Edges come from synthetic probing; payload-dependent branches may be missing.";
 
+export const FUZZ_NOTE =
+  "Green edges were observed while fuzzing. Fuzzing finds behaviour; it never proves an edge is impossible.";
+
 interface ViewState {
   machineId: string;
   selection: Selection | null;
@@ -20,13 +23,22 @@ function hasCoverage(machine: AtlasMachine): boolean {
   );
 }
 
-function legend(doc: Document, showCoverage: boolean): HTMLUListElement {
+function legend(
+  doc: Document,
+  { showCoverage, fuzzed }: { showCoverage: boolean; fuzzed: boolean },
+): HTMLUListElement {
   const entries: Array<[string, string]> = [
     ["legend-final", "double border: final state"],
     ["legend-undetermined", "dashed edge to ?: target undetermined"],
     ["legend-internal", "dotted edge, italic label: internal event"],
     ["legend-effect", "faint self-loop: state runs effects on entry"],
   ];
+  if (fuzzed) {
+    entries.push(
+      ["legend-fuzz", "green: observed only while fuzzing"],
+      ["legend-stay", "dotted self-loop: handled, no state change"],
+    );
+  }
   if (showCoverage) entries.push(["legend-unreached", "dimmed and dashed: never reached in run"]);
   return html(
     doc,
@@ -123,8 +135,10 @@ export function mountViewer(root: HTMLElement, atlas: AtlasDocument): void {
     ]);
     root.append(
       header,
-      html(doc, "p", { class: "banner", role: "note" }, [PROBE_BANNER]),
-      legend(doc, covered),
+      html(doc, "p", { class: "banner", role: "note" }, [
+        machine.fuzz === null ? PROBE_BANNER : `${PROBE_BANNER} ${FUZZ_NOTE}`,
+      ]),
+      legend(doc, { showCoverage: covered, fuzzed: machine.fuzz !== null }),
       html(doc, "div", { class: "atlas-main" }, [
         html(doc, "div", { class: "canvas" }, [renderGraph(doc, machine, { select })]),
         panel,

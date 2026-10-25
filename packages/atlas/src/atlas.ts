@@ -108,6 +108,7 @@ function toEdge(
     event: kind === "initial" ? "" : edge.label,
     to: edge.isUndetermined === true ? null : edge.target,
     kind,
+    origin: "probe",
     emits: emitsOf(edge),
     contexts: [...new Set(edge.contexts)].sort(),
     explanation: null,
@@ -115,7 +116,8 @@ function toEdge(
   };
 }
 
-function toMachine(input: AtlasInput): AtlasMachine {
+/** One machine; `toAtlas` is this plus sorting into a document. */
+export function toAtlasMachine(input: AtlasInput): AtlasMachine {
   const graph = buildGraph(input.actor, { sampleContexts: input.sampleContexts });
   const internalIds = parseInternalEventIds(input.actor.options);
   const initialEdge = graph.edges.find((edge) => edge.source === INITIAL_NODE_ID);
@@ -139,12 +141,12 @@ function toMachine(input: AtlasInput): AtlasMachine {
     ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
   ].sort();
 
-  return { id: input.id, initial, regions, states, events, edges };
+  return { id: input.id, initial, regions, states, events, edges, fuzz: null };
 }
 
 export function toAtlas(inputs: ReadonlyArray<AtlasInput>): AtlasDocument {
   return {
     schemaVersion: ATLAS_SCHEMA_VERSION,
-    machines: inputs.map(toMachine).sort(byId),
+    machines: inputs.map(toAtlasMachine).sort(byId),
   };
 }

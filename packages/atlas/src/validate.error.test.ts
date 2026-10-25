@@ -37,7 +37,7 @@ describe("validateAtlas rejects", () => {
     machines[0].edges[1].to = "nowhere";
     expect(issues(doc)).toEqual([
       "$.machines[0].states[0].final: expected boolean",
-      "$.machines[0].edges[0].kind: expected one of initial, transition, effect",
+      "$.machines[0].edges[0].kind: expected one of initial, transition, effect, stay",
       "$.machines[0].edges[1].to: unknown state nowhere",
     ]);
   });
@@ -50,6 +50,30 @@ describe("validateAtlas rejects", () => {
     machines[0].states[0].coverage = { hits: 1.5 };
     expect(issues(doc)).toEqual([
       "$.machines[0].states[0].coverage: expected null or { hits: integer }",
+    ]);
+  });
+
+  test("fuzz section: bad step kind and non-JSON payload", () => {
+    const doc = valid();
+    if (typeof doc !== "object" || doc === null || !("machines" in doc)) return;
+    const machines = doc.machines;
+    if (!Array.isArray(machines)) return;
+    machines[0].fuzz = {
+      seed: 1,
+      iterations: 1,
+      corpus: [
+        {
+          discovered: [],
+          steps: [{ kind: "teleport" }, { kind: "event", event: "x", payload: Number.NaN }],
+        },
+      ],
+      errors: [],
+    };
+    expect(issues(doc)).toEqual([
+      "$.machines[0].fuzz.corpus[0].steps[0].kind: expected event or advance",
+      "$.machines[0].fuzz.corpus[0].steps[0].event: expected string",
+      "$.machines[0].fuzz.corpus[0].steps[0].payload: expected JSON value",
+      "$.machines[0].fuzz.corpus[0].steps[1].payload: expected JSON value",
     ]);
   });
 });

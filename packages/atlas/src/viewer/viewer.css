@@ -1,4 +1,5 @@
 :root {
+  --fuzz: #138a4a;
   --bg: #fbfbfa;
   --fg: #1d1d1f;
   --muted: #6b6b70;
@@ -24,6 +25,7 @@
     --region-bg: #1a1a1e;
     --accent: #7aa7ff;
     --unknown: #f0a742;
+    --fuzz: #4cc98a;
     --banner-bg: #2e2510;
     --banner-fg: #f3d58c;
     color-scheme: dark;
@@ -184,6 +186,26 @@ body {
 .edge.undetermined path {
   stroke: var(--unknown);
   stroke-dasharray: 6 4;
+}
+
+.edge.fuzz path {
+  stroke: var(--fuzz);
+}
+
+.edge.fuzz text {
+  fill: var(--fuzz);
+}
+
+.edge.stay path {
+  stroke-dasharray: 1 3;
+  stroke-linecap: round;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
 }
 
 .unknown-node circle {

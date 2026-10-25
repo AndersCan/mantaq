@@ -1,9 +1,13 @@
 // @vitest-environment happy-dom
 import { toAtlas } from "../atlas.ts";
-import { exampleInputs } from "../examples.ts";
-import { createCheckoutActor } from "../fixtures/checkout.ts";
+import { exampleInputs, exampleTargets } from "../examples.ts";
+import { createCheckoutActor, submitBasicInfo } from "../fixtures/checkout.ts";
 import type { AtlasDocument } from "../schema.ts";
-import { PROBE_BANNER, mountViewer } from "./viewer.ts";
+import { fuzz } from "../fuzz/fuzz.ts";
+import { fuzzedMachine } from "../fuzz/to-atlas.ts";
+import { ATLAS_SCHEMA_VERSION } from "../schema.ts";
+import { FUZZ_NOTE, PROBE_BANNER, mountViewer } from "./viewer.ts";
+import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
 function mount(atlas: AtlasDocument): HTMLElement {
@@ -134,7 +138,9 @@ describe("viewer: checkout", () => {
 });
 
 function checkoutWithRun(): AtlasDocument {
-  return toAtlas(exampleInputs().filter((input) => input.id === "checkout"));
+  const run = instrument(createCheckoutActor());
+  run.send(submitBasicInfo.create({ email: "a@b.c", name: "A" }));
+  return toAtlas([{ id: "checkout", actor: createCheckoutActor(), history: run.history }]);
 }
 
 describe("viewer: coverage and switching", () => {
@@ -176,5 +182,47 @@ describe("viewer: coverage and switching", () => {
       );
       expect(new Set(positions).size).toBe(positions.length);
     }
+  });
+});
+
+function fuzzedCheckout(): AtlasDocument {
+  const target = exampleTargets().find((each) => each.id === "checkout");
+  if (!target) return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [] };
+  const machine = fuzzedMachine(target, fuzz(target, { seed: 1, iterations: 1000 }));
+  return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] };
+}
+
+describe("viewer: fuzz results", () => {
+  test("fuzz-discovered edges and stays are drawn distinctly; banner mentions fuzzing", () => {
+    const root = mount(fuzzedCheckout());
+    expect(root.querySelector(".banner")?.textContent).toBe(`${PROBE_BANNER} ${FUZZ_NOTE}`);
+    const fuzzBack = [...root.querySelectorAll<SVGGElement>(".edge.fuzz")].filter(
+      (edge) => edge.textContent === "back" && !edge.classList.contains("stay"),
+    );
+    expect(fuzzBack.map((edge) => `${edge.dataset["from"]}->${edge.dataset["to"]}`).sort()).toEqual(
+      ["error->payment", "payment->shippingAddress", "shippingAddress->basicInfo"],
+    );
+    expect(root.querySelectorAll(".edge.stay").length).toBeGreaterThan(0);
+    expect(root.querySelector(".legend-fuzz")).not.toBeNull();
+  });
+
+  test("edge panel shows origin and the replay sequence that reached it", () => {
+    const atlas = fuzzedCheckout();
+    const root = mount(atlas);
+    const edge = atlas.machines[0]?.edges.find(
+      (candidate) => candidate.origin === "fuzz" && candidate.from === "error",
+    );
+    edgeElement(root, edge?.id ?? "").dispatchEvent(new Event("click"));
+    expect(field(root, "origin")).toBe("fuzz (observed, not probed)");
+    const steps = [...root.querySelectorAll(".panel .steps li")].map((item) => item.textContent);
+    expect(steps.at(-1)).toBe("back");
+    expect(steps).toContain('paymentFail {"reason":"declined"}');
+  });
+
+  test("idle panel shows the fuzz run summary", () => {
+    const root = mount(fuzzedCheckout());
+    expect(root.querySelector(".fuzz-summary")).not.toBeNull();
+    expect(field(root, "seed")).toBe("1");
+    expect(field(root, "handler errors")).toBe("none");
   });
 });

@@ -1,4 +1,4 @@
-import { Actor, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, event, state } from "@mantaq/core";
 
 const idle = state("idle")();
 const approved = state("approved")();
@@ -6,8 +6,9 @@ const rejected = state("rejected")();
 const review = event("review")<{ amount: number }>();
 
 /** Target depends on payload, so the synthetic traversal cannot determine it. */
-export function createConditionalActor() {
+export function createConditionalActor(clock: VirtualClock = VirtualClock()) {
   return Actor({
+    clock,
     inputs: [review],
     states: [idle, approved, rejected],
     initial: idle,

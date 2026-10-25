@@ -14,6 +14,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "__initial__",
           "id": "__initial__->checkingAuth",
           "kind": "initial",
+          "origin": "probe",
           "to": "checkingAuth"
         },
         {
@@ -27,6 +28,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "checkingAuth",
           "id": "checkingAuth-MONITOR_TICK-checkingAuth-undetermined-MONITOR_TICK",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -40,6 +42,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "checkingAuth",
           "id": "checkingAuth-SIGN_IN-signingIn",
           "kind": "transition",
+          "origin": "probe",
           "to": "signingIn"
         },
         {
@@ -51,6 +54,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "checkingAuth",
           "id": "checkingAuth-effect:checkingAuth-checkingAuth",
           "kind": "effect",
+          "origin": "probe",
           "to": "checkingAuth"
         },
         {
@@ -64,6 +68,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "loggedIn",
           "id": "loggedIn-MONITOR_TICK-loggedIn-undetermined-MONITOR_TICK",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -77,6 +82,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "loggedIn",
           "id": "loggedIn-SIGN_OUT-signingOut",
           "kind": "transition",
+          "origin": "probe",
           "to": "signingOut"
         },
         {
@@ -88,6 +94,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "loggedIn",
           "id": "loggedIn-effect:loggedIn-loggedIn",
           "kind": "effect",
+          "origin": "probe",
           "to": "loggedIn"
         },
         {
@@ -101,6 +108,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "loggedOut",
           "id": "loggedOut-MONITOR_TICK-loggedOut-undetermined-MONITOR_TICK",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -114,6 +122,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "loggedOut",
           "id": "loggedOut-SIGN_IN-signingIn",
           "kind": "transition",
+          "origin": "probe",
           "to": "signingIn"
         },
         {
@@ -127,6 +136,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signInError",
           "id": "signInError-MONITOR_TICK-signInError-undetermined-MONITOR_TICK",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -140,6 +150,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signInError",
           "id": "signInError-RETRY-signingIn",
           "kind": "transition",
+          "origin": "probe",
           "to": "signingIn"
         },
         {
@@ -153,6 +164,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signInError",
           "id": "signInError-SIGN_IN-signingIn",
           "kind": "transition",
+          "origin": "probe",
           "to": "signingIn"
         },
         {
@@ -166,6 +178,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingIn",
           "id": "signingIn-MONITOR_TICK-signingIn-undetermined-MONITOR_TICK",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -179,6 +192,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingIn",
           "id": "signingIn-SIGN_IN_DONE-loggedIn",
           "kind": "transition",
+          "origin": "probe",
           "to": "loggedIn"
         },
         {
@@ -192,6 +206,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingIn",
           "id": "signingIn-SIGN_IN_ERROR-signInError",
           "kind": "transition",
+          "origin": "probe",
           "to": "signInError"
         },
         {
@@ -203,6 +218,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingIn",
           "id": "signingIn-effect:signingIn-signingIn",
           "kind": "effect",
+          "origin": "probe",
           "to": "signingIn"
         },
         {
@@ -216,6 +232,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingOut",
           "id": "signingOut-MONITOR_TICK-signingOut-undetermined-MONITOR_TICK",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -229,6 +246,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingOut",
           "id": "signingOut-SIGNING_OUT_DONE-loggedOut",
           "kind": "transition",
+          "origin": "probe",
           "to": "loggedOut"
         },
         {
@@ -240,6 +258,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingOut",
           "id": "signingOut-effect:signingOut-signingOut",
           "kind": "effect",
+          "origin": "probe",
           "to": "signingOut"
         }
       ],
@@ -280,6 +299,7 @@ exports[`determinism > auth snapshot 1`] = `
           "payloadType": null
         }
       ],
+      "fuzz": null,
       "id": "auth",
       "initial": "checkingAuth",
       "regions": [],
@@ -335,7 +355,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 1
+  "schemaVersion": 2
 }
 "
 `;
@@ -354,6 +374,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "__initial__",
           "id": "__initial__->basicInfo",
           "kind": "initial",
+          "origin": "probe",
           "to": "basicInfo"
         },
         {
@@ -367,6 +388,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "basicInfo",
           "id": "basicInfo-back-basicInfo-undetermined-back",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -380,6 +402,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "basicInfo",
           "id": "basicInfo-submitBasicInfo-shippingAddress",
           "kind": "transition",
+          "origin": "probe",
           "to": "shippingAddress"
         },
         {
@@ -393,6 +416,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "error",
           "id": "error-back-error-undetermined-back",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -406,6 +430,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "payment",
           "id": "payment-back-payment-undetermined-back",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -419,6 +444,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "payment",
           "id": "payment-submitPayment-submitting",
           "kind": "transition",
+          "origin": "probe",
           "to": "submitting"
         },
         {
@@ -432,6 +458,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "shippingAddress",
           "id": "shippingAddress-back-shippingAddress-undetermined-back",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -445,6 +472,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "shippingAddress",
           "id": "shippingAddress-submitShipping-payment",
           "kind": "transition",
+          "origin": "probe",
           "to": "payment"
         },
         {
@@ -458,6 +486,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-back-submitting-undetermined-back",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -469,6 +498,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-effect:submitting-submitting",
           "kind": "effect",
+          "origin": "probe",
           "to": "submitting"
         },
         {
@@ -482,6 +512,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-paymentFail-error",
           "kind": "transition",
+          "origin": "probe",
           "to": "error"
         },
         {
@@ -495,6 +526,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-paymentOk-success",
           "kind": "transition",
+          "origin": "probe",
           "to": "success"
         },
         {
@@ -508,6 +540,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-submittingDone-success",
           "kind": "transition",
+          "origin": "probe",
           "to": "success"
         },
         {
@@ -521,6 +554,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "success",
           "id": "success-back-success-undetermined-back",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         }
       ],
@@ -561,6 +595,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "payloadType": null
         }
       ],
+      "fuzz": null,
       "id": "checkout",
       "initial": "basicInfo",
       "regions": [],
@@ -616,7 +651,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 1
+  "schemaVersion": 2
 }
 "
 `;
@@ -635,6 +670,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "__initial__",
           "id": "__initial__->idle",
           "kind": "initial",
+          "origin": "probe",
           "to": "idle"
         },
         {
@@ -648,6 +684,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRefund",
           "id": "compensatingRefund-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -661,6 +698,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRefund",
           "id": "compensatingRefund-REFUND_DONE-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -674,6 +712,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRefund",
           "id": "compensatingRefund-REFUND_FAILED-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -685,6 +724,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRefund",
           "id": "compensatingRefund-effect:compensatingRefund-compensatingRefund",
           "kind": "effect",
+          "origin": "probe",
           "to": "compensatingRefund"
         },
         {
@@ -698,6 +738,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRelease",
           "id": "compensatingRelease-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -711,6 +752,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRelease",
           "id": "compensatingRelease-RELEASE_DONE-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -724,6 +766,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRelease",
           "id": "compensatingRelease-RELEASE_FAILED-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -735,6 +778,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRelease",
           "id": "compensatingRelease-effect:compensatingRelease-compensatingRelease",
           "kind": "effect",
+          "origin": "probe",
           "to": "compensatingRelease"
         },
         {
@@ -748,6 +792,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "completed",
           "id": "completed-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -761,6 +806,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "creatingShipment",
           "id": "creatingShipment-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -774,6 +820,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "creatingShipment",
           "id": "creatingShipment-SHIPMENT_CREATED-creatingShipment-undetermined-SHIPMENT_CREATED",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -787,6 +834,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "creatingShipment",
           "id": "creatingShipment-SHIPMENT_FAILED-compensatingRefund",
           "kind": "transition",
+          "origin": "probe",
           "to": "compensatingRefund"
         },
         {
@@ -798,6 +846,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "creatingShipment",
           "id": "creatingShipment-effect:creatingShipment-creatingShipment",
           "kind": "effect",
+          "origin": "probe",
           "to": "creatingShipment"
         },
         {
@@ -811,6 +860,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "failed",
           "id": "failed-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -824,6 +874,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "idle",
           "id": "idle-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -837,6 +888,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "idle",
           "id": "idle-START-reservingInventory",
           "kind": "transition",
+          "origin": "probe",
           "to": "reservingInventory"
         },
         {
@@ -850,6 +902,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "notifying",
           "id": "notifying-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -863,6 +916,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "notifying",
           "id": "notifying-NOTIFICATION_FAILED-completed",
           "kind": "transition",
+          "origin": "probe",
           "to": "completed"
         },
         {
@@ -876,6 +930,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "notifying",
           "id": "notifying-NOTIFICATION_SENT-completed",
           "kind": "transition",
+          "origin": "probe",
           "to": "completed"
         },
         {
@@ -887,6 +942,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "notifying",
           "id": "notifying-effect:notifying-notifying",
           "kind": "effect",
+          "origin": "probe",
           "to": "notifying"
         },
         {
@@ -900,6 +956,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "processingPayment",
           "id": "processingPayment-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -913,6 +970,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "processingPayment",
           "id": "processingPayment-PAYMENT_FAILED-compensatingRefund",
           "kind": "transition",
+          "origin": "probe",
           "to": "compensatingRefund"
         },
         {
@@ -926,6 +984,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "processingPayment",
           "id": "processingPayment-PAYMENT_PROCESSED-processingPayment-undetermined-PAYMENT_PROCESSED",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -937,6 +996,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "processingPayment",
           "id": "processingPayment-effect:processingPayment-processingPayment",
           "kind": "effect",
+          "origin": "probe",
           "to": "processingPayment"
         },
         {
@@ -950,6 +1010,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "reservingInventory",
           "id": "reservingInventory-CANCEL-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -963,6 +1024,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "reservingInventory",
           "id": "reservingInventory-INVENTORY_FAILED-failed",
           "kind": "transition",
+          "origin": "probe",
           "to": "failed"
         },
         {
@@ -976,6 +1038,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "reservingInventory",
           "id": "reservingInventory-INVENTORY_RESERVED-reservingInventory-undetermined-INVENTORY_RESERVED",
           "kind": "transition",
+          "origin": "probe",
           "to": null
         },
         {
@@ -987,6 +1050,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "reservingInventory",
           "id": "reservingInventory-effect:reservingInventory-reservingInventory",
           "kind": "effect",
+          "origin": "probe",
           "to": "reservingInventory"
         }
       ],
@@ -1062,6 +1126,7 @@ exports[`determinism > saga snapshot 1`] = `
           "payloadType": null
         }
       ],
+      "fuzz": null,
       "id": "saga",
       "initial": "idle",
       "regions": [],
@@ -1141,7 +1206,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 1
+  "schemaVersion": 2
 }
 "
 `;

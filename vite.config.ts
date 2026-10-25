@@ -234,6 +234,14 @@ export default defineConfig({
         },
       },
       {
+        // Atlas fixtures mirror example machines that live in test files
+        // (where structure limits are off). Kept verbatim so they don't drift.
+        files: ["packages/atlas/src/fixtures/**"],
+        rules: {
+          "eslint/max-lines-per-function": "off",
+        },
+      },
+      {
         // functions-first: stateful resources (Actor, VirtualClock) became
         // factory functions whose helpers share closure state. The whole
         // resource is intentionally one function; per-function line limits

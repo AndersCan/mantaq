@@ -19,6 +19,7 @@
   "dependencies": {
     "@dagrejs/dagre": "catalog:",
     "@mantaq/core": "workspace:*",
+    "@mantaq/pbt": "workspace:*",
     "@mantaq/traversal": "workspace:*",
     "@mantaq/utils": "workspace:*"
   },
