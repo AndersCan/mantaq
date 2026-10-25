@@ -13,7 +13,9 @@ const FRAME_120_MS = 1000 / 120;
 // from a dev machine and CI hardware differs. Catches order-of-magnitude
 // regressions (accidental O(n), alloc storms), not 5% drifts.
 const MAX_SLOWDOWN = Number(process.env["MANTAQ_BENCH_DELTA"] ?? 2);
-const BASELINE_DIR = process.env["MANTAQ_BENCH_BASELINE_DIR"] ?? "perf";
+// Measure-only mode (bench-vs-main.sh): write results here, assert nothing; the
+// script compares best-of-N across alternating base/PR processes.
+const OUT_DIR = process.env["MANTAQ_BENCH_OUT"];
 const WRITE_BASELINE = process.env["MANTAQ_BENCH_WRITE_BASELINE"] === "1";
 
 const WORKLOADS = [
@@ -26,10 +28,14 @@ const WORKLOADS = [
 
 for (const workload of WORKLOADS) {
   test(`${workload.name} stays within baseline`, async ({ bench }) => {
-    const baselinePath = `${BASELINE_DIR}/${workload.name}.json`;
-    const writeResult = WRITE_BASELINE ? baselinePath : `.vitest/bench/${workload.name}.json`;
+    const baselinePath = `perf/${workload.name}.json`;
+    const writeResult = OUT_DIR
+      ? `${OUT_DIR}/${workload.name}.json`
+      : WRITE_BASELINE
+        ? baselinePath
+        : `.vitest/bench/${workload.name}.json`;
     const current = bench(workload.name, { writeResult }, workload.make());
-    if (WRITE_BASELINE) {
+    if (WRITE_BASELINE || OUT_DIR) {
       await current.run();
       return;
     }

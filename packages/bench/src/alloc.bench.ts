@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { expect, test } from "vite-plus/test";
 import {
   clockWorkload,
@@ -17,7 +17,8 @@ const ROUNDS = 15;
 const WARMUP_OPS = 300_000;
 const MAX_GROWTH = Number(process.env["MANTAQ_BENCH_ALLOC_GROWTH"] ?? 0.1);
 const WRITE_BASELINE = process.env["MANTAQ_BENCH_WRITE_BASELINE"] === "1";
-const BASELINE_FILE = process.env["MANTAQ_BENCH_ALLOC_BASELINE"] ?? "perf/alloc.json";
+const OUT_DIR = process.env["MANTAQ_BENCH_OUT"];
+const BASELINE_FILE = "perf/alloc.json";
 
 const WORKLOADS = {
   dispatch: dispatchWorkload,
@@ -45,8 +46,12 @@ test("allocation per operation stays within baseline", () => {
   const current: Record<string, number> = {};
   for (const [name, make] of Object.entries(WORKLOADS)) current[name] = bytesPerOp(make());
   console.log(`bytes/op: ${JSON.stringify(current)}`);
-  if (WRITE_BASELINE) {
-    writeFileSync(BASELINE_FILE, `${JSON.stringify(current, null, 2)}\n`);
+  if (OUT_DIR) mkdirSync(OUT_DIR, { recursive: true });
+  if (WRITE_BASELINE || OUT_DIR) {
+    writeFileSync(
+      OUT_DIR ? `${OUT_DIR}/alloc.json` : BASELINE_FILE,
+      `${JSON.stringify(current, null, 2)}\n`,
+    );
     return;
   }
   const baseline: Record<string, number> = JSON.parse(readFileSync(BASELINE_FILE, "utf8"));

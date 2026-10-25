@@ -59,7 +59,7 @@ only IDs from it.
    a screen of `setup`, show the composition utilities rather than one giant
    closure: build the static spec with `actorSpec(config)`, wrap each concern in
    its own `definePart<typeof spec>(fn)` file, wire them with `withParts(spec,
-parts)` (or `use(m, part)` inside a hand-written `setup`). This makes a long
+   parts)` (or `use(m, part)` inside a hand-written `setup`). This makes a long
    state machine readable file by file and threads the same running example —
    no new IDs. See the Composition page and `packages/sugar/src/parts.test.ts`.
 
