@@ -344,6 +344,12 @@ describe("event directed mutation tests", () => {
     expect(created).toEqual({ type: "X" });
     expect("payload" in created).toBe(false);
   });
+
+  test("is() rejects undefined and null without throwing", () => {
+    const ref = event("X")();
+    expect(ref.is(undefined)).toBe(false);
+    expect(ref.is(null)).toBe(false);
+  });
 });
 
 describe("runEffects directed mutation tests", () => {
