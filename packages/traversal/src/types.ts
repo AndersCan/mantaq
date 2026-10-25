@@ -1,15 +1,10 @@
 import type { AnyActor, Context } from "@mantaq/core";
+import type { HandlerResult } from "./is-handler-result.ts";
 
 /** Synthetic event object for graph introspection — matches minimal InternalEvent shape */
 export interface SyntheticEvent {
   type: string;
   payload?: unknown;
-}
-
-/** Simplified handler return — matches TransitionResult with erased generics */
-interface HandlerResult {
-  state?: { name?: string };
-  emit?: Array<{ type?: string }>;
 }
 
 export type TransitionHandler = (
