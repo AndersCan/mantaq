@@ -39,3 +39,21 @@ jobs:
           cache: true
       - run: vp install
       - run: vp run mutation:sugar
+
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+      - run: vp install
+      # same-runner comparison against main: tight threshold, no cross-machine noise
+      - run: vp run bench:main
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
+      # committed baselines: loose backstop, also records absolute numbers
+      - run: vp run bench
