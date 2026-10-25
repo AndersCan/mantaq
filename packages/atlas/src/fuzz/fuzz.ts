@@ -12,15 +12,15 @@ export interface FuzzOptions {
   maxLength?: number;
   literals?: LiteralPool;
   /**
-   * Optional search guidance (Phase 5). Lower is better; a child that lowers
-   * the best score so far is kept even without new coverage.
+   * Optional search guidance (Phase 5). Sees every run; returning true keeps
+   * the run in the corpus as a stepping stone even without new coverage.
    */
-  fitness?: (trace: Trace) => number;
+  guide?: (trace: Trace) => boolean;
 }
 
 export interface CorpusEntry {
   steps: AtlasStep[];
-  /** Features first reached by this entry. Empty for fitness-only keeps. */
+  /** Features first reached by this entry. Empty for guide-only keeps. */
   discovered: string[];
   iteration: number;
 }
@@ -93,18 +93,16 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   const seen = new Set<string>();
   const firstHit = new Map<string, number>();
   const corpus: CorpusEntry[] = [];
-  let best = Number.POSITIVE_INFINITY;
 
   function consider(steps: AtlasStep[], iteration: number): void {
     const trace = execute(target, steps);
     const discovered = trace.features.filter((feature) => !seen.has(feature));
-    const score = options.fitness ? options.fitness(trace) : Number.POSITIVE_INFINITY;
+    const guided = options.guide ? options.guide(trace) : false;
     for (const feature of discovered) {
       seen.add(feature);
       firstHit.set(feature, iteration);
     }
-    if (discovered.length > 0 || score < best) corpus.push({ steps, discovered, iteration });
-    best = Math.min(best, score);
+    if (discovered.length > 0 || guided) corpus.push({ steps, discovered, iteration });
   }
 
   consider([], 0);

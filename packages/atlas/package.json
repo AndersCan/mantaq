@@ -14,7 +14,8 @@
     "build": "vp build",
     "test": "vp test",
     "check": "vp check",
-    "atlas:export": "node src/cli.ts export"
+    "atlas:export": "node src/cli.ts export",
+    "atlas:compare": "node src/cli.ts compare"
   },
   "dependencies": {
     "@dagrejs/dagre": "catalog:",

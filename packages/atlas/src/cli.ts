@@ -2,18 +2,25 @@
  * Atlas CLI.
  *
  *   node src/cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]
+ *   node src/cli.ts compare [--seeds N] [--iterations N]
  *
- * Writes one JSON per example machine plus `examples.json` (all of them),
- * which the viewer loads by default. Pipeline: probe structure, fuzz
- * (seeded from MANTAQ_SEED, default from @mantaq/pbt), annotate edges from
- * the handler source. Same seed => identical files.
+ * export: one JSON per example machine plus `examples.json` (all of them),
+ * which the viewer loads by default. Pipeline: probe structure, annotate
+ * edges from handler source (AST), fuzz guided by the AST's literals and
+ * comparisons (seeded from MANTAQ_SEED, default from @mantaq/pbt), annotate
+ * fuzz-found edges. Same seed => identical files.
+ *
+ * compare: blind vs literal-seeded vs branch-distance fuzzing on every
+ * example, as a Markdown report (seeds 1..N).
  */
 import type { AtlasMachine } from "./schema.ts";
 import { toAtlasMachine } from "./atlas.ts";
 import { annotateMachine } from "./ast/annotate.ts";
 import { EXAMPLE_ROOT, exampleTargets } from "./examples.ts";
 import type { Example } from "./examples.ts";
+import { compareArms, renderComparison } from "./fuzz/compare.ts";
 import { fuzz } from "./fuzz/fuzz.ts";
+import { guidance } from "./fuzz/guided.ts";
 import { fuzzedMachine } from "./fuzz/to-atlas.ts";
 import { ATLAS_SCHEMA_VERSION } from "./schema.ts";
 import { serializeAtlas } from "./serialize.ts";
@@ -25,6 +32,12 @@ import { parseArgs } from "node:util";
 
 const DEFAULT_OUT = resolve(import.meta.dirname, "..", "public", "atlas");
 const DEFAULT_ITERATIONS = 2000;
+const DEFAULT_COMPARE_SEEDS = 30;
+const USAGE = [
+  "usage: node src/cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]",
+  "       node src/cli.ts compare [--seeds N] [--iterations N]",
+  "",
+].join("\n");
 
 function writeDocument(path: string, machines: AtlasMachine[]): void {
   writeFileSync(path, serializeAtlas({ schemaVersion: ATLAS_SCHEMA_VERSION, machines }));
@@ -39,17 +52,42 @@ interface ExportOptions {
   ast: boolean;
 }
 
-function exampleMachine(example: Example, options: ExportOptions): AtlasMachine {
-  const machine =
-    options.iterations === null
-      ? toAtlasMachine({ id: example.id, actor: example.create().actor })
-      : fuzzedMachine(
-          example,
-          fuzz(example, { seed: options.seed, iterations: options.iterations }),
-        );
+function annotate(machine: AtlasMachine, example: Example, options: ExportOptions): AtlasMachine {
   return options.ast
     ? annotateMachine(machine, { file: example.source, root: EXAMPLE_ROOT })
     : machine;
+}
+
+function exampleMachine(example: Example, options: ExportOptions): AtlasMachine {
+  const structure = annotate(
+    toAtlasMachine({ id: example.id, actor: example.create().actor }),
+    example,
+    options,
+  );
+  if (options.iterations === null) return structure;
+  const search = options.ast ? guidance(structure) : {};
+  const result = fuzz(example, { seed: options.seed, iterations: options.iterations, ...search });
+  return annotate(fuzzedMachine(example, result), example, options);
+}
+
+function compareExamples(options: { seeds: number; iterations: number }): void {
+  const seeds = Array.from({ length: options.seeds }, (_, index) => index + 1);
+  const checkpoints = [25, 50, 100, 250, 500, 1000, 2000].filter((at) => at < options.iterations);
+  const rows = exampleTargets().map((example) => {
+    const machine = annotateMachine(
+      toAtlasMachine({ id: example.id, actor: example.create().actor }),
+      {
+        file: example.source,
+        root: EXAMPLE_ROOT,
+      },
+    );
+    return compareArms(example, {
+      machine,
+      seeds,
+      checkpoints: [...checkpoints, options.iterations],
+    });
+  });
+  process.stdout.write(renderComparison(rows));
 }
 
 function exportExamples(options: ExportOptions): void {
@@ -66,6 +104,7 @@ function main(): void {
     allowPositionals: true,
     options: {
       iterations: { type: "string" },
+      seeds: { type: "string" },
       "no-fuzz": { type: "boolean" },
       "no-ast": { type: "boolean" },
     },
@@ -73,11 +112,15 @@ function main(): void {
   const [command, outArg] = positionals;
   const seed = parseSeed(process.env[SEED_ENV]);
   const iterations = Number(values.iterations ?? DEFAULT_ITERATIONS);
-  if (command !== "export" || !Number.isInteger(iterations) || iterations < 0) {
-    process.stderr.write(
-      "usage: node src/cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]\n",
-    );
+  const seeds = Number(values.seeds ?? DEFAULT_COMPARE_SEEDS);
+  const counts = [iterations, seeds].every((count) => Number.isInteger(count) && count >= 0);
+  if ((command !== "export" && command !== "compare") || !counts) {
+    process.stderr.write(USAGE);
     process.exitCode = 1;
+    return;
+  }
+  if (command === "compare") {
+    compareExamples({ seeds, iterations });
     return;
   }
   if (Either.isLeft(seed)) {

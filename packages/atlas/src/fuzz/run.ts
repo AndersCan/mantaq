@@ -18,6 +18,8 @@ export interface Observation {
   event: string;
   to: string;
   transitioned: boolean;
+  /** Payload the handler received (for branch-distance guidance). */
+  payload: unknown;
 }
 
 export interface RunError {
@@ -106,7 +108,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<AtlasStep>): Tr
   let index = 0;
   actor.on("transition", {
     fn: ({ event, from, to, transitioned }) => {
-      observations.push({ from, event: event.type, to, transitioned });
+      observations.push({ from, event: event.type, to, transitioned, payload: event.payload });
       if (transitioned) visited.push(to);
     },
   });
