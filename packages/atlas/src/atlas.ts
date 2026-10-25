@@ -61,6 +61,7 @@ function toState(
     initial: node.id === initialId,
     final: node.isFinal,
     coverage: visits ? hits(visits.get(node.id)) : null,
+    tested: null,
   };
 }
 
@@ -113,6 +114,7 @@ function toEdge(
     contexts: [...new Set(edge.contexts)].sort(),
     explanation: null,
     coverage: transitions && kind === "transition" ? hits(edgeHits(edge, transitions)) : null,
+    tested: null,
   };
 }
 

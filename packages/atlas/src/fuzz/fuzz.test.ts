@@ -1,4 +1,5 @@
 import { exampleTargets, handWrittenBaselines } from "../examples.ts";
+import { withTestCoverage } from "./coverage.ts";
 import { createConditionalActor } from "../fixtures/conditional.ts";
 import { serializeAtlas } from "../serialize.ts";
 import { ATLAS_SCHEMA_VERSION } from "../schema.ts";
@@ -137,5 +138,33 @@ describe("determinism and replay", () => {
         });
       }
     }
+  });
+});
+
+describe("test coverage", () => {
+  test("tested counts what the example tests exercise; stays and transitions kept apart", () => {
+    const checkout = exampleTargets().find((target) => target.id === "checkout");
+    if (!checkout) return;
+    const fuzzed = fuzzedMachine(
+      checkout,
+      fuzz(checkout, { seed: DEFAULT_SEED, iterations: 2000 }),
+    );
+    const machine = withTestCoverage(checkout, fuzzed, handWrittenBaselines()["checkout"] ?? []);
+    const state = (id: string) => machine.states.find((each) => each.id === id)?.tested;
+    // Five test starts plus one `back` from shippingAddress.
+    expect(state("basicInfo")).toEqual({ hits: 6 });
+    expect(state("error")).toEqual({ hits: 0 });
+    const edge = (from: string, event: string, kind: string) =>
+      machine.edges.find(
+        (each) => each.from === from && each.event === event && each.kind === kind,
+      );
+    expect(edge("basicInfo", "back", "stay")?.tested).toEqual({ hits: 0 });
+    expect(edge("shippingAddress", "back", "transition")?.tested).toEqual({ hits: 1 });
+    expect(edge("payment", "back", "transition")?.tested).toEqual({ hits: 1 });
+    expect(
+      machine.edges.filter((each) => each.kind === "effect").every((each) => each.tested === null),
+    ).toBe(true);
+    const text = serializeAtlas({ schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] });
+    expect(Either.getRight(parseAtlas(text))?.machines[0]).toEqual(machine);
   });
 });

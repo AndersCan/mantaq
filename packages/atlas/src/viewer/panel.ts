@@ -22,7 +22,30 @@ function joined(values: ReadonlyArray<string>): string {
 }
 
 function hitsText(coverage: { hits: number } | null): string {
-  return coverage === null ? "no run supplied" : String(coverage.hits);
+  return coverage === null ? "not supplied" : String(coverage.hits);
+}
+
+function runLabel(machine: AtlasMachine): string {
+  return machine.fuzz === null ? "run hits" : "fuzz hits";
+}
+
+/**
+ * A probe edge no fuzz run produced. Probing calls the handler with `{}` and a
+ * sample context, so it can predict a target the live machine never reaches.
+ */
+function predictionNote(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLElement | null {
+  const unobserved = edge.coverage !== null && edge.coverage.hits === 0;
+  if (
+    machine.fuzz === null ||
+    edge.origin !== "probe" ||
+    edge.kind !== "transition" ||
+    !unobserved
+  ) {
+    return null;
+  }
+  return html(doc, "p", { class: "prediction-note", role: "note" }, [
+    "Probing predicted this edge, but no fuzz run produced it. Probing calls the handler with an empty payload and a sample context, so this edge may be impossible in a real run. Fuzzing never proves that, so check the handler.",
+  ]);
 }
 
 function stepText(step: AtlasStep): string {
@@ -89,6 +112,7 @@ function edgePanel(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLE
   const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [`Edge ${edge.id}`]),
+    predictionNote(doc, edge, machine),
     list(doc, [
       ["source", edge.from],
       [
@@ -100,7 +124,8 @@ function edgePanel(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLE
       ["origin", edge.origin === "fuzz" ? "fuzz (observed, not probed)" : "probe"],
       ["emits", joined(edge.emits)],
       ["contexts", joined(edge.contexts)],
-      ["hits", hitsText(edge.coverage)],
+      [runLabel(machine), hitsText(edge.coverage)],
+      ["test hits", hitsText(edge.tested)],
       ["explanation", renderExplanation(doc, { edge, machine })],
       ["reached by", reachedBy(doc, edge, machine)],
     ]),
@@ -122,7 +147,8 @@ function statePanel(
       ["id", state.id],
       ["region", state.region ?? "(root)"],
       ["flags", joined(flags)],
-      ["visits", hitsText(state.coverage)],
+      [machine.fuzz === null ? "run visits" : "fuzz visits", hitsText(state.coverage)],
+      ["test visits", hitsText(state.tested)],
       ["outgoing", edgeList(doc, outgoing, select)],
       ["incoming", edgeList(doc, incoming, select)],
     ]),

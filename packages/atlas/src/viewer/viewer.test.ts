@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import { toAtlas, toAtlasMachine } from "../atlas.ts";
 import { annotateMachine } from "../ast/annotate.ts";
-import { EXAMPLE_ROOT, exampleInputs, exampleTargets } from "../examples.ts";
+import { EXAMPLE_ROOT, exampleInputs, exampleTargets, handWrittenBaselines } from "../examples.ts";
+import { withTestCoverage } from "../fuzz/coverage.ts";
+import { DEFAULT_SEED } from "@mantaq/pbt";
 import { createCheckoutActor, submitBasicInfo } from "../fixtures/checkout.ts";
 import type { AtlasDocument } from "../schema.ts";
 import { fuzz } from "../fuzz/fuzz.ts";
@@ -85,7 +87,8 @@ describe("viewer: checkout", () => {
     expect(field(root, "event")).toBe("paymentOk (internal)");
     expect(field(root, "target")).toBe("success");
     expect(field(root, "explanation")).toBe("not analyzed");
-    expect(field(root, "hits")).toBe("no run supplied");
+    expect(field(root, "run hits")).toBe("not supplied");
+    expect(field(root, "test hits")).toBe("not supplied");
   });
 
   test("undetermined edge panel says undetermined, never a guessed target", () => {
@@ -99,7 +102,7 @@ describe("viewer: checkout", () => {
   test("clicking a state lists its edges and click-through selects the edge", () => {
     const root = mount(checkout());
     root.querySelector('[data-node-id="submitting"]')?.dispatchEvent(new Event("click"));
-    expect(field(root, "visits")).toBe("no run supplied");
+    expect(field(root, "run visits")).toBe("not supplied");
     const links = root.querySelectorAll<HTMLElement>(".panel [data-edge-link]");
     expect(links.length).toBeGreaterThan(2);
     const first = links[0];
@@ -130,13 +133,20 @@ describe("viewer: checkout", () => {
     expect(root.querySelectorAll(".highlight").length).toBe(0);
   });
 
-  test("shows the probing banner; no coverage toggle without a run", () => {
+  test("shows the probing banner; no coverage picker without a run", () => {
     const root = mount(checkout());
     expect(root.querySelector(".banner")?.textContent).toBe(PROBE_BANNER);
-    expect(root.querySelector(".coverage-toggle")).toBeNull();
+    expect(root.querySelector(".coverage-mode")).toBeNull();
     expect(root.querySelector(".machine-select")).toBeNull();
   });
 });
+
+function pick(root: HTMLElement, mode: string): void {
+  const select = root.querySelector<HTMLSelectElement>(".coverage-mode");
+  expect(select).not.toBeNull();
+  if (select) select.value = mode;
+  select?.dispatchEvent(new Event("change"));
+}
 
 function checkoutWithRun(): AtlasDocument {
   const run = instrument(createCheckoutActor());
@@ -147,7 +157,7 @@ function checkoutWithRun(): AtlasDocument {
 describe("viewer: coverage and switching", () => {
   test("unreached edges and states are marked, and the legend explains it", () => {
     const root = mount(checkoutWithRun());
-    expect(root.querySelector(".coverage-toggle")).not.toBeNull();
+    expect(root.querySelector(".coverage-mode")).not.toBeNull();
     expect(root.classList.contains("coverage-on")).toBe(true);
     expect(root.querySelector('[data-node-id="payment"]')?.classList.contains("unreached")).toBe(
       true,
@@ -157,15 +167,17 @@ describe("viewer: coverage and switching", () => {
     ).toBe(false);
     expect(root.querySelectorAll(".edge.unreached").length).toBeGreaterThan(0);
     expect(root.querySelectorAll(".edge.undetermined").length).toBeGreaterThan(0);
-    expect(root.querySelector(".legend-unreached")).not.toBeNull();
+    expect(root.querySelector(".legend-unreached")?.textContent).toBe(
+      "dimmed and dashed: never taken in the supplied run",
+    );
   });
 
-  test("coverage toggle turns the overlay off", () => {
+  test("picking 'off' turns the overlay off", () => {
     const root = mount(checkoutWithRun());
-    const toggle = root.querySelector<HTMLInputElement>(".coverage-toggle");
-    if (toggle) toggle.checked = false;
-    toggle?.dispatchEvent(new Event("change"));
+    pick(root, "off");
     expect(root.classList.contains("coverage-on")).toBe(false);
+    expect(root.querySelectorAll(".unreached").length).toBe(0);
+    expect(root.querySelector(".legend-unreached")).toBeNull();
   });
 
   test("switcher renders every example without manual positioning", () => {
@@ -265,5 +277,56 @@ describe("viewer: AST explanations", () => {
       "resetHandler",
     );
     expect(root.querySelector(".panel pre")?.textContent).toBe("resetHandler");
+  });
+});
+
+describe("viewer: fuzz vs test coverage", () => {
+  function fuzzedAndTested(id: string): AtlasDocument {
+    const target = exampleTargets().find((each) => each.id === id);
+    if (!target) return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [] };
+    const fuzzed = fuzzedMachine(target, fuzz(target, { seed: DEFAULT_SEED, iterations: 2000 }));
+    const machine = withTestCoverage(target, fuzzed, handWrittenBaselines()[id] ?? []);
+    return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] };
+  }
+
+  test("tests are the default source; dimmed = not exercised by any test", () => {
+    const root = mount(fuzzedAndTested("checkout"));
+    expect(root.querySelector<HTMLSelectElement>(".coverage-mode")?.value).toBe("tests");
+    expect(root.querySelector(".legend-unreached")?.textContent).toBe(
+      "dimmed and dashed: no test exercises this",
+    );
+    // The example tests never fire paymentFail, so error is untested.
+    expect(root.querySelector('[data-node-id="error"]')?.classList.contains("unreached")).toBe(
+      true,
+    );
+    pick(root, "run");
+    expect(root.querySelector('[data-node-id="error"]')?.classList.contains("unreached")).toBe(
+      false,
+    );
+  });
+
+  test("probe edge no fuzz run produced gets the 'may be impossible' note", () => {
+    const atlas = fuzzedAndTested("saga");
+    const root = mount(atlas);
+    const predicted = atlas.machines[0]?.edges.find(
+      (edge) =>
+        edge.from === "compensatingRefund" && edge.event === "REFUND_DONE" && edge.to === "failed",
+    );
+    expect(predicted?.coverage).toEqual({ hits: 0 });
+    edgeElement(root, predicted?.id ?? "").dispatchEvent(new Event("click"));
+    expect(root.querySelector(".panel .prediction-note")?.textContent).toMatch(
+      /^Probing predicted this edge, but no fuzz run produced it/,
+    );
+    expect(field(root, "fuzz hits")).toBe("0");
+  });
+
+  test("edges fuzzing reached get no note", () => {
+    const atlas = fuzzedAndTested("saga");
+    const root = mount(atlas);
+    const reached = atlas.machines[0]?.edges.find(
+      (edge) => edge.origin === "probe" && (edge.coverage?.hits ?? 0) > 0,
+    );
+    edgeElement(root, reached?.id ?? "").dispatchEvent(new Event("click"));
+    expect(root.querySelector(".panel .prediction-note")).toBeNull();
   });
 });

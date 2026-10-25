@@ -1,31 +1,15 @@
 import { toAtlasMachine } from "../atlas.ts";
 import type { AtlasEdge, AtlasEvent, AtlasMachine } from "../schema.ts";
+import { edgeHits, stateVisits } from "./coverage.ts";
 import type { FuzzResult } from "./fuzz.ts";
 import { eventCatalog, execute } from "./run.ts";
 import type { FuzzTarget, Observation, Trace } from "./run.ts";
-import { createHistory } from "@mantaq/traversal";
-import type { History } from "@mantaq/traversal";
-
-function historyOf(traces: ReadonlyArray<Trace>): History {
-  const history = createHistory();
-  for (const trace of traces) {
-    history.append({ type: "state_visit", data: { stateName: trace.visited[0] ?? "" } });
-    for (const seen of trace.observations) {
-      history.append({
-        type: "transition",
-        data: { from: seen.from, event: seen.event, to: seen.to },
-      });
-      if (seen.transitioned) history.append({ type: "state_visit", data: { stateName: seen.to } });
-    }
-  }
-  return history;
-}
 
 function observedKey(seen: Observation): string {
   return seen.transitioned ? `${seen.from}>${seen.event}>${seen.to}` : `${seen.from}>${seen.event}`;
 }
 
-function fuzzEdge(seen: Observation, hits: number): AtlasEdge {
+function fuzzEdge(seen: Observation): AtlasEdge {
   const kind = seen.transitioned ? "transition" : "stay";
   return {
     id: `fuzz:${seen.from}-${seen.event}-${kind === "stay" ? "stay" : seen.to}`,
@@ -37,7 +21,8 @@ function fuzzEdge(seen: Observation, hits: number): AtlasEdge {
     emits: [],
     contexts: [],
     explanation: null,
-    coverage: { hits },
+    coverage: null,
+    tested: null,
   };
 }
 
@@ -54,15 +39,13 @@ function discoveredEdges(machine: AtlasMachine, traces: ReadonlyArray<Trace>): A
         : [`${edge.from}>${edge.event}>${edge.to}`],
     ),
   );
-  const found = new Map<string, { seen: Observation; hits: number }>();
+  const found = new Map<string, Observation>();
   for (const seen of traces.flatMap((trace) => trace.observations)) {
     const key = observedKey(seen);
     if (seen.transitioned && probed.has(key)) continue;
-    const entry = found.get(key) ?? { seen, hits: 0 };
-    entry.hits += 1;
-    found.set(key, entry);
+    if (!found.has(key)) found.set(key, seen);
   }
-  return [...found.values()].map(({ seen, hits }) => fuzzEdge(seen, hits));
+  return [...found.values()].map(fuzzEdge);
 }
 
 function byId<T extends { id: string }>(left: T, right: T): number {
@@ -78,7 +61,7 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): AtlasMach
   const traces = result.corpus.map((entry) => execute(target, entry.steps));
   const fresh = target.create().actor;
   const internal = new Set(eventCatalog(fresh).internal);
-  const base = toAtlasMachine({ id: target.id, actor: fresh, history: historyOf(traces) });
+  const base = toAtlasMachine({ id: target.id, actor: fresh });
   const added = discoveredEdges(base, traces);
   const known = new Set(base.events.map((event) => event.id));
   const events: AtlasEvent[] = [
@@ -90,7 +73,14 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): AtlasMach
   return {
     ...base,
     events,
-    edges: [...base.edges, ...added].sort(byId),
+    states: base.states.map((state) => ({
+      ...state,
+      coverage: { hits: stateVisits(state.id, traces) },
+    })),
+    edges: [...base.edges, ...added].sort(byId).map((edge) => {
+      const hits = edgeHits(edge, traces);
+      return { ...edge, coverage: hits === null ? null : { hits } };
+    }),
     fuzz: {
       seed: result.seed,
       iterations: result.iterations,

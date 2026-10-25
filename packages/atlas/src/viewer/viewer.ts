@@ -2,6 +2,8 @@ import type { AtlasDocument, AtlasMachine } from "../schema.ts";
 import { html } from "./dom.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
+import { availableModes, modeLabel, unreachedText } from "./coverage-mode.ts";
+import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
 
 export const PROBE_BANNER =
@@ -13,19 +15,20 @@ export const FUZZ_NOTE =
 interface ViewState {
   machineId: string;
   selection: Selection | null;
-  coverage: boolean;
+  /** null = use the machine's best available mode. */
+  coverage: CoverageMode | null;
 }
 
-function hasCoverage(machine: AtlasMachine): boolean {
-  return (
-    machine.states.some((state) => state.coverage !== null) ||
-    machine.edges.some((edge) => edge.coverage !== null)
-  );
+function effectiveMode(view: ViewState, machine: AtlasMachine): CoverageMode {
+  const modes = availableModes(machine);
+  if (view.coverage === "off") return "off";
+  if (view.coverage !== null && modes.includes(view.coverage)) return view.coverage;
+  return modes[0] ?? "off";
 }
 
 function legend(
   doc: Document,
-  { showCoverage, fuzzed }: { showCoverage: boolean; fuzzed: boolean },
+  { mode, machine }: { mode: CoverageMode; machine: AtlasMachine },
 ): HTMLUListElement {
   const entries: Array<[string, string]> = [
     ["legend-final", "double border: final state"],
@@ -33,13 +36,13 @@ function legend(
     ["legend-internal", "dotted edge, italic label: internal event"],
     ["legend-effect", "faint self-loop: state runs effects on entry"],
   ];
-  if (fuzzed) {
+  if (machine.fuzz !== null) {
     entries.push(
       ["legend-fuzz", "green: observed only while fuzzing"],
       ["legend-stay", "dotted self-loop: handled, no state change"],
     );
   }
-  if (showCoverage) entries.push(["legend-unreached", "dimmed and dashed: never reached in run"]);
+  if (mode !== "off") entries.push(["legend-unreached", unreachedText(mode, machine)]);
   return html(
     doc,
     "ul",
@@ -71,17 +74,30 @@ function machineSelect(
   return html(doc, "label", {}, ["Machine ", select]);
 }
 
-function coverageToggle(
+function isMode(value: string): value is CoverageMode {
+  return value === "off" || value === "run" || value === "tests";
+}
+
+function coveragePicker(
   doc: Document,
-  context: { view: ViewState; onChange: (on: boolean) => void },
-): HTMLLabelElement {
-  const input = html(doc, "input", {
-    type: "checkbox",
-    class: "coverage-toggle",
-    checked: context.view.coverage ? "" : null,
+  context: { machine: AtlasMachine; mode: CoverageMode; onChange: (mode: CoverageMode) => void },
+): HTMLLabelElement | null {
+  const modes = availableModes(context.machine);
+  if (modes.length === 0) return null;
+  const select = html(
+    doc,
+    "select",
+    { class: "coverage-mode" },
+    [...modes, "off" as const].map((mode) =>
+      html(doc, "option", { value: mode, selected: mode === context.mode ? "" : null }, [
+        modeLabel(mode, context.machine),
+      ]),
+    ),
+  );
+  select.addEventListener("change", () => {
+    if (isMode(select.value)) context.onChange(select.value);
   });
-  input.addEventListener("change", () => context.onChange(input.checked));
-  return html(doc, "label", {}, [input, " Show coverage"]);
+  return html(doc, "label", {}, ["Coverage from ", select]);
 }
 
 /**
@@ -93,19 +109,19 @@ export function mountViewer(root: HTMLElement, atlas: AtlasDocument): void {
   const view: ViewState = {
     machineId: atlas.machines[0]?.id ?? "",
     selection: null,
-    coverage: true,
+    coverage: null,
   };
 
   function render(): void {
     const machine = atlas.machines.find((candidate) => candidate.id === view.machineId);
     root.replaceChildren();
     root.classList.add("atlas");
-    root.classList.toggle("coverage-on", view.coverage);
     if (!machine) {
       root.append(html(doc, "p", { class: "empty" }, ["Document has no machines."]));
       return;
     }
-    const covered = hasCoverage(machine);
+    const mode = effectiveMode(view, machine);
+    root.classList.toggle("coverage-on", mode !== "off");
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Selection only swaps the panel and marks; the SVG stays put so keyboard focus survives.
     const select = (selection: Selection) => {
@@ -123,24 +139,23 @@ export function mountViewer(root: HTMLElement, atlas: AtlasDocument): void {
           render();
         },
       }),
-      covered
-        ? coverageToggle(doc, {
-            view,
-            onChange: (on) => {
-              view.coverage = on;
-              render();
-            },
-          })
-        : null,
+      coveragePicker(doc, {
+        machine,
+        mode,
+        onChange: (next) => {
+          view.coverage = next;
+          render();
+        },
+      }),
     ]);
     root.append(
       header,
       html(doc, "p", { class: "banner", role: "note" }, [
         machine.fuzz === null ? PROBE_BANNER : `${PROBE_BANNER} ${FUZZ_NOTE}`,
       ]),
-      legend(doc, { showCoverage: covered, fuzzed: machine.fuzz !== null }),
+      legend(doc, { mode, machine }),
       html(doc, "div", { class: "atlas-main" }, [
-        html(doc, "div", { class: "canvas" }, [renderGraph(doc, machine, { select })]),
+        html(doc, "div", { class: "canvas" }, [renderGraph(doc, machine, { select, mode })]),
         panel,
       ]),
     );

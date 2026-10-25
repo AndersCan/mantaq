@@ -284,3 +284,10 @@ body {
 .branch[data-branch-status="this edge"] .branch-status {
   color: var(--accent);
 }
+
+.prediction-note {
+  background: var(--banner-bg);
+  color: var(--banner-fg);
+  padding: 6px 8px;
+  border-radius: 4px;
+}

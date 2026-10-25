@@ -37,6 +37,7 @@ function readState(reader: Reader, record: JsonObject, path: string): AtlasState
     initial: readBoolean(reader, { record, key: "initial", path }),
     final: readBoolean(reader, { record, key: "final", path }),
     coverage: readCoverage(reader, { record, key: "coverage", path }),
+    tested: readCoverage(reader, { record, key: "tested", path }),
   };
 }
 
@@ -63,6 +64,7 @@ function readEdge(reader: Reader, record: JsonObject, path: string): AtlasEdge {
     contexts: readStrings(reader, { record, key: "contexts", path }),
     explanation: readExplanation(reader, { record, path }),
     coverage: readCoverage(reader, { record, key: "coverage", path }),
+    tested: readCoverage(reader, { record, key: "tested", path }),
   };
 }
 

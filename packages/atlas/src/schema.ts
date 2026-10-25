@@ -2,7 +2,7 @@
  * Atlas document schema. Bump `ATLAS_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const ATLAS_SCHEMA_VERSION = 3;
+export const ATLAS_SCHEMA_VERSION = 4;
 
 export interface AtlasCoverage {
   hits: number;
@@ -16,8 +16,10 @@ export interface AtlasState {
   region: string | null;
   initial: boolean;
   final: boolean;
-  /** null = no run supplied; otherwise visit count. */
+  /** Visits in the supplied run (history or fuzz corpus replay). null = no run. */
   coverage: AtlasCoverage | null;
+  /** Visits by the supplied test sequences. null = no tests supplied. */
+  tested: AtlasCoverage | null;
 }
 
 export interface AtlasEvent {
@@ -106,8 +108,10 @@ export interface AtlasEdge {
   contexts: string[];
   /** null = no handler behind this edge (initial, effect) or analysis not run. */
   explanation: AtlasExplanation | null;
-  /** null = no run supplied; otherwise transition count. */
+  /** Times taken in the supplied run (history or fuzz corpus replay). null = no run. */
   coverage: AtlasCoverage | null;
+  /** Times taken by the supplied test sequences. null = no tests supplied. */
+  tested: AtlasCoverage | null;
 }
 
 export interface AtlasMachine {

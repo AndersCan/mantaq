@@ -1,4 +1,6 @@
-import type { AtlasMachine } from "../schema.ts";
+import type { AtlasCoverage, AtlasMachine } from "../schema.ts";
+import { measure } from "./coverage-mode.ts";
+import type { CoverageMode } from "./coverage-mode.ts";
 import { activatable, svg } from "./dom.ts";
 import { layoutMachine } from "./layout.ts";
 import type { PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
@@ -8,9 +10,11 @@ export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: stri
 
 export interface GraphCallbacks {
   select(selection: Selection): void;
+  /** Coverage source the overlay dims by. */
+  mode: CoverageMode;
 }
 
-function isUnreached(coverage: { hits: number } | null): boolean {
+function isUnreached(coverage: AtlasCoverage | null): boolean {
   return coverage !== null && coverage.hits === 0;
 }
 
@@ -68,7 +72,7 @@ function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallback
         state: true,
         initial: state.initial,
         final: state.final,
-        unreached: isUnreached(state.coverage),
+        unreached: isUnreached(measure(callbacks.mode, state)),
       }),
       "data-node-id": state.id,
       "aria-label": `state ${state.id}${state.final ? " (final)" : ""}`,
@@ -124,7 +128,7 @@ function edgeGroup(
         fuzz: edge.origin === "fuzz",
         undetermined: edge.to === null,
         internal: internal === true,
-        unreached: isUnreached(edge.coverage),
+        unreached: isUnreached(measure(context.callbacks.mode, edge)),
       }),
       "data-edge-id": edge.id,
       "data-from": edge.from,

@@ -14,9 +14,11 @@ Branch `feat/atlas`. Package `packages/atlas`. No `@mantaq/core` API changes.
 | 5     | Literal seeding + branch-distance guide; 4-arm comparison over 30 seeds                                                                                                                    | `src/fuzz/{guided,compare}.ts`, `docs/atlas/phase5-comparison.md` |
 | —     | One command: `vp run atlas:export` (probe → AST → guided fuzz → AST); `vp run atlas:compare`                                                                                               | `src/cli.ts`                                                      |
 
-Schema went v1 → v2 (edge `origin`, kind `stay`, `machine.fuzz`) → v3 (`explanation`). It is unreleased, so there is no migration; the validator accepts only v3.
+Schema went v1 → v2 (edge `origin`, kind `stay`, `machine.fuzz`) → v3 (`explanation`) → v4 (`tested` on states and edges: coverage by test sequences, separate from run/fuzz coverage). It is unreleased, so there is no migration; the validator accepts only v4.
 
-Tests: 77 in `packages/atlas`. They cover schema validation (round-trip plus one error test per section), deterministic output (snapshots, byte-identical export per seed), fuzzer replay (every kept sequence reproduces its features; kept sequences are 1-minimal), fuzzer ≥ hand-written coverage on every example, AST on conditional / ternary / stay / by-reference / switch / missing-source handlers, and viewer DOM assertions (no screenshots).
+Coverage overlay: the viewer picks between "example tests" (dimmed = untested; the default) and "fuzz runs" (dimmed = never observed; on probe edges, likely an impossible prediction, and the panel says so).
+
+Tests: 81 in `packages/atlas`. They cover schema validation (round-trip plus one error test per section), deterministic output (snapshots, byte-identical export per seed), fuzzer replay (every kept sequence reproduces its features; kept sequences are 1-minimal), fuzzer ≥ hand-written coverage on every example, AST on conditional / ternary / stay / by-reference / switch / missing-source handlers, and viewer DOM assertions (no screenshots).
 
 ## Acceptance numbers
 

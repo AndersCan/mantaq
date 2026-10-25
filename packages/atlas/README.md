@@ -47,16 +47,16 @@ const machine = annotateMachine(fuzzedMachine(target, result), {
   file: "/abs/path/cart.ts",
   root: "/abs/repo",
 });
-serializeAtlas({ schemaVersion: 3, machines: [machine] });
+serializeAtlas({ schemaVersion: 4, machines: [withTestCoverage(target, machine, mySequences)] });
 ```
 
 Pass a **fresh** actor to `toAtlas` / `toAtlasMachine`. Probing calls handlers, and a handler that reads live actor state sees whatever state that actor is in.
 
 `parseAtlas(text)` / `validateAtlas(value)` read untrusted JSON and return `Either<AtlasIssue[], AtlasDocument>`, with every issue and its path.
 
-## Schema (v3)
+## Schema (v4)
 
-`AtlasDocument { schemaVersion: 3, machines: AtlasMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
+`AtlasDocument { schemaVersion: 4, machines: AtlasMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
 
 | field              | meaning                                                                                                                                                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -69,6 +69,13 @@ Pass a **fresh** actor to `toAtlas` / `toAtlasMachine`. Probing calls handlers, 
 | `machine.fuzz`     | `null` or `{ seed, iterations, corpus: [{ steps, discovered }], errors: [{ from, event, message, steps }] }`; every sequence is shrunk and replayable from a fresh actor                                                                                      |
 
 Bump `ATLAS_SCHEMA_VERSION` on any breaking change. The validator accepts only the current version.
+
+## Coverage: two sources, two questions
+
+The viewer's "Coverage from" picker dims elements with zero hits. What dimmed means depends on the source:
+
+- **example tests** (`tested`): no test exercises this. It is the classic "what is untested" view, and the default when tests are supplied. The export replays the example tests transcribed in `handWrittenBaselines()`.
+- **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **probe-only edge**: probing ran the handler with `{}` and a sample context and predicted a target the live machine may never reach. Saga's `X -CANCEL-> failed` after inventory is reserved is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
 
 ## How each tool works
 

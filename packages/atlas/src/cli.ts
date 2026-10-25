@@ -8,7 +8,8 @@
  * which the viewer loads by default. Pipeline: probe structure, annotate
  * edges from handler source (AST), fuzz guided by the AST's literals and
  * comparisons (seeded from MANTAQ_SEED, default from @mantaq/pbt), annotate
- * fuzz-found edges. Same seed => identical files.
+ * fuzz-found edges, then replay the transcribed example tests for `tested`
+ * coverage. Same seed => identical files.
  *
  * compare: blind vs literal-seeded vs branch-distance fuzzing on every
  * example, as a Markdown report (seeds 1..N).
@@ -16,9 +17,10 @@
 import type { AtlasMachine } from "./schema.ts";
 import { toAtlasMachine } from "./atlas.ts";
 import { annotateMachine } from "./ast/annotate.ts";
-import { EXAMPLE_ROOT, exampleTargets } from "./examples.ts";
+import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "./examples.ts";
 import type { Example } from "./examples.ts";
 import { compareArms, renderComparison } from "./fuzz/compare.ts";
+import { withTestCoverage } from "./fuzz/coverage.ts";
 import { fuzz } from "./fuzz/fuzz.ts";
 import { guidance } from "./fuzz/guided.ts";
 import { fuzzedMachine } from "./fuzz/to-atlas.ts";
@@ -59,15 +61,21 @@ function annotate(machine: AtlasMachine, example: Example, options: ExportOption
 }
 
 function exampleMachine(example: Example, options: ExportOptions): AtlasMachine {
-  const structure = annotate(
-    toAtlasMachine({ id: example.id, actor: example.create().actor }),
-    example,
-    options,
-  );
-  if (options.iterations === null) return structure;
-  const search = options.ast ? guidance(structure) : {};
-  const result = fuzz(example, { seed: options.seed, iterations: options.iterations, ...search });
-  return annotate(fuzzedMachine(example, result), example, options);
+  const plain = toAtlasMachine({ id: example.id, actor: example.create().actor });
+  const structure = annotate(plain, example, options);
+  const machine =
+    options.iterations === null
+      ? structure
+      : fuzzedMachine(
+          example,
+          fuzz(example, {
+            seed: options.seed,
+            iterations: options.iterations,
+            ...(options.ast ? guidance(structure) : {}),
+          }),
+        );
+  const tests = handWrittenBaselines()[example.id] ?? [];
+  return annotate(withTestCoverage(example, machine, tests), example, options);
 }
 
 function compareExamples(options: { seeds: number; iterations: number }): void {
