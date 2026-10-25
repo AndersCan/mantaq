@@ -24,7 +24,7 @@ import {
 const ROOT = new URL("..", import.meta.url).pathname;
 const DOCS_DIR = join(ROOT, "apps/docs/src/content/docs");
 const EXAMPLE_TEST = join(ROOT, "packages/examples/checkout.test.ts");
-const EXAMPLE_MDX = join(ROOT, ".opencode/skills/docs-write/resources/example.mdx");
+const EXAMPLE_MDX = join(ROOT, "docs/canonical-example.mdx");
 const CORE_INDEX = join(ROOT, "packages/core/src/index.ts");
 const SUGAR_INDEX = join(ROOT, "packages/sugar/src/index.ts");
 const PBT_INDEX = join(ROOT, "packages/pbt/src/index.ts");
