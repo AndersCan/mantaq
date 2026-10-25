@@ -1,0 +1,1147 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`determinism > auth snapshot 1`] = `
+"{
+  "machines": [
+    {
+      "edges": [
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "",
+          "explanation": null,
+          "from": "__initial__",
+          "id": "__initial__->checkingAuth",
+          "kind": "initial",
+          "to": "checkingAuth"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "MONITOR_TICK",
+          "explanation": null,
+          "from": "checkingAuth",
+          "id": "checkingAuth-MONITOR_TICK-checkingAuth-undetermined-MONITOR_TICK",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SIGN_IN",
+          "explanation": null,
+          "from": "checkingAuth",
+          "id": "checkingAuth-SIGN_IN-signingIn",
+          "kind": "transition",
+          "to": "signingIn"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:checkingAuth",
+          "explanation": null,
+          "from": "checkingAuth",
+          "id": "checkingAuth-effect:checkingAuth-checkingAuth",
+          "kind": "effect",
+          "to": "checkingAuth"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "MONITOR_TICK",
+          "explanation": null,
+          "from": "loggedIn",
+          "id": "loggedIn-MONITOR_TICK-loggedIn-undetermined-MONITOR_TICK",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SIGN_OUT",
+          "explanation": null,
+          "from": "loggedIn",
+          "id": "loggedIn-SIGN_OUT-signingOut",
+          "kind": "transition",
+          "to": "signingOut"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:loggedIn",
+          "explanation": null,
+          "from": "loggedIn",
+          "id": "loggedIn-effect:loggedIn-loggedIn",
+          "kind": "effect",
+          "to": "loggedIn"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "MONITOR_TICK",
+          "explanation": null,
+          "from": "loggedOut",
+          "id": "loggedOut-MONITOR_TICK-loggedOut-undetermined-MONITOR_TICK",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SIGN_IN",
+          "explanation": null,
+          "from": "loggedOut",
+          "id": "loggedOut-SIGN_IN-signingIn",
+          "kind": "transition",
+          "to": "signingIn"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "MONITOR_TICK",
+          "explanation": null,
+          "from": "signInError",
+          "id": "signInError-MONITOR_TICK-signInError-undetermined-MONITOR_TICK",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "RETRY",
+          "explanation": null,
+          "from": "signInError",
+          "id": "signInError-RETRY-signingIn",
+          "kind": "transition",
+          "to": "signingIn"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SIGN_IN",
+          "explanation": null,
+          "from": "signInError",
+          "id": "signInError-SIGN_IN-signingIn",
+          "kind": "transition",
+          "to": "signingIn"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "MONITOR_TICK",
+          "explanation": null,
+          "from": "signingIn",
+          "id": "signingIn-MONITOR_TICK-signingIn-undetermined-MONITOR_TICK",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SIGN_IN_DONE",
+          "explanation": null,
+          "from": "signingIn",
+          "id": "signingIn-SIGN_IN_DONE-loggedIn",
+          "kind": "transition",
+          "to": "loggedIn"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SIGN_IN_ERROR",
+          "explanation": null,
+          "from": "signingIn",
+          "id": "signingIn-SIGN_IN_ERROR-signInError",
+          "kind": "transition",
+          "to": "signInError"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:signingIn",
+          "explanation": null,
+          "from": "signingIn",
+          "id": "signingIn-effect:signingIn-signingIn",
+          "kind": "effect",
+          "to": "signingIn"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "MONITOR_TICK",
+          "explanation": null,
+          "from": "signingOut",
+          "id": "signingOut-MONITOR_TICK-signingOut-undetermined-MONITOR_TICK",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SIGNING_OUT_DONE",
+          "explanation": null,
+          "from": "signingOut",
+          "id": "signingOut-SIGNING_OUT_DONE-loggedOut",
+          "kind": "transition",
+          "to": "loggedOut"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:signingOut",
+          "explanation": null,
+          "from": "signingOut",
+          "id": "signingOut-effect:signingOut-signingOut",
+          "kind": "effect",
+          "to": "signingOut"
+        }
+      ],
+      "events": [
+        {
+          "id": "MONITOR_TICK",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "RETRY",
+          "internal": false,
+          "payloadType": null
+        },
+        {
+          "id": "SIGNING_OUT_DONE",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "SIGN_IN",
+          "internal": false,
+          "payloadType": null
+        },
+        {
+          "id": "SIGN_IN_DONE",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "SIGN_IN_ERROR",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "SIGN_OUT",
+          "internal": false,
+          "payloadType": null
+        }
+      ],
+      "id": "auth",
+      "initial": "checkingAuth",
+      "regions": [],
+      "states": [
+        {
+          "coverage": null,
+          "final": false,
+          "id": "checkingAuth",
+          "initial": true,
+          "label": "checkingAuth",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "loggedIn",
+          "initial": false,
+          "label": "loggedIn",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "loggedOut",
+          "initial": false,
+          "label": "loggedOut",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "signInError",
+          "initial": false,
+          "label": "signInError",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "signingIn",
+          "initial": false,
+          "label": "signingIn",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "signingOut",
+          "initial": false,
+          "label": "signingOut",
+          "region": null
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 1
+}
+"
+`;
+
+exports[`determinism > checkout snapshot 1`] = `
+"{
+  "machines": [
+    {
+      "edges": [
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "",
+          "explanation": null,
+          "from": "__initial__",
+          "id": "__initial__->basicInfo",
+          "kind": "initial",
+          "to": "basicInfo"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "back",
+          "explanation": null,
+          "from": "basicInfo",
+          "id": "basicInfo-back-basicInfo-undetermined-back",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "submitBasicInfo",
+          "explanation": null,
+          "from": "basicInfo",
+          "id": "basicInfo-submitBasicInfo-shippingAddress",
+          "kind": "transition",
+          "to": "shippingAddress"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "back",
+          "explanation": null,
+          "from": "error",
+          "id": "error-back-error-undetermined-back",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "back",
+          "explanation": null,
+          "from": "payment",
+          "id": "payment-back-payment-undetermined-back",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "submitPayment",
+          "explanation": null,
+          "from": "payment",
+          "id": "payment-submitPayment-submitting",
+          "kind": "transition",
+          "to": "submitting"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "back",
+          "explanation": null,
+          "from": "shippingAddress",
+          "id": "shippingAddress-back-shippingAddress-undetermined-back",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "submitShipping",
+          "explanation": null,
+          "from": "shippingAddress",
+          "id": "shippingAddress-submitShipping-payment",
+          "kind": "transition",
+          "to": "payment"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "back",
+          "explanation": null,
+          "from": "submitting",
+          "id": "submitting-back-submitting-undetermined-back",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:submitting",
+          "explanation": null,
+          "from": "submitting",
+          "id": "submitting-effect:submitting-submitting",
+          "kind": "effect",
+          "to": "submitting"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "paymentFail",
+          "explanation": null,
+          "from": "submitting",
+          "id": "submitting-paymentFail-error",
+          "kind": "transition",
+          "to": "error"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "paymentOk",
+          "explanation": null,
+          "from": "submitting",
+          "id": "submitting-paymentOk-success",
+          "kind": "transition",
+          "to": "success"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "submittingDone",
+          "explanation": null,
+          "from": "submitting",
+          "id": "submitting-submittingDone-success",
+          "kind": "transition",
+          "to": "success"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "back",
+          "explanation": null,
+          "from": "success",
+          "id": "success-back-success-undetermined-back",
+          "kind": "transition",
+          "to": null
+        }
+      ],
+      "events": [
+        {
+          "id": "back",
+          "internal": false,
+          "payloadType": null
+        },
+        {
+          "id": "paymentFail",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "paymentOk",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "submitBasicInfo",
+          "internal": false,
+          "payloadType": null
+        },
+        {
+          "id": "submitPayment",
+          "internal": false,
+          "payloadType": null
+        },
+        {
+          "id": "submitShipping",
+          "internal": false,
+          "payloadType": null
+        },
+        {
+          "id": "submittingDone",
+          "internal": true,
+          "payloadType": null
+        }
+      ],
+      "id": "checkout",
+      "initial": "basicInfo",
+      "regions": [],
+      "states": [
+        {
+          "coverage": null,
+          "final": false,
+          "id": "basicInfo",
+          "initial": true,
+          "label": "basicInfo",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "error",
+          "initial": false,
+          "label": "error",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "payment",
+          "initial": false,
+          "label": "payment",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "shippingAddress",
+          "initial": false,
+          "label": "shippingAddress",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "submitting",
+          "initial": false,
+          "label": "submitting",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": true,
+          "id": "success",
+          "initial": false,
+          "label": "success",
+          "region": null
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 1
+}
+"
+`;
+
+exports[`determinism > saga snapshot 1`] = `
+"{
+  "machines": [
+    {
+      "edges": [
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "",
+          "explanation": null,
+          "from": "__initial__",
+          "id": "__initial__->idle",
+          "kind": "initial",
+          "to": "idle"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "compensatingRefund",
+          "id": "compensatingRefund-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "REFUND_DONE",
+          "explanation": null,
+          "from": "compensatingRefund",
+          "id": "compensatingRefund-REFUND_DONE-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "REFUND_FAILED",
+          "explanation": null,
+          "from": "compensatingRefund",
+          "id": "compensatingRefund-REFUND_FAILED-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:compensatingRefund",
+          "explanation": null,
+          "from": "compensatingRefund",
+          "id": "compensatingRefund-effect:compensatingRefund-compensatingRefund",
+          "kind": "effect",
+          "to": "compensatingRefund"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "compensatingRelease",
+          "id": "compensatingRelease-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "RELEASE_DONE",
+          "explanation": null,
+          "from": "compensatingRelease",
+          "id": "compensatingRelease-RELEASE_DONE-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "RELEASE_FAILED",
+          "explanation": null,
+          "from": "compensatingRelease",
+          "id": "compensatingRelease-RELEASE_FAILED-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:compensatingRelease",
+          "explanation": null,
+          "from": "compensatingRelease",
+          "id": "compensatingRelease-effect:compensatingRelease-compensatingRelease",
+          "kind": "effect",
+          "to": "compensatingRelease"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "completed",
+          "id": "completed-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "creatingShipment",
+          "id": "creatingShipment-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SHIPMENT_CREATED",
+          "explanation": null,
+          "from": "creatingShipment",
+          "id": "creatingShipment-SHIPMENT_CREATED-creatingShipment-undetermined-SHIPMENT_CREATED",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "SHIPMENT_FAILED",
+          "explanation": null,
+          "from": "creatingShipment",
+          "id": "creatingShipment-SHIPMENT_FAILED-compensatingRefund",
+          "kind": "transition",
+          "to": "compensatingRefund"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:creatingShipment",
+          "explanation": null,
+          "from": "creatingShipment",
+          "id": "creatingShipment-effect:creatingShipment-creatingShipment",
+          "kind": "effect",
+          "to": "creatingShipment"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "failed",
+          "id": "failed-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "idle",
+          "id": "idle-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "START",
+          "explanation": null,
+          "from": "idle",
+          "id": "idle-START-reservingInventory",
+          "kind": "transition",
+          "to": "reservingInventory"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "notifying",
+          "id": "notifying-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "NOTIFICATION_FAILED",
+          "explanation": null,
+          "from": "notifying",
+          "id": "notifying-NOTIFICATION_FAILED-completed",
+          "kind": "transition",
+          "to": "completed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "NOTIFICATION_SENT",
+          "explanation": null,
+          "from": "notifying",
+          "id": "notifying-NOTIFICATION_SENT-completed",
+          "kind": "transition",
+          "to": "completed"
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:notifying",
+          "explanation": null,
+          "from": "notifying",
+          "id": "notifying-effect:notifying-notifying",
+          "kind": "effect",
+          "to": "notifying"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "processingPayment",
+          "id": "processingPayment-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "PAYMENT_FAILED",
+          "explanation": null,
+          "from": "processingPayment",
+          "id": "processingPayment-PAYMENT_FAILED-compensatingRefund",
+          "kind": "transition",
+          "to": "compensatingRefund"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "PAYMENT_PROCESSED",
+          "explanation": null,
+          "from": "processingPayment",
+          "id": "processingPayment-PAYMENT_PROCESSED-processingPayment-undetermined-PAYMENT_PROCESSED",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:processingPayment",
+          "explanation": null,
+          "from": "processingPayment",
+          "id": "processingPayment-effect:processingPayment-processingPayment",
+          "kind": "effect",
+          "to": "processingPayment"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "reservingInventory",
+          "id": "reservingInventory-CANCEL-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "INVENTORY_FAILED",
+          "explanation": null,
+          "from": "reservingInventory",
+          "id": "reservingInventory-INVENTORY_FAILED-failed",
+          "kind": "transition",
+          "to": "failed"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "INVENTORY_RESERVED",
+          "explanation": null,
+          "from": "reservingInventory",
+          "id": "reservingInventory-INVENTORY_RESERVED-reservingInventory-undetermined-INVENTORY_RESERVED",
+          "kind": "transition",
+          "to": null
+        },
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "effect:reservingInventory",
+          "explanation": null,
+          "from": "reservingInventory",
+          "id": "reservingInventory-effect:reservingInventory-reservingInventory",
+          "kind": "effect",
+          "to": "reservingInventory"
+        }
+      ],
+      "events": [
+        {
+          "id": "CANCEL",
+          "internal": false,
+          "payloadType": null
+        },
+        {
+          "id": "INVENTORY_FAILED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "INVENTORY_RESERVED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "NOTIFICATION_FAILED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "NOTIFICATION_SENT",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "PAYMENT_FAILED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "PAYMENT_PROCESSED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "REFUND_DONE",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "REFUND_FAILED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "RELEASE_DONE",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "RELEASE_FAILED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "SHIPMENT_CREATED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "SHIPMENT_FAILED",
+          "internal": true,
+          "payloadType": null
+        },
+        {
+          "id": "START",
+          "internal": false,
+          "payloadType": null
+        }
+      ],
+      "id": "saga",
+      "initial": "idle",
+      "regions": [],
+      "states": [
+        {
+          "coverage": null,
+          "final": false,
+          "id": "compensatingRefund",
+          "initial": false,
+          "label": "compensatingRefund",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "compensatingRelease",
+          "initial": false,
+          "label": "compensatingRelease",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": true,
+          "id": "completed",
+          "initial": false,
+          "label": "completed",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "creatingShipment",
+          "initial": false,
+          "label": "creatingShipment",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": true,
+          "id": "failed",
+          "initial": false,
+          "label": "failed",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "idle",
+          "initial": true,
+          "label": "idle",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "notifying",
+          "initial": false,
+          "label": "notifying",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "processingPayment",
+          "initial": false,
+          "label": "processingPayment",
+          "region": null
+        },
+        {
+          "coverage": null,
+          "final": false,
+          "id": "reservingInventory",
+          "initial": false,
+          "label": "reservingInventory",
+          "region": null
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 1
+}
+"
+`;

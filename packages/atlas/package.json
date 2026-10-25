@@ -1,0 +1,28 @@
+{
+  "name": "@mantaq/atlas",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Serialize Mantaq machines to a versioned, deterministic JSON document for visualization.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@mantaq/core": "workspace:*",
+    "@mantaq/traversal": "workspace:*"
+  },
+  "devDependencies": {
+    "@mantaq/sugar": "workspace:*",
+    "@types/node": "^26.2.0",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
