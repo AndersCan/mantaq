@@ -5,6 +5,7 @@ import type {
   SubscriberHandler,
 } from "./actor-internal.ts";
 import type {
+  CreatedOf,
   ErrorInfo,
   ErrorReason,
   ErrorState,
@@ -17,7 +18,8 @@ import type { Clock } from "./clock.ts";
 import { Context } from "./context.ts";
 import { parseTarget } from "./dispatch.ts";
 import { runEffects } from "./effects.ts";
-import type { CreatedOfEvent, EventRef, InternalEvent } from "./index.ts";
+import type { AnyEventRef } from "./event.ts";
+import type { InternalEvent } from "./index.ts";
 import { parseContextOption } from "./parse-context-option.ts";
 import { InternalQueue } from "./queue.ts";
 import { RealClock } from "./real-clock.ts";
@@ -30,11 +32,6 @@ import { Either } from "@mantaq/utils";
 
 export { RealClock, VirtualClock };
 export type { Clock, Snapshot, AnyActor };
-
-type CreatedOf<E extends AnyEventRef> =
-  E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never;
-
-type AnyEventRef = import("./event.ts").AnyEventRef;
 
 export type InitialState<S extends AnyStateRef> =
   S extends StateRef<infer _N extends string, infer P, infer _I extends boolean>
