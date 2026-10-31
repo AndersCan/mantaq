@@ -9,7 +9,7 @@ export default defineConfig({
     dts: {
       generator: "tsgo",
     },
-    exports: true,
+    exports: { devExports: true },
     minify: true,
   },
   lint: {
