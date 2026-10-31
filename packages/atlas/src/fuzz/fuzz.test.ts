@@ -1,6 +1,7 @@
 import { exampleTargets, handWrittenBaselines } from "../examples.ts";
 import { withTestCoverage } from "./coverage.ts";
 import { createConditionalActor } from "../fixtures/conditional.ts";
+import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import { serializeAtlas } from "../serialize.ts";
 import { ATLAS_SCHEMA_VERSION } from "../schema.ts";
 import type { AtlasStep } from "../schema.ts";
@@ -43,18 +44,16 @@ describe("fuzz reaches hand-written test coverage", () => {
 describe("fuzz write-back", () => {
   const checkout = exampleTargets().find((target) => target.id === "checkout");
 
-  test("undetermined back gets concrete targets as fuzz edges; probe stub stays", () => {
+  test("fuzzing marks which declared back edges the live machine takes", () => {
     if (!checkout) return;
     const machine = fuzzedMachine(
       checkout,
       fuzz(checkout, { seed: DEFAULT_SEED, iterations: ITERATIONS }),
     );
     const back = machine.edges.filter((edge) => edge.event === "back");
-    expect(back.filter((edge) => edge.origin === "probe").every((edge) => edge.to === null)).toBe(
-      true,
-    );
+    expect(back.some((edge) => edge.origin === "fuzz" && edge.kind === "transition")).toBe(false);
     const found = back
-      .filter((edge) => edge.origin === "fuzz" && edge.kind === "transition")
+      .filter((edge) => edge.kind === "transition" && (edge.coverage?.hits ?? 0) > 0)
       .map((edge) => `${edge.from}->${edge.to}`)
       .sort();
     expect(found).toEqual([
@@ -62,11 +61,23 @@ describe("fuzz write-back", () => {
       "payment->shippingAddress",
       "shippingAddress->basicInfo",
     ]);
-    expect(
-      back.some(
-        (edge) => edge.kind === "stay" && edge.from === "basicInfo" && edge.to === "basicInfo",
-      ),
-    ).toBe(true);
+    // Unhandled in basicInfo: the event is ignored, so no edge is drawn there.
+    expect(back.some((edge) => edge.from === "basicInfo")).toBe(false);
+  });
+
+  test("a stay from an onAny handler is drawn once from the any-state source", () => {
+    const routing: FuzzTarget = {
+      id: "routing",
+      create: () => {
+        const clock = VirtualClock();
+        return { actor: createStateRoutingActor(clock), clock };
+      },
+      payloads: {},
+    };
+    const machine = fuzzedMachine(routing, fuzz(routing, { seed: DEFAULT_SEED, iterations: 200 }));
+    const stays = machine.edges.filter((edge) => edge.kind === "stay");
+    expect(stays.map((edge) => `${edge.origin}:${edge.from}->${edge.to}`)).toEqual(["fuzz:*->*"]);
+    expect(stays[0]?.coverage?.hits).toBeGreaterThan(0);
   });
 
   test("coverage filled, fuzz summary present, document validates", () => {
@@ -82,7 +93,7 @@ describe("fuzz write-back", () => {
     expect(Either.isRight(parseAtlas(text))).toBe(true);
   });
 
-  test("payload-dependent branch hidden from probing is found", () => {
+  test("payload-dependent branch hidden from probing is declared, and fuzzing reaches it", () => {
     const conditional: FuzzTarget = {
       id: "conditional",
       create: () => {
@@ -97,9 +108,10 @@ describe("fuzz write-back", () => {
     );
     const review = machine.edges.filter((edge) => edge.event === "review");
     expect(review.map((edge) => `${edge.origin}:${edge.to}`).sort()).toEqual([
-      "fuzz:rejected",
-      "probe:approved",
+      "declared:approved",
+      "declared:rejected",
     ]);
+    expect(review.find((edge) => edge.to === "rejected")?.coverage?.hits).toBeGreaterThan(0);
   });
 });
 
@@ -142,7 +154,7 @@ describe("determinism and replay", () => {
 });
 
 describe("test coverage", () => {
-  test("tested counts what the example tests exercise; stays and transitions kept apart", () => {
+  test("tested counts what the example tests exercise", () => {
     const checkout = exampleTargets().find((target) => target.id === "checkout");
     if (!checkout) return;
     const fuzzed = fuzzedMachine(
@@ -154,13 +166,13 @@ describe("test coverage", () => {
     // Five test starts plus one `back` from shippingAddress.
     expect(state("basicInfo")).toEqual({ hits: 6 });
     expect(state("error")).toEqual({ hits: 0 });
-    const edge = (from: string, event: string, kind: string) =>
+    const edge = (from: string, kind: string, to: string) =>
       machine.edges.find(
-        (each) => each.from === from && each.event === event && each.kind === kind,
+        (each) =>
+          each.from === from && each.event === "back" && each.kind === kind && each.to === to,
       );
-    expect(edge("basicInfo", "back", "stay")?.tested).toEqual({ hits: 0 });
-    expect(edge("shippingAddress", "back", "transition")?.tested).toEqual({ hits: 1 });
-    expect(edge("payment", "back", "transition")?.tested).toEqual({ hits: 1 });
+    expect(edge("shippingAddress", "transition", "basicInfo")?.tested).toEqual({ hits: 1 });
+    expect(edge("payment", "transition", "shippingAddress")?.tested).toEqual({ hits: 1 });
     expect(
       machine.edges.filter((each) => each.kind === "effect").every((each) => each.tested === null),
     ).toBe(true);

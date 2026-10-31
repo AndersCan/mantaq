@@ -59,7 +59,8 @@ function createRequestHandler(orderId: string, options: { clock: Clock }) {
     context: { orderId, timeoutMs: 0 },
     setup: (m) => {
       m.on(idle, {
-        eventRef: request,
+        event: request,
+        to: [pending],
         handler: (event, { context }) => {
           const snapshot = context.get();
           snapshot.timeoutMs = event.payload.timeoutMs;
@@ -77,7 +78,8 @@ function createRequestHandler(orderId: string, options: { clock: Clock }) {
         },
       });
       m.on(pending, {
-        eventRef: answer,
+        event: answer,
+        to: [answered],
         handler: (event) => ({
           state: answered,
           emit: [
@@ -86,7 +88,8 @@ function createRequestHandler(orderId: string, options: { clock: Clock }) {
         }),
       });
       m.on(pending, {
-        eventRef: timeout,
+        event: timeout,
+        to: [timedOut],
         handler: () => ({
           state: timedOut,
           emit: [requestSettled.create({ orderId, status: "timedOut" })],
@@ -112,7 +115,7 @@ export function createRequester(options: { clock?: Clock; defaultTimeoutMs?: num
     context: initialManagerContext,
     setup: (m) => {
       m.on(open, {
-        eventRef: request,
+        event: request,
         handler: (event, { context }) => {
           const snapshot = context.get();
           if (snapshot.results[event.payload.orderId]) {
@@ -125,14 +128,14 @@ export function createRequester(options: { clock?: Clock; defaultTimeoutMs?: num
         },
       });
       m.on(open, {
-        eventRef: answer,
+        event: answer,
         handler: (event) => {
           requests.send(event.payload.orderId, answer.create(event.payload));
           return {};
         },
       });
       m.on(open, {
-        eventRef: requestSettled,
+        event: requestSettled,
         handler: (event, { context }) => {
           const snapshot = context.get();
           snapshot.results[event.payload.orderId] = event.payload;

@@ -18,12 +18,12 @@ describe("Actor.settled", () => {
       states: [idle, a, b],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: a }) });
+        m.on(idle, { event: trigger, to: [a], handler: () => ({ state: a }) });
         m.effect(a, {
           name: "chainToNext",
           fn: ({ emit }) => Promise.resolve().then(() => emit(next.create())),
         });
-        m.on(a, { eventRef: next, handler: () => ({ state: b }) });
+        m.on(a, { event: next, to: [b], handler: () => ({ state: b }) });
         m.effect(b, {
           name: "flagArrival",
           fn: () =>
@@ -53,9 +53,10 @@ describe("Actor dispatch resolution", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         m.onAny({
-          eventRef: trigger,
+          event: trigger,
+          to: [idle],
           handler: () => {
             anyRuns++;
             return { state: idle };
@@ -80,7 +81,7 @@ describe("Actor dispatch resolution", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: tick, handler: () => ({ emit: [out.create()] }) });
+        m.onAny({ event: tick, handler: () => ({ emit: [out.create()] }) });
       },
     });
 
@@ -101,7 +102,7 @@ describe("Actor dispatch resolution", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
       },
     });
 
@@ -136,7 +137,7 @@ describe("Actor effects", () => {
             emit(tick.create());
           },
         });
-        m.on(idle, { eventRef: tick, handler: () => ({ state: done }) });
+        m.on(idle, { event: tick, to: [done], handler: () => ({ state: done }) });
       },
     });
     const doneSnap = actor.snapshot();
@@ -168,7 +169,7 @@ describe("Actor effects", () => {
             });
           },
         });
-        m.on(idle, { eventRef: tick, handler: () => ({ state: done }) });
+        m.on(idle, { event: tick, to: [done], handler: () => ({ state: done }) });
       },
     });
     const statesAt = [actor.snapshot().path[0]];
@@ -190,7 +191,7 @@ describe("Actor effects", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
         m.effect(done, {
           name: "countFinalEntry",
           fn: () => {
@@ -218,7 +219,7 @@ describe("Actor effects", () => {
       states: [childIdle, childDone],
       initial: childIdle,
       setup: (m) => {
-        m.on(childIdle, { eventRef: childGo, handler: () => ({ state: childDone }) });
+        m.on(childIdle, { event: childGo, to: [childDone], handler: () => ({ state: childDone }) });
         m.effect(childDone, { name: "emitChildOut", fn: ({ emit }) => emit(childOut.create()) });
       },
     });
@@ -229,7 +230,11 @@ describe("Actor effects", () => {
       initial: parentIdle,
       regions: { child },
       setup: (m) => {
-        m.on(parentIdle, { eventRef: childOut, handler: () => ({ state: parentActive }) });
+        m.on(parentIdle, {
+          event: childOut,
+          to: [parentActive],
+          handler: () => ({ state: parentActive }),
+        });
       },
     });
 
@@ -260,8 +265,8 @@ describe("Actor effects", () => {
             savedEmit = emit;
           },
         });
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: running }) });
-        m.on(running, { eventRef: stop, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [running], handler: () => ({ state: running }) });
+        m.on(running, { event: stop, to: [idle], handler: () => ({ state: idle }) });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -295,8 +300,8 @@ describe("Actor effects", () => {
             effectSignal = signal;
           },
         });
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: running }) });
-        m.on(running, { eventRef: stop, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [running], handler: () => ({ state: running }) });
+        m.on(running, { event: stop, to: [idle], handler: () => ({ state: idle }) });
       },
     });
 
@@ -324,7 +329,8 @@ describe("Actor effects", () => {
           },
         });
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [running],
           handler: () => ({ state: running.create({ url: "https://x" }) }),
         });
       },
@@ -351,7 +357,8 @@ describe("Actor regions", () => {
       initial: childIdle,
       setup: (m) => {
         m.on(childIdle, {
-          eventRef: childGo,
+          event: childGo,
+          to: [childDone],
           handler: () => ({ state: childDone, emit: [doneEvt.create()] }),
         });
       },
@@ -363,7 +370,11 @@ describe("Actor regions", () => {
       initial: parentIdle,
       regions: { child },
       setup: (m) => {
-        m.on(parentIdle, { eventRef: doneEvt, handler: () => ({ state: parentActive }) });
+        m.on(parentIdle, {
+          event: doneEvt,
+          to: [parentActive],
+          handler: () => ({ state: parentActive }),
+        });
       },
     });
 
@@ -425,7 +436,7 @@ describe("Actor context change detection", () => {
       context: { progress: 1 },
       setup: (m) => {
         m.on(idle, {
-          eventRef: reset,
+          event: reset,
           handler: (_e, { context }) => {
             context.set({ progress: 0 });
             return {};
@@ -450,9 +461,9 @@ describe("Actor context change detection", () => {
       initial: idle,
       context: { n: 0 },
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         m.onAny({
-          eventRef: tick,
+          event: tick,
           handler: (_e, { context }) => {
             context.set({ n: 5 });
             return {};
@@ -485,7 +496,7 @@ describe("Actor context change detection", () => {
       initial: idle,
       context: { n: 0 },
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     const snap = actor.snapshot();
@@ -505,9 +516,9 @@ describe("Actor context change detection", () => {
       initial: idle,
       context: { n: 0 },
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         m.onAny({
-          eventRef: tick,
+          event: tick,
           handler: (_e, { context }) => {
             context.set({ n: 5 });
             return {};
@@ -539,7 +550,8 @@ describe("Actor context change detection", () => {
       context: { n: 0 },
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [active],
           handler: (_e, { context }) => {
             const current = context.get();
             context.set({ ...current, n: 1 });
@@ -564,7 +576,7 @@ describe("Actor context change detection", () => {
       context: { n: 1 },
       setup: (m) => {
         m.on(idle, {
-          eventRef: tick,
+          event: tick,
           handler: (_e, { context }) => {
             const current = context.get();
             context.set({ ...current, n: 2 });
@@ -595,7 +607,7 @@ describe("Actor context change detection", () => {
       context: makeProgress(),
       setup: (m) => {
         m.on(idle, {
-          eventRef: tick,
+          event: tick,
           handler: (_e, { context }) => {
             const current = context.get();
             current.progress += 1;
@@ -622,7 +634,7 @@ describe("Actor payload normalization", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: update,
+          event: update,
           handler: (e) => {
             void e.payload.codeSize;
             return {};
@@ -648,7 +660,7 @@ describe("Actor payload normalization", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: update,
+          event: update,
           handler: (e) => {
             seen = e.payload;
             return {};
@@ -672,7 +684,8 @@ describe("Actor snapshot payload", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [ready],
           handler: () => ({ state: ready.create({ items: ["a"] }) }),
         });
       },
@@ -706,7 +719,7 @@ describe("Actor snapshot payload", () => {
       states: [idle, ready],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: ready }) });
+        m.on(idle, { event: trigger, to: [ready], handler: () => ({ state: ready }) });
       },
     });
     actor.send(trigger.create());
@@ -728,7 +741,7 @@ describe("Actor transition observability", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
@@ -747,7 +760,7 @@ describe("Actor transition observability", () => {
       states: [home],
       initial: home,
       setup: (m) => {
-        m.on(home, { eventRef: reset, handler: () => ({ state: home }) });
+        m.on(home, { event: reset, to: [home], handler: () => ({ state: home }) });
       },
     });
     const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
@@ -766,7 +779,7 @@ describe("Actor transition observability", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: tick, handler: () => ({}) });
+        m.onAny({ event: tick, handler: () => ({}) });
       },
     });
     const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
@@ -786,7 +799,7 @@ describe("Actor transition observability", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: trigger, handler: () => ({ state: active }) });
+        m.onAny({ event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
@@ -809,9 +822,9 @@ describe("Actor transition observability", () => {
       states: [a, b, c],
       initial: a,
       setup: (m) => {
-        m.on(a, { eventRef: start, handler: () => ({ state: b }) });
+        m.on(a, { event: start, to: [b], handler: () => ({ state: b }) });
         m.effect(b, { name: "emitNext", fn: ({ emit }) => emit(next.create()) });
-        m.on(b, { eventRef: next, handler: () => ({ state: c }) });
+        m.on(b, { event: next, to: [c], handler: () => ({ state: c }) });
       },
     });
     const seen: Array<{ from: string; to: string }> = [];

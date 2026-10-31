@@ -73,7 +73,7 @@ describe("withPromise", () => {
             });
           },
         });
-        m.on(loading, { eventRef: done, handler: () => ({ state: ready }) });
+        m.on(loading, { event: done, to: [ready], handler: () => ({ state: ready }) });
       },
     });
 

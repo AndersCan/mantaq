@@ -23,19 +23,32 @@ export interface EffectEntry<ActorContext> {
 
 export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
   transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
+  /** Declared `to` state names per `[state][event]`; `Any` keys `onAny`. Static graph for tooling. */
+  targets: Record<string, Record<string, string[]>>;
   effects: Record<string, Array<EffectEntry<ActorContext>>>;
 }
 
+/** Handler may only return states listed in `to`; no `to` means it can only stay. */
 type HandlerFn<
-  States extends readonly AnyStateRef[],
-  _InputsInternal extends readonly AnyEventRef[],
+  To extends AnyStateRef,
   Outputs extends readonly AnyEventRef[],
   ActorContext,
   E extends AnyEventRef,
 > = (
   event: E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never,
   opts: { context: Context<ActorContext>; actor: AnyActor<ActorContext> },
-) => TransitionResult<States[number], EventTypeOf<Outputs[number]>>;
+) => TransitionResult<To, EventTypeOf<Outputs[number]>>;
+
+interface HandlerOptions<
+  To extends readonly AnyStateRef[],
+  Outputs extends readonly AnyEventRef[],
+  ActorContext,
+  E extends AnyEventRef,
+> {
+  event: E;
+  to?: To;
+  handler: HandlerFn<NoInfer<To[number]>, Outputs, ActorContext, E>;
+}
 
 export interface ActorBuilder<
   States extends readonly AnyStateRef[],
@@ -44,17 +57,20 @@ export interface ActorBuilder<
   Outputs extends readonly AnyEventRef[],
   ActorContext,
 > {
-  on<S extends States[number], E extends Inputs[number] | Internal[number]>(
+  on<
+    S extends States[number],
+    E extends Inputs[number] | Internal[number],
+    const To extends readonly States[number][] = readonly [],
+  >(
     stateRef: S,
-    options: {
-      eventRef: E;
-      handler: HandlerFn<States, Inputs | Internal, Outputs, ActorContext, E>;
-    },
+    options: HandlerOptions<To, Outputs, ActorContext, E>,
   ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
-  onAny<E extends Inputs[number] | Internal[number]>(options: {
-    eventRef: E;
-    handler: HandlerFn<States, Inputs | Internal, Outputs, ActorContext, E>;
-  }): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
+  onAny<
+    E extends Inputs[number] | Internal[number],
+    const To extends readonly States[number][] = readonly [],
+  >(
+    options: HandlerOptions<To, Outputs, ActorContext, E>,
+  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
   effect<S extends States[number]>(
     stateRef: S,
     definition: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
@@ -71,22 +87,26 @@ export function ActorBuilder<
   ActorContext,
 >(): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
   const transitions: BuiltMaps<States, ActorContext>["transitions"] = {};
+  const targets: BuiltMaps<States, ActorContext>["targets"] = {};
   const effects: BuiltMaps<States, ActorContext>["effects"] = {};
 
+  function register(
+    stateName: string,
+    options: { event: AnyEventRef; to?: readonly AnyStateRef[]; handler: unknown },
+  ): void {
+    const eventType = options.event.type;
+    (transitions[stateName] ??= {})[eventType] = parseTransitionHandler(options.handler);
+    (targets[stateName] ??= {})[eventType] = (options.to ?? []).map((target) => target.name);
+  }
+
   const self: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> = {
-    on(
-      stateRef,
-      { eventRef, handler },
-    ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
-      const stateName = stateRef.name;
-      const eventType = eventRef.type;
-      (transitions[stateName] ??= {})[eventType] = parseTransitionHandler(handler);
+    on(stateRef, options): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
+      register(stateRef.name, options);
       return self;
     },
 
     onAny(options): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
-      const eventType = options.eventRef.type;
-      (transitions["Any"] ??= {})[eventType] = parseTransitionHandler(options.handler);
+      register("Any", options);
       return self;
     },
 
@@ -99,7 +119,7 @@ export function ActorBuilder<
     },
 
     build(): BuiltMaps<States, ActorContext> {
-      return { transitions, effects };
+      return { transitions, targets, effects };
     },
   };
   return self;

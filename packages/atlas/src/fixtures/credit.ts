@@ -31,7 +31,7 @@ export function createCreditActor(clock: VirtualClock = VirtualClock()) {
     context: initialContext,
     setup: (m) => {
       m.on(idle, {
-        eventRef: setTier,
+        event: setTier,
         handler: (event, { context }) => {
           const current = context.get();
           current.tier = event.payload.tier;
@@ -40,7 +40,8 @@ export function createCreditActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(idle, {
-        eventRef: apply,
+        event: apply,
+        to: [manualReview, approved, rejected],
         handler: (event, { context }) => {
           const { score, amount } = event.payload;
           if (score < 600) return { state: rejected };
@@ -49,11 +50,12 @@ export function createCreditActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(manualReview, {
-        eventRef: decide,
+        event: decide,
+        to: [approved, rejected],
         handler: (event) => ({ state: event.payload.approve ? approved : rejected }),
       });
-      m.on(approved, { eventRef: reset, handler: resetHandler });
-      m.on(rejected, { eventRef: reset, handler: resetHandler });
+      m.on(approved, { event: reset, to: [idle], handler: resetHandler });
+      m.on(rejected, { event: reset, to: [idle], handler: resetHandler });
     },
   });
 }

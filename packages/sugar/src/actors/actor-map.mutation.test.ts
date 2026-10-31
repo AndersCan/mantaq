@@ -51,10 +51,11 @@ describe("ActorMap mutation tests", () => {
       initial: off,
       setup: (m) => {
         m.on(off, {
-          eventRef: toggle,
+          event: toggle,
+          to: [onState],
           handler: () => ({ state: onState, emit: [output.create({ from: actorKey })] }),
         });
-        m.on(onState, { eventRef: toggle, handler: () => ({ state: off }) });
+        m.on(onState, { event: toggle, to: [off], handler: () => ({ state: off }) });
       },
     });
     return { actor, toggle, output, off, on: onState };
@@ -70,7 +71,7 @@ describe("ActorMap mutation tests", () => {
       states: [off, onState],
       initial: off,
       setup: (m) => {
-        m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) });
+        m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
         m.effect(onState, {
           name: "captureSignal",
           fn: ({ signal }) => {
@@ -152,7 +153,7 @@ describe("ActorMap mutation tests", () => {
         states: [off, onState],
         initial: off,
         setup: (m) => {
-          m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) });
+          m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
           m.effect(onState, {
             name: "countEffect",
             fn: () => {
@@ -188,10 +189,11 @@ describe("ActorMap directed mutation tests", () => {
       initial: off,
       setup: (m) => {
         m.on(off, {
-          eventRef: toggle,
+          event: toggle,
+          to: [onState],
           handler: () => ({ state: onState, emit: [output.create({ from: actorKey })] }),
         });
-        m.on(onState, { eventRef: toggle, handler: () => ({ state: off }) });
+        m.on(onState, { event: toggle, to: [off], handler: () => ({ state: off }) });
       },
     });
     return { actor, toggle, output };
@@ -265,7 +267,8 @@ describe("ActorMap autoReap directed mutation tests", () => {
         context: {},
         states: [off, onState],
         initial: off,
-        setup: (m) => m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) }),
+        setup: (m) =>
+          m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) }),
       }),
       toggle,
     };
@@ -282,7 +285,8 @@ describe("ActorMap autoReap directed mutation tests", () => {
           context: {},
           states: [off, onState],
           initial: off,
-          setup: (m) => m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) }),
+          setup: (m) =>
+            m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) }),
         }),
       { autoReap: true },
     );
@@ -316,7 +320,7 @@ describe("ActorMap autoReap directed mutation tests", () => {
           context: {},
           states: [off],
           initial: off,
-          setup: (m) => m.on(off, { eventRef: goEvent, handler: () => JSON.parse("{") }),
+          setup: (m) => m.on(off, { event: goEvent, handler: () => JSON.parse("{") }),
         }),
       { autoReap: true },
     );
@@ -339,7 +343,7 @@ describe("ActorMap autoReap directed mutation tests", () => {
           initial: init,
           setup: (m) => {
             m.effect(init, { name: "emitTick", fn: ({ emit }) => emit(tick.create()) });
-            m.on(init, { eventRef: tick, handler: () => ({ state: done }) });
+            m.on(init, { event: tick, to: [done], handler: () => ({ state: done }) });
           },
         }),
       { autoReap: true },

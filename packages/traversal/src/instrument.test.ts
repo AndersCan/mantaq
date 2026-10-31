@@ -16,8 +16,16 @@ function createTestActor() {
     states: [idleState, activeState, doneState],
     initial: idleState,
     setup: (machine) => {
-      machine.on(idleState, { eventRef: goEvent, handler: () => ({ state: activeState }) });
-      machine.on(activeState, { eventRef: finishEvent, handler: () => ({ state: doneState }) });
+      machine.on(idleState, {
+        event: goEvent,
+        to: [activeState],
+        handler: () => ({ state: activeState }),
+      });
+      machine.on(activeState, {
+        event: finishEvent,
+        to: [doneState],
+        handler: () => ({ state: doneState }),
+      });
     },
   });
 }
@@ -127,7 +135,11 @@ describe("instrument", () => {
       states: [homeState],
       initial: homeState,
       setup: (machine) => {
-        machine.on(homeState, { eventRef: resetEvent, handler: () => ({ state: homeState }) });
+        machine.on(homeState, {
+          event: resetEvent,
+          to: [homeState],
+          handler: () => ({ state: homeState }),
+        });
       },
     });
 
@@ -148,7 +160,7 @@ describe("instrument", () => {
       states: [idleState],
       initial: idleState,
       setup: (machine) => {
-        machine.onAny({ eventRef: tickEvent, handler: () => ({}) });
+        machine.onAny({ event: tickEvent, handler: () => ({}) });
       },
     });
 
@@ -175,12 +187,20 @@ describe("instrument", () => {
       states: [startState, middleState, endState],
       initial: startState,
       setup: (machine) => {
-        machine.on(startState, { eventRef: startEvent, handler: () => ({ state: middleState }) });
+        machine.on(startState, {
+          event: startEvent,
+          to: [middleState],
+          handler: () => ({ state: middleState }),
+        });
         machine.effect(middleState, {
           name: "emitNext",
           fn: ({ emit }) => emit(nextEvent.create()),
         });
-        machine.on(middleState, { eventRef: nextEvent, handler: () => ({ state: endState }) });
+        machine.on(middleState, {
+          event: nextEvent,
+          to: [endState],
+          handler: () => ({ state: endState }),
+        });
       },
     });
 
@@ -207,7 +227,11 @@ describe("instrument", () => {
       states: [homeState],
       initial: homeState,
       setup: (machine) => {
-        machine.on(homeState, { eventRef: resetEvent, handler: () => ({ state: homeState }) });
+        machine.on(homeState, {
+          event: resetEvent,
+          to: [homeState],
+          handler: () => ({ state: homeState }),
+        });
       },
     });
 

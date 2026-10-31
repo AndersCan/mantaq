@@ -29,7 +29,7 @@ describe("recover() resource cleanup", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "scheduleLateEmit",
           fn: ({ signal, emit }) => {
@@ -47,8 +47,8 @@ describe("recover() resource cleanup", () => {
             });
           },
         });
-        m.on(loading, { eventRef: boom, handler: () => isErrorBomb("boom") });
-        m.on(loading, { eventRef: tick, handler: () => ({ state: idle }) });
+        m.on(loading, { event: boom, handler: () => isErrorBomb("boom") });
+        m.on(loading, { event: tick, to: [idle], handler: () => ({ state: idle }) });
       },
     });
 
@@ -96,7 +96,7 @@ describe("recover() resource cleanup", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "resolveOnAbort",
           fn: ({ signal }) => {
@@ -106,7 +106,7 @@ describe("recover() resource cleanup", () => {
             });
           },
         });
-        m.on(loading, { eventRef: boom, handler: () => isErrorBomb("boom") });
+        m.on(loading, { event: boom, handler: () => isErrorBomb("boom") });
       },
     });
 

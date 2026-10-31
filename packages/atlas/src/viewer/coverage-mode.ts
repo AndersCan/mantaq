@@ -36,5 +36,5 @@ export function modeLabel(mode: CoverageMode, machine: AtlasMachine): string {
 export function unreachedText(mode: CoverageMode, machine: AtlasMachine): string {
   if (mode === "tests") return "dimmed and dashed: no test exercises this";
   if (machine.fuzz === null) return "dimmed and dashed: never taken in the supplied run";
-  return "dimmed and dashed: never observed while fuzzing (probe-only edges here may be impossible)";
+  return "dimmed and dashed: never observed while fuzzing (declared edges here may be unreachable)";
 }

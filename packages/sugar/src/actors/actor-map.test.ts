@@ -57,10 +57,11 @@ describe("ActorMap", () => {
       initial: off,
       setup: (m) => {
         m.on(off, {
-          eventRef: toggle,
+          event: toggle,
+          to: [onState],
           handler: () => ({ state: onState, emit: [output.create({ from: actorKey })] }),
         });
-        m.on(onState, { eventRef: toggle, handler: () => ({ state: off }) });
+        m.on(onState, { event: toggle, to: [off], handler: () => ({ state: off }) });
       },
     });
     return { actor, toggle, output, off, on: onState };
@@ -217,7 +218,7 @@ describe("ActorMap", () => {
         states: [off, onState],
         initial: off,
         setup: (m) => {
-          m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) });
+          m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
           m.effect(onState, {
             name: "markEffectRan",
             fn: () => {
@@ -298,7 +299,8 @@ describe("ActorMap", () => {
         context: {},
         states: [off, onState],
         initial: off,
-        setup: (m) => m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) }),
+        setup: (m) =>
+          m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) }),
       }),
     );
     map.spawn("a");
@@ -317,7 +319,8 @@ describe("ActorMap", () => {
           context: {},
           states: [off, onState],
           initial: off,
-          setup: (m) => m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) }),
+          setup: (m) =>
+            m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) }),
         }),
       { autoReap: true },
     );
@@ -339,7 +342,7 @@ describe("ActorMap", () => {
           initial: off,
           setup: (m) =>
             // malformed JSON raises inside the transition, driving the child into __error
-            m.on(off, { eventRef: goEvent, handler: () => JSON.parse("{") }),
+            m.on(off, { event: goEvent, handler: () => JSON.parse("{") }),
         }),
       { autoReap: true },
     );
@@ -362,7 +365,7 @@ describe("ActorMap", () => {
           initial: init,
           setup: (m) => {
             m.effect(init, { name: "emitTick", fn: ({ emit }) => emit(tick.create()) });
-            m.on(init, { eventRef: tick, handler: () => ({ state: done }) });
+            m.on(init, { event: tick, to: [done], handler: () => ({ state: done }) });
           },
         }),
       { autoReap: true },
@@ -382,7 +385,8 @@ describe("ActorMap", () => {
           context: {},
           states: [off, onState],
           initial: off,
-          setup: (m) => m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) }),
+          setup: (m) =>
+            m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) }),
         }),
       { autoReap: true },
     );
@@ -459,7 +463,11 @@ describe("ActorMap", () => {
       states: [parentOff, parentDone],
       initial: parentOff,
       setup: (m) => {
-        m.on(parentOff, { eventRef: childOutput, handler: () => ({ state: parentDone }) });
+        m.on(parentOff, {
+          event: childOutput,
+          to: [parentDone],
+          handler: () => ({ state: parentDone }),
+        });
       },
     });
 
@@ -473,7 +481,8 @@ describe("ActorMap", () => {
         initial: childOff,
         setup: (m) => {
           m.on(childOff, {
-            eventRef: goEvent,
+            event: goEvent,
+            to: [childOn],
             handler: () => ({
               state: childOn,
               emit: [childOutput.create({ data: "hello" })],

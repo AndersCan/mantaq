@@ -14,7 +14,9 @@ export { branchDistance, branchDistanceGuide, guidance, literalPool } from "./fu
 export { analyzeSource, annotateMachine } from "./ast/annotate.ts";
 export type { HandlerSite } from "./ast/annotate.ts";
 export type { AnalysisSource } from "./ast/program.ts";
-export { ATLAS_SCHEMA_VERSION } from "./schema.ts";
+export { ANY_STATE, ATLAS_SCHEMA_VERSION, coveredByAny, isAnyState } from "./schema.ts";
+export { routingWarnings } from "./routing.ts";
+export type { RoutingWarning } from "./routing.ts";
 export type {
   AtlasCoverage,
   AtlasDocument,

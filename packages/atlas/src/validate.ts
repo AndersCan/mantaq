@@ -1,4 +1,4 @@
-import { ATLAS_SCHEMA_VERSION } from "./schema.ts";
+import { ATLAS_SCHEMA_VERSION, isAnyState } from "./schema.ts";
 import type {
   AtlasDocument,
   AtlasEdge,
@@ -27,7 +27,7 @@ import { Either } from "@mantaq/utils";
 export type { AtlasIssue } from "./validate-read.ts";
 
 const EDGE_KINDS: ReadonlyArray<AtlasEdgeKind> = ["initial", "transition", "effect", "stay"];
-const EDGE_ORIGINS: ReadonlyArray<AtlasEdgeOrigin> = ["probe", "fuzz"];
+const EDGE_ORIGINS: ReadonlyArray<AtlasEdgeOrigin> = ["declared", "probe", "fuzz"];
 
 function readState(reader: Reader, record: JsonObject, path: string): AtlasState {
   return {
@@ -71,7 +71,7 @@ function readEdge(reader: Reader, record: JsonObject, path: string): AtlasEdge {
 /** Edge endpoints must name declared states; a dangling reference is a broken document. */
 function checkReferences(reader: Reader, machine: AtlasMachine, path: string): void {
   const stateIds = new Set(machine.states.map((state) => state.id));
-  const known = (id: string) => stateIds.has(id) || id === "__initial__";
+  const known = (id: string) => stateIds.has(id) || id === "__initial__" || isAnyState(id);
   machine.edges.forEach((edge, index) => {
     if (!known(edge.from)) {
       report(reader, {
@@ -79,7 +79,8 @@ function checkReferences(reader: Reader, machine: AtlasMachine, path: string): v
         message: `unknown state ${edge.from}`,
       });
     }
-    if (edge.to !== null && !stateIds.has(edge.to)) {
+    const anyStay = edge.kind === "stay" && edge.to === edge.from && isAnyState(edge.from);
+    if (edge.to !== null && !stateIds.has(edge.to) && !anyStay) {
       report(reader, { path: `${path}.edges[${index}].to`, message: `unknown state ${edge.to}` });
     }
   });

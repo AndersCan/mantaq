@@ -12,5 +12,12 @@
     "@typescript/native-preview",
     "@varlock/bumpy"
   ],
-  "entry": ["scripts/bench-compare.mjs"]
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/bench-compare.mjs"]
+    },
+    "packages/codemod": {
+      "ignoreDependencies": ["@mantaq/core"]
+    }
+  }
 }

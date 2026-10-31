@@ -24,9 +24,9 @@ describe("Actor property tests", () => {
           states: [idle, waiting, done],
           initial: idle,
           setup: (m) => {
-            m.on(idle, { eventRef: start, handler: () => ({ state: waiting }) });
-            m.on(waiting, { eventRef: stop, handler: () => ({ state: idle }) });
-            m.on(waiting, { eventRef: tick, handler: () => ({ state: done }) });
+            m.on(idle, { event: start, to: [waiting], handler: () => ({ state: waiting }) });
+            m.on(waiting, { event: stop, to: [idle], handler: () => ({ state: idle }) });
+            m.on(waiting, { event: tick, to: [done], handler: () => ({ state: done }) });
             m.effect(waiting, {
               name: "armDeadlineTimer",
               fn: ({ signal, clock: c, emit }) => {
@@ -59,8 +59,8 @@ describe("Actor property tests", () => {
         states: [idle, onState],
         initial: idle,
         setup: (m) => {
-          m.on(idle, { eventRef: toggle, handler: () => ({ state: onState }) });
-          m.on(onState, { eventRef: toggle, handler: () => ({ state: idle }) });
+          m.on(idle, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
+          m.on(onState, { event: toggle, to: [idle], handler: () => ({ state: idle }) });
         },
       });
 

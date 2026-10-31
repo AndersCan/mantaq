@@ -33,17 +33,30 @@ describe("toAtlas structure", () => {
     expect(machine?.edges.find((e) => e.kind === "initial")?.to).toBe("basicInfo");
   });
 
-  test("handler reading live actor state is undetermined (to: null)", () => {
+  test("per-state handlers give exact source/target pairs", () => {
     const machine = toAtlas([{ id: "checkout", actor: createCheckoutActor() }]).machines[0];
-    const back = machine?.edges.filter((e) => e.event === "back") ?? [];
-    expect(back.length).toBeGreaterThan(0);
-    expect(back.every((e) => e.to === null)).toBe(true);
+    const back = machine?.edges.filter((e) => e.event === "back").map((e) => `${e.from}->${e.to}`);
+    expect(back?.sort()).toEqual([
+      "error->payment",
+      "payment->shippingAddress",
+      "shippingAddress->basicInfo",
+    ]);
   });
 
-  test("known limit: payload-dependent branch shows only the branch the synthetic event takes", () => {
+  test("onAny edges leave the any-state source once per declared target", () => {
+    const machine = toAtlas([{ id: "saga", actor: createSagaActor() }]).machines[0];
+    const cancel = machine?.edges.filter((e) => e.event === "CANCEL") ?? [];
+    expect(cancel.map((e) => `${e.from}->${e.to}`).sort()).toEqual([
+      "*->compensatingRelease",
+      "*->failed",
+    ]);
+    expect(machine?.states.some((s) => s.id === "*")).toBe(false);
+  });
+
+  test("payload-dependent branch shows every declared target, not only the probed one", () => {
     const machine = toAtlas([{ id: "cond", actor: createConditionalActor() }]).machines[0];
     const targets = machine?.edges.filter((e) => e.event === "review").map((e) => e.to);
-    expect(targets).toEqual(["approved"]);
+    expect(targets).toEqual(["approved", "rejected"]);
     expect(machine?.edges.find((e) => e.event === "review")?.explanation).toBeNull();
   });
 
@@ -84,11 +97,10 @@ describe("determinism", () => {
 });
 
 describe("coverage", () => {
-  test("example export keeps back undetermined (structure from a fresh actor)", () => {
-    const machine = toAtlas(exampleInputs()).machines.find((m) => m.id === "checkout");
-    const back = machine?.edges.filter((e) => e.event === "back") ?? [];
-    expect(back.length).toBeGreaterThan(0);
-    expect(back.every((e) => e.to === null)).toBe(true);
+  test("example export has no undetermined edges: every target is declared", () => {
+    for (const machine of toAtlas(exampleInputs()).machines) {
+      expect(machine.edges.filter((e) => e.to === null)).toEqual([]);
+    }
   });
 
   test("counts state visits and edge hits from instrumented run", () => {

@@ -131,25 +131,27 @@ function createCheckoutActor(
           withTimeout(800, input, () => submittingDone.create());
         },
       });
-      m.onAny(back, (_event, opts) => {
-        const s = actor.state.name;
-        if (s === "payment") {
+      m.on(payment, {
+        event: back,
+        to: [shippingAddress],
+        handler: (_event, opts) => {
           const cur = opts.context.get();
           cur.paymentInfo = undefined;
           opts.context.set(cur);
           return { state: shippingAddress };
-        }
-        if (s === "shippingAddress") {
+        },
+      });
+      m.on(shippingAddress, {
+        event: back,
+        to: [basicInfo],
+        handler: (_event, opts) => {
           const cur = opts.context.get();
           cur.shippingAddress = undefined;
           opts.context.set(cur);
           return { state: basicInfo };
-        }
-        if (s === "error") {
-          return { state: payment };
-        }
-        return {};
+        },
       });
+      m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
       m.on(basicInfo, submitBasicInfo, (event, opts) => {
         const cur = opts.context.get();
         cur.basicInfo = event.payload;

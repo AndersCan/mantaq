@@ -2,6 +2,13 @@ import type { Snapshot } from "@mantaq/core";
 
 export const INITIAL_NODE_ID = "__initial__";
 
+/** Source of `onAny` edges: any non-final state of the machine (`region.*` inside a region). */
+export const ANY_NODE_NAME = "*";
+
+export function isAnyNode(id: string): boolean {
+  return id === ANY_NODE_NAME || id.endsWith(`.${ANY_NODE_NAME}`);
+}
+
 export function collectActiveStates(
   snapshot: Snapshot,
   options: { prefix: string; activeSet: Set<string> },

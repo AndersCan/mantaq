@@ -129,8 +129,8 @@ describe("sugar re-exports", () => {
           states: [off, onState],
           initial: off,
           setup: (m) => {
-            m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) });
-            m.on(onState, { eventRef: toggle, handler: () => ({ state: off }) });
+            m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
+            m.on(onState, { event: toggle, to: [off], handler: () => ({ state: off }) });
           },
         }),
       );
@@ -171,7 +171,8 @@ describe("sugar re-exports", () => {
         initial: off,
         setup: (m) => {
           m.on(off, {
-            eventRef: goEvent,
+            event: goEvent,
+            to: [finished],
             handler: () => ({ state: finished, emit: [done.create({ ok: true })] }),
           });
         },

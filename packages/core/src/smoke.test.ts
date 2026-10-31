@@ -14,8 +14,8 @@ describe("API smoke", () => {
       states: [idle, running],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ state: running }) });
-        m.on(running, { eventRef: stop, handler: () => ({ state: idle }) });
+        m.on(idle, { event: start, to: [running], handler: () => ({ state: running }) });
+        m.on(running, { event: stop, to: [idle], handler: () => ({ state: idle }) });
       },
     });
 
@@ -38,7 +38,8 @@ describe("API smoke", () => {
       initial: { state: idle, payload: { x: 0 } },
       setup: (m) => {
         m.on(idle, {
-          eventRef: start,
+          event: start,
+          to: [running],
           handler: (event) => {
             expect(typeof event.payload.url).toBe("string");
             return { state: running };
@@ -61,7 +62,7 @@ describe("API smoke", () => {
       initial: idle,
       clock,
       setup: (m) => {
-        m.on(idle, { eventRef: ping, handler: () => ({}) });
+        m.on(idle, { event: ping, handler: () => ({}) });
       },
     });
     actor.send(ping.create());

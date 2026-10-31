@@ -1,3 +1,4 @@
+import { isAnyState, scopeOf } from "../schema.ts";
 import type { AtlasEdge, AtlasMachine, AtlasState } from "../schema.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
@@ -17,6 +18,16 @@ export interface PlacedUnknown {
   kind: "unknown";
   id: string;
   edgeId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The `*` source of `onAny` edges: one per machine or region that registers `onAny`. */
+export interface PlacedAny {
+  kind: "any";
+  id: string;
   x: number;
   y: number;
   width: number;
@@ -43,7 +54,7 @@ export interface PlacedRegion {
 export interface MachineLayout {
   width: number;
   height: number;
-  nodes: Array<PlacedState | PlacedUnknown>;
+  nodes: Array<PlacedState | PlacedUnknown | PlacedAny>;
   edges: PlacedEdge[];
   regions: PlacedRegion[];
   /** Entry arrow into the initial state, from the `initial` edge. */
@@ -54,6 +65,11 @@ const CHAR_WIDTH = 7;
 const NODE_HEIGHT = 36;
 const LABEL_HEIGHT = 16;
 const UNKNOWN_SIZE = 28;
+const ANY_LABEL = "any state";
+
+function anyIds(machine: AtlasMachine): string[] {
+  return [...new Set(machine.edges.map((edge) => edge.from).filter(isAnyState))].sort();
+}
 
 function unknownNodeId(edge: AtlasEdge): string {
   return `?:${edge.id}`;
@@ -95,6 +111,16 @@ function addStates(graph: LayoutGraph, machine: AtlasMachine): void {
   }
 }
 
+function addAnyNodes(graph: LayoutGraph, machine: AtlasMachine): void {
+  for (const id of anyIds(machine)) {
+    graph.setNode(id, { width: ANY_LABEL.length * CHAR_WIDTH + 24, height: NODE_HEIGHT });
+    const region = scopeOf(id);
+    if (region !== "" && machine.regions.includes(region)) {
+      graph.setParent(id, regionNodeId(region));
+    }
+  }
+}
+
 function addEdges(graph: LayoutGraph, machine: AtlasMachine): void {
   for (const edge of machine.edges) {
     if (edge.kind === "initial" || edge.to === edge.from) continue;
@@ -117,8 +143,11 @@ function box(label: NodeLabel): { x: number; y: number; width: number; height: n
   return { x: label.x ?? 0, y: label.y ?? 0, width: label.width, height: label.height };
 }
 
-function placeNodes(graph: LayoutGraph, machine: AtlasMachine): Array<PlacedState | PlacedUnknown> {
-  const states: Array<PlacedState | PlacedUnknown> = machine.states.map((state) => ({
+function placeNodes(
+  graph: LayoutGraph,
+  machine: AtlasMachine,
+): Array<PlacedState | PlacedUnknown | PlacedAny> {
+  const states: Array<PlacedState | PlacedUnknown | PlacedAny> = machine.states.map((state) => ({
     kind: "state",
     id: state.id,
     state,
@@ -132,7 +161,12 @@ function placeNodes(graph: LayoutGraph, machine: AtlasMachine): Array<PlacedStat
       edgeId: edge.id,
       ...box(graph.node(unknownNodeId(edge))),
     }));
-  return [...states, ...unknowns];
+  const anys: PlacedAny[] = anyIds(machine).map((id) => ({
+    kind: "any",
+    id,
+    ...box(graph.node(id)),
+  }));
+  return [...states, ...anys, ...unknowns];
 }
 
 function polyline(points: ReadonlyArray<Point>): string {
@@ -202,6 +236,7 @@ export function layoutMachine(machine: AtlasMachine): MachineLayout {
   });
   addRegions(graph, machine.regions);
   addStates(graph, machine);
+  addAnyNodes(graph, machine);
   addEdges(graph, machine);
   layout(graph);
   const size = graph.graph();

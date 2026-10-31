@@ -6,11 +6,11 @@ import { availableModes, modeLabel, unreachedText } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
 
-export const PROBE_BANNER =
-  "Edges come from synthetic probing; payload-dependent branches may be missing.";
+export const STRUCTURE_BANNER =
+  "Edges come from each handler's declared `to` list. Guards are not evaluated, so some edges may never be taken.";
 
 export const FUZZ_NOTE =
-  "Green edges were observed while fuzzing. Fuzzing finds behaviour; it never proves an edge is impossible.";
+  "Green edges were observed while fuzzing but not declared. Fuzzing finds behaviour; it never proves an edge is impossible.";
 
 interface ViewState {
   machineId: string;
@@ -151,7 +151,7 @@ export function mountViewer(root: HTMLElement, atlas: AtlasDocument): void {
     root.append(
       header,
       html(doc, "p", { class: "banner", role: "note" }, [
-        machine.fuzz === null ? PROBE_BANNER : `${PROBE_BANNER} ${FUZZ_NOTE}`,
+        machine.fuzz === null ? STRUCTURE_BANNER : `${STRUCTURE_BANNER} ${FUZZ_NOTE}`,
       ]),
       legend(doc, { mode, machine }),
       html(doc, "div", { class: "atlas-main" }, [

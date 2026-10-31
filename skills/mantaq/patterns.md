@@ -22,7 +22,11 @@ Actor({
       name: "startSubmitTimeout",
       fn: (input) => withTimeout(800, { input, event: () => submittingDone.create() }),
     });
-    m.on(submitting, { eventRef: submittingDone, handler: () => ({ state: success }) });
+    m.on(submitting, {
+      event: submittingDone,
+      to: [success],
+      handler: () => ({ state: success }),
+    });
   },
 });
 ```
@@ -43,25 +47,18 @@ clock.setTimeout(delay, { signal, cb: () => emit(retryDone.create()) });
 
 ## Cross-State Handling → onAny
 
-Events valid in every state (cancel, back, disconnect). One handler; return `{}` when irrelevant.
+Events that do the same thing in every state (cancel, disconnect, purge). The target may depend on payload or context, never on the current state. Diagrams draw it once, from "any state".
 
 ```ts
-m.onAny({
-  eventRef: backEvent,
-  handler: (ev, { context, actor }) => {
-    if (matches(actor, "payment")) {
-      const cur = context.get();
-      cur.paymentInfo = undefined;
-      context.set(cur);
-      return { state: shippingAddress };
-    }
-    if (matches(actor, "error")) return { state: payment };
-    return {};
-  },
-});
+m.onAny({ event: disconnect, to: [disconnected], handler: () => ({ state: disconnected }) });
 ```
 
-Branch on payload or context where you can. `actor.state` inside a handler is easy to misread (previous vs new state depending on handler kind).
+Target depends on the current state (back, next)? One `m.on` per state, not `onAny` branching on `actor.state`. Each registration then declares its exact target and the diagram shows exact source/target pairs (atlas warns otherwise).
+
+```ts
+m.on(payment, { event: back, to: [shippingAddress], handler: () => ({ state: shippingAddress }) });
+m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
+```
 
 ## Parallel Concerns → Regions
 
@@ -77,7 +74,7 @@ Actor({ regions: { health: healthMonitor, movement: movementActor }, ... });
 
 ```ts
 m.onAny({
-  eventRef: toggleEvent,
+  event: toggleEvent,
   handler: (_ev, { actor }) => {
     actor.regions.movement.send(jumpEvent.create());
     return {};

@@ -52,7 +52,7 @@ describe("broadcast", () => {
         states: [off, onState],
         initial: off,
         setup: (m) => {
-          m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) });
+          m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
         },
       }),
       toggle,
@@ -87,8 +87,8 @@ describe("broadcast", () => {
         states: [off, onState],
         initial: off,
         setup: (m) => {
-          m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) });
-          m.on(onState, { eventRef: reset, handler: () => ({ state: off }) });
+          m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
+          m.on(onState, { event: reset, to: [off], handler: () => ({ state: off }) });
         },
       }),
     );
@@ -139,7 +139,7 @@ describe("broadcast", () => {
         states: [childOff, childOn],
         initial: childOff,
         setup: (m) => {
-          m.on(childOff, { eventRef: pong, handler: () => ({ state: childOn }) });
+          m.on(childOff, { event: pong, to: [childOn], handler: () => ({ state: childOn }) });
         },
       }),
     );
@@ -152,7 +152,8 @@ describe("broadcast", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: ping,
+          event: ping,
+          to: [done],
           handler: () => {
             broadcast(map, pong.create());
             return { state: done };

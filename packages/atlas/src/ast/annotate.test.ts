@@ -3,6 +3,7 @@ import { EXAMPLE_ROOT, exampleTargets } from "../examples.ts";
 import { createCheckoutActor } from "../fixtures/checkout.ts";
 import { createCreditActor } from "../fixtures/credit.ts";
 import { createSagaActor } from "../fixtures/saga.ts";
+import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import type { AtlasExplanation, AtlasMachine } from "../schema.ts";
 import { analyzeSource, annotateMachine } from "./annotate.ts";
 import { Either } from "@mantaq/utils";
@@ -26,10 +27,9 @@ describe("AST: conditional handler (credit)", () => {
   const machine = annotated("credit", createCreditActor());
   const apply = machine.edges.find((edge) => edge.event === "apply");
 
-  test("probing sees one branch; the AST explains all three", () => {
-    expect(machine.edges.filter((edge) => edge.event === "apply").map((edge) => edge.to)).toEqual([
-      "approved",
-    ]);
+  test("the graph has every declared branch; the AST explains all three", () => {
+    const targets = machine.edges.filter((edge) => edge.event === "apply").map((edge) => edge.to);
+    expect(targets).toEqual(["approved", "manualReview", "rejected"]);
     const explanation = analyzed(apply?.explanation);
     expect(explanation?.branches).toEqual([
       { conditions: ["score < 600"], target: { kind: "state", state: "rejected" } },
@@ -90,9 +90,10 @@ describe("AST: conditional handler (credit)", () => {
 });
 
 describe("AST: examples", () => {
-  test("checkout back: onAny handler reads live actor state", () => {
-    const machine = annotated("checkout", createCheckoutActor());
+  test("onAny handler reading live actor state is flagged, explained on the any-state edges", () => {
+    const machine = annotated("state-routing", createStateRoutingActor());
     const back = machine.edges.filter((edge) => edge.event === "back");
+    expect(back.map((edge) => edge.from)).toEqual(["*", "*"]);
     for (const edge of back) {
       const explanation = analyzed(edge.explanation);
       expect(explanation?.registration).toBe("onAny");
@@ -100,11 +101,20 @@ describe("AST: examples", () => {
     }
     const targets = analyzed(back[0]?.explanation)?.branches.map((branch) => branch.target);
     expect(targets).toEqual([
-      { kind: "state", state: "shippingAddress" },
-      { kind: "state", state: "basicInfo" },
-      { kind: "state", state: "payment" },
+      { kind: "state", state: "second" },
+      { kind: "state", state: "first" },
       { kind: "stay" },
     ]);
+  });
+
+  test("checkout back: per-state handlers read no actor state", () => {
+    const machine = annotated("checkout", createCheckoutActor());
+    const back = machine.edges.filter((edge) => edge.event === "back");
+    expect(back.length).toBe(3);
+    for (const edge of back) {
+      expect(analyzed(edge.explanation)?.registration).toBe("on");
+      expect(analyzed(edge.explanation)?.readsActorState).toBe(false);
+    }
   });
 
   test("saga: specific `on` wins over onAny; payload paths are dotted", () => {

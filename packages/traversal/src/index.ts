@@ -14,7 +14,13 @@ export type {
 } from "./types.ts";
 export type { History } from "./history.ts";
 export { createHistory } from "./history.ts";
-export { buildGraph, collectActiveStates, INITIAL_NODE_ID } from "./graph.ts";
+export {
+  ANY_NODE_NAME,
+  buildGraph,
+  collectActiveStates,
+  INITIAL_NODE_ID,
+  isAnyNode,
+} from "./graph.ts";
 export {
   parseContextRecord,
   parseInitialName,

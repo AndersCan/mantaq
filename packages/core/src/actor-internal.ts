@@ -38,6 +38,7 @@ export interface AnyActor<C = Record<string, unknown>> {
   context?: C;
   options?: {
     transitions?: Record<string, Record<string, unknown>>;
+    targets?: Record<string, Record<string, string[]>>;
     effects?: Record<string, unknown[]>;
     states?: ReadonlyArray<{ name: string; isFinal: boolean }>;
   };

@@ -15,6 +15,9 @@ export type TransitionHandler = (
 /** Map of state/Any → event → handler */
 export type TransitionDispatchMap = Record<string, Record<string, TransitionHandler>>;
 
+/** Map of state/Any → event → declared `to` state names (builder `to` option). */
+export type TargetMap = Record<string, Record<string, string[]>>;
+
 /** State definition — matches AnyActor.options.states element type */
 export type StateDef = { name: string; isFinal: boolean };
 
@@ -24,6 +27,8 @@ export interface GraphNode {
   isActive: boolean;
   isFinal: boolean;
   isInitial?: boolean;
+  /** The `*` source of `onAny` edges: any non-final state. */
+  isAny?: boolean;
 }
 
 export interface GraphEdge {
@@ -34,6 +39,10 @@ export interface GraphEdge {
   isActive: boolean;
   isInternal?: boolean;
   isUndetermined?: boolean;
+  /** Handled without a state change: the registration declares no `to`. */
+  isStay?: boolean;
+  /** Target comes from the builder's `to` list, not from running the handler. */
+  isDeclared?: boolean;
   payload?: { action?: string };
   contexts: string[];
 }

@@ -25,7 +25,7 @@ describe("API type safety", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: clicked, handler: () => ({ emit: [pong.create()] }) });
+        m.on(idle, { event: clicked, handler: () => ({ emit: [pong.create()] }) });
       },
     });
 
@@ -52,8 +52,8 @@ describe("API type safety", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: triggered, handler: () => ({ state: active }) });
-        m.onAny({ eventRef: triggered, handler: () => ({ state: idle }) });
+        m.on(idle, { event: triggered, to: [active], handler: () => ({ state: active }) });
+        m.onAny({ event: triggered, to: [idle], handler: () => ({ state: idle }) });
       },
     });
 
@@ -72,7 +72,7 @@ describe("API type safety", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: complete, handler: () => ({ state: done }) });
+        m.on(pending, { event: complete, to: [done], handler: () => ({ state: done }) });
       },
     });
 
@@ -90,7 +90,7 @@ describe("API type safety", () => {
       context: { count: 0 },
       setup: (m) => {
         m.on(idle, {
-          eventRef: tick,
+          event: tick,
           handler: (_e, { context }) => {
             const current = context.get();
             context.set({ ...current, count: current.count + 1 });
@@ -185,7 +185,7 @@ describe("type level contract — type = behavior", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: clicked,
+          event: clicked,
           handler: (event) => {
             expectTypeOf(event).toEqualTypeOf<{ type: "CLICKED"; payload: { x: number } }>();
             return {};
@@ -206,7 +206,7 @@ describe("type level contract — type = behavior", () => {
       context: { count: 0 },
       setup: (m) => {
         m.on(idle, {
-          eventRef: tick,
+          event: tick,
           handler: (_e, { context }) => {
             expectTypeOf(context).toEqualTypeOf<Context<{ count: number }>>();
             expectTypeOf(context.get()).toEqualTypeOf<{ count: number }>();
@@ -330,10 +330,10 @@ describe("transition contract — type = behavior", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: clicked, handler: () => ({ state: active }) });
+        m.on(idle, { event: clicked, to: [active], handler: () => ({ state: active }) });
         // @ts-expect-error transition target must be a declared state
-        // suppressed: m.on(idle, { eventRef: other, handler: () => ({ state: alien }) }); — transition target must be a declared state
-        m.on(idle, { eventRef: other, handler: () => ({ state: alien }) });
+        // suppressed: m.on(idle, { event: other, to: [alien], handler: () => ({ state: alien }) }); — transition target must be a declared state
+        m.on(idle, { event: other, to: [alien], handler: () => ({ state: alien }) });
       },
     });
 
@@ -343,9 +343,46 @@ describe("transition contract — type = behavior", () => {
       initial: idle,
       setup: (m) => {
         // @ts-expect-error emit id must be a declared output
-        // suppressed: m.on(idle, { eventRef: clicked, handler: () => ({ emit: [{ type: "UNDE — emit id must be a declared output
-        m.on(idle, { eventRef: clicked, handler: () => ({ emit: [{ type: "UNDECLARED_OUT" }] }) });
+        // suppressed: m.on(idle, { event: clicked, handler: () => ({ emit: [{ type: "UNDE — emit id must be a declared output
+        m.on(idle, { event: clicked, handler: () => ({ emit: [{ type: "UNDECLARED_OUT" }] }) });
       },
+    });
+  });
+
+  test("handler may only return states listed in to", () => {
+    const idle = state("idle")();
+    const active = state("active")();
+    const done = state("done")().final();
+    const clicked = event("CLICKED")();
+    const other = event("OTHER")();
+
+    const actor = Actor({
+      inputs: [clicked, other],
+      states: [idle, active, done],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, {
+          event: clicked,
+          to: [active, done],
+          handler: () => (Number("1") > 0 ? { state: active } : { state: done }),
+        });
+        m.on(active, { event: clicked, to: [done], handler: () => ({}) });
+        m.on(active, {
+          event: other,
+          to: [idle],
+          // @ts-expect-error returned state must be listed in `to`
+          // suppressed: handler: () => ({ state: done }) — returned state must be listed in `to`
+          handler: () => ({ state: done }),
+        });
+        // @ts-expect-error without `to` the handler can only stay
+        // suppressed: m.onAny({ event: other, handler: () => ({ state: idle }) }) — without `to` the handler can only stay
+        m.onAny({ event: other, handler: () => ({ state: idle }) });
+      },
+    });
+    expect(actor.options.targets).toEqual({
+      idle: { CLICKED: ["active", "done"] },
+      active: { CLICKED: ["done"], OTHER: ["idle"] },
+      Any: { OTHER: [] },
     });
   });
 
@@ -360,7 +397,7 @@ describe("transition contract — type = behavior", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: clicked, handler: () => ({ emit: [pong.create({ n: 1 })] }) });
+        m.on(idle, { event: clicked, handler: () => ({ emit: [pong.create({ n: 1 })] }) });
       },
     });
   });
@@ -377,7 +414,7 @@ describe("transition contract — type = behavior", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: clicked,
+          event: clicked,
           handler: () => ({ emit: [{ type: "PONG", payload: { n: 1 } }] }),
         });
       },

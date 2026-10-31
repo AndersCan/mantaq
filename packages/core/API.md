@@ -58,7 +58,7 @@ const a = new Actor({
   inputs: [click],
   states: [idle],
   initial: idle,
-  setup: (m) => m.on(idle, click, () => ({})),
+  setup: (m) => m.on(idle, { event: click, handler: () => ({}) }),
 });
 a.send(click.create());
 ```
@@ -160,11 +160,14 @@ class Context<T> {
   get(): T;
   set(value: T): void;
 }
-m.on(idle, tick, (_e, { context }) => {
-  const s = context.get();
-  s.count += 1;
-  context.set(s);
-  return {};
+m.on(idle, {
+  event: tick,
+  handler: (_e, { context }) => {
+    const s = context.get();
+    s.count += 1;
+    context.set(s);
+    return {};
+  },
 });
 ```
 
@@ -392,23 +395,33 @@ interface Clock {
 
 The type-safe transition/effect registrar passed to `setup`. Targets validate against declared `States`/`Inputs`/`Internal`/`Outputs`. An undeclared target fails to compile.
 
+`to` lists every state the handler may return. The handler's return type is narrowed to `to[number]`, so returning an unlisted state fails to compile; omit `to` for a handler that only stays. The builder records `to` in `BuiltMaps.targets`, so the full transition graph is static data: tooling reads it without running a handler.
+
 ```ts
 class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
-  on<S extends States[number], E extends Inputs[number] | Internal[number]>(
-    stateRef: S,
-    eventRef: E,
-    fn: Handler,
-  ): this;
-  onAny<E extends Inputs[number] | Internal[number]>(eventRef: E, fn: Handler): this;
+  on<
+    S extends States[number],
+    E extends Inputs[number] | Internal[number],
+    To extends States[number][],
+  >(stateRef: S, options: { event: E; to?: To; handler: Handler<To[number]> }): this;
+  onAny<E extends Inputs[number] | Internal[number], To extends States[number][]>(options: {
+    event: E;
+    to?: To;
+    handler: Handler<To[number]>;
+  }): this;
   effect<S extends States[number]>(
     stateRef: S,
     def: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
   ): this;
 }
-// Handler = (event, opts: { context: Context<ActorContext>; actor: AnyActor }) =>
-//   { state?: AnyStateRef; payload?: unknown; emit?: Array<{ type: string; payload?: unknown }> }
-m.on(idle, click, () => ({ state: active, emit: [pong.create()] }));
-m.onAny(click, () => ({ state: idle }));
+// Handler<To> = (event, opts: { context: Context<ActorContext>; actor: AnyActor }) =>
+//   { state?: To; payload?: unknown; emit?: Array<{ type: string; payload?: unknown }> }
+m.on(idle, {
+  event: click,
+  to: [active],
+  handler: () => ({ state: active, emit: [pong.create()] }),
+});
+m.onAny({ event: click, to: [idle], handler: () => ({ state: idle }) });
 m.effect(active, {
   name: "markReady",
   fn: ({ context }) => {
@@ -436,6 +449,8 @@ The built transition/effect registries produced by `ActorBuilder.build()`. Expos
 ```ts
 interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
   transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
+  /** Declared `to` state names per `[state][event]`; `Any` keys `onAny`. */
+  targets: Record<string, Record<string, string[]>>;
   effects: Record<string, Array<{ name: string; fn: EffectFn<ActorContext> }>>;
 }
 ```

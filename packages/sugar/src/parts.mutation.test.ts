@@ -31,7 +31,7 @@ describe("parts directed mutation tests", () => {
 
   test("returns its function unchanged from definePart", () => {
     function part(builder: BuilderOf<typeof base>): void {
-      builder.on(idle, { eventRef: goEvent, handler: () => ({ state: idle }) });
+      builder.on(idle, { event: goEvent, to: [idle], handler: () => ({ state: idle }) });
     }
     expect(definePart<typeof base>(part)).toBe(part);
   });
@@ -62,7 +62,7 @@ describe("parts directed mutation tests", () => {
     const order: string[] = [];
     function first(builder: BuilderOf<typeof base>): void {
       order.push("first");
-      builder.on(idle, { eventRef: goEvent, handler: () => ({ state: idle }) });
+      builder.on(idle, { event: goEvent, to: [idle], handler: () => ({ state: idle }) });
     }
     function second(_m: BuilderOf<typeof base>): void {
       order.push("second");

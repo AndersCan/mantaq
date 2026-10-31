@@ -219,6 +219,18 @@ body {
   font-weight: 700;
 }
 
+.any-node rect {
+  fill: none;
+  stroke: var(--state-border);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 3;
+}
+
+.any-node text {
+  fill: var(--muted);
+  font-style: italic;
+}
+
 .entry circle {
   fill: var(--line);
 }
@@ -285,7 +297,8 @@ body {
   color: var(--accent);
 }
 
-.prediction-note {
+.prediction-note,
+.routing-note {
   background: var(--banner-bg);
   color: var(--banner-fg);
   padding: 6px 8px;

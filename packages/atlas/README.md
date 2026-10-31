@@ -47,24 +47,25 @@ const machine = annotateMachine(fuzzedMachine(target, result), {
   file: "/abs/path/cart.ts",
   root: "/abs/repo",
 });
-serializeAtlas({ schemaVersion: 4, machines: [withTestCoverage(target, machine, mySequences)] });
+serializeAtlas({ schemaVersion: 5, machines: [withTestCoverage(target, machine, mySequences)] });
 ```
 
 Pass a **fresh** actor to `toAtlas` / `toAtlasMachine`. Probing calls handlers, and a handler that reads live actor state sees whatever state that actor is in.
 
 `parseAtlas(text)` / `validateAtlas(value)` read untrusted JSON and return `Either<AtlasIssue[], AtlasDocument>`, with every issue and its path.
 
-## Schema (v4)
+## Schema (v5)
 
-`AtlasDocument { schemaVersion: 4, machines: AtlasMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
+`AtlasDocument { schemaVersion: 5, machines: AtlasMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
 
 | field              | meaning                                                                                                                                                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `machine.states[]` | `id` (region-prefixed `region.state`), `region`, `initial`, `final`, `coverage` (`null` = no run, else `{ hits }`)                                                                                                                                            |
+| `edge.from`        | a state id, `__initial__`, or `*` (`region.*` in a region): an `onAny` registration, meaning any non-final state. `*` is never in `states`; a `stay` from `*` has `to: "*"`                                                                                   |
 | `machine.events[]` | `id`, `internal`, `payloadType` (always `null`: erased at runtime)                                                                                                                                                                                            |
-| `edge.kind`        | `initial` · `transition` · `effect` (state runs effects on entry) · `stay` (handled, no state change)                                                                                                                                                         |
-| `edge.to`          | `null` = **undetermined**: probing could not tell the target                                                                                                                                                                                                  |
-| `edge.origin`      | `probe` (synthetic traversal) · `fuzz` (observed only while fuzzing)                                                                                                                                                                                          |
+| `edge.kind`        | `initial` · `transition` · `effect` (state runs effects on entry) · `stay` (handled, no state change: a registration without `to`, or observed while fuzzing)                                                                                                 |
+| `edge.to`          | `null` = **undetermined**: only for actors that carry no `to` declarations                                                                                                                                                                                    |
+| `edge.origin`      | `declared` (builder `to`, vouched for by the type checker) · `probe` (synthetic traversal, undeclared actors) · `fuzz` (observed only while fuzzing)                                                                                                          |
 | `edge.explanation` | `null` (no handler: initial/effect, or AST not run) · `{ status: "analyzed", location, registration, branches, payloadReads, contextReads, contextWrites, readsActorState, comparisons, literals }` · `{ status: "not_analyzed", location, reason, snippet }` |
 | `machine.fuzz`     | `null` or `{ seed, iterations, corpus: [{ steps, discovered }], errors: [{ from, event, message, steps }] }`; every sequence is shrunk and replayable from a fresh actor                                                                                      |
 
@@ -75,26 +76,26 @@ Bump `ATLAS_SCHEMA_VERSION` on any breaking change. The validator accepts only t
 The viewer's "Coverage from" picker dims elements with zero hits. What dimmed means depends on the source:
 
 - **example tests** (`tested`): no test exercises this. It is the classic "what is untested" view, and the default when tests are supplied. The export replays the example tests transcribed in `handWrittenBaselines()`.
-- **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **probe-only edge**: probing ran the handler with `{}` and a sample context and predicted a target the live machine may never reach. Saga's `X -CANCEL-> failed` after inventory is reserved is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
+- **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
 
 ## How each tool works
 
-**Probe** (`toAtlas`, Phase 1): `@mantaq/traversal` calls each handler with payload `{}` and a sample context. Fast, total, shallow.
+**Structure** (`toAtlas`, Phase 1): states come from the actor's `states`, edges from each registration's `to` (`actor.options.targets`): one edge per declared target, a `stay` edge when `to` is absent. `onAny` registrations draw from one `*` source per machine or region, never once per state. Coverage of a `*` edge counts every covered state; a state's own handler for the same event is not told apart. Nothing runs to find them. `@mantaq/traversal` still calls each handler with payload `{}` and each sample context, but only to label edges with the contexts that reach them and what they emit.
 
 **Fuzzer** (`fuzz`, Phase 3): a fresh actor and `VirtualClock` per run, so it is synchronous and deterministic. Mutations: insert, delete, swap, payload leaf tweak, time advance, and **loop**. Loop repeats, 2–13 times or a compared literal's count, a step that changed the actor's context, so counter guards like `if (attempts > 10)` become reachable. A step that changes nothing is never looped. A run is kept when it reaches a new feature (`state:x`, `edge:a>e>b`, `stay:a>e`, `error:a>e`), then shrunk to 1-minimal. Internal events are injected only when the current state handles them, as a live effect would (core rejects the rest). Payloads come from the per-machine samples and are mutated leaf by leaf, keeping each leaf's JSON type and never dropping keys. So a handler that throws is a real finding, not a type violation the compiler would reject.
 
-**AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { eventRef, handler })` / `m.onAny({ eventRef, handler })` and resolves names from the literal types of `state.name` / `eventRef.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. A specific `on` wins over `onAny`, as at runtime.
+**AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { event, handler })` / `m.onAny({ event, handler })` and resolves names from the literal types of `state.name` / `event.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. A specific `on` wins over `onAny`, as at runtime.
 
 **Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See `docs/atlas/phase5-comparison.md`.
 
 ## What it cannot show
 
-- **Payload-dependent branches** are invisible to probing: only the branch `{}` takes shows up, with no marker. The fuzzer finds them only if sample payloads can be mutated into them. The AST lists them as "not in graph" either way.
-- **Handlers reading live actor state** (`actor.state.name`) come out `to: null` from probing. The fuzzer fills in the concrete targets it reached; the AST flags `readsActorState`.
+- **Guards** are not evaluated. A declared edge says "the handler may return this", not "some input reaches it". Fuzz coverage and the AST's branch conditions are the evidence; neither is proof.
+- **`onAny` routing on live actor state** (`actor.state.name`) cannot be drawn exactly: the `*` edges say "from any state, may go to X", not which state leads where. Register per-state `m.on` handlers instead, as checkout's `back` does. `routingWarnings(machine)` lists these handlers (the viewer and `atlas:export` show them); it needs AST explanations.
 - **Payload types** are erased: `payloadType` is always `null`, and the fuzzer knows only the shapes you sample.
 - **Effects** are opaque. An effect edge says "this state runs effects on entry", not what they emit or which effect it is (traversal labels it by state, not effect name). Example fixtures stub effects, and the fuzzer stands in for them by injecting internal events. It can therefore produce event orders a real effect never would, but only in states that handle the event.
 - **Regions**: the fuzzer observes the root actor only. Region transitions are probed but not fuzzed.
-- **AST limits**: handlers passed by reference, returns inside `switch` / loops / `try`, and computed `eventRef`s are `not_analyzed`, with a reason and snippet. Comparisons against actor state or computed values carry no guidance.
+- **AST limits**: handlers passed by reference, returns inside `switch` / loops / `try`, and computed `event`s are `not_analyzed`, with a reason and snippet. Comparisons against actor state or computed values carry no guidance.
 - **History** cannot distinguish an ignored event from a self-loop. The fuzzer can (`stay` vs `transition`), but probe-only coverage cannot.
 - **Fuzzing is not proof.** An edge that is absent was not reached; it is not shown to be impossible.
 

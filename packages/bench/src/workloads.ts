@@ -15,11 +15,13 @@ function toggler() {
     context: {},
     setup: (machine) => {
       machine.on(counterStates.on, {
-        eventRef: counterEvents.TOGGLE,
+        event: counterEvents.TOGGLE,
+        to: [counterStates.off],
         handler: () => ({ state: counterStates.off }),
       });
       machine.on(counterStates.off, {
-        eventRef: counterEvents.TOGGLE,
+        event: counterEvents.TOGGLE,
+        to: [counterStates.on],
         handler: () => ({ state: counterStates.on }),
       });
     },
@@ -36,7 +38,7 @@ export function dispatchWorkload() {
     initial: counterStates.on,
     context: {},
     setup: (machine) => {
-      machine.on(counterStates.on, { eventRef: counterEvents.TICK, handler: () => ({}) });
+      machine.on(counterStates.on, { event: counterEvents.TICK, handler: () => ({}) });
     },
   });
   return () => {
@@ -63,7 +65,7 @@ export function contextGuardWorkload() {
     context: { health: 100 },
     setup: (machine) => {
       machine.on(counterStates.on, {
-        eventRef: damage,
+        event: damage,
         handler: (incoming, { context }) => {
           const current = context.get();
           if (current.health <= 0) return {};
@@ -92,7 +94,7 @@ export function regionWorkload() {
     regions: { child: toggler() },
     setup: (machine) => {
       machine.on(counterStates.on, {
-        eventRef: counterEvents.TOGGLE,
+        event: counterEvents.TOGGLE,
         handler: () => {
           actor.regions.child.send(counterEvents.TOGGLE.create());
           return {};

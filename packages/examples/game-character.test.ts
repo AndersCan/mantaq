@@ -79,19 +79,22 @@ function createCharacter(clock?: VirtualClock) {
     context: {},
     setup: (m) => {
       m.on(movementStates.idle, {
-        eventRef: combatEvents.START_SPRINT,
+        event: combatEvents.START_SPRINT,
+        to: [movementStates.sprinting],
         handler: () => ({
           state: movementStates.sprinting,
         }),
       });
       m.on(movementStates.running, {
-        eventRef: combatEvents.START_SPRINT,
+        event: combatEvents.START_SPRINT,
+        to: [movementStates.sprinting],
         handler: () => ({
           state: movementStates.sprinting,
         }),
       });
       m.on(movementStates.sprinting, {
-        eventRef: combatEvents.STOP_SPRINT,
+        event: combatEvents.STOP_SPRINT,
+        to: [movementStates.running],
         handler: () => ({
           state: movementStates.running,
         }),
@@ -142,7 +145,7 @@ function createCharacter(clock?: VirtualClock) {
         },
       });
       m.on(lifeStates.alive, {
-        eventRef: combatEvents.START_SPRINT,
+        event: combatEvents.START_SPRINT,
         handler: (_event, { context }) => {
           const current = context.get();
           if (current.stamina <= 0) return {};
@@ -153,14 +156,14 @@ function createCharacter(clock?: VirtualClock) {
         },
       });
       m.on(lifeStates.alive, {
-        eventRef: combatEvents.STOP_SPRINT,
+        event: combatEvents.STOP_SPRINT,
         handler: () => {
           actor.regions.movement.send(combatEvents.STOP_SPRINT.create());
           return {};
         },
       });
       m.on(lifeStates.alive, {
-        eventRef: combatEvents.ATTACK,
+        event: combatEvents.ATTACK,
         handler: (_event, { context }) => {
           const current = context.get();
           if (current.health <= 0) return {};
@@ -185,7 +188,8 @@ function createCharacter(clock?: VirtualClock) {
         },
       });
       m.onAny({
-        eventRef: takeDamageEvent,
+        event: takeDamageEvent,
+        to: [lifeStates.dead],
         handler: (event, { context }) => {
           const current = context.get();
           current.health = Math.max(0, current.health - event.payload.amount);
@@ -199,7 +203,7 @@ function createCharacter(clock?: VirtualClock) {
         },
       });
       m.onAny({
-        eventRef: combatEvents.REGEN,
+        event: combatEvents.REGEN,
         handler: (_event, { context }) => {
           const current = context.get();
           current.stamina = Math.min(

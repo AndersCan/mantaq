@@ -6,6 +6,21 @@ exports[`determinism > auth snapshot 1`] = `
     {
       "edges": [
         {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "MONITOR_TICK",
+          "explanation": null,
+          "from": "*",
+          "id": "*-MONITOR_TICK-stay",
+          "kind": "stay",
+          "origin": "declared",
+          "tested": null,
+          "to": "*"
+        },
+        {
           "contexts": [],
           "coverage": null,
           "emits": [],
@@ -24,27 +39,12 @@ exports[`determinism > auth snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "MONITOR_TICK",
-          "explanation": null,
-          "from": "checkingAuth",
-          "id": "checkingAuth-MONITOR_TICK-checkingAuth-undetermined-MONITOR_TICK",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "SIGN_IN",
           "explanation": null,
           "from": "checkingAuth",
           "id": "checkingAuth-SIGN_IN-signingIn",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "signingIn"
         },
@@ -67,27 +67,12 @@ exports[`determinism > auth snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "MONITOR_TICK",
-          "explanation": null,
-          "from": "loggedIn",
-          "id": "loggedIn-MONITOR_TICK-loggedIn-undetermined-MONITOR_TICK",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "SIGN_OUT",
           "explanation": null,
           "from": "loggedIn",
           "id": "loggedIn-SIGN_OUT-signingOut",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "signingOut"
         },
@@ -110,44 +95,14 @@ exports[`determinism > auth snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "MONITOR_TICK",
-          "explanation": null,
-          "from": "loggedOut",
-          "id": "loggedOut-MONITOR_TICK-loggedOut-undetermined-MONITOR_TICK",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "SIGN_IN",
           "explanation": null,
           "from": "loggedOut",
           "id": "loggedOut-SIGN_IN-signingIn",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "signingIn"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "MONITOR_TICK",
-          "explanation": null,
-          "from": "signInError",
-          "id": "signInError-MONITOR_TICK-signInError-undetermined-MONITOR_TICK",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
         },
         {
           "contexts": [
@@ -160,7 +115,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signInError",
           "id": "signInError-RETRY-signingIn",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "signingIn"
         },
@@ -175,24 +130,9 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signInError",
           "id": "signInError-SIGN_IN-signingIn",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "signingIn"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "MONITOR_TICK",
-          "explanation": null,
-          "from": "signingIn",
-          "id": "signingIn-MONITOR_TICK-signingIn-undetermined-MONITOR_TICK",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
         },
         {
           "contexts": [
@@ -205,7 +145,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingIn",
           "id": "signingIn-SIGN_IN_DONE-loggedIn",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "loggedIn"
         },
@@ -220,7 +160,7 @@ exports[`determinism > auth snapshot 1`] = `
           "from": "signingIn",
           "id": "signingIn-SIGN_IN_ERROR-signInError",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "signInError"
         },
@@ -243,27 +183,12 @@ exports[`determinism > auth snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "MONITOR_TICK",
-          "explanation": null,
-          "from": "signingOut",
-          "id": "signingOut-MONITOR_TICK-signingOut-undetermined-MONITOR_TICK",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "SIGNING_OUT_DONE",
           "explanation": null,
           "from": "signingOut",
           "id": "signingOut-SIGNING_OUT_DONE-loggedOut",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "loggedOut"
         },
@@ -380,7 +305,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 4
+  "schemaVersion": 5
 }
 "
 `;
@@ -409,27 +334,12 @@ exports[`determinism > checkout snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "back",
-          "explanation": null,
-          "from": "basicInfo",
-          "id": "basicInfo-back-basicInfo-undetermined-back",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "submitBasicInfo",
           "explanation": null,
           "from": "basicInfo",
           "id": "basicInfo-submitBasicInfo-shippingAddress",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "shippingAddress"
         },
@@ -442,11 +352,11 @@ exports[`determinism > checkout snapshot 1`] = `
           "event": "back",
           "explanation": null,
           "from": "error",
-          "id": "error-back-error-undetermined-back",
+          "id": "error-back-payment",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
-          "to": null
+          "to": "payment"
         },
         {
           "contexts": [
@@ -457,11 +367,11 @@ exports[`determinism > checkout snapshot 1`] = `
           "event": "back",
           "explanation": null,
           "from": "payment",
-          "id": "payment-back-payment-undetermined-back",
+          "id": "payment-back-shippingAddress",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
-          "to": null
+          "to": "shippingAddress"
         },
         {
           "contexts": [
@@ -474,7 +384,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "payment",
           "id": "payment-submitPayment-submitting",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "submitting"
         },
@@ -487,11 +397,11 @@ exports[`determinism > checkout snapshot 1`] = `
           "event": "back",
           "explanation": null,
           "from": "shippingAddress",
-          "id": "shippingAddress-back-shippingAddress-undetermined-back",
+          "id": "shippingAddress-back-basicInfo",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
-          "to": null
+          "to": "basicInfo"
         },
         {
           "contexts": [
@@ -504,24 +414,9 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "shippingAddress",
           "id": "shippingAddress-submitShipping-payment",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "payment"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "back",
-          "explanation": null,
-          "from": "submitting",
-          "id": "submitting-back-submitting-undetermined-back",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
         },
         {
           "contexts": [],
@@ -547,7 +442,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-paymentFail-error",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "error"
         },
@@ -562,7 +457,7 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-paymentOk-success",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "success"
         },
@@ -577,24 +472,9 @@ exports[`determinism > checkout snapshot 1`] = `
           "from": "submitting",
           "id": "submitting-submittingDone-success",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "success"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "back",
-          "explanation": null,
-          "from": "success",
-          "id": "success-back-success-undetermined-back",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": null
         }
       ],
       "events": [
@@ -696,7 +576,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 4
+  "schemaVersion": 5
 }
 "
 `;
@@ -706,6 +586,34 @@ exports[`determinism > saga snapshot 1`] = `
   "machines": [
     {
       "edges": [
+        {
+          "contexts": [],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "*",
+          "id": "*-CANCEL-compensatingRelease",
+          "kind": "transition",
+          "origin": "declared",
+          "tested": null,
+          "to": "compensatingRelease"
+        },
+        {
+          "contexts": [
+            "default"
+          ],
+          "coverage": null,
+          "emits": [],
+          "event": "CANCEL",
+          "explanation": null,
+          "from": "*",
+          "id": "*-CANCEL-failed",
+          "kind": "transition",
+          "origin": "declared",
+          "tested": null,
+          "to": "failed"
+        },
         {
           "contexts": [],
           "coverage": null,
@@ -720,19 +628,17 @@ exports[`determinism > saga snapshot 1`] = `
           "to": "idle"
         },
         {
-          "contexts": [
-            "default"
-          ],
+          "contexts": [],
           "coverage": null,
           "emits": [],
-          "event": "CANCEL",
+          "event": "REFUND_DONE",
           "explanation": null,
           "from": "compensatingRefund",
-          "id": "compensatingRefund-CANCEL-failed",
+          "id": "compensatingRefund-REFUND_DONE-compensatingRelease",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
-          "to": "failed"
+          "to": "compensatingRelease"
         },
         {
           "contexts": [
@@ -745,7 +651,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRefund",
           "id": "compensatingRefund-REFUND_DONE-failed",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "failed"
         },
@@ -760,7 +666,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRefund",
           "id": "compensatingRefund-REFUND_FAILED-failed",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "failed"
         },
@@ -783,27 +689,12 @@ exports[`determinism > saga snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "compensatingRelease",
-          "id": "compensatingRelease-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "RELEASE_DONE",
           "explanation": null,
           "from": "compensatingRelease",
           "id": "compensatingRelease-RELEASE_DONE-failed",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "failed"
         },
@@ -818,7 +709,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "compensatingRelease",
           "id": "compensatingRelease-RELEASE_FAILED-failed",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "failed"
         },
@@ -836,49 +727,17 @@ exports[`determinism > saga snapshot 1`] = `
           "to": "compensatingRelease"
         },
         {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "completed",
-          "id": "completed-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "creatingShipment",
-          "id": "creatingShipment-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
+          "contexts": [],
           "coverage": null,
           "emits": [],
           "event": "SHIPMENT_CREATED",
           "explanation": null,
           "from": "creatingShipment",
-          "id": "creatingShipment-SHIPMENT_CREATED-creatingShipment-undetermined-SHIPMENT_CREATED",
+          "id": "creatingShipment-SHIPMENT_CREATED-notifying",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
-          "to": null
+          "to": "notifying"
         },
         {
           "contexts": [
@@ -891,7 +750,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "creatingShipment",
           "id": "creatingShipment-SHIPMENT_FAILED-compensatingRefund",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "compensatingRefund"
         },
@@ -914,59 +773,14 @@ exports[`determinism > saga snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "failed",
-          "id": "failed-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "idle",
-          "id": "idle-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "START",
           "explanation": null,
           "from": "idle",
           "id": "idle-START-reservingInventory",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "reservingInventory"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "notifying",
-          "id": "notifying-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
         },
         {
           "contexts": [
@@ -979,7 +793,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "notifying",
           "id": "notifying-NOTIFICATION_FAILED-completed",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "completed"
         },
@@ -994,7 +808,7 @@ exports[`determinism > saga snapshot 1`] = `
           "from": "notifying",
           "id": "notifying-NOTIFICATION_SENT-completed",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "completed"
         },
@@ -1017,44 +831,27 @@ exports[`determinism > saga snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "processingPayment",
-          "id": "processingPayment-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "PAYMENT_FAILED",
           "explanation": null,
           "from": "processingPayment",
           "id": "processingPayment-PAYMENT_FAILED-compensatingRefund",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "compensatingRefund"
         },
         {
-          "contexts": [
-            "default"
-          ],
+          "contexts": [],
           "coverage": null,
           "emits": [],
           "event": "PAYMENT_PROCESSED",
           "explanation": null,
           "from": "processingPayment",
-          "id": "processingPayment-PAYMENT_PROCESSED-processingPayment-undetermined-PAYMENT_PROCESSED",
+          "id": "processingPayment-PAYMENT_PROCESSED-creatingShipment",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
-          "to": null
+          "to": "creatingShipment"
         },
         {
           "contexts": [],
@@ -1075,44 +872,27 @@ exports[`determinism > saga snapshot 1`] = `
           ],
           "coverage": null,
           "emits": [],
-          "event": "CANCEL",
-          "explanation": null,
-          "from": "reservingInventory",
-          "id": "reservingInventory-CANCEL-failed",
-          "kind": "transition",
-          "origin": "probe",
-          "tested": null,
-          "to": "failed"
-        },
-        {
-          "contexts": [
-            "default"
-          ],
-          "coverage": null,
-          "emits": [],
           "event": "INVENTORY_FAILED",
           "explanation": null,
           "from": "reservingInventory",
           "id": "reservingInventory-INVENTORY_FAILED-failed",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
           "to": "failed"
         },
         {
-          "contexts": [
-            "default"
-          ],
+          "contexts": [],
           "coverage": null,
           "emits": [],
           "event": "INVENTORY_RESERVED",
           "explanation": null,
           "from": "reservingInventory",
-          "id": "reservingInventory-INVENTORY_RESERVED-reservingInventory-undetermined-INVENTORY_RESERVED",
+          "id": "reservingInventory-INVENTORY_RESERVED-processingPayment",
           "kind": "transition",
-          "origin": "probe",
+          "origin": "declared",
           "tested": null,
-          "to": null
+          "to": "processingPayment"
         },
         {
           "contexts": [],
@@ -1289,7 +1069,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 4
+  "schemaVersion": 5
 }
 "
 `;

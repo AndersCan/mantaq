@@ -27,7 +27,7 @@ function createWorker(workerId: string, options: { clock: VirtualClock; reportTo
     context: { id: workerId },
     clock,
     setup: (m) => {
-      m.on(idle, { eventRef: doWork, handler: () => ({ state: working }) });
+      m.on(idle, { event: doWork, to: [working], handler: () => ({ state: working }) });
       m.effect(working, {
         name: "doWork",
         fn: ({ clock: effectClock }) => {
@@ -58,7 +58,7 @@ describe("actor map example", () => {
       context: collectorContext,
       setup: (m) => {
         m.on(collecting, {
-          eventRef: requestWork,
+          event: requestWork,
           handler: (event, { context }) => {
             const snapshot = context.get();
             snapshot.pending += 1;
@@ -73,7 +73,7 @@ describe("actor map example", () => {
           },
         });
         m.on(collecting, {
-          eventRef: workResult,
+          event: workResult,
           handler: (event, { context }) => {
             const snapshot = context.get();
             snapshot.results = [...snapshot.results, event.payload];

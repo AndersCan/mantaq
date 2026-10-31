@@ -48,7 +48,7 @@ describe("Snapshot context isolation property tests", () => {
           context: { n: initial },
           setup: (m) => {
             m.on(idle, {
-              eventRef: trigger,
+              event: trigger,
               handler: (_e, { context }) => {
                 context.set({ n: set });
                 return {};
@@ -81,9 +81,9 @@ describe("Snapshot context isolation property tests", () => {
         initial: idle,
         context: { n },
         setup: (m) => {
-          m.on(idle, { eventRef: trigger, handler: () => ({ state: idle }) }); // state/event only, no context change
+          m.on(idle, { event: trigger, to: [idle], handler: () => ({ state: idle }) }); // state/event only, no context change
           m.on(idle, {
-            eventRef: set,
+            event: set,
             handler: (_e, { context }) => {
               context.set({ n: n + 1 });
               return {};
@@ -122,7 +122,7 @@ describe("Snapshot context isolation property tests", () => {
         initial: idle,
         context: { n },
         setup: (m) => {
-          m.onAny({ eventRef: bad, handler: () => isErrorBomb("boom") });
+          m.onAny({ event: bad, handler: () => isErrorBomb("boom") });
         },
       });
       actor.send(bad.create());

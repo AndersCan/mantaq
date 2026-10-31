@@ -15,7 +15,8 @@ function createFlatActor() {
     initial: idleState,
     setup: (machine) => {
       machine.on(idleState, {
-        eventRef: goEvent,
+        event: goEvent,
+        to: [activeState],
         handler: () => ({ state: activeState }),
       });
     },
@@ -34,7 +35,7 @@ function createAnyWildcardActor() {
     states: [idleState, activeState],
     initial: idleState,
     setup: (machine) => {
-      machine.onAny({ eventRef: goEvent, handler: () => ({ state: activeState }) });
+      machine.onAny({ event: goEvent, to: [activeState], handler: () => ({ state: activeState }) });
     },
   });
 }
@@ -52,8 +53,16 @@ function createInternalEventActor() {
     states: [idleState, activeState],
     initial: idleState,
     setup: (machine) => {
-      machine.on(idleState, { eventRef: goEvent, handler: () => ({ state: activeState }) });
-      machine.on(idleState, { eventRef: pingEvent, handler: () => ({ state: idleState }) });
+      machine.on(idleState, {
+        event: goEvent,
+        to: [activeState],
+        handler: () => ({ state: activeState }),
+      });
+      machine.on(idleState, {
+        event: pingEvent,
+        to: [idleState],
+        handler: () => ({ state: idleState }),
+      });
     },
   });
 }
@@ -70,7 +79,11 @@ function createFinalStateActor() {
     states: [idleState, doneState],
     initial: idleState,
     setup: (machine) => {
-      machine.on(idleState, { eventRef: finishEvent, handler: () => ({ state: doneState }) });
+      machine.on(idleState, {
+        event: finishEvent,
+        to: [doneState],
+        handler: () => ({ state: doneState }),
+      });
     },
   });
 }
@@ -88,7 +101,8 @@ function createRegionActor() {
     initial: childStateA,
     setup: (machine) => {
       machine.on(childStateA, {
-        eventRef: toggleEvent,
+        event: toggleEvent,
+        to: [childStateB],
         handler: () => ({ state: childStateB }),
       });
     },
@@ -105,7 +119,11 @@ function createRegionActor() {
     initial: parentState,
     regions: { region1: child },
     setup: (machine) => {
-      machine.on(parentState, { eventRef: startEvent, handler: () => ({ state: parentState }) });
+      machine.on(parentState, {
+        event: startEvent,
+        to: [parentState],
+        handler: () => ({ state: parentState }),
+      });
     },
   });
 }
@@ -140,6 +158,8 @@ describe("buildGraph", () => {
           label: "GO",
           isActive: true,
           isUndetermined: false,
+          isStay: false,
+          isDeclared: true,
           contexts: ["default"],
         },
         {
@@ -154,26 +174,22 @@ describe("buildGraph", () => {
     });
   });
 
-  test("returns wildcard edges for an actor that only handles Any transitions", () => {
+  test("returns onAny edges once, from the any-state source", () => {
     const graph = buildGraph(createAnyWildcardActor());
 
+    expect(graph.nodes.filter((node) => node.isAny)).toEqual([
+      { id: "*", label: "any state", isActive: false, isFinal: false, isAny: true },
+    ]);
     expect(graph.edges).toEqual([
       {
-        id: "idle-GO-active",
-        source: "idle",
+        id: "*-GO-active",
+        source: "*",
         target: "active",
         label: "GO",
         isActive: true,
         isUndetermined: false,
-        contexts: ["default"],
-      },
-      {
-        id: "active-GO-active",
-        source: "active",
-        target: "active",
-        label: "GO",
-        isActive: false,
-        isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["default"],
       },
       {
@@ -200,6 +216,8 @@ describe("buildGraph", () => {
         isActive: true,
         isInternal: false,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["default"],
       },
       {
@@ -210,6 +228,8 @@ describe("buildGraph", () => {
         isActive: true,
         isInternal: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["default"],
       },
       {
@@ -235,6 +255,8 @@ describe("buildGraph", () => {
         label: "TOGGLE",
         isActive: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["default"],
       },
     ]);
@@ -246,9 +268,32 @@ describe("buildGraph", () => {
         label: "START",
         isActive: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["default"],
       },
     ]);
+  });
+
+  test("returns an inactive any-state source once the machine is final", () => {
+    const idleState = state("idle")();
+    const doneState = state("done")().final();
+    const goEvent = event("GO")();
+    const actor = Actor({
+      inputs: [goEvent],
+      states: [idleState, doneState],
+      initial: idleState,
+      setup: (machine) => {
+        machine.onAny({ event: goEvent, to: [doneState], handler: () => ({ state: doneState }) });
+      },
+    });
+
+    expect(buildGraph(actor).edges.map((edge) => edge.id)).toEqual([
+      "*-GO-done",
+      "__initial__->idle",
+    ]);
+    actor.send(goEvent.create());
+    expect(buildGraph(actor).edges.find((edge) => edge.source === "*")?.isActive).toBe(false);
   });
 
   test("returns final markers on final states", () => {
@@ -261,7 +306,7 @@ describe("buildGraph", () => {
     ]);
   });
 
-  test("returns undetermined edges when a transition handler fails", () => {
+  test("returns a stay edge without contexts when a stay-only handler fails", () => {
     const idleState = state("idle")();
     const goEvent = event("GO")();
 
@@ -272,7 +317,7 @@ describe("buildGraph", () => {
       states: [idleState],
       initial: idleState,
       setup: (machine) => {
-        machine.on(idleState, { eventRef: goEvent, handler: isTransitionExplosion });
+        machine.on(idleState, { event: goEvent, handler: isTransitionExplosion });
       },
     });
 
@@ -280,13 +325,15 @@ describe("buildGraph", () => {
 
     expect(graph.edges).toEqual([
       {
-        id: "idle-GO-idle-undetermined-GO",
+        id: "idle-GO-stay",
         source: "idle",
-        target: "idle-undetermined-GO",
+        target: "idle",
         label: "GO",
         isActive: true,
-        isUndetermined: true,
-        contexts: ["default"],
+        isUndetermined: false,
+        isStay: true,
+        isDeclared: true,
+        contexts: [],
       },
       {
         id: "__initial__->idle",
@@ -328,7 +375,8 @@ describe("buildGraph", () => {
       initial: { state: idleState, payload: { count: 0 } },
       setup: (machine) => {
         machine.on(idleState, {
-          eventRef: goEvent,
+          event: goEvent,
+          to: [activeState],
           handler: () => ({ state: activeState }),
         });
       },
@@ -371,6 +419,8 @@ describe("buildGraph", () => {
         label: "GO",
         isActive: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["default"],
       },
     ]);
@@ -393,7 +443,8 @@ describe("buildGraph with sampleContexts", () => {
       context: { ready: false },
       setup: (machine) => {
         machine.on(idleState, {
-          eventRef: goEvent,
+          event: goEvent,
+          to: [activeState, blockedState],
           handler: (_sentEvent, { context }) =>
             context.get().ready ? { state: activeState } : { state: blockedState },
         });
@@ -401,7 +452,7 @@ describe("buildGraph with sampleContexts", () => {
     });
   }
 
-  test("returns one edge per event when a single context is sampled", () => {
+  test("returns every declared target; probing labels only the reached one", () => {
     const graph = buildGraph(createContextBranchActor(), {
       sampleContexts: { ready: { ready: true } },
     });
@@ -414,7 +465,20 @@ describe("buildGraph with sampleContexts", () => {
         label: "GO",
         isActive: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["ready"],
+      },
+      {
+        id: "idle-GO-blocked",
+        source: "idle",
+        target: "blocked",
+        label: "GO",
+        isActive: true,
+        isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
+        contexts: [],
       },
     ]);
   });
@@ -435,6 +499,8 @@ describe("buildGraph with sampleContexts", () => {
         label: "GO",
         isActive: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["ready"],
       },
       {
@@ -444,6 +510,8 @@ describe("buildGraph with sampleContexts", () => {
         label: "GO",
         isActive: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["notReady"],
       },
     ]);
@@ -462,7 +530,11 @@ describe("buildGraph with sampleContexts", () => {
       initial: idleState,
       context: { note: "" },
       setup: (machine) => {
-        machine.on(idleState, { eventRef: goEvent, handler: () => ({ state: activeState }) });
+        machine.on(idleState, {
+          event: goEvent,
+          to: [activeState],
+          handler: () => ({ state: activeState }),
+        });
       },
     });
 
@@ -482,12 +554,14 @@ describe("buildGraph with sampleContexts", () => {
         label: "GO",
         isActive: true,
         isUndetermined: false,
+        isStay: false,
+        isDeclared: true,
         contexts: ["alpha", "beta", "gamma"],
       },
     ]);
   });
 
-  test("adds context names to undetermined edges too", () => {
+  test("adds context names to stay edges too", () => {
     const idleState = state("idle")();
     const goEvent = event("GO")();
 
@@ -500,7 +574,7 @@ describe("buildGraph with sampleContexts", () => {
       context: { threshold: 0 },
       setup: (machine) => {
         machine.on(idleState, {
-          eventRef: goEvent,
+          event: goEvent,
           handler: (_sentEvent, { context }) => (context.get().threshold > 10 ? {} : {}),
         });
       },
@@ -515,12 +589,14 @@ describe("buildGraph with sampleContexts", () => {
 
     expect(graph.edges.filter((edge) => edge.label === "GO")).toEqual([
       {
-        id: "idle-GO-idle-undetermined-GO",
+        id: "idle-GO-stay",
         source: "idle",
-        target: "idle-undetermined-GO",
+        target: "idle",
         label: "GO",
         isActive: true,
-        isUndetermined: true,
+        isUndetermined: false,
+        isStay: true,
+        isDeclared: true,
         contexts: ["large", "small"],
       },
     ]);

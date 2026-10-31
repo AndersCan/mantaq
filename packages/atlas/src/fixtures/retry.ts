@@ -27,9 +27,10 @@ export function createRetryActor(clock: VirtualClock = VirtualClock()) {
     clock,
     context: initialContext,
     setup: (m) => {
-      m.on(idle, { eventRef: connect, handler: () => ({ state: connecting }) });
+      m.on(idle, { event: connect, to: [connecting], handler: () => ({ state: connecting }) });
       m.on(connecting, {
-        eventRef: failed,
+        event: failed,
+        to: [lockedOut],
         handler: (_event, { context }) => {
           const current = context.get();
           current.attempts += 1;
@@ -39,7 +40,8 @@ export function createRetryActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(connecting, {
-        eventRef: opened,
+        event: opened,
+        to: [connected],
         handler: (_event, { context }) => {
           const current = context.get();
           current.attempts = 0;
@@ -48,7 +50,8 @@ export function createRetryActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(lockedOut, {
-        eventRef: reset,
+        event: reset,
+        to: [idle],
         handler: (_event, { context }) => {
           const current = context.get();
           current.attempts = 0;
