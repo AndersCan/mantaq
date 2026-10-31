@@ -28,9 +28,9 @@ describe("Actor error state property tests", () => {
           states: [idle, active],
           initial: idle,
           setup: (m) => {
-            m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
-            m.on(active, { eventRef: trigger, handler: () => ({ state: idle }) });
-            m.onAny({ eventRef: bad, handler: () => isErrorBomb("boom") });
+            m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
+            m.on(active, { event: trigger, to: [idle], handler: () => ({ state: idle }) });
+            m.onAny({ event: bad, handler: () => isErrorBomb("boom") });
           },
         });
 

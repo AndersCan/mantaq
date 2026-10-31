@@ -56,7 +56,8 @@ function nameOf(actor: { state: { name: string } }): string {
 
 const startPart = definePart<typeof load>((m) => {
   m.on(idle, {
-    eventRef: start,
+    event: start,
+    to: [loading],
     handler: (_event, { context }) => {
       const cur = context.get();
       cur.attempts += 1;
@@ -68,7 +69,8 @@ const startPart = definePart<typeof load>((m) => {
 
 const finishPart = definePart<typeof load>((m) => {
   m.on(loading, {
-    eventRef: finish,
+    event: finish,
+    to: [done],
     handler: (event, { context }) => {
       const cur = context.get();
       cur.last = `v${event.payload.value}`;
@@ -76,12 +78,13 @@ const finishPart = definePart<typeof load>((m) => {
       return { state: done, emit: [report.create({ value: event.payload.value })] };
     },
   });
-  m.on(loading, { eventRef: fail, handler: (_event) => ({ state: failed }) });
+  m.on(loading, { event: fail, to: [failed], handler: (_event) => ({ state: failed }) });
 });
 
 const retryPart = definePart<typeof load>((m) => {
   m.on(failed, {
-    eventRef: start,
+    event: start,
+    to: [loading],
     handler: (_event, { context }) => {
       const cur = context.get();
       cur.attempts += 1;
@@ -98,7 +101,7 @@ const timeoutPart = definePart<typeof load>((m) => {
       withTimeout(5, { input, event: () => slow.create() });
     },
   });
-  m.on(loading, { eventRef: slow, handler: (_event) => ({ state: failed }) });
+  m.on(loading, { event: slow, to: [failed], handler: (_event) => ({ state: failed }) });
 });
 
 describe("actorSpec", () => {
@@ -127,13 +130,14 @@ describe("actorSpec", () => {
     });
     definePart<typeof spec>((m) => {
       m.on(idle, {
-        eventRef: start,
+        event: start,
+        to: [loading],
         handler: (_event, { context }) => {
           expectTypeOf(context.get().attempts).toEqualTypeOf<number>();
           return { state: loading };
         },
       });
-      m.on(loading, { eventRef: fail, handler: (_event) => ({ state: failed }) });
+      m.on(loading, { event: fail, to: [failed], handler: (_event) => ({ state: failed }) });
     });
   });
 
@@ -214,8 +218,8 @@ describe("withParts", () => {
 
   test("handles an inline arrow as a part", () => {
     const actor = withParts(newLoad(), (m) => {
-      m.on(idle, { eventRef: start, handler: () => ({ state: loading }) });
-      m.on(loading, { eventRef: finish, handler: () => ({ state: done }) });
+      m.on(idle, { event: start, to: [loading], handler: () => ({ state: loading }) });
+      m.on(loading, { event: finish, to: [done], handler: () => ({ state: done }) });
     });
     actor.send(start.create());
     actor.send(finish.create({ value: 5 }));
@@ -224,11 +228,12 @@ describe("withParts", () => {
 
   test("lets one part call another part's builder", () => {
     const subA = definePart<typeof load>((m) => {
-      m.on(idle, { eventRef: start, handler: () => ({ state: loading }) });
+      m.on(idle, { event: start, to: [loading], handler: () => ({ state: loading }) });
     });
     const subB = definePart<typeof load>((m) => {
       m.on(loading, {
-        eventRef: finish,
+        event: finish,
+        to: [done],
         handler: (event, { context }) => {
           const cur = context.get();
           cur.last = `v${event.payload.value}`;
@@ -266,10 +271,11 @@ describe("withParts", () => {
     });
     const part = definePart<typeof pair>((m) => {
       m.on(off, {
-        eventRef: goEvent,
+        event: goEvent,
+        to: [onState],
         handler: () => ({ state: onState, emit: [emitA.create({ n: 1 })] }),
       });
-      m.onAny({ eventRef: goEvent, handler: () => ({ emit: [emitB.create()] }) });
+      m.onAny({ event: goEvent, handler: () => ({ emit: [emitB.create()] }) });
     });
     const actor = withParts(pair, part);
     const received: Array<{ type: string; payload?: unknown }> = [];
@@ -290,8 +296,8 @@ describe("withParts", () => {
       clock,
     });
     const part = definePart<typeof machine>((m) => {
-      m.on(idle, { eventRef: start, handler: () => ({ state: loading }) });
-      m.on(loading, { eventRef: bounce, handler: () => ({ state: loading }) });
+      m.on(idle, { event: start, to: [loading], handler: () => ({ state: loading }) });
+      m.on(loading, { event: bounce, to: [loading], handler: () => ({ state: loading }) });
       m.effect(loading, {
         name: "restartBounceTimer",
         fn: (input) => {
@@ -299,7 +305,8 @@ describe("withParts", () => {
         },
       });
       m.on(loading, {
-        eventRef: slow,
+        event: slow,
+        to: [done],
         handler: (_event, { context }) => {
           const cur = context.get();
           cur.last = "timed-out";
@@ -335,7 +342,11 @@ describe("withParts", () => {
       context: {},
     });
     const childPart = definePart<typeof childBase>((m) => {
-      m.on(cidle, { eventRef: goEvent, handler: () => ({ state: cdone, emit: [ready.create()] }) });
+      m.on(cidle, {
+        event: goEvent,
+        to: [cdone],
+        handler: () => ({ state: cdone, emit: [ready.create()] }),
+      });
     });
     const parentBase = actorSpec({
       inputs: [ready],
@@ -345,7 +356,7 @@ describe("withParts", () => {
       context: {},
     });
     const parentPart = definePart<typeof parentBase>((m) => {
-      m.on(pidle, { eventRef: ready, handler: () => ({ state: active }) });
+      m.on(pidle, { event: ready, to: [active], handler: () => ({ state: active }) });
     });
     const child = withParts(childBase, childPart);
     const parent = withParts({ ...parentBase, regions: { worker: child } }, parentPart);
@@ -399,10 +410,10 @@ describe("withParts", () => {
       context: { flips: 0 },
     });
     const flipPart = definePart<typeof lamp>((m) => {
-      m.on(off, { eventRef: toggle, handler: () => ({ state: onState }) });
-      m.on(onState, { eventRef: toggle, handler: () => ({ state: off }) });
+      m.on(off, { event: toggle, to: [onState], handler: () => ({ state: onState }) });
+      m.on(onState, { event: toggle, to: [off], handler: () => ({ state: off }) });
       m.onAny({
-        eventRef: toggle,
+        event: toggle,
         handler: (_event, { context }) => {
           const cur = context.get();
           cur.flips += 1;
@@ -435,8 +446,8 @@ describe("withParts", () => {
       context: {},
     });
     const dingPart = definePart<typeof bell>((m) => {
-      m.on(off, { eventRef: ring, handler: () => ({ state: onState }) });
-      m.onAny({ eventRef: ring, handler: () => ({ emit: [notify.create({ msg: "ding" })] }) });
+      m.on(off, { event: ring, to: [onState], handler: () => ({ state: onState }) });
+      m.onAny({ event: ring, handler: () => ({ emit: [notify.create({ msg: "ding" })] }) });
     });
     const actor = withParts(bell, dingPart);
     const received: Array<{ type: string; payload?: unknown }> = [];
@@ -451,7 +462,8 @@ describe("withParts", () => {
   test("treats the last matching handler as the winner when parts target the same state and event", () => {
     const firstPart = definePart<typeof load>((m) => {
       m.on(idle, {
-        eventRef: start,
+        event: start,
+        to: [failed],
         handler: (_event, { context }) => {
           const cur = context.get();
           cur.attempts += 1;
@@ -461,7 +473,7 @@ describe("withParts", () => {
       });
     });
     const secondPart = definePart<typeof load>((m) => {
-      m.on(idle, { eventRef: start, handler: () => ({ state: loading }) });
+      m.on(idle, { event: start, to: [loading], handler: () => ({ state: loading }) });
     });
     const actor = withParts(newLoad(), firstPart, secondPart);
     actor.send(start.create());
@@ -527,7 +539,8 @@ describe("parts keep full types", () => {
   test("resolves exact event and context types inside handlers", () => {
     definePart<typeof load>((m) => {
       m.on(loading, {
-        eventRef: finish,
+        event: finish,
+        to: [done],
         handler: (event, { context }) => {
           expectTypeOf(event.payload).toEqualTypeOf<{ value: number }>();
           expectTypeOf(context).toEqualTypeOf<Context<LoadContext>>();
@@ -556,7 +569,8 @@ describe("parts keep full types", () => {
   test("returns only the declared payload on handler events", () => {
     definePart<typeof load>((m) => {
       m.on(loading, {
-        eventRef: finish,
+        event: finish,
+        to: [done],
         handler: (event) => {
           expectTypeOf(event.payload).toEqualTypeOf<{ value: number }>();
           return { state: done };
@@ -568,7 +582,8 @@ describe("parts keep full types", () => {
   test("returns only the declared context to handlers", () => {
     definePart<typeof load>((m) => {
       m.on(idle, {
-        eventRef: start,
+        event: start,
+        to: [loading],
         handler: (_event, { context }) => {
           expectTypeOf(context.get()).toEqualTypeOf<LoadContext>();
           return { state: loading };
@@ -617,7 +632,8 @@ describe("parts keep full types", () => {
     });
     const part = definePart<typeof annotated>((b) => {
       b.on(idle, {
-        eventRef: slow,
+        event: slow,
+        to: [loading],
         handler: (_event, { context }) => {
           expectTypeOf(context.get().attempts).toEqualTypeOf<number>();
           return { state: loading, emit: [report.create({ value: 1 })] };

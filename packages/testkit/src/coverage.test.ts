@@ -20,8 +20,8 @@ function makeActor(effects?: {
     states: [stateA, stateB],
     initial: stateA,
     setup: (machine) => {
-      machine.on(stateA, { eventRef: goEvent, handler: () => ({ state: stateB }) });
-      machine.on(stateB, { eventRef: stopEvent, handler: () => ({ state: stateA }) });
+      machine.on(stateA, { event: goEvent, to: [stateB], handler: () => ({ state: stateB }) });
+      machine.on(stateB, { event: stopEvent, to: [stateA], handler: () => ({ state: stateA }) });
       if (effects?.a !== undefined) machine.effect(stateA, { name: "aEffect", fn: effects.a });
       if (effects?.b !== undefined) machine.effect(stateB, { name: "bEffect", fn: effects.b });
     },

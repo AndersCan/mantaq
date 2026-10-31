@@ -124,7 +124,7 @@ function createCacheActor(options: { capacity?: number; clock?: VirtualClock } =
         },
       });
       m.onAny({
-        eventRef: getEvent,
+        event: getEvent,
         handler: (event, { context }) => {
           const snapshot = context.get();
           const entry = snapshot.entries.get(event.payload.key);
@@ -159,7 +159,7 @@ function createCacheActor(options: { capacity?: number; clock?: VirtualClock } =
         },
       });
       m.onAny({
-        eventRef: deleteEvent,
+        event: deleteEvent,
         handler: (event, { context }) => {
           const snapshot = context.get();
           if (snapshot.entries.has(event.payload.key)) {
@@ -172,7 +172,8 @@ function createCacheActor(options: { capacity?: number; clock?: VirtualClock } =
         },
       });
       m.onAny({
-        eventRef: putEvent,
+        event: putEvent,
+        to: [cacheStates.full],
         handler: (event, { context }) => {
           const snapshot = context.get();
           const now = c.now();
@@ -194,9 +195,13 @@ function createCacheActor(options: { capacity?: number; clock?: VirtualClock } =
           return {};
         },
       });
-      m.onAny({ eventRef: lifecycleEvents.PURGE, handler: () => ({ state: cacheStates.purging }) });
       m.onAny({
-        eventRef: setCapacityEvent,
+        event: lifecycleEvents.PURGE,
+        to: [cacheStates.purging],
+        handler: () => ({ state: cacheStates.purging }),
+      });
+      m.onAny({
+        event: setCapacityEvent,
         handler: (event, { context }) => {
           const snapshot = context.get();
           snapshot.capacity = event.payload.capacity;
@@ -205,7 +210,8 @@ function createCacheActor(options: { capacity?: number; clock?: VirtualClock } =
         },
       });
       m.on(cacheStates.purging, {
-        eventRef: lifecycleEvents.PURGE_DONE,
+        event: lifecycleEvents.PURGE_DONE,
+        to: [cacheStates.ready, cacheStates.full],
         handler: (_event, { context }) => {
           const snapshot = context.get();
           if (snapshot.entries.size > snapshot.capacity) {
@@ -215,7 +221,8 @@ function createCacheActor(options: { capacity?: number; clock?: VirtualClock } =
         },
       });
       m.on(cacheStates.full, {
-        eventRef: lifecycleEvents.EVICTION_DONE,
+        event: lifecycleEvents.EVICTION_DONE,
+        to: [cacheStates.ready, cacheStates.full],
         handler: (_event, { context }) => {
           const snapshot = context.get();
           if (snapshot.entries.size > snapshot.capacity) {

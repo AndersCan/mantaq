@@ -27,7 +27,8 @@ function brittleTarget(): FuzzTarget {
         clock,
         setup: (m) => {
           m.on(idle, {
-            eventRef: pick,
+            event: pick,
+            to: [left, right],
             handler: (e) => ({ state: routes[e.payload.side].next }),
           });
         },
@@ -51,7 +52,7 @@ describe("fuzz failure paths", () => {
           states: [idle, left],
           initial: left,
           clock,
-          setup: (m) => m.on(idle, { eventRef: done, handler: () => ({ state: left }) }),
+          setup: (m) => m.on(idle, { event: done, to: [left], handler: () => ({ state: left }) }),
         });
         return { actor, clock };
       },

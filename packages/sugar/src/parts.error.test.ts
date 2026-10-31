@@ -21,7 +21,7 @@ function nameOf(actor: { state: { name: string } }): string {
 }
 
 const emitBoomPart = definePart<typeof machine>((m) => {
-  m.on(idle, { eventRef: start, handler: () => ({ state: loading }) });
+  m.on(idle, { event: start, to: [loading], handler: () => ({ state: loading }) });
   m.effect(loading, {
     name: "emitBoom",
     fn: (input) => {
@@ -65,8 +65,8 @@ describe("parts error paths", () => {
       internalBudget: 2,
     });
     const floodPart = definePart<typeof flood>((m) => {
-      m.on(idle, { eventRef: start, handler: () => ({ state: loading }) });
-      m.on(loading, { eventRef: loop, handler: () => ({ state: loading }) });
+      m.on(idle, { event: start, to: [loading], handler: () => ({ state: loading }) });
+      m.on(loading, { event: loop, to: [loading], handler: () => ({ state: loading }) });
       m.effect(loading, {
         name: "floodLoopEvents",
         fn: (input) => {

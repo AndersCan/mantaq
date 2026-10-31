@@ -357,7 +357,7 @@ describe("Actor state entry directed mutation tests", () => {
             emit(tick.create());
           },
         });
-        m.on(idle, { eventRef: tick, handler: () => ({ state: done }) });
+        m.on(idle, { event: tick, to: [done], handler: () => ({ state: done }) });
       },
     });
     expect({
@@ -389,7 +389,7 @@ describe("Actor state entry directed mutation tests", () => {
             c.setTimeout(100, { cb: () => emit(tick.create()) });
           },
         });
-        m.on(idle, { eventRef: tick, handler: () => ({ state: done }) });
+        m.on(idle, { event: tick, to: [done], handler: () => ({ state: done }) });
       },
     });
     const statesAt = [actor.snapshot().path[0]];
@@ -408,7 +408,7 @@ describe("Actor state entry directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [idle], handler: () => ({ state: idle }) });
         m.effect(idle, {
           name: "settleAsync",
           fn: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
@@ -428,7 +428,7 @@ describe("Actor state entry directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [idle], handler: () => ({ state: idle }) });
         m.effect(idle, {
           name: "hangAsync",
           fn: () => new Promise<void>(() => {}),
@@ -461,8 +461,8 @@ describe("Actor state entry directed mutation tests", () => {
             savedEmit = emit;
           },
         });
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: running }) });
-        m.on(running, { eventRef: stop, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [running], handler: () => ({ state: running }) });
+        m.on(running, { event: stop, to: [idle], handler: () => ({ state: idle }) });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -514,7 +514,7 @@ describe("on('error') death signal", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
       },
     });
     let errors = 0;
@@ -535,7 +535,7 @@ describe("on('error') death signal", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
       },
     });
     const seen: string[] = [];
@@ -579,7 +579,7 @@ describe("Actor", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     const off = actor.on("change", { fn: () => calls++ });
@@ -599,7 +599,7 @@ describe("Actor", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
       },
     });
     const off = actor.on("done", { fn: () => doneCalls++ });
@@ -653,8 +653,8 @@ describe("Actor", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: tick, handler: () => ({ emit: [out.create()] }) });
-        m.onAny({ eventRef: tick, handler: () => ({ state: active }) });
+        m.on(idle, { event: tick, handler: () => ({ emit: [out.create()] }) });
+        m.onAny({ event: tick, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -675,7 +675,7 @@ describe("Actor", () => {
       context: { n: 5 },
       setup: (m) => {
         m.onAny({
-          eventRef: tick,
+          event: tick,
           handler: (_e, { context, actor: a }) => {
             gotContext = context.get().n;
             gotActor = a;
@@ -698,7 +698,7 @@ describe("Actor", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     const warns: string[] = [];
@@ -725,7 +725,11 @@ describe("Actor", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active, emit: [out.create()] }) });
+        m.on(idle, {
+          event: trigger,
+          to: [active],
+          handler: () => ({ state: active, emit: [out.create()] }),
+        });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -754,8 +758,16 @@ describe("Actor", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active, emit: [out.create()] }) });
-        m.on(active, { eventRef: stop, handler: () => ({ state: idle, emit: [out.create()] }) });
+        m.on(idle, {
+          event: trigger,
+          to: [active],
+          handler: () => ({ state: active, emit: [out.create()] }),
+        });
+        m.on(active, {
+          event: stop,
+          to: [idle],
+          handler: () => ({ state: idle, emit: [out.create()] }),
+        });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -783,8 +795,8 @@ describe("Actor", () => {
             emit(tick.create());
           },
         });
-        m.on(init, { eventRef: start, handler: () => ({ state: idle }) });
-        m.on(idle, { eventRef: tick, handler: () => ({ state: done }) });
+        m.on(init, { event: start, to: [idle], handler: () => ({ state: idle }) });
+        m.on(idle, { event: tick, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.send(start.create());
@@ -801,7 +813,7 @@ describe("Actor", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.on("done", { fn: () => doneCalls++ });
@@ -818,7 +830,7 @@ describe("Actor", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: tick, handler: () => ({ state: active }) });
+        m.onAny({ event: tick, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.send(tick.create());
@@ -835,7 +847,7 @@ describe("Actor", () => {
       states: [idle, running],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ state: running }) });
+        m.on(idle, { event: start, to: [running], handler: () => ({ state: running }) });
         m.effect(running, {
           name: "captureSignal",
           fn: ({ signal }) => {
@@ -876,8 +888,8 @@ describe("Actor directed mutation tests", () => {
       initial: idle,
       internalBudget: 0,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ emit: [loop.create()] }) });
-        m.on(idle, { eventRef: loop, handler: () => ({ emit: [loop.create()] }) });
+        m.on(idle, { event: start, handler: () => ({ emit: [loop.create()] }) });
+        m.on(idle, { event: loop, handler: () => ({ emit: [loop.create()] }) });
       },
     });
     actor.send(start.create());
@@ -973,7 +985,7 @@ describe("Actor directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.send(trigger.create());
@@ -991,8 +1003,8 @@ describe("Actor directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
-        m.on(active, { eventRef: back, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
+        m.on(active, { event: back, to: [idle], handler: () => ({ state: idle }) });
       },
     });
     actor.on("change", {
@@ -1017,9 +1029,9 @@ describe("Actor directed mutation tests", () => {
       initial: idle,
       internalBudget: 1,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ emit: [loop.create()] }) });
+        m.on(idle, { event: start, handler: () => ({ emit: [loop.create()] }) });
         m.on(idle, {
-          eventRef: loop,
+          event: loop,
           handler: () => {
             handlerCalls++;
             return { emit: [loop.create()] };
@@ -1043,7 +1055,7 @@ describe("Actor directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ emit: [out.create()] }) });
+        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create()] }) });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -1064,9 +1076,9 @@ describe("Actor directed mutation tests 2", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
         m.onAny({
-          eventRef: stray,
+          event: stray,
           handler: () => {
             strayRuns++;
             return {};
@@ -1117,7 +1129,8 @@ describe("Actor directed mutation tests 2", () => {
       initial: childIdle,
       setup: (m) => {
         m.on(childIdle, {
-          eventRef: childGo,
+          event: childGo,
+          to: [childDone],
           handler: () => ({ state: childDone, emit: [doneEvt.create()] }),
         });
       },
@@ -1129,7 +1142,11 @@ describe("Actor directed mutation tests 2", () => {
       initial: parentIdle,
       regions: { child },
       setup: (m) => {
-        m.on(parentIdle, { eventRef: doneEvt, handler: () => ({ state: parentActive }) });
+        m.on(parentIdle, {
+          event: doneEvt,
+          to: [parentActive],
+          handler: () => ({ state: parentActive }),
+        });
       },
     });
 
@@ -1152,7 +1169,7 @@ describe("Actor directed mutation tests 2", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: tick, handler: () => ({ emit: [out.create()] }) });
+        m.onAny({ event: tick, handler: () => ({ emit: [out.create()] }) });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -1171,9 +1188,10 @@ describe("Actor directed mutation tests 2", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: tick, handler: () => ({ state: active }) });
+        m.on(idle, { event: tick, to: [active], handler: () => ({ state: active }) });
         m.onAny({
-          eventRef: tick,
+          event: tick,
+          to: [idle],
           handler: () => {
             anyRuns++;
             return { state: idle };
@@ -1196,7 +1214,7 @@ describe("Actor directed mutation tests 2", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.on("done", { fn: () => doneCalls++ });
@@ -1217,14 +1235,14 @@ describe("Actor directed mutation tests 2", () => {
       states: [init, done],
       initial: init,
       setup: (m) => {
-        m.on(init, { eventRef: start, handler: () => ({ state: init }) });
+        m.on(init, { event: start, to: [init], handler: () => ({ state: init }) });
         m.effect(init, {
           name: "emitTick",
           fn: ({ emit }) => {
             emit(tick.create());
           },
         });
-        m.on(init, { eventRef: tick, handler: () => ({ state: done }) });
+        m.on(init, { event: tick, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.send(start.create());
@@ -1243,7 +1261,8 @@ describe("Actor directed mutation tests 2", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [active],
           handler: (_e, { actor: a }) => {
             gotActor = a;
             return { state: active };
@@ -1266,7 +1285,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
@@ -1284,10 +1303,11 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
-        m.onAny({ eventRef: bad, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
+        m.onAny({ event: bad, handler: () => isErrorBomb("boom") });
         m.on(active, {
-          eventRef: trigger,
+          event: trigger,
+          to: [idle],
           handler: () => {
             handlerCalls++;
             return { state: idle };
@@ -1310,7 +1330,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.on("change", { fn: () => isErrorBomb("boom") });
@@ -1334,8 +1354,8 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       internalBudget: 1,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ emit: [loop.create()] }) });
-        m.on(idle, { eventRef: loop, handler: () => ({ emit: [loop.create()] }) });
+        m.on(idle, { event: start, handler: () => ({ emit: [loop.create()] }) });
+        m.on(idle, { event: loop, handler: () => ({ emit: [loop.create()] }) });
       },
     });
     expect(() => actor.send(start.create())).not.toThrow();
@@ -1356,7 +1376,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "failFirst",
           fn: () => {
@@ -1387,7 +1407,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ emit: [out.create()] }) });
+        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create()] }) });
       },
     });
     actor.on("output", { fn: () => isErrorBomb("output boom") });
@@ -1404,8 +1424,8 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: trigger, handler: () => isErrorBomb("first") });
-        m.onAny({ eventRef: bad, handler: () => isErrorBomb("second") });
+        m.onAny({ event: trigger, handler: () => isErrorBomb("first") });
+        m.onAny({ event: bad, handler: () => isErrorBomb("second") });
       },
     });
     actor.send(trigger.create());
@@ -1429,7 +1449,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         m.effect(active, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("boom"),
@@ -1453,7 +1473,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "rejectAsync",
           fn: async () => isErrorBomb("late boom"),
@@ -1481,13 +1501,14 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.onAny({
-          eventRef: trigger,
+          event: trigger,
+          to: [active],
           handler: () => {
             anyCalls++;
             return { state: active };
           },
         });
-        m.onAny({ eventRef: bad, handler: () => isErrorBomb("boom") });
+        m.onAny({ event: bad, handler: () => isErrorBomb("boom") });
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
@@ -1518,8 +1539,8 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
-        m.on(loading, { eventRef: boom, handler: () => isErrorBomb("nested") });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
+        m.on(loading, { event: boom, handler: () => isErrorBomb("nested") });
         m.effect(loading, {
           name: "emitBoomThenThrow",
           fn: ({ emit }) => {
@@ -1545,7 +1566,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isFalsyBomb() });
+        m.on(idle, { event: trigger, handler: () => isFalsyBomb() });
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
@@ -1561,7 +1582,11 @@ describe("Actor error state directed mutation tests", () => {
       states: declaredStates,
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: impostorState }) });
+        m.on(idle, {
+          event: trigger,
+          to: [impostorState],
+          handler: () => ({ state: impostorState }),
+        });
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
@@ -1585,9 +1610,10 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
         m.onAny({
-          eventRef: trigger,
+          event: trigger,
+          to: [active],
           handler: () => {
             ranAny = true;
             return { state: active };
@@ -1611,7 +1637,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ emit: [out.create(), out.create()] }) });
+        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create(), out.create()] }) });
       },
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
@@ -1631,13 +1657,13 @@ describe("Actor error state directed mutation tests", () => {
       context: { n: 0 },
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
           handler: (_e, { context }) => {
             context.set({ n: 1 });
             return {};
           },
         });
-        m.on(idle, { eventRef: ping, handler: () => ({}) });
+        m.on(idle, { event: ping, handler: () => ({}) });
       },
     });
     actor.on("change", { fn: () => changes++ });
@@ -1656,7 +1682,11 @@ describe("Actor error state directed mutation tests", () => {
       states: declaredStates,
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: impostorState }) });
+        m.on(idle, {
+          event: trigger,
+          to: [impostorState],
+          handler: () => ({ state: impostorState }),
+        });
       },
     });
     actor.send(trigger.create());
@@ -1678,11 +1708,12 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [loading],
           handler: () => ({ state: loading, emit: [boom.create(), boom.create()] }),
         });
         m.on(loading, {
-          eventRef: boom,
+          event: boom,
           handler: () => {
             boomCalls++;
             return isErrorBomb("boom");
@@ -1705,7 +1736,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "settleAfterMicrotasks",
           fn: async () => {
@@ -1734,7 +1765,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "rejectDelayed",
           fn: async () => {
@@ -1765,7 +1796,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ emit: [out.create()] }) });
+        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create()] }) });
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
@@ -1823,7 +1854,7 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       internalBudget: 0,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ emit: [loop.create()] }) });
+        m.on(idle, { event: start, handler: () => ({ emit: [loop.create()] }) });
       },
     });
     actor.send(start.create());
@@ -1844,7 +1875,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("boom"),
@@ -1871,7 +1902,7 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: update,
+          event: update,
           handler: (e) => {
             void e.payload.codeSize;
             return {};
@@ -1896,7 +1927,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
@@ -1917,7 +1948,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         m.effect(active, { name: "markReady", fn: () => {} });
         m.effect(active, { name: "logEntry", fn: () => {} });
       },
@@ -1940,7 +1971,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, bare],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: bare }) });
+        m.on(idle, { event: trigger, to: [bare], handler: () => ({ state: bare }) });
       },
     });
     const seen: Array<string[]> = [];
@@ -1957,7 +1988,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: ping, handler: () => ({}) });
+        m.on(idle, { event: ping, handler: () => ({}) });
       },
     });
     const seen: Array<string[]> = [];
@@ -1990,7 +2021,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
       },
     });
     let fires = 0;
@@ -2009,7 +2040,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("effect boom"),
@@ -2031,7 +2062,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [idle], handler: () => ({ state: idle }) });
       },
     });
     actor.on("transition", { fn: () => isErrorBomb("sub boom") });
@@ -2055,13 +2086,14 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       context: { n: 0 },
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("effect boom"),
         });
         m.on(loading, {
-          eventRef: tick,
+          event: tick,
+          to: [idle],
           handler: () => {
             ticks++;
             return { state: idle };
@@ -2092,7 +2124,7 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       context: { n: 1 },
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [idle], handler: () => ({ state: idle }) });
       },
     });
     let changes = 0;
@@ -2112,7 +2144,7 @@ describe("Actor error state directed mutation tests", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
       },
     });
     let dones = 0;
@@ -2132,7 +2164,8 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [ready],
           handler: () => ({ state: ready, payload: { items: ["a"] } }),
         });
       },
@@ -2152,7 +2185,8 @@ describe("Actor error state directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [ready],
           handler: () => ({ state: ready, payload: { items: ["a"] } }),
         });
         m.effect(ready, {
@@ -2203,7 +2237,8 @@ describe("dispose and inject directed mutation tests", () => {
       internal: [boom],
       states: [idle, active],
       initial: idle,
-      setup: (m) => m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) }),
+      setup: (m) =>
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) }),
     });
     actor.dispose();
     actor.send(trigger.create());
@@ -2231,7 +2266,8 @@ describe("dispose and inject directed mutation tests", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
+          to: [active],
           handler: (_e, { actor: actorRef }) => {
             actorRef.dispose();
             return { state: active, emit: [boom.create()] };
@@ -2276,7 +2312,7 @@ describe("dispose and inject directed mutation tests", () => {
       inputs: [tick],
       states: [idle],
       initial: idle,
-      setup: (m) => m.onAny({ eventRef: tick, handler: () => ({}) }),
+      setup: (m) => m.onAny({ event: tick, handler: () => ({}) }),
     });
     let changes = 0;
     actor.on("change", { fn: () => changes++ });
@@ -2294,7 +2330,7 @@ describe("dispose and inject directed mutation tests", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
       },
     });
     actor.send(trigger.create());
@@ -2324,7 +2360,7 @@ describe("ActorBuilder registration invariants", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.send(trigger.create());
@@ -2341,8 +2377,8 @@ describe("ActorBuilder registration invariants", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
-        m.on(active, { eventRef: stop, handler: () => ({ state: idle }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
+        m.on(active, { event: stop, to: [idle], handler: () => ({ state: idle }) });
       },
     });
     actor.send(trigger.create());
@@ -2362,8 +2398,8 @@ describe("ActorBuilder registration invariants", () => {
       states: [idle, active, done],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: done }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.send(trigger.create());
@@ -2380,7 +2416,7 @@ describe("ActorBuilder registration invariants", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: tick, handler: () => ({ state: active }) });
+        m.onAny({ event: tick, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.send(tick.create());
@@ -2397,8 +2433,8 @@ describe("ActorBuilder registration invariants", () => {
       states: [idle, active, done],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: trigger, handler: () => ({ state: active }) });
-        m.onAny({ eventRef: trigger, handler: () => ({ state: done }) });
+        m.onAny({ event: trigger, to: [active], handler: () => ({ state: active }) });
+        m.onAny({ event: trigger, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.send(trigger.create());

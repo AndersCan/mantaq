@@ -91,7 +91,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
       m.effect(sagaStates.compensatingRefund, { name: "runRefund", fn: () => undefined });
       m.effect(sagaStates.compensatingRelease, { name: "releaseInventory", fn: () => undefined });
       m.onAny({
-        eventRef: CANCEL,
+        event: CANCEL,
+        to: [failed, sagaStates.compensatingRelease],
         handler: (_event, { context }) => {
           const current = context.get();
           if (current.completedSteps.includes("inventory")) {
@@ -103,7 +104,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.idle, {
-        eventRef: START,
+        event: START,
+        to: [sagaStates.reservingInventory],
         handler: (event, { context }) => {
           const current = context.get();
           current.order = event.payload.order;
@@ -112,7 +114,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.reservingInventory, {
-        eventRef: INVENTORY_RESERVED,
+        event: INVENTORY_RESERVED,
+        to: [sagaStates.processingPayment],
         handler: (event, { context }) => {
           const current = context.get();
           current.reservationId = event.payload.result.reservationId;
@@ -122,7 +125,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.reservingInventory, {
-        eventRef: INVENTORY_FAILED,
+        event: INVENTORY_FAILED,
+        to: [failed],
         handler: (event, { context }) => {
           const current = context.get();
           current.error = event.payload.error;
@@ -131,7 +135,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.processingPayment, {
-        eventRef: PAYMENT_PROCESSED,
+        event: PAYMENT_PROCESSED,
+        to: [sagaStates.creatingShipment],
         handler: (event, { context }) => {
           const current = context.get();
           current.transactionId = event.payload.result.transactionId;
@@ -141,7 +146,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.processingPayment, {
-        eventRef: PAYMENT_FAILED,
+        event: PAYMENT_FAILED,
+        to: [sagaStates.compensatingRefund],
         handler: (event, { context }) => {
           const current = context.get();
           current.error = event.payload.error;
@@ -151,7 +157,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.creatingShipment, {
-        eventRef: SHIPMENT_CREATED,
+        event: SHIPMENT_CREATED,
+        to: [sagaStates.notifying],
         handler: (event, { context }) => {
           const current = context.get();
           current.trackingNumber = event.payload.result.trackingNumber;
@@ -161,7 +168,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.creatingShipment, {
-        eventRef: SHIPMENT_FAILED,
+        event: SHIPMENT_FAILED,
+        to: [sagaStates.compensatingRefund],
         handler: (event, { context }) => {
           const current = context.get();
           current.error = event.payload.error;
@@ -170,11 +178,13 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.notifying, {
-        eventRef: NOTIFICATION_SENT,
+        event: NOTIFICATION_SENT,
+        to: [completed],
         handler: () => ({ state: completed }),
       });
       m.on(sagaStates.notifying, {
-        eventRef: NOTIFICATION_FAILED,
+        event: NOTIFICATION_FAILED,
+        to: [completed],
         handler: (_event, { context }) => {
           const current = context.get();
           current.error = "Notification failed";
@@ -183,7 +193,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.compensatingRefund, {
-        eventRef: REFUND_DONE,
+        event: REFUND_DONE,
+        to: [failed, sagaStates.compensatingRelease],
         handler: (_event, { context }) => {
           const current = context.get();
           current.completedSteps = [...current.completedSteps, "refunded"];
@@ -195,7 +206,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.compensatingRefund, {
-        eventRef: REFUND_FAILED,
+        event: REFUND_FAILED,
+        to: [failed],
         handler: (event, { context }) => {
           const current = context.get();
           current.error = `Refund failed: ${event.payload.error}`;
@@ -204,7 +216,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.compensatingRelease, {
-        eventRef: RELEASE_DONE,
+        event: RELEASE_DONE,
+        to: [failed],
         handler: (_event, { context }) => {
           const current = context.get();
           current.completedSteps = [...current.completedSteps, "released"];
@@ -213,7 +226,8 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(sagaStates.compensatingRelease, {
-        eventRef: RELEASE_FAILED,
+        event: RELEASE_FAILED,
+        to: [failed],
         handler: (event, { context }) => {
           const current = context.get();
           current.error = `Release failed: ${event.payload.error}`;

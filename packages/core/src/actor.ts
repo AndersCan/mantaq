@@ -88,6 +88,7 @@ interface InternalActorOptions<
   ActorContext = Record<string, unknown>,
 > extends Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup"> {
   transitions: TransitionDispatch<States, ActorContext>;
+  targets: Record<string, Record<string, string[]>>;
   effects: Record<string, Array<EffectEntry<ActorContext>>>;
 }
 
@@ -149,6 +150,7 @@ export function Actor<
   const actorOptions: InternalActorOptions<States, Inputs, Internal, Outputs, ActorContext> = {
     ...options,
     transitions: built.transitions,
+    targets: built.targets,
     effects: built.effects,
   };
 

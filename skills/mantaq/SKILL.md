@@ -41,7 +41,7 @@ One way to do things; don't invent competing patterns.
 - **Context.** Plain, cloneable shared data that accumulates across transitions. Not a substitute for states. `context.set()` is the write signal for subscribers.
 - **State payload.** Data tied to one visit to a state, passed on transition. Per-visit data → payload. Cross-step data → context.
 - **Effect.** A named side effect that runs when a state is entered and is aborted when it is left. All async work, timers and I/O live here. Never in transition handlers.
-- **Transition handler.** Pure decision: read event + context, return the next state and/or events to emit. Registered per state (`m.on`) or for every state (`m.onAny`).
+- **Transition handler.** Pure decision: read event + context, return the next state and/or events to emit. Registered per state (`m.on`) or for every state (`m.onAny`), with `to` listing every state it may return (compile-checked; omit `to` for a handler that only stays). `to` is what diagrams draw.
 - **Clock.** The only source of time. `VirtualClock` in tests, `RealClock` in production.
 - **Regions.** Child actors composed into a parent. Forwarding events into a child is manual.
 - **Actor.** Wires the above together: declared `inputs` (what callers send), `internal` events (emitted back to itself), `outputs` (emitted outward), states, initial state, context, clock, and a `setup` that registers handlers and effects.

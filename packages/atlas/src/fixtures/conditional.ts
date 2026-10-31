@@ -14,7 +14,8 @@ export function createConditionalActor(clock: VirtualClock = VirtualClock()) {
     initial: idle,
     setup: (m) => {
       m.on(idle, {
-        eventRef: review,
+        event: review,
+        to: [approved, rejected],
         handler: (e) => ({ state: (e.payload?.amount ?? 0) > 100 ? rejected : approved }),
       });
     },

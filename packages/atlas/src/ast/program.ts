@@ -12,7 +12,7 @@ export interface AnalysisSource {
   tsconfig?: string;
 }
 
-/** One `m.on(state, { eventRef, handler })` or `m.onAny({ eventRef, handler })` call. */
+/** One `m.on(state, { event, handler })` or `m.onAny({ event, handler })` call. */
 export interface Registration {
   kind: "on" | "onAny";
   /** Resolved state name; null for onAny or when the type has no literal name. */
@@ -66,7 +66,7 @@ function toRegistration(checker: ts.TypeChecker, call: ts.CallExpression): Regis
   if (method !== "on" && method !== "onAny") return null;
   const options = call.arguments[method === "on" ? 1 : 0];
   if (options === undefined || !ts.isObjectLiteralExpression(options)) return null;
-  const eventRef = property(options, "eventRef");
+  const eventRef = property(options, "event");
   if (eventRef === undefined) return null;
   const stateArg = method === "on" ? call.arguments[0] : undefined;
   return {

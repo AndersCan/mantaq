@@ -16,8 +16,8 @@ function makeToggleActor() {
     states: [stateA, stateB],
     initial: stateA,
     setup: (machine) => {
-      machine.on(stateA, { eventRef: goEvent, handler: () => ({ state: stateB }) });
-      machine.on(stateB, { eventRef: stopEvent, handler: () => ({ state: stateA }) });
+      machine.on(stateA, { event: goEvent, to: [stateB], handler: () => ({ state: stateB }) });
+      machine.on(stateB, { event: stopEvent, to: [stateA], handler: () => ({ state: stateA }) });
     },
   });
 }
@@ -95,7 +95,11 @@ describe("createTestHarness", () => {
       states: [idleState, activeState],
       initial: idleState,
       setup: (machine) => {
-        machine.on(idleState, { eventRef: goEvent, handler: () => ({ state: activeState }) });
+        machine.on(idleState, {
+          event: goEvent,
+          to: [activeState],
+          handler: () => ({ state: activeState }),
+        });
         machine.effect(activeState, { name: "logVisit", fn: () => {} });
       },
     });
@@ -157,7 +161,7 @@ describe("createTestHarness", () => {
       context: { count: 0 },
       setup: (machine) => {
         machine.on(idleState, {
-          eventRef: tickEvent,
+          event: tickEvent,
           handler: (_sentEvent, { context }) => {
             const current = context.get();
             context.set({ ...current, count: current.count + 1 });
@@ -187,7 +191,8 @@ describe("createTestHarness with regions", () => {
       initial: childIdleState,
       setup: (machine) => {
         machine.on(childIdleState, {
-          eventRef: childGoEvent,
+          event: childGoEvent,
+          to: [childDoneState],
           handler: () => ({ state: childDoneState, emit: [childDoneEvent.create()] }),
         });
       },
@@ -203,7 +208,8 @@ describe("createTestHarness with regions", () => {
       regions: { child },
       setup: (machine) => {
         machine.on(parentIdleState, {
-          eventRef: childDoneEvent,
+          event: childDoneEvent,
+          to: [parentActiveState],
           handler: () => ({ state: parentActiveState }),
         });
       },

@@ -36,8 +36,8 @@ function makeActor() {
     states: [stateA, stateB],
     initial: stateA,
     setup: (machine) => {
-      machine.on(stateA, { eventRef: goEvent, handler: () => ({ state: stateB }) });
-      machine.on(stateB, { eventRef: stopEvent, handler: () => ({ state: stateA }) });
+      machine.on(stateA, { event: goEvent, to: [stateB], handler: () => ({ state: stateB }) });
+      machine.on(stateB, { event: stopEvent, to: [stateA], handler: () => ({ state: stateA }) });
     },
   });
 }
@@ -56,7 +56,8 @@ function makeActorWithContext() {
     initial: stateA,
     setup: (machine) => {
       machine.on(stateA, {
-        eventRef: goEvent,
+        event: goEvent,
+        to: [stateB],
         handler: (_sentEvent, { context }) => {
           const current = context.get();
           context.set({ ...current, count: current.count + 1 });

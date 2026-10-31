@@ -143,7 +143,7 @@ function createAccountAggregate(clock?: VirtualClock) {
     context: initialContext,
     setup: (m) => {
       m.on(activeState, {
-        eventRef: openAccountCmd,
+        event: openAccountCmd,
         handler: (evt, { context }) => {
           const current = context.get();
           const domainEvent: AccountEvent = {
@@ -162,7 +162,7 @@ function createAccountAggregate(clock?: VirtualClock) {
         },
       });
       m.on(activeState, {
-        eventRef: depositCmd,
+        event: depositCmd,
         handler: (evt, { context }) => {
           const current = context.get();
           if (evt.payload.amount <= 0) return {};
@@ -181,7 +181,7 @@ function createAccountAggregate(clock?: VirtualClock) {
         },
       });
       m.on(activeState, {
-        eventRef: withdrawCmd,
+        event: withdrawCmd,
         handler: (evt, { context }) => {
           const current = context.get();
           if (evt.payload.amount <= 0 || evt.payload.amount > current.balance) return {};
@@ -200,7 +200,8 @@ function createAccountAggregate(clock?: VirtualClock) {
         },
       });
       m.on(activeState, {
-        eventRef: closeAccountCmd,
+        event: closeAccountCmd,
+        to: [closedState],
         handler: (evt, { context }) => {
           const current = context.get();
           const domainEvent: AccountEvent = {
@@ -249,7 +250,7 @@ function createBalanceProjection(clock?: VirtualClock) {
     context: initialContext,
     setup: (m) => {
       m.on(trackingState, {
-        eventRef: eventStoredEvt,
+        event: eventStoredEvt,
         handler: (evt, { context }) => {
           const current = context.get();
           current.accountEvents = [...current.accountEvents, evt.payload.event];

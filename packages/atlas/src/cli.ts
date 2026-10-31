@@ -17,6 +17,7 @@
 import type { AtlasMachine } from "./schema.ts";
 import { toAtlasMachine } from "./atlas.ts";
 import { annotateMachine } from "./ast/annotate.ts";
+import { routingWarnings } from "./routing.ts";
 import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "./examples.ts";
 import type { Example } from "./examples.ts";
 import { compareArms, renderComparison } from "./fuzz/compare.ts";
@@ -103,6 +104,9 @@ function exportExamples(options: ExportOptions): void {
   const machines = exampleTargets().map((example) => exampleMachine(example, options));
   for (const machine of machines) {
     writeDocument(join(options.outDir, `${machine.id}.json`), [machine]);
+    for (const warning of routingWarnings(machine)) {
+      process.stderr.write(`warning: ${warning.machine}: ${warning.message}\n`);
+    }
   }
   writeDocument(join(options.outDir, "examples.json"), machines);
 }

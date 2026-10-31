@@ -85,19 +85,22 @@ function createConnectionManager(clock?: VirtualClock) {
     context: {},
     setup: (m) => {
       m.on(healthStates.unknown, {
-        eventRef: healthCheckResult,
+        event: healthCheckResult,
+        to: [healthStates.healthy, healthStates.degraded],
         handler: (event) => ({
           state: event.payload.healthy ? healthStates.healthy : healthStates.degraded,
         }),
       });
       m.on(healthStates.healthy, {
-        eventRef: healthCheckResult,
+        event: healthCheckResult,
+        to: [healthStates.healthy, healthStates.degraded],
         handler: (event) => ({
           state: event.payload.healthy ? healthStates.healthy : healthStates.degraded,
         }),
       });
       m.on(healthStates.degraded, {
-        eventRef: healthCheckResult,
+        event: healthCheckResult,
+        to: [healthStates.healthy, healthStates.degraded],
         handler: (event) => ({
           state: event.payload.healthy ? healthStates.healthy : healthStates.degraded,
         }),
@@ -161,7 +164,8 @@ function createConnectionManager(clock?: VirtualClock) {
         },
       });
       m.on(connectionStates.disconnected, {
-        eventRef: connectEvent,
+        event: connectEvent,
+        to: [connectionStates.connecting],
         handler: (event, { context }) => {
           const current = context.get();
           current.url = event.payload.url;
@@ -172,7 +176,8 @@ function createConnectionManager(clock?: VirtualClock) {
         },
       });
       m.on(connectionStates.connecting, {
-        eventRef: managerEvents.CONNECTION_ESTABLISHED,
+        event: managerEvents.CONNECTION_ESTABLISHED,
+        to: [connectionStates.connected],
         handler: (_event, { context }) => {
           const current = context.get();
           current.retryCount = 0;
@@ -181,7 +186,8 @@ function createConnectionManager(clock?: VirtualClock) {
         },
       });
       m.on(connectionStates.connecting, {
-        eventRef: connectionFailed,
+        event: connectionFailed,
+        to: [connectionStates.reconnecting, connectionStates.failed],
         handler: (event, { context }) => {
           const current = context.get();
           current.lastError = event.payload.error;
@@ -194,13 +200,15 @@ function createConnectionManager(clock?: VirtualClock) {
         },
       });
       m.on(connectionStates.connected, {
-        eventRef: managerEvents.DISCONNECT,
+        event: managerEvents.DISCONNECT,
+        to: [connectionStates.disconnected],
         handler: () => ({
           state: connectionStates.disconnected,
         }),
       });
       m.on(connectionStates.connected, {
-        eventRef: healthCheckResult,
+        event: healthCheckResult,
+        to: [connectionStates.reconnecting],
         handler: (event, { context }) => {
           actor.regions.health.send(healthCheckResult.create({ healthy: event.payload.healthy }));
           if (!event.payload.healthy) {
@@ -214,7 +222,8 @@ function createConnectionManager(clock?: VirtualClock) {
         },
       });
       m.on(connectionStates.reconnecting, {
-        eventRef: managerEvents.CONNECTION_ESTABLISHED,
+        event: managerEvents.CONNECTION_ESTABLISHED,
+        to: [connectionStates.connected],
         handler: (_event, { context }) => {
           const current = context.get();
           current.retryCount = 0;
@@ -223,7 +232,8 @@ function createConnectionManager(clock?: VirtualClock) {
         },
       });
       m.on(connectionStates.reconnecting, {
-        eventRef: connectionFailed,
+        event: connectionFailed,
+        to: [connectionStates.failed],
         handler: (event, { context }) => {
           const current = context.get();
           current.lastError = event.payload.error;
@@ -235,7 +245,7 @@ function createConnectionManager(clock?: VirtualClock) {
           return {};
         },
       });
-      m.on(connectionStates.reconnecting, { eventRef: managerEvents.RETRY, handler: () => ({}) });
+      m.on(connectionStates.reconnecting, { event: managerEvents.RETRY, handler: () => ({}) });
     },
   });
 

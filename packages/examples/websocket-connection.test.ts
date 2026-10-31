@@ -112,9 +112,14 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
           }
         },
       });
-      m.onAny({ eventRef: disconnect, handler: () => ({ state: disconnectedState }) });
       m.onAny({
-        eventRef: forceReconnect,
+        event: disconnect,
+        to: [disconnectedState],
+        handler: () => ({ state: disconnectedState }),
+      });
+      m.onAny({
+        event: forceReconnect,
+        to: [reconnectingState],
         handler: (_event, { context }) => {
           const current = context.get();
           current.retryCount = 0;
@@ -123,7 +128,8 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
         },
       });
       m.on(disconnectedState, {
-        eventRef: connect,
+        event: connect,
+        to: [connectingState],
         handler: (event, { context }) => {
           const current = context.get();
           current.url = event.payload.url;
@@ -133,11 +139,13 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
         },
       });
       m.on(connectingState, {
-        eventRef: connectionEstablished,
+        event: connectionEstablished,
+        to: [connectedState],
         handler: () => ({ state: connectedState }),
       });
       m.on(connectingState, {
-        eventRef: connectionFailed,
+        event: connectionFailed,
+        to: [reconnectingState],
         handler: (event, { context }) => {
           const current = context.get();
           current.retryCount += 1;
@@ -147,11 +155,13 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
         },
       });
       m.on(connectedState, {
-        eventRef: heartbeatTimeout,
+        event: heartbeatTimeout,
+        to: [reconnectingState],
         handler: () => ({ state: reconnectingState }),
       });
       m.on(reconnectingState, {
-        eventRef: connectionEstablished,
+        event: connectionEstablished,
+        to: [connectedState],
         handler: (_event, { context }) => {
           const current = context.get();
           current.retryCount = 0;
@@ -160,15 +170,18 @@ function createWsActor(clock?: VirtualClock, options?: { maxRetries?: number }) 
         },
       });
       m.on(reconnectingState, {
-        eventRef: reconnectTimeout,
+        event: reconnectTimeout,
+        to: [connectingState],
         handler: () => ({ state: connectingState }),
       });
       m.on(reconnectingState, {
-        eventRef: maxRetriesReached,
+        event: maxRetriesReached,
+        to: [permanentlyDisconnectedState],
         handler: () => ({ state: permanentlyDisconnectedState }),
       });
       m.on(permanentlyDisconnectedState, {
-        eventRef: connect,
+        event: connect,
+        to: [connectingState],
         handler: (event, { context }) => {
           const current = context.get();
           current.url = event.payload.url;

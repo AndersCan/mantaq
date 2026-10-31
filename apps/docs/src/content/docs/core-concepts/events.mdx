@@ -3,6 +3,8 @@ title: Events
 description: Messages that trigger transitions.
 ---
 
+import CheckoutAtlas from "../../../components/CheckoutAtlas.astro";
+
 ## What
 
 An event is a typed message that triggers a transition. `event("back")()`
@@ -67,19 +69,28 @@ const paymentFail = event("paymentFail")<{ reason: string }>();
 
 ## `onAny`
 
-Intercepts an event in every state. State-specific handler runs first;
-`onAny` only fires if no state handler matched.
+Handles an event in every non-final state, for events that do the same thing
+everywhere: cancel, disconnect, purge. A state-specific handler for the same
+event runs first; `onAny` still runs and may transition only if the state
+handler did not.
 
 ```ts
-m.onAny(back, (_event, { context }) => {
-  const s = checkout.state.name;
-  if (s === "payment") {
-    const cur = context.get();
-    cur.paymentInfo = undefined;
-    context.set(cur);
-    return { state: shippingAddress };
-  }
-  if (s === "error") return { state: payment };
-  return {};
-});
+m.onAny({ event: cancel, to: [basicInfo], handler: () => ({ state: basicInfo }) });
 ```
+
+When the target depends on the current state, as with `back`, register one
+`m.on` per state instead of branching on `actor.state` inside `onAny`. Each
+registration declares its exact target, so diagrams show which state leads
+where.
+
+```ts
+m.on(payment, { event: back, to: [shippingAddress], handler: () => ({ state: shippingAddress }) });
+m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
+```
+
+The diagram below is generated from the docs' checkout machine
+([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts))
+when the site is built. Each `back` is its own edge with its own target. Click
+a state or an edge to see the handler behind it.
+
+<CheckoutAtlas />

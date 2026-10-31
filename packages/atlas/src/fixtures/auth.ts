@@ -61,9 +61,10 @@ export function createAuthActor(clock: VirtualClock = VirtualClock()) {
       m.effect(authStates.loggedIn, { name: "monitorLoggedIn", fn: () => undefined });
       m.effect(authStates.signingIn, { name: "signInWithPhone", fn: () => undefined });
       m.effect(authStates.signingOut, { name: "signOut", fn: () => undefined });
-      m.onAny({ eventRef: authEvents.MONITOR_TICK, handler: () => ({}) });
+      m.onAny({ event: authEvents.MONITOR_TICK, handler: () => ({}) });
       m.on(authStates.checkingAuth, {
-        eventRef: signInEvent,
+        event: signInEvent,
+        to: [authStates.signingIn],
         handler: (event, { context }) => {
           const current = context.get();
           current.phoneNumber = event.payload.phoneNumber;
@@ -72,7 +73,8 @@ export function createAuthActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(authStates.loggedOut, {
-        eventRef: signInEvent,
+        event: signInEvent,
+        to: [authStates.signingIn],
         handler: (event, { context }) => {
           const current = context.get();
           current.phoneNumber = event.payload.phoneNumber;
@@ -81,7 +83,8 @@ export function createAuthActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(authStates.signingIn, {
-        eventRef: signInDoneEvent,
+        event: signInDoneEvent,
+        to: [authStates.loggedIn],
         handler: (event, { context }) => {
           const current = context.get();
           current.user = event.payload.user;
@@ -90,7 +93,8 @@ export function createAuthActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(authStates.signingIn, {
-        eventRef: signInErrorEvent,
+        event: signInErrorEvent,
+        to: [authStates.signInError],
         handler: (event, { context }) => {
           const current = context.get();
           current.error = event.payload.error;
@@ -99,7 +103,8 @@ export function createAuthActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(authStates.loggedIn, {
-        eventRef: authEvents.SIGN_OUT,
+        event: authEvents.SIGN_OUT,
+        to: [authStates.signingOut],
         handler: (_event, { context }) => {
           const current = context.get();
           current.user = undefined;
@@ -109,17 +114,20 @@ export function createAuthActor(clock: VirtualClock = VirtualClock()) {
         },
       });
       m.on(authStates.signingOut, {
-        eventRef: authEvents.SIGNING_OUT_DONE,
+        event: authEvents.SIGNING_OUT_DONE,
+        to: [authStates.loggedOut],
         handler: () => ({
           state: authStates.loggedOut,
         }),
       });
       m.on(authStates.signInError, {
-        eventRef: authEvents.RETRY,
+        event: authEvents.RETRY,
+        to: [authStates.signingIn],
         handler: () => ({ state: authStates.signingIn }),
       });
       m.on(authStates.signInError, {
-        eventRef: signInEvent,
+        event: signInEvent,
+        to: [authStates.signingIn],
         handler: (event, { context }) => {
           const current = context.get();
           current.phoneNumber = event.payload.phoneNumber;

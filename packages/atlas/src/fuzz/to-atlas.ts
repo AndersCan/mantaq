@@ -1,21 +1,39 @@
 import { toAtlasMachine } from "../atlas.ts";
+import { ANY_STATE, coveredByAny } from "../schema.ts";
 import type { AtlasEdge, AtlasEvent, AtlasMachine } from "../schema.ts";
 import { edgeHits, stateVisits } from "./coverage.ts";
 import type { FuzzResult } from "./fuzz.ts";
 import { eventCatalog, execute } from "./run.ts";
 import type { FuzzTarget, Observation, Trace } from "./run.ts";
 
-function observedKey(seen: Observation): string {
-  return seen.transitioned ? `${seen.from}>${seen.event}>${seen.to}` : `${seen.from}>${seen.event}`;
+function observedKey(seen: Observation, from: string): string {
+  return seen.transitioned ? `${from}>${seen.event}>${seen.to}` : `${from}>${seen.event}`;
 }
 
-function fuzzEdge(seen: Observation): AtlasEdge {
+/**
+ * Source to draw an observation from: its state when that state registers the
+ * event, else the `*` source when an `onAny` handler does. One `*` edge beats
+ * the same stay repeated on every state.
+ */
+function anySourceOf(machine: AtlasMachine, seen: Observation): string | undefined {
+  return machine.edges.find(
+    (edge) => edge.event === seen.event && coveredByAny(edge.from, seen.from),
+  )?.from;
+}
+
+function sourceOf(machine: AtlasMachine, seen: Observation): string {
+  const own = machine.edges.some((edge) => edge.from === seen.from && edge.event === seen.event);
+  return own ? seen.from : (anySourceOf(machine, seen) ?? seen.from);
+}
+
+function fuzzEdge(seen: Observation, from: string): AtlasEdge {
   const kind = seen.transitioned ? "transition" : "stay";
+  const to = kind === "stay" && from.endsWith(ANY_STATE) ? from : seen.to;
   return {
-    id: `fuzz:${seen.from}-${seen.event}-${kind === "stay" ? "stay" : seen.to}`,
-    from: seen.from,
+    id: `fuzz:${from}-${seen.event}-${kind === "stay" ? "stay" : seen.to}`,
+    from,
     event: seen.event,
-    to: seen.to,
+    to,
     kind,
     origin: "fuzz",
     emits: [],
@@ -26,26 +44,29 @@ function fuzzEdge(seen: Observation): AtlasEdge {
   };
 }
 
+function knownKey(edge: AtlasEdge): string | null {
+  if (edge.kind === "stay") return `${edge.from}>${edge.event}`;
+  return edge.to === null || edge.kind !== "transition"
+    ? null
+    : `${edge.from}>${edge.event}>${edge.to}`;
+}
+
 /**
- * Edges the fuzzer observed that probing did not produce as determined edges:
- * concrete targets of undetermined handlers, payload-dependent branches, and
- * `stay` (handled, no state change).
+ * Edges the fuzzer observed that the structure lacks: concrete targets of
+ * undetermined handlers, and `stay` from handlers that declare targets but may
+ * also return none. A transition outside `to` would land here too.
  */
 function discoveredEdges(machine: AtlasMachine, traces: ReadonlyArray<Trace>): AtlasEdge[] {
-  const probed = new Set(
-    machine.edges.flatMap((edge) =>
-      edge.to === null || edge.kind !== "transition"
-        ? []
-        : [`${edge.from}>${edge.event}>${edge.to}`],
-    ),
-  );
-  const found = new Map<string, Observation>();
+  const known = new Set(machine.edges.flatMap((edge) => knownKey(edge) ?? []));
+  const found = new Map<string, AtlasEdge>();
   for (const seen of traces.flatMap((trace) => trace.observations)) {
-    const key = observedKey(seen);
-    if (seen.transitioned && probed.has(key)) continue;
-    if (!found.has(key)) found.set(key, seen);
+    const from = sourceOf(machine, seen);
+    const key = observedKey(seen, from);
+    const sources = [seen.from, anySourceOf(machine, seen)].flatMap((each) => each ?? []);
+    if (sources.some((each) => known.has(observedKey(seen, each)))) continue;
+    if (!found.has(key)) found.set(key, fuzzEdge(seen, from));
   }
-  return [...found.values()].map(fuzzEdge);
+  return [...found.values()];
 }
 
 function byId<T extends { id: string }>(left: T, right: T): number {

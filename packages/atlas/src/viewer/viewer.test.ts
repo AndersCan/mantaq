@@ -5,11 +5,13 @@ import { EXAMPLE_ROOT, exampleInputs, exampleTargets, handWrittenBaselines } fro
 import { withTestCoverage } from "../fuzz/coverage.ts";
 import { DEFAULT_SEED } from "@mantaq/pbt";
 import { createCheckoutActor, submitBasicInfo } from "../fixtures/checkout.ts";
+import { createStateRoutingActor } from "../fixtures/state-routing.ts";
+import { join } from "node:path";
 import type { AtlasDocument } from "../schema.ts";
 import { fuzz } from "../fuzz/fuzz.ts";
 import { fuzzedMachine } from "../fuzz/to-atlas.ts";
 import { ATLAS_SCHEMA_VERSION } from "../schema.ts";
-import { FUZZ_NOTE, PROBE_BANNER, mountViewer } from "./viewer.ts";
+import { FUZZ_NOTE, STRUCTURE_BANNER, mountViewer } from "./viewer.ts";
 import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -26,6 +28,23 @@ function checkout(): AtlasDocument {
 
 function field(root: HTMLElement, name: string): string | null | undefined {
   return root.querySelector(`.panel [data-field="${name}"]`)?.textContent;
+}
+
+/** Checkout as an undeclared actor would export it: `back` targets unknown. */
+function undeterminedBack(atlas: AtlasDocument): AtlasDocument {
+  return {
+    ...atlas,
+    machines: atlas.machines.map((machine) => ({
+      ...machine,
+      edges: machine.edges.flatMap((edge) => {
+        if (edge.event !== "back") return [edge];
+        if (edge.to !== "basicInfo") return [];
+        return [
+          { ...edge, id: `${edge.from}-back-undetermined`, to: null, origin: "probe" as const },
+        ];
+      }),
+    })),
+  };
 }
 
 function edgeElement(root: HTMLElement, id: string): Element {
@@ -57,8 +76,18 @@ describe("viewer: checkout", () => {
     );
   });
 
-  test("back edges are undetermined stubs, each to its own ? node", () => {
+  test("declared back edges draw real targets; no ? nodes", () => {
     const root = mount(checkout());
+    const back = [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
+      edge.textContent?.includes("back"),
+    );
+    expect(back.length).toBeGreaterThan(0);
+    expect(back.some((edge) => edge.classList.contains("undetermined"))).toBe(false);
+    expect(root.querySelectorAll(".unknown-node").length).toBe(0);
+  });
+
+  test("undetermined edges are stubs, each to its own ? node", () => {
+    const root = mount(undeterminedBack(checkout()));
     const back = [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
       edge.textContent?.includes("back"),
     );
@@ -92,7 +121,7 @@ describe("viewer: checkout", () => {
   });
 
   test("undetermined edge panel says undetermined, never a guessed target", () => {
-    const atlas = checkout();
+    const atlas = undeterminedBack(checkout());
     const root = mount(atlas);
     const back = atlas.machines[0]?.edges.find((candidate) => candidate.event === "back");
     edgeElement(root, back?.id ?? "").dispatchEvent(new Event("click"));
@@ -135,7 +164,7 @@ describe("viewer: checkout", () => {
 
   test("shows the probing banner; no coverage picker without a run", () => {
     const root = mount(checkout());
-    expect(root.querySelector(".banner")?.textContent).toBe(PROBE_BANNER);
+    expect(root.querySelector(".banner")?.textContent).toBe(STRUCTURE_BANNER);
     expect(root.querySelector(".coverage-mode")).toBeNull();
     expect(root.querySelector(".machine-select")).toBeNull();
   });
@@ -166,7 +195,6 @@ describe("viewer: coverage and switching", () => {
       root.querySelector('[data-node-id="shippingAddress"]')?.classList.contains("unreached"),
     ).toBe(false);
     expect(root.querySelectorAll(".edge.unreached").length).toBeGreaterThan(0);
-    expect(root.querySelectorAll(".edge.undetermined").length).toBeGreaterThan(0);
     expect(root.querySelector(".legend-unreached")?.textContent).toBe(
       "dimmed and dashed: never taken in the supplied run",
     );
@@ -198,45 +226,86 @@ describe("viewer: coverage and switching", () => {
   });
 });
 
-function fuzzedCheckout(): AtlasDocument {
-  const target = exampleTargets().find((each) => each.id === "checkout");
+function fuzzed(id: string): AtlasDocument {
+  const target = exampleTargets().find((each) => each.id === id);
   if (!target) return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [] };
   const machine = fuzzedMachine(target, fuzz(target, { seed: DEFAULT_SEED, iterations: 2000 }));
   return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] };
 }
 
 describe("viewer: fuzz results", () => {
-  test("fuzz-discovered edges and stays are drawn distinctly; banner mentions fuzzing", () => {
-    const root = mount(fuzzedCheckout());
-    expect(root.querySelector(".banner")?.textContent).toBe(`${PROBE_BANNER} ${FUZZ_NOTE}`);
-    const fuzzBack = [...root.querySelectorAll<SVGGElement>(".edge.fuzz")].filter(
-      (edge) => edge.textContent === "back" && !edge.classList.contains("stay"),
+  test("fuzz-observed stays are drawn distinctly; declared transitions need no fuzz edge", () => {
+    const root = mount(fuzzed("retry"));
+    expect(root.querySelector(".banner")?.textContent).toBe(`${STRUCTURE_BANNER} ${FUZZ_NOTE}`);
+    const fuzzTransitions = [...root.querySelectorAll<SVGGElement>(".edge.fuzz")].filter(
+      (edge) => !edge.classList.contains("stay"),
     );
-    expect(fuzzBack.map((edge) => `${edge.dataset["from"]}->${edge.dataset["to"]}`).sort()).toEqual(
-      ["error->payment", "payment->shippingAddress", "shippingAddress->basicInfo"],
-    );
-    expect(root.querySelectorAll(".edge.stay").length).toBeGreaterThan(0);
+    expect(fuzzTransitions).toEqual([]);
+    expect(root.querySelectorAll(".edge.fuzz.stay").length).toBeGreaterThan(0);
     expect(root.querySelector(".legend-fuzz")).not.toBeNull();
   });
 
   test("edge panel shows origin and the replay sequence that reached it", () => {
-    const atlas = fuzzedCheckout();
+    const atlas = fuzzed("retry");
     const root = mount(atlas);
-    const edge = atlas.machines[0]?.edges.find(
-      (candidate) => candidate.origin === "fuzz" && candidate.from === "error",
-    );
+    const edge = atlas.machines[0]?.edges.find((candidate) => candidate.origin === "fuzz");
     edgeElement(root, edge?.id ?? "").dispatchEvent(new Event("click"));
-    expect(field(root, "origin")).toBe("fuzz (observed, not probed)");
+    expect(field(root, "origin")).toBe("fuzz (observed, not declared)");
     const steps = [...root.querySelectorAll(".panel .steps li")].map((item) => item.textContent);
-    expect(steps.at(-1)).toBe("back");
-    expect(steps).toContain('paymentFail {"reason":"declined"}');
+    expect(steps.at(-1)).toMatch(/^failed/);
   });
 
   test("idle panel shows the fuzz run summary", () => {
-    const root = mount(fuzzedCheckout());
+    const root = mount(fuzzed("checkout"));
     expect(root.querySelector(".fuzz-summary")).not.toBeNull();
     expect(field(root, "seed")).toBe(String(DEFAULT_SEED));
     expect(field(root, "handler errors")).toBe("none");
+  });
+});
+
+describe("viewer: onAny", () => {
+  function saga(): AtlasDocument {
+    return toAtlas(exampleInputs().filter((input) => input.id === "saga"));
+  }
+
+  test("onAny edges start at one 'any state' node, not at every state", () => {
+    const root = mount(saga());
+    expect(root.querySelectorAll(".any-node").length).toBe(1);
+    expect(root.querySelector(".any-node")?.textContent).toBe("any state");
+    const cancel = [...root.querySelectorAll<SVGGElement>(".edge")].filter(
+      (edge) => edge.textContent === "CANCEL",
+    );
+    expect(cancel.map((edge) => edge.dataset["from"])).toEqual(["*", "*"]);
+    expect(cancel[0]?.getAttribute("aria-label")).toMatch(/^any state on CANCEL to /);
+  });
+
+  test("a covered state lists the onAny edges as outgoing; the edge panel names the source", () => {
+    const atlas = saga();
+    const root = mount(atlas);
+    root.querySelector('[data-node-id="processingPayment"]')?.dispatchEvent(new Event("click"));
+    const links = [...root.querySelectorAll(".panel [data-edge-link]")].map(
+      (link) => link.textContent,
+    );
+    expect(links).toContain("any state —CANCEL→ failed");
+    const cancel = atlas.machines[0]?.edges.find((edge) => edge.event === "CANCEL");
+    edgeElement(root, cancel?.id ?? "").dispatchEvent(new Event("click"));
+    expect(field(root, "source")).toBe("any state (onAny)");
+  });
+
+  test("an onAny handler that reads actor state gets the per-state routing note", () => {
+    const machine = annotateMachine(
+      toAtlasMachine({ id: "routing", actor: createStateRoutingActor() }),
+      {
+        file: join(EXAMPLE_ROOT, "packages/atlas/src/fixtures/state-routing.ts"),
+        root: EXAMPLE_ROOT,
+      },
+    );
+    const root = mount({ schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] });
+    const back = machine.edges.find((edge) => edge.event === "back");
+    edgeElement(root, back?.id ?? "").dispatchEvent(new Event("click"));
+    expect(root.querySelector(".panel .routing-note")?.textContent).toMatch(
+      /^onAny\(back\) reads actor state/,
+    );
   });
 });
 
@@ -254,7 +323,7 @@ describe("viewer: AST explanations", () => {
     return { schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] };
   }
 
-  test("branches the graph lacks are flagged 'not in graph'", () => {
+  test("every analyzed branch maps to a declared edge", () => {
     const atlas = annotatedCredit();
     const root = mount(atlas);
     const apply = atlas.machines[0]?.edges.find((edge) => edge.event === "apply");
@@ -262,7 +331,7 @@ describe("viewer: AST explanations", () => {
     const statuses = [...root.querySelectorAll<HTMLElement>(".panel .branch")].map(
       (item) => item.dataset["branchStatus"],
     );
-    expect(statuses).toEqual(["not in graph", "not in graph", "this edge"]);
+    expect(statuses).toEqual(["in graph", "in graph", "this edge"]);
     expect(root.querySelector('.panel [data-explain="comparisons"]')?.textContent).toContain(
       "payload.amount > 50000",
     );
@@ -305,7 +374,7 @@ describe("viewer: fuzz vs test coverage", () => {
     );
   });
 
-  test("probe edge no fuzz run produced gets the 'may be impossible' note", () => {
+  test("declared edge no fuzz run produced gets the 'guards may never allow it' note", () => {
     const atlas = fuzzedAndTested("saga");
     const root = mount(atlas);
     const predicted = atlas.machines[0]?.edges.find(
@@ -315,7 +384,7 @@ describe("viewer: fuzz vs test coverage", () => {
     expect(predicted?.coverage).toEqual({ hits: 0 });
     edgeElement(root, predicted?.id ?? "").dispatchEvent(new Event("click"));
     expect(root.querySelector(".panel .prediction-note")?.textContent).toMatch(
-      /^Probing predicted this edge, but no fuzz run produced it/,
+      /^The handler declares this target in `to`, but no fuzz run produced it/,
     );
     expect(field(root, "fuzz hits")).toBe("0");
   });
@@ -324,7 +393,7 @@ describe("viewer: fuzz vs test coverage", () => {
     const atlas = fuzzedAndTested("saga");
     const root = mount(atlas);
     const reached = atlas.machines[0]?.edges.find(
-      (edge) => edge.origin === "probe" && (edge.coverage?.hits ?? 0) > 0,
+      (edge) => edge.origin === "declared" && (edge.coverage?.hits ?? 0) > 0,
     );
     edgeElement(root, reached?.id ?? "").dispatchEvent(new Event("click"));
     expect(root.querySelector(".panel .prediction-note")).toBeNull();

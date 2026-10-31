@@ -4,7 +4,7 @@
  * converted (per ts-strict-casting) and every other module consumes typed
  * results from here.
  */
-import type { StateDef, TransitionDispatchMap, TransitionHandler } from "./types.ts";
+import type { StateDef, TargetMap, TransitionDispatchMap, TransitionHandler } from "./types.ts";
 import { isStateRef } from "@mantaq/core";
 
 export function parseStates(options: unknown): ReadonlyArray<StateDef> {
@@ -30,6 +30,20 @@ export function parseTransitionMap(source: unknown): TransitionDispatchMap {
     }
   }
   return dispatchMap;
+}
+
+export function parseTargetMap(source: unknown): TargetMap {
+  const targetMap: TargetMap = {};
+  if (typeof source !== "object" || source === null) return targetMap;
+  for (const [stateName, eventMap] of Object.entries(source)) {
+    if (typeof eventMap !== "object" || eventMap === null) continue;
+    for (const [eventType, names] of Object.entries(eventMap)) {
+      if (!Array.isArray(names)) continue;
+      const declared = names.filter((name): name is string => typeof name === "string");
+      (targetMap[stateName] ??= {})[eventType] = declared;
+    }
+  }
+  return targetMap;
 }
 
 export function parseInitialName(options: unknown): string | undefined {

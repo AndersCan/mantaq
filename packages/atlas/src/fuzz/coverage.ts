@@ -1,9 +1,16 @@
+import { coveredByAny } from "../schema.ts";
 import type { AtlasEdge, AtlasMachine, AtlasStep } from "../schema.ts";
 import { execute } from "./run.ts";
 import type { FuzzTarget, Observation, Trace } from "./run.ts";
 
+/**
+ * An `onAny` edge counts observations from every state it covers. A state's
+ * own handler for the same event is not told apart: observations carry no
+ * handler identity.
+ */
 function matches(edge: AtlasEdge, seen: Observation): boolean {
-  if (seen.from !== edge.from || seen.event !== edge.event) return false;
+  const source = seen.from === edge.from || coveredByAny(edge.from, seen.from);
+  if (!source || seen.event !== edge.event) return false;
   if (edge.kind === "stay") return !seen.transitioned;
   // Undetermined: any outcome of this handler counts.
   if (edge.to === null) return true;

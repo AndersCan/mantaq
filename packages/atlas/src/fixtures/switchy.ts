@@ -14,7 +14,8 @@ export function createSwitchyActor(clock: VirtualClock = VirtualClock()) {
     clock,
     setup: (m) => {
       m.on(off, {
-        eventRef: dial,
+        event: dial,
+        to: [low, high],
         handler: (event) => {
           switch (event.payload.level) {
             case 1:

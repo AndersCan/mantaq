@@ -1,4 +1,4 @@
-:root {
+.atlas {
   --fuzz: #138a4a;
   --bg: #fbfbfa;
   --fg: #1d1d1f;
@@ -12,10 +12,12 @@
   --banner-bg: #fff6e0;
   --banner-fg: #5a3e00;
   color-scheme: light;
+  background: var(--bg);
+  color: var(--fg);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  .atlas {
     --bg: #141416;
     --fg: #ececf0;
     --muted: #9a9aa3;
@@ -32,40 +34,26 @@
   }
 }
 
-body {
-  margin: 0;
-  padding: 16px;
-  background: var(--bg);
-  color: var(--fg);
-  font:
-    14px/1.4 system-ui,
-    sans-serif;
-}
-
-.toolbar {
-  margin-bottom: 12px;
-}
-
-.atlas-header {
+.atlas .atlas-header {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   align-items: center;
 }
 
-.atlas-header h1 {
+.atlas .atlas-header :is(h1, h2, h3) {
   font-size: 18px;
   margin: 0;
 }
 
-.banner {
+.atlas .banner {
   background: var(--banner-bg);
   color: var(--banner-fg);
   padding: 8px 12px;
   border-radius: 6px;
 }
 
-.legend {
+.atlas .legend {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 18px;
@@ -75,57 +63,57 @@ body {
   font-size: 12px;
 }
 
-.atlas-main {
+.atlas .atlas-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
 }
 
 @media (max-width: 760px) {
-  .atlas-main {
+  .atlas .atlas-main {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.canvas {
+.atlas .canvas {
   overflow: auto;
 }
 
-.panel {
+.atlas .panel {
   border-left: 1px solid var(--region-bg);
   padding-left: 16px;
 }
 
-.panel dl {
+.atlas .panel dl {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 4px 12px;
 }
 
-.panel dt {
+.atlas .panel dt {
   color: var(--muted);
 }
 
-.panel dd {
+.atlas .panel dd {
   margin: 0;
 }
 
-.panel ul {
+.atlas .panel ul {
   margin: 0;
   padding-left: 16px;
 }
 
-.link {
+.atlas .link {
   color: var(--accent);
   cursor: pointer;
 }
 
-.graph {
+.atlas .graph {
   width: 100%;
   height: auto;
 }
 
-.graph text {
+.atlas .graph text {
   fill: var(--fg);
   font-size: 12px;
   paint-order: stroke;
@@ -134,137 +122,149 @@ body {
   stroke-linejoin: round;
 }
 
-.graph .arrow-head {
+.atlas .graph .arrow-head {
   fill: var(--line);
 }
 
-.region rect {
+.atlas .region rect {
   fill: var(--region-bg);
   stroke: var(--muted);
   stroke-dasharray: 2 3;
 }
 
-.region text {
+.atlas .region text {
   fill: var(--muted);
 }
 
-.state .frame {
+.atlas .state .frame {
   fill: var(--state-bg);
   stroke: var(--state-border);
   stroke-width: 1.5;
 }
 
-.state.final .inner {
+.atlas .state.final .inner {
   fill: none;
 }
 
-.state,
-.edge {
+.atlas .state,
+.atlas .edge {
   cursor: pointer;
   outline: none;
 }
 
-.edge path {
+.atlas .edge path {
   fill: none;
   stroke: var(--line);
   stroke-width: 1.5;
 }
 
-.edge.internal path {
+.atlas .edge.internal path {
   stroke-dasharray: 1 3;
   stroke-linecap: round;
 }
 
-.edge.internal text {
+.atlas .edge.internal text {
   font-style: italic;
 }
 
-.edge.effect {
+.atlas .edge.effect {
   opacity: 0.45;
 }
 
-.edge.undetermined path {
+.atlas .edge.undetermined path {
   stroke: var(--unknown);
   stroke-dasharray: 6 4;
 }
 
-.edge.fuzz path {
+.atlas .edge.fuzz path {
   stroke: var(--fuzz);
 }
 
-.edge.fuzz text {
+.atlas .edge.fuzz text {
   fill: var(--fuzz);
 }
 
-.edge.stay path {
+.atlas .edge.stay path {
   stroke-dasharray: 1 3;
   stroke-linecap: round;
 }
 
-.steps {
+.atlas .steps {
   margin: 0;
   padding-left: 20px;
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
 
-.unknown-node circle {
+.atlas .unknown-node circle {
   fill: var(--state-bg);
   stroke: var(--unknown);
   stroke-dasharray: 4 3;
 }
 
-.unknown-node text {
+.atlas .unknown-node text {
   fill: var(--unknown);
   font-weight: 700;
 }
 
-.entry circle {
+.atlas .any-node rect {
+  fill: none;
+  stroke: var(--state-border);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 3;
+}
+
+.atlas .any-node text {
+  fill: var(--muted);
+  font-style: italic;
+}
+
+.atlas .entry circle {
   fill: var(--line);
 }
 
-.entry path {
+.atlas .entry path {
   stroke: var(--line);
   stroke-width: 1.5;
 }
 
-.coverage-on .unreached {
+.atlas.coverage-on .unreached {
   opacity: 0.35;
 }
 
-.coverage-on .state.unreached .frame,
-.coverage-on .edge.unreached path {
+.atlas.coverage-on .state.unreached .frame,
+.atlas.coverage-on .edge.unreached path {
   stroke-dasharray: 3 3;
 }
 
-.highlight path,
-.highlight .frame,
-.highlight circle,
-.selected path,
-.selected .frame {
+.atlas .highlight path,
+.atlas .highlight .frame,
+.atlas .highlight circle,
+.atlas .selected path,
+.atlas .selected .frame {
   stroke: var(--accent);
   stroke-width: 2.5;
 }
 
-.state:focus-visible .frame,
-.edge:focus-visible path {
+.atlas .state:focus-visible .frame,
+.atlas .edge:focus-visible path {
   stroke: var(--accent);
   stroke-width: 3;
 }
 
-.load-error {
+.atlas .load-error {
   color: var(--unknown);
 }
 
-.muted {
+.atlas .muted {
   color: var(--muted);
 }
 
-.explanation p {
+.atlas .explanation p {
   margin: 2px 0;
 }
 
-.explanation pre {
+.atlas .explanation pre {
   overflow-x: auto;
   font-size: 12px;
   background: var(--region-bg);
@@ -272,20 +272,21 @@ body {
   border-radius: 4px;
 }
 
-.branches {
+.atlas .branches {
   padding-left: 16px;
 }
 
-.branch[data-branch-status="not in graph"] .branch-status {
+.atlas .branch[data-branch-status="not in graph"] .branch-status {
   color: var(--unknown);
   font-weight: 600;
 }
 
-.branch[data-branch-status="this edge"] .branch-status {
+.atlas .branch[data-branch-status="this edge"] .branch-status {
   color: var(--accent);
 }
 
-.prediction-note {
+.atlas .prediction-note,
+.atlas .routing-note {
   background: var(--banner-bg);
   color: var(--banner-fg);
   padding: 6px 8px;

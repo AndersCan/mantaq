@@ -129,19 +129,19 @@ Type-safe registrar passed to `setup`. Targets validate against declared states,
 
 ```ts
 setup: (m) => {
-  m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
-  m.onAny(back, () => ({ state: basicInfo }));
+  m.on(basicInfo, { event: submitBasicInfo, to: [payment], handler: () => ({ state: payment }) });
+  m.onAny({ event: back, to: [basicInfo], handler: () => ({ state: basicInfo }) });
   m.effect(payment, { name: "chargePayment", fn: ({ signal, emit }) => {} });
 };
 ```
 
-| Method                        | Signature                          | What                    |
-| ----------------------------- | ---------------------------------- | ----------------------- |
-| `on(state, event, fn)`        | `(stateRef, eventRef, fn) => this` | Transition for one pair |
-| `onAny(event, fn)`            | `(eventRef, fn) => this`           | Handler in every state  |
-| `effect(state, { name, fn })` | `(stateRef, { name, fn }) => this` | Run `fn` on state entry |
+| Method                              | Signature                                     | What                    |
+| ----------------------------------- | --------------------------------------------- | ----------------------- |
+| `on(state, { event, to, handler })` | `(stateRef, { event, to?, handler }) => this` | Transition for one pair |
+| `onAny({ event, to, handler })`     | `({ event, to?, handler }) => this`           | Handler in every state  |
+| `effect(state, { name, fn })`       | `(stateRef, { name, fn }) => this`            | Run `fn` on state entry |
 
-Handler return: `{ state?; payload?; emit? }` or `{}` to stay in place.
+Handler return: `{ state?; payload?; emit? }` or `{}` to stay in place. `state` must be listed in `to`; omit `to` when the handler only stays. `to` is what the builder records, so diagrams show every transition without running handlers.
 
 Effects run on every state entry. Each takes a required camelCase `name`;
 executed effects are recorded in history as `{ stateName, effectName }`, and

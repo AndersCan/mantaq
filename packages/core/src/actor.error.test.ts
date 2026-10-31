@@ -69,9 +69,9 @@ describe("Actor error paths", () => {
       states: [pending, done],
       initial: pending,
       setup: (m) => {
-        m.on(pending, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
         m.onAny({
-          eventRef: stray,
+          event: stray,
           handler: () => {
             strayRuns++;
             return {};
@@ -94,7 +94,7 @@ describe("Actor error paths", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ emit: [out.create()] }) });
+        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create()] }) });
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
@@ -129,9 +129,9 @@ describe("Actor error paths", () => {
       initial: idle,
       internalBudget: 2,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ emit: [loop.create()] }) });
+        m.on(idle, { event: start, handler: () => ({ emit: [loop.create()] }) });
         m.on(idle, {
-          eventRef: loop,
+          event: loop,
           handler: () => {
             handlerCalls++;
             return { emit: [loop.create()] };
@@ -160,14 +160,14 @@ describe("Actor error paths", () => {
       initial: idle,
       internalBudget: 2,
       setup: (m) => {
-        m.on(idle, { eventRef: start, handler: () => ({ state: running }) });
+        m.on(idle, { event: start, to: [running], handler: () => ({ state: running }) });
         m.effect(running, {
           name: "captureSignal",
           fn: ({ signal }) => {
             effectSignal = signal;
           },
         });
-        m.on(running, { eventRef: loop, handler: () => ({ emit: [loop.create()] }) });
+        m.on(running, { event: loop, handler: () => ({ emit: [loop.create()] }) });
       },
     });
     actor.send(start.create());
@@ -192,7 +192,8 @@ describe("Actor error paths", () => {
       initial: idle,
       setup: (m) => {
         m.on(idle, {
-          eventRef: start,
+          event: start,
+          to: [loading],
           handler: () => ({ state: loading, emit: [finish.create(), finish.create()] }),
         });
         m.effect(loading, {
@@ -202,7 +203,7 @@ describe("Actor error paths", () => {
             return isErrorBomb("effect bug");
           },
         });
-        m.on(loading, { eventRef: finish, handler: () => ({ state: done }) });
+        m.on(loading, { event: finish, to: [done], handler: () => ({ state: done }) });
       },
     });
     expect(() => actor.send(start.create())).not.toThrow();
@@ -229,9 +230,10 @@ describe("Actor error paths", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
         m.onAny({
-          eventRef: trigger,
+          event: trigger,
+          to: [active],
           handler: () => {
             ranAny = true;
             return { state: active };
@@ -259,7 +261,7 @@ describe("Actor error paths", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("effect boom"),
@@ -284,7 +286,7 @@ describe("Actor error paths", () => {
       context: { n: 0 },
       setup: (m) => {
         m.on(idle, {
-          eventRef: trigger,
+          event: trigger,
           handler: (_e, { context }) => {
             context.set({ n: 99 });
             return isErrorBomb("boom");
@@ -306,7 +308,7 @@ describe("Actor error paths", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
       },
     });
     actor.on("change", { fn: () => isErrorBomb("sub boom") });
@@ -330,7 +332,7 @@ describe("Actor error paths", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ emit: [out.create()] }) });
+        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create()] }) });
       },
     });
     actor.on("output", { fn: () => isErrorBomb("output boom") });
@@ -351,7 +353,11 @@ describe("Actor error paths", () => {
       states: declaredStates,
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: impostorState }) });
+        m.on(idle, {
+          event: trigger,
+          to: [impostorState],
+          handler: () => ({ state: impostorState }),
+        });
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
@@ -374,7 +380,7 @@ describe("Actor error paths", () => {
       states: [idle, loading],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "rejectAsync",
           fn: async () => isErrorBomb("late boom"),
@@ -405,7 +411,7 @@ describe("Actor error paths", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         m.effect(active, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("boom"),
@@ -431,8 +437,8 @@ describe("Actor error paths", () => {
         states: [idle, active],
         initial: idle,
         setup: (m) => {
-          m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
-          m.on(active, { eventRef: bad, handler: () => isErrorBomb("boom") });
+          m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
+          m.on(active, { event: bad, handler: () => isErrorBomb("boom") });
         },
       });
     }
@@ -481,13 +487,14 @@ describe("Actor error paths", () => {
       initial: idle,
       context: { n: 0 },
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: loading }) });
+        m.on(idle, { event: trigger, to: [loading], handler: () => ({ state: loading }) });
         m.effect(loading, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("effect boom"),
         });
         m.on(loading, {
-          eventRef: tick,
+          event: tick,
+          to: [idle],
           handler: () => {
             ticks++;
             return { state: idle };
@@ -589,7 +596,7 @@ describe("Actor error paths", () => {
       states: [idle, active],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         m.effect(active, {
           name: "throwOnEnter",
           fn: () => isErrorBomb("boom"),
@@ -612,9 +619,9 @@ describe("Actor error paths", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
         m.on(idle, {
-          eventRef: tick,
+          event: tick,
           handler: () => {
             ticks++;
             return {};
@@ -646,7 +653,7 @@ describe("Actor error paths", () => {
       states: [idle],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => isErrorBomb("boom") });
+        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
       },
     });
     const seen: ErrorInfo[] = [];

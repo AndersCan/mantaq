@@ -1,22 +1,25 @@
 import { buildEdgesFromTransitions } from "./graph-edges.ts";
 import type { GraphTraversal } from "./graph-edges.ts";
 import {
+  ANY_NODE_NAME,
   INITIAL_NODE_ID,
   collectActiveStates,
   collectActorsFromSnapshot,
+  isAnyNode,
   nodeId,
 } from "./graph-ids.ts";
 import {
   parseContextRecord,
   parseInitialName,
   parseStates,
+  parseTargetMap,
   parseTransitionMap,
 } from "./parse-graph.ts";
 import type { ActorGraph, GraphEdge, GraphNode, StateDef } from "./types.ts";
 import type { AnyActor } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 
-export { INITIAL_NODE_ID, collectActiveStates };
+export { ANY_NODE_NAME, INITIAL_NODE_ID, collectActiveStates, isAnyNode };
 
 function buildNodesFromStates(
   states: ReadonlyArray<StateDef>,
@@ -38,10 +41,16 @@ function addNodesForActor(
   layout: { pathPrefix: string; activeSet: Set<string> },
 ): GraphNode[] {
   const states = parseStates(actor.options);
-  return buildNodesFromStates(states, {
+  const nodes = buildNodesFromStates(states, {
     activeSet: layout.activeSet,
     pathPrefix: layout.pathPrefix,
   });
+  const anyTransitions = parseTransitionMap(actor.options?.transitions)["Any"];
+  if (anyTransitions !== undefined && Object.keys(anyTransitions).length > 0) {
+    const id = nodeId({ prefix: layout.pathPrefix, name: ANY_NODE_NAME });
+    nodes.push({ id, label: "any state", isActive: false, isFinal: false, isAny: true });
+  }
+  return nodes;
 }
 
 function addEdgesForActor(
@@ -50,7 +59,8 @@ function addEdgesForActor(
 ): GraphEdge[] {
   const states = parseStates(actor.options);
   const transitions = parseTransitionMap(actor.options?.transitions);
-  return buildEdgesFromTransitions({ states, transitions, traversal: layout.traversal });
+  const targets = parseTargetMap(actor.options?.targets);
+  return buildEdgesFromTransitions({ states, transitions, targets, traversal: layout.traversal });
 }
 
 function recurseRegions(

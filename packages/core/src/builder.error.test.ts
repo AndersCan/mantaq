@@ -13,8 +13,8 @@ describe("ActorBuilder registration override", () => {
       states: [idle, active, done],
       initial: idle,
       setup: (m) => {
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: done }) });
+        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
+        m.on(idle, { event: trigger, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.send(trigger.create());
@@ -27,8 +27,8 @@ describe("ActorBuilder registration override", () => {
       states: [idle, active, done],
       initial: idle,
       setup: (m) => {
-        m.onAny({ eventRef: trigger, handler: () => ({ state: active }) });
-        m.onAny({ eventRef: trigger, handler: () => ({ state: done }) });
+        m.onAny({ event: trigger, to: [active], handler: () => ({ state: active }) });
+        m.onAny({ event: trigger, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.send(trigger.create());
@@ -42,11 +42,11 @@ describe("ActorBuilder registration override", () => {
       initial: idle,
       setup: (m) => {
         function part(b: typeof m): void {
-          b.on(idle, { eventRef: trigger, handler: () => ({ state: active }) });
+          b.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
         }
         part(m);
         part(m);
-        m.on(idle, { eventRef: trigger, handler: () => ({ state: done }) });
+        m.on(idle, { event: trigger, to: [done], handler: () => ({ state: done }) });
       },
     });
     actor.send(trigger.create());

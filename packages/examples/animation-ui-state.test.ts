@@ -55,15 +55,18 @@ function createAnimationActor(clock?: VirtualClock) {
     context: {},
     setup: (m) => {
       m.on(brightness.dim, {
-        eventRef: setBrightnessRegionEvent,
+        event: setBrightnessRegionEvent,
+        to: [brightness.normal],
         handler: () => ({ state: brightness.normal }),
       });
       m.on(brightness.normal, {
-        eventRef: setBrightnessRegionEvent,
+        event: setBrightnessRegionEvent,
+        to: [brightness.bright],
         handler: () => ({ state: brightness.bright }),
       });
       m.on(brightness.bright, {
-        eventRef: setBrightnessRegionEvent,
+        event: setBrightnessRegionEvent,
+        to: [brightness.normal],
         handler: () => ({ state: brightness.normal }),
       });
     },
@@ -78,15 +81,18 @@ function createAnimationActor(clock?: VirtualClock) {
     context: {},
     setup: (m) => {
       m.on(color.blue, {
-        eventRef: regionEvents.CYCLE_COLOR,
+        event: regionEvents.CYCLE_COLOR,
+        to: [color.red],
         handler: () => ({ state: color.red }),
       });
       m.on(color.red, {
-        eventRef: regionEvents.CYCLE_COLOR,
+        event: regionEvents.CYCLE_COLOR,
+        to: [color.green],
         handler: () => ({ state: color.green }),
       });
       m.on(color.green, {
-        eventRef: regionEvents.CYCLE_COLOR,
+        event: regionEvents.CYCLE_COLOR,
+        to: [color.blue],
         handler: () => ({ state: color.blue }),
       });
     },
@@ -101,11 +107,13 @@ function createAnimationActor(clock?: VirtualClock) {
     context: {},
     setup: (m) => {
       m.on(dashboard.closed, {
-        eventRef: regionEvents.TOGGLE_DASHBOARD,
+        event: regionEvents.TOGGLE_DASHBOARD,
+        to: [dashboard.open],
         handler: () => ({ state: dashboard.open }),
       });
       m.on(dashboard.open, {
-        eventRef: regionEvents.TOGGLE_DASHBOARD,
+        event: regionEvents.TOGGLE_DASHBOARD,
+        to: [dashboard.closed],
         handler: () => ({ state: dashboard.closed }),
       });
     },
@@ -120,11 +128,13 @@ function createAnimationActor(clock?: VirtualClock) {
     context: {},
     setup: (m) => {
       m.on(sidebar.closed, {
-        eventRef: regionEvents.TOGGLE_SIDEBAR,
+        event: regionEvents.TOGGLE_SIDEBAR,
+        to: [sidebar.open],
         handler: () => ({ state: sidebar.open }),
       });
       m.on(sidebar.open, {
-        eventRef: regionEvents.TOGGLE_SIDEBAR,
+        event: regionEvents.TOGGLE_SIDEBAR,
+        to: [sidebar.closed],
         handler: () => ({ state: sidebar.closed }),
       });
     },
@@ -163,39 +173,43 @@ function createAnimationActor(clock?: VirtualClock) {
           withTimeout(300, { input: input, event: () => ({ type: "DRAWER_CLOSE_DONE" }) }),
       });
       m.on(drawer.drawerRoot, {
-        eventRef: mainEvents.OPEN_DRAWER,
+        event: mainEvents.OPEN_DRAWER,
+        to: [drawer.drawerOpening],
         handler: () => ({ state: drawer.drawerOpening }),
       });
       m.on(drawer.drawerRoot, {
-        eventRef: mainEvents.CLOSE_DRAWER,
+        event: mainEvents.CLOSE_DRAWER,
+        to: [drawer.drawerClosing],
         handler: () => ({ state: drawer.drawerClosing }),
       });
       m.on(drawer.drawerOpening, {
-        eventRef: doneEvents.DRAWER_OPEN_DONE,
+        event: doneEvents.DRAWER_OPEN_DONE,
+        to: [drawer.drawerRoot],
         handler: () => ({ state: drawer.drawerRoot }),
       });
       m.on(drawer.drawerClosing, {
-        eventRef: doneEvents.DRAWER_CLOSE_DONE,
+        event: doneEvents.DRAWER_CLOSE_DONE,
+        to: [drawer.drawerRoot],
         handler: () => ({
           state: drawer.drawerRoot,
         }),
       });
       m.onAny({
-        eventRef: mainEvents.TOGGLE_DASHBOARD,
+        event: mainEvents.TOGGLE_DASHBOARD,
         handler: () => {
           actor.regions.dashboard.send(regionEvents.TOGGLE_DASHBOARD.create());
           return {};
         },
       });
       m.onAny({
-        eventRef: mainEvents.TOGGLE_SIDEBAR,
+        event: mainEvents.TOGGLE_SIDEBAR,
         handler: () => {
           actor.regions.sidebar.send(regionEvents.TOGGLE_SIDEBAR.create());
           return {};
         },
       });
       m.onAny({
-        eventRef: setBrightnessEvent,
+        event: setBrightnessEvent,
         handler: (event) => {
           actor.regions.brightness.send(
             setBrightnessRegionEvent.create({ level: event.payload.level }),
@@ -204,7 +218,7 @@ function createAnimationActor(clock?: VirtualClock) {
         },
       });
       m.onAny({
-        eventRef: mainEvents.CYCLE_COLOR,
+        event: mainEvents.CYCLE_COLOR,
         handler: () => {
           actor.regions.color.send(regionEvents.CYCLE_COLOR.create());
           return {};

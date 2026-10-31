@@ -169,7 +169,7 @@ describe("withTimeout — timer lifecycle", () => {
   });
 
   const startPart = definePart<typeof spec>((m) => {
-    m.on(idle, { eventRef: start, handler: () => ({ state: loading }) });
+    m.on(idle, { event: start, to: [loading], handler: () => ({ state: loading }) });
   });
   const timeoutPart = definePart<typeof spec>((m) => {
     m.effect(loading, {
@@ -178,10 +178,10 @@ describe("withTimeout — timer lifecycle", () => {
         withTimeout(1000, { input, event: () => slow.create() });
       },
     });
-    m.on(loading, { eventRef: slow, handler: () => ({ state: failed }) });
+    m.on(loading, { event: slow, to: [failed], handler: () => ({ state: failed }) });
   });
   const toDonePart = definePart<typeof spec>((m) => {
-    m.on(loading, { eventRef: finish, handler: () => ({ state: done }) });
+    m.on(loading, { event: finish, to: [done], handler: () => ({ state: done }) });
   });
 
   test("deletes the fired one-shot timer from the clock (no dangling timer on the happy path)", () => {

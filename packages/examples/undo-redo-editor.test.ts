@@ -106,7 +106,8 @@ function createEditorActor(clock?: VirtualClock) {
     context,
     setup: (m) => {
       m.onAny({
-        eventRef: historyEvents.UNDO,
+        event: historyEvents.UNDO,
+        to: [editorStates.idle, editorStates.editing],
         handler: (_event, { context }) => {
           const cur = context.get();
           const entry = cur.undoStack[cur.undoStack.length - 1];
@@ -127,7 +128,8 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.onAny({
-        eventRef: historyEvents.REDO,
+        event: historyEvents.REDO,
+        to: [editorStates.idle, editorStates.editing],
         handler: (_event, { context }) => {
           const cur = context.get();
           const entry = cur.redoStack[cur.redoStack.length - 1];
@@ -148,7 +150,8 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.onAny({
-        eventRef: undoToCheckpointEvent,
+        event: undoToCheckpointEvent,
+        to: [editorStates.idle],
         handler: (event, { context }) => {
           const cur = context.get();
           const targetIndex = cur.checkpoints.get(event.payload.name);
@@ -170,7 +173,7 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.onAny({
-        eventRef: historyEvents.CLEAR_HISTORY,
+        event: historyEvents.CLEAR_HISTORY,
         handler: (_event, { context }) => {
           const cur = context.get();
           cur.undoStack = [];
@@ -181,7 +184,8 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.idle, {
-        eventRef: insertTextEvent,
+        event: insertTextEvent,
+        to: [editorStates.editing],
         handler: (event, { context }) => {
           const cur = context.get();
           cur.undoStack = [
@@ -204,7 +208,8 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.idle, {
-        eventRef: deleteTextEvent,
+        event: deleteTextEvent,
+        to: [editorStates.editing],
         handler: (event, { context }) => {
           const cur = context.get();
           cur.undoStack = [
@@ -227,7 +232,8 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.idle, {
-        eventRef: replaceTextEvent,
+        event: replaceTextEvent,
+        to: [editorStates.editing],
         handler: (event, { context }) => {
           const cur = context.get();
           cur.undoStack = [
@@ -251,7 +257,7 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.idle, {
-        eventRef: checkpointEvent,
+        event: checkpointEvent,
         handler: (event, { context }) => {
           const cur = context.get();
           cur.checkpoints = new Map(cur.checkpoints);
@@ -261,7 +267,7 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.editing, {
-        eventRef: insertTextEvent,
+        event: insertTextEvent,
         handler: (event, { context }) => {
           const cur = context.get();
           cur.undoStack = [
@@ -284,7 +290,7 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.editing, {
-        eventRef: deleteTextEvent,
+        event: deleteTextEvent,
         handler: (event, { context }) => {
           const cur = context.get();
           cur.undoStack = [
@@ -307,7 +313,7 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.editing, {
-        eventRef: replaceTextEvent,
+        event: replaceTextEvent,
         handler: (event, { context }) => {
           const cur = context.get();
           cur.undoStack = [
@@ -331,7 +337,7 @@ function createEditorActor(clock?: VirtualClock) {
         },
       });
       m.on(editorStates.editing, {
-        eventRef: checkpointEvent,
+        event: checkpointEvent,
         handler: (event, { context }) => {
           const cur = context.get();
           cur.checkpoints = new Map(cur.checkpoints);

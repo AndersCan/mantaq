@@ -22,7 +22,8 @@ const base = actorSpec({
 
 function rawA(builder: BuilderOf<typeof base>): void {
   builder.on(idle, {
-    eventRef: start,
+    event: start,
+    to: [loading],
     handler: (_event, { context }) => {
       const cur = context.get();
       cur.hits += 1;
@@ -31,7 +32,8 @@ function rawA(builder: BuilderOf<typeof base>): void {
     },
   });
   builder.on(loading, {
-    eventRef: finish,
+    event: finish,
+    to: [done],
     handler: (_event, { context }) => {
       const cur = context.get();
       cur.hits += 1;
@@ -43,7 +45,8 @@ function rawA(builder: BuilderOf<typeof base>): void {
 
 function rawB(builder: BuilderOf<typeof base>): void {
   builder.on(loading, {
-    eventRef: fail,
+    event: fail,
+    to: [idle],
     handler: (_event, { context }) => {
       const cur = context.get();
       cur.hits += 1;

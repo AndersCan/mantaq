@@ -139,9 +139,10 @@ function createCreditCheckActor(options: { clock?: VirtualClock; random?: () => 
         name: "notifyWarehouse",
         fn: notifyWarehouseEffect,
       });
-      m.onAny({ eventRef: cancelEvent, handler: () => ({ state: idleState }) });
+      m.onAny({ event: cancelEvent, to: [idleState], handler: () => ({ state: idleState }) });
       m.on(idleState, {
-        eventRef: startOrderEvent,
+        event: startOrderEvent,
+        to: [checkingCreditState],
         handler: (event, { context }) => {
           const current = context.get();
           current.order = event.payload.order;
@@ -150,7 +151,8 @@ function createCreditCheckActor(options: { clock?: VirtualClock; random?: () => 
         },
       });
       m.on(checkingCreditState, {
-        eventRef: creditCheckDoneEvent,
+        event: creditCheckDoneEvent,
+        to: [processingPaymentState, creditDeniedState],
         handler: (event, { context }) => {
           const current = context.get();
           current.creditCheckResult = event.payload.result;
@@ -162,37 +164,43 @@ function createCreditCheckActor(options: { clock?: VirtualClock; random?: () => 
         },
       });
       m.on(checkingCreditState, {
-        eventRef: creditCheckErrorEvent,
+        event: creditCheckErrorEvent,
+        to: [creditCheckFailedState],
         handler: () => {
           return { state: creditCheckFailedState };
         },
       });
       m.on(processingPaymentState, {
-        eventRef: paymentDoneEvent,
+        event: paymentDoneEvent,
+        to: [notifyingWarehouseState],
         handler: () => {
           return { state: notifyingWarehouseState };
         },
       });
       m.on(processingPaymentState, {
-        eventRef: paymentErrorEvent,
+        event: paymentErrorEvent,
+        to: [paymentFailedState],
         handler: () => {
           return { state: paymentFailedState };
         },
       });
       m.on(notifyingWarehouseState, {
-        eventRef: notificationDoneEvent,
+        event: notificationDoneEvent,
+        to: [orderCompleteState],
         handler: () => {
           return { state: orderCompleteState };
         },
       });
       m.on(notifyingWarehouseState, {
-        eventRef: notificationErrorEvent,
+        event: notificationErrorEvent,
+        to: [notificationFailedState],
         handler: () => {
           return { state: notificationFailedState };
         },
       });
       m.on(creditCheckFailedState, {
-        eventRef: retryEvent,
+        event: retryEvent,
+        to: [checkingCreditState],
         handler: (_event, { context }) => {
           const current = context.get();
           current.retryCount += 1;
@@ -201,13 +209,15 @@ function createCreditCheckActor(options: { clock?: VirtualClock; random?: () => 
         },
       });
       m.on(paymentFailedState, {
-        eventRef: retryEvent,
+        event: retryEvent,
+        to: [processingPaymentState],
         handler: () => {
           return { state: processingPaymentState };
         },
       });
       m.on(notificationFailedState, {
-        eventRef: retryEvent,
+        event: retryEvent,
+        to: [notifyingWarehouseState],
         handler: () => {
           return { state: notifyingWarehouseState };
         },

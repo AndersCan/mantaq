@@ -2,7 +2,28 @@
  * Atlas document schema. Bump `ATLAS_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const ATLAS_SCHEMA_VERSION = 4;
+export const ATLAS_SCHEMA_VERSION = 5;
+
+/**
+ * Edge source of an `onAny` registration: any non-final state of the machine,
+ * or `region.*` inside a region. Never listed in `states`.
+ */
+export const ANY_STATE = "*";
+
+/** Region prefix of a state id (`""` at the root). */
+export function scopeOf(id: string): string {
+  const cut = id.lastIndexOf(".");
+  return cut === -1 ? "" : id.slice(0, cut);
+}
+
+export function isAnyState(id: string): boolean {
+  return id === ANY_STATE || id.endsWith(`.${ANY_STATE}`);
+}
+
+/** True when `stateId` is one of the states an `anyId` source stands for. */
+export function coveredByAny(anyId: string, stateId: string): boolean {
+  return isAnyState(anyId) && !isAnyState(stateId) && scopeOf(anyId) === scopeOf(stateId);
+}
 
 export interface AtlasCoverage {
   hits: number;
@@ -30,13 +51,17 @@ export interface AtlasEvent {
 }
 
 /**
- * `stay`: the event was handled but the state did not change (handler returned
- * no target). Only observed by running the machine, never by probing.
+ * `stay`: the event was handled but the state did not change. Declared by a
+ * registration without `to`, or observed while fuzzing.
  */
 export type AtlasEdgeKind = "initial" | "transition" | "effect" | "stay";
 
-/** `probe`: found by synthetic traversal. `fuzz`: observed only while fuzzing. */
-export type AtlasEdgeOrigin = "probe" | "fuzz";
+/**
+ * `declared`: from the builder's `to` list, so the type checker vouches for it.
+ * `probe`: an actor without declarations, found by synthetic traversal.
+ * `fuzz`: observed only while fuzzing.
+ */
+export type AtlasEdgeOrigin = "declared" | "probe" | "fuzz";
 
 export interface AtlasLocation {
   /** POSIX path relative to the analysis root. */

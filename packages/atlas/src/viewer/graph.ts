@@ -1,9 +1,10 @@
+import { isAnyState } from "../schema.ts";
 import type { AtlasCoverage, AtlasMachine } from "../schema.ts";
 import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { activatable, svg } from "./dom.ts";
 import { layoutMachine } from "./layout.ts";
-import type { PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
+import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
 
 export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: string };
@@ -12,6 +13,10 @@ export interface GraphCallbacks {
   select(selection: Selection): void;
   /** Coverage source the overlay dims by. */
   mode: CoverageMode;
+}
+
+function sourceText(from: string): string {
+  return isAnyState(from) ? "any state" : from;
 }
 
 function isUnreached(coverage: AtlasCoverage | null): boolean {
@@ -108,6 +113,37 @@ function unknownGroup(doc: Document, placed: PlacedUnknown): SVGGElement {
   );
 }
 
+function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
+  return svg(
+    doc,
+    "g",
+    {
+      class: "any-node",
+      "data-node-id": placed.id,
+      "aria-label": "any non-final state (onAny handlers)",
+    },
+    [
+      svg(doc, "rect", {
+        x: placed.x - placed.width / 2,
+        y: placed.y - placed.height / 2,
+        width: placed.width,
+        height: placed.height,
+        rx: placed.height / 2,
+      }),
+      svg(doc, "text", { x: placed.x, y: placed.y + 4, "text-anchor": "middle" }, ["any state"]),
+    ],
+  );
+}
+
+function nodeGroup(
+  doc: Document,
+  node: PlacedState | PlacedUnknown | PlacedAny,
+  callbacks: GraphCallbacks,
+): SVGGElement {
+  if (node.kind === "state") return stateGroup(doc, node, callbacks);
+  return node.kind === "any" ? anyGroup(doc, node) : unknownGroup(doc, node);
+}
+
 function edgeGroup(
   doc: Document,
   placed: PlacedEdge,
@@ -135,8 +171,8 @@ function edgeGroup(
       "data-to": placed.target,
       "aria-label":
         edge.kind === "stay"
-          ? `${edge.from} on ${text} stays`
-          : `${edge.from} on ${text} to ${edge.to ?? "undetermined"}`,
+          ? `${sourceText(edge.from)} on ${text} stays`
+          : `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}`,
     },
     [
       svg(doc, "path", { d: placed.path, "marker-end": "url(#atlas-arrow)" }),
@@ -189,6 +225,9 @@ export function renderGraph(
     {
       class: "graph",
       viewBox: `0 0 ${Math.ceil(placed.width)} ${Math.ceil(placed.height)}`,
+      // Natural size; the standalone page scales to fit, embeds may scroll instead.
+      width: Math.ceil(placed.width),
+      height: Math.ceil(placed.height),
       // Scales down to fit the canvas; never up past natural size.
       style: `max-width: ${Math.ceil(placed.width)}px`,
       role: "group",
@@ -199,9 +238,7 @@ export function renderGraph(
       ...placed.regions.map((region) => regionGroup(doc, region)),
       ...placed.edges.map((edge) => edgeGroup(doc, edge, { machine, callbacks })),
       placed.entry ? entryArrow(doc, placed.entry) : null,
-      ...placed.nodes.map((node) =>
-        node.kind === "state" ? stateGroup(doc, node, callbacks) : unknownGroup(doc, node),
-      ),
+      ...placed.nodes.map((node) => nodeGroup(doc, node, callbacks)),
     ],
   );
   wireHover(root);

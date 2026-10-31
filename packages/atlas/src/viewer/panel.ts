@@ -1,3 +1,5 @@
+import { routingWarnings } from "../routing.ts";
+import { coveredByAny, isAnyState } from "../schema.ts";
 import type { AtlasEdge, AtlasMachine, AtlasState, AtlasStep } from "../schema.ts";
 import { activatable, html } from "./dom.ts";
 import { renderExplanation } from "./explanation.ts";
@@ -25,26 +27,37 @@ function hitsText(coverage: { hits: number } | null): string {
   return coverage === null ? "not supplied" : String(coverage.hits);
 }
 
+const ORIGIN_LABELS: Record<AtlasEdge["origin"], string> = {
+  declared: "declared (builder `to`)",
+  probe: "probe",
+  fuzz: "fuzz (observed, not declared)",
+};
+
 function runLabel(machine: AtlasMachine): string {
   return machine.fuzz === null ? "run hits" : "fuzz hits";
 }
 
 /**
- * A probe edge no fuzz run produced. Probing calls the handler with `{}` and a
- * sample context, so it can predict a target the live machine never reaches.
+ * A declared or probed edge no fuzz run produced. `to` lists what the handler
+ * may return, not what its guards allow; probing runs it with `{}` and a sample
+ * context. Either way the live machine may never take it.
  */
 function predictionNote(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLElement | null {
   const unobserved = edge.coverage !== null && edge.coverage.hits === 0;
   if (
     machine.fuzz === null ||
-    edge.origin !== "probe" ||
+    edge.origin === "fuzz" ||
     edge.kind !== "transition" ||
     !unobserved
   ) {
     return null;
   }
+  const source =
+    edge.origin === "declared"
+      ? "The handler declares this target in `to`, but no fuzz run produced it. Its guards may never allow it."
+      : "Probing predicted this edge, but no fuzz run produced it. Probing calls the handler with an empty payload and a sample context, so this edge may be impossible in a real run.";
   return html(doc, "p", { class: "prediction-note", role: "note" }, [
-    "Probing predicted this edge, but no fuzz run produced it. Probing calls the handler with an empty payload and a sample context, so this edge may be impossible in a real run. Fuzzing never proves that, so check the handler.",
+    `${source} Fuzzing never proves that, so check the handler.`,
   ]);
 }
 
@@ -82,13 +95,25 @@ function targetText(edge: AtlasEdge): string {
   return edge.to ?? "undetermined";
 }
 
+function sourceText(from: string): string {
+  return isAnyState(from) ? "any state" : from;
+}
+
+function routingNote(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLElement | null {
+  if (!isAnyState(edge.from)) return null;
+  const warning = routingWarnings(machine).find((each) => each.event === edge.event);
+  return warning
+    ? html(doc, "p", { class: "routing-note", role: "note" }, [warning.message])
+    : null;
+}
+
 function edgeLink(
   doc: Document,
   edge: AtlasEdge,
   select: (selection: Selection) => void,
 ): HTMLLIElement {
   const link = html(doc, "span", { class: "link", "data-edge-link": edge.id }, [
-    `${edge.from} —${edge.event || "initial"}→ ${edge.to ?? "?"}`,
+    `${sourceText(edge.from)} —${edge.event || "initial"}→ ${edge.to ?? "?"}`,
   ]);
   activatable(link, () => select({ kind: "edge", id: edge.id }));
   return html(doc, "li", {}, [link]);
@@ -112,16 +137,17 @@ function edgePanel(doc: Document, edge: AtlasEdge, machine: AtlasMachine): HTMLE
   const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [`Edge ${edge.id}`]),
+    routingNote(doc, edge, machine),
     predictionNote(doc, edge, machine),
     list(doc, [
-      ["source", edge.from],
+      ["source", isAnyState(edge.from) ? "any state (onAny)" : edge.from],
       [
         "event",
         edge.kind === "initial" ? "(initial)" : `${edge.event}${internal ? " (internal)" : ""}`,
       ],
       ["target", targetText(edge)],
       ["kind", edge.kind],
-      ["origin", edge.origin === "fuzz" ? "fuzz (observed, not probed)" : "probe"],
+      ["origin", ORIGIN_LABELS[edge.origin]],
       ["emits", joined(edge.emits)],
       ["contexts", joined(edge.contexts)],
       [runLabel(machine), hitsText(edge.coverage)],
@@ -139,7 +165,9 @@ function statePanel(
 ): HTMLElement {
   const { machine, select } = context;
   const flags = [state.initial ? "initial" : "", state.final ? "final" : ""].filter(Boolean);
-  const outgoing = machine.edges.filter((edge) => edge.from === state.id);
+  const outgoing = machine.edges.filter(
+    (edge) => edge.from === state.id || (!state.final && coveredByAny(edge.from, state.id)),
+  );
   const incoming = machine.edges.filter((edge) => edge.to === state.id && edge.kind !== "initial");
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
     html(doc, "h2", {}, [`State ${state.id}`]),

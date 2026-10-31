@@ -1,0 +1,29 @@
+{
+  "name": "@mantaq/codemod",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Source migrations for breaking Mantaq API changes. Type-checker driven, idempotent, run in order.",
+  "license": "MIT",
+  "bin": {
+    "mantaq-codemod": "./src/cli.ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "typescript": "catalog:"
+  },
+  "devDependencies": {
+    "@mantaq/core": "workspace:*",
+    "@types/node": "^26.2.0",
+    "@typescript/native-preview": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

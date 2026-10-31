@@ -1,6 +1,6 @@
 # Builder Pattern, Not Static Structure
 
-Why `setup(m) => m.on(stateRef, eventRef, fn)` builder. Not `transitions: { idle: { START: fn } }` static map.
+Why `setup(m) => m.on(stateRef, { event, to, handler })` builder. Not `transitions: { idle: { START: fn } }` static map.
 
 > Historical design notes. Type shapes and plans predate the current API: events are
 > now envelopes `{ type, payload }`, and errors land in the universal `__error` state
@@ -30,7 +30,7 @@ Mapped-type fix attempt: `HandlerEvent<Inputs, Internal, E>` lookup via `Extract
 
 ## Why Builder Wins
 
-`m.on(stateRef, eventRef, fn)` passes refs as ARGS. TypeScript infers `fn`'s event param DIRECTLY from `eventRef`'s generic. No map lookup. No mapped types. No casts.
+`m.on(stateRef, { event, to, handler })` passes refs as values. TypeScript infers `handler`'s event param DIRECTLY from `event`'s generic, and narrows its return to `to[number]`. No map lookup. No mapped types. No casts.
 
 ```ts
 // Builder — types flow via args

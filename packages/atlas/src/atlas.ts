@@ -1,4 +1,4 @@
-import { ATLAS_SCHEMA_VERSION } from "./schema.ts";
+import { ATLAS_SCHEMA_VERSION, coveredByAny, isAnyState } from "./schema.ts";
 import type {
   AtlasCoverage,
   AtlasDocument,
@@ -67,6 +67,7 @@ function toState(
 
 function edgeKind(edge: GraphEdge): AtlasEdge["kind"] {
   if (edge.source === INITIAL_NODE_ID) return "initial";
+  if (edge.isStay === true) return "stay";
   return edge.isInternal === true && edge.label.startsWith("effect:") ? "effect" : "transition";
 }
 
@@ -78,11 +79,26 @@ function emitsOf(edge: GraphEdge): string[] {
 
 /** Count of recorded transitions matching an edge by source, event and (if determined) target. */
 function edgeHits(edge: GraphEdge, transitions: Map<string, Map<string, number>>): number {
+  if (isAnyState(edge.source)) {
+    let total = 0;
+    for (const [key, byTarget] of transitions) {
+      const [from = "", event] = key.split("\u0000");
+      if (event !== edge.label || !coveredByAny(edge.source, from)) continue;
+      total += isAnyHit(edge, byTarget);
+    }
+    return total;
+  }
   const byTarget = transitions.get(`${edge.source}\u0000${edge.label}`);
   if (!byTarget) return 0;
   if (edge.isUndetermined === true) {
     return [...byTarget.values()].reduce((sum, count) => sum + count, 0);
   }
+  return byTarget.get(edge.target) ?? 0;
+}
+
+/** Hits of an `onAny` edge from one source: its target, or every outcome when undetermined. */
+function isAnyHit(edge: GraphEdge, byTarget: Map<string, number>): number {
+  if (edge.isUndetermined === true) return [...byTarget.values()].reduce((sum, n) => sum + n, 0);
   return byTarget.get(edge.target) ?? 0;
 }
 
@@ -109,7 +125,7 @@ function toEdge(
     event: kind === "initial" ? "" : edge.label,
     to: edge.isUndetermined === true ? null : edge.target,
     kind,
-    origin: "probe",
+    origin: edge.isDeclared === true ? "declared" : "probe",
     emits: emitsOf(edge),
     contexts: [...new Set(edge.contexts)].sort(),
     explanation: null,
@@ -131,7 +147,7 @@ export function toAtlasMachine(input: AtlasInput): AtlasMachine {
   const transitions = input.history ? indexTransitions(input.history) : undefined;
 
   const states = graph.nodes
-    .filter((node) => node.id !== INITIAL_NODE_ID)
+    .filter((node) => node.id !== INITIAL_NODE_ID && node.isAny !== true)
     .map((node) => toState(node, visits, initial))
     .sort(byId);
   const edges = graph.edges.map((edge) => toEdge(edge, transitions)).sort(byId);

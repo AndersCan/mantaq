@@ -91,30 +91,30 @@ export function createCheckoutActor(
           });
         },
       });
-      m.onAny({
-        eventRef: back,
+      m.on(payment, {
+        event: back,
+        to: [shippingAddress],
         handler: (_event, { context }) => {
-          const currentState = actor.state.name;
-          if (currentState === "payment") {
-            const current = context.get();
-            current.paymentInfo = undefined;
-            context.set(current);
-            return { state: shippingAddress };
-          }
-          if (currentState === "shippingAddress") {
-            const current = context.get();
-            current.shippingAddress = undefined;
-            context.set(current);
-            return { state: basicInfo };
-          }
-          if (currentState === "error") {
-            return { state: payment };
-          }
-          return {};
+          const current = context.get();
+          current.paymentInfo = undefined;
+          context.set(current);
+          return { state: shippingAddress };
         },
       });
+      m.on(shippingAddress, {
+        event: back,
+        to: [basicInfo],
+        handler: (_event, { context }) => {
+          const current = context.get();
+          current.shippingAddress = undefined;
+          context.set(current);
+          return { state: basicInfo };
+        },
+      });
+      m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
       m.on(basicInfo, {
-        eventRef: submitBasicInfo,
+        event: submitBasicInfo,
+        to: [shippingAddress],
         handler: (event, { context }) => {
           const current = context.get();
           current.basicInfo = event.payload;
@@ -123,7 +123,8 @@ export function createCheckoutActor(
         },
       });
       m.on(shippingAddress, {
-        eventRef: submitShipping,
+        event: submitShipping,
+        to: [payment],
         handler: (event, { context }) => {
           const current = context.get();
           current.shippingAddress = event.payload;
@@ -132,7 +133,8 @@ export function createCheckoutActor(
         },
       });
       m.on(payment, {
-        eventRef: submitPayment,
+        event: submitPayment,
+        to: [submitting],
         handler: (event, { context }) => {
           const current = context.get();
           current.paymentInfo = event.payload;
@@ -141,7 +143,8 @@ export function createCheckoutActor(
         },
       });
       m.on(submitting, {
-        eventRef: paymentOk,
+        event: paymentOk,
+        to: [success],
         handler: (event, { context }) => {
           const current = context.get();
           current.orderId = event.payload.orderId;
@@ -149,8 +152,12 @@ export function createCheckoutActor(
           return { state: success };
         },
       });
-      m.on(submitting, { eventRef: paymentFail, handler: () => ({ state: error }) });
-      m.on(submitting, { eventRef: submittingDone, handler: () => ({ state: success }) });
+      m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
+      m.on(submitting, {
+        event: submittingDone,
+        to: [success],
+        handler: () => ({ state: success }),
+      });
     },
   });
   return { actor, clock: c };
