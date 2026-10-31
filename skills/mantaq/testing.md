@@ -1,85 +1,68 @@
 # Testing Mantaq
 
-Deterministic tests with the VirtualClock + vitest. Harness and coverage from `@mantaq/test` (`npm install @mantaq/test`) and `@mantaq/traversal`.
+Deterministic tests with the VirtualClock + vitest. Harness and coverage from `@mantaq/test` (`npm install @mantaq/test`) and `@mantaq/traversal`. Written against `@mantaq/core` 0.4, `@mantaq/test` 1.0, `@mantaq/traversal` 0.2. Check exact signatures against the installed types.
 
 ## Deterministic Tests (VirtualClock)
 
 Never real timers in tests. Inject `VirtualClock`, jump with `advance`.
 
 ```ts
-import { describe, it, expect } from "vitest";
-import { Actor, VirtualClock, state, event } from "@mantaq/core";
-import { matches, withTimeout } from "@mantaq/sugar";
+import { Actor, VirtualClock } from "@mantaq/core";
+import { matches } from "@mantaq/sugar";
 
-const clock = new VirtualClock();
-const actor = new Actor({ clock, ... });
+const clock = VirtualClock();
+const actor = Actor({ clock, ... });
 
 actor.send(submit.create({ ... }));
 clock.advance(800);                       // fires timers, drains queue — synchronous
 expect(matches(actor, "success")).toBe(true);
 ```
 
-No awaits needed with VirtualClock. Everything runs synchronously in one
-call stack: `send()` drains immediately, `advance()` fires due timers
-and drains each fire. `settled()` resolves on queue drain only. Pending
-timers are not queued events. Don't `await settled()` expecting timer
-work done.
+No awaits needed for timer work. For promise-based effects, `await actor.settled()`. Pending timers are not queued events, so `settled()` does not advance time.
 
-Clock extras: `clock.hasPending()`, `clock.pendingTimers()` (assert no leaked timers), `clock.now()`.
+Assert no leaked timers at the end of a test with the clock's pending-timer inspection (`hasPending`, `pendingTimers`).
 
 ## Failure-Path Injection
 
-`actor.send()` only accepts input events (typed). To exercise an error
-branch, drive the failure event through the harness. It dispatches any
-event id at runtime:
+`actor.send()` only accepts declared input events. To exercise an error branch, inject an internal event by id through the harness's `send` (or the actor's `inject`):
 
 ```ts
 import { createTestHarness } from "@mantaq/test";
 
 const h = createTestHarness(actor);
-h.send({ type: "CONNECTION_FAILED" }); // same as actor.send, but any id
+h.send({ type: "CONNECTION_FAILED" });
 clock.advance(2000);
 expect(matches(actor, "reconnecting")).toBe(true);
 ```
 
-Use this to test internal failure events (`PAYMENT_FAILED`, timeouts, retries) without forcing failures through the public API.
+Use this for internal failure events (`PAYMENT_FAILED`, timeouts, retries) without forcing failures through the public API.
 
 ## Assertions
 
 - `matches(actor, "state.path")`. Sugar state check.
-- `actor.snapshot()` → `{ path, context, regions, done }`. `done` true in final state.
-- `expect(actor.context.x).toEqual(...)`. Accumulated data.
+- `actor.snapshot()`: path, context, regions, `done`, `error`. Snapshot context is a copy.
+- `actor.context`: live accumulated data.
 
 ## Coverage (Harness + Traversal)
 
-Prove behavior, don't just assert happy paths.
+Prove behavior, don't just assert happy paths. The harness records visited states, fired transitions and executed effects, and offers `assert*` / `was*` helpers plus a `coverage()` report:
 
 ```ts
 const h = createTestHarness(actor);
 h.send(someEvent.create());
 clock.advance(800);
 
-h.coverage(); // states + transitions exercised
+h.coverage();
 h.assertAllStatesVisited();
 h.assertAllTransitionsVisited();
-h.assertStateVisited("error");
-h.assertTransitionNeverVisited("idle", "START");
-h.assertEffectRan("submitting");
-h.assertContextNever((c) => c.broken);
 ```
 
-Harness exposes `history` (visit/transition/effect records), `graph`, `reset()`. Assertion names in `@mantaq/test`'s index.
+Other assertions cover a specific state, transition or effect being visited or never visited, and a context predicate that must never hold. List them from the `@mantaq/test` types; they take option objects.
 
-Traversal algorithms direct (from `@mantaq/traversal`): `reachable`,
-`allPaths`, `findCycles`, `unreachableNodes`, `shortestPath`.
-`unreachableNodes` finds declared-but-unreachable states. States you
-declared but never wired.
+`@mantaq/traversal` exposes graph algorithms (reachability, paths, cycles, unreachable states). Use unreachable-state analysis to find states you declared but never wired.
 
 ## Test Design
 
 - Happy path + every failure arc. Each error state needs a test that reaches it.
 - Assert on state, not on internal wiring. `matches` + `done` cover most.
-- Verify no leaked timers at the end of tests (`clock.hasPending()`).
-- Simulated randomness: pin it (`vi.spyOn(Math, "random")`). Keep
-  simulation effects' randomness contained so the actor logic stays
-  deterministic.
+- Pin simulated randomness. Keep simulation effects' randomness contained so actor logic stays deterministic.

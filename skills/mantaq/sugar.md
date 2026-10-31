@@ -1,89 +1,27 @@
 # Sugar Reference
 
-Ergonomic layer over `@mantaq/core`. `npm install @mantaq/sugar`.
+Ergonomic layer over `@mantaq/core`: `npm install @mantaq/sugar`. Written against `@mantaq/sugar` 1.0.
 
-## Batch Creation
+This lists what exists and when to reach for it. Get exact signatures from
+`node_modules/@mantaq/sugar/dist/*.d.ts` or `packages/examples/`.
 
-```ts
-const s = states("idle", "running", "success"); // { idle: StateRef, running: StateRef, ... }
-const e = events("START", "STOP"); // { START: EventRef, ... }
-```
+| Helper                                           | Use for                                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `states(...)`, `events(...)`                     | Create many state/event refs in one call.                               |
+| `matches(actor, "a.b")`                          | Is the actor in state `a`, region `b`? Dotted path through regions.     |
+| `isIn(snapshot, name)`, `activeLeaves(snapshot)` | Any-depth state check; list of deepest active states.                   |
+| `tag(...states)`                                 | Group states under one `has(snapshot)` check.                           |
+| `withTimeout`                                    | Effect helper: emit one event after a delay on the injected clock.      |
+| `withPromise`                                    | Effect helper: turn a promise into success/error events, abort-guarded. |
+| `createActorMap`                                 | Spawn, send to and kill same-shaped child actors by key at runtime.     |
+| `onOutput`                                       | Route a child actor's declared outputs to a handler (manual wiring).    |
+| `broadcast`                                      | Send one event to every child of a map.                                 |
+| `actorSpec`, `definePart`, `use`, `withParts`    | Split a large `setup` into typed, reusable fragments.                   |
 
-## Matching
+## Notes
 
-```ts
-matches(actor, "idle"); // snapshot().path[0] === "idle"
-matches(actor, "drawer.open"); // dot path through regions
-isIn(snapshot, "combat"); // any depth, any region
-activeLeaves(snapshot); // ["drawer.open", "movement.idle"] — deepest active states
-```
-
-`matches` returns `false` for malformed patterns (empty, leading/trailing dots, `..`).
-
-## Tags
-
-Group states under one check. Handy for cross-region "is this family active" tests.
-
-```ts
-const dangerous = tag(state("attack")(), state("regen")());
-dangerous.has(actor.snapshot());
-```
-
-## Dynamic Children (ActorMap)
-
-Spawn/kill actors by key at runtime. Children wire output → parent.
-
-```ts
-const map = new ActorMap(parentActor);
-map.spawn("order-1", () => new Actor({ ... }));
-map.send("order-1", someEvent.create());
-map.kill("order-1");              // aborts child effects
-map.ensure("order-2", factory);   // spawn if missing
-map.snapshot("order-1");
-```
-
-## Dynamic Children (ActorMap)
-
-Spawn/kill actors by key at runtime. Children wire output → parent.
-
-```ts
-const map = new ActorMap(parentActor);
-map.spawn("order-1", () => new Actor({ ... }));
-map.send("order-1", someEvent.create());
-map.kill("order-1");              // aborts child effects
-map.ensure("order-2", factory);   // spawn if missing
-map.snapshot("order-1");
-```
-
-## Broadcast
-
-Send one event to every actor in a map (or any `{ keys(), send() }`):
-
-```ts
-broadcast(map, shutdownEvent); // SendableEvent = EventRef | { type, payload? }
-```
-
-## Effect Helpers
-
-```ts
-// fire one event after ms (injected clock — deterministic in tests)
-m.effect(submittingState, {
-  name: "startSubmitTimeout",
-  fn: (input) => withTimeout(800, input, () => ({ type: "SUBMITTING_DONE" })),
-});
-
-// resolve a promise → emit success/error event (guarded by abort signal)
-withPromise(promise, signal, emit, {
-  success: (data) => ({ type: "FETCH_OK", payload: data }),
-  error: (err) => ({ type: "FETCH_ERR", payload: err }),
-});
-```
-
-`withTimeout`'s timer is NOT removed on abort. The callback no-ops via
-`signal.aborted`. For immediate removal, pass the signal to
-`clock.setTimeout` or clear in an abort listener.
-
-## Conventions
-
-- Prefer sugar over raw core. Less ceremony, same semantics.
-- `ActorMap`, `broadcast`, `tag` are newer; reach for them when the need arises, not preemptively.
+- Return the promise from an effect that uses `withPromise` so `settled()` waits for it.
+- `regions` wire child outputs into the parent automatically. `createActorMap` children do not: connect them with `onOutput`.
+- Map children's context must be plain data. Capture parent actors in the factory closure, not in context.
+- Dispose an actor map when its owner is disposed.
+- Prefer sugar over raw core where it fits. Reach for the map, broadcast, tag and parts helpers when the need arises, not preemptively.
