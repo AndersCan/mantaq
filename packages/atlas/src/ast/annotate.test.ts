@@ -137,7 +137,8 @@ describe("AST: examples", () => {
         expect(edge.explanation === null).toBe(!handlerDriven);
       }
     }
-  });
+    // One TypeScript program per example: ~6s on CI runners, past the 5s default.
+  }, 30_000);
 
   test("deterministic: same source => identical sites", () => {
     const file = join(FIXTURES, "credit.ts");
