@@ -1,0 +1,77 @@
+---
+/**
+ * Atlas viewer for the docs' checkout machine. The atlas document is built
+ * from the real actor at docs build time, so the diagram cannot drift from
+ * `checkout.ts`. Edge explanations come from the AST annotator.
+ */
+import {
+  ATLAS_SCHEMA_VERSION,
+  annotateMachine,
+  serializeAtlas,
+  toAtlasMachine,
+} from "@mantaq/atlas";
+import { resolve } from "node:path";
+import { createCheckoutActor } from "../content/docs/checkout.ts";
+
+// Astro runs with the docs app as cwd; the AST annotator needs real paths.
+const docsRoot = process.cwd();
+const machine = annotateMachine(
+  toAtlasMachine({ id: "checkout", actor: createCheckoutActor().actor }),
+  { file: resolve(docsRoot, "src/content/docs/checkout.ts"), root: resolve(docsRoot, "../..") },
+);
+const json = serializeAtlas({ schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] });
+---
+
+<div class="atlas-embed not-content" data-atlas={json}>
+  <noscript>The interactive state diagram needs JavaScript.</noscript>
+</div>
+
+<script>
+  import { mountAtlasText } from "@mantaq/atlas/viewer";
+  import "@mantaq/atlas/viewer.css";
+
+  for (const root of document.querySelectorAll<HTMLElement>(".atlas-embed")) {
+    const text = root.dataset.atlas;
+    if (text !== undefined) mountAtlasText(root, { source: "checkout atlas", text }, { heading: "h3" });
+  }
+</script>
+
+<style is:global>
+  /* Follow Starlight's theme toggle instead of the OS color scheme. */
+  .atlas-embed.atlas {
+    --bg: var(--sl-color-bg);
+    --fg: var(--sl-color-white);
+    --muted: var(--sl-color-gray-3);
+    --line: var(--sl-color-gray-2);
+    --state-bg: var(--sl-color-bg);
+    --state-border: var(--sl-color-gray-2);
+    --region-bg: var(--sl-color-gray-6);
+    --accent: var(--sl-color-accent);
+    --unknown: var(--sl-color-orange);
+    --fuzz: var(--sl-color-green);
+    --banner-bg: var(--sl-color-orange-low);
+    --banner-fg: var(--sl-color-orange-high);
+    color-scheme: inherit;
+    margin-block: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    font-size: var(--sl-text-sm);
+  }
+
+  /* The content column is too narrow for a side panel: stack it under the graph. */
+  .atlas-embed .atlas-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Scaling the wide graph to the column makes labels unreadable: scroll instead. */
+  .atlas-embed .graph {
+    width: auto;
+  }
+
+  .atlas-embed .panel {
+    border-left: none;
+    border-top: 1px solid var(--sl-color-gray-5);
+    padding: 0.75rem 0 0;
+  }
+</style>

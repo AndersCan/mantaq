@@ -7,6 +7,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./viewer": "./src/viewer/embed.ts",
+    "./viewer.css": "./src/viewer/viewer.css",
     "./package.json": "./package.json"
   },
   "scripts": {

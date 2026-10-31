@@ -225,6 +225,9 @@ export function renderGraph(
     {
       class: "graph",
       viewBox: `0 0 ${Math.ceil(placed.width)} ${Math.ceil(placed.height)}`,
+      // Natural size; the standalone page scales to fit, embeds may scroll instead.
+      width: Math.ceil(placed.width),
+      height: Math.ceil(placed.height),
       // Scales down to fit the canvas; never up past natural size.
       style: `max-width: ${Math.ceil(placed.width)}px`,
       role: "group",

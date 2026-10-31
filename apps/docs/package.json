@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.41.7",
+    "@mantaq/atlas": "workspace:*",
+    "@mantaq/core": "workspace:*",
+    "@mantaq/sugar": "workspace:*",
     "astro": "^7.2.0",
     "sharp": "catalog:",
     "starlight-llms-txt": "catalog:"
