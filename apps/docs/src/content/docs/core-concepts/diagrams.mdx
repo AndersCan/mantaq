@@ -1,0 +1,40 @@
+---
+title: Diagrams
+description: The state graph drawn from the builder's declared targets.
+---
+
+import CheckoutAtlas from "../../../components/CheckoutAtlas.astro";
+
+## What
+
+Every `m.on` and `m.onAny` lists its targets in `to`. The builder records them,
+so the whole transition graph is static data: it can be drawn without running
+a single handler.
+
+The diagram below is the docs' checkout machine
+([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)),
+generated when the site is built. It cannot drift from the code.
+
+<CheckoutAtlas />
+
+## Reading it
+
+- **Box**: a state. Double border: final.
+- **Arrow**: one target from one `to` list, labelled with its event.
+- **Dot and arrow on the left**: the initial state.
+- **Dotted arrow, italic label**: an internal event, emitted by an effect.
+- **Faint self-loop**: the state runs effects on entry.
+- **Dashed box `*`**: an `onAny` registration, meaning any non-final state.
+
+Click a state or an edge, or focus it and press Enter. The panel shows the
+handler behind an edge: where it is registered, which branches lead where,
+and what it reads and writes in context.
+
+## What it does not tell you
+
+Guards are not evaluated. An edge means the handler _may_ go there, not that it
+ever will. A handler with no `to` can only stay in place.
+
+When the target depends on the current state, register one `m.on` per state
+instead of branching on `actor.state` inside `onAny`. Each `back` above is its
+own edge for that reason. See [`onAny`](/mantaq/core-concepts/events/#onany).

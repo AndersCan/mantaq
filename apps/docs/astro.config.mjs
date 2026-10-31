@@ -39,6 +39,7 @@ export default defineConfig({
             { label: "Actors", slug: "core-concepts/actors" },
             { label: "States", slug: "core-concepts/states" },
             { label: "Events", slug: "core-concepts/events" },
+            { label: "Diagrams", slug: "core-concepts/diagrams" },
             { label: "Effects", slug: "core-concepts/effects" },
             { label: "Context", slug: "core-concepts/context" },
             { label: "Error Handling", slug: "core-concepts/error-handling" },
