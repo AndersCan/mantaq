@@ -3,6 +3,8 @@ title: Events
 description: Messages that trigger transitions.
 ---
 
+import CheckoutAtlas from "../../../components/CheckoutAtlas.astro";
+
 ## What
 
 An event is a typed message that triggers a transition. `event("back")()`
@@ -85,3 +87,10 @@ where.
 m.on(payment, { event: back, to: [shippingAddress], handler: () => ({ state: shippingAddress }) });
 m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
 ```
+
+The diagram below is generated from the docs' checkout machine
+([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts))
+when the site is built. Each `back` is its own edge with its own target. Click
+a state or an edge to see the handler behind it.
+
+<CheckoutAtlas />

@@ -100,11 +100,20 @@ function coveragePicker(
   return html(doc, "label", {}, ["Coverage from ", select]);
 }
 
+export interface ViewerOptions {
+  /** Title element. Embedded viewers use `h2`/`h3` to fit the host page's outline. */
+  heading?: "h1" | "h2" | "h3";
+}
+
 /**
  * Mount a read-only viewer for an atlas document into `root`. No live actors,
  * no editing: the document is the only input.
  */
-export function mountViewer(root: HTMLElement, atlas: AtlasDocument): void {
+export function mountViewer(
+  root: HTMLElement,
+  atlas: AtlasDocument,
+  options: ViewerOptions = {},
+): void {
   const doc = root.ownerDocument;
   const view: ViewState = {
     machineId: atlas.machines[0]?.id ?? "",
@@ -130,7 +139,7 @@ export function mountViewer(root: HTMLElement, atlas: AtlasDocument): void {
       markSelection(root, selection);
     };
     const header = html(doc, "header", { class: "atlas-header" }, [
-      html(doc, "h1", {}, [`Atlas: ${machine.id}`]),
+      html(doc, options.heading ?? "h1", {}, [`Atlas: ${machine.id}`]),
       machineSelect(doc, atlas, {
         view,
         onChange: (id) => {
