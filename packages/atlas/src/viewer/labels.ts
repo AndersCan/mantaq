@@ -1,7 +1,7 @@
 import type { AtlasEdge, AtlasMachine } from "../schema.ts";
 
 /** Names of the effects the state behind an effect edge runs on entry. */
-export function effectNames(edge: AtlasEdge, machine: AtlasMachine): string[] {
+function effectNames(edge: AtlasEdge, machine: AtlasMachine): string[] {
   return machine.states.find((state) => state.id === edge.from)?.effects ?? [];
 }
 

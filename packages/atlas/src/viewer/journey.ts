@@ -14,7 +14,7 @@ export function findJourney(machine: AtlasMachine, id: string): AtlasJourney | u
 }
 
 /** State the actor is in after `at` moves. */
-export function stateAt(view: JourneyView): string {
+function stateAt(view: JourneyView): string {
   return view.journey.moves[view.at - 1]?.to ?? view.journey.start;
 }
 
