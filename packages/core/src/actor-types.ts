@@ -14,17 +14,17 @@ export type NonFinalStateRef<States extends AnyStateRef[]> = Extract<
   { isFinal: false }
 >;
 
-export interface EffectInput<ActorContext, Payload = unknown> {
+export interface EffectInput<ActorContext, Payload = unknown, Emit = InternalEvent> {
   signal: AbortSignal;
   state: { name: string; payload: Payload };
   event: InternalEvent;
   context: Context<ActorContext>;
-  emit: (event: InternalEvent) => void;
+  emit: (event: Emit) => void;
   clock: Clock;
 }
 
-export type EffectFn<ActorContext, Payload = unknown> = (
-  input: EffectInput<ActorContext, Payload>,
+export type EffectFn<ActorContext, Payload = unknown, Emit = InternalEvent> = (
+  input: EffectInput<ActorContext, Payload, Emit>,
 ) => void | Promise<void> | { then(onFulfilled: unknown, onRejected: unknown): unknown };
 export type ErrorReason =
   | "transition"

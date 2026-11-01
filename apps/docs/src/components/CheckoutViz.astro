@@ -1,0 +1,76 @@
+---
+/**
+ * Viz viewer for the docs' checkout machine. The viz document is built
+ * from the real actor at docs build time, so the diagram cannot drift from
+ * `checkout.ts`. Edge explanations come from the AST annotator. Readers walk
+ * the drawn graph in the browser; no actor runs there.
+ */
+import { inspect, vizDocument } from "@mantaq/inspect";
+import { serializeViz } from "@mantaq/viz";
+import { resolve } from "node:path";
+import { createCheckoutActor } from "../content/docs/checkout.ts";
+
+// Astro runs with the docs app as cwd; the AST annotator needs real paths.
+const docsRoot = process.cwd();
+const { machine } = inspect({
+  id: "checkout",
+  create: () => createCheckoutActor().actor,
+  source: { file: resolve(docsRoot, "src/content/docs/checkout.ts"), root: resolve(docsRoot, "../..") },
+  fuzz: false,
+});
+const json = serializeViz(vizDocument([machine]));
+---
+
+<div class="viz-embed not-content" data-viz={json}>
+  <noscript>The interactive state diagram needs JavaScript.</noscript>
+</div>
+
+<script>
+  import { mountVizText } from "@mantaq/viz/viewer";
+  import "@mantaq/viz/viewer.css";
+
+  for (const root of document.querySelectorAll<HTMLElement>(".viz-embed")) {
+    const text = root.dataset.viz;
+    if (text !== undefined) mountVizText(root, { source: "checkout viz", text }, { heading: "h3" });
+  }
+</script>
+
+<style is:global>
+  /* Follow Starlight's theme toggle instead of the OS color scheme. */
+  .viz-embed.viz {
+    --bg: var(--sl-color-bg);
+    --fg: var(--sl-color-white);
+    --muted: var(--sl-color-gray-3);
+    --line: var(--sl-color-gray-2);
+    --state-bg: var(--sl-color-bg);
+    --state-border: var(--sl-color-gray-2);
+    --region-bg: var(--sl-color-gray-6);
+    --accent: var(--sl-color-accent);
+    --unknown: var(--sl-color-orange);
+    --fuzz: var(--sl-color-green);
+    --banner-bg: var(--sl-color-orange-low);
+    --banner-fg: var(--sl-color-orange-high);
+    color-scheme: inherit;
+    margin-block: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    font-size: var(--sl-text-sm);
+  }
+
+  /* The content column is too narrow for a side panel: stack it under the graph. */
+  .viz-embed .viz-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Scaling the wide graph to the column makes labels unreadable: scroll instead. */
+  .viz-embed .graph {
+    width: auto;
+  }
+
+  .viz-embed .panel {
+    border-left: none;
+    border-top: 1px solid var(--sl-color-gray-5);
+    padding: 0.75rem 0 0;
+  }
+</style>

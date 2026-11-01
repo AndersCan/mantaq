@@ -1,0 +1,38 @@
+{
+  "name": "@mantaq/inspect",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Turn a Mantaq machine into a viz document: structure, handler explanations (AST), fuzz and test coverage. CLI and Vite plugin included.",
+  "license": "MIT",
+  "bin": {
+    "mantaq-inspect": "./src/cli.ts"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check",
+    "viz:export": "node src/examples-cli.ts export",
+    "viz:compare": "node src/examples-cli.ts compare"
+  },
+  "dependencies": {
+    "@mantaq/core": "workspace:*",
+    "@mantaq/pbt": "workspace:*",
+    "@mantaq/traversal": "workspace:*",
+    "@mantaq/utils": "workspace:*",
+    "@mantaq/viz": "workspace:*",
+    "typescript": "catalog:"
+  },
+  "devDependencies": {
+    "@mantaq/sugar": "workspace:*",
+    "@types/node": "^26.2.0",
+    "@typescript/native-preview": "catalog:",
+    "happy-dom": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

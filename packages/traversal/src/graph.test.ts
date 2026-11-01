@@ -296,19 +296,24 @@ describe("buildGraph", () => {
     expect(buildGraph(actor).edges.find((edge) => edge.source === "*")?.isActive).toBe(false);
   });
 
-  test("labels an effect self-loop with the effect names, in registration order", () => {
+  test("labels an effect self-loop with the effect names and sends, in registration order", () => {
     const idleState = state("idle")();
+    const loaded = event("loaded")();
     const actor = Actor({
       inputs: [],
+      internal: [loaded],
       states: [idleState],
       initial: idleState,
       setup: (machine) => {
-        machine.effect(idleState, { name: "loadUser", fn: () => undefined });
+        machine.effect(idleState, { name: "loadUser", sends: [loaded], fn: () => undefined });
         machine.effect(idleState, { name: "startPolling", fn: () => undefined });
       },
     });
     const loop = buildGraph(actor).edges.find((edge) => edge.label === "effect:idle");
-    expect(loop?.effects).toEqual(["loadUser", "startPolling"]);
+    expect(loop?.effects).toEqual([
+      { name: "loadUser", sends: ["loaded"] },
+      { name: "startPolling", sends: null },
+    ]);
   });
 
   test("returns final markers on final states", () => {

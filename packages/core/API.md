@@ -409,11 +409,12 @@ class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
     to?: To;
     handler: Handler<To[number]>;
   }): this;
-  effect<S extends States[number]>(
+  effect<S extends States[number], const E extends readonly Internal[number][] | undefined>(
     stateRef: S,
-    def: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
+    def: { name: string; sends?: E; fn: EffectFn<ActorContext, PayloadOf<S>, EmitOf<E>> },
   ): this;
 }
+// EmitOf<E> = the created events listed in `sends`; any InternalEvent when `sends` is omitted
 // Handler<To> = (event, opts: { context: Context<ActorContext>; actor: AnyActor }) =>
 //   { state?: To; payload?: unknown; emit?: Array<{ type: string; payload?: unknown }> }
 m.on(idle, {
@@ -424,6 +425,7 @@ m.on(idle, {
 m.onAny({ event: click, to: [idle], handler: () => ({ state: idle }) });
 m.effect(active, {
   name: "markReady",
+  sends: [],
   fn: ({ context }) => {
     const s = context.get();
     s.ready = true;
@@ -451,7 +453,8 @@ interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
   transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
   /** Declared `to` state names per `[state][event]`; `Any` keys `onAny`. */
   targets: Record<string, Record<string, string[]>>;
-  effects: Record<string, Array<{ name: string; fn: EffectFn<ActorContext> }>>;
+  /** `sends`: declared event types per effect; absent = not declared. */
+  effects: Record<string, Array<{ name: string; sends?: string[]; fn: EffectFn<ActorContext> }>>;
 }
 ```
 
@@ -521,15 +524,18 @@ type CreatedOfEvent<T extends string, P> = P extends void ? { type: T } : { type
 Argument to every effect. `signal` ties lifetime to state exit; `emit` sends events back into the machine; `state` is the entered state, `event` caused it. Effects run exactly once per state entry. The initial state runs its effects at construction (`event` is the synthetic `{ type: "__init" }`), and terminal states run theirs on entry.
 
 ```ts
-interface EffectInput<ActorContext, Payload = unknown> {
+interface EffectInput<ActorContext, Payload = unknown, Emit = InternalEvent> {
   signal: AbortSignal;
   state: { name: string; payload: Payload };
   event: InternalEvent;
   context: Context<ActorContext>;
-  emit: (event: InternalEvent) => void;
+  emit: (event: Emit) => void;
   clock: Clock;
 }
 ```
+
+`Emit` narrows to the events listed in the effect's `sends`, so `emit` rejects any other event at
+compile time. `sends: []` allows no emits. Without `sends`, `emit` accepts any `InternalEvent`.
 
 `Payload` is inferred from the state's declared payload when the effect is registered with
 `m.effect(stateRef, { name, fn })`. `state.payload` is typed, no cast needed. States declared without a
@@ -540,8 +546,8 @@ payload generic (`state("idle")()`) keep `payload: unknown`.
 An effect function, run on state entry; the signal aborts on state exit or actor halt. May return a promise for async work. A rejected promise is contained the same way as a synchronous throw and kills the machine.
 
 ```ts
-type EffectFn<ActorContext, Payload = unknown> = (
-  input: EffectInput<ActorContext, Payload>,
+type EffectFn<ActorContext, Payload = unknown, Emit = InternalEvent> = (
+  input: EffectInput<ActorContext, Payload, Emit>,
 ) => void | Promise<void>;
 m.effect(loading, {
   name: "fetchUrl",

@@ -174,6 +174,7 @@ describe("withTimeout — timer lifecycle", () => {
   const timeoutPart = definePart<typeof spec>((m) => {
     m.effect(loading, {
       name: "startTimeoutTimer",
+      sends: [slow],
       fn: (input) => {
         withTimeout(1000, { input, event: () => slow.create() });
       },

@@ -46,6 +46,31 @@ m.effect(submitting, {
 
 Post-abort `emit` is a silent no-op anyway. The guard skips the wasted call.
 
+## Declaring what an effect sends
+
+List the internal events an effect can emit in `sends`. `emit` then accepts
+only those events. Emitting anything else is a type error.
+
+```ts
+m.effect(submitting, {
+  name: "chargeCard",
+  sends: [paymentOk, paymentFail, paymentTimeout],
+  fn: ({ signal, emit }) => {
+    chargeCard(cardNumber).then((orderId) => {
+      if (!signal.aborted) emit(paymentOk.create({ orderId }));
+    });
+  },
+});
+```
+
+- `sends: []`: the effect emits nothing.
+- No `sends`: `emit` takes any event, untyped. This exists for migration only.
+- `sends` lists internal events only. Inputs come from outside.
+
+The diagram uses `sends` to show which events can follow an effect. Walking
+the [diagram](/mantaq/core-concepts/diagrams/), entering `submitting` offers
+`paymentOk`, `paymentFail` and `paymentTimeout` as next steps.
+
 ## Multiple effects
 
 Call `m.effect` multiple times for one state. They run in order.

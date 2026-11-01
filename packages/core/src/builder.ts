@@ -1,6 +1,6 @@
 import type { AnyActor } from "./actor-internal.ts";
-import type { Context, EffectFn, TransitionResult } from "./actor-types.ts";
-import type { AnyEventRef, EventRef, CreatedOfEvent } from "./index.ts";
+import type { Context, CreatedOf, EffectFn, TransitionResult } from "./actor-types.ts";
+import type { AnyEventRef, EventRef, CreatedOfEvent, InternalEvent } from "./index.ts";
 import type { RuntimeTransitionHandler } from "./parse-handler.ts";
 import { parseEffectFn, parseTransitionHandler } from "./parse-handler.ts";
 import type { AnyStateRef, StateRef } from "./state.ts";
@@ -18,8 +18,12 @@ export type TransitionHandler<
 
 export interface EffectEntry<ActorContext> {
   name: string;
+  sends?: string[]; // declared event types, for tooling; undefined = not declared
   fn: EffectFn<ActorContext>;
 }
+
+type EmitOf<E> = E extends readonly AnyEventRef[] ? CreatedOf<E[number]> : InternalEvent;
+type SendList<I extends readonly AnyEventRef[]> = readonly I[number][] | undefined;
 
 export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> {
   transitions: Record<string, Record<string, TransitionHandler<States, ActorContext>>>;
@@ -71,9 +75,10 @@ export interface ActorBuilder<
   >(
     options: HandlerOptions<To, Outputs, ActorContext, E>,
   ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
-  effect<S extends States[number]>(
+  /** `sends`: internal events `fn` may emit; `emit` only accepts those. Omit for untyped `emit`. */
+  effect<S extends States[number], const E extends SendList<Internal> = undefined>(
     stateRef: S,
-    definition: { name: string; fn: EffectFn<ActorContext, PayloadOf<S>> },
+    definition: { name: string; sends?: E; fn: EffectFn<ActorContext, PayloadOf<S>, EmitOf<E>> },
   ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
   /** @internal */
   build(): BuiltMaps<States, ActorContext>;
@@ -110,9 +115,10 @@ export function ActorBuilder<
       return self;
     },
 
-    effect(stateRef, { name, fn }) {
+    effect(stateRef, { name, sends, fn }) {
       (effects[stateRef.name] ??= []).push({
         name,
+        ...(sends && { sends: sends.map((sent) => sent.type) }),
         fn: parseEffectFn(fn),
       });
       return self;

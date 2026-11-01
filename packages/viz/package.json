@@ -1,0 +1,33 @@
+{
+  "name": "@mantaq/viz",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Draw and walk a Mantaq machine in the browser, from a versioned, deterministic JSON document.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./viewer": "./src/viewer/embed.ts",
+    "./viewer.css": "./src/viewer/viewer.css",
+    "./page": "./src/viewer/page.ts",
+    "./standalone": "./src/viewer/standalone.ts",
+    "./package.json": "./package.json",
+    "./live": "./src/viewer/live.ts"
+  },
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "catalog:",
+    "@mantaq/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "happy-dom": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

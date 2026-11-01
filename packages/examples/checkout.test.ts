@@ -78,6 +78,7 @@ function createCheckoutActor(
     setup: (m) => {
       m.effect(submitting, {
         name: "chargeCard",
+        sends: [paymentOk, paymentFail, paymentTimeout],
         fn: (input) => {
           const snapshot = input.context.get();
           if (!snapshot.paymentInfo) {

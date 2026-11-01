@@ -1,10 +1,10 @@
 import type { EffectInput, InternalEvent } from "@mantaq/core";
 
-export function withTimeout<ActorContext>(
+export function withTimeout<ActorContext, Payload = unknown, Emit = InternalEvent>(
   durationMs: number,
   options: {
-    input: EffectInput<ActorContext>;
-    event: () => InternalEvent;
+    input: EffectInput<ActorContext, Payload, Emit>;
+    event: () => NoInfer<Emit>;
   },
 ): void {
   const { input, event } = options;

@@ -3,7 +3,7 @@ title: Diagrams
 description: The state graph drawn from the builder's declared targets.
 ---
 
-import CheckoutAtlas from "../../../components/CheckoutAtlas.astro";
+import CheckoutViz from "../../../components/CheckoutViz.astro";
 
 ## What
 
@@ -15,7 +15,7 @@ The diagram below is the docs' checkout machine
 ([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)),
 generated when the site is built. It cannot drift from the code.
 
-<CheckoutAtlas />
+<CheckoutViz />
 
 ## Reading it
 
@@ -30,13 +30,49 @@ Click a state or an edge, or focus it and press Enter. The panel shows the
 handler behind an edge: where it is registered, which branches lead where,
 and what it reads and writes in context.
 
-## Journeys
+## Walking it
 
-Pick a journey, such as _How we handle a declined card_, to walk one real run.
-Each journey is a script of inputs replayed against the real handlers and the
-real `chargeCard` effect when the site is built. Everything off its path dims;
-the next edge pulses. Click it, press Next, or use the arrow keys. The panel
-says what happened at each step and which effects ran.
+The diagram starts in the initial state. Pulsing edges are the steps you can
+take next. Click one, click the state it leads to, or use the buttons in the
+panel. The panel groups the next steps:
+
+- **Send an input**: what a user or caller can send.
+- **Effect reports back**: the events an effect of this state declares in
+  `sends`. Entering `submitting` runs `chargeCard`, which sends `paymentOk`,
+  `paymentFail` or `paymentTimeout`. Pick one to say how the charge went.
+- **Other internal events**: internal events that no effect of this state
+  declares.
+
+Nothing runs: the walk follows the drawn edges, so no network or service is
+needed. **Back**, **Reset** and the path list undo steps. The standalone viewer
+keeps the walk in the URL (`?step=`), so a link opens the same path.
+
+## Draw your own
+
+Point `mantaq-inspect` (from `@mantaq/inspect`) at the file that exports your
+machine, or a function that builds it:
+
+```sh
+mantaq-inspect src/cart.ts
+```
+
+It writes `mantaq-viz.html`, one file that opens without a server. Handler
+explanations and sample payloads come from the file's types. Machines on a
+`VirtualClock` are also fuzzed, which adds coverage and finds edges the
+declarations miss.
+
+On Vite, add the plugin instead and keep the page open while you edit:
+
+```ts
+// vite.config.ts
+import { mantaqViz } from "@mantaq/inspect/vite";
+
+export default defineConfig({
+  plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })],
+});
+```
+
+Then open `/__mantaq/` on the dev server. It redraws on save and keeps your walk.
 
 ## What it does not tell you
 

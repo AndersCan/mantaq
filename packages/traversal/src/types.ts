@@ -31,6 +31,12 @@ export interface GraphNode {
   isAny?: boolean;
 }
 
+/** An effect a state runs on entry. `sends`: declared event types; null = not declared. */
+export interface GraphEffect {
+  name: string;
+  sends: string[] | null;
+}
+
 export interface GraphEdge {
   id: string;
   source: string;
@@ -45,8 +51,8 @@ export interface GraphEdge {
   isDeclared?: boolean;
   payload?: { action?: string };
   contexts: string[];
-  /** Effect self-loops only: names of the effects the state runs on entry, in registration order. */
-  effects?: string[];
+  /** Effect self-loops only: the effects the state runs on entry, in registration order. */
+  effects?: GraphEffect[];
 }
 
 export interface ActorGraph {
