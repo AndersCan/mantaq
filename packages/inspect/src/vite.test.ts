@@ -32,6 +32,7 @@ describe("mantaqViz", () => {
     const page = await (await fetch(`${origin}/__mantaq/`)).text();
     expect(page).toContain('<main id="app" data-src="/__mantaq/viz.json">');
     expect(page).toContain("/@vite/client");
+    expect(page).toContain("<style>");
     const entry = page.match(/src="(\/@fs[^"]+live\.ts)"/)?.[1];
     expect((await fetch(`${origin}${entry ?? ""}`)).status).toBe(200);
   });
