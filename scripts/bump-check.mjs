@@ -7,28 +7,40 @@
  * Run with `vp run bump:check`. Wired into the root `ready` script.
  */
 import { findUnknownNames } from "./lib/bump-files.mjs";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
-const WORKSPACE_DIRS = ["apps", "packages", "tools"];
+
+function workspaceGroups() {
+  const yaml = readFileSync(join(ROOT, "pnpm-workspace.yaml"), "utf8");
+  const section = /^packages:\s*\n((?:[ \t]+-.*\n?)+)/m.exec(yaml);
+  if (section === null) throw new Error("pnpm-workspace.yaml: no packages list found");
+  const groups = [];
+  for (const line of section[1].split("\n")) {
+    if (line.trim() === "") continue;
+    const glob = line
+      .replace(/^\s*-\s*/, "")
+      .replace(/["']/g, "")
+      .trim();
+    const match = /^([\w.-]+)\/\*$/.exec(glob);
+    if (match === null)
+      throw new Error(`pnpm-workspace.yaml: unsupported glob "${glob}" (only "dir/*")`);
+    groups.push(match[1]);
+  }
+  return groups;
+}
 
 function workspaceNames() {
   const names = new Set();
-  for (const group of WORKSPACE_DIRS) {
-    let entries = [];
-    try {
-      entries = readdirSync(join(ROOT, group));
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      try {
-        const pkg = JSON.parse(readFileSync(join(ROOT, group, entry, "package.json"), "utf8"));
-        if (typeof pkg.name === "string") names.add(pkg.name);
-      } catch {
-        continue;
-      }
+  for (const group of workspaceGroups()) {
+    const dir = join(ROOT, group);
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir)) {
+      const file = join(dir, entry, "package.json");
+      if (!existsSync(file)) continue;
+      const pkg = JSON.parse(readFileSync(file, "utf8"));
+      if (typeof pkg.name === "string") names.add(pkg.name);
     }
   }
   return names;

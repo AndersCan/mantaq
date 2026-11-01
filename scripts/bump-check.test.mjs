@@ -19,3 +19,7 @@ test("returns nothing for empty or missing frontmatter", () => {
   assert.deepEqual(findUnknownNames({ source: "---\n---\n", known }), []);
   assert.deepEqual(findUnknownNames({ source: "no frontmatter", known }), []);
 });
+
+test("ignores a horizontal rule in the body after empty frontmatter", () => {
+  assert.deepEqual(extractBumpNames("---\n---\n\nNote: x\n\n---\n"), []);
+});
