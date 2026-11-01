@@ -36,12 +36,12 @@ const submitPayment = event("submitPayment")<{ cardNumber: string }>();
 const back = event("back")();
 const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
-const submittingDone = event("submittingDone")();
+const paymentTimeout = event("paymentTimeout")();
 
 function createCheckoutActor() {
   return new Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, submittingDone],
+    internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
     context: {} as CheckoutContext,
@@ -60,7 +60,7 @@ function createCheckoutActor() {
       });
       m.on(submitting, paymentOk, () => ({ state: success }));
       m.on(submitting, paymentFail, () => ({ state: error }));
-      m.on(submitting, submittingDone, () => ({ state: success }));
+      m.on(submitting, paymentTimeout, () => ({ state: error }));
     },
   });
 }
@@ -97,7 +97,7 @@ expect(checkout.snapshot().done).toBe(true);
 const clock = new VirtualClock();
 const checkout = new Actor({
   inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-  internal: [submittingDone],
+  internal: [paymentTimeout],
   states: [basicInfo, shippingAddress, payment, submitting, success, error],
   initial: basicInfo,
   clock,
@@ -105,12 +105,12 @@ const checkout = new Actor({
     m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
     m.on(shippingAddress, submitShipping, () => ({ state: payment }));
     m.on(payment, submitPayment, () => ({ state: submitting }));
-    m.on(submitting, submittingDone, () => ({ state: success }));
+    m.on(submitting, paymentTimeout, () => ({ state: error }));
     m.effect(submitting, {
       name: "startSubmitTimeout",
       fn: ({ signal, emit, clock }) => {
         clock.setTimeout(800, () => {
-          if (!signal.aborted) emit(submittingDone.create());
+          if (!signal.aborted) emit(paymentTimeout.create());
         });
       },
     });
@@ -123,7 +123,7 @@ checkout.send(submitPayment.create({ cardNumber: "1111222233334444" }));
 expect(checkout.snapshot().path[0]).toBe("submitting");
 
 clock.advance(800);
-expect(checkout.snapshot().path[0]).toBe("success");
+expect(checkout.snapshot().path[0]).toBe("error");
 ```
 
 ## Assert promise effects with settled

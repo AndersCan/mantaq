@@ -292,3 +292,99 @@
   padding: 6px 8px;
   border-radius: 4px;
 }
+
+/* Journey: walk one recorded run; everything else steps back. */
+.atlas.journey-on .off-path {
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.atlas .taken path,
+.atlas .current .frame {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.atlas .current .frame {
+  stroke-width: 3.5;
+}
+
+.atlas .next path {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-dasharray: 8 5;
+  animation: atlas-march 0.8s linear infinite;
+}
+
+.atlas .next text {
+  fill: var(--accent);
+  font-weight: 700;
+}
+
+.atlas .edge.effect.running {
+  opacity: 1;
+}
+
+.atlas .running path {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.atlas .running text {
+  fill: var(--accent);
+  font-weight: 700;
+}
+
+@keyframes atlas-march {
+  to {
+    stroke-dashoffset: -13;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas .next path {
+    animation: none;
+  }
+}
+
+.atlas .journey-now {
+  background: var(--region-bg);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.atlas .journey-now p {
+  margin: 4px 0;
+}
+
+.atlas .journey-note {
+  font-style: italic;
+}
+
+.atlas .journey-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.atlas .journey-moves {
+  padding-left: 20px;
+}
+
+.atlas .journey-moves li {
+  cursor: pointer;
+  margin: 2px 0;
+}
+
+.atlas .journey-moves li.later {
+  color: var(--muted);
+}
+
+.atlas .journey-moves li[aria-current="step"] {
+  font-weight: 600;
+}
+
+.atlas .journeys ul {
+  padding-left: 16px;
+}

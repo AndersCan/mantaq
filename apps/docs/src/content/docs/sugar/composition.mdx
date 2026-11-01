@@ -32,11 +32,11 @@ export const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: s
 export const submitPayment = event("submitPayment")<{ cardNumber: string }>();
 export const paymentOk = event("paymentOk")<{ orderId: string }>();
 export const paymentFail = event("paymentFail")<{ reason: string }>();
-export const submittingDone = event("submittingDone")();
+export const paymentTimeout = event("paymentTimeout")();
 
 export const checkout = actorSpec({
   inputs: [submitBasicInfo, submitPayment],
-  internal: [paymentOk, paymentFail, submittingDone],
+  internal: [paymentOk, paymentFail, paymentTimeout],
   states: [basicInfo, payment, submitting, success, error],
   initial: basicInfo,
   context: {} as CheckoutContext,
@@ -78,14 +78,14 @@ export const submittingPart = definePart<typeof checkout>((m) => {
         success: (orderId) => paymentOk.create({ orderId }),
         error: (reason) => paymentFail.create({ reason: String(reason) }),
       });
-      withTimeout(800, input, () => submittingDone.create());
+      withTimeout(800, input, () => paymentTimeout.create());
     },
   });
   m.on(submitting, paymentOk, (event, opts) => {
     /* ... */
   });
   m.on(submitting, paymentFail, () => ({ state: error }));
-  m.on(submitting, submittingDone, () => ({ state: success }));
+  m.on(submitting, paymentTimeout, () => ({ state: error }));
 });
 ```
 

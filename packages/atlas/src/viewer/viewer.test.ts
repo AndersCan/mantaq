@@ -1,7 +1,15 @@
 // @vitest-environment happy-dom
 import { toAtlas, toAtlasMachine } from "../atlas.ts";
 import { annotateMachine } from "../ast/annotate.ts";
-import { EXAMPLE_ROOT, exampleInputs, exampleTargets, handWrittenBaselines } from "../examples.ts";
+import {
+  EXAMPLE_ROOT,
+  exampleInputs,
+  exampleJourneys,
+  exampleTargets,
+  handWrittenBaselines,
+} from "../examples.ts";
+import { withJourneys } from "../journey.ts";
+import { Either } from "@mantaq/utils";
 import { withTestCoverage } from "../fuzz/coverage.ts";
 import { DEFAULT_SEED } from "@mantaq/pbt";
 import { createCheckoutActor, submitBasicInfo } from "../fixtures/checkout.ts";
@@ -11,14 +19,14 @@ import type { AtlasDocument } from "../schema.ts";
 import { fuzz } from "../fuzz/fuzz.ts";
 import { fuzzedMachine } from "../fuzz/to-atlas.ts";
 import { ATLAS_SCHEMA_VERSION } from "../schema.ts";
-import { FUZZ_NOTE, STRUCTURE_BANNER, mountViewer } from "./viewer.ts";
+import { FUZZ_NOTE, JOURNEY_BANNER, STRUCTURE_BANNER, mountViewer } from "./viewer.ts";
 import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
-function mount(atlas: AtlasDocument): HTMLElement {
+function mount(atlas: AtlasDocument, options: Parameters<typeof mountViewer>[2] = {}): HTMLElement {
   const root = document.createElement("main");
   document.body.replaceChildren(root);
-  mountViewer(root, atlas);
+  mountViewer(root, atlas, options);
   return root;
 }
 
@@ -104,7 +112,7 @@ describe("viewer: checkout", () => {
     const internal = [...root.querySelectorAll(".edge.internal")].map((edge) => edge.textContent);
     expect(internal).toContain("paymentOk");
     expect(internal).not.toContain("back");
-    expect(root.querySelector(".edge.effect")?.textContent).toBe("effect");
+    expect(root.querySelector(".edge.effect")?.textContent).toBe("runs chargeCard");
   });
 
   test("clicking an edge shows source, event, target and 'not analyzed'", () => {
@@ -364,14 +372,14 @@ describe("viewer: fuzz vs test coverage", () => {
     expect(root.querySelector(".legend-unreached")?.textContent).toBe(
       "dimmed and dashed: no test exercises this",
     );
-    // The example tests never fire paymentFail, so error is untested.
-    expect(root.querySelector('[data-node-id="error"]')?.classList.contains("unreached")).toBe(
-      true,
-    );
+    // The example tests never fire paymentFail, so that edge is untested.
+    const paymentFail = () =>
+      root.querySelector(
+        '.edge[data-from="submitting"][data-to="error"][aria-label*="paymentFail"]',
+      );
+    expect(paymentFail()?.classList.contains("unreached")).toBe(true);
     pick(root, "run");
-    expect(root.querySelector('[data-node-id="error"]')?.classList.contains("unreached")).toBe(
-      false,
-    );
+    expect(paymentFail()?.classList.contains("unreached")).toBe(false);
   });
 
   test("declared edge no fuzz run produced gets the 'guards may never allow it' note", () => {
@@ -397,5 +405,116 @@ describe("viewer: fuzz vs test coverage", () => {
     );
     edgeElement(root, reached?.id ?? "").dispatchEvent(new Event("click"));
     expect(root.querySelector(".panel .prediction-note")).toBeNull();
+  });
+});
+
+describe("viewer: journeys", () => {
+  function withCheckoutJourneys(): AtlasDocument {
+    const atlas = checkout();
+    const target = exampleTargets().find((each) => each.id === "checkout");
+    const [machine] = atlas.machines;
+    if (target === undefined || machine === undefined) return atlas;
+    const result = withJourneys(target, machine, exampleJourneys()["checkout"] ?? []);
+    return Either.isRight(result) ? { ...atlas, machines: [result[1]] } : atlas;
+  }
+
+  function nodeElement(root: HTMLElement, id: string): Element | null {
+    return root.querySelector(`.graph [data-node-id="${id}"]`);
+  }
+
+  function nextEdge(root: HTMLElement): Element | null {
+    return root.querySelector(".graph .edge.next");
+  }
+
+  function startDeclined(): HTMLElement {
+    const root = mount(withCheckoutJourneys());
+    root.querySelector('[data-journey-link="card-declined"]')?.dispatchEvent(new Event("click"));
+    return root;
+  }
+
+  test("idle panel lists the journeys by title", () => {
+    const root = mount(withCheckoutJourneys());
+    const titles = [...root.querySelectorAll(".panel [data-journey-link]")].map(
+      (link) => link.textContent,
+    );
+    expect(titles).toEqual([
+      "How we take a successful order",
+      "How we handle a declined card",
+      "How a customer edits their address",
+    ]);
+  });
+
+  test("starting a journey dims everything off its path and makes it inert", () => {
+    const root = startDeclined();
+    expect(root.classList.contains("journey-on")).toBe(true);
+    expect(root.querySelector(".banner")?.textContent).toBe(JOURNEY_BANNER);
+    expect(root.querySelector(".coverage-mode")).toBeNull();
+    const success = nodeElement(root, "success");
+    expect(success?.classList.contains("off-path")).toBe(true);
+    expect(success?.getAttribute("tabindex")).toBe("-1");
+    expect(nodeElement(root, "basicInfo")?.classList.contains("current")).toBe(true);
+    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 0 of 5");
+  });
+
+  test("only the next edge advances; clicking off the path does nothing", () => {
+    const root = startDeclined();
+    expect(nextEdge(root)?.getAttribute("data-from")).toBe("basicInfo");
+    const offPath = [...root.querySelectorAll(".graph .edge.off-path")][0];
+    offPath?.dispatchEvent(new Event("click"));
+    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 0 of 5");
+    expect(root.querySelector(".panel [data-selected-edge]")).toBeNull();
+    nextEdge(root)?.dispatchEvent(new Event("click"));
+    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 1 of 5");
+    expect(nodeElement(root, "shippingAddress")?.classList.contains("current")).toBe(true);
+    expect(root.querySelector(".graph .edge.taken")?.getAttribute("data-to")).toBe(
+      "shippingAddress",
+    );
+  });
+
+  test("entering a state names the effects it ran and lights its effect loop", () => {
+    const root = startDeclined();
+    for (let step = 0; step < 3; step += 1) nextEdge(root)?.dispatchEvent(new Event("click"));
+    expect(root.querySelector(".panel .journey-effects")?.textContent).toBe(
+      "Entering submitting runs chargeCard.",
+    );
+    expect(root.querySelector(".panel .journey-note")?.textContent).toBe(
+      "Customer submits card details; entering submitting charges the card.",
+    );
+    const running = root.querySelector(".graph .edge.effect.running");
+    expect(running?.textContent).toBe("runs chargeCard");
+    expect(running?.getAttribute("data-from")).toBe("submitting");
+  });
+
+  test("arrow keys and buttons step; the end says where the journey stops", () => {
+    const root = startDeclined();
+    const key = (name: string) =>
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
+    for (let step = 0; step < 9; step += 1) key("ArrowRight");
+    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 5 of 5");
+    expect(root.querySelector(".panel .journey-next")?.textContent).toBe(
+      "End of journey, in payment.",
+    );
+    key("ArrowLeft");
+    expect(nodeElement(root, "error")?.classList.contains("current")).toBe(true);
+    root.querySelector<HTMLButtonElement>('[data-journey-action="restart"]')?.click();
+    expect(nodeElement(root, "basicInfo")?.classList.contains("current")).toBe(true);
+    root.querySelector<HTMLButtonElement>('[data-journey-action="exit"]')?.click();
+    expect(root.classList.contains("journey-on")).toBe(false);
+    expect(root.querySelector(".graph .off-path")).toBeNull();
+  });
+
+  test("clicking a state already on the path jumps back to when it was reached", () => {
+    const root = startDeclined();
+    for (let step = 0; step < 4; step += 1) nextEdge(root)?.dispatchEvent(new Event("click"));
+    nodeElement(root, "payment")?.dispatchEvent(new Event("click"));
+    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 2 of 5");
+  });
+
+  test("the journey option opens straight into a walk", () => {
+    const root = mount(withCheckoutJourneys(), { machine: "checkout", journey: "happy-path" });
+    expect(root.querySelector(".panel [data-journey]")?.getAttribute("data-journey")).toBe(
+      "happy-path",
+    );
+    expect(root.querySelector<HTMLSelectElement>(".journey-select")?.value).toBe("happy-path");
   });
 });

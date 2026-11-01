@@ -19,7 +19,7 @@ basicInfo → shippingAddress → payment → submitting → success (final)
 ```
 
 `submitting` runs two effects: charge card (promise → `paymentOk` /
-`paymentFail`) and a 800ms timeout fallback (`submittingDone`).
+`paymentFail`) and a 800ms timeout (`paymentTimeout` → `error`).
 
 ## Entity registry
 
@@ -57,7 +57,7 @@ Every narrative docs page may use ONLY these IDs. Reference pages exempt.
 | `back`            | —                              | input                             |
 | `paymentOk`       | `{ orderId }`                  | internal                          |
 | `paymentFail`     | `{ reason }`                   | internal                          |
-| `submittingDone`  | —                              | internal                          |
+| `paymentTimeout`  | —                              | internal                          |
 | `scanDone`        | `{ risky }`                    | input (fraud)                     |
 | `checkoutDone`    | `{ orderId }`                  | input (shop)                      |
 | `ship`            | —                              | input (worker)                    |
@@ -100,7 +100,7 @@ const submitPayment = event("submitPayment")<PaymentInfo>();
 const back = event("back")();
 const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
-const submittingDone = event("submittingDone")();
+const paymentTimeout = event("paymentTimeout")();
 
 function chargeCard(cardNumber: string): Promise<string> {
   // your payment provider. resolves with an order id.
@@ -114,7 +114,7 @@ function createCheckoutActor(
   const c = clock ?? new VirtualClock();
   const actor = new Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, submittingDone],
+    internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
     clock: c,
@@ -128,7 +128,7 @@ function createCheckoutActor(
             success: (orderId) => paymentOk.create({ orderId }),
             error: (reason) => paymentFail.create({ reason: String(reason) }),
           });
-          withTimeout(800, input, () => submittingDone.create());
+          withTimeout(800, input, () => paymentTimeout.create());
         },
       });
       m.on(payment, {
@@ -177,7 +177,7 @@ function createCheckoutActor(
         return { state: success };
       });
       m.on(submitting, paymentFail, () => ({ state: error }));
-      m.on(submitting, submittingDone, () => ({ state: success }));
+      m.on(submitting, paymentTimeout, () => ({ state: error }));
     },
   });
   return { actor, clock: c };
@@ -354,7 +354,7 @@ at the parent's output edge turns settlements into promises (`waitFor`).
 
 | Page             | Slice                                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------------------------------- |
-| introduction     | 3 states (`basicInfo`, `payment`, `success`), 3 events (`submitBasicInfo`, `submitPayment`, `submittingDone`) |
+| introduction     | 3 states (`basicInfo`, `payment`, `success`), 3 events (`submitBasicInfo`, `submitPayment`, `paymentTimeout`) |
 | installation     | none (no example)                                                                                             |
 | actors           | full `createCheckoutActor`, send, snapshot, `on("change")`, `settled()`                                       |
 | states           | nodes, `.final()` on `success`, payloads, + fraud region                                                      |

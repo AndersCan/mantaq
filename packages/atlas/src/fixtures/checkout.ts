@@ -30,13 +30,13 @@ const submitPayment = event("submitPayment")<PaymentInfo>();
 const back = event("back")();
 const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
-const submittingDone = event("submittingDone")();
+const paymentTimeout = event("paymentTimeout")();
 
 export function createCheckoutActor(clock: VirtualClock = VirtualClock()) {
   const initialContext: CheckoutContext = {};
   const actor = Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, submittingDone],
+    internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
     clock,
@@ -106,9 +106,9 @@ export function createCheckoutActor(clock: VirtualClock = VirtualClock()) {
       });
       m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
       m.on(submitting, {
-        event: submittingDone,
-        to: [success],
-        handler: () => ({ state: success }),
+        event: paymentTimeout,
+        to: [error],
+        handler: () => ({ state: error }),
       });
     },
   });

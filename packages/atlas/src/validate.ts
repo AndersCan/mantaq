@@ -10,6 +10,7 @@ import type {
 } from "./schema.ts";
 import { readExplanation } from "./validate-explanation.ts";
 import { readFuzz } from "./validate-fuzz.ts";
+import { checkJourneys, readJourneys } from "./validate-journey.ts";
 import {
   isRecord,
   readBoolean,
@@ -36,6 +37,7 @@ function readState(reader: Reader, record: JsonObject, path: string): AtlasState
     region: readNullableString(reader, { record, key: "region", path }),
     initial: readBoolean(reader, { record, key: "initial", path }),
     final: readBoolean(reader, { record, key: "final", path }),
+    effects: readStrings(reader, { record, key: "effects", path }),
     coverage: readCoverage(reader, { record, key: "coverage", path }),
     tested: readCoverage(reader, { record, key: "tested", path }),
   };
@@ -104,8 +106,15 @@ function readMachine(reader: Reader, record: JsonObject, path: string): AtlasMac
       readEdge(reader, item, at),
     ),
     fuzz: readFuzz(reader, { record, path }),
+    journeys: readJourneys(reader, { record, path }),
   };
   checkReferences(reader, machine, path);
+  checkJourneys(reader, {
+    journeys: machine.journeys,
+    stateIds: new Set(machine.states.map((state) => state.id)),
+    edgeIds: new Set(machine.edges.map((edge) => edge.id)),
+    path,
+  });
   return machine;
 }
 

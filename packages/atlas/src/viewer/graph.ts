@@ -1,8 +1,9 @@
 import { isAnyState } from "../schema.ts";
-import type { AtlasCoverage, AtlasMachine } from "../schema.ts";
+import type { AtlasCoverage, AtlasEdge, AtlasMachine } from "../schema.ts";
 import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { activatable, svg } from "./dom.ts";
+import { edgeText } from "./labels.ts";
 import { layoutMachine } from "./layout.ts";
 import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
@@ -144,6 +145,12 @@ function nodeGroup(
   return node.kind === "any" ? anyGroup(doc, node) : unknownGroup(doc, node);
 }
 
+function edgeAria(edge: AtlasEdge, text: string): string {
+  if (edge.kind === "effect") return `${edge.from} ${text} on entry`;
+  if (edge.kind === "stay") return `${sourceText(edge.from)} on ${text} stays`;
+  return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}`;
+}
+
 function edgeGroup(
   doc: Document,
   placed: PlacedEdge,
@@ -151,8 +158,7 @@ function edgeGroup(
 ): SVGGElement {
   const { edge } = placed;
   const internal = context.machine.events.find((event) => event.id === edge.event)?.internal;
-  // Effect edges carry the state name, not the effect name: label them generically.
-  const text = edge.kind === "effect" ? "effect" : edge.event;
+  const text = edgeText(edge, context.machine);
   const group = svg(
     doc,
     "g",
@@ -169,10 +175,7 @@ function edgeGroup(
       "data-edge-id": edge.id,
       "data-from": edge.from,
       "data-to": placed.target,
-      "aria-label":
-        edge.kind === "stay"
-          ? `${sourceText(edge.from)} on ${text} stays`
-          : `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}`,
+      "aria-label": edgeAria(edge, text),
     },
     [
       svg(doc, "path", { d: placed.path, "marker-end": "url(#atlas-arrow)" }),

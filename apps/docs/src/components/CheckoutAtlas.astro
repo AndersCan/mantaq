@@ -2,14 +2,18 @@
 /**
  * Atlas viewer for the docs' checkout machine. The atlas document is built
  * from the real actor at docs build time, so the diagram cannot drift from
- * `checkout.ts`. Edge explanations come from the AST annotator.
+ * `checkout.ts`. Edge explanations come from the AST annotator; journeys are
+ * replayed against the real handlers and the real `chargeCard` effect.
  */
 import {
   ATLAS_SCHEMA_VERSION,
   annotateMachine,
   serializeAtlas,
   toAtlasMachine,
+  withJourneys,
 } from "@mantaq/atlas";
+import type { AtlasJson, AtlasStep, FuzzTarget, JourneySpec } from "@mantaq/atlas";
+import { Either } from "@mantaq/utils";
 import { resolve } from "node:path";
 import { createCheckoutActor } from "../content/docs/checkout.ts";
 
@@ -19,7 +23,56 @@ const machine = annotateMachine(
   toAtlasMachine({ id: "checkout", actor: createCheckoutActor().actor }),
   { file: resolve(docsRoot, "src/content/docs/checkout.ts"), root: resolve(docsRoot, "../..") },
 );
-const json = serializeAtlas({ schemaVersion: ATLAS_SCHEMA_VERSION, machines: [machine] });
+
+// The payment provider never answers on its own: each journey says what it reports.
+const target: FuzzTarget = {
+  id: "checkout",
+  create: () => createCheckoutActor({ chargeCard: () => new Promise(() => undefined) }),
+};
+function send(event: string, payload: AtlasJson = null): AtlasStep {
+  return { kind: "event", event, payload };
+}
+const toPayment: JourneySpec["inputs"] = [
+  { step: send("submitBasicInfo", { email: "a@b.com", name: "Ada" }), note: "Customer enters name and email." },
+  { step: send("submitShipping", { street: "1 Main St", city: "Oslo", zip: "0150" }), note: "Customer enters a shipping address." },
+  { step: send("submitPayment", { cardNumber: "4242424242424242" }), note: "Customer submits the card. Entering submitting runs chargeCard." },
+];
+const journeys: JourneySpec[] = [
+  {
+    id: "happy-path",
+    title: "How we take a successful order",
+    description: "Three form steps, then the provider accepts the card.",
+    inputs: [
+      ...toPayment,
+      { step: send("paymentOk", { orderId: "ord_4242" }), note: "chargeCard resolves with an order id." },
+    ],
+  },
+  {
+    id: "card-declined",
+    title: "How we handle a declined card",
+    description: "The provider rejects the card; the customer goes back and tries again.",
+    inputs: [
+      ...toPayment,
+      { step: send("paymentFail", { reason: "declined" }), note: "chargeCard rejects: the card was declined." },
+      { step: send("back"), note: "Customer goes back to the payment step." },
+    ],
+  },
+  {
+    id: "provider-timeout",
+    title: "How we handle a provider that never answers",
+    description: "chargeCard arms an 800 ms timeout next to the charge; the timeout fails the payment.",
+    inputs: [
+      ...toPayment,
+      { step: { kind: "advance", ms: 800 }, note: "800 ms pass without an answer; the timeout emits paymentTimeout." },
+      { step: send("back"), note: "Customer goes back to the payment step to try again." },
+    ],
+  },
+];
+const recorded = withJourneys(target, machine, journeys);
+if (Either.isLeft(recorded)) {
+  throw new Error(recorded[0].map((issue) => `${issue.journey}: ${issue.message}`).join("\n"));
+}
+const json = serializeAtlas({ schemaVersion: ATLAS_SCHEMA_VERSION, machines: [recorded[1]] });
 ---
 
 <div class="atlas-embed not-content" data-atlas={json}>

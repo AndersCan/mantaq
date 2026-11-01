@@ -84,6 +84,12 @@ function recurseRegions(
   return { nodes, edges: childEdges };
 }
 
+function effectName(entry: unknown): string | undefined {
+  if (typeof entry !== "object" || entry === null) return undefined;
+  const name: unknown = Reflect.get(entry, "name");
+  return typeof name === "string" ? name : undefined;
+}
+
 function addEffectSelfLoops(
   actor: AnyActor<unknown>,
   layout: { pathPrefix: string; activeSet: Set<string> },
@@ -102,6 +108,7 @@ function addEffectSelfLoops(
           isActive: layout.activeSet.has(loopId),
           isInternal: true,
           contexts: [],
+          effects: effectFns.flatMap((entry: unknown) => effectName(entry) ?? []),
         });
       }
     }

@@ -68,7 +68,7 @@ m.effect(submitting, {
   name: "startSubmitTimeout",
   fn: ({ signal, emit, clock }) => {
     clock.setTimeout(800, () => {
-      if (!signal.aborted) emit(submittingDone.create());
+      if (!signal.aborted) emit(paymentTimeout.create());
     });
   },
 ```

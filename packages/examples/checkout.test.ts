@@ -13,7 +13,7 @@
  *                                                          error
  *
  * Effects on `submitting`: charge card via promise (paymentOk / paymentFail)
- * and a 800ms timeout fallback (submittingDone).
+ * and a 800ms timeout (paymentTimeout → error).
  */
 
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
@@ -55,7 +55,7 @@ const submitPayment = event("submitPayment")<PaymentInfo>();
 const back = event("back")();
 const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
-const submittingDone = event("submittingDone")();
+const paymentTimeout = event("paymentTimeout")();
 
 function chargeCard(cardNumber: string): Promise<string> {
   // your payment provider. resolves with an order id.
@@ -70,7 +70,7 @@ function createCheckoutActor(
   const initialContext: CheckoutContext = {};
   const actor = Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, submittingDone],
+    internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
     clock: c,
@@ -83,7 +83,7 @@ function createCheckoutActor(
           if (!snapshot.paymentInfo) {
             return;
           }
-          withTimeout(800, { input: input, event: () => submittingDone.create() });
+          withTimeout(800, { input: input, event: () => paymentTimeout.create() });
           return withPromise({
             promise: chargeCardImpl(snapshot.paymentInfo.cardNumber),
             signal: input.signal,
@@ -158,9 +158,9 @@ function createCheckoutActor(
       });
       m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
       m.on(submitting, {
-        event: submittingDone,
-        to: [success],
-        handler: () => ({ state: success }),
+        event: paymentTimeout,
+        to: [error],
+        handler: () => ({ state: error }),
       });
     },
   });
@@ -239,7 +239,7 @@ describe("checkout actor", () => {
     expect(matches(actor, "shippingAddress")).toBe(true);
   });
 
-  it("resolves via submittingDone timeout when charge hangs", () => {
+  it("fails via paymentTimeout when the charge hangs", () => {
     const clock = VirtualClock();
     const { actor } = createCheckoutActor({ clock, chargeCard: () => new Promise(() => {}) });
 
@@ -249,7 +249,7 @@ describe("checkout actor", () => {
     expect(matches(actor, "submitting")).toBe(true);
 
     clock.advance(800);
-    expect(matches(actor, "success")).toBe(true);
-    expect(actor.snapshot().done).toBe(true);
+    expect(matches(actor, "error")).toBe(true);
+    expect(actor.snapshot().done).not.toBe(true);
   });
 });

@@ -165,7 +165,8 @@ describe("test coverage", () => {
     const state = (id: string) => machine.states.find((each) => each.id === id)?.tested;
     // Five test starts plus one `back` from shippingAddress.
     expect(state("basicInfo")).toEqual({ hits: 6 });
-    expect(state("error")).toEqual({ hits: 0 });
+    // Only the timeout test reaches error; none fires paymentFail.
+    expect(state("error")).toEqual({ hits: 1 });
     const edge = (from: string, kind: string, to: string) =>
       machine.edges.find(
         (each) =>
@@ -173,6 +174,7 @@ describe("test coverage", () => {
       );
     expect(edge("shippingAddress", "transition", "basicInfo")?.tested).toEqual({ hits: 1 });
     expect(edge("payment", "transition", "shippingAddress")?.tested).toEqual({ hits: 1 });
+    expect(edge("error", "transition", "payment")?.tested).toEqual({ hits: 0 });
     expect(
       machine.edges.filter((each) => each.kind === "effect").every((each) => each.tested === null),
     ).toBe(true);

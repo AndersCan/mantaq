@@ -2,7 +2,7 @@
  * Atlas document schema. Bump `ATLAS_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const ATLAS_SCHEMA_VERSION = 5;
+export const ATLAS_SCHEMA_VERSION = 6;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -37,6 +37,8 @@ export interface AtlasState {
   region: string | null;
   initial: boolean;
   final: boolean;
+  /** Names of the effects this state runs on entry, in registration order. */
+  effects: string[];
   /** Visits in the supplied run (history or fuzz corpus replay). null = no run. */
   coverage: AtlasCoverage | null;
   /** Visits by the supplied test sequences. null = no tests supplied. */
@@ -149,6 +151,8 @@ export interface AtlasMachine {
   edges: AtlasEdge[];
   /** null = not fuzzed. */
   fuzz: AtlasFuzz | null;
+  /** Named walkthroughs ("how we handle X"), each replayed against the real handlers. */
+  journeys: AtlasJourney[];
 }
 
 export type AtlasJson =
@@ -184,6 +188,46 @@ export interface AtlasFuzz {
   iterations: number;
   corpus: AtlasFuzzSequence[];
   errors: AtlasFuzzError[];
+}
+
+/** One scripted input of a journey, with the author's narration. */
+export interface AtlasJourneyInput {
+  step: AtlasStep;
+  /** What this input means to a reader, e.g. "The bank declines the card". */
+  note: string | null;
+}
+
+export type AtlasJourneyMoveOutcome = "transition" | "stay" | "ignored";
+
+/**
+ * What one input did when replayed. `transition` / `stay`: a handler ran
+ * (`edge` is the drawn edge it matched, null when none matches). `ignored`:
+ * no handler for the event in that state, so nothing happened.
+ */
+export interface AtlasJourneyMove {
+  /** Index into `inputs` of the input that caused this move. */
+  input: number;
+  from: string;
+  event: string;
+  to: string;
+  outcome: AtlasJourneyMoveOutcome;
+  edge: string | null;
+  /** Names of the effects that ran on entry into `to`. */
+  effects: string[];
+}
+
+/**
+ * A recorded run from a fresh actor, in order. Every move is what the real
+ * handlers did with the scripted inputs, never a path picked from the graph.
+ */
+export interface AtlasJourney {
+  id: string;
+  title: string;
+  description: string | null;
+  /** State the fresh actor starts in. */
+  start: string;
+  inputs: AtlasJourneyInput[];
+  moves: AtlasJourneyMove[];
 }
 
 export interface AtlasDocument {

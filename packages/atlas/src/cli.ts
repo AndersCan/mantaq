@@ -9,7 +9,7 @@
  * edges from handler source (AST), fuzz guided by the AST's literals and
  * comparisons (seeded from MANTAQ_SEED, default from @mantaq/pbt), annotate
  * fuzz-found edges, then replay the transcribed example tests for `tested`
- * coverage. Same seed => identical files.
+ * coverage, and record the example journeys. Same seed => identical files.
  *
  * compare: blind vs literal-seeded vs branch-distance fuzzing on every
  * example, as a Markdown report (seeds 1..N).
@@ -18,7 +18,9 @@ import type { AtlasMachine } from "./schema.ts";
 import { toAtlasMachine } from "./atlas.ts";
 import { annotateMachine } from "./ast/annotate.ts";
 import { routingWarnings } from "./routing.ts";
-import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "./examples.ts";
+import { EXAMPLE_ROOT, exampleJourneys, exampleTargets, handWrittenBaselines } from "./examples.ts";
+import { withJourneys } from "./journey.ts";
+import type { JourneyIssue } from "./journey.ts";
 import type { Example } from "./examples.ts";
 import { compareArms, renderComparison } from "./fuzz/compare.ts";
 import { withTestCoverage } from "./fuzz/coverage.ts";
@@ -61,7 +63,10 @@ function annotate(machine: AtlasMachine, example: Example, options: ExportOption
     : machine;
 }
 
-function exampleMachine(example: Example, options: ExportOptions): AtlasMachine {
+function exampleMachine(
+  example: Example,
+  options: ExportOptions,
+): Either<JourneyIssue[], AtlasMachine> {
   const plain = toAtlasMachine({ id: example.id, actor: example.create().actor });
   const structure = annotate(plain, example, options);
   const machine =
@@ -76,7 +81,8 @@ function exampleMachine(example: Example, options: ExportOptions): AtlasMachine 
           }),
         );
   const tests = handWrittenBaselines()[example.id] ?? [];
-  return annotate(withTestCoverage(example, machine, tests), example, options);
+  const annotated = annotate(withTestCoverage(example, machine, tests), example, options);
+  return withJourneys(example, annotated, exampleJourneys()[example.id] ?? []);
 }
 
 function compareExamples(options: { seeds: number; iterations: number }): void {
@@ -101,7 +107,16 @@ function compareExamples(options: { seeds: number; iterations: number }): void {
 
 function exportExamples(options: ExportOptions): void {
   mkdirSync(options.outDir, { recursive: true });
-  const machines = exampleTargets().map((example) => exampleMachine(example, options));
+  const results = exampleTargets().map((example) => exampleMachine(example, options));
+  const issues = results.flatMap((result) => (Either.isLeft(result) ? result[0] : []));
+  if (issues.length > 0) {
+    for (const issue of issues) {
+      process.stderr.write(`journey ${issue.journey}: ${issue.message}\n`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+  const machines = results.flatMap((result) => (Either.isRight(result) ? [result[1]] : []));
   for (const machine of machines) {
     writeDocument(join(options.outDir, `${machine.id}.json`), [machine]);
     for (const warning of routingWarnings(machine)) {

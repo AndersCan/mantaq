@@ -46,7 +46,7 @@ setup: (m) => {
 ## withTimeout
 
 ```ts
-withTimeout(ms, input, () => submittingDone.create());
+withTimeout(ms, input, () => paymentTimeout.create());
 ```
 
 - Schedules timeout on the actor's clock
@@ -59,7 +59,7 @@ Equivalent without sugar:
 ```ts
 m.effect(submitting, ({ clock, signal, emit }) => {
   clock.setTimeout(800, () => {
-    if (!signal.aborted) emit(submittingDone.create());
+    if (!signal.aborted) emit(paymentTimeout.create());
   });
 });
 ```
@@ -73,7 +73,7 @@ import { VirtualClock } from "@mantaq/core";
 const clock = VirtualClock();
 checkout.send(submitPayment.create());
 clock.advance(800); // triggers timeout synchronously
-matches(checkout, "success"); // true
+matches(checkout, "error"); // true: no answer in 800ms
 ```
 
 Same clock, same inputs, same trace.
