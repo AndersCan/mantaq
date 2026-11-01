@@ -242,5 +242,20 @@ describe("computeCoverage", () => {
 
       expect(computeCoverage(graph, { history }).transitions.uncovered).toEqual([]);
     });
+
+    test("a region onAny is uncovered when RESET fired only in a nested region", () => {
+      const graph = buildGraph(makeRegionActor());
+      const history = createHistory();
+
+      history.append({
+        type: "transition",
+        data: { from: "r1.sub.idle", event: "RESET", to: "r1.sub.idle" },
+      });
+
+      expect(computeCoverage(graph, { history }).transitions.uncovered).toContainEqual({
+        from: "r1.*",
+        event: "RESET",
+      });
+    });
   });
 });

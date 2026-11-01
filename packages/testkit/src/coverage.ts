@@ -70,5 +70,5 @@ export function computeCoverage(graph: ActorGraph, tracked: { history: History }
 
 function isInAnyScope(from: string, anyNodeId: string): boolean {
   const prefix = anyNodeId.slice(0, -1);
-  return prefix === "" ? !from.includes(".") : from.startsWith(prefix);
+  return from.startsWith(prefix) && !from.slice(prefix.length).includes(".");
 }
