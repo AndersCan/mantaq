@@ -2,4 +2,6 @@
 "@mantaq/test": major
 ---
 
-Exposes `@mantaq/core` types changed by the breaking builder-targets change (#297), so consumers see a breaking type surface.
+**Breaking.** `harness.graph` (the traversal `ActorGraph`) now has a `*`
+any-node and one edge per declared target, which changes coverage totals.
+`onAny` transitions are also counted correctly in coverage (#309).

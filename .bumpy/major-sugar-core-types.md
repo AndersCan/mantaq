@@ -2,4 +2,7 @@
 "@mantaq/sugar": major
 ---
 
-Re-exports and wraps `@mantaq/core` builder types changed by the breaking builder-targets change (#297), so consumers see a breaking type surface.
+**Breaking.** Sugar wraps core's `ActorBuilder`, so its builder `on()` now takes
+`{ event, to }` instead of `eventRef` (from the core builder-targets change,
+#297). Migrate with `node packages/codemod/src/cli.ts <tsconfig.json>...`
+(`@mantaq/codemod`), then `vp check`.
