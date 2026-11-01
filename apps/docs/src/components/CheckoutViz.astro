@@ -5,18 +5,20 @@
  * `checkout.ts`. Edge explanations come from the AST annotator. Readers walk
  * the drawn graph in the browser; no actor runs there.
  */
-import { annotateMachine, toVizMachine } from "@mantaq/inspect";
-import { VIZ_SCHEMA_VERSION, serializeViz } from "@mantaq/viz";
+import { inspect, vizDocument } from "@mantaq/inspect";
+import { serializeViz } from "@mantaq/viz";
 import { resolve } from "node:path";
 import { createCheckoutActor } from "../content/docs/checkout.ts";
 
 // Astro runs with the docs app as cwd; the AST annotator needs real paths.
 const docsRoot = process.cwd();
-const machine = annotateMachine(
-  toVizMachine({ id: "checkout", actor: createCheckoutActor().actor }),
-  { file: resolve(docsRoot, "src/content/docs/checkout.ts"), root: resolve(docsRoot, "../..") },
-);
-const json = serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] });
+const { machine } = inspect({
+  id: "checkout",
+  create: () => createCheckoutActor().actor,
+  source: { file: resolve(docsRoot, "src/content/docs/checkout.ts"), root: resolve(docsRoot, "../..") },
+  fuzz: false,
+});
+const json = serializeViz(vizDocument([machine]));
 ---
 
 <div class="viz-embed not-content" data-viz={json}>

@@ -38,6 +38,9 @@ const PACKAGE_INDEX = new Map([
   ["@mantaq/pbt", PBT_INDEX],
   ["@mantaq/test", TEST_INDEX],
   ["@mantaq/traversal", TRAVERSAL_INDEX],
+  ["@mantaq/inspect", join(ROOT, "packages/inspect/src/index.ts")],
+  ["@mantaq/inspect/vite", join(ROOT, "packages/inspect/src/vite.ts")],
+  ["@mantaq/viz", join(ROOT, "packages/viz/src/index.ts")],
 ]);
 
 let failures = 0;

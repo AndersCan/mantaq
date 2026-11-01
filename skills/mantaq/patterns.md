@@ -53,7 +53,7 @@ Events that do the same thing in every state (cancel, disconnect, purge). The ta
 m.onAny({ event: disconnect, to: [disconnected], handler: () => ({ state: disconnected }) });
 ```
 
-Target depends on the current state (back, next)? One `m.on` per state, not `onAny` branching on `actor.state`. Each registration then declares its exact target and the diagram shows exact source/target pairs (atlas warns otherwise).
+Target depends on the current state (back, next)? One `m.on` per state, not `onAny` branching on `actor.state`. Each registration then declares its exact target and the diagram shows exact source/target pairs (`@mantaq/inspect` warns otherwise).
 
 ```ts
 m.on(payment, { event: back, to: [shippingAddress], handler: () => ({ state: shippingAddress }) });

@@ -20,6 +20,9 @@
     },
     "packages/codemod": {
       "ignoreDependencies": ["@mantaq/core"]
+    },
+    "packages/inspect": {
+      "entry": ["src/fixtures/*.ts"]
     }
   }
 }

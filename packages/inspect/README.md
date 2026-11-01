@@ -1,94 +1,61 @@
 # @mantaq/inspect
 
-Turns a Mantaq machine into a versioned, deterministic JSON document, and ships three tools around it:
-
-1. **Viewer**: static page that draws the document (dagre + SVG). **Explore** it: walk the drawn edges from the initial state, step by step. No actor runs, so nothing needs a network or service.
-2. **Fuzzer**: seeded, coverage-guided. Finds edges probing cannot see, and writes coverage back.
-3. **AST annotator**: reads handler source (TypeScript compiler API), explains each edge.
-
-Rule throughout: the runtime graph is the source of truth. The AST only annotates edges, the fuzzer only adds edges it observed, and anything not understood is reported as unknown / not analyzed, never guessed.
-
-## Run it
+Turns your Mantaq machine into a picture you can walk: one command, no config.
 
 ```sh
-vp run viz:export     # checkout, auth, saga, credit -> packages/viz/public/examples/*.json
-cd packages/inspect && vp dev   # viewer; loads atlas/examples.json, or ?src=<url>, or a picked file
-                              # ?machine=checkout&step=<edge id>&step=… opens straight into a walk
-vp run viz:compare    # blind vs guided fuzzing report (Markdown, 30 seeds)
+mantaq-inspect src/cart.ts     # writes mantaq-viz.html and opens it
 ```
 
-`export` options: `[outDir] --iterations N --no-fuzz --no-ast`. Seed: `MANTAQ_SEED` (default from `@mantaq/pbt`). Same seed → byte-identical files.
+It finds every exported actor, or function that builds one, from the file's types. It reads handler explanations and sample payloads from the source, fuzzes each machine that runs on a `VirtualClock`, and writes one self-contained HTML page that works offline: commit it, attach it to a PR. The viewer is [`@mantaq/viz`](../viz/README.md).
 
-## Library
+## Three ways in
+
+**CLI**: `mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open]`. `--json` writes the viz document instead of the page. Seed: `MANTAQ_SEED` (default from `@mantaq/pbt`). Same seed → same output.
+
+**Vite plugin**: a live page on your dev server that redraws, keeping your walk, when you save.
 
 ```ts
-import {
-  annotateMachine,
-  fuzz,
-  fuzzedMachine,
-  guidance,
-  serializeViz,
-  toVizMachine,
-} from "@mantaq/inspect";
+// vite.config.ts
+import { mantaqViz } from "@mantaq/inspect/vite";
 
-const structure = annotateMachine(toVizMachine({ id: "cart", actor: createCart() }), {
-  file: "/abs/path/cart.ts", // file with the m.on / m.onAny calls
-  root: "/abs/repo", // locations are relative to this
+export default defineConfig({
+  plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })],
 });
-const target = {
-  id: "cart",
-  create: () => {
-    const clock = VirtualClock();
-    return { actor: createCart(clock), clock };
-  },
-  payloads: { addItem: [{ sku: "A1", qty: 1 }] }, // sample payloads: the only shape knowledge
-};
-const result = fuzz(target, { seed: 1, iterations: 2000, ...guidance(structure) });
-const machine = annotateMachine(fuzzedMachine(target, result), {
-  file: "/abs/path/cart.ts",
-  root: "/abs/repo",
-});
-serializeViz({ schemaVersion: 7, machines: [machine] });
+// open /__mantaq/ while `vp dev` runs
 ```
 
-Pass a **fresh** actor to `toViz` / `toVizMachine`. Probing calls handlers, and a handler that reads live actor state sees whatever state that actor is in.
+Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations }`; default 500 iterations so a save redraws fast).
 
-`parseViz(text)` / `validateViz(value)` read untrusted JSON and return `Either<VizIssue[], VizDocument>`, with every issue and its path.
+**Library**: one call per machine.
 
-## Explore
+```ts
+import { inspect, vizDocument } from "@mantaq/inspect";
+import { serializeViz } from "@mantaq/viz";
 
-The viewer keeps a cursor on one state, starting at the initial one. The panel lists what can happen next, in three groups:
+const { machine, warnings } = inspect({
+  id: "cart",
+  create: () => createCart(), // a fresh actor every call
+  source: { file: "/abs/src/cart.ts", root: "/abs" }, // optional: explanations + payloads from types
+  tests: [[{ kind: "event", event: "addItem", payload: { sku: "A1" } }]], // optional: "example tests" coverage
+});
+const json = serializeViz(vizDocument([machine]));
+```
 
-- **Send an input**: edges on input events.
-- **Effect reports back**: internal events that an effect of the current state declares in `sends` (`m.effect(state, { name, sends: [...], fn })`). Entering `submitting` runs `chargeCard`, which sends `paymentOk | paymentFail | paymentTimeout`.
-- **Other internal events**: internal events that no effect of the state declares.
+`inspectFile(file)` / `inspectModule(file, { load })` do the discovery the CLI does. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
 
-Take a step with a panel button, by clicking a pulsing edge, or by clicking a state that exactly one next step reaches. An undetermined edge (`to: null`) offers each target its AST explanation names. Without one, it cannot be taken. A final state ends the walk. **Back** (or ←), **Reset** and the path list undo steps. The standalone page keeps the walk in the URL: `?step=` holds one edge id per step, plus `~target` for an undetermined edge.
+## What it needs from your file
 
-Nothing runs. The walk follows declarations, so guards are not evaluated, and a path may not happen at runtime. The logic is in `src/moves.ts`: `movesFrom`, `unhandledSends`, `decodePath`.
+- **Exports.** An actor, or a function that returns one (or `{ actor }`). Functions are called with no arguments, with a `VirtualClock` when the first parameter is a clock, or with `{ clock }` when it is an options object with a `clock`. Functions with other required parameters are skipped. Discovery reads types only; nothing is called to find out.
+- **A fresh actor per call**, to fuzz. A file that only exports one actor instance is drawn, not fuzzed. When a file has factories, its actor instances are skipped.
+- **A `VirtualClock`**, to fuzz. An actor on the real clock is drawn, with a warning.
 
-## Schema (v7)
-
-`VizDocument { schemaVersion: 7, machines: VizMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
-
-| field              | meaning                                                                                                                                                                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `machine.states[]` | `id` (region-prefixed `region.state`), `region`, `initial`, `final`, `effects` (`[{ name, sends }]` run on entry, registration order; `sends`: declared event ids, `null` = not declared), `coverage` (`null` = no run, else `{ hits }`)                      |
-| `edge.from`        | a state id, `__initial__`, or `*` (`region.*` in a region): an `onAny` registration, meaning any non-final state. `*` is never in `states`; a `stay` from `*` has `to: "*"`                                                                                   |
-| `machine.events[]` | `id`, `internal`, `payloadType` (always `null`: erased at runtime)                                                                                                                                                                                            |
-| `edge.kind`        | `initial` · `transition` · `effect` (state runs effects on entry) · `stay` (handled, no state change: a registration without `to`, or observed while fuzzing)                                                                                                 |
-| `edge.to`          | `null` = **undetermined**: only for actors that carry no `to` declarations                                                                                                                                                                                    |
-| `edge.origin`      | `declared` (builder `to`, vouched for by the type checker) · `probe` (synthetic traversal, undeclared actors) · `fuzz` (observed only while fuzzing)                                                                                                          |
-| `edge.explanation` | `null` (no handler: initial/effect, or AST not run) · `{ status: "analyzed", location, registration, branches, payloadReads, contextReads, contextWrites, readsActorState, comparisons, literals }` · `{ status: "not_analyzed", location, reason, snippet }` |
-| `machine.fuzz`     | `null` or `{ seed, iterations, corpus: [{ steps, discovered }], errors: [{ from, event, message, steps }] }`; every sequence is shrunk and replayable from a fresh actor                                                                                      |
-
-Bump `VIZ_SCHEMA_VERSION` on any breaking change. The validator accepts only the current version.
+Every part that cannot run is skipped with a warning, never guessed.
 
 ## Coverage: two sources, two questions
 
 The viewer's "Coverage from" picker dims elements with zero hits. What dimmed means depends on the source:
 
-- **example tests** (`tested`): no test exercises this. It is the classic "what is untested" view, and the default when tests are supplied. The export replays the example tests transcribed in `handWrittenBaselines()`.
+- **example tests** (`tested`): no test exercises this. Collected by replaying the event sequences you pass as `tests`, each on a fresh actor.
 - **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
 
 ## How each tool works
@@ -97,6 +64,8 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 
 **Fuzzer** (`fuzz`, Phase 3): a fresh actor and `VirtualClock` per run, so it is synchronous and deterministic. Mutations: insert, delete, swap, payload leaf tweak, time advance, and **loop**. Loop repeats, 2–13 times or a compared literal's count, a step that changed the actor's context, so counter guards like `if (attempts > 10)` become reachable. A step that changes nothing is never looped. A run is kept when it reaches a new feature (`state:x`, `edge:a>e>b`, `stay:a>e`, `error:a>e`), then shrunk to 1-minimal. Internal events are injected only when the current state handles them, as a live effect would (core rejects the rest). Payloads come from the per-machine samples and are mutated leaf by leaf, keeping each leaf's JSON type and never dropping keys. So a handler that throws is a real finding, not a type violation the compiler would reject.
 
+**Payloads** (`analyzeModule`): the TypeScript checker reads each handled event's payload type (`event("x")<{ ... }>()`) and builds samples: `"sample"` for strings, `1` for numbers, every member of a literal union (varied one field at a time), one element per array. The fuzzer mutates from there. Samples you pass replace them per event.
+
 **AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { event, handler })` / `m.onAny({ event, handler })` and resolves names from the literal types of `state.name` / `event.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. A specific `on` wins over `onAny`, as at runtime.
 
 **Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See `docs/atlas/phase5-comparison.md`.
@@ -104,9 +73,9 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 ## What it cannot show
 
 - **Guards** are not evaluated. A declared edge says "the handler may return this", not "some input reaches it". Fuzz coverage and the AST's branch conditions are the evidence; neither is proof.
-- **`onAny` routing on live actor state** (`actor.state.name`) cannot be drawn exactly: the `*` edges say "from any state, may go to X", not which state leads where. Register per-state `m.on` handlers instead, as checkout's `back` does. `routingWarnings(machine)` lists these handlers (the viewer and `viz:export` show them); it needs AST explanations.
-- **Payload types** are erased: `payloadType` is always `null`, and the fuzzer knows only the shapes you sample.
-- **Effects** are known by name and declared `sends` only. An effect without `sends` shows `sends not declared`, and its events fall under "other internal events". `viz:export` warns when a declared send has no handler in the effect's state. Example fixtures stub effects, and the fuzzer stands in for them by injecting internal events. It can therefore produce event orders a real effect never would, but only in states that handle the event.
+- **`onAny` routing on live actor state** (`actor.state.name`) cannot be drawn exactly: the `*` edges say "from any state, may go to X", not which state leads where. Register per-state `m.on` handlers instead, as checkout's `back` does. `routingWarnings(machine)` lists these handlers (the viewer and `inspect` warnings show them); it needs AST explanations.
+- **Payload types** come from the source. Without `source`, the fuzzer knows only the shapes you sample. Loose types (`string`, `unknown`) give loose samples. The document's `payloadType` is always `null`.
+- **Effects** are known by name and declared `sends` only. An effect without `sends` shows `sends not declared`, and its events fall under "other internal events". `inspect` warns when a declared send has no handler in the effect's state. Example fixtures stub effects, and the fuzzer stands in for them by injecting internal events. It can therefore produce event orders a real effect never would, but only in states that handle the event.
 - **Regions**: the fuzzer observes the root actor only. Region transitions are probed but not fuzzed.
 - **AST limits**: handlers passed by reference, returns inside `switch` / loops / `try`, and computed `event`s are `not_analyzed`, with a reason and snippet. Comparisons against actor state or computed values carry no guidance.
 - **History** cannot distinguish an ignored event from a self-loop. The fuzzer can (`stay` vs `transition`), but probe-only coverage cannot.
@@ -115,3 +84,12 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 ## Fixtures
 
 `src/fixtures/{checkout,auth,saga}.ts` copy the handlers of `packages/examples/*.test.ts` verbatim, with effects stubbed. The examples live in test files and cannot be imported, so the copies can drift from them. `credit.ts` (conditional handlers, far literals), `retry.ts` (context counter, `attempts > 10`) and `switchy.ts` (unsupported control flow) exist for the AST, loop and guidance tests.
+
+## Repo scripts
+
+```sh
+vp run viz:export     # bundled examples -> packages/viz/public/examples/*.json (the viz dev page loads them)
+vp run viz:compare    # blind vs guided fuzzing report (Markdown, 30 seeds)
+```
+
+`export` options: `[outDir] --iterations N --no-fuzz --no-ast`.

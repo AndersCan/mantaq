@@ -9,7 +9,10 @@
     ".": "./src/index.ts",
     "./viewer": "./src/viewer/embed.ts",
     "./viewer.css": "./src/viewer/viewer.css",
-    "./package.json": "./package.json"
+    "./page": "./src/viewer/page.ts",
+    "./standalone": "./src/viewer/standalone.ts",
+    "./package.json": "./package.json",
+    "./live": "./src/viewer/live.ts"
   },
   "scripts": {
     "dev": "vp dev",

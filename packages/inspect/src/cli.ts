@@ -1,156 +1,102 @@
+#!/usr/bin/env node
 /**
- * Viz CLI.
+ * mantaq-inspect: draw the machines a file exports.
  *
- *   node src/cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]
- *   node src/cli.ts compare [--seeds N] [--iterations N]
+ *   mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open]
  *
- * export: one JSON per example machine plus `examples.json` (all of them),
- * which the viewer loads by default. Pipeline: probe structure, annotate
- * edges from handler source (AST), fuzz guided by the AST's literals and
- * comparisons (seeded from MANTAQ_SEED, default from @mantaq/pbt), annotate
- * fuzz-found edges, then replay the transcribed example tests for `tested`
- * coverage. Same seed => identical files.
- *
- * compare: blind vs literal-seeded vs branch-distance fuzzing on every
- * example, as a Markdown report (seeds 1..N).
+ * Finds every exported actor or actor factory from the file's types, reads
+ * handler explanations and sample payloads from the source, fuzzes each
+ * machine that runs on a VirtualClock, and writes one self-contained HTML page
+ * (default `mantaq-viz.html`) that opens without a server. `--json` writes the
+ * viz document instead. Seed: MANTAQ_SEED (default from @mantaq/pbt).
  */
-import type { VizMachine } from "@mantaq/viz";
-import { toVizMachine } from "./structure.ts";
-import { annotateMachine } from "./ast/annotate.ts";
-import { unhandledSends, routingWarnings, VIZ_SCHEMA_VERSION, serializeViz } from "@mantaq/viz";
-import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "./examples.ts";
-import type { Example } from "./examples.ts";
-import { compareArms, renderComparison } from "./fuzz/compare.ts";
-import { withTestCoverage } from "./fuzz/coverage.ts";
-import { fuzz } from "./fuzz/fuzz.ts";
-import { guidance } from "./fuzz/guided.ts";
-import { fuzzedMachine } from "./fuzz/to-viz.ts";
+import { serializeViz } from "@mantaq/viz";
+import { vizDocument } from "./inspect.ts";
+import type { FuzzSettings } from "./inspect.ts";
+import { inspectFile } from "./load.ts";
+import { htmlPage } from "./page.ts";
 import { SEED_ENV, parseSeed } from "@mantaq/pbt";
 import { Either } from "@mantaq/utils";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { basename, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-const DEFAULT_OUT = resolve(import.meta.dirname, "..", "..", "viz", "public", "examples");
-const DEFAULT_ITERATIONS = 2000;
-const DEFAULT_COMPARE_SEEDS = 30;
-const USAGE = [
-  "usage: node src/cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]",
-  "       node src/cli.ts compare [--seeds N] [--iterations N]",
-  "",
-].join("\n");
+const USAGE =
+  "usage: mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open]\n";
 
-function writeDocument(path: string, machines: VizMachine[]): void {
-  writeFileSync(path, serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines }));
-  process.stdout.write(`wrote ${path}\n`);
+interface Options {
+  files: string[];
+  out: string;
+  json: boolean;
+  fuzz: false | FuzzSettings;
+  open: boolean;
 }
 
-interface ExportOptions {
-  outDir: string;
-  seed: number;
-  /** null = structure only, no fuzzing. */
-  iterations: number | null;
-  ast: boolean;
-}
-
-function annotate(machine: VizMachine, example: Example, options: ExportOptions): VizMachine {
-  return options.ast
-    ? annotateMachine(machine, { file: example.source, root: EXAMPLE_ROOT })
-    : machine;
-}
-
-function exampleMachine(example: Example, options: ExportOptions): VizMachine {
-  const plain = toVizMachine({ id: example.id, actor: example.create().actor });
-  const structure = annotate(plain, example, options);
-  const machine =
-    options.iterations === null
-      ? structure
-      : fuzzedMachine(
-          example,
-          fuzz(example, {
-            seed: options.seed,
-            iterations: options.iterations,
-            ...(options.ast ? guidance(structure) : {}),
-          }),
-        );
-  const tests = handWrittenBaselines()[example.id] ?? [];
-  return annotate(withTestCoverage(example, machine, tests), example, options);
-}
-
-function compareExamples(options: { seeds: number; iterations: number }): void {
-  const seeds = Array.from({ length: options.seeds }, (_, index) => index + 1);
-  const checkpoints = [25, 50, 100, 250, 500, 1000, 2000].filter((at) => at < options.iterations);
-  const rows = exampleTargets().map((example) => {
-    const machine = annotateMachine(
-      toVizMachine({ id: example.id, actor: example.create().actor }),
-      {
-        file: example.source,
-        root: EXAMPLE_ROOT,
+function parse(): Either<string, Options> {
+  const parsed = Either.from(() =>
+    parseArgs({
+      allowPositionals: true,
+      options: {
+        out: { type: "string" },
+        json: { type: "boolean" },
+        iterations: { type: "string" },
+        "no-fuzz": { type: "boolean" },
+        "no-open": { type: "boolean" },
       },
-    );
-    return compareArms(example, {
-      machine,
-      seeds,
-      checkpoints: [...checkpoints, options.iterations],
-    });
-  });
-  process.stdout.write(renderComparison(rows));
-}
-
-function exportExamples(options: ExportOptions): void {
-  mkdirSync(options.outDir, { recursive: true });
-  const machines = exampleTargets().map((example) => exampleMachine(example, options));
-  for (const machine of machines) {
-    writeDocument(join(options.outDir, `${machine.id}.json`), [machine]);
-    for (const warning of routingWarnings(machine)) {
-      process.stderr.write(`warning: ${warning.machine}: ${warning.message}\n`);
-    }
-    for (const state of machine.states) {
-      for (const { effect, event } of unhandledSends(machine, state.id)) {
-        process.stderr.write(
-          `warning: ${machine.id}: effect ${effect} in ${state.id} sends ${event}, but ${state.id} has no handler for it\n`,
-        );
-      }
-    }
-  }
-  writeDocument(join(options.outDir, "examples.json"), machines);
-}
-
-function main(): void {
-  const { positionals, values } = parseArgs({
-    allowPositionals: true,
-    options: {
-      iterations: { type: "string" },
-      seeds: { type: "string" },
-      "no-fuzz": { type: "boolean" },
-      "no-ast": { type: "boolean" },
-    },
-  });
-  const [command, outArg] = positionals;
+    }),
+  );
+  if (Either.isLeft(parsed)) return Either.left(String(parsed[0]));
+  const { positionals, values } = parsed[1];
+  if (positionals.length === 0) return Either.left("no file given");
+  const iterations = Number(values.iterations ?? 2000);
+  if (!Number.isInteger(iterations) || iterations < 0) return Either.left("bad --iterations");
   const seed = parseSeed(process.env[SEED_ENV]);
-  const iterations = Number(values.iterations ?? DEFAULT_ITERATIONS);
-  const seeds = Number(values.seeds ?? DEFAULT_COMPARE_SEEDS);
-  const counts = [iterations, seeds].every((count) => Number.isInteger(count) && count >= 0);
-  if ((command !== "export" && command !== "compare") || !counts) {
-    process.stderr.write(USAGE);
-    process.exitCode = 1;
-    return;
-  }
-  if (command === "compare") {
-    compareExamples({ seeds, iterations });
-    return;
-  }
-  if (Either.isLeft(seed)) {
-    process.stderr.write(`${seed[0].message}\n`);
-    process.exitCode = 1;
-    return;
-  }
-  exportExamples({
-    outDir: outArg === undefined ? DEFAULT_OUT : resolve(outArg),
-    seed: seed[1],
-    iterations: values["no-fuzz"] === true ? null : iterations,
-    ast: values["no-ast"] !== true,
+  if (Either.isLeft(seed)) return Either.left(seed[0].message);
+  const json = values.json === true;
+  const fuzz: false | FuzzSettings =
+    values["no-fuzz"] === true ? false : { seed: seed[1], iterations };
+  return Either.right({
+    files: positionals.map((file) => resolve(file)),
+    out: resolve(values.out ?? (json ? "mantaq-viz.json" : "mantaq-viz.html")),
+    json,
+    fuzz,
+    open: values["no-open"] !== true && !json && process.stdout.isTTY === true,
   });
 }
 
-main();
+function openInBrowser(path: string): void {
+  const command =
+    process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer" : "xdg-open";
+  spawn(command, [path], { stdio: "ignore", detached: true })
+    .on("error", () => {})
+    .unref();
+}
+
+async function main(): Promise<void> {
+  const options = parse();
+  if (Either.isLeft(options)) {
+    process.stderr.write(`${options[0]}\n${USAGE}`);
+    process.exitCode = 1;
+    return;
+  }
+  const { files, out, json, fuzz, open } = options[1];
+  const results = [];
+  for (const file of files) results.push(await inspectFile(file, { fuzz }));
+  for (const warning of results.flatMap((result) => result.warnings)) {
+    process.stderr.write(`warning: ${warning}\n`);
+  }
+  const machines = results.flatMap((result) => result.machines);
+  if (machines.length === 0) {
+    process.stderr.write("no machines found\n");
+    process.exitCode = 1;
+    return;
+  }
+  const document = vizDocument(machines);
+  const title = `${files.map((file) => basename(file)).join(", ")} · mantaq viz`;
+  writeFileSync(out, json ? serializeViz(document) : await htmlPage(document, title));
+  process.stdout.write(`wrote ${out} (${machines.map((machine) => machine.id).join(", ")})\n`);
+  if (open) openInBrowser(out);
+}
+
+void main();

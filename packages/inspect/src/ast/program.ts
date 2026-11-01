@@ -18,6 +18,8 @@ export interface Registration {
   /** Resolved state name; null for onAny or when the type has no literal name. */
   state: string | null;
   event: string | null;
+  /** The `event:` expression: an EventRef, whose type carries the payload type. */
+  eventRef: ts.Expression;
   handler: ts.Expression | undefined;
   call: ts.CallExpression;
 }
@@ -73,6 +75,7 @@ function toRegistration(checker: ts.TypeChecker, call: ts.CallExpression): Regis
     kind: method,
     state: stateArg === undefined ? null : literalProperty(checker, stateArg, "name"),
     event: literalProperty(checker, eventRef, "type"),
+    eventRef,
     handler: property(options, "handler"),
     call,
   };

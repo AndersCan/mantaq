@@ -16,8 +16,8 @@
   "scripts": {
     "test": "vp test",
     "check": "vp check",
-    "viz:export": "node src/cli.ts export",
-    "viz:compare": "node src/cli.ts compare"
+    "viz:export": "node src/examples-cli.ts export",
+    "viz:compare": "node src/examples-cli.ts compare"
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",
