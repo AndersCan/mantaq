@@ -16,7 +16,7 @@ const RESOLVED = `\0${ENTRY}`;
  * through a bundler and inspected from plain Node would look stateless.
  */
 function entrySource(file: string): string {
-  const inspect = fileURLToPath(import.meta.resolve("./inspect.ts"));
+  const inspect = fileURLToPath(import.meta.resolve("@mantaq/inspect"));
   return [
     `import * as machines from ${JSON.stringify(file)};`,
     `import { inspectModule } from ${JSON.stringify(inspect)};`,

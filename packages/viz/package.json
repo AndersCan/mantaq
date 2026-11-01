@@ -1,24 +1,49 @@
 {
   "name": "@mantaq/viz",
   "version": "0.0.0",
-  "private": true,
   "description": "Draw and walk a Mantaq machine in the browser, from a versioned, deterministic JSON document.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/viz"
+  },
+  "files": [
+    "dist",
+    "src/viewer/viewer.css",
+    "src/viewer/page.css"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./viewer": "./src/viewer/embed.ts",
     "./viewer.css": "./src/viewer/viewer.css",
+    "./page.css": "./src/viewer/page.css",
     "./page": "./src/viewer/page.ts",
     "./standalone": "./src/viewer/standalone.ts",
-    "./package.json": "./package.json",
-    "./live": "./src/viewer/live.ts"
+    "./live": "./src/viewer/live.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./viewer": "./dist/viewer.mjs",
+      "./viewer.css": "./src/viewer/viewer.css",
+      "./page.css": "./src/viewer/page.css",
+      "./page": "./dist/page.mjs",
+      "./standalone": "./dist/standalone.mjs",
+      "./live": "./dist/live.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
   },
   "scripts": {
     "dev": "vp dev",
-    "build": "vp build",
+    "build": "vp pack",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "prepublishOnly": "vp run build",
+    "prepack": "vp run build"
   },
   "dependencies": {
     "@dagrejs/dagre": "catalog:",

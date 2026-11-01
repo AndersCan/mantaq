@@ -1,23 +1,45 @@
 {
   "name": "@mantaq/inspect",
   "version": "0.0.0",
-  "private": true,
   "description": "Turn a Mantaq machine into a viz document: structure, handler explanations (AST), fuzz and test coverage. CLI and Vite plugin included.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/inspect"
+  },
   "bin": {
     "mantaq-inspect": "./src/cli.ts"
   },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./src/vite.ts",
     "./package.json": "./package.json"
   },
+  "publishConfig": {
+    "bin": {
+      "mantaq-inspect": "./dist/cli.mjs"
+    },
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./vite": "./dist/vite.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
   "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
     "test": "vp test",
     "check": "vp check",
     "viz:export": "node src/examples-cli.ts export",
-    "viz:compare": "node src/examples-cli.ts compare"
+    "viz:compare": "node src/examples-cli.ts compare",
+    "prepublishOnly": "vp run build",
+    "prepack": "vp run build"
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",
@@ -25,14 +47,14 @@
     "@mantaq/traversal": "workspace:*",
     "@mantaq/utils": "workspace:*",
     "@mantaq/viz": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:"
   },
   "devDependencies": {
     "@mantaq/sugar": "workspace:*",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "catalog:",
     "happy-dom": "catalog:",
-    "vite": "catalog:",
     "vite-plus": "catalog:"
   }
 }

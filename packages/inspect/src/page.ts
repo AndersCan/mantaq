@@ -1,9 +1,10 @@
 import { serializeViz, standaloneHtml } from "@mantaq/viz";
 import type { VizDocument } from "@mantaq/viz";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 
-/** The viewer as one classic script plus its CSS, built from `@mantaq/viz/standalone`. */
+/** The viewer as one classic script, built from `@mantaq/viz/standalone`, plus its stylesheets. */
 async function viewerBundle(): Promise<{ script: string; css: string }> {
   const entry = fileURLToPath(import.meta.resolve("@mantaq/viz/standalone"));
   const output = await build({
@@ -20,10 +21,8 @@ async function viewerBundle(): Promise<{ script: string; css: string }> {
     "output" in each ? each.output : [],
   );
   const script = outputs.flatMap((file) => (file.type === "chunk" ? [file.code] : [])).join("\n");
-  const css = outputs
-    .flatMap((file) =>
-      file.type === "asset" && file.fileName.endsWith(".css") ? [String(file.source)] : [],
-    )
+  const css = ["@mantaq/viz/viewer.css", "@mantaq/viz/page.css"]
+    .map((id) => readFileSync(fileURLToPath(import.meta.resolve(id)), "utf8"))
     .join("\n");
   return { script, css };
 }

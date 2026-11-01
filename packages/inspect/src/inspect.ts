@@ -141,7 +141,7 @@ export function inspect(target: InspectTarget): Inspected {
 }
 
 /** Directory of the nearest package.json above `file`: locations are reported relative to it. */
-export function projectRoot(file: string): string {
+function projectRoot(file: string): string {
   let dir = dirname(file);
   while (!existsSync(join(dir, "package.json")) && dirname(dir) !== dir) dir = dirname(dir);
   return dir;
