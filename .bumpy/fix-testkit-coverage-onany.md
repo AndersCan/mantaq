@@ -1,5 +1,5 @@
 ---
-"@mantaq/testkit": patch
+"@mantaq/test": patch
 ---
 
 `computeCoverage` no longer counts the `onAny` pseudo-state as an unvisitable

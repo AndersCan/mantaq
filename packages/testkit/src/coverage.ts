@@ -7,10 +7,12 @@ export function computeCoverage(graph: ActorGraph, tracked: { history: History }
   const firedTransitions = tracked.history.firedTransitions();
   const effects = tracked.history.effects();
 
-  const firedEvents = new Set([...firedTransitions].map((key) => key.slice(key.indexOf(":") + 1)));
+  const firedRecords = tracked.history.transitions();
   const isFired = (edge: { source: string; label: string }) =>
     isAnyNode(edge.source)
-      ? firedEvents.has(edge.label)
+      ? firedRecords.some(
+          (record) => record.event === edge.label && isInAnyScope(record.from, edge.source),
+        )
       : firedTransitions.has(`${edge.source}:${edge.label}`);
 
   const graphNodes = graph.nodes.filter(
@@ -64,4 +66,9 @@ export function computeCoverage(graph: ActorGraph, tracked: { history: History }
         effectStatesFromGraph.size === 0 ? 0 : (effectsRan.size / effectStatesFromGraph.size) * 100,
     },
   };
+}
+
+function isInAnyScope(from: string, anyNodeId: string): boolean {
+  const prefix = anyNodeId.slice(0, -1);
+  return prefix === "" ? !from.includes(".") : from.startsWith(prefix);
 }

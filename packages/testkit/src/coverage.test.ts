@@ -175,4 +175,72 @@ describe("computeCoverage", () => {
       ]);
     });
   });
+
+  describe("onAny transitions in regions", () => {
+    function makeRegionActor() {
+      const resetEvent = event("RESET")();
+      const idleState = state("idle")();
+      const busyState = state("busy")();
+      const child = Actor({
+        inputs: [resetEvent],
+        outputs: [],
+        states: [idleState, busyState],
+        initial: idleState,
+        setup: (machine) => {
+          machine.onAny({
+            event: resetEvent,
+            to: [idleState],
+            handler: () => ({ state: idleState }),
+          });
+        },
+      });
+      const rootState = state("root")();
+      return Actor({
+        inputs: [resetEvent],
+        outputs: [],
+        states: [rootState],
+        initial: rootState,
+        regions: { r1: child, r2: child },
+        setup: (machine) => {
+          machine.onAny({
+            event: resetEvent,
+            to: [rootState],
+            handler: () => ({ state: rootState }),
+          });
+        },
+      });
+    }
+
+    test("a region onAny is uncovered when RESET fired only in another region or root", () => {
+      const graph = buildGraph(makeRegionActor());
+      const history = createHistory();
+
+      history.append({ type: "transition", data: { from: "root", event: "RESET", to: "root" } });
+      history.append({
+        type: "transition",
+        data: { from: "r2.idle", event: "RESET", to: "r2.idle" },
+      });
+
+      expect(computeCoverage(graph, { history }).transitions.uncovered).toEqual([
+        { from: "r1.*", event: "RESET" },
+      ]);
+    });
+
+    test("a region onAny is covered when RESET fired in that region", () => {
+      const graph = buildGraph(makeRegionActor());
+      const history = createHistory();
+
+      history.append({ type: "transition", data: { from: "root", event: "RESET", to: "root" } });
+      history.append({
+        type: "transition",
+        data: { from: "r1.idle", event: "RESET", to: "r1.idle" },
+      });
+      history.append({
+        type: "transition",
+        data: { from: "r2.idle", event: "RESET", to: "r2.idle" },
+      });
+
+      expect(computeCoverage(graph, { history }).transitions.uncovered).toEqual([]);
+    });
+  });
 });
