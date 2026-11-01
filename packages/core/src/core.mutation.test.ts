@@ -473,6 +473,26 @@ describe("Actor state entry directed mutation tests", () => {
   });
 });
 
+describe("builder effect sends", () => {
+  test("records declared sends as event types and omits the key when undeclared", () => {
+    const idle = state("idle")();
+    const done = event("done")();
+    const actor = Actor({
+      inputs: [],
+      internal: [done],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, { name: "declared", sends: [done], fn: () => undefined });
+        m.effect(idle, { name: "undeclared", fn: () => undefined });
+      },
+    });
+    const [declared, undeclared] = actor.options.effects["idle"] ?? [];
+    expect(declared?.sends).toEqual(["done"]);
+    expect(undeclared === undefined ? true : "sends" in undeclared).toBe(false);
+  });
+});
+
 describe("Subscribers", () => {
   test("done unsubscribe removes the callback", () => {
     const subs = Subscribers();

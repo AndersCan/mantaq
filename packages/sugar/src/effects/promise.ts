@@ -1,16 +1,19 @@
-type EmitFn = (event: { type: string; payload?: unknown }) => void;
+type AnyEvent = { type: string; payload?: unknown };
 
-export interface WithPromiseOptions<T> {
+/** `Emit`: events the effect may send; follows the effect's `sends` list when declared. */
+export interface WithPromiseOptions<T, Emit = AnyEvent> {
   promise: Promise<T>;
   signal: AbortSignal;
-  emit: EmitFn;
+  emit: (event: Emit) => void;
   events: {
-    success: (data: T) => { type: string; payload?: unknown };
-    error: (err: unknown) => { type: string; payload?: unknown };
+    success: (data: T) => NoInfer<Emit>;
+    error: (err: unknown) => NoInfer<Emit>;
   };
 }
 
-export function withPromise<T>(options: WithPromiseOptions<T>): Promise<void> {
+export function withPromise<T, Emit = AnyEvent>(
+  options: WithPromiseOptions<T, Emit>,
+): Promise<void> {
   const { promise, signal, emit, events } = options;
   // Use the two-argument `then` so the rejection handler is bound ONLY to the
   // original `promise`. With `.then(...).catch(...)` the `.catch` also swallows

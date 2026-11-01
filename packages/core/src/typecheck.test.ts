@@ -264,6 +264,62 @@ describe("type level contract — type = behavior", () => {
     });
   });
 
+  test("effect sends narrows emit to the declared internal events", () => {
+    const idle = state("idle")();
+    const charging = state("charging")();
+    const ok = event("ok")<{ id: string }>();
+    const fail = event("fail")();
+    const other = event("other")();
+    const go = event("go")();
+
+    const actor = Actor({
+      inputs: [go],
+      internal: [ok, fail, other],
+      states: [idle, charging],
+      initial: idle,
+      setup: (m) => {
+        m.effect(charging, {
+          name: "charge",
+          sends: [ok, fail],
+          fn: ({ emit }) => {
+            emit(ok.create({ id: "1" }));
+            emit(fail.create());
+            // @ts-expect-error other is not in sends
+            // suppressed: emit(other.create()) — other is not declared in sends
+            emit(other.create());
+          },
+        });
+        m.effect(charging, {
+          name: "silent",
+          sends: [],
+          fn: ({ emit }) => {
+            // @ts-expect-error an empty sends list allows no emits
+            // suppressed: emit(ok.create(...)) — sends: [] declares no events
+            emit(ok.create({ id: "1" }));
+          },
+        });
+        m.effect(idle, {
+          name: "undeclared",
+          fn: ({ emit }) => {
+            emit({ type: "anything" });
+          },
+        });
+        m.effect(idle, {
+          name: "inputNotAllowed",
+          // @ts-expect-error sends lists internal events only
+          // suppressed: sends: [go] — go is an input, not an internal event
+          sends: [go],
+          fn: () => undefined,
+        });
+      },
+    });
+    expect(actor.options.effects["charging"]?.map((entry) => entry.sends)).toEqual([
+      ["ok", "fail"],
+      [],
+    ]);
+    expect(actor.options.effects["idle"]?.[0]?.sends).toBeUndefined();
+  });
+
   test("final() sets isFinal to true at the type level", () => {
     const done = state("done")().final();
     const pending = state("pending")();
