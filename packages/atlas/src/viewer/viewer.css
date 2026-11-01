@@ -388,6 +388,11 @@
   color: var(--unknown);
 }
 
+.atlas .explore-done {
+  border-left: 3px solid var(--accent);
+  padding: 4px 8px;
+}
+
 .atlas .explore-warning {
   background: var(--banner-bg);
   color: var(--banner-fg);

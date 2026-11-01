@@ -9,7 +9,7 @@ type RetryContext = { attempts: number };
 
 const idle = state("idle")();
 const connecting = state("connecting")();
-const connected = state("connected")();
+const connected = state("connected")().final();
 const lockedOut = state("lockedOut")();
 
 const connect = event("connect")();

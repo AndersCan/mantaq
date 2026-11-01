@@ -470,8 +470,10 @@ describe("viewer: explore", () => {
     }
     expect(current(root)).toBe("success");
     expect(root.querySelector(".panel .explore-end")?.textContent).toBe(
-      "success is final: the actor has stopped.",
+      "Done. success is final: the actor has stopped.",
     );
+    expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(0);
+    expect(root.querySelectorAll(".graph .edge.next, .graph .state.reachable")).toHaveLength(0);
   });
 
   test("clicking a next edge or a reachable state on the graph takes the step", () => {

@@ -125,8 +125,9 @@ function movesSection(
   context: { current: string; final: boolean; take: (step: ExploreStep) => void },
 ): HTMLElement {
   if (context.final) {
-    return html(doc, "p", { class: "explore-end" }, [
-      `${context.current} is final: the actor has stopped.`,
+    return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
+      html(doc, "strong", {}, ["Done."]),
+      ` ${context.current} is final: the actor has stopped.`,
     ]);
   }
   if (moves.length === 0) {
@@ -188,29 +189,34 @@ export function explorePanel(doc: Document, context: ExploreContext): HTMLElemen
   const current = stateAfter(machine, path) ?? "";
   const final = machine.states.find((state) => state.id === current)?.final === true;
   const moves = movesFrom(machine, current);
-  return html(doc, "section", { class: "explore", "data-current": current }, [
-    html(doc, "h2", {}, ["Explore"]),
-    html(doc, "p", { class: "explore-now" }, [
-      "In ",
-      html(doc, "strong", {}, [current]),
-      final ? " (final)" : "",
-    ]),
-    effectsSection(doc, machine, current),
-    movesSection(doc, moves, { current, final, take: context.take }),
-    html(doc, "div", { class: "explore-controls" }, [
-      button(doc, ["Back"], {
-        onClick: () => context.rewind(path.length - 1),
-        disabled: path.length === 0,
-        attrs: { "data-explore-action": "back" },
-      }),
-      button(doc, ["Reset"], {
-        onClick: () => context.rewind(0),
-        disabled: path.length === 0,
-        attrs: { "data-explore-action": "reset" },
-      }),
-    ]),
-    pathSection(doc, context),
-  ]);
+  return html(
+    doc,
+    "section",
+    { class: "explore", "data-current": current, "data-done": final ? "" : null },
+    [
+      html(doc, "h2", {}, ["Explore"]),
+      html(doc, "p", { class: "explore-now" }, [
+        "In ",
+        html(doc, "strong", {}, [current]),
+        final ? " (final)" : "",
+      ]),
+      effectsSection(doc, machine, current),
+      movesSection(doc, moves, { current, final, take: context.take }),
+      html(doc, "div", { class: "explore-controls" }, [
+        button(doc, ["Back"], {
+          onClick: () => context.rewind(path.length - 1),
+          disabled: path.length === 0,
+          attrs: { "data-explore-action": "back" },
+        }),
+        button(doc, ["Reset"], {
+          onClick: () => context.rewind(0),
+          disabled: path.length === 0,
+          attrs: { "data-explore-action": "reset" },
+        }),
+      ]),
+      pathSection(doc, context),
+    ],
+  );
 }
 
 /**
