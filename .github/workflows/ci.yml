@@ -17,6 +17,7 @@ jobs:
           cache: true
       - run: vp install
       - run: vp run ready
+      - run: node scripts/pack-smoke.mjs
 
   mutation-core:
     runs-on: ubuntu-latest

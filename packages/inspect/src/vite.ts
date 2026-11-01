@@ -13,11 +13,13 @@ import { UPDATE_EVENT, livePageHtml, serializeViz } from "@mantaq/viz";
 import type { FuzzSettings } from "./inspect.ts";
 import { vizDocument } from "./inspect.ts";
 import { entryId, inspectEntry, runOf } from "./load.ts";
-import { globSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { searchForWorkspaceRoot } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
+
+const STYLESHEETS = ["@mantaq/viz/viewer.css", "@mantaq/viz/page.css"];
 
 export interface MantaqVizOptions {
   /** Files that export machines: paths or globs, relative to the Vite root. */
@@ -109,6 +111,9 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
           title: "mantaq viz",
           source: `${base}viz.json`,
           entry: `/@fs${live}`,
+          css: STYLESHEETS.map((id) =>
+            readFileSync(fileURLToPath(import.meta.resolve(id)), "utf8"),
+          ).join("\n"),
         });
         void server.transformIndexHtml(request.url ?? base, html).then((page) => {
           response.setHeader("content-type", "text/html");

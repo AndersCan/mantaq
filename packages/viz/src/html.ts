@@ -49,7 +49,13 @@ export function standaloneHtml(parts: {
 export const UPDATE_EVENT = "mantaq:viz-update";
 
 /** The live page: the viewer as a module, fetching the document from `source`. */
-export function livePageHtml(parts: { title: string; source: string; entry: string }): string {
+export function livePageHtml(parts: {
+  title: string;
+  source: string;
+  entry: string;
+  /** Stylesheet text, inlined: the built entry carries no CSS of its own. */
+  css: string;
+}): string {
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -57,6 +63,7 @@ export function livePageHtml(parts: { title: string; source: string; entry: stri
     '<meta charset="utf-8" />',
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
     `<title>${escapeText(parts.title)}</title>`,
+    `<style>${inline(parts.css, "style")}</style>`,
     "</head>",
     '<body class="viz">',
     `<main id="app" data-src="${escapeText(parts.source)}"></main>`,
