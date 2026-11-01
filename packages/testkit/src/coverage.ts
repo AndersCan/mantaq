@@ -1,13 +1,23 @@
 import type { CoverageReport } from "./types.ts";
 import type { ActorGraph, History } from "@mantaq/traversal";
-import { INITIAL_NODE_ID } from "@mantaq/traversal";
+import { INITIAL_NODE_ID, isAnyNode } from "@mantaq/traversal";
 
 export function computeCoverage(graph: ActorGraph, tracked: { history: History }): CoverageReport {
   const visitedStates = tracked.history.visitedStates();
   const firedTransitions = tracked.history.firedTransitions();
   const effects = tracked.history.effects();
 
-  const graphNodes = graph.nodes.filter((node) => node.id !== INITIAL_NODE_ID);
+  const firedRecords = tracked.history.transitions();
+  const isFired = (edge: { source: string; label: string }) =>
+    isAnyNode(edge.source)
+      ? firedRecords.some(
+          (record) => record.event === edge.label && isInAnyScope(record.from, edge.source),
+        )
+      : firedTransitions.has(`${edge.source}:${edge.label}`);
+
+  const graphNodes = graph.nodes.filter(
+    (node) => node.id !== INITIAL_NODE_ID && !isAnyNode(node.id),
+  );
   const graphEdges = graph.edges.filter(
     (edge) =>
       edge.source !== INITIAL_NODE_ID &&
@@ -23,11 +33,9 @@ export function computeCoverage(graph: ActorGraph, tracked: { history: History }
     .map((node) => node.id);
 
   const transitionsTotal = graphEdges.length;
-  const transitionsVisited = graphEdges.filter((edge) =>
-    firedTransitions.has(`${edge.source}:${edge.label}`),
-  ).length;
+  const transitionsVisited = graphEdges.filter(isFired).length;
   const transitionsUncovered = graphEdges
-    .filter((edge) => !firedTransitions.has(`${edge.source}:${edge.label}`))
+    .filter((edge) => !isFired(edge))
     .map((edge) => ({ from: edge.source, event: edge.label }));
 
   const effectEdges = graph.edges.filter(
@@ -58,4 +66,9 @@ export function computeCoverage(graph: ActorGraph, tracked: { history: History }
         effectStatesFromGraph.size === 0 ? 0 : (effectsRan.size / effectStatesFromGraph.size) * 100,
     },
   };
+}
+
+function isInAnyScope(from: string, anyNodeId: string): boolean {
+  const prefix = anyNodeId.slice(0, -1);
+  return from.startsWith(prefix) && !from.slice(prefix.length).includes(".");
 }
