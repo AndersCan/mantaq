@@ -122,4 +122,57 @@ describe("computeCoverage", () => {
 
     expect(computeCoverage(graph, { history }).effects.unexecuted).toEqual(["b"]);
   });
+
+  describe("onAny transitions", () => {
+    function makeAnyActor() {
+      const goEvent = event("GO")();
+      const resetEvent = event("RESET")();
+      const stateA = state("a")();
+      const stateB = state("b")();
+
+      return Actor({
+        inputs: [goEvent, resetEvent],
+        outputs: [],
+        internal: [],
+        states: [stateA, stateB],
+        initial: stateA,
+        setup: (machine) => {
+          machine.on(stateA, { event: goEvent, to: [stateB], handler: () => ({ state: stateB }) });
+          machine.onAny({
+            event: resetEvent,
+            to: [stateA],
+            handler: () => ({ state: stateA }),
+          });
+        },
+      });
+    }
+
+    test("is fully covered once the onAny event fired from any state", () => {
+      const graph = buildGraph(makeAnyActor());
+      const history = createHistory();
+
+      history.append({ type: "state_visit", data: { stateName: "a" } });
+      history.append({ type: "state_visit", data: { stateName: "b" } });
+      history.append({ type: "transition", data: { from: "a", event: "GO", to: "b" } });
+      history.append({ type: "transition", data: { from: "b", event: "RESET", to: "a" } });
+
+      const report = computeCoverage(graph, { history });
+
+      expect(report.states).toEqual({ total: 2, visited: 2, uncovered: [] });
+      expect(report.transitions).toEqual({ total: 2, visited: 2, uncovered: [] });
+    });
+
+    test("reports a never-fired onAny transition as uncovered", () => {
+      const graph = buildGraph(makeAnyActor());
+      const history = createHistory();
+
+      history.append({ type: "state_visit", data: { stateName: "a" } });
+      history.append({ type: "state_visit", data: { stateName: "b" } });
+      history.append({ type: "transition", data: { from: "a", event: "GO", to: "b" } });
+
+      expect(computeCoverage(graph, { history }).transitions.uncovered).toEqual([
+        { from: "*", event: "RESET" },
+      ]);
+    });
+  });
 });
