@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run guard && vp run knip && vp run docs:check && vp run -r test && vp run -r build",
+    "ready": "vp check && vp run guard && vp run bump:check && vp run knip && vp run docs:check && vp run -r test && vp run -r build",
     "guard": "node scripts/vision-guard.mjs",
+    "bump:check": "node --test scripts/bump-check.test.mjs && node scripts/bump-check.mjs",
     "smoke:pack": "node scripts/pack-smoke.mjs",
     "docs:check": "node scripts/docs-check.mjs",
     "knip": "knip",
