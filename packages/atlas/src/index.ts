@@ -10,6 +10,8 @@ export type { FuzzTarget, Observation, RunError, Trace } from "./fuzz/run.ts";
 export type { LiteralPool } from "./fuzz/mutate.ts";
 export { fuzzedMachine } from "./fuzz/to-atlas.ts";
 export { withTestCoverage } from "./fuzz/coverage.ts";
+export { withJourneys } from "./journey.ts";
+export type { JourneyIssue, JourneySpec } from "./journey.ts";
 export { branchDistance, branchDistanceGuide, guidance, literalPool } from "./fuzz/guided.ts";
 export { analyzeSource, annotateMachine } from "./ast/annotate.ts";
 export type { HandlerSite } from "./ast/annotate.ts";
@@ -31,6 +33,10 @@ export type {
   AtlasFuzz,
   AtlasFuzzError,
   AtlasFuzzSequence,
+  AtlasJourney,
+  AtlasJourneyInput,
+  AtlasJourneyMove,
+  AtlasJourneyMoveOutcome,
   AtlasJson,
   AtlasLocation,
   AtlasMachine,

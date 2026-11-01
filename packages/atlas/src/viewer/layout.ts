@@ -1,5 +1,6 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { AtlasEdge, AtlasMachine, AtlasState } from "../schema.ts";
+import { edgeText } from "./labels.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -79,10 +80,6 @@ function regionNodeId(region: string): string {
   return `region:${region}`;
 }
 
-function edgeText(edge: AtlasEdge): string {
-  return edge.kind === "effect" ? "effect" : edge.event;
-}
-
 function stateWidth(state: AtlasState): number {
   return Math.max(80, state.label.length * CHAR_WIDTH + 24);
 }
@@ -131,7 +128,7 @@ function addEdges(graph: LayoutGraph, machine: AtlasMachine): void {
       if (region !== null) graph.setParent(target, regionNodeId(region));
     }
     const label: EdgeLabel = {
-      width: edgeText(edge).length * CHAR_WIDTH + 8,
+      width: edgeText(edge, machine).length * CHAR_WIDTH + 8,
       height: LABEL_HEIGHT,
       labelpos: "c",
     };

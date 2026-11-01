@@ -103,4 +103,32 @@ describe("validateAtlas rejects", () => {
       "$.machines[0].edges[2].explanation.branches[0].target.kind: expected one of state, stay, unresolved",
     ]);
   });
+
+  test("journeys: dangling state and edge, input out of range, bad outcome", () => {
+    const doc = valid();
+    if (typeof doc !== "object" || doc === null || !("machines" in doc)) return;
+    const machines = doc.machines;
+    if (!Array.isArray(machines)) return;
+    const move = { input: 0, from: "basicInfo", event: "go", to: "basicInfo", effects: [] };
+    machines[0].journeys = [
+      {
+        id: "j",
+        title: "J",
+        description: null,
+        start: "nowhere",
+        inputs: [{ step: { kind: "event", event: "go", payload: null }, note: null }],
+        moves: [
+          { ...move, outcome: "transition", edge: "no-such-edge", to: "gone" },
+          { ...move, outcome: "teleport", edge: null, input: 3 },
+        ],
+      },
+    ];
+    expect(issues(doc)).toEqual([
+      "$.machines[0].journeys[0].moves[1].outcome: expected one of transition, stay, ignored",
+      "$.machines[0].journeys[0].start: unknown state nowhere",
+      "$.machines[0].journeys[0].moves[0].to: unknown state gone",
+      "$.machines[0].journeys[0].moves[0].edge: unknown edge no-such-edge",
+      "$.machines[0].journeys[0].moves[1].input: input out of range or order",
+    ]);
+  });
 });

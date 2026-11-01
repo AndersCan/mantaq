@@ -19,6 +19,10 @@ export interface Observation {
   event: string;
   to: string;
   transitioned: boolean;
+  /** Names of the effects that ran on entry into `to`. */
+  effects: string[];
+  /** Index of the step that caused it. */
+  step: number;
   /** Payload the handler received (for branch-distance guidance). */
   payload: unknown;
   /** JSON copy of the actor context right after the handler ran; null if not JSON. */
@@ -136,13 +140,15 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<AtlasStep>): Tr
   const contextSteps: number[] = [];
   let index = 0;
   actor.on("transition", {
-    fn: ({ event, from, to, transitioned }) => {
+    fn: ({ event, from, to, transitioned, effects }) => {
       const context = parsed(contextText(actor));
       observations.push({
         from,
         event: event.type,
         to,
         transitioned,
+        effects,
+        step: index,
         payload: event.payload,
         context,
       });

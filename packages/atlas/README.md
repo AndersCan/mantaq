@@ -2,7 +2,7 @@
 
 Turns a Mantaq machine into a versioned, deterministic JSON document, and ships three tools around it:
 
-1. **Viewer**: static page that draws the document (dagre + SVG). No live actors.
+1. **Viewer**: static page that draws the document (dagre + SVG). No live actors. Walks **journeys**: "here is how we handle X", one recorded run at a time.
 2. **Fuzzer**: seeded, coverage-guided. Finds edges probing cannot see, and writes coverage back.
 3. **AST annotator**: reads handler source (TypeScript compiler API), explains each edge.
 
@@ -13,6 +13,7 @@ Rule throughout: the runtime graph is the source of truth. The AST only annotate
 ```sh
 vp run atlas:export     # checkout, auth, saga, credit -> packages/atlas/public/atlas/*.json
 cd packages/atlas && vp dev   # viewer; loads atlas/examples.json, or ?src=<url>, or a picked file
+                              # ?machine=checkout&journey=card-declined opens straight into a walk
 vp run atlas:compare    # blind vs guided fuzzing report (Markdown, 30 seeds)
 ```
 
@@ -47,26 +48,49 @@ const machine = annotateMachine(fuzzedMachine(target, result), {
   file: "/abs/path/cart.ts",
   root: "/abs/repo",
 });
-serializeAtlas({ schemaVersion: 5, machines: [withTestCoverage(target, machine, mySequences)] });
+const walked = withJourneys(target, machine, [
+  {
+    id: "card-declined",
+    title: "How we handle a declined card",
+    inputs: [
+      {
+        step: { kind: "event", event: "addItem", payload: { sku: "A1", qty: 1 } },
+        note: "Customer adds an item.",
+      },
+      {
+        step: { kind: "advance", ms: 800 },
+        note: "The provider never answers; the timeout fires.",
+      },
+    ],
+  },
+]); // Either<JourneyIssue[], AtlasMachine>: Left when a handler throws or an id repeats
+if (Either.isRight(walked)) serializeAtlas({ schemaVersion: 6, machines: [walked[1]] });
 ```
 
 Pass a **fresh** actor to `toAtlas` / `toAtlasMachine`. Probing calls handlers, and a handler that reads live actor state sees whatever state that actor is in.
 
 `parseAtlas(text)` / `validateAtlas(value)` read untrusted JSON and return `Either<AtlasIssue[], AtlasDocument>`, with every issue and its path.
 
-## Schema (v5)
+## Journeys
 
-`AtlasDocument { schemaVersion: 5, machines: AtlasMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
+A journey is a named, scripted run: inputs (events or clock advances), each with a note for the reader. `withJourneys` replays it from a fresh actor and records every **move**: `from`, `event`, `to`, `outcome` (`transition` · `stay` · `ignored` = no handler), the drawn `edge` it took, and the `effects` that ran on entry, by name. One input can cause several moves (an `advance` whose timer makes an effect emit). Nothing is picked from the graph, so a journey cannot show a path the machine does not take.
+
+In the viewer, pick a journey from the header or the idle panel. Everything off its path dims and stops responding; the next edge pulses. Click it (or Next, or →) to take the step; click a state or edge already on the path to jump back to it. The panel narrates each step: the event, the note, and the effects entering the state ran.
+
+## Schema (v6)
+
+`AtlasDocument { schemaVersion: 6, machines: AtlasMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
 
 | field              | meaning                                                                                                                                                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `machine.states[]` | `id` (region-prefixed `region.state`), `region`, `initial`, `final`, `coverage` (`null` = no run, else `{ hits }`)                                                                                                                                            |
+| `machine.states[]` | `id` (region-prefixed `region.state`), `region`, `initial`, `final`, `effects` (names run on entry, registration order), `coverage` (`null` = no run, else `{ hits }`)                                                                                        |
 | `edge.from`        | a state id, `__initial__`, or `*` (`region.*` in a region): an `onAny` registration, meaning any non-final state. `*` is never in `states`; a `stay` from `*` has `to: "*"`                                                                                   |
 | `machine.events[]` | `id`, `internal`, `payloadType` (always `null`: erased at runtime)                                                                                                                                                                                            |
 | `edge.kind`        | `initial` · `transition` · `effect` (state runs effects on entry) · `stay` (handled, no state change: a registration without `to`, or observed while fuzzing)                                                                                                 |
 | `edge.to`          | `null` = **undetermined**: only for actors that carry no `to` declarations                                                                                                                                                                                    |
 | `edge.origin`      | `declared` (builder `to`, vouched for by the type checker) · `probe` (synthetic traversal, undeclared actors) · `fuzz` (observed only while fuzzing)                                                                                                          |
 | `edge.explanation` | `null` (no handler: initial/effect, or AST not run) · `{ status: "analyzed", location, registration, branches, payloadReads, contextReads, contextWrites, readsActorState, comparisons, literals }` · `{ status: "not_analyzed", location, reason, snippet }` |
+| `machine.journeys` | `[{ id, title, description, start, inputs: [{ step, note }], moves: [{ input, from, event, to, outcome, edge, effects }] }]`; every state and edge id must exist                                                                                              |
 | `machine.fuzz`     | `null` or `{ seed, iterations, corpus: [{ steps, discovered }], errors: [{ from, event, message, steps }] }`; every sequence is shrunk and replayable from a fresh actor                                                                                      |
 
 Bump `ATLAS_SCHEMA_VERSION` on any breaking change. The validator accepts only the current version.
@@ -93,7 +117,7 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 - **Guards** are not evaluated. A declared edge says "the handler may return this", not "some input reaches it". Fuzz coverage and the AST's branch conditions are the evidence; neither is proof.
 - **`onAny` routing on live actor state** (`actor.state.name`) cannot be drawn exactly: the `*` edges say "from any state, may go to X", not which state leads where. Register per-state `m.on` handlers instead, as checkout's `back` does. `routingWarnings(machine)` lists these handlers (the viewer and `atlas:export` show them); it needs AST explanations.
 - **Payload types** are erased: `payloadType` is always `null`, and the fuzzer knows only the shapes you sample.
-- **Effects** are opaque. An effect edge says "this state runs effects on entry", not what they emit or which effect it is (traversal labels it by state, not effect name). Example fixtures stub effects, and the fuzzer stands in for them by injecting internal events. It can therefore produce event orders a real effect never would, but only in states that handle the event.
+- **Effects** are opaque beyond their names. An effect loop is labelled with the effects the state runs on entry (`runs chargeCard`), not what they emit; a journey shows what an effect reported only through the input that stands in for it. Example fixtures stub effects, and the fuzzer stands in for them by injecting internal events. It can therefore produce event orders a real effect never would, but only in states that handle the event.
 - **Regions**: the fuzzer observes the root actor only. Region transitions are probed but not fuzzed.
 - **AST limits**: handlers passed by reference, returns inside `switch` / loops / `try`, and computed `event`s are `not_analyzed`, with a reason and snippet. Comparisons against actor state or computed values carry no guidance.
 - **History** cannot distinguish an ignored event from a self-loop. The fuzzer can (`stay` vs `transition`), but probe-only coverage cannot.

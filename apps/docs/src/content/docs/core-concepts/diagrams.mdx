@@ -23,12 +23,20 @@ generated when the site is built. It cannot drift from the code.
 - **Arrow**: one target from one `to` list, labelled with its event.
 - **Dot and arrow on the left**: the initial state.
 - **Dotted arrow, italic label**: an internal event, emitted by an effect.
-- **Faint self-loop**: the state runs effects on entry.
+- **Faint self-loop**: the effects the state runs on entry, by name (`runs chargeCard`).
 - **Dashed box `*`**: an `onAny` registration, meaning any non-final state.
 
 Click a state or an edge, or focus it and press Enter. The panel shows the
 handler behind an edge: where it is registered, which branches lead where,
 and what it reads and writes in context.
+
+## Journeys
+
+Pick a journey, such as _How we handle a declined card_, to walk one real run.
+Each journey is a script of inputs replayed against the real handlers and the
+real `chargeCard` effect when the site is built. Everything off its path dims;
+the next edge pulses. Click it, press Next, or use the arrow keys. The panel
+says what happened at each step and which effects ran.
 
 ## What it does not tell you
 

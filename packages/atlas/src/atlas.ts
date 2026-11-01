@@ -51,15 +51,20 @@ function hits(count: number | undefined): AtlasCoverage {
 
 function toState(
   node: GraphNode,
-  visits: Map<string, number> | undefined,
-  initialId: string | null,
+  context: {
+    visits: Map<string, number> | undefined;
+    initialId: string | null;
+    effects: ReadonlyArray<GraphEdge>;
+  },
 ): AtlasState {
+  const { visits } = context;
   return {
     id: node.id,
     label: node.label,
     region: regionOf(node.id),
-    initial: node.id === initialId,
+    initial: node.id === context.initialId,
     final: node.isFinal,
+    effects: context.effects.find((edge) => edge.source === node.id)?.effects ?? [],
     coverage: visits ? hits(visits.get(node.id)) : null,
     tested: null,
   };
@@ -146,9 +151,10 @@ export function toAtlasMachine(input: AtlasInput): AtlasMachine {
     : undefined;
   const transitions = input.history ? indexTransitions(input.history) : undefined;
 
+  const effectEdges = graph.edges.filter((edge) => edgeKind(edge) === "effect");
   const states = graph.nodes
     .filter((node) => node.id !== INITIAL_NODE_ID && node.isAny !== true)
-    .map((node) => toState(node, visits, initial))
+    .map((node) => toState(node, { visits, initialId: initial, effects: effectEdges }))
     .sort(byId);
   const edges = graph.edges.map((edge) => toEdge(edge, transitions)).sort(byId);
   const events: AtlasEvent[] = [...new Set(edges.map((edge) => edge.event).filter(Boolean))]
@@ -159,7 +165,7 @@ export function toAtlasMachine(input: AtlasInput): AtlasMachine {
     ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
   ].sort();
 
-  return { id: input.id, initial, regions, states, events, edges, fuzz: null };
+  return { id: input.id, initial, regions, states, events, edges, fuzz: null, journeys: [] };
 }
 
 export function toAtlas(inputs: ReadonlyArray<AtlasInput>): AtlasDocument {

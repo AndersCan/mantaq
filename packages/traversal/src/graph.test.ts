@@ -296,6 +296,21 @@ describe("buildGraph", () => {
     expect(buildGraph(actor).edges.find((edge) => edge.source === "*")?.isActive).toBe(false);
   });
 
+  test("labels an effect self-loop with the effect names, in registration order", () => {
+    const idleState = state("idle")();
+    const actor = Actor({
+      inputs: [],
+      states: [idleState],
+      initial: idleState,
+      setup: (machine) => {
+        machine.effect(idleState, { name: "loadUser", fn: () => undefined });
+        machine.effect(idleState, { name: "startPolling", fn: () => undefined });
+      },
+    });
+    const loop = buildGraph(actor).edges.find((edge) => edge.label === "effect:idle");
+    expect(loop?.effects).toEqual(["loadUser", "startPolling"]);
+  });
+
   test("returns final markers on final states", () => {
     const graph = buildGraph(createFinalStateActor());
 

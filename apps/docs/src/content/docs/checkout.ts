@@ -51,7 +51,7 @@ export const submitPayment = event("submitPayment")<PaymentInfo>();
 export const back = event("back")();
 export const paymentOk = event("paymentOk")<{ orderId: string }>();
 export const paymentFail = event("paymentFail")<{ reason: string }>();
-export const submittingDone = event("submittingDone")();
+export const paymentTimeout = event("paymentTimeout")();
 
 export function chargeCard(cardNumber: string): Promise<string> {
   // your payment provider. resolves with an order id.
@@ -66,7 +66,7 @@ export function createCheckoutActor(
   const initialContext: CheckoutContext = {};
   const actor = Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, submittingDone],
+    internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
     clock: c,
@@ -79,7 +79,7 @@ export function createCheckoutActor(
           if (!snapshot.paymentInfo) {
             return;
           }
-          withTimeout(800, { input: input, event: () => submittingDone.create() });
+          withTimeout(800, { input: input, event: () => paymentTimeout.create() });
           return withPromise({
             promise: chargeCardImpl(snapshot.paymentInfo.cardNumber),
             signal: input.signal,
@@ -154,9 +154,9 @@ export function createCheckoutActor(
       });
       m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
       m.on(submitting, {
-        event: submittingDone,
-        to: [success],
-        handler: () => ({ state: success }),
+        event: paymentTimeout,
+        to: [error],
+        handler: () => ({ state: error }),
       });
     },
   });

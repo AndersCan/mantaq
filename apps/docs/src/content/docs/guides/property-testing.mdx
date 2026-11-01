@@ -14,7 +14,7 @@ Property tests assert an invariant over every generated input, not one path.
 
 ## Deadline-exactness invariant
 
-Machine in `submitting` schedules `submittingDone` after `timeoutMs`. `VirtualClock.advance(ms)` is synchronous, fires timers, drains queue.
+Machine in `submitting` schedules `paymentTimeout` after `timeoutMs`. `VirtualClock.advance(ms)` is synchronous, fires timers, drains queue.
 
 ```ts
 import { Actor, VirtualClock } from "@mantaq/core";
@@ -27,27 +27,27 @@ runProperty(
     const actor = new Actor({
       clock,
       inputs: [],
-      internal: [submittingDone],
-      states: [basicInfo, shippingAddress, payment, submitting, success],
+      internal: [paymentTimeout],
+      states: [basicInfo, shippingAddress, payment, submitting, success, error],
       initial: submitting,
       setup: (m) => {
-        m.on(submitting, submittingDone, () => ({ state: success }));
+        m.on(submitting, paymentTimeout, () => ({ state: error }));
         m.effect(submitting, {
           name: "startSubmitTimeout",
           fn: ({ signal, clock: c, emit }) => {
-            c.setTimeout(timeoutMs, () => emit(submittingDone.create()), { signal });
+            c.setTimeout(timeoutMs, () => emit(paymentTimeout.create()), { signal });
           },
         });
       },
     });
     clock.advance(advanceMs);
-    const inSuccess = actor.snapshot().path[0] === "success";
-    return advanceMs >= timeoutMs ? inSuccess : !inSuccess;
+    const timedOut = actor.snapshot().path[0] === "error";
+    return advanceMs >= timeoutMs ? timedOut : !timedOut;
   },
 );
 ```
 
-`internal: [submittingDone]` marks it machine-internal so external sends cannot fake the deadline.
+`internal: [paymentTimeout]` marks it machine-internal so external sends cannot fake the deadline.
 
 ## Back-navigation invariant
 

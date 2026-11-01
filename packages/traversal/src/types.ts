@@ -45,6 +45,8 @@ export interface GraphEdge {
   isDeclared?: boolean;
   payload?: { action?: string };
   contexts: string[];
+  /** Effect self-loops only: names of the effects the state runs on entry, in registration order. */
+  effects?: string[];
 }
 
 export interface ActorGraph {

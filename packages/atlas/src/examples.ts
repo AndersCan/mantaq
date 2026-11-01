@@ -5,6 +5,7 @@ import { createCreditActor } from "./fixtures/credit.ts";
 import { createRetryActor } from "./fixtures/retry.ts";
 import { createSagaActor } from "./fixtures/saga.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
+import type { JourneySpec } from "./journey.ts";
 import type { AtlasJson, AtlasStep } from "./schema.ts";
 import { VirtualClock } from "@mantaq/core";
 import { join, resolve } from "node:path";
@@ -117,7 +118,7 @@ export function handWrittenBaselines(): Record<string, AtlasStep[][]> {
       c(["submitBasicInfo", "submitShipping", "submitPayment"]),
       c(["submitBasicInfo", "back"]),
       c(["submitBasicInfo", "submitShipping", "back"]),
-      c(["submitBasicInfo", "submitShipping", "submitPayment", "submittingDone"]),
+      c(["submitBasicInfo", "submitShipping", "submitPayment", "paymentTimeout"]),
     ],
     auth: [
       a(["MONITOR_TICK"]),
@@ -141,6 +142,178 @@ export function handWrittenBaselines(): Record<string, AtlasStep[][]> {
     // No example test file: the sample path a reader would write first.
     credit: [cr(["apply", "reset"]), cr(["setTier"])],
     retry: [r(["connect", "failed", "opened"])],
+  };
+}
+
+type Narrated = [event: string, note: string];
+
+interface JourneyText {
+  id: string;
+  title: string;
+  description: string;
+  inputs: Narrated[];
+}
+
+function journey(payloads: Record<string, AtlasJson[]>, spec: JourneyText): JourneySpec {
+  return {
+    id: spec.id,
+    title: spec.title,
+    description: spec.description,
+    inputs: spec.inputs.map(([event, note]) => ({ step: send(event, payloads), note })),
+  };
+}
+
+function checkoutJourneys(): JourneySpec[] {
+  const c = (spec: JourneyText) => journey(checkoutPayloads, spec);
+  const toPayment: Narrated[] = [
+    ["submitBasicInfo", "Customer enters name and email."],
+    ["submitShipping", "Customer enters a shipping address."],
+    ["submitPayment", "Customer submits card details; entering submitting charges the card."],
+  ];
+  return [
+    c({
+      id: "happy-path",
+      title: "How we take a successful order",
+      description: "Three form steps, then the card charge succeeds.",
+      inputs: [...toPayment, ["paymentOk", "chargeCard reports success with an order id."]],
+    }),
+    c({
+      id: "card-declined",
+      title: "How we handle a declined card",
+      description:
+        "The charge fails; the customer lands on the error step and goes back to fix the card.",
+      inputs: [
+        ...toPayment,
+        ["paymentFail", "chargeCard reports the card was declined."],
+        ["back", "Customer goes back to the payment step to try another card."],
+      ],
+    }),
+    c({
+      id: "edit-address",
+      title: "How a customer edits their address",
+      description: "Back from payment clears the address so it is entered again.",
+      inputs: [
+        ["submitBasicInfo", "Customer enters name and email."],
+        ["submitShipping", "Customer enters a shipping address."],
+        ["back", "Customer goes back; the stored address is cleared."],
+        ["submitShipping", "Customer enters the corrected address."],
+      ],
+    }),
+  ];
+}
+
+function authJourneys(): JourneySpec[] {
+  const a = (spec: JourneyText) => journey(authPayloads, spec);
+  return [
+    a({
+      id: "sign-in",
+      title: "How a user signs in",
+      description: "Phone sign-in from a fresh app start.",
+      inputs: [
+        ["SIGN_IN", "User submits a phone number; entering signingIn starts signInWithPhone."],
+        ["SIGN_IN_DONE", "signInWithPhone reports the user."],
+      ],
+    }),
+    a({
+      id: "sign-in-retry",
+      title: "How we recover from a failed sign-in",
+      description: "The first attempt fails; the user retries and gets in.",
+      inputs: [
+        ["SIGN_IN", "User submits a phone number."],
+        ["SIGN_IN_ERROR", "signInWithPhone reports an error."],
+        ["RETRY", "User taps retry; signInWithPhone runs again."],
+        ["SIGN_IN_DONE", "This time it succeeds."],
+      ],
+    }),
+    a({
+      id: "sign-out",
+      title: "How a user signs out",
+      description: "Signed in, then out; MONITOR_TICK is handled anywhere without moving.",
+      inputs: [
+        ["SIGN_IN", "User submits a phone number."],
+        ["SIGN_IN_DONE", "signInWithPhone reports the user."],
+        ["MONITOR_TICK", "The auth monitor ticks; nothing changes."],
+        ["SIGN_OUT", "User taps sign out; entering signingOut runs signOut."],
+        ["SIGNING_OUT_DONE", "signOut finishes."],
+      ],
+    }),
+  ];
+}
+
+function sagaJourneys(): JourneySpec[] {
+  const s = (spec: JourneyText) => journey(sagaPayloads, spec);
+  const reserved: Narrated[] = [
+    ["START", "An order comes in; entering reservingInventory reserves stock."],
+    ["INVENTORY_RESERVED", "Stock is reserved; entering processingPayment charges the customer."],
+  ];
+  return [
+    s({
+      id: "order-completes",
+      title: "How an order goes through",
+      description: "Reserve stock, charge, ship, notify.",
+      inputs: [
+        ...reserved,
+        ["PAYMENT_PROCESSED", "Payment clears; entering creatingShipment books the carrier."],
+        ["SHIPMENT_CREATED", "Carrier returns a tracking number; the customer is notified."],
+        ["NOTIFICATION_SENT", "Notification delivered."],
+      ],
+    }),
+    s({
+      id: "payment-fails",
+      title: "How we handle a failed payment",
+      description: "Compensation runs in reverse: refund, then release the stock.",
+      inputs: [
+        ...reserved,
+        ["PAYMENT_FAILED", "The card is declined; compensation starts with runRefund."],
+        ["REFUND_DONE", "Refund settled; releaseInventory frees the reserved stock."],
+        ["RELEASE_DONE", "Stock released; the saga ends failed."],
+      ],
+    }),
+    s({
+      id: "customer-cancels",
+      title: "How we handle a cancellation mid-order",
+      description: "Cancel after stock is reserved releases it.",
+      inputs: [
+        ...reserved,
+        ["CANCEL", "Customer cancels; releaseInventory frees the stock."],
+        ["RELEASE_DONE", "Stock released."],
+      ],
+    }),
+  ];
+}
+
+function retryJourneys(): JourneySpec[] {
+  return [
+    {
+      id: "lockout",
+      title: "How we lock out after repeated failures",
+      description: "Each failure counts; the 11th locks the connection until reset.",
+      inputs: [
+        { step: send("connect", retryPayloads), note: "Client starts connecting." },
+        ...Array.from({ length: 11 }, (_, index) => ({
+          step: send("failed", retryPayloads),
+          note:
+            index < 10
+              ? `Attempt ${index + 1} fails; we keep trying.`
+              : "Attempt 11 fails: locked out.",
+        })),
+        { step: send("reset", retryPayloads), note: "An operator resets the lock." },
+      ],
+    },
+  ];
+}
+
+/**
+ * Walkthroughs for readers: "here is how we handle X". Unlike the baselines
+ * (coverage bar), these are written to explain, one note per input. Internal
+ * events stand in for what the stubbed effect would report.
+ */
+export function exampleJourneys(): Record<string, JourneySpec[]> {
+  return {
+    checkout: checkoutJourneys(),
+    auth: authJourneys(),
+    saga: sagaJourneys(),
+    retry: retryJourneys(),
   };
 }
 
