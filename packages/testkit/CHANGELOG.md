@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0
+
+<sub>2026-11-01</sub>
+
+- _(major)_
+  **Breaking.** `harness.graph` (the traversal `ActorGraph`) now has a `*`
+  any-node and one edge per declared target, which changes coverage totals.
+  `onAny` transitions are also counted correctly in coverage (#309).
+- _(patch)_
+  `computeCoverage` no longer counts the `onAny` pseudo-state as an unvisitable
+  state, and counts an `onAny` transition as covered once its event fired from
+  any state. `assertAllStatesVisited` and `assertAllTransitionsVisited` can now
+  pass for machines that use `onAny`.
+
 ## 1.0.0
 
 <sub>2026-09-04</sub>
