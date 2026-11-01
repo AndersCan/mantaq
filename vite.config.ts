@@ -234,9 +234,9 @@ export default defineConfig({
         },
       },
       {
-        // Atlas fixtures mirror example machines that live in test files
+        // Viz fixtures mirror example machines that live in test files
         // (where structure limits are off). Kept verbatim so they don't drift.
-        files: ["packages/atlas/src/fixtures/**"],
+        files: ["packages/inspect/src/fixtures/**"],
         rules: {
           "eslint/max-lines-per-function": "off",
         },

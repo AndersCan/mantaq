@@ -16,8 +16,8 @@
     "prepare": "vp config",
     "mutation:core": "stryker run",
     "mutation:sugar": "cd packages/sugar && stryker run",
-    "atlas:export": "vp run @mantaq/atlas#atlas:export",
-    "atlas:compare": "vp run @mantaq/atlas#atlas:compare"
+    "viz:export": "vp run @mantaq/inspect#viz:export",
+    "viz:compare": "vp run @mantaq/inspect#viz:compare"
   },
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",
