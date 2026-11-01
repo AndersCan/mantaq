@@ -10,7 +10,7 @@ import {
 } from "./validate-read.ts";
 import type { JsonObject, Reader } from "./validate-read.ts";
 
-export function readStep(reader: Reader, record: JsonObject, path: string): AtlasStep {
+function readStep(reader: Reader, record: JsonObject, path: string): AtlasStep {
   if (record["kind"] === "advance")
     return { kind: "advance", ms: readInteger(reader, { record, key: "ms", path }) };
   if (record["kind"] !== "event")

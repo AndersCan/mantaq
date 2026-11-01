@@ -57,10 +57,26 @@ export function createAuthActor(clock: VirtualClock = VirtualClock()) {
     clock,
     context: initialContext,
     setup: (m) => {
-      m.effect(authStates.checkingAuth, { name: "monitorCheckingAuth", fn: () => undefined });
-      m.effect(authStates.loggedIn, { name: "monitorLoggedIn", fn: () => undefined });
-      m.effect(authStates.signingIn, { name: "signInWithPhone", fn: () => undefined });
-      m.effect(authStates.signingOut, { name: "signOut", fn: () => undefined });
+      m.effect(authStates.checkingAuth, {
+        name: "monitorCheckingAuth",
+        sends: [authEvents.MONITOR_TICK],
+        fn: () => undefined,
+      });
+      m.effect(authStates.loggedIn, {
+        name: "monitorLoggedIn",
+        sends: [authEvents.MONITOR_TICK],
+        fn: () => undefined,
+      });
+      m.effect(authStates.signingIn, {
+        name: "signInWithPhone",
+        sends: [signInDoneEvent, signInErrorEvent],
+        fn: () => undefined,
+      });
+      m.effect(authStates.signingOut, {
+        name: "signOut",
+        sends: [authEvents.SIGNING_OUT_DONE],
+        fn: () => undefined,
+      });
       m.onAny({ event: authEvents.MONITOR_TICK, handler: () => ({}) });
       m.on(authStates.checkingAuth, {
         event: signInEvent,

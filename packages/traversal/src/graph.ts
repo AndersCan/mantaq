@@ -15,7 +15,7 @@ import {
   parseTargetMap,
   parseTransitionMap,
 } from "./parse-graph.ts";
-import type { ActorGraph, GraphEdge, GraphNode, StateDef } from "./types.ts";
+import type { ActorGraph, GraphEdge, GraphEffect, GraphNode, StateDef } from "./types.ts";
 import type { AnyActor } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 
@@ -84,10 +84,19 @@ function recurseRegions(
   return { nodes, edges: childEdges };
 }
 
-function effectName(entry: unknown): string | undefined {
-  if (typeof entry !== "object" || entry === null) return undefined;
+function readEffect(entry: unknown): GraphEffect[] {
+  if (typeof entry !== "object" || entry === null) return [];
   const name: unknown = Reflect.get(entry, "name");
-  return typeof name === "string" ? name : undefined;
+  if (typeof name !== "string") return [];
+  const sends: unknown = Reflect.get(entry, "sends");
+  return [
+    {
+      name,
+      sends: Array.isArray(sends)
+        ? sends.filter((type): type is string => typeof type === "string")
+        : null,
+    },
+  ];
 }
 
 function addEffectSelfLoops(
@@ -108,7 +117,7 @@ function addEffectSelfLoops(
           isActive: layout.activeSet.has(loopId),
           isInternal: true,
           contexts: [],
-          effects: effectFns.flatMap((entry: unknown) => effectName(entry) ?? []),
+          effects: effectFns.flatMap((entry: unknown) => readEffect(entry)),
         });
       }
     }

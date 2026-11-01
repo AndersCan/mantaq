@@ -9,7 +9,7 @@
  * edges from handler source (AST), fuzz guided by the AST's literals and
  * comparisons (seeded from MANTAQ_SEED, default from @mantaq/pbt), annotate
  * fuzz-found edges, then replay the transcribed example tests for `tested`
- * coverage, and record the example journeys. Same seed => identical files.
+ * coverage. Same seed => identical files.
  *
  * compare: blind vs literal-seeded vs branch-distance fuzzing on every
  * example, as a Markdown report (seeds 1..N).
@@ -17,10 +17,9 @@
 import type { AtlasMachine } from "./schema.ts";
 import { toAtlasMachine } from "./atlas.ts";
 import { annotateMachine } from "./ast/annotate.ts";
+import { unhandledSends } from "./moves.ts";
 import { routingWarnings } from "./routing.ts";
-import { EXAMPLE_ROOT, exampleJourneys, exampleTargets, handWrittenBaselines } from "./examples.ts";
-import { withJourneys } from "./journey.ts";
-import type { JourneyIssue } from "./journey.ts";
+import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "./examples.ts";
 import type { Example } from "./examples.ts";
 import { compareArms, renderComparison } from "./fuzz/compare.ts";
 import { withTestCoverage } from "./fuzz/coverage.ts";
@@ -63,10 +62,7 @@ function annotate(machine: AtlasMachine, example: Example, options: ExportOption
     : machine;
 }
 
-function exampleMachine(
-  example: Example,
-  options: ExportOptions,
-): Either<JourneyIssue[], AtlasMachine> {
+function exampleMachine(example: Example, options: ExportOptions): AtlasMachine {
   const plain = toAtlasMachine({ id: example.id, actor: example.create().actor });
   const structure = annotate(plain, example, options);
   const machine =
@@ -81,8 +77,7 @@ function exampleMachine(
           }),
         );
   const tests = handWrittenBaselines()[example.id] ?? [];
-  const annotated = annotate(withTestCoverage(example, machine, tests), example, options);
-  return withJourneys(example, annotated, exampleJourneys()[example.id] ?? []);
+  return annotate(withTestCoverage(example, machine, tests), example, options);
 }
 
 function compareExamples(options: { seeds: number; iterations: number }): void {
@@ -107,20 +102,18 @@ function compareExamples(options: { seeds: number; iterations: number }): void {
 
 function exportExamples(options: ExportOptions): void {
   mkdirSync(options.outDir, { recursive: true });
-  const results = exampleTargets().map((example) => exampleMachine(example, options));
-  const issues = results.flatMap((result) => (Either.isLeft(result) ? result[0] : []));
-  if (issues.length > 0) {
-    for (const issue of issues) {
-      process.stderr.write(`journey ${issue.journey}: ${issue.message}\n`);
-    }
-    process.exitCode = 1;
-    return;
-  }
-  const machines = results.flatMap((result) => (Either.isRight(result) ? [result[1]] : []));
+  const machines = exampleTargets().map((example) => exampleMachine(example, options));
   for (const machine of machines) {
     writeDocument(join(options.outDir, `${machine.id}.json`), [machine]);
     for (const warning of routingWarnings(machine)) {
       process.stderr.write(`warning: ${warning.machine}: ${warning.message}\n`);
+    }
+    for (const state of machine.states) {
+      for (const { effect, event } of unhandledSends(machine, state.id)) {
+        process.stderr.write(
+          `warning: ${machine.id}: effect ${effect} in ${state.id} sends ${event}, but ${state.id} has no handler for it\n`,
+        );
+      }
     }
   }
   writeDocument(join(options.outDir, "examples.json"), machines);

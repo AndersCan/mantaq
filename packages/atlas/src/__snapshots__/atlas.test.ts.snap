@@ -246,13 +246,17 @@ exports[`determinism > auth snapshot 1`] = `
       "fuzz": null,
       "id": "auth",
       "initial": "checkingAuth",
-      "journeys": [],
       "regions": [],
       "states": [
         {
           "coverage": null,
           "effects": [
-            "monitorCheckingAuth"
+            {
+              "name": "monitorCheckingAuth",
+              "sends": [
+                "MONITOR_TICK"
+              ]
+            }
           ],
           "final": false,
           "id": "checkingAuth",
@@ -264,7 +268,12 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "monitorLoggedIn"
+            {
+              "name": "monitorLoggedIn",
+              "sends": [
+                "MONITOR_TICK"
+              ]
+            }
           ],
           "final": false,
           "id": "loggedIn",
@@ -296,7 +305,13 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "signInWithPhone"
+            {
+              "name": "signInWithPhone",
+              "sends": [
+                "SIGN_IN_DONE",
+                "SIGN_IN_ERROR"
+              ]
+            }
           ],
           "final": false,
           "id": "signingIn",
@@ -308,7 +323,12 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "signOut"
+            {
+              "name": "signOut",
+              "sends": [
+                "SIGNING_OUT_DONE"
+              ]
+            }
           ],
           "final": false,
           "id": "signingOut",
@@ -320,7 +340,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 6
+  "schemaVersion": 7
 }
 "
 `;
@@ -532,7 +552,6 @@ exports[`determinism > checkout snapshot 1`] = `
       "fuzz": null,
       "id": "checkout",
       "initial": "basicInfo",
-      "journeys": [],
       "regions": [],
       "states": [
         {
@@ -578,7 +597,14 @@ exports[`determinism > checkout snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "chargeCard"
+            {
+              "name": "chargeCard",
+              "sends": [
+                "paymentOk",
+                "paymentFail",
+                "paymentTimeout"
+              ]
+            }
           ],
           "final": false,
           "id": "submitting",
@@ -600,7 +626,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 6
+  "schemaVersion": 7
 }
 "
 `;
@@ -1007,13 +1033,18 @@ exports[`determinism > saga snapshot 1`] = `
       "fuzz": null,
       "id": "saga",
       "initial": "idle",
-      "journeys": [],
       "regions": [],
       "states": [
         {
           "coverage": null,
           "effects": [
-            "runRefund"
+            {
+              "name": "runRefund",
+              "sends": [
+                "REFUND_DONE",
+                "REFUND_FAILED"
+              ]
+            }
           ],
           "final": false,
           "id": "compensatingRefund",
@@ -1025,7 +1056,13 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "releaseInventory"
+            {
+              "name": "releaseInventory",
+              "sends": [
+                "RELEASE_DONE",
+                "RELEASE_FAILED"
+              ]
+            }
           ],
           "final": false,
           "id": "compensatingRelease",
@@ -1047,7 +1084,13 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "createShipment"
+            {
+              "name": "createShipment",
+              "sends": [
+                "SHIPMENT_CREATED",
+                "SHIPMENT_FAILED"
+              ]
+            }
           ],
           "final": false,
           "id": "creatingShipment",
@@ -1079,7 +1122,13 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "sendNotification"
+            {
+              "name": "sendNotification",
+              "sends": [
+                "NOTIFICATION_SENT",
+                "NOTIFICATION_FAILED"
+              ]
+            }
           ],
           "final": false,
           "id": "notifying",
@@ -1091,7 +1140,13 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "processPayment"
+            {
+              "name": "processPayment",
+              "sends": [
+                "PAYMENT_PROCESSED",
+                "PAYMENT_FAILED"
+              ]
+            }
           ],
           "final": false,
           "id": "processingPayment",
@@ -1103,7 +1158,13 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "coverage": null,
           "effects": [
-            "reserveInventory"
+            {
+              "name": "reserveInventory",
+              "sends": [
+                "INVENTORY_RESERVED",
+                "INVENTORY_FAILED"
+              ]
+            }
           ],
           "final": false,
           "id": "reservingInventory",
@@ -1115,7 +1176,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 6
+  "schemaVersion": 7
 }
 "
 `;

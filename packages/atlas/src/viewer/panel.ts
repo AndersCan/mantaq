@@ -175,7 +175,16 @@ function statePanel(
       ["id", state.id],
       ["region", state.region ?? "(root)"],
       ["flags", joined(flags)],
-      ["effects on entry", joined(state.effects)],
+      [
+        "effects on entry",
+        joined(
+          state.effects.map((effect) =>
+            effect.sends === null
+              ? effect.name
+              : `${effect.name} (sends ${effect.sends.join(", ") || "nothing"})`,
+          ),
+        ),
+      ],
       [machine.fuzz === null ? "run visits" : "fuzz visits", hitsText(state.coverage)],
       ["test visits", hitsText(state.tested)],
       ["outgoing", edgeList(doc, outgoing, select)],

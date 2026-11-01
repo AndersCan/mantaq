@@ -165,7 +165,7 @@ export function toAtlasMachine(input: AtlasInput): AtlasMachine {
     ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
   ].sort();
 
-  return { id: input.id, initial, regions, states, events, edges, fuzz: null, journeys: [] };
+  return { id: input.id, initial, regions, states, events, edges, fuzz: null };
 }
 
 export function toAtlas(inputs: ReadonlyArray<AtlasInput>): AtlasDocument {

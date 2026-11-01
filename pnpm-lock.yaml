@@ -90,9 +90,6 @@ importers:
       '@mantaq/sugar':
         specifier: workspace:*
         version: link:../../packages/sugar
-      '@mantaq/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       astro:
         specifier: ^7.2.0
         version: 7.2.0(@astrojs/markdown-remark@7.2.2)(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.3)(@types/node@26.2.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0)

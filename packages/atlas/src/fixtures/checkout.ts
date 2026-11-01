@@ -42,7 +42,11 @@ export function createCheckoutActor(clock: VirtualClock = VirtualClock()) {
     clock,
     context: initialContext,
     setup: (m) => {
-      m.effect(submitting, { name: "chargeCard", fn: () => undefined });
+      m.effect(submitting, {
+        name: "chargeCard",
+        sends: [paymentOk, paymentFail, paymentTimeout],
+        fn: () => undefined,
+      });
       m.on(payment, {
         event: back,
         to: [shippingAddress],

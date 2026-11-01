@@ -6,13 +6,22 @@ const DEFAULT_SRC = "atlas/examples.json";
 
 const params = new URLSearchParams(location.search);
 
-/** `?machine=checkout&journey=card-declined` opens straight into that walk. */
+/** Keep `?machine=…&step=…` in the address bar so the current walk can be shared. */
+function rememberWalk(where: { machine: string; steps: string[] }): void {
+  const next = new URLSearchParams(location.search);
+  next.set("machine", where.machine);
+  next.delete("step");
+  for (const step of where.steps) next.append("step", step);
+  history.replaceState(null, "", `?${next.toString()}`);
+}
+
+/** `?machine=checkout&step=<edge id>&step=…` opens straight into that walk. */
 function linkOptions(): ViewerOptions {
   const machine = params.get("machine");
-  const journey = params.get("journey");
   return {
     ...(machine === null ? {} : { machine }),
-    ...(journey === null ? {} : { journey }),
+    steps: params.getAll("step"),
+    onNavigate: rememberWalk,
   };
 }
 

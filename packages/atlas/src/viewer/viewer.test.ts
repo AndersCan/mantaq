@@ -1,25 +1,17 @@
 // @vitest-environment happy-dom
 import { toAtlas, toAtlasMachine } from "../atlas.ts";
 import { annotateMachine } from "../ast/annotate.ts";
-import {
-  EXAMPLE_ROOT,
-  exampleInputs,
-  exampleJourneys,
-  exampleTargets,
-  handWrittenBaselines,
-} from "../examples.ts";
-import { withJourneys } from "../journey.ts";
-import { Either } from "@mantaq/utils";
+import { EXAMPLE_ROOT, exampleInputs, exampleTargets, handWrittenBaselines } from "../examples.ts";
 import { withTestCoverage } from "../fuzz/coverage.ts";
 import { DEFAULT_SEED } from "@mantaq/pbt";
 import { createCheckoutActor, submitBasicInfo } from "../fixtures/checkout.ts";
 import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import { join } from "node:path";
-import type { AtlasDocument } from "../schema.ts";
+import type { AtlasDocument, AtlasExplanation } from "../schema.ts";
 import { fuzz } from "../fuzz/fuzz.ts";
 import { fuzzedMachine } from "../fuzz/to-atlas.ts";
 import { ATLAS_SCHEMA_VERSION } from "../schema.ts";
-import { FUZZ_NOTE, JOURNEY_BANNER, STRUCTURE_BANNER, mountViewer } from "./viewer.ts";
+import { FUZZ_NOTE, STRUCTURE_BANNER, mountViewer } from "./viewer.ts";
 import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -408,113 +400,177 @@ describe("viewer: fuzz vs test coverage", () => {
   });
 });
 
-describe("viewer: journeys", () => {
-  function withCheckoutJourneys(): AtlasDocument {
-    const atlas = checkout();
-    const target = exampleTargets().find((each) => each.id === "checkout");
-    const [machine] = atlas.machines;
-    if (target === undefined || machine === undefined) return atlas;
-    const result = withJourneys(target, machine, exampleJourneys()["checkout"] ?? []);
-    return Either.isRight(result) ? { ...atlas, machines: [result[1]] } : atlas;
-  }
-
+describe("viewer: explore", () => {
   function nodeElement(root: HTMLElement, id: string): Element | null {
     return root.querySelector(`.graph [data-node-id="${id}"]`);
   }
 
-  function nextEdge(root: HTMLElement): Element | null {
-    return root.querySelector(".graph .edge.next");
-  }
-
-  function startDeclined(): HTMLElement {
-    const root = mount(withCheckoutJourneys());
-    root.querySelector('[data-journey-link="card-declined"]')?.dispatchEvent(new Event("click"));
-    return root;
-  }
-
-  test("idle panel lists the journeys by title", () => {
-    const root = mount(withCheckoutJourneys());
-    const titles = [...root.querySelectorAll(".panel [data-journey-link]")].map(
-      (link) => link.textContent,
+  function take(root: HTMLElement, event: string, target?: string): void {
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>(".panel [data-take]")];
+    const found = buttons.find(
+      (button) =>
+        button.querySelector("code")?.textContent === event &&
+        (target === undefined || button.dataset["target"] === target),
     );
-    expect(titles).toEqual([
-      "How we take a successful order",
-      "How we handle a declined card",
-      "How a customer edits their address",
-    ]);
-  });
+    expect(found, `no move ${event}`).toBeDefined();
+    found?.click();
+  }
 
-  test("starting a journey dims everything off its path and makes it inert", () => {
-    const root = startDeclined();
-    expect(root.classList.contains("journey-on")).toBe(true);
-    expect(root.querySelector(".banner")?.textContent).toBe(JOURNEY_BANNER);
-    expect(root.querySelector(".coverage-mode")).toBeNull();
-    const success = nodeElement(root, "success");
-    expect(success?.classList.contains("off-path")).toBe(true);
-    expect(success?.getAttribute("tabindex")).toBe("-1");
+  function current(root: HTMLElement): string | null | undefined {
+    return root.querySelector(".panel .explore")?.getAttribute("data-current");
+  }
+
+  function groupEvents(root: HTMLElement, group: string): string[] {
+    return [...root.querySelectorAll(`.panel [data-group="${group}"] [data-take] code`)].map(
+      (code) => code.textContent ?? "",
+    );
+  }
+
+  test("starts in the initial state with its inputs as next steps", () => {
+    const root = mount(checkout());
+    expect(current(root)).toBe("basicInfo");
     expect(nodeElement(root, "basicInfo")?.classList.contains("current")).toBe(true);
-    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 0 of 5");
-  });
-
-  test("only the next edge advances; clicking off the path does nothing", () => {
-    const root = startDeclined();
-    expect(nextEdge(root)?.getAttribute("data-from")).toBe("basicInfo");
-    const offPath = [...root.querySelectorAll(".graph .edge.off-path")][0];
-    offPath?.dispatchEvent(new Event("click"));
-    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 0 of 5");
-    expect(root.querySelector(".panel [data-selected-edge]")).toBeNull();
-    nextEdge(root)?.dispatchEvent(new Event("click"));
-    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 1 of 5");
-    expect(nodeElement(root, "shippingAddress")?.classList.contains("current")).toBe(true);
-    expect(root.querySelector(".graph .edge.taken")?.getAttribute("data-to")).toBe(
+    expect(groupEvents(root, "input")).toEqual(["submitBasicInfo"]);
+    expect(root.querySelector(".graph .edge.next")?.getAttribute("data-to")).toBe(
       "shippingAddress",
     );
+    expect(nodeElement(root, "shippingAddress")?.classList.contains("reachable")).toBe(true);
   });
 
-  test("entering a state names the effects it ran and lights its effect loop", () => {
-    const root = startDeclined();
-    for (let step = 0; step < 3; step += 1) nextEdge(root)?.dispatchEvent(new Event("click"));
-    expect(root.querySelector(".panel .journey-effects")?.textContent).toBe(
-      "Entering submitting runs chargeCard.",
+  test("an effect's declared sends are the next steps it reports back", () => {
+    const root = mount(checkout());
+    take(root, "submitBasicInfo");
+    take(root, "submitShipping");
+    take(root, "submitPayment");
+    expect(current(root)).toBe("submitting");
+    expect(root.querySelector('.panel [data-effect="chargeCard"]')?.textContent).toBe(
+      "chargeCard sends paymentOk, paymentFail, paymentTimeout",
     );
-    expect(root.querySelector(".panel .journey-note")?.textContent).toBe(
-      "Customer submits card details; entering submitting charges the card.",
-    );
+    expect(groupEvents(root, "effect")).toEqual(["paymentFail", "paymentOk", "paymentTimeout"]);
+    expect(groupEvents(root, "input")).toEqual([]);
     const running = root.querySelector(".graph .edge.effect.running");
-    expect(running?.textContent).toBe("runs chargeCard");
     expect(running?.getAttribute("data-from")).toBe("submitting");
   });
 
-  test("arrow keys and buttons step; the end says where the journey stops", () => {
-    const root = startDeclined();
-    const key = (name: string) =>
-      root.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
-    for (let step = 0; step < 9; step += 1) key("ArrowRight");
-    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 5 of 5");
-    expect(root.querySelector(".panel .journey-next")?.textContent).toBe(
-      "End of journey, in payment.",
-    );
-    key("ArrowLeft");
-    expect(nodeElement(root, "error")?.classList.contains("current")).toBe(true);
-    root.querySelector<HTMLButtonElement>('[data-journey-action="restart"]')?.click();
-    expect(nodeElement(root, "basicInfo")?.classList.contains("current")).toBe(true);
-    root.querySelector<HTMLButtonElement>('[data-journey-action="exit"]')?.click();
-    expect(root.classList.contains("journey-on")).toBe(false);
-    expect(root.querySelector(".graph .off-path")).toBeNull();
+  test("a timeout leads to error, and back retries payment", () => {
+    const root = mount(checkout());
+    for (const event of ["submitBasicInfo", "submitShipping", "submitPayment", "paymentTimeout"]) {
+      take(root, event);
+    }
+    expect(current(root)).toBe("error");
+    take(root, "back");
+    expect(current(root)).toBe("payment");
+    expect([...root.querySelectorAll(".graph .edge.taken")]).toHaveLength(5);
   });
 
-  test("clicking a state already on the path jumps back to when it was reached", () => {
-    const root = startDeclined();
-    for (let step = 0; step < 4; step += 1) nextEdge(root)?.dispatchEvent(new Event("click"));
+  test("a final state ends the walk", () => {
+    const root = mount(checkout());
+    for (const event of ["submitBasicInfo", "submitShipping", "submitPayment", "paymentOk"]) {
+      take(root, event);
+    }
+    expect(current(root)).toBe("success");
+    expect(root.querySelector(".panel .explore-end")?.textContent).toBe(
+      "success is final: the actor has stopped.",
+    );
+  });
+
+  test("clicking a next edge or a reachable state on the graph takes the step", () => {
+    const root = mount(checkout());
+    root.querySelector(".graph .edge.next")?.dispatchEvent(new Event("click"));
+    expect(current(root)).toBe("shippingAddress");
+    expect(root.querySelector(".panel [data-selected-edge]")).not.toBeNull();
     nodeElement(root, "payment")?.dispatchEvent(new Event("click"));
-    expect(root.querySelector(".panel .journey-progress")?.textContent).toBe("Step 2 of 5");
+    expect(current(root)).toBe("payment");
+    nodeElement(root, "success")?.dispatchEvent(new Event("click"));
+    expect(current(root)).toBe("payment");
+    expect(root.querySelector('.panel [data-selected-state="success"]')).not.toBeNull();
   });
 
-  test("the journey option opens straight into a walk", () => {
-    const root = mount(withCheckoutJourneys(), { machine: "checkout", journey: "happy-path" });
-    expect(root.querySelector(".panel [data-journey]")?.getAttribute("data-journey")).toBe(
-      "happy-path",
+  test("back, reset, rewinding the path and ArrowLeft", () => {
+    const root = mount(checkout());
+    take(root, "submitBasicInfo");
+    take(root, "submitShipping");
+    take(root, "submitPayment");
+    root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.click();
+    expect(current(root)).toBe("payment");
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(current(root)).toBe("shippingAddress");
+    root.querySelector<HTMLButtonElement>('.panel [data-rewind="1"]')?.click();
+    expect(current(root)).toBe("shippingAddress");
+    root.querySelector<HTMLButtonElement>('[data-explore-action="reset"]')?.click();
+    expect(current(root)).toBe("basicInfo");
+    expect(root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.disabled).toBe(
+      true,
     );
-    expect(root.querySelector<HTMLSelectElement>(".journey-select")?.value).toBe("happy-path");
+  });
+
+  test("onAny moves are offered from every non-final state", () => {
+    const atlas = toAtlas(exampleInputs().filter((input) => input.id === "saga"));
+    const root = mount(atlas);
+    take(root, "START");
+    expect(current(root)).toBe("reservingInventory");
+    const cancels = [...root.querySelectorAll<HTMLButtonElement>('.panel [data-take^="*-CANCEL"]')];
+    expect(
+      cancels
+        .map((button) => button.dataset["target"])
+        .toSorted((a = "", b = "") => a.localeCompare(b)),
+    ).toEqual(["compensatingRelease", "failed"]);
+  });
+
+  test("steps round-trip through onNavigate and the steps option", () => {
+    const seen: Array<{ machine: string; steps: string[] }> = [];
+    const root = mount(checkout(), { onNavigate: (where) => seen.push(where) });
+    take(root, "submitBasicInfo");
+    take(root, "back");
+    const last = seen.at(-1);
+    expect(last?.machine).toBe("checkout");
+    expect(last?.steps).toHaveLength(2);
+    const reopened = mount(checkout(), { steps: [...(last?.steps ?? []), "no-such-edge"] });
+    expect(current(reopened)).toBe("basicInfo");
+    expect(reopened.querySelectorAll(".panel .explore-path li")).toHaveLength(3);
+  });
+
+  test("an undetermined edge offers each target its explanation names, or none", () => {
+    const atlas = undeterminedBack(checkout());
+    const id = "shippingAddress-back-undetermined";
+    const plain = mount(atlas);
+    take(plain, "submitBasicInfo");
+    expect(plain.querySelector(`.panel [data-move="${id}"]`)?.textContent).toBe(
+      "back → ? target depends on payload or context",
+    );
+
+    const explanation: AtlasExplanation = {
+      status: "analyzed",
+      location: { file: "checkout.ts", line: 1, column: 1 },
+      registration: "on",
+      branches: [
+        { conditions: ["ok"], target: { kind: "state", state: "basicInfo" } },
+        { conditions: ["!(ok)"], target: { kind: "stay" } },
+      ],
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    };
+    const explained: AtlasDocument = {
+      ...atlas,
+      machines: atlas.machines.map((machine) => ({
+        ...machine,
+        edges: machine.edges.map((edge) => (edge.id === id ? { ...edge, explanation } : edge)),
+      })),
+    };
+    const seen: string[][] = [];
+    const root = mount(explained, { onNavigate: (where) => seen.push(where.steps) });
+    take(root, "submitBasicInfo");
+    const targets = [...root.querySelectorAll<HTMLButtonElement>(`.panel [data-take="${id}"]`)].map(
+      (button) => button.dataset["target"],
+    );
+    expect(targets).toEqual(["basicInfo", "shippingAddress"]);
+    take(root, "back", "shippingAddress");
+    expect(current(root)).toBe("shippingAddress");
+    expect(seen.at(-1)?.at(-1)).toBe(`${id}~shippingAddress`);
+    expect(current(mount(explained, { steps: seen.at(-1) }))).toBe("shippingAddress");
   });
 });

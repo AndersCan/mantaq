@@ -65,6 +65,10 @@ export function readStrings(reader: Reader, at: Field): string[] {
   return fail(reader, at, { message: "expected string[]", fallback: [] });
 }
 
+export function readNullableStrings(reader: Reader, at: Field): string[] | null {
+  return at.record[at.key] === null ? null : readStrings(reader, at);
+}
+
 export function readEnum<T extends string>(
   reader: Reader,
   at: Field,

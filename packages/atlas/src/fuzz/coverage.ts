@@ -8,7 +8,7 @@ import type { FuzzTarget, Observation, Trace } from "./run.ts";
  * own handler for the same event is not told apart: observations carry no
  * handler identity.
  */
-export function matches(edge: AtlasEdge, seen: Observation): boolean {
+function matches(edge: AtlasEdge, seen: Observation): boolean {
   const source = seen.from === edge.from || coveredByAny(edge.from, seen.from);
   if (!source || seen.event !== edge.event) return false;
   if (edge.kind === "stay") return !seen.transitioned;

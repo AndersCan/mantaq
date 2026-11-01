@@ -84,12 +84,36 @@ export function createSagaActor(clock: VirtualClock = VirtualClock()) {
     clock,
     context: initialContext,
     setup: (m) => {
-      m.effect(sagaStates.reservingInventory, { name: "reserveInventory", fn: () => undefined });
-      m.effect(sagaStates.processingPayment, { name: "processPayment", fn: () => undefined });
-      m.effect(sagaStates.creatingShipment, { name: "createShipment", fn: () => undefined });
-      m.effect(sagaStates.notifying, { name: "sendNotification", fn: () => undefined });
-      m.effect(sagaStates.compensatingRefund, { name: "runRefund", fn: () => undefined });
-      m.effect(sagaStates.compensatingRelease, { name: "releaseInventory", fn: () => undefined });
+      m.effect(sagaStates.reservingInventory, {
+        name: "reserveInventory",
+        sends: [INVENTORY_RESERVED, INVENTORY_FAILED],
+        fn: () => undefined,
+      });
+      m.effect(sagaStates.processingPayment, {
+        name: "processPayment",
+        sends: [PAYMENT_PROCESSED, PAYMENT_FAILED],
+        fn: () => undefined,
+      });
+      m.effect(sagaStates.creatingShipment, {
+        name: "createShipment",
+        sends: [SHIPMENT_CREATED, SHIPMENT_FAILED],
+        fn: () => undefined,
+      });
+      m.effect(sagaStates.notifying, {
+        name: "sendNotification",
+        sends: [NOTIFICATION_SENT, NOTIFICATION_FAILED],
+        fn: () => undefined,
+      });
+      m.effect(sagaStates.compensatingRefund, {
+        name: "runRefund",
+        sends: [REFUND_DONE, REFUND_FAILED],
+        fn: () => undefined,
+      });
+      m.effect(sagaStates.compensatingRelease, {
+        name: "releaseInventory",
+        sends: [RELEASE_DONE, RELEASE_FAILED],
+        fn: () => undefined,
+      });
       m.onAny({
         event: CANCEL,
         to: [failed, sagaStates.compensatingRelease],

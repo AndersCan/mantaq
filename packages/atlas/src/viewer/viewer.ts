@@ -5,14 +5,12 @@ import type { Selection } from "./graph.ts";
 import { availableModes, modeLabel, unreachedText } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
-import { clickTarget, findJourney, journeyList, journeyPanel, markJourney } from "./journey.ts";
-import type { JourneyView } from "./journey.ts";
+import { decodePath, encodeStep } from "../moves.ts";
+import type { ExploreStep } from "../moves.ts";
+import { clickStep, explorePanel, markExplore } from "./explore.ts";
 
 export const STRUCTURE_BANNER =
-  "Edges come from each handler's declared `to` list. Guards are not evaluated, so some edges may never be taken.";
-
-export const JOURNEY_BANNER =
-  "Journey: a recorded run from a fresh actor. Every step is what the real handlers did with these inputs; only the path can be clicked.";
+  "Click a pulsing edge, or a state it leads to, to walk the machine. Edges come from each handler's declared `to` list and effects' `sends`; guards are not evaluated, so a path here may not happen at runtime.";
 
 export const FUZZ_NOTE =
   "Green edges were observed while fuzzing but not declared. Fuzzing finds behaviour; it never proves an edge is impossible.";
@@ -22,8 +20,8 @@ interface ViewState {
   selection: Selection | null;
   /** null = use the machine's best available mode. */
   coverage: CoverageMode | null;
-  /** Journey being walked, by id; null = free exploration. */
-  journey: { id: string; at: number } | null;
+  /** Steps taken from the initial state. */
+  path: ExploreStep[];
 }
 
 function effectiveMode(view: ViewState, machine: AtlasMachine): CoverageMode {
@@ -35,13 +33,16 @@ function effectiveMode(view: ViewState, machine: AtlasMachine): CoverageMode {
 
 function legend(
   doc: Document,
-  { mode, machine, journey }: { mode: CoverageMode; machine: AtlasMachine; journey: boolean },
+  { mode, machine }: { mode: CoverageMode; machine: AtlasMachine },
 ): HTMLUListElement {
   const entries: Array<[string, string]> = [
     ["legend-final", "double border: final state"],
     ["legend-undetermined", "dashed edge to ?: target undetermined"],
     ["legend-internal", "dotted edge, italic label: internal event"],
     ["legend-effect", "faint self-loop: state runs effects on entry"],
+    ["legend-current", "thick accent border: where the walk is"],
+    ["legend-next", "pulsing: a possible next step"],
+    ["legend-taken", "bold accent: path taken"],
   ];
   if (machine.fuzz !== null) {
     entries.push(
@@ -50,12 +51,6 @@ function legend(
     );
   }
   if (mode !== "off") entries.push(["legend-unreached", unreachedText(mode, machine)]);
-  if (journey) {
-    entries.push(
-      ["legend-taken", "bold accent: already taken"],
-      ["legend-next", "pulsing: click to take the next step"],
-    );
-  }
   return html(
     doc,
     "ul",
@@ -85,28 +80,6 @@ function machineSelect(
   );
   select.addEventListener("change", () => context.onChange(select.value));
   return html(doc, "label", {}, ["Machine ", select]);
-}
-
-function journeyPicker(
-  doc: Document,
-  context: { machine: AtlasMachine; current: string | null; onChange: (id: string | null) => void },
-): HTMLLabelElement | null {
-  if (context.machine.journeys.length === 0) return null;
-  const select = html(doc, "select", { class: "journey-select" }, [
-    html(doc, "option", { value: "", selected: context.current === null ? "" : null }, [
-      "explore freely",
-    ]),
-    ...context.machine.journeys.map((journey) =>
-      html(
-        doc,
-        "option",
-        { value: journey.id, selected: journey.id === context.current ? "" : null },
-        [journey.title],
-      ),
-    ),
-  ]);
-  select.addEventListener("change", () => context.onChange(select.value || null));
-  return html(doc, "label", {}, ["Journey ", select]);
 }
 
 function isMode(value: string): value is CoverageMode {
@@ -140,13 +113,15 @@ export interface ViewerOptions {
   heading?: "h1" | "h2" | "h3";
   /** Machine to show first; defaults to the first one. */
   machine?: string;
-  /** Journey to open on load (in the shown machine), e.g. from `?journey=`. */
-  journey?: string;
+  /** Encoded steps to open on (from `?step=`), in the shown machine. */
+  steps?: ReadonlyArray<string>;
+  /** Called after every walk or machine change, e.g. to keep the URL shareable. */
+  onNavigate?: (where: { machine: string; steps: string[] }) => void;
 }
 
 /**
- * Mount a read-only viewer for an atlas document into `root`. No live actors,
- * no editing: the document is the only input.
+ * Mount a viewer for an atlas document into `root`. Walking the graph moves a
+ * cursor over the drawn edges; no actor runs. The document is the only input.
  */
 export function mountViewer(
   root: HTMLElement,
@@ -160,101 +135,76 @@ export function mountViewer(
     machineId: first?.id ?? "",
     selection: null,
     coverage: null,
-    journey:
-      first !== undefined && options.journey !== undefined && findJourney(first, options.journey)
-        ? { id: options.journey, at: 0 }
-        : null,
+    path: first === undefined ? [] : decodePath(first, options.steps ?? []),
   };
-  // Re-bound by each render: arrow keys step the journey being walked.
-  let step: (delta: number) => void = () => undefined;
+  // Re-bound by each render: ArrowLeft steps back.
+  let back: () => void = () => undefined;
   root.addEventListener("keydown", (event) => {
     if (!("key" in event) || event.target instanceof HTMLSelectElement) return;
-    if (event.key === "ArrowRight") step(1);
-    else if (event.key === "ArrowLeft") step(-1);
+    if (event.key === "ArrowLeft") back();
   });
 
   function render(): void {
     const machine = atlas.machines.find((candidate) => candidate.id === view.machineId);
     root.replaceChildren();
     root.classList.add("atlas");
-    root.classList.remove("journey-on");
     if (!machine) {
       root.append(html(doc, "p", { class: "empty" }, ["Document has no machines."]));
       return;
     }
     const mode = effectiveMode(view, machine);
-    const journey = view.journey === null ? undefined : findJourney(machine, view.journey.id);
-    root.classList.toggle("coverage-on", mode !== "off" && journey === undefined);
+    root.classList.toggle("coverage-on", mode !== "off");
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
-    const startJourney = (id: string | null) => {
-      view.journey = id === null ? null : { id, at: 0 };
-      view.selection = null;
-      render();
-    };
-    const go = (at: number) => {
-      if (journey === undefined || view.journey === null) return;
-      view.journey.at = Math.max(0, Math.min(at, journey.moves.length));
-      showJourney({ journey, at: view.journey.at });
-    };
-    // Steps only swap the panel and marks; the SVG stays put so keyboard focus survives.
-    const showJourney = (walk: JourneyView) => {
+    // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
+    const refresh = () => {
       panel.replaceChildren(
-        journeyPanel(doc, { machine, view: walk, go, exit: () => startJourney(null) }),
+        explorePanel(doc, { machine, path: view.path, take, rewind }),
+        renderPanel(doc, machine, { selection: view.selection, select }),
       );
-      markJourney(root, { machine, view: walk });
+      markExplore(root, { machine, path: view.path });
+      markSelection(root, view.selection);
     };
-    const idle = () =>
-      html(doc, "div", {}, [
-        journeyList(doc, { machine, start: startJourney }),
-        renderPanel(doc, machine, { selection: null, select }),
-      ]);
-    // Selection only swaps the panel and marks; the SVG stays put so keyboard focus survives.
+    const walked = () => {
+      options.onNavigate?.({
+        machine: machine.id,
+        steps: view.path.map((step) => encodeStep(machine, step)),
+      });
+      refresh();
+    };
+    const take = (step: ExploreStep) => {
+      view.path = [...view.path, step];
+      walked();
+    };
+    const rewind = (length: number) => {
+      view.path = view.path.slice(0, Math.max(0, length));
+      walked();
+    };
+    // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {
-      if (journey !== undefined && view.journey !== null) {
-        const at = clickTarget({ journey, at: view.journey.at }, { machine, selection });
-        if (at !== null) go(at);
-        return;
-      }
+      const step = clickStep(machine, { path: view.path, selection });
       view.selection = selection;
-      panel.replaceChildren(renderPanel(doc, machine, { selection, select }));
-      markSelection(root, selection);
+      if (step === null) refresh();
+      else take(step);
     };
-    step = (delta) => {
-      if (view.journey !== null) go(view.journey.at + delta);
-    };
-    const header = headerOf(doc, {
-      atlas,
-      machine,
-      view,
-      heading: options.heading ?? "h1",
-      mode,
-      walking: journey !== undefined,
-      startJourney,
-      render,
-    });
+    back = () => rewind(view.path.length - 1);
     root.append(
-      header,
-      html(doc, "p", { class: "banner", role: "note" }, [banner(machine, journey !== undefined)]),
-      legend(doc, {
-        mode: journey === undefined ? mode : "off",
+      headerOf(doc, {
+        atlas,
         machine,
-        journey: journey !== undefined,
+        view,
+        heading: options.heading ?? "h1",
+        mode,
+        render,
+        onNavigate: options.onNavigate,
       }),
+      html(doc, "p", { class: "banner", role: "note" }, [banner(machine)]),
+      legend(doc, { mode, machine }),
       html(doc, "div", { class: "atlas-main" }, [
         html(doc, "div", { class: "canvas" }, [renderGraph(doc, machine, { select, mode })]),
         panel,
       ]),
     );
-    if (journey !== undefined && view.journey !== null) {
-      showJourney({ journey, at: view.journey.at });
-      return;
-    }
-    panel.append(
-      view.selection === null
-        ? idle()
-        : renderPanel(doc, machine, { selection: view.selection, select }),
-    );
-    markSelection(root, view.selection);
+    refresh();
   }
 
   render();
@@ -268,9 +218,8 @@ function headerOf(
     view: ViewState;
     heading: "h1" | "h2" | "h3";
     mode: CoverageMode;
-    walking: boolean;
-    startJourney: (id: string | null) => void;
     render: () => void;
+    onNavigate: ViewerOptions["onNavigate"];
   },
 ): HTMLElement {
   const { machine, view, render } = context;
@@ -281,30 +230,23 @@ function headerOf(
       onChange: (id) => {
         view.machineId = id;
         view.selection = null;
-        view.journey = null;
+        view.path = [];
+        context.onNavigate?.({ machine: id, steps: [] });
         render();
       },
     }),
-    journeyPicker(doc, {
+    coveragePicker(doc, {
       machine,
-      current: context.walking ? (view.journey?.id ?? null) : null,
-      onChange: context.startJourney,
+      mode: context.mode,
+      onChange: (next) => {
+        view.coverage = next;
+        render();
+      },
     }),
-    context.walking
-      ? null
-      : coveragePicker(doc, {
-          machine,
-          mode: context.mode,
-          onChange: (next) => {
-            view.coverage = next;
-            render();
-          },
-        }),
   ]);
 }
 
-function banner(machine: AtlasMachine, walking: boolean): string {
-  if (walking) return JOURNEY_BANNER;
+function banner(machine: AtlasMachine): string {
   return machine.fuzz === null ? STRUCTURE_BANNER : `${STRUCTURE_BANNER} ${FUZZ_NOTE}`;
 }
 

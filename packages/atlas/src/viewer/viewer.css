@@ -293,12 +293,7 @@
   border-radius: 4px;
 }
 
-/* Journey: walk one recorded run; everything else steps back. */
-.atlas.journey-on .off-path {
-  opacity: 0.18;
-  pointer-events: none;
-}
-
+/* Explore: the walk over the drawn graph. */
 .atlas .taken path,
 .atlas .current .frame {
   stroke: var(--accent);
@@ -347,44 +342,60 @@
   }
 }
 
-.atlas .journey-now {
+.atlas .explore {
   background: var(--region-bg);
   border-radius: 6px;
   padding: 6px 10px;
+  margin-bottom: 12px;
 }
 
-.atlas .journey-now p {
-  margin: 4px 0;
+.atlas .explore h3 {
+  font-size: 13px;
+  margin: 10px 0 4px;
+  color: var(--muted);
 }
 
-.atlas .journey-note {
-  font-style: italic;
+.atlas .explore ul,
+.atlas .explore ol {
+  margin: 0;
+  padding-left: 18px;
 }
 
-.atlas .journey-controls {
+.atlas .explore li {
+  margin: 3px 0;
+}
+
+.atlas .explore li > button + button {
+  margin-left: 6px;
+}
+
+.atlas .explore button {
+  cursor: pointer;
+}
+
+.atlas .explore-path li[aria-current="step"] button {
+  font-weight: 700;
+}
+
+.atlas .explore-controls {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
   margin: 8px 0;
 }
 
-.atlas .journey-moves {
-  padding-left: 20px;
+.atlas .explore .unhandled code {
+  text-decoration: line-through;
+  color: var(--unknown);
 }
 
-.atlas .journey-moves li {
-  cursor: pointer;
-  margin: 2px 0;
+.atlas .explore-warning {
+  background: var(--banner-bg);
+  color: var(--banner-fg);
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
-.atlas .journey-moves li.later {
-  color: var(--muted);
-}
-
-.atlas .journey-moves li[aria-current="step"] {
-  font-weight: 600;
-}
-
-.atlas .journeys ul {
-  padding-left: 16px;
+.atlas .reachable .frame {
+  stroke: var(--accent);
+  stroke-dasharray: 4 3;
 }
