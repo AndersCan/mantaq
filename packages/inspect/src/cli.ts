@@ -104,6 +104,8 @@ async function main(): Promise<void> {
   for (const warning of results.flatMap((result) => result.warnings)) {
     process.stderr.write(`warning: ${warning}\n`);
   }
+  const failed = results.some((result) => result.failed);
+  if (failed) process.exitCode = 1;
   const machines = results.flatMap((result) => result.machines);
   const errors = machines.flatMap((machine) =>
     (machine.fuzz?.errors ?? []).map(
@@ -115,7 +117,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   }
   if (machines.length === 0) {
-    process.stderr.write("no machines found\n");
+    if (!failed) process.stderr.write("no machines found\n");
     process.exitCode = 1;
     return;
   }

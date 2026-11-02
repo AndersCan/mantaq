@@ -55,3 +55,36 @@ describe("inspectFile with a project Vite config", () => {
     expect(result.warnings.join("\n")).toContain("VITE_X is not set");
   });
 });
+
+describe("inspectFile config errors", () => {
+  const ENV = join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/env.ts");
+  const dir = join(EXAMPLE_ROOT, "packages/inspect/src/fixtures");
+
+  test("a missing --config is reported plainly and marks the file failed", async () => {
+    const config = join(dir, "nope.vite.config.ts");
+    const result = await inspectFile(ENV, { fuzz: false }, { config });
+    expect(result.failed).toBe(true);
+    expect(result.machines).toEqual([]);
+    expect(result.warnings.join("\n")).toContain(`Vite config not found: ${config}`);
+    expect(result.warnings.join("\n")).not.toContain("\u001b");
+  });
+
+  test("--config without the mode that selects the env file warns", async () => {
+    const config = join(dir, "env.vite.config.ts");
+    const result = await inspectFile(ENV, { fuzz: false }, { config });
+    expect(result.failed).toBe(true);
+    expect(result.warnings.join("\n")).toContain("VITE_X is not set");
+  });
+
+  test("envDir: false loads no env files", async () => {
+    const config = join(dir, "env-off.vite.config.ts");
+    const result = await inspectFile(ENV, { fuzz: false }, { config, mode: "fixture" });
+    expect(result.failed).toBe(true);
+    expect(result.warnings.join("\n")).toContain("VITE_X is not set");
+  });
+
+  test("a loaded file is not failed", async () => {
+    const result = await inspectFile(FACTORIES, { fuzz: false });
+    expect(result.failed).toBe(false);
+  });
+});
