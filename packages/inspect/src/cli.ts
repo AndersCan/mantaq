@@ -14,6 +14,7 @@
  * fuzzing found a handler error (each printed as `error:`). Seed: MANTAQ_SEED (default from @mantaq/pbt).
  */
 import { serializeViz } from "@mantaq/viz";
+import type { VizMachine } from "@mantaq/viz";
 import { vizDocument } from "./inspect.ts";
 import type { FuzzSettings } from "./inspect.ts";
 import { inspectFile } from "./load.ts";
@@ -91,6 +92,16 @@ function openInBrowser(path: string): void {
     .unref();
 }
 
+function checkFails(results: { warnings: string[] }[], machines: VizMachine[]): boolean {
+  const errors = machines.flatMap((machine) =>
+    (machine.fuzz?.errors ?? []).map(
+      (error) => `${machine.id}: ${error.from} -${error.event}-> ${error.message}`,
+    ),
+  );
+  for (const error of errors) process.stderr.write(`error: ${error}\n`);
+  return errors.length > 0 || results.some((result) => result.warnings.length > 0);
+}
+
 async function main(): Promise<void> {
   const options = parse();
   if (Either.isLeft(options)) {
@@ -107,15 +118,7 @@ async function main(): Promise<void> {
   const failed = results.some((result) => result.failed);
   if (failed) process.exitCode = 1;
   const machines = results.flatMap((result) => result.machines);
-  const errors = machines.flatMap((machine) =>
-    (machine.fuzz?.errors ?? []).map(
-      (error) => `${machine.id}: ${error.from} -${error.event}-> ${error.message}`,
-    ),
-  );
-  if (check) for (const error of errors) process.stderr.write(`error: ${error}\n`);
-  if (check && (errors.length > 0 || results.some((result) => result.warnings.length > 0))) {
-    process.exitCode = 1;
-  }
+  if (check && checkFails(results, machines)) process.exitCode = 1;
   if (machines.length === 0) {
     if (!failed) process.stderr.write("no machines found\n");
     process.exitCode = 1;
