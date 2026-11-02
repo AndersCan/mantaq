@@ -1,0 +1,87 @@
+---
+title: Machines in an application
+description: Build machines from factories that take ports and a clock, so the app and every test get their own.
+---
+
+A machine in an app talks to the outside world: a payment provider, a timer. Don't import those from inside the machine. Pass them in.
+
+## A factory with ports and a clock
+
+```ts
+import { createCheckoutActor, chargeCard } from "../checkout.ts";
+
+// app: one singleton, real port, real clock
+export const checkout = createCheckoutActor({ chargeCard }).actor;
+```
+
+`createCheckoutActor({ clock, chargeCard })` returns `{ actor, clock }`. Both options are optional: the port defaults to the real provider, the clock to a `VirtualClock`. The app builds one actor at module scope. Each test calls the factory again and gets a fresh actor with its own state.
+
+## Test with a fake port and a virtual clock
+
+```ts
+import { VirtualClock } from "@mantaq/core";
+import { createTestHarness } from "@mantaq/test";
+import {
+  createCheckoutActor,
+  submitBasicInfo,
+  submitShipping,
+  submitPayment,
+} from "../checkout.ts";
+
+const clock = VirtualClock();
+const { actor } = createCheckoutActor({
+  clock,
+  chargeCard: (cardNumber) => Promise.resolve(`fake_${cardNumber.slice(-4)}`),
+});
+const harness = createTestHarness(actor);
+
+harness.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
+harness.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
+harness.send(submitPayment.create({ cardNumber: "1111222233334444" }));
+
+await actor.settled();
+harness.assertStateVisited({ stateName: "success" });
+```
+
+The fake is a plain function passed as an option. There is no `vi.mock`, no fake timers, no `as any` and no `waitFor`. `settled()` waits for the promise effect to emit.
+
+## A delay is `withTimeout` on the injected clock
+
+The `chargeCard` effect arms a timeout next to the promise:
+
+```ts
+withTimeout(800, { input: input, event: () => paymentTimeout.create() });
+```
+
+`withTimeout` schedules on the actor's clock and checks the abort signal when it fires. You don't write `setTimeout` plus an abort listener. In a test, `clock.advance(800)` fires it:
+
+```ts
+const slow = VirtualClock();
+const { actor: slowActor } = createCheckoutActor({
+  clock: slow,
+  chargeCard: () => new Promise<string>(() => {}),
+});
+const slowHarness = createTestHarness(slowActor);
+
+slowHarness.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
+slowHarness.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
+slowHarness.send(submitPayment.create({ cardNumber: "1111222233334444" }));
+
+slow.advance(800);
+slowHarness.assertStateVisited({ stateName: "error" });
+```
+
+## Stay or self-transition
+
+When an event arrives in a state with a running effect or timer, the handler picks one:
+
+| Handler returns              | Effect                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `{}`                         | Stay. The state is not left; the effect keeps running.                  |
+| `{ state: <current state> }` | Self-transition. The effect is aborted and its entry effect runs again. |
+
+Use `{}` to record data without disturbing the work. Use the self-transition to restart it, for example to reset a timer. Core pins both in `packages/core/src/reentry.test.ts`.
+
+## Export the factory
+
+`mantaq-inspect` draws and fuzzes what your file exports. A factory that takes a clock gives it a fresh actor per run and a `VirtualClock` to drive. A file that only exports a singleton is drawn but not fuzzed. See [what inspect needs from your file](https://github.com/AndersCan/mantaq/tree/main/packages/inspect#what-it-needs-from-your-file).
