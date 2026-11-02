@@ -332,9 +332,12 @@ function liveState(view: ViewState): { live?: string } {
   return view.live === null ? {} : { live: view.live.state };
 }
 
-/** Back is reset plus replay: the driver keeps no history. */
+/** Back is reset plus replay: the driver keeps no history. Stops at the first step the driver throws on. */
 function replay(driver: VizDriver, steps: ReadonlyArray<VizStep>): VizLiveState {
   let live = driver.reset();
-  for (const step of steps) live = driver.step(step);
+  for (const step of steps) {
+    live = stepSafely(driver, { before: live, step });
+    if (live.last?.error) return live;
+  }
   return live;
 }
