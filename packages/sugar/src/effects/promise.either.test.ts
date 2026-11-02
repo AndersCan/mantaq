@@ -75,7 +75,6 @@ function buildActor(load: () => Promise<Either<PortError, Loaded>>) {
         sends: [loaded],
         fn: (input) => {
           // @ts-expect-error unrelated is not in sends
-          // suppressed: input.emit(unrelated.create()) — unrelated is not declared in sends
           input.emit(unrelated.create());
         },
       });
@@ -109,17 +108,45 @@ describe("withPromise with Either results", () => {
     expect(actor.snapshot().payload).toEqual({ message: "Error: boom" });
   });
 
-  test("an effect aborted before the promise resolves emits nothing", async () => {
-    let resolve: (value: Either<PortError, Loaded>) => void = () => undefined;
-    const pending = new Promise<Either<PortError, Loaded>>((r) => {
-      resolve = r;
+  test("a result arriving after abort emits nothing", async () => {
+    const controller = new AbortController();
+    const emitted: LoadEvent[] = [];
+    const done = withPromise({
+      promise: Promise.resolve(Either.right({ id: "late" })),
+      signal: controller.signal,
+      emit: (e: LoadEvent) => emitted.push(e),
+      events: {
+        success: (r) =>
+          Either.match(r, {
+            onLeft: (e): LoadEvent => ({ type: "failed", payload: e }),
+            onRight: (v): LoadEvent => ({ type: "loaded", payload: v }),
+          }),
+        error: (): LoadEvent => ({ type: "failed", payload: { code: "E_REJECT" } }),
+      },
     });
-    const { actor, start, stop } = buildActor(() => pending);
-    actor.send(start.create());
-    actor.send(stop.create());
-    resolve(Either.right({ id: "late" }));
-    await pending;
-    await actor.settled();
-    expect(actor.state.name).toBe("idle");
+    controller.abort();
+    await done;
+    expect(emitted).toEqual([]);
+  });
+
+  test("a rejection arriving after abort emits nothing", async () => {
+    const controller = new AbortController();
+    const emitted: LoadEvent[] = [];
+    const done = withPromise({
+      promise: Promise.reject<Either<PortError, Loaded>>(new Error("boom")),
+      signal: controller.signal,
+      emit: (e: LoadEvent) => emitted.push(e),
+      events: {
+        success: (r) =>
+          Either.match(r, {
+            onLeft: (e): LoadEvent => ({ type: "failed", payload: e }),
+            onRight: (v): LoadEvent => ({ type: "loaded", payload: v }),
+          }),
+        error: (): LoadEvent => ({ type: "failed", payload: { code: "E_REJECT" } }),
+      },
+    });
+    controller.abort();
+    await done;
+    expect(emitted).toEqual([]);
   });
 });
