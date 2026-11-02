@@ -226,6 +226,36 @@ describe("type level contract — type = behavior", () => {
     expectTypeOf(actor.context).toEqualTypeOf<{ count: number }>();
   });
 
+  test("a typed const context flows to actor.context and handlers", () => {
+    type Ctx = { user?: string; count: number };
+    const idle = state("idle")();
+    const tick = event("TICK")();
+    const initialContext: Ctx = { count: 0 };
+
+    const actor = Actor({
+      inputs: [tick],
+      states: [idle],
+      initial: idle,
+      context: initialContext,
+      setup: (m) => {
+        m.on(idle, {
+          event: tick,
+          handler: (_e, { context }) => {
+            expectTypeOf(context.get()).toEqualTypeOf<Ctx>();
+            return {};
+          },
+        });
+      },
+    });
+
+    expectTypeOf(actor.context).toEqualTypeOf<Ctx>();
+
+    // @ts-expect-error count is required, so the typed const rejects a missing field
+    // suppressed: const missing: Ctx = {}; — the annotation catches what `as Ctx` would hide
+    const missing: Ctx = {};
+    expect(missing).toBeDefined();
+  });
+
   test("state payload is typed through create", () => {
     const ready = state("ready")<{ items: string[] }>();
 

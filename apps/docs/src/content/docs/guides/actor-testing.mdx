@@ -39,12 +39,13 @@ const paymentFail = event("paymentFail")<{ reason: string }>();
 const paymentTimeout = event("paymentTimeout")();
 
 function createCheckoutActor() {
+  const initialContext: CheckoutContext = {};
   return new Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
     internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
-    context: {} as CheckoutContext,
+    context: initialContext,
     setup: (m) => {
       m.on(basicInfo, submitBasicInfo, (e, { context }) => {
         context.set({ ...context.get(), basicInfo: e.payload });
@@ -131,12 +132,13 @@ expect(checkout.snapshot().path[0]).toBe("error");
 Promise effects emit in a microtask. `settled()` waits for them.
 
 ```ts
+const initialContext: CheckoutContext = {};
 const checkout = new Actor({
   inputs: [submitBasicInfo, submitShipping, submitPayment, back],
   internal: [paymentOk, paymentFail],
   states: [basicInfo, shippingAddress, payment, submitting, success, error],
   initial: basicInfo,
-  context: {} as CheckoutContext,
+  context: initialContext,
   setup: (m) => {
     m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
     m.on(shippingAddress, submitShipping, () => ({ state: payment }));
