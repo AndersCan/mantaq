@@ -84,8 +84,7 @@ function annotator(
 ): (machine: VizMachine) => VizMachine {
   const { source } = target;
   if (analysis === null || source === undefined) return (machine) => machine;
-  const sites = Either.map(analysis, { onRight: (found) => found.sites });
-  return (machine) => annotateWith(machine, { analysis: sites, source });
+  return (machine) => annotateWith(machine, { analysis, source });
 }
 
 /** Fuzz and test coverage on top of the structure, as far as the target allows. */

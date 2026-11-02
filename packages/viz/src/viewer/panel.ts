@@ -146,6 +146,7 @@ function edgePanel(doc: Document, edge: VizEdge, machine: VizMachine): HTMLEleme
         edge.kind === "initial" ? "(initial)" : `${edge.event}${internal ? " (internal)" : ""}`,
       ],
       ["target", targetText(edge)],
+      ["doc", edge.doc ?? "none"],
       ["kind", edge.kind],
       ["origin", ORIGIN_LABELS[edge.origin]],
       ["emits", joined(edge.emits)],
@@ -173,6 +174,7 @@ function statePanel(
     html(doc, "h2", {}, [`State ${state.id}`]),
     list(doc, [
       ["id", state.id],
+      ["doc", state.doc ?? "none"],
       ["region", state.region ?? "(root)"],
       ["flags", joined(flags)],
       [

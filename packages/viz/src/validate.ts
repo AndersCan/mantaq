@@ -43,6 +43,7 @@ function readState(reader: Reader, record: JsonObject, path: string): VizState {
     })),
     coverage: readCoverage(reader, { record, key: "coverage", path }),
     tested: readCoverage(reader, { record, key: "tested", path }),
+    doc: readNullableString(reader, { record, key: "doc", path }),
   };
 }
 
@@ -53,6 +54,7 @@ function readEvent(reader: Reader, record: JsonObject, path: string): VizEvent {
   return {
     id: readString(reader, { record, key: "id", path }),
     internal: readBoolean(reader, { record, key: "internal", path }),
+    doc: readNullableString(reader, { record, key: "doc", path }),
     payloadType: null,
   };
 }
@@ -68,6 +70,7 @@ function readEdge(reader: Reader, record: JsonObject, path: string): VizEdge {
     emits: readStrings(reader, { record, key: "emits", path }),
     contexts: readStrings(reader, { record, key: "contexts", path }),
     explanation: readExplanation(reader, { record, path }),
+    doc: readNullableString(reader, { record, key: "doc", path }),
     coverage: readCoverage(reader, { record, key: "coverage", path }),
     tested: readCoverage(reader, { record, key: "tested", path }),
   };

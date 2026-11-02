@@ -10,6 +10,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "MONITOR_TICK",
           "explanation": null,
@@ -23,6 +24,7 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "",
           "explanation": null,
@@ -38,6 +40,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SIGN_IN",
           "explanation": null,
@@ -51,6 +54,7 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:checkingAuth",
           "explanation": null,
@@ -66,6 +70,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SIGN_OUT",
           "explanation": null,
@@ -79,6 +84,7 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:loggedIn",
           "explanation": null,
@@ -94,6 +100,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SIGN_IN",
           "explanation": null,
@@ -109,6 +116,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "RETRY",
           "explanation": null,
@@ -124,6 +132,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SIGN_IN",
           "explanation": null,
@@ -139,6 +148,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SIGN_IN_DONE",
           "explanation": null,
@@ -154,6 +164,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SIGN_IN_ERROR",
           "explanation": null,
@@ -167,6 +178,7 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:signingIn",
           "explanation": null,
@@ -182,6 +194,7 @@ exports[`determinism > auth snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SIGNING_OUT_DONE",
           "explanation": null,
@@ -195,6 +208,7 @@ exports[`determinism > auth snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:signingOut",
           "explanation": null,
@@ -208,36 +222,43 @@ exports[`determinism > auth snapshot 1`] = `
       ],
       "events": [
         {
+          "doc": null,
           "id": "MONITOR_TICK",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "RETRY",
           "internal": false,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "SIGNING_OUT_DONE",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "SIGN_IN",
           "internal": false,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "SIGN_IN_DONE",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "SIGN_IN_ERROR",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "SIGN_OUT",
           "internal": false,
           "payloadType": null
@@ -250,6 +271,7 @@ exports[`determinism > auth snapshot 1`] = `
       "states": [
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "monitorCheckingAuth",
@@ -267,6 +289,7 @@ exports[`determinism > auth snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "monitorLoggedIn",
@@ -284,6 +307,7 @@ exports[`determinism > auth snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": false,
           "id": "loggedOut",
@@ -294,6 +318,7 @@ exports[`determinism > auth snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": false,
           "id": "signInError",
@@ -304,6 +329,7 @@ exports[`determinism > auth snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "signInWithPhone",
@@ -322,6 +348,7 @@ exports[`determinism > auth snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "signOut",
@@ -340,7 +367,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 7
+  "schemaVersion": 8
 }
 "
 `;
@@ -353,6 +380,7 @@ exports[`determinism > checkout snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "",
           "explanation": null,
@@ -368,6 +396,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "submitBasicInfo",
           "explanation": null,
@@ -383,6 +412,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "back",
           "explanation": null,
@@ -398,6 +428,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "back",
           "explanation": null,
@@ -413,6 +444,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "submitPayment",
           "explanation": null,
@@ -428,6 +460,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "back",
           "explanation": null,
@@ -443,6 +476,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "submitShipping",
           "explanation": null,
@@ -456,6 +490,7 @@ exports[`determinism > checkout snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:submitting",
           "explanation": null,
@@ -471,6 +506,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "paymentFail",
           "explanation": null,
@@ -486,6 +522,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "paymentOk",
           "explanation": null,
@@ -501,6 +538,7 @@ exports[`determinism > checkout snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "paymentTimeout",
           "explanation": null,
@@ -514,36 +552,43 @@ exports[`determinism > checkout snapshot 1`] = `
       ],
       "events": [
         {
+          "doc": null,
           "id": "back",
           "internal": false,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "paymentFail",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "paymentOk",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "paymentTimeout",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "submitBasicInfo",
           "internal": false,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "submitPayment",
           "internal": false,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "submitShipping",
           "internal": false,
           "payloadType": null
@@ -556,6 +601,7 @@ exports[`determinism > checkout snapshot 1`] = `
       "states": [
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": false,
           "id": "basicInfo",
@@ -566,6 +612,7 @@ exports[`determinism > checkout snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": false,
           "id": "error",
@@ -576,6 +623,7 @@ exports[`determinism > checkout snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": false,
           "id": "payment",
@@ -586,6 +634,7 @@ exports[`determinism > checkout snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": false,
           "id": "shippingAddress",
@@ -596,6 +645,7 @@ exports[`determinism > checkout snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "chargeCard",
@@ -615,6 +665,7 @@ exports[`determinism > checkout snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": true,
           "id": "success",
@@ -626,7 +677,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 7
+  "schemaVersion": 8
 }
 "
 `;
@@ -639,6 +690,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "CANCEL",
           "explanation": null,
@@ -654,6 +706,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "CANCEL",
           "explanation": null,
@@ -667,6 +720,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "",
           "explanation": null,
@@ -680,6 +734,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "REFUND_DONE",
           "explanation": null,
@@ -695,6 +750,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "REFUND_DONE",
           "explanation": null,
@@ -710,6 +766,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "REFUND_FAILED",
           "explanation": null,
@@ -723,6 +780,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:compensatingRefund",
           "explanation": null,
@@ -738,6 +796,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "RELEASE_DONE",
           "explanation": null,
@@ -753,6 +812,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "RELEASE_FAILED",
           "explanation": null,
@@ -766,6 +826,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:compensatingRelease",
           "explanation": null,
@@ -779,6 +840,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SHIPMENT_CREATED",
           "explanation": null,
@@ -794,6 +856,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "SHIPMENT_FAILED",
           "explanation": null,
@@ -807,6 +870,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:creatingShipment",
           "explanation": null,
@@ -822,6 +886,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "START",
           "explanation": null,
@@ -837,6 +902,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "NOTIFICATION_FAILED",
           "explanation": null,
@@ -852,6 +918,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "NOTIFICATION_SENT",
           "explanation": null,
@@ -865,6 +932,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:notifying",
           "explanation": null,
@@ -880,6 +948,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "PAYMENT_FAILED",
           "explanation": null,
@@ -893,6 +962,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "PAYMENT_PROCESSED",
           "explanation": null,
@@ -906,6 +976,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:processingPayment",
           "explanation": null,
@@ -921,6 +992,7 @@ exports[`determinism > saga snapshot 1`] = `
             "default"
           ],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "INVENTORY_FAILED",
           "explanation": null,
@@ -934,6 +1006,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "INVENTORY_RESERVED",
           "explanation": null,
@@ -947,6 +1020,7 @@ exports[`determinism > saga snapshot 1`] = `
         {
           "contexts": [],
           "coverage": null,
+          "doc": null,
           "emits": [],
           "event": "effect:reservingInventory",
           "explanation": null,
@@ -960,71 +1034,85 @@ exports[`determinism > saga snapshot 1`] = `
       ],
       "events": [
         {
+          "doc": null,
           "id": "CANCEL",
           "internal": false,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "INVENTORY_FAILED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "INVENTORY_RESERVED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "NOTIFICATION_FAILED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "NOTIFICATION_SENT",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "PAYMENT_FAILED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "PAYMENT_PROCESSED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "REFUND_DONE",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "REFUND_FAILED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "RELEASE_DONE",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "RELEASE_FAILED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "SHIPMENT_CREATED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "SHIPMENT_FAILED",
           "internal": true,
           "payloadType": null
         },
         {
+          "doc": null,
           "id": "START",
           "internal": false,
           "payloadType": null
@@ -1037,6 +1125,7 @@ exports[`determinism > saga snapshot 1`] = `
       "states": [
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "runRefund",
@@ -1055,6 +1144,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "releaseInventory",
@@ -1073,6 +1163,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": true,
           "id": "completed",
@@ -1083,6 +1174,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "createShipment",
@@ -1101,6 +1193,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": true,
           "id": "failed",
@@ -1111,6 +1204,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [],
           "final": false,
           "id": "idle",
@@ -1121,6 +1215,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "sendNotification",
@@ -1139,6 +1234,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "processPayment",
@@ -1157,6 +1253,7 @@ exports[`determinism > saga snapshot 1`] = `
         },
         {
           "coverage": null,
+          "doc": null,
           "effects": [
             {
               "name": "reserveInventory",
@@ -1176,7 +1273,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 7
+  "schemaVersion": 8
 }
 "
 `;

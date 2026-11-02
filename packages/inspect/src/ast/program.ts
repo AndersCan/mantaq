@@ -22,6 +22,8 @@ export interface Registration {
   eventRef: ts.Expression;
   handler: ts.Expression | undefined;
   call: ts.CallExpression;
+  /** Leading JSDoc of the statement holding the call. null = none. */
+  doc: string | null;
 }
 
 export interface LoadedSource {
@@ -29,6 +31,25 @@ export interface LoadedSource {
   sourceFile: ts.SourceFile;
   root: string;
   registrations: Registration[];
+  /** Leading JSDoc by state name, from `const x = state("x")()` declarations. */
+  stateDocs: Map<string, string>;
+  /** Leading JSDoc by event type, from `const x = event("X")()` declarations. */
+  eventDocs: Map<string, string>;
+}
+
+/** Text of the JSDoc block directly above a node, or null when there is none. */
+function docOf(node: ts.Node): string | null {
+  const sourceFile = node.getSourceFile();
+  const ranges = ts.getLeadingCommentRanges(sourceFile.text, node.getFullStart()) ?? [];
+  const block = ranges.filter((range) => sourceFile.text.startsWith("/**", range.pos)).at(-1);
+  if (block === undefined) return null;
+  const text = sourceFile.text
+    .slice(block.pos + 3, block.end - 2)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*\* ?/, "").trim())
+    .join("\n")
+    .trim();
+  return text === "" ? null : text;
 }
 
 function compilerOptions(source: AnalysisSource): ts.CompilerOptions {
@@ -78,6 +99,7 @@ function toRegistration(checker: ts.TypeChecker, call: ts.CallExpression): Regis
     eventRef,
     handler: property(options, "handler"),
     call,
+    doc: docOf(ts.isExpressionStatement(call.parent) ? call.parent : call),
   };
 }
 
@@ -91,6 +113,29 @@ export function locationOf(node: ts.Node, root: string): VizLocation {
   };
 }
 
+/** Name literal of `state("x")()` / `event("X")()`, with which builder it came from. */
+function declaredName(init: ts.Expression): { builder: string; name: string } | null {
+  if (!ts.isCallExpression(init) || !ts.isCallExpression(init.expression)) return null;
+  const builder = init.expression.expression;
+  const [name] = init.expression.arguments;
+  if (!ts.isIdentifier(builder) || name === undefined || !ts.isStringLiteralLike(name)) return null;
+  return { builder: builder.text, name: name.text };
+}
+
+function collectDeclarationDocs(
+  statement: ts.VariableStatement,
+  docs: { stateDocs: Map<string, string>; eventDocs: Map<string, string> },
+): void {
+  const doc = docOf(statement);
+  if (doc === null) return;
+  for (const declaration of statement.declarationList.declarations) {
+    const declared = declaration.initializer && declaredName(declaration.initializer);
+    if (!declared) continue;
+    if (declared.builder === "state") docs.stateDocs.set(declared.name, doc);
+    if (declared.builder === "event") docs.eventDocs.set(declared.name, doc);
+  }
+}
+
 /**
  * Type-check one file and collect its handler registrations. Any compiler
  * failure becomes a Left reason; it never throws.
@@ -102,13 +147,16 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
     if (sourceFile === undefined) return `source not found: ${source.file}`;
     const checker = program.getTypeChecker();
     const registrations: Registration[] = [];
+    const stateDocs = new Map<string, string>();
+    const eventDocs = new Map<string, string>();
     const visit = (node: ts.Node): void => {
       const found = ts.isCallExpression(node) ? toRegistration(checker, node) : null;
       if (found) registrations.push(found);
+      if (ts.isVariableStatement(node)) collectDeclarationDocs(node, { stateDocs, eventDocs });
       ts.forEachChild(node, visit);
     };
     visit(sourceFile);
-    return { checker, sourceFile, root: source.root, registrations };
+    return { checker, sourceFile, root: source.root, registrations, stateDocs, eventDocs };
   });
   if (Either.isLeft(loaded)) return Either.left(`compiler failed: ${String(loaded[0])}`);
   const value = loaded[1];
