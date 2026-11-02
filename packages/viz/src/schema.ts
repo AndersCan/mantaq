@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 7;
+export const VIZ_SCHEMA_VERSION = 8;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -50,11 +50,15 @@ export interface VizState {
   coverage: VizCoverage | null;
   /** Visits by the supplied test sequences. null = no tests supplied. */
   tested: VizCoverage | null;
+  /** Leading JSDoc of the `state(...)` declaration. null = undocumented or AST not run. */
+  doc: string | null;
 }
 
 export interface VizEvent {
   id: string;
   internal: boolean;
+  /** Leading JSDoc of the `event(...)` declaration. null = undocumented or AST not run. */
+  doc: string | null;
   /** Payload types are erased at runtime; always null. */
   payloadType: null;
 }
@@ -142,6 +146,8 @@ export interface VizEdge {
   contexts: string[];
   /** null = no handler behind this edge (initial, effect) or analysis not run. */
   explanation: VizExplanation | null;
+  /** Leading JSDoc of the `m.on` / `m.onAny` call. null = undocumented, no handler, or AST not run. */
+  doc: string | null;
   /** Times taken in the supplied run (history or fuzz corpus replay). null = no run. */
   coverage: VizCoverage | null;
   /** Times taken by the supplied test sequences. null = no tests supplied. */

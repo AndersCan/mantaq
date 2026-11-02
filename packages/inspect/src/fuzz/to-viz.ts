@@ -39,6 +39,7 @@ function fuzzEdge(seen: Observation, from: string): VizEdge {
     emits: [],
     contexts: [],
     explanation: null,
+    doc: null,
     coverage: null,
     tested: null,
   };
@@ -89,7 +90,7 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): VizMachin
     ...base.events,
     ...[...new Set(added.map((edge) => edge.event))]
       .filter((id) => !known.has(id))
-      .map((id) => ({ id, internal: internal.has(id), payloadType: null })),
+      .map((id) => ({ id, internal: internal.has(id), doc: null, payloadType: null })),
   ].sort(byId);
   return {
     ...base,

@@ -37,6 +37,12 @@ function button(
   return element;
 }
 
+function docNote(doc: Document, note: { text: string | null; scope: string }): HTMLElement | null {
+  return note.text === null
+    ? null
+    : html(doc, "p", { class: "doc", "data-doc": note.scope }, [note.text]);
+}
+
 function targetText(move: Move, target: string, current: string): string {
   return target === current && move.edge.kind === "stay" ? "stays" : `→ ${target}`;
 }
@@ -54,13 +60,11 @@ function moveItem(
       code(doc, edge.event),
       via,
       html(doc, "span", { class: "muted" }, [" → ? target depends on payload or context"]),
+      docNote(doc, { text: edge.doc, scope: "edge" }),
     ]);
   }
-  return html(
-    doc,
-    "li",
-    { "data-move": edge.id },
-    move.targets.map((target) =>
+  return html(doc, "li", { "data-move": edge.id }, [
+    ...move.targets.map((target) =>
       button(
         doc,
         [
@@ -74,7 +78,8 @@ function moveItem(
         },
       ),
     ),
-  );
+    docNote(doc, { text: edge.doc, scope: "edge" }),
+  ]);
 }
 
 function effectsSection(doc: Document, machine: VizMachine, current: string): HTMLElement | null {
@@ -200,6 +205,10 @@ export function explorePanel(doc: Document, context: ExploreContext): HTMLElemen
         html(doc, "strong", {}, [current]),
         final ? " (final)" : "",
       ]),
+      docNote(doc, {
+        text: machine.states.find((state) => state.id === current)?.doc ?? null,
+        scope: "state",
+      }),
       effectsSection(doc, machine, current),
       movesSection(doc, moves, { current, final, take: context.take }),
       html(doc, "div", { class: "explore-controls" }, [

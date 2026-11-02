@@ -82,7 +82,7 @@ try {
   const bin = join(app, "node_modules/.bin/mantaq-inspect");
   run(bin, ["retry.ts", "--json", "--out", "x.json", "--no-open"], app);
   const json = JSON.parse(readFileSync(join(app, "x.json"), "utf8"));
-  check(json.schemaVersion === 7 && json.machines.length > 0, "CLI --json writes a v7 document");
+  check(json.schemaVersion === 8 && json.machines.length > 0, "CLI --json writes a v8 document");
   run(bin, ["retry.ts", "--out", "x.html", "--no-open"], app);
   const html = readFileSync(join(app, "x.html"), "utf8");
   check(
@@ -129,7 +129,7 @@ console.log(JSON.stringify({ results, page, entryStatus, schemaVersion: doc.sche
     "plugin page carries a stylesheet",
   );
   check(out.entryStatus === 200, "plugin page serves the live entry");
-  check(out.schemaVersion === 7, "plugin serves a v7 document");
+  check(out.schemaVersion === 8, "plugin serves a v8 document");
 } catch (error) {
   fail(String(error));
 } finally {

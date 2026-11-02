@@ -2,6 +2,7 @@ import { toVizMachine } from "../structure.ts";
 import { EXAMPLE_ROOT, exampleTargets } from "../examples.ts";
 import { createCheckoutActor } from "../fixtures/checkout.ts";
 import { createCreditActor } from "../fixtures/credit.ts";
+import { createDocumentedActor } from "../fixtures/documented.ts";
 import { createSagaActor } from "../fixtures/saga.ts";
 import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import type { VizExplanation, VizMachine } from "@mantaq/viz";
@@ -146,5 +147,35 @@ describe("AST: examples", () => {
       analyzeSource({ file, root: EXAMPLE_ROOT }),
     );
     expect(Either.isRight(analyzeSource({ file, root: EXAMPLE_ROOT }))).toBe(true);
+  });
+});
+
+describe("AST: JSDoc becomes doc", () => {
+  const machine = annotated("documented", createDocumentedActor());
+
+  test("documented state, event and handler carry their text", () => {
+    expect(machine.states.find((state) => state.id === "waiting")?.doc).toBe(
+      "Waiting for the visitor.\nShows the welcome screen.",
+    );
+    expect(machine.events.find((event) => event.id === "start")?.doc).toBe(
+      "The visitor pressed start.",
+    );
+    expect(machine.edges.find((edge) => edge.event === "start")?.doc).toBe(
+      "Starting moves on.\n\nNothing is saved yet.",
+    );
+  });
+
+  test("each link of a chained m.on keeps its own doc", () => {
+    const docOfEvent = (name: string) => machine.edges.find((edge) => edge.event === name)?.doc;
+    expect(docOfEvent("again")).toBe("First of the chain, see waiting.");
+    expect(docOfEvent("more")).toBe("Second of the chain.");
+    expect(docOfEvent("last")).toBeNull();
+  });
+
+  test("undocumented state, event and handler are null", () => {
+    expect(machine.states.find((state) => state.id === "done")?.doc).toBeNull();
+    expect(machine.events.find((event) => event.id === "finish")?.doc).toBeNull();
+    expect(machine.edges.find((edge) => edge.event === "finish")?.doc).toBeNull();
+    expect(machine.edges.find((edge) => edge.kind === "initial")?.doc).toBeNull();
   });
 });

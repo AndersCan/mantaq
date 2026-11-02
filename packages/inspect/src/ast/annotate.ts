@@ -13,6 +13,15 @@ export interface HandlerSite {
   state: string | null;
   event: string;
   explanation: VizExplanation;
+  /** Leading JSDoc of the registration. null = undocumented. */
+  doc: string | null;
+}
+
+/** Everything annotation reads from one source file. */
+export interface SourceDocs {
+  sites: HandlerSite[];
+  stateDocs: ReadonlyMap<string, string>;
+  eventDocs: ReadonlyMap<string, string>;
 }
 
 function sitesOf(loaded: LoadedSource): HandlerSite[] {
@@ -25,6 +34,7 @@ function sitesOf(loaded: LoadedSource): HandlerSite[] {
       {
         state: registration.state,
         event: registration.event,
+        doc: registration.doc,
         explanation: Either.getOrElse(explanation, {
           onLeft: (error): VizExplanation => ({
             status: "not_analyzed",
@@ -43,9 +53,15 @@ export function analyzeSource(source: AnalysisSource): Either<string, HandlerSit
   return Either.chain(loadSource(source), { onRight: (loaded) => Either.right(sitesOf(loaded)) });
 }
 
+function docsOf(loaded: LoadedSource): SourceDocs {
+  return { sites: sitesOf(loaded), stateDocs: loaded.stateDocs, eventDocs: loaded.eventDocs };
+}
+
 /** Everything one type-check of a machine file yields. */
 export interface ModuleAnalysis {
   sites: HandlerSite[];
+  stateDocs: ReadonlyMap<string, string>;
+  eventDocs: ReadonlyMap<string, string>;
   payloads: Record<string, VizJson[]>;
   machines: MachineExport[];
 }
@@ -55,7 +71,7 @@ export function analyzeModule(source: AnalysisSource): Either<string, ModuleAnal
   return Either.chain(loadSource(source), {
     onRight: (loaded) =>
       Either.right({
-        sites: sitesOf(loaded),
+        ...docsOf(loaded),
         payloads: payloadSamples(loaded),
         machines: machineExports(loaded),
       }),
@@ -70,20 +86,23 @@ function localState(id: string): string {
 function explain(
   edge: VizEdge,
   context: { sites: ReadonlyArray<HandlerSite>; file: string },
-): VizExplanation | null {
-  if (edge.kind === "initial" || edge.kind === "effect") return null;
+): { explanation: VizExplanation | null; doc: string | null } {
+  if (edge.kind === "initial" || edge.kind === "effect") return { explanation: null, doc: null };
   const state = localState(edge.from);
   const site =
     context.sites.find(
       (candidate) => candidate.state === state && candidate.event === edge.event,
     ) ??
     context.sites.find((candidate) => candidate.state === null && candidate.event === edge.event);
-  if (site) return site.explanation;
+  if (site) return { explanation: site.explanation, doc: site.doc };
   return {
-    status: "not_analyzed",
-    location: null,
-    reason: `no m.on/m.onAny registration for (${state}, ${edge.event}) found in ${context.file}`,
-    snippet: null,
+    explanation: {
+      status: "not_analyzed",
+      location: null,
+      reason: `no m.on/m.onAny registration for (${state}, ${edge.event}) found in ${context.file}`,
+      snippet: null,
+    },
+    doc: null,
   };
 }
 
@@ -93,13 +112,16 @@ function explain(
  * analyzed marks every handler edge `not_analyzed` with the reason.
  */
 export function annotateMachine(machine: VizMachine, source: AnalysisSource): VizMachine {
-  return annotateWith(machine, { analysis: analyzeSource(source), source });
+  const analysis = Either.chain(loadSource(source), {
+    onRight: (loaded) => Either.right(docsOf(loaded)),
+  });
+  return annotateWith(machine, { analysis, source });
 }
 
 /** `annotateMachine` with the analysis already done (one program for many machines). */
 export function annotateWith(
   machine: VizMachine,
-  context: { analysis: Either<string, ReadonlyArray<HandlerSite>>; source: AnalysisSource },
+  context: { analysis: Either<string, SourceDocs>; source: AnalysisSource },
 ): VizMachine {
   const { analysis, source } = context;
   const file = source.file.slice(source.root.length).replace(/^[\\/]/, "");
@@ -109,9 +131,19 @@ export function annotateWith(
       const explanation: VizExplanation | null = handlerDriven
         ? { status: "not_analyzed", location: null, reason: analysis[0], snippet: null }
         : null;
-      return { ...edge, explanation };
+      return { ...edge, explanation, doc: null };
     }
-    return { ...edge, explanation: explain(edge, { sites: analysis[1], file }) };
+    return { ...edge, ...explain(edge, { sites: analysis[1].sites, file }) };
   });
-  return { ...machine, edges };
+  if (Either.isLeft(analysis)) return { ...machine, edges };
+  const { stateDocs, eventDocs } = analysis[1];
+  return {
+    ...machine,
+    states: machine.states.map((state) => ({
+      ...state,
+      doc: stateDocs.get(localState(state.id)) ?? null,
+    })),
+    events: machine.events.map((event) => ({ ...event, doc: eventDocs.get(event.id) ?? null })),
+    edges,
+  };
 }

@@ -67,6 +67,7 @@ function toState(
     effects: context.effects.find((edge) => edge.source === node.id)?.effects ?? [],
     coverage: visits ? hits(visits.get(node.id)) : null,
     tested: null,
+    doc: null,
   };
 }
 
@@ -134,6 +135,7 @@ function toEdge(
     emits: emitsOf(edge),
     contexts: [...new Set(edge.contexts)].sort(),
     explanation: null,
+    doc: null,
     coverage: transitions && kind === "transition" ? hits(edgeHits(edge, transitions)) : null,
     tested: null,
   };
@@ -160,7 +162,12 @@ export function toVizMachine(input: VizInput): VizMachine {
   const events: VizEvent[] = [...new Set(edges.map((edge) => edge.event).filter(Boolean))]
     .filter((eventId) => !eventId.startsWith("effect:"))
     .sort()
-    .map((eventId) => ({ id: eventId, internal: internalIds.has(eventId), payloadType: null }));
+    .map((eventId) => ({
+      id: eventId,
+      internal: internalIds.has(eventId),
+      doc: null,
+      payloadType: null,
+    }));
   const regions = [
     ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
   ].sort();
