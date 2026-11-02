@@ -45,6 +45,7 @@ export default defineConfig({
             { label: "Error Handling", slug: "core-concepts/error-handling" },
             { label: "Testing", slug: "guides/actor-testing" },
             { label: "Test Harness", slug: "guides/testing-guide" },
+            { label: "Machines in an app", slug: "guides/machines-in-an-app" },
           ],
         },
         {

@@ -47,6 +47,7 @@ const json = serializeViz(vizDocument([machine]));
 
 - **Exports.** An actor, or a function that returns one (or `{ actor }`). Functions are called with no arguments, with a `VirtualClock` when the first parameter is a clock, or with `{ clock }` when it is an options object with a `clock`. Functions with other required parameters are skipped. Discovery reads types only; nothing is called to find out.
 - **A fresh actor per call**, to fuzz. A file that only exports one actor instance is drawn, not fuzzed. When a file has factories, its actor instances are skipped.
+- **Exported factories.** Export a factory that takes ports and a clock, not only a built instance. See [Machines in an application](https://anderscan.github.io/mantaq/guides/machines-in-an-app/).
 - **A `VirtualClock`**, to fuzz. An actor on the real clock is drawn, with a warning.
 
 Every part that cannot run is skipped with a warning, never guessed.
