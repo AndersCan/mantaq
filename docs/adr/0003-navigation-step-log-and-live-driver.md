@@ -35,4 +35,5 @@ handler errors (`packages/inspect/src/fuzz/run.ts:117-178`). It imports only viz
 - Undo, share and what-if forks are the same operation on one serialisable log.
 - Live runs real effects in the browser; machines touching network or storage need factory-injected
   ports, otherwise they stay static-only.
-- Timer labels depend on sugar passing `eventName` (ADR 0004).
+- Timer labels depend on sugar passing `eventName` (ADR 0004; planned).
+- `VizDriver` is not yet implemented.
