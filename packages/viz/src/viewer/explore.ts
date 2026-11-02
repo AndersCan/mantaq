@@ -1,6 +1,6 @@
 import { movesFrom, stateAfter, unhandledSends } from "../moves.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
-import type { VizMachine } from "../schema.ts";
+import type { VizLiveState, VizLiveStep, VizMachine, VizStep } from "../schema.ts";
 import { html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 
@@ -10,6 +10,8 @@ export interface ExploreContext {
   take: (step: ExploreStep) => void;
   /** Keep the first `length` steps. */
   rewind: (length: number) => void;
+  /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
+  live?: { state: VizLiveState; send: (step: VizStep) => void };
 }
 
 const GROUP_TITLES: Record<MoveGroup, string> = {
@@ -188,42 +190,157 @@ function pathSection(doc: Document, context: ExploreContext): HTMLElement {
   ]);
 }
 
+function describeStep(step: VizStep): string {
+  return step.kind === "advance" ? `advance ${step.ms} ms` : step.event;
+}
+
+function liveMovesSection(
+  doc: Document,
+  machine: VizMachine,
+  context: { state: VizLiveState; send: (step: VizStep) => void; final: boolean },
+): HTMLElement {
+  const current = context.state.state;
+  if (context.final) {
+    return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
+      html(doc, "strong", {}, ["Done."]),
+      ` ${current} is final: the actor has stopped.`,
+    ]);
+  }
+  const handled = new Set(movesFrom(machine, current).map((move) => move.edge.event));
+  const inputs = machine.events.filter((event) => !event.internal).map((event) => event.id);
+  const events = [...new Set([...handled, ...inputs])].sort();
+  return html(doc, "div", { class: "explore-moves" }, [
+    html(doc, "h3", {}, ["Send"]),
+    html(
+      doc,
+      "ul",
+      { "data-group": "live" },
+      events.map((event) =>
+        html(doc, "li", { "data-send-item": event }, [
+          button(doc, [code(doc, event)], {
+            onClick: () => context.send({ kind: "event", event, payload: null }),
+            attrs: { "data-send": event },
+          }),
+          handled.has(event)
+            ? null
+            : html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`]),
+        ]),
+      ),
+    ),
+  ]);
+}
+
+function outcomeText(last: VizLiveStep): string {
+  if (last.outcome === "transition") return ` ${last.from} → ${last.to}`;
+  if (last.outcome === "stay") return ` handled in ${last.from}: stays`;
+  return ` ignored in ${last.from}: no handler`;
+}
+
+function liveResultSection(doc: Document, state: VizLiveState): HTMLElement {
+  const { last } = state;
+  return html(doc, "div", { class: "explore-live" }, [
+    last === null
+      ? html(doc, "p", { class: "muted" }, ["Nothing has run yet."])
+      : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
+          html(doc, "p", {}, [code(doc, last.event), outcomeText(last)]),
+          last.effects.length === 0
+            ? null
+            : html(doc, "p", { "data-live-effects": "" }, [
+                "Effects run: ",
+                ...last.effects.flatMap((name, index) => [
+                  index === 0 ? "" : ", ",
+                  code(doc, name),
+                ]),
+              ]),
+          last.error === null
+            ? null
+            : html(doc, "p", { class: "explore-warning", role: "alert", "data-live-error": "" }, [
+                `Handler threw: ${last.error}`,
+              ]),
+        ]),
+    html(doc, "p", { "data-live-context": "" }, [
+      "Context: ",
+      code(doc, JSON.stringify(state.context)),
+    ]),
+  ]);
+}
+
+function livePathSection(doc: Document, context: ExploreContext, state: VizLiveState): HTMLElement {
+  return html(doc, "div", { class: "explore-path" }, [
+    html(doc, "h3", {}, ["Path"]),
+    html(doc, "ol", {}, [
+      html(doc, "li", { "aria-current": state.steps.length === 0 ? "step" : null }, [
+        button(doc, ["start"], {
+          onClick: () => context.rewind(0),
+          attrs: { "data-rewind": "0" },
+        }),
+      ]),
+      ...state.steps.map((step, index) =>
+        html(doc, "li", { "aria-current": index === state.steps.length - 1 ? "step" : null }, [
+          button(doc, [describeStep(step)], {
+            onClick: () => context.rewind(index + 1),
+            attrs: { "data-rewind": String(index + 1) },
+          }),
+        ]),
+      ),
+    ]),
+  ]);
+}
+
+function nowSection(
+  doc: Document,
+  machine: VizMachine,
+  context: { current: string; final: boolean },
+): Array<HTMLElement | null> {
+  const { current, final } = context;
+  return [
+    html(doc, "p", { class: "explore-now" }, [
+      "In ",
+      html(doc, "strong", {}, [current]),
+      final ? " (final)" : "",
+    ]),
+    docNote(doc, {
+      text: machine.states.find((state) => state.id === current)?.doc ?? null,
+      scope: "state",
+    }),
+  ];
+}
+
 /** Side-panel section: where the walk is, what can happen next, and how it got here. */
 export function explorePanel(doc: Document, context: ExploreContext): HTMLElement {
-  const { machine, path } = context;
-  const current = stateAfter(machine, path) ?? "";
+  const { machine, path, live } = context;
+  const current = live?.state.state ?? stateAfter(machine, path) ?? "";
   const final = machine.states.find((state) => state.id === current)?.final === true;
-  const moves = movesFrom(machine, current);
+  const length = live?.state.steps.length ?? path.length;
   return html(
     doc,
     "section",
     { class: "explore", "data-current": current, "data-done": final ? "" : null },
     [
       html(doc, "h2", {}, ["Explore"]),
-      html(doc, "p", { class: "explore-now" }, [
-        "In ",
-        html(doc, "strong", {}, [current]),
-        final ? " (final)" : "",
-      ]),
-      docNote(doc, {
-        text: machine.states.find((state) => state.id === current)?.doc ?? null,
-        scope: "state",
-      }),
-      effectsSection(doc, machine, current),
-      movesSection(doc, moves, { current, final, take: context.take }),
+      ...nowSection(doc, machine, { current, final }),
+      ...(live
+        ? [
+            liveResultSection(doc, live.state),
+            liveMovesSection(doc, machine, { state: live.state, send: live.send, final }),
+          ]
+        : [
+            effectsSection(doc, machine, current),
+            movesSection(doc, movesFrom(machine, current), { current, final, take: context.take }),
+          ]),
       html(doc, "div", { class: "explore-controls" }, [
         button(doc, ["Back"], {
-          onClick: () => context.rewind(path.length - 1),
-          disabled: path.length === 0,
+          onClick: () => context.rewind(length - 1),
+          disabled: length === 0,
           attrs: { "data-explore-action": "back" },
         }),
         button(doc, ["Reset"], {
           onClick: () => context.rewind(0),
-          disabled: path.length === 0,
+          disabled: length === 0,
           attrs: { "data-explore-action": "reset" },
         }),
       ]),
-      pathSection(doc, context),
+      live ? livePathSection(doc, context, live.state) : pathSection(doc, context),
     ],
   );
 }
@@ -252,10 +369,10 @@ export function clickStep(
 /** Mark the walk on the drawn graph: current state, path taken, possible next steps. */
 export function markExplore(
   root: HTMLElement,
-  context: { machine: VizMachine; path: ReadonlyArray<ExploreStep> },
+  context: { machine: VizMachine; path: ReadonlyArray<ExploreStep>; live?: string },
 ): void {
   const { machine, path } = context;
-  const current = stateAfter(machine, path);
+  const current = context.live ?? stateAfter(machine, path);
   const moves = current === null ? [] : movesFrom(machine, current);
   const next = new Set(moves.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
   const reachable = new Set(moves.flatMap((move) => move.targets).filter((to) => to !== current));

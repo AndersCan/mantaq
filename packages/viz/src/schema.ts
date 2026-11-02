@@ -173,6 +173,46 @@ export type VizStep =
   | { kind: "event"; event: string; payload: VizJson }
   | { kind: "advance"; ms: number };
 
+/** What one step did: the actor moved, handled it without moving, or had no handler. */
+export type VizLiveOutcome = "transition" | "stay" | "ignored";
+
+export interface VizLiveStep {
+  from: string;
+  event: string;
+  to: string;
+  outcome: VizLiveOutcome;
+  /** Names of the effects the step ran. */
+  effects: string[];
+  context: VizJson;
+  /** Message of a handler that threw; null when none did. */
+  error: string | null;
+}
+
+export interface VizLiveTimer {
+  id: string;
+  ms: number;
+  deadline: number;
+  eventName: string | null;
+}
+
+/** Where a running actor is, after the steps in `steps`. */
+export interface VizLiveState {
+  state: string;
+  steps: VizStep[];
+  last: VizLiveStep | null;
+  timers: VizLiveTimer[];
+  context: VizJson;
+}
+
+/**
+ * A running actor behind the viewer. JSON in, JSON out, so viz needs no core:
+ * `@mantaq/inspect` implements it on the step function the fuzzer uses.
+ */
+export interface VizDriver {
+  reset(): VizLiveState;
+  step(step: VizStep): VizLiveState;
+}
+
 export interface VizFuzzSequence {
   /** Shrunk replayable sequence, starting from a fresh actor. */
   steps: VizStep[];

@@ -1,4 +1,4 @@
-import type { VizDocument, VizMachine } from "../schema.ts";
+import type { VizDocument, VizDriver, VizLiveState, VizMachine, VizStep } from "../schema.ts";
 import { html } from "./dom.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
@@ -12,6 +12,9 @@ import { clickStep, explorePanel, markExplore } from "./explore.ts";
 export const STRUCTURE_BANNER =
   "Click a pulsing edge, or a state it leads to, to walk the machine. Edges come from each handler's declared `to` list and effects' `sends`; guards are not evaluated, so a path here may not happen at runtime.";
 
+const LIVE_BANNER =
+  "Live: the real machine runs. Send an input and the cursor follows its actual state; guards and effects run.";
+
 export const FUZZ_NOTE =
   "Green edges were observed while fuzzing but not declared. Fuzzing finds behaviour; it never proves an edge is impossible.";
 
@@ -22,6 +25,8 @@ interface ViewState {
   coverage: CoverageMode | null;
   /** Steps taken from the initial state. */
   path: ExploreStep[];
+  /** Set while a driver runs the actor. */
+  live: VizLiveState | null;
 }
 
 function effectiveMode(view: ViewState, machine: VizMachine): CoverageMode {
@@ -115,6 +120,8 @@ export interface ViewerOptions {
   machine?: string;
   /** Encoded steps to open on (from `?step=`), in the shown machine. */
   steps?: ReadonlyArray<string>;
+  /** Runs the machine for real: steps go to the driver and the cursor follows its state. */
+  driver?: VizDriver;
   /** Called after every walk or machine change, e.g. to keep the URL shareable. */
   onNavigate?: (where: { machine: string; steps: string[] }) => void;
 }
@@ -135,7 +142,9 @@ export function mountViewer(
     selection: null,
     coverage: null,
     path: first === undefined ? [] : decodePath(first, options.steps ?? []),
+    live: options.driver?.reset() ?? null,
   };
+  const { driver } = options;
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   root.addEventListener("keydown", (event) => {
@@ -157,10 +166,20 @@ export function mountViewer(
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     const refresh = () => {
       panel.replaceChildren(
-        explorePanel(doc, { machine, path: view.path, take, rewind }),
+        explorePanel(doc, {
+          machine,
+          path: view.path,
+          take,
+          rewind,
+          ...(view.live === null ? {} : { live: { state: view.live, send } }),
+        }),
         renderPanel(doc, machine, { selection: view.selection, select }),
       );
-      markExplore(root, { machine, path: view.path });
+      markExplore(root, {
+        machine,
+        path: view.path,
+        ...(view.live === null ? {} : { live: view.live.state }),
+      });
       markSelection(root, view.selection);
     };
     const walked = () => {
@@ -170,11 +189,30 @@ export function mountViewer(
       });
       refresh();
     };
+    const send = (step: VizStep) => {
+      if (driver === undefined) return;
+      view.live = driver.step(step);
+      refresh();
+    };
     const take = (step: ExploreStep) => {
+      if (driver !== undefined) {
+        const event = machine.edges.find((edge) => edge.id === step.edge)?.event;
+        if (event !== undefined) send({ kind: "event", event, payload: null });
+        return;
+      }
       view.path = [...view.path, step];
       walked();
     };
     const rewind = (length: number) => {
+      if (driver !== undefined && view.live !== null) {
+        // Back is reset plus replay: the driver keeps no history.
+        const keep = view.live.steps.slice(0, Math.max(0, length));
+        let live = driver.reset();
+        for (const step of keep) live = driver.step(step);
+        view.live = live;
+        refresh();
+        return;
+      }
       view.path = view.path.slice(0, Math.max(0, length));
       walked();
     };
@@ -196,7 +234,9 @@ export function mountViewer(
         render,
         onNavigate: options.onNavigate,
       }),
-      html(doc, "p", { class: "banner", role: "note" }, [banner(machine)]),
+      html(doc, "p", { class: "banner", role: "note" }, [
+        driver === undefined ? banner(machine) : LIVE_BANNER,
+      ]),
       legend(doc, { mode, machine }),
       html(doc, "div", { class: "viz-main" }, [
         html(doc, "div", { class: "canvas" }, [renderGraph(doc, machine, { select, mode })]),
