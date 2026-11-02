@@ -17,8 +17,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./vite": "./src/vite.ts",
     "./drive": "./src/drive.ts",
+    "./vite": "./src/vite.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -27,8 +27,8 @@
     },
     "exports": {
       ".": "./dist/index.mjs",
-      "./vite": "./dist/vite.mjs",
       "./drive": "./dist/drive.mjs",
+      "./vite": "./dist/vite.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"

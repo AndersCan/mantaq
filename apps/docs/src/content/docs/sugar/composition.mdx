@@ -34,12 +34,14 @@ export const paymentOk = event("paymentOk")<{ orderId: string }>();
 export const paymentFail = event("paymentFail")<{ reason: string }>();
 export const paymentTimeout = event("paymentTimeout")();
 
+const initialContext: CheckoutContext = {};
+
 export const checkout = actorSpec({
   inputs: [submitBasicInfo, submitPayment],
   internal: [paymentOk, paymentFail, paymentTimeout],
   states: [basicInfo, payment, submitting, success, error],
   initial: basicInfo,
-  context: {} as CheckoutContext,
+  context: initialContext,
 });
 ```
 

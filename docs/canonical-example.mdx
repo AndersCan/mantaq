@@ -112,13 +112,14 @@ function createCheckoutActor(
   chargeCardImpl: (cardNumber: string) => Promise<string> = chargeCard,
 ) {
   const c = clock ?? new VirtualClock();
+  const initialContext: CheckoutContext = {};
   const actor = new Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
     internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
     clock: c,
-    context: {} as CheckoutContext,
+    context: initialContext,
     setup: (m) => {
       m.effect(submitting, {
         name: "chargeCard",

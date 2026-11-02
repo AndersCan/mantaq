@@ -12,7 +12,7 @@ npm install @mantaq/core
 
 | Pattern         | Correct                                            | Anti-pattern                          |
 | --------------- | -------------------------------------------------- | ------------------------------------- |
-| Type context    | `context: {} as MyContext`                         | casting in every handler              |
+| Type context    | `const c: MyContext = {...}`, `context: c`         | `as` cast on the context value        |
 | Write context   | `const s = context.get(); s.x = y; context.set(s)` | mutate without `set()`                |
 | Type events     | `event("ID")<Payload>()`                           | `event("ID")()` without generic       |
 | Send events     | `actor.send(signInEvent.create(data))`             | raw `{ type: "ID", payload }` objects |
@@ -81,7 +81,7 @@ See [anderscan.github.io/mantaq](https://anderscan.github.io/mantaq) for full do
 
 ### Typed Actor Context
 
-Cast the context type once at the constructor level. Handlers receive the typed context automatically. No casting needed per-handler.
+Declare the context value with its type once, then pass it to the constructor. Handlers receive the typed context automatically. `as` on the context is an anti-pattern: it hides missing fields.
 
 ```ts
 interface AuthContext {
@@ -89,11 +89,13 @@ interface AuthContext {
   phoneNumber?: string;
 }
 
+const initialContext: AuthContext = {};
+
 const actor = new Actor({
   inputs: [signInEvent],
   states: [idleState, signingInState],
   initial: idleState,
-  context: {} as AuthContext,
+  context: initialContext,
   setup: (m) => {
     m.on(idleState, signInEvent, (event, opts) => {
       // ✅ typed — context.get()/set() flow the constructor type
@@ -299,12 +301,13 @@ const doneEvent = event("WORK_DONE")();
 const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
 function createActor() {
+  const initialContext: MyContext = { retryCount: 0, maxRetries: 3 };
   return new Actor({
     inputs: [startEvent],
     internal: [doneEvent, failedEvent],
     states: [idleState, workingState, doneState, errorState],
     initial: idleState,
-    context: { retryCount: 0, maxRetries: 3 } as MyContext,
+    context: initialContext,
     setup: (m) => {
       m.effect(workingState, {
         name: "attemptWork",

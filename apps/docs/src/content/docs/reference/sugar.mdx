@@ -163,12 +163,13 @@ function actorSpec<
 Builds static actor spec. Narrows state/event arrays to literals (no `as const`), keeps context mutable. Feed to `definePart<typeof x>` and `withParts`.
 
 ```ts
+const initialContext: CheckoutContext = {};
 const checkout = actorSpec({
   inputs: [submitBasicInfo, submitShipping],
   internal: [paymentOk, paymentFail],
   states: [basicInfo, shippingAddress, payment, submitting],
   initial: basicInfo,
-  context: {} as CheckoutContext,
+  context: initialContext,
 });
 ```
 
