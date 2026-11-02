@@ -86,7 +86,7 @@ function toEvent(step: { event: string; payload: VizJson }): InternalEvent {
   return step.payload === null ? { type: step.event } : { type: step.event, payload: step.payload };
 }
 
-function messageOf(error: unknown): string {
+export function messageOf(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
@@ -105,16 +105,17 @@ function featuresOf(trace: Pick<Trace, "visited" | "observations" | "errors">): 
 }
 
 /** JSON text of the context, or null when it is not serializable (functions, cycles). */
-function contextText(actor: AnyActor<unknown>): string | null {
+export function contextText(actor: AnyActor<unknown>): string | null {
   const text = Either.from(() => JSON.stringify(actor.context ?? null));
   return Either.isRight(text) ? text[1] : null;
 }
 
-function parsed(text: string | null): unknown {
+export function parsed(text: string | null): unknown {
   return text === null ? null : JSON.parse(text);
 }
 
-function dispatch(
+/** The one step function: the fuzzer and the live driver both apply steps through it. */
+export function applyStep(
   actor: AnyActor<unknown>,
   context: { step: VizStep; clock: VirtualClock; internal: ReadonlySet<string> },
 ): void {
@@ -168,7 +169,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   for (const step of steps) {
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
-    dispatch(actor, { step, clock, internal });
+    applyStep(actor, { step, clock, internal });
     if (contextText(actor) !== before) contextSteps.push(index);
     index += 1;
   }
