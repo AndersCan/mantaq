@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",
-    "@mantaq/sugar": "workspace:*"
+    "@mantaq/sugar": "workspace:*",
+    "@mantaq/test": "workspace:*",
+    "@mantaq/utils": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
