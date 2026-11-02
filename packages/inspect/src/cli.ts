@@ -2,13 +2,14 @@
 /**
  * mantaq-inspect: draw the machines a file exports.
  *
- *   mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open]
+ *   mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open] [--check]
  *
  * Finds every exported actor or actor factory from the file's types, reads
  * handler explanations and sample payloads from the source, fuzzes each
  * machine that runs on a VirtualClock, and writes one self-contained HTML page
  * (default `mantaq-viz.html`) that opens without a server. `--json` writes the
- * viz document instead. Seed: MANTAQ_SEED (default from @mantaq/pbt).
+ * viz document instead. `--check` exits 1 if any warning was printed or fuzzing
+ * found a handler error (each printed as `error:`). Seed: MANTAQ_SEED (default from @mantaq/pbt).
  */
 import { serializeViz } from "@mantaq/viz";
 import { vizDocument } from "./inspect.ts";
@@ -23,7 +24,7 @@ import { basename, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 const USAGE =
-  "usage: mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open]\n";
+  "usage: mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open] [--check]\n";
 
 interface Options {
   files: string[];
@@ -31,6 +32,7 @@ interface Options {
   json: boolean;
   fuzz: false | FuzzSettings;
   open: boolean;
+  check: boolean;
 }
 
 function parse(): Either<string, Options> {
@@ -43,6 +45,7 @@ function parse(): Either<string, Options> {
         iterations: { type: "string" },
         "no-fuzz": { type: "boolean" },
         "no-open": { type: "boolean" },
+        check: { type: "boolean" },
       },
     }),
   );
@@ -61,6 +64,7 @@ function parse(): Either<string, Options> {
     out: resolve(values.out ?? (json ? "mantaq-viz.json" : "mantaq-viz.html")),
     json,
     fuzz,
+    check: values.check === true,
     open: values["no-open"] !== true && !json && process.stdout.isTTY === true,
   });
 }
@@ -80,13 +84,22 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { files, out, json, fuzz, open } = options[1];
+  const { files, out, json, fuzz, open, check } = options[1];
   const results = [];
   for (const file of files) results.push(await inspectFile(file, { fuzz }));
   for (const warning of results.flatMap((result) => result.warnings)) {
     process.stderr.write(`warning: ${warning}\n`);
   }
   const machines = results.flatMap((result) => result.machines);
+  const errors = machines.flatMap((machine) =>
+    (machine.fuzz?.errors ?? []).map(
+      (error) => `${machine.id}: ${error.from} -${error.event}-> ${error.message}`,
+    ),
+  );
+  if (check) for (const error of errors) process.stderr.write(`error: ${error}\n`);
+  if (check && (errors.length > 0 || results.some((result) => result.warnings.length > 0))) {
+    process.exitCode = 1;
+  }
   if (machines.length === 0) {
     process.stderr.write("no machines found\n");
     process.exitCode = 1;
