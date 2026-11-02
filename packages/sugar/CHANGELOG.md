@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1
+
+<sub>2026-11-02</sub>
+
+- _(patch)_
+  `withTimeout` now labels its timer with the emitted event's type, so `pendingTimers()` shows it. The `Emit` type parameter is now constrained to `InternalEvent`. The event factory is called once when the timer is scheduled (for the label) and again when it fires.
+
 ## 2.0.0
 
 <sub>2026-11-01</sub>
