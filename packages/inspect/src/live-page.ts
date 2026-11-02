@@ -34,7 +34,12 @@ export function mountDriven(
   const viz = parsed[1];
   const shown = only(viz, options.machine ?? null);
   const id = shown.machines[0]?.id ?? "";
-  const create = context.targets[id];
+  const target = context.targets[id];
+  // Same rule as static inspection: a driver needs a clock it can advance.
+  const create =
+    target !== undefined && typeof Reflect.get(target().clock, "advance") === "function"
+      ? target
+      : undefined;
   const picker = viz.machines.length > 1;
   const select = (machine: string) => {
     const next = new URLSearchParams(location.search);
