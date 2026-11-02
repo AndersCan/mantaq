@@ -5,7 +5,7 @@ import type { Selection } from "./graph.ts";
 import { availableModes, modeLabel, unreachedText } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
-import { decodePath, encodeStep } from "../moves.ts";
+import { decodeLiveSteps, decodePath, encodeLiveStep, encodeStep } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore } from "./explore.ts";
 
@@ -118,12 +118,11 @@ export interface ViewerOptions {
   heading?: "h1" | "h2" | "h3";
   /** Machine to show first; defaults to the first one. */
   machine?: string;
-  /** Encoded steps to open on (from `?step=`), in the shown machine. Ignored with a `driver`. */
+  /** Encoded steps to open on (from `?step=`), in the shown machine. With a `driver`, live steps replayed through it. */
   steps?: ReadonlyArray<string>;
   /**
    * Runs the machine for real: steps go to the driver and the cursor follows its state.
-   * The driver runs one machine, so the machine picker is hidden and live walks are not
-   * written to the URL.
+   * The driver runs one machine, so the machine picker is hidden.
    */
   driver?: VizDriver;
   /** Called after every walk or machine change, e.g. to keep the URL shareable. */
@@ -149,9 +148,10 @@ export function mountViewer(
       first === undefined || options.driver !== undefined
         ? []
         : decodePath(first, options.steps ?? []),
-    live: options.driver?.reset() ?? null,
+    live: null,
   };
   const { driver } = options;
+  if (driver !== undefined) view.live = replay(driver, decodeLiveSteps(options.steps ?? []));
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   root.addEventListener("keydown", (event) => {
@@ -186,16 +186,17 @@ export function mountViewer(
       markSelection(root, view.selection);
     };
     const walked = () => {
-      options.onNavigate?.({
-        machine: machine.id,
-        steps: view.path.map((step) => encodeStep(machine, step)),
-      });
+      const steps =
+        view.live === null
+          ? view.path.map((step) => encodeStep(machine, step))
+          : view.live.steps.map(encodeLiveStep);
+      options.onNavigate?.({ machine: machine.id, steps });
       refresh();
     };
     const send = (step: VizStep) => {
       if (driver === undefined) return;
       view.live = stepSafely(driver, { before: view.live, step });
-      refresh();
+      walked();
     };
     const take = (step: ExploreStep) => {
       if (driver !== undefined) {
@@ -209,7 +210,7 @@ export function mountViewer(
     const rewind = (length: number) => {
       if (driver !== undefined && view.live !== null) {
         view.live = replay(driver, view.live.steps.slice(0, Math.max(0, length)));
-        refresh();
+        walked();
         return;
       }
       view.path = view.path.slice(0, Math.max(0, length));

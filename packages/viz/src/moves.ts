@@ -1,5 +1,5 @@
 import { coveredByAny } from "./schema.ts";
-import type { VizEdge, VizMachine } from "./schema.ts";
+import type { VizEdge, VizJson, VizMachine, VizStep } from "./schema.ts";
 
 /**
  * Walking the drawn graph by hand: no actor runs. A path is the edges taken
@@ -128,4 +128,60 @@ export function decodePath(machine: VizMachine, encoded: ReadonlyArray<string>):
     path.push({ edge: edgeId, to });
   }
   return path;
+}
+
+/**
+ * A live step as text for a URL: `@800` advances the clock 800 ms, `go` sends
+ * `go` with no payload, `pay={"amount":5}` sends `pay` with a JSON payload.
+ */
+export function encodeLiveStep(step: VizStep): string {
+  if (step.kind === "advance") return `@${step.ms}`;
+  return step.payload === null ? step.event : `${step.event}=${JSON.stringify(step.payload)}`;
+}
+
+function parseJson(text: string): { value: VizJson } | null {
+  try {
+    return { value: JSON.parse(text) as VizJson };
+  } catch {
+    return null;
+  }
+}
+
+/** Inverse of `encodeLiveStep`; null when the text is not a step. */
+function decodeLiveStep(text: string): VizStep | null {
+  if (text.startsWith("@")) {
+    const ms = Number(text.slice(1));
+    return text.length > 1 && Number.isFinite(ms) && ms >= 0 ? { kind: "advance", ms } : null;
+  }
+  const cut = text.indexOf("=");
+  const event = cut === -1 ? text : text.slice(0, cut);
+  if (event === "") return null;
+  if (cut === -1) return { kind: "event", event, payload: null };
+  const payload = parseJson(text.slice(cut + 1));
+  return payload === null ? null : { kind: "event", event, payload: payload.value };
+}
+
+/** Steps from a shared link, up to the first one that does not parse. */
+export function decodeLiveSteps(encoded: ReadonlyArray<string>): VizStep[] {
+  const steps: VizStep[] = [];
+  for (const text of encoded) {
+    const step = decodeLiveStep(text);
+    if (step === null) break;
+    steps.push(step);
+  }
+  return steps;
+}
+
+/** Distinct payloads the fuzzer sent with `event`, in first-seen order. */
+export function payloadSamples(machine: VizMachine, event: string): VizJson[] {
+  const steps = [
+    ...(machine.fuzz?.corpus.flatMap((sequence) => sequence.steps) ?? []),
+    ...(machine.fuzz?.errors.flatMap((error) => error.steps) ?? []),
+  ];
+  const seen = new Map<string, VizJson>();
+  for (const step of steps) {
+    if (step.kind !== "event" || step.event !== event || step.payload === null) continue;
+    seen.set(JSON.stringify(step.payload), step.payload);
+  }
+  return [...seen.values()];
 }
