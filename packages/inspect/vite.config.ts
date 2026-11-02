@@ -8,6 +8,7 @@ export default defineConfig({
       cli: "src/cli.ts",
       vite: "src/vite.ts",
       drive: "src/drive.ts",
+      "live-entry": "src/live-entry.ts",
     },
     dts: {
       generator: "tsgo",

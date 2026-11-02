@@ -1,0 +1,22 @@
+/**
+ * Entry of the page `@mantaq/inspect/vite` serves. Redraws when the dev
+ * server reports a change, and when the machine code itself hot-updates.
+ */
+import { UPDATE_EVENT } from "@mantaq/viz";
+import { targets } from "virtual:mantaq/targets";
+import { mountLiveDriven } from "./live-page.ts";
+import type { LiveTargets } from "./live-page.ts";
+
+const root = document.querySelector<HTMLElement>("#app");
+const source = root?.dataset["src"];
+const current: { targets: LiveTargets } = { targets };
+
+if (root && source !== undefined) {
+  const draw = () => void mountLiveDriven(root, { source, targets: current.targets });
+  draw();
+  import.meta.hot?.on(UPDATE_EVENT, draw);
+  import.meta.hot?.accept("virtual:mantaq/targets", (module) => {
+    if (module !== undefined) current.targets = module["targets"];
+    draw();
+  });
+}
