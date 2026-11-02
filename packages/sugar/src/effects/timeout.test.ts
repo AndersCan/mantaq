@@ -29,6 +29,25 @@ describe("withTimeout", () => {
     expect(emitted).toEqual([{ type: "timeout" }]);
   });
 
+  test("labels the pending timer with the event type", () => {
+    const clock = VirtualClock();
+    const abort = new AbortController();
+
+    withTimeout(800, {
+      input: {
+        signal: abort.signal,
+        state: { name: "", payload: undefined },
+        event: { type: "" },
+        context: Context({ get: () => undefined, set: () => {} }),
+        emit: () => {},
+        clock,
+      },
+      event: () => ({ type: "timeout" }),
+    });
+
+    expect(clock.pendingTimers()[0]?.eventName).toBe("timeout");
+  });
+
   test("does not emit if the timer aborted before firing", () => {
     const clock = VirtualClock();
     const emitted: Array<{ type: string; [key: string]: unknown }> = [];
