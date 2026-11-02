@@ -10,7 +10,7 @@ It finds every exported actor, or function that builds one, from the file's type
 
 ## Three ways in
 
-**CLI**: `mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--no-open] [--check]`. `--check` exits 1 if a warning was printed or fuzzing found a handler error (printed as `error:`), so CI can gate on design errors. `--json` writes the viz document instead of the page. Seed: `MANTAQ_SEED` (default from `@mantaq/pbt`). Same seed → same output.
+**CLI**: `mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--config FILE] [--mode MODE] [--no-open] [--check]`. `--config` loads the files with that Vite config (env, aliases, plugins) and `--mode` picks its mode; without `--config` no project config is read. `--check` exits 1 if a warning was printed or fuzzing found a handler error (printed as `error:`), so CI can gate on design errors. `--json` writes the viz document instead of the page. Seed: `MANTAQ_SEED` (default from `@mantaq/pbt`). Same seed → same output.
 
 **Vite plugin**: a live page on your dev server that redraws, keeping your walk, when you save.
 
