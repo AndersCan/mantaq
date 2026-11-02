@@ -1,10 +1,25 @@
 import type { InspectedModule, ModuleOptions } from "./inspect.ts";
+import { Either } from "@mantaq/utils";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { runnerImport } from "vite";
-import type { Plugin } from "vite";
+import { dirname, resolve } from "node:path";
+import { loadConfigFromFile, loadEnv, runnerImport } from "vite";
+import type { InlineConfig, Plugin } from "vite";
 
 /** Options `inspectFile` passes through to `inspectModule`; loading is its job. */
 export type FileOptions = Omit<ModuleOptions, "load">;
+
+/** An inspected file; `failed` when it could not be loaded at all (its warnings say why). */
+export type LoadedFile = InspectedModule & { failed: boolean };
+
+const ESC = String.fromCharCode(27);
+const ANSI = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+/** Which Vite config and mode load the file; without a config, no project config is read. */
+export interface LoadOptions {
+  config?: string;
+  mode?: string;
+}
 
 const ENTRY = "virtual:mantaq-inspect";
 const RESOLVED = `\0${ENTRY}`;
@@ -53,17 +68,86 @@ export function runOf(
   return async (options) => Reflect.apply(run, undefined, [options]);
 }
 
+// Built in pieces so this file is not rewritten when it is itself loaded.
+const ENV_ACCESS = ["import", "meta", "env"].join(".");
+
+/**
+ * Replaces the env object with the project's env: `runnerImport` never reads
+ * env files, so `VITE_*` variables would otherwise be missing. A textual
+ * replace: it also rewrites matches in strings and comments, and a frozen
+ * snapshot replaces Vite's own `import.meta.env`, so assigning to it fails.
+ */
+function projectEnv(env: Record<string, string>, mode: string): Plugin {
+  const value = JSON.stringify({
+    ...env,
+    BASE_URL: "/",
+    MODE: mode,
+    DEV: true,
+    PROD: false,
+    SSR: true,
+  });
+  return {
+    name: "mantaq-inspect-env",
+    enforce: "pre",
+    transform: (code, id) =>
+      id.includes("/node_modules/") || !code.includes(ENV_ACCESS)
+        ? null
+        : { code: code.replaceAll(ENV_ACCESS, `(${value})`), map: null },
+  };
+}
+
+/**
+ * The inline config for a load: empty without `--config`; otherwise the
+ * project's Vite config (plugins, aliases, define) plus its env files.
+ */
+async function inlineConfig({ config, mode }: LoadOptions): Promise<InlineConfig> {
+  const base: InlineConfig = { configFile: false, logLevel: "silent" };
+  if (config === undefined) return { ...base, ...(mode === undefined ? {} : { mode }) };
+  const chosen = mode ?? "development";
+  const loaded = await loadConfigFromFile({ command: "serve", mode: chosen }, config);
+  const user = loaded?.config ?? {};
+  const envDir = resolve(dirname(config), user.envDir === false ? "." : (user.envDir ?? "."));
+  const env = user.envDir === false ? {} : loadEnv(chosen, envDir, user.envPrefix ?? "VITE_");
+  return {
+    ...user,
+    ...base,
+    mode: chosen,
+    plugins: [...(user.plugins ?? []), projectEnv(env, chosen)],
+  };
+}
+
 /** Load `file` with Vite (TS, tsconfig paths, extensionless imports) and inspect its machines. */
 export async function inspectFile(
   file: string,
   options: FileOptions = {},
-): Promise<InspectedModule> {
-  const { module } = await runnerImport(entryId(file), {
-    configFile: false,
-    logLevel: "silent",
-    plugins: [inspectEntry()],
-  });
+  load: LoadOptions = {},
+): Promise<LoadedFile> {
+  if (load.config !== undefined && !existsSync(load.config)) {
+    return {
+      machines: [],
+      warnings: [`${file}: Vite config not found: ${load.config}`],
+      failed: true,
+    };
+  }
+  const loaded = await inlineConfig(load)
+    .then((inline) =>
+      runnerImport(entryId(file), {
+        ...inline,
+        plugins: [...(inline.plugins ?? []), inspectEntry()],
+      }),
+    )
+    .then(
+      (value) => Either.right(value),
+      (error: unknown) =>
+        Either.left((error instanceof Error ? error.message : String(error)).replace(ANSI, "")),
+    );
+  if (Either.isLeft(loaded)) {
+    return { machines: [], warnings: [`${file}: ${loaded[0]}`], failed: true };
+  }
+  const { module } = loaded[1];
   const run = runOf(module);
-  if (run === null) return { machines: [], warnings: [`${file}: could not load the inspector`] };
-  return run(options);
+  if (run === null) {
+    return { machines: [], warnings: [`${file}: could not load the inspector`], failed: true };
+  }
+  return { ...(await run(options)), failed: false };
 }
