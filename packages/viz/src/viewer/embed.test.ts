@@ -269,6 +269,28 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 
+  test("a link with a step the driver throws on still mounts", () => {
+    const root = document.createElement("div");
+    const inner = fakeDriver();
+    const mount = () =>
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEvents] },
+        {
+          driver: {
+            reset: () => inner.reset(),
+            step: (step) => {
+              if (step.kind === "event" && step.event === "boom") throw new Error("x");
+              return inner.step(step);
+            },
+          },
+          steps: ["boom"],
+        },
+      );
+    expect(mount).not.toThrow();
+    expect(root.querySelector("[data-live-error]")?.textContent).toBe("Handler threw: x");
+  });
+
   test("a graph click is resolved from the live state", () => {
     const selection = { kind: "state", id: "done" } as const;
     expect(clickStep(withEvents, { path: [], selection })).not.toBeNull();

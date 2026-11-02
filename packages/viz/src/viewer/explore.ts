@@ -1,6 +1,13 @@
-import { movesFrom, stateAfter, unhandledSends } from "../moves.ts";
+import { movesFrom, payloadSamples, stateAfter, unhandledSends } from "../moves.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
-import type { VizLiveState, VizLiveStep, VizMachine, VizStep } from "../schema.ts";
+import type {
+  VizJson,
+  VizLiveState,
+  VizLiveStep,
+  VizLiveTimer,
+  VizMachine,
+  VizStep,
+} from "../schema.ts";
 import { html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 
@@ -191,7 +198,62 @@ function pathSection(doc: Document, context: ExploreContext): HTMLElement {
 }
 
 function describeStep(step: VizStep): string {
-  return step.kind === "advance" ? `advance ${step.ms} ms` : step.event;
+  if (step.kind === "advance") return `advance ${step.ms} ms`;
+  return step.payload === null ? step.event : `${step.event} ${JSON.stringify(step.payload)}`;
+}
+
+/** The clock starts at 0 and only `advance` steps move it. */
+function elapsed(steps: ReadonlyArray<VizStep>): number {
+  return steps.reduce((sum, step) => sum + (step.kind === "advance" ? step.ms : 0), 0);
+}
+
+function timersSection(
+  doc: Document,
+  context: { state: VizLiveState; send: (step: VizStep) => void },
+): HTMLElement {
+  const now = elapsed(context.state.steps);
+  const input = html(doc, "input", {
+    type: "number",
+    min: "0",
+    value: "100",
+    "aria-label": "milliseconds",
+    "data-advance-ms": "",
+  });
+  const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" }, [
+    "Enter a number of milliseconds, 0 or more.",
+  ]);
+  const advance = () => {
+    const ms = Number(input.value);
+    const valid = input.value.trim() !== "" && Number.isFinite(ms) && ms >= 0;
+    problem.toggleAttribute("hidden", valid);
+    if (valid) context.send({ kind: "advance", ms });
+  };
+  return html(doc, "div", { class: "explore-time" }, [
+    html(doc, "h3", {}, ["Time"]),
+    html(
+      doc,
+      "ul",
+      { "data-group": "timers" },
+      context.state.timers.map((timer: VizLiveTimer) => {
+        const remaining = Math.max(0, timer.deadline - now);
+        return html(doc, "li", { "data-timer": timer.id }, [
+          button(doc, [`advance ${remaining} ms → ${timer.eventName ?? timer.id}`], {
+            onClick: () => context.send({ kind: "advance", ms: remaining }),
+            attrs: { "data-advance-timer": timer.id },
+          }),
+        ]);
+      }),
+    ),
+    context.state.timers.length === 0
+      ? html(doc, "p", { class: "muted", "data-no-timers": "" }, ["No timers pending."])
+      : null,
+    html(doc, "div", {}, [
+      input,
+      " ms ",
+      button(doc, ["advance"], { onClick: advance, attrs: { "data-advance": "" } }),
+    ]),
+    problem,
+  ]);
 }
 
 function liveMovesSection(
@@ -209,23 +271,62 @@ function liveMovesSection(
   const handled = new Set(movesFrom(machine, current).map((move) => move.edge.event));
   const inputs = machine.events.filter((event) => !event.internal).map((event) => event.id);
   const events = [...new Set([...handled, ...inputs])].sort();
+  const json = html(doc, "textarea", {
+    rows: "2",
+    placeholder: "payload as JSON (empty: the sample, or none)",
+    "aria-label": "payload JSON",
+    "data-payload-json": "",
+  });
+  const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" }, [
+    "Payload is not valid JSON.",
+  ]);
+  const payloadFor = (sample: HTMLSelectElement | null): { value: VizJson } | null => {
+    try {
+      if (json.value.trim() !== "") return { value: JSON.parse(json.value) as VizJson };
+      return { value: sample === null || sample.value === "" ? null : JSON.parse(sample.value) };
+    } catch {
+      return null;
+    }
+  };
   return html(doc, "div", { class: "explore-moves" }, [
     html(doc, "h3", {}, ["Send"]),
+    json,
+    problem,
     html(
       doc,
       "ul",
       { "data-group": "live" },
-      events.map((event) =>
-        html(doc, "li", { "data-send-item": event }, [
+      events.map((event) => {
+        const samples = payloadSamples(machine, event);
+        const sample =
+          samples.length === 0
+            ? null
+            : html(
+                doc,
+                "select",
+                { "aria-label": `${event} payload sample`, "data-sample": event },
+                [
+                  html(doc, "option", { value: "" }, ["no payload"]),
+                  ...samples.map((each) =>
+                    html(doc, "option", { value: JSON.stringify(each) }, [JSON.stringify(each)]),
+                  ),
+                ],
+              );
+        return html(doc, "li", { "data-send-item": event }, [
           button(doc, [code(doc, event)], {
-            onClick: () => context.send({ kind: "event", event, payload: null }),
+            onClick: () => {
+              const payload = payloadFor(sample);
+              problem.toggleAttribute("hidden", payload !== null);
+              if (payload !== null) context.send({ kind: "event", event, payload: payload.value });
+            },
             attrs: { "data-send": event },
           }),
+          sample,
           handled.has(event)
             ? null
             : html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`]),
-        ]),
-      ),
+        ]);
+      }),
     ),
   ]);
 }
@@ -323,6 +424,7 @@ export function explorePanel(doc: Document, context: ExploreContext): HTMLElemen
         ? [
             liveResultSection(doc, live.state),
             liveMovesSection(doc, machine, { state: live.state, send: live.send, final }),
+            final ? null : timersSection(doc, { state: live.state, send: live.send }),
           ]
         : [
             effectsSection(doc, machine, current),
