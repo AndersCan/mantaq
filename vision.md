@@ -73,8 +73,8 @@ Part of the core promise: behavior is readable without reading code.
 
 - The diagram reflects the real machine, never a guess. Anything it cannot show
   is marked "undetermined" or fixed in core (remedy, #286).
-- How the diagram is extracted (runtime trace of the real `Actor` vs static AST
-  parse) is open. A separate plan decides it. This document does not.
+- How the diagram is extracted is decided in
+  `docs/adr/0002-extraction-declared-targets-ts-checker.md`.
 
 ## Verifying LLM-built machines
 
