@@ -11,8 +11,11 @@
  */
 import { UPDATE_EVENT, livePageHtml, serializeViz } from "@mantaq/viz";
 import type { FuzzSettings } from "./inspect.ts";
-import { vizDocument } from "./inspect.ts";
+import { vizDocument, machineId, projectRoot } from "./inspect.ts";
+import { analyzeModule } from "./ast/annotate.ts";
+import type { MachineExport } from "./ast/discover.ts";
 import { entryId, inspectEntry, runOf } from "./load.ts";
+import { Either } from "@mantaq/utils";
 import { globSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,6 +34,51 @@ export interface MantaqVizOptions {
 }
 
 const DEV_ITERATIONS = 500;
+
+const TARGETS = "virtual:mantaq/targets";
+const TARGETS_RESOLVED = `\0${TARGETS}`;
+
+function createExpression(found: MachineExport, index: number): string {
+  const callee = `m${index}[${JSON.stringify(found.name)}]`;
+  const call =
+    found.call === "clock"
+      ? `${callee}(VirtualClock())`
+      : found.call === "options"
+        ? `${callee}({ clock: VirtualClock() })`
+        : `${callee}()`;
+  return found.unwrap === "actor" ? `${call}.actor` : call;
+}
+
+/**
+ * Source of `virtual:mantaq/targets`: one factory per exported actor factory,
+ * shaped by its type (`call`, `clock`, `options`). A bare actor export cannot
+ * be recreated, so it gets none. Like the server-side inspection, plain actors
+ * are skipped when a file has factories.
+ */
+function targetsSource(files: ReadonlyArray<string>): string {
+  const core = fileURLToPath(import.meta.resolve("@mantaq/core"));
+  const imports: string[] = [];
+  const entries: string[] = [];
+  files.forEach((file, index) => {
+    const analysis = analyzeModule({ file, root: projectRoot(file) });
+    if (Either.isLeft(analysis)) return;
+    const factories = analysis[1].machines.filter((found) => found.call !== "instance");
+    if (factories.length === 0) return;
+    imports.push(`import * as m${index} from ${JSON.stringify(file)};`);
+    for (const found of factories) {
+      entries.push(
+        `  ${JSON.stringify(machineId(found.name))}: () => { const actor = ${createExpression(found, index)}; return { actor, clock: actor.clock }; },`,
+      );
+    }
+  });
+  return [
+    `import { VirtualClock } from ${JSON.stringify(core)};`,
+    ...imports,
+    "export const targets = {",
+    ...entries,
+    "};",
+  ].join("\n");
+}
 
 function machineFiles(root: string, patterns: ReadonlyArray<string>): string[] {
   const files = patterns.flatMap((pattern) => globSync(pattern, { cwd: root }));
@@ -60,7 +108,20 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
   const base = (options.base ?? "/__mantaq/").replace(/\/?$/, "/");
   const patterns = Array.isArray(options.machines) ? options.machines : [options.machines];
   const fuzz = options.fuzz ?? { iterations: DEV_ITERATIONS };
-  const live = fileURLToPath(import.meta.resolve("@mantaq/viz/live"));
+  const live = fileURLToPath(
+    import.meta.resolve(import.meta.url.endsWith(".ts") ? "./live-entry.ts" : "./live-entry.mjs"),
+  );
+  const viz = dirname(dirname(fileURLToPath(import.meta.resolve("@mantaq/viz/live"))));
+  let root = process.cwd();
+  const targets: Plugin = {
+    name: "mantaq-viz-targets",
+    apply: "serve",
+    configResolved: (config) => {
+      root = config.root;
+    },
+    resolveId: (id) => (id === TARGETS ? TARGETS_RESOLVED : null),
+    load: (id) => (id === TARGETS_RESOLVED ? targetsSource(machineFiles(root, patterns)) : null),
+  };
   const plugin: Plugin = {
     name: "mantaq-viz",
     apply: "serve",
@@ -68,7 +129,11 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
     config: (config) => ({
       server: {
         fs: {
-          allow: [searchForWorkspaceRoot(config.root ?? process.cwd()), dirname(dirname(live))],
+          allow: [
+            searchForWorkspaceRoot(config.root ?? process.cwd()),
+            dirname(dirname(live)),
+            viz,
+          ],
         },
       },
     }),
@@ -83,6 +148,8 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       server.watcher.on("all", (_event, path) => {
         if (!/\.[cm]?[jt]sx?$/.test(path)) return;
         cached = null;
+        const generated = server.moduleGraph.getModuleById(TARGETS_RESOLVED);
+        if (generated !== undefined) server.moduleGraph.invalidateModule(generated);
         server.environments.ssr.moduleGraph.invalidateAll();
         server.ws.send({ type: "custom", event: UPDATE_EVENT });
       });
@@ -125,5 +192,5 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       });
     },
   };
-  return [inspectEntry(), plugin];
+  return [inspectEntry(), targets, plugin];
 }

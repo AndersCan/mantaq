@@ -33,7 +33,7 @@ describe("mantaqViz", () => {
     expect(page).toContain('<main id="app" data-src="/__mantaq/viz.json">');
     expect(page).toContain("/@vite/client");
     expect(page).toContain("<style>");
-    const entry = page.match(/src="(\/@fs[^"]+live\.ts)"/)?.[1];
+    const entry = page.match(/src="(\/@fs[^"]+live-entry\.ts)"/)?.[1];
     expect((await fetch(`${origin}${entry ?? ""}`)).status).toBe(200);
   });
 
@@ -57,5 +57,17 @@ describe("mantaqViz", () => {
 
   test("other paths fall through to Vite", async () => {
     expect((await fetch(`${origin}/__mantaq/nope`)).status).toBe(404);
+  });
+});
+
+describe("mantaqViz targets", () => {
+  test("the virtual module exposes a factory per machine with a call shape", async () => {
+    const result = await server.ssrLoadModule("virtual:mantaq/targets");
+    const targets: Record<string, () => { actor: { state: { name: string } }; clock: unknown }> =
+      result["targets"];
+    expect(Object.keys(targets).sort()).toEqual(["credit", "retry"]);
+    const made = targets["retry"]?.();
+    expect(made?.actor.state.name).toBe("idle");
+    expect(made?.clock).toBeDefined();
   });
 });
