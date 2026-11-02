@@ -227,7 +227,6 @@ export default defineConfig({
                   name: "@mantaq/traversal",
                   message: "@mantaq/examples may not import @mantaq/traversal",
                 },
-                { name: "@mantaq/test", message: "@mantaq/examples may not import @mantaq/test" },
               ],
             },
           ],
