@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@mantaq/pbt": "workspace:*",
+    "@mantaq/utils": "workspace:*",
     "@stryker-mutator/core": "catalog:",
     "@stryker-mutator/vitest-runner": "catalog:",
     "@types/node": "^26.2.0",

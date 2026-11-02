@@ -302,6 +302,9 @@ importers:
       '@mantaq/pbt':
         specifier: workspace:*
         version: link:../pbt
+      '@mantaq/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@stryker-mutator/core':
         specifier: 'catalog:'
         version: 10.1.1(@types/node@26.2.0)

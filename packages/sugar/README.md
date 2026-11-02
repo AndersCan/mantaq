@@ -387,6 +387,36 @@ withPromise(fetchData(), input.signal, input.emit, {
 });
 ```
 
+#### Errors as values
+
+When a port returns `Promise<Either<PortError, Loaded>>`, map the result with `Either.match` inside `success`. No new helper is needed, and both branches stay typed without a cast:
+
+```ts
+import { Either } from "@mantaq/utils";
+import { withPromise } from "@mantaq/sugar";
+
+m.effect(loading, {
+  name: "load",
+  sends: [loaded, failed, loadRejected],
+  fn: (input) =>
+    withPromise({
+      promise: port.load(),
+      signal: input.signal,
+      emit: input.emit,
+      events: {
+        success: (result) =>
+          Either.match(result, {
+            onLeft: (e): LoadEvent => failed.create(e), // e: PortError
+            onRight: (v): LoadEvent => loaded.create(v), // v: Loaded
+          }),
+        error: (err) => loadRejected.create({ message: String(err) }),
+      },
+    }),
+});
+```
+
+`LoadEvent` is the union of the two event shapes; annotating both handlers with it lets `Either.match` infer one result type. A rejected promise still goes through `error`, and an effect aborted before the promise settles emits nothing. See `src/effects/promise.either.test.ts`.
+
 ### `withTimeout(ms, input, eventFn)`
 
 Schedule a timeout event through the actor's clock. Aborts cleanly if the actor is destroyed before timeout fires.

@@ -14,9 +14,14 @@ side effects. Both use the actor's clock, so tests stay deterministic on
 ## withPromise
 
 ```ts
-withPromise(promise, signal, emit, {
-  success: (data) => ({ type: "paymentOk", payload: data }),
-  error: (err) => ({ type: "paymentFail", payload: err }),
+withPromise({
+  promise,
+  signal,
+  emit,
+  events: {
+    success: (data) => ({ type: "paymentOk", payload: data }),
+    error: (err) => ({ type: "paymentFail", payload: err }),
+  },
 });
 ```
 
@@ -34,14 +39,51 @@ setup: (m) => {
     name: "chargeCard",
     fn: (input) => {
       const s = input.context.get();
-      withPromise(chargeCard(s.paymentInfo!.cardNumber), input.signal, input.emit, {
-        success: (orderId) => paymentOk.create({ orderId }),
-        error: (reason) => paymentFail.create({ reason: String(reason) }),
+      withPromise({
+        promise: chargeCard(s.paymentInfo!.cardNumber),
+        signal: input.signal,
+        emit: input.emit,
+        events: {
+          success: (orderId) => paymentOk.create({ orderId }),
+          error: (reason) => paymentFail.create({ reason: String(reason) }),
+        },
       });
     },
   });
 };
 ```
+
+### Errors as values
+
+When the port returns `Promise<Either<PaymentError, string>>`, map the result with `Either.match` (from `@mantaq/utils`) inside `success`. No extra helper is needed and neither branch needs a cast:
+
+```ts
+type PaymentEvent =
+  | { type: "paymentOk"; payload: { orderId: string } }
+  | { type: "paymentFail"; payload: { reason: string } };
+
+m.effect(submitting, {
+  name: "chargeCard",
+  fn: (input) => {
+    const s = input.context.get();
+    withPromise({
+      promise: chargeCard(s.paymentInfo!.cardNumber),
+      signal: input.signal,
+      emit: input.emit,
+      events: {
+        success: (result) =>
+          Either.match(result, {
+            onLeft: (reason): PaymentEvent => paymentFail.create({ reason: reason.message }),
+            onRight: (orderId): PaymentEvent => paymentOk.create({ orderId }),
+          }),
+        error: (reason) => paymentFail.create({ reason: String(reason) }),
+      },
+    });
+  },
+});
+```
+
+Annotating both handlers with the event union lets `Either.match` infer one result type.
 
 ## withTimeout
 
