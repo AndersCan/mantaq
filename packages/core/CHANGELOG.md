@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+<sub>2026-11-02</sub>
+
+- _(patch)_ Docs declare the actor context as a typed const instead of casting it with `as`. A cast hides missing fields.
+
 ## 0.5.0
 
 <sub>2026-11-01</sub>
