@@ -37,19 +37,45 @@ export interface LoadedSource {
   eventDocs: Map<string, string>;
 }
 
-/** Text of the JSDoc block directly above a node, or null when there is none. */
-function docOf(node: ts.Node): string | null {
-  const sourceFile = node.getSourceFile();
-  const ranges = ts.getLeadingCommentRanges(sourceFile.text, node.getFullStart()) ?? [];
+/**
+ * Prose of the JSDoc block found in the trivia starting at `pos`, or null when
+ * there is none. Block tags (`@param`, ...) and everything after them are cut;
+ * `{@link x}` reads as `x`.
+ */
+function docAt(sourceFile: ts.SourceFile, pos: number): string | null {
+  const ranges = ts.getLeadingCommentRanges(sourceFile.text, pos) ?? [];
   const block = ranges.filter((range) => sourceFile.text.startsWith("/**", range.pos)).at(-1);
   if (block === undefined) return null;
-  const text = sourceFile.text
+  const lines = sourceFile.text
     .slice(block.pos + 3, block.end - 2)
     .split(/\r?\n/)
-    .map((line) => line.replace(/^\s*\* ?/, "").trim())
+    .map((line) => line.replace(/^\s*\* ?/, "").trim());
+  const tag = lines.findIndex((line) => line.startsWith("@"));
+  const text = (tag === -1 ? lines : lines.slice(0, tag))
     .join("\n")
+    .replace(/\{@link(?:code|plain)?\s+([^}|\s]+)[^}]*\}/g, "$1")
     .trim();
   return text === "" ? null : text;
+}
+
+function docOf(node: ts.Node): string | null {
+  return docAt(node.getSourceFile(), node.getFullStart());
+}
+
+/**
+ * Doc of one `m.on(...)` link. The first link of a chain owns the comment above
+ * the statement; later links own the comment just before their `.on`.
+ */
+function callDoc(call: ts.CallExpression): string | null {
+  const callee = call.expression;
+  if (ts.isPropertyAccessExpression(callee) && ts.isCallExpression(callee.expression)) {
+    return docAt(call.getSourceFile(), callee.expression.end);
+  }
+  let top: ts.Node = call;
+  while (ts.isPropertyAccessExpression(top.parent) || ts.isCallExpression(top.parent)) {
+    top = top.parent;
+  }
+  return docOf(ts.isExpressionStatement(top.parent) ? top.parent : call);
 }
 
 function compilerOptions(source: AnalysisSource): ts.CompilerOptions {
@@ -99,7 +125,7 @@ function toRegistration(checker: ts.TypeChecker, call: ts.CallExpression): Regis
     eventRef,
     handler: property(options, "handler"),
     call,
-    doc: docOf(ts.isExpressionStatement(call.parent) ? call.parent : call),
+    doc: callDoc(call),
   };
 }
 

@@ -165,6 +165,13 @@ describe("AST: JSDoc becomes doc", () => {
     );
   });
 
+  test("each link of a chained m.on keeps its own doc", () => {
+    const docOfEvent = (name: string) => machine.edges.find((edge) => edge.event === name)?.doc;
+    expect(docOfEvent("again")).toBe("First of the chain, see waiting.");
+    expect(docOfEvent("more")).toBe("Second of the chain.");
+    expect(docOfEvent("last")).toBeNull();
+  });
+
   test("undocumented state, event and handler are null", () => {
     expect(machine.states.find((state) => state.id === "done")?.doc).toBeNull();
     expect(machine.events.find((event) => event.id === "finish")?.doc).toBeNull();
