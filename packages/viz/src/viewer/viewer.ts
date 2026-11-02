@@ -118,9 +118,13 @@ export interface ViewerOptions {
   heading?: "h1" | "h2" | "h3";
   /** Machine to show first; defaults to the first one. */
   machine?: string;
-  /** Encoded steps to open on (from `?step=`), in the shown machine. */
+  /** Encoded steps to open on (from `?step=`), in the shown machine. Ignored with a `driver`. */
   steps?: ReadonlyArray<string>;
-  /** Runs the machine for real: steps go to the driver and the cursor follows its state. */
+  /**
+   * Runs the machine for real: steps go to the driver and the cursor follows its state.
+   * The driver runs one machine, so the machine picker is hidden and live walks are not
+   * written to the URL.
+   */
   driver?: VizDriver;
   /** Called after every walk or machine change, e.g. to keep the URL shareable. */
   onNavigate?: (where: { machine: string; steps: string[] }) => void;
@@ -141,7 +145,10 @@ export function mountViewer(
     machineId: first?.id ?? "",
     selection: null,
     coverage: null,
-    path: first === undefined ? [] : decodePath(first, options.steps ?? []),
+    path:
+      first === undefined || options.driver !== undefined
+        ? []
+        : decodePath(first, options.steps ?? []),
     live: options.driver?.reset() ?? null,
   };
   const { driver } = options;
@@ -175,11 +182,7 @@ export function mountViewer(
         }),
         renderPanel(doc, machine, { selection: view.selection, select }),
       );
-      markExplore(root, {
-        machine,
-        path: view.path,
-        ...(view.live === null ? {} : { live: view.live.state }),
-      });
+      markExplore(root, { machine, path: view.path, ...liveState(view) });
       markSelection(root, view.selection);
     };
     const walked = () => {
@@ -191,7 +194,7 @@ export function mountViewer(
     };
     const send = (step: VizStep) => {
       if (driver === undefined) return;
-      view.live = driver.step(step);
+      view.live = stepSafely(driver, { before: view.live, step });
       refresh();
     };
     const take = (step: ExploreStep) => {
@@ -205,11 +208,7 @@ export function mountViewer(
     };
     const rewind = (length: number) => {
       if (driver !== undefined && view.live !== null) {
-        // Back is reset plus replay: the driver keeps no history.
-        const keep = view.live.steps.slice(0, Math.max(0, length));
-        let live = driver.reset();
-        for (const step of keep) live = driver.step(step);
-        view.live = live;
+        view.live = replay(driver, view.live.steps.slice(0, Math.max(0, length)));
         refresh();
         return;
       }
@@ -218,12 +217,12 @@ export function mountViewer(
     };
     // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {
-      const step = clickStep(machine, { path: view.path, selection });
+      const step = clickStep(machine, { path: view.path, selection, ...liveState(view) });
       view.selection = selection;
       if (step === null) refresh();
       else take(step);
     };
-    back = () => rewind(view.path.length - 1);
+    back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(
       headerOf(doc, {
         viz,
@@ -233,6 +232,7 @@ export function mountViewer(
         mode,
         render,
         onNavigate: options.onNavigate,
+        live: driver !== undefined,
       }),
       html(doc, "p", { class: "banner", role: "note" }, [
         driver === undefined ? banner(machine) : LIVE_BANNER,
@@ -249,6 +249,31 @@ export function mountViewer(
   render();
 }
 
+/** A driver that throws leaves the state where it was and shows the message as a handler error. */
+function stepSafely(
+  driver: VizDriver,
+  context: { before: VizLiveState | null; step: VizStep },
+): VizLiveState {
+  const { before, step } = context;
+  try {
+    return driver.step(step);
+  } catch (error) {
+    if (before === null) throw error;
+    return {
+      ...before,
+      last: {
+        from: before.state,
+        event: step.kind === "event" ? step.event : step.kind,
+        to: before.state,
+        outcome: "stay",
+        effects: [],
+        context: before.context,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+}
+
 function headerOf(
   doc: Document,
   context: {
@@ -259,21 +284,24 @@ function headerOf(
     mode: CoverageMode;
     render: () => void;
     onNavigate: ViewerOptions["onNavigate"];
+    live: boolean;
   },
 ): HTMLElement {
   const { machine, view, render } = context;
   return html(doc, "header", { class: "viz-header" }, [
     html(doc, context.heading, {}, [`Viz: ${machine.id}`]),
-    machineSelect(doc, context.viz, {
-      view,
-      onChange: (id) => {
-        view.machineId = id;
-        view.selection = null;
-        view.path = [];
-        context.onNavigate?.({ machine: id, steps: [] });
-        render();
-      },
-    }),
+    context.live
+      ? null
+      : machineSelect(doc, context.viz, {
+          view,
+          onChange: (id) => {
+            view.machineId = id;
+            view.selection = null;
+            view.path = [];
+            context.onNavigate?.({ machine: id, steps: [] });
+            render();
+          },
+        }),
     coveragePicker(doc, {
       machine,
       mode: context.mode,
@@ -297,4 +325,15 @@ function markSelection(root: HTMLElement, selection: Selection | null): void {
       selection !== null && element.dataset[attribute] === selection.id,
     );
   }
+}
+
+function liveState(view: ViewState): { live?: string } {
+  return view.live === null ? {} : { live: view.live.state };
+}
+
+/** Back is reset plus replay: the driver keeps no history. */
+function replay(driver: VizDriver, steps: ReadonlyArray<VizStep>): VizLiveState {
+  let live = driver.reset();
+  for (const step of steps) live = driver.step(step);
+  return live;
 }

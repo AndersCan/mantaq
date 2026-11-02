@@ -351,9 +351,9 @@ export function explorePanel(doc: Document, context: ExploreContext): HTMLElemen
  */
 export function clickStep(
   machine: VizMachine,
-  context: { path: ReadonlyArray<ExploreStep>; selection: Selection },
+  context: { path: ReadonlyArray<ExploreStep>; selection: Selection; live?: string },
 ): ExploreStep | null {
-  const current = stateAfter(machine, context.path);
+  const current = context.live ?? stateAfter(machine, context.path);
   if (current === null) return null;
   const { selection } = context;
   const steps = movesFrom(machine, current).flatMap((move) =>

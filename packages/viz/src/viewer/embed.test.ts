@@ -2,6 +2,7 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
 import { serializeViz } from "../serialize.ts";
+import { clickStep } from "./explore.ts";
 import { mountViewer, mountVizText } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -223,5 +224,54 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelectorAll("[data-rewind]")).toHaveLength(2);
     root.querySelector<HTMLButtonElement>('[data-explore-action="reset"]')?.click();
     expect(root.querySelector("[data-outcome]")).toBeNull();
+  });
+
+  test("ArrowLeft steps back one live step", () => {
+    const root = mountLive();
+    send(root, "peek");
+    send(root, "peek");
+    send(root, "go");
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(root.querySelectorAll("[data-rewind]")).toHaveLength(3);
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
+  });
+
+  test("hides the machine picker and ignores ?step= in live mode", () => {
+    const root = document.createElement("div");
+    const other = { ...withEvents, id: "other" };
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEvents, other] },
+      { driver: fakeDriver(), steps: ["x"] },
+    );
+    expect(root.querySelector(".machine-select")).toBeNull();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
+  });
+
+  test("a driver that throws shows the error and keeps the state", () => {
+    const root = document.createElement("div");
+    const inner = fakeDriver();
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEvents] },
+      {
+        driver: {
+          reset: () => inner.reset(),
+          step: (step) => {
+            if (step.kind === "event" && step.event === "peek") throw new Error("driver down");
+            return inner.step(step);
+          },
+        },
+      },
+    );
+    send(root, "peek");
+    expect(root.querySelector("[data-live-error]")?.textContent).toBe("Handler threw: driver down");
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
+  });
+
+  test("a graph click is resolved from the live state", () => {
+    const selection = { kind: "state", id: "done" } as const;
+    expect(clickStep(withEvents, { path: [], selection })).not.toBeNull();
+    expect(clickStep(withEvents, { path: [], selection, live: "done" })).toBeNull();
   });
 });
