@@ -61,5 +61,37 @@ describe("createAbortController", () => {
       expect(fn).toHaveBeenCalledTimes(1);
       expect(onabort).toHaveBeenCalledTimes(1);
     });
+
+    test("a throwing listener does not stop the others", () => {
+      const controller = make();
+      const next = vi.fn();
+      controller.signal.addEventListener("abort", () => {
+        throw new Error("boom");
+      });
+      controller.signal.addEventListener("abort", next);
+      expect(() => controller.abort()).toThrow("boom");
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(controller.signal.aborted).toBe(true);
+    });
+
+    test("a listener removed during dispatch is skipped", () => {
+      const controller = make();
+      const second = vi.fn();
+      controller.signal.addEventListener("abort", () => {
+        controller.signal.removeEventListener("abort", second);
+      });
+      controller.signal.addEventListener("abort", second);
+      controller.abort();
+      expect(second).not.toHaveBeenCalled();
+    });
+
+    test("adding the same listener twice registers it once", () => {
+      const controller = make();
+      const fn = vi.fn();
+      controller.signal.addEventListener("abort", fn);
+      controller.signal.addEventListener("abort", fn);
+      controller.abort();
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
   });
 });

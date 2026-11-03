@@ -1,5 +1,5 @@
 type AbortListener = (event: object) => void;
-type Entry = { fn: AbortListener; once: boolean };
+type Entry = { fn: AbortListener; once: boolean; removed: boolean };
 
 export function createAbortController(): AbortController {
   if (typeof globalThis.AbortController === "function") {
@@ -12,11 +12,13 @@ export function createAbortController(): AbortController {
     onabort: undefined as AbortListener | undefined,
     addEventListener(type: string, fn: AbortListener, options?: { once?: boolean }) {
       if (type === "abort" && !entries.some((entry) => entry.fn === fn)) {
-        entries.push({ fn, once: options?.once === true });
+        entries.push({ fn, once: options?.once === true, removed: false });
       }
     },
     removeEventListener(type: string, fn: AbortListener) {
-      if (type === "abort") entries = entries.filter((entry) => entry.fn !== fn);
+      if (type !== "abort") return;
+      for (const entry of entries) if (entry.fn === fn) entry.removed = true;
+      entries = entries.filter((entry) => entry.fn !== fn);
     },
     throwIfAborted() {
       if (signal.aborted) throw signal.reason;
@@ -29,8 +31,21 @@ export function createAbortController(): AbortController {
     const event = { type: "abort", target: signal };
     const snapshot = entries;
     entries = snapshot.filter((entry) => !entry.once);
-    signal.onabort?.(event);
-    for (const entry of snapshot) entry.fn(event);
+    const errors: unknown[] = [];
+    try {
+      signal.onabort?.(event);
+    } catch (error) {
+      errors.push(error);
+    }
+    for (const entry of snapshot) {
+      if (entry.removed) continue;
+      try {
+        entry.fn(event);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length > 0) throw errors[0];
   }
   return asController({ signal, abort });
 }
