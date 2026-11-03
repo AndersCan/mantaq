@@ -536,6 +536,41 @@ m.on(idleState, submitEvent, (event, opts) => {
 });
 ```
 
+### Reading state in a UI
+
+`actor.state.name` is the typed state name: a union of your declared states plus `"__error"`. Read it, not `snapshot().path[0]`, which is an untyped `string`.
+
+```ts
+const render = () => show(actor.state.name);
+actor.on("change", { fn: render });
+render();
+```
+
+Two different failures need two different responses:
+
+- **Dead machine.** `actor.state.name === "__error"` (details in `snapshot().error`). A handler threw and the actor is terminal. Create a new actor and offer Reload.
+- **Failed state the machine models.** An `error` state reached through a failure event is an ordinary state. Render it like any other state.
+
+`recover()` is not for UIs: it breaks determinism. Recreate the actor instead.
+
+To bind any actor without naming `Actor`'s five generics, type the binder on the parts it uses:
+
+```ts
+import type { Snapshot } from "@mantaq/core";
+
+function bind<
+  A extends {
+    state: { name: string };
+    on(event: "change", options: { fn: () => void }): () => void;
+    snapshot(): Snapshot<unknown>;
+  },
+>(actor: A, render: (name: A["state"]["name"]) => void): () => void {
+  const paint = () => render(actor.state.name);
+  paint();
+  return actor.on("change", { fn: paint });
+}
+```
+
 ### Any Handler
 
 Use `onAny` to intercept events across all states. Useful for universal error handling, cleanup, or logging.
