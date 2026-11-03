@@ -550,6 +550,7 @@ describe("Actor error paths", () => {
       },
     });
     expect(actor.snapshot().path[0]).toBe("__error");
+    expect(actor.state.name).toBe("__error");
     const seen: ErrorInfo[] = [];
     actor.on("error", { fn: (info) => seen.push(info) });
     expect(seen).toMatchObject([

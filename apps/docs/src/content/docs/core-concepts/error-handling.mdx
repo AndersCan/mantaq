@@ -82,3 +82,23 @@ not re-armed. No-op on a live machine.
 ```ts
 checkout.recover({ state: payment, context: { paymentInfo: { cardNumber: "..." } } });
 ```
+
+## Dead vs failed in a UI
+
+Read `checkout.state.name`, the typed state name, not `snapshot().path[0]`.
+
+- **Dead.** `checkout.state.name === "__error"`, details in
+  `checkout.snapshot().error`. A handler threw. Recreate the actor and offer
+  Reload.
+- **Failed.** The machine models it: `submitting` moves to a `paymentFailed`
+  state on `paymentFail`. This is a normal state. Send `retry` and offer Retry.
+
+```ts
+checkout.on("change", {
+  fn: () => {
+    show(checkout.state.name);
+  },
+});
+```
+
+Do not call `recover()` from a UI.

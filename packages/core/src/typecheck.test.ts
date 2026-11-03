@@ -10,6 +10,7 @@ import type {
   InternalEvent,
   PayloadOf,
   TransitionResult,
+  Snapshot,
 } from "./index.ts";
 import { expect, expectTypeOf, test, describe } from "vite-plus/test";
 
@@ -141,6 +142,31 @@ describe("type level contract — type = behavior", () => {
     expectTypeOf(actor.state.name).toEqualTypeOf<"idle" | "active" | "__error">();
     expectTypeOf(actor.state).toMatchTypeOf<StateRef<string, unknown, boolean>>();
     expectTypeOf(actor.state.isFinal).toEqualTypeOf<false | true>();
+  });
+
+  test("a generic binder returns each actor's own state-name union", () => {
+    function bind<
+      A extends {
+        state: { name: string };
+        on(event: "change", options: { fn: () => void }): () => void;
+        snapshot(): Snapshot<unknown>;
+      },
+    >(actor: A): A["state"]["name"] {
+      return actor.state.name;
+    }
+    const idle = state("idle")();
+    const busy = state("busy")();
+    const first = Actor({ inputs: [], states: [idle, busy], initial: idle, setup: () => {} });
+    const open = state("open")();
+    const second = Actor({ inputs: [], states: [open], initial: open, setup: () => {} });
+
+    expectTypeOf(first.state.name).toEqualTypeOf<"idle" | "busy" | "__error">();
+    expectTypeOf(bind(first)).toEqualTypeOf<"idle" | "busy" | "__error">();
+    expectTypeOf(bind(second)).toEqualTypeOf<"open" | "__error">();
+    // @ts-expect-error one actor's state names are not another's
+    // suppressed: "open" is not in the first actor's union
+    const wrong: ReturnType<typeof bind<typeof second>> = bind(first);
+    expect(wrong).toBe("idle");
   });
 
   test("snapshot.error keeps its narrowed type on presence", () => {
