@@ -56,6 +56,20 @@ export default defineConfig({
         },
       },
       {
+        // The abort fallback mirrors AbortController dispatch: every listener
+        // runs even if an earlier one throws, so the loop must catch.
+        files: ["packages/core/src/abort.ts"],
+        rules: {
+          "mantaq/no-try-catch": "off",
+        },
+      },
+      {
+        files: ["packages/core/src/abort.test.ts"],
+        rules: {
+          "mantaq/no-throw": "off",
+        },
+      },
+      {
         // Directed tests simulate programmer-bug explosions inside handlers to
         // prove the machine contains them; the throw lives in a guard-shaped
         // isErrorBomb helper in each of these files.
