@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+<sub>2026-11-03</sub>
+
+- _(patch)_
+  The JSDoc above `m.effect(...)` becomes the doc of the state's effect edge, and the walkthrough shows it under "Entering <state> runs".
+
 ## 0.2.2
 
 <sub>2026-11-03</sub>
