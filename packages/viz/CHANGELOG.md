@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+<sub>2026-11-03</sub>
+
+- _(patch)_ README: separate the static walk (nothing runs) from the live page (steps run the real actor).
+
 ## 0.2.0
 
 <sub>2026-11-02</sub>
