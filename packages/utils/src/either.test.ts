@@ -165,4 +165,27 @@ describe("Either runtime", () => {
     expect(mapped).toBe(failure);
     expect(Either.isLeft(mapped)).toBe(true);
   });
+
+  test("builds a void right with no argument", () => {
+    const unit = Either.right();
+    expect(unit).toEqual([undefined, undefined]);
+    expect(Either.isRight(unit)).toBe(true);
+    expect(Either.isLeft(unit)).toBe(false);
+    expect(Either.match(unit, { onLeft: () => "L", onRight: () => "R" })).toBe("R");
+    let visited = 0;
+    expect(Either.tap(unit, { onRight: () => visited++ })).toBe(unit);
+    expect(visited).toBe(1);
+  });
+
+  test("treats a void right like any right in map, chain and getOrElse", () => {
+    const unit = Either.right();
+    expect(Either.map(unit, { onRight: () => 1 })).toEqual([undefined, 1]);
+    expect(Either.chain(unit, { onRight: () => Either.right(2) })).toEqual([undefined, 2]);
+    expect(Either.getOrElse(unit, { onLeft: () => undefined })).toBeUndefined();
+  });
+
+  test("rejects swapping a void right", () => {
+    // @ts-expect-error a void right would swap into a left holding undefined
+    Either.swap(Either.right());
+  });
 });

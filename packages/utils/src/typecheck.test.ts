@@ -99,4 +99,12 @@ describe("Either type level contract", () => {
     }
     expect(Either.isLeft(result)).toBe(false);
   });
+
+  test("lets a void port return Either.right()", async () => {
+    const port: () => Promise<EitherType<Error, void>> = async () => Either.right();
+    expectTypeOf(Either.right()).toEqualTypeOf<Right<void>>();
+    expect(await port()).toEqual([undefined, undefined]);
+    // @ts-expect-error undefined is not a valid right value
+    Either.right(undefined);
+  });
 });

@@ -10,8 +10,18 @@ function isLeft<L, R>(either: Either<L, R>): either is Left<L> {
   return either[0] !== undefined;
 }
 
+/**
+ * Slot 0 decides: left values are never nullish, so a right is exactly an
+ * `undefined` left slot. This lets a right carry `void`.
+ */
 function isRight<L, R>(either: Either<L, R>): either is Right<R> {
-  return either[1] !== undefined;
+  return either[0] === undefined;
+}
+
+function right(): Right<void>;
+function right<R extends {}>(value: R): Right<R>;
+function right(value?: {}): Right<unknown> {
+  return [undefined, value];
 }
 
 /**
@@ -19,17 +29,16 @@ function isRight<L, R>(either: Either<L, R>): either is Right<R> {
  *
  * Left is `[value, undefined]`, right is `[undefined, value]`. Exactly one
  * slot is populated, so the predicates are a single array-index undefined
- * check. Side values must not be undefined or null — undefined is the
- * sentinel and is rejected at construction time.
+ * check. Left values must not be undefined or null — undefined is the
+ * sentinel. A right may be void via `Either.right()`, which is
+ * `[undefined, undefined]`; `Either.from` still rejects nullish returns.
  */
 export const Either = {
   left<L extends {}>(value: L): Left<L> {
     return [value, undefined];
   },
 
-  right<R extends {}>(value: R): Right<R> {
-    return [undefined, value];
-  },
+  right,
 
   from<R>(fn: () => R): Either<unknown, R> {
     try {
@@ -100,7 +109,9 @@ export const Either = {
     return isLeft<LeftOf<E>, RightOf<E>>(either) ? fallback.onLeft(either[0]) : either[1];
   },
 
-  swap<E extends Either<LeftOf<E>, RightOf<E>>>(either: E): Either<RightOf<E>, LeftOf<E>> {
+  swap<E extends Either<LeftOf<E>, RightOf<E>> & Either<LeftOf<E>, RightOf<E> & {}>>(
+    either: E,
+  ): Either<RightOf<E>, LeftOf<E>> {
     return isLeft<LeftOf<E>, RightOf<E>>(either) ? [undefined, either[0]] : [either[1], undefined];
   },
 
