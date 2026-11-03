@@ -549,13 +549,15 @@ render();
 Two different failures need two different responses:
 
 - **Dead machine.** `actor.state.name === "__error"` (details in `snapshot().error`). A handler threw and the actor is terminal. Create a new actor and offer Reload.
-- **Failed state the machine models.** An `error` state reached through a failure event is an ordinary state. Send `retry` and offer Retry.
+- **Failed state the machine models.** An `error` state reached through a failure event is an ordinary state. Render it like any other state.
 
 `recover()` is not for UIs: it breaks determinism. Recreate the actor instead.
 
 To bind any actor without naming `Actor`'s five generics, type the binder on the parts it uses:
 
 ```ts
+import type { Snapshot } from "@mantaq/core";
+
 function bind<
   A extends {
     state: { name: string };

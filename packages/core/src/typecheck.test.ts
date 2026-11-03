@@ -144,15 +144,17 @@ describe("type level contract — type = behavior", () => {
     expectTypeOf(actor.state.isFinal).toEqualTypeOf<false | true>();
   });
 
-  test("a generic binder returns each actor's own state-name union", () => {
+  test("a generic binder passes each actor's own state-name union to render", () => {
     function bind<
       A extends {
         state: { name: string };
         on(event: "change", options: { fn: () => void }): () => void;
         snapshot(): Snapshot<unknown>;
       },
-    >(actor: A): A["state"]["name"] {
-      return actor.state.name;
+    >(actor: A, render: (name: A["state"]["name"]) => void): () => void {
+      const paint = () => render(actor.state.name);
+      paint();
+      return actor.on("change", { fn: paint });
     }
     const idle = state("idle")();
     const busy = state("busy")();
@@ -160,13 +162,20 @@ describe("type level contract — type = behavior", () => {
     const open = state("open")();
     const second = Actor({ inputs: [], states: [open], initial: open, setup: () => {} });
 
-    expectTypeOf(first.state.name).toEqualTypeOf<"idle" | "busy" | "__error">();
-    expectTypeOf(bind(first)).toEqualTypeOf<"idle" | "busy" | "__error">();
-    expectTypeOf(bind(second)).toEqualTypeOf<"open" | "__error">();
+    const seenFirst: string[] = [];
+    const stopFirst = bind(first, (name) => {
+      expectTypeOf(name).toEqualTypeOf<"idle" | "busy" | "__error">();
+      seenFirst.push(name);
+    });
+    const stopSecond = bind(second, (name) => {
+      expectTypeOf(name).toEqualTypeOf<"open" | "__error">();
+    });
+    expectTypeOf(stopFirst).toEqualTypeOf<() => void>();
+    expectTypeOf(stopSecond).toEqualTypeOf<() => void>();
     // @ts-expect-error one actor's state names are not another's
-    // suppressed: "open" is not in the first actor's union
-    const wrong: ReturnType<typeof bind<typeof second>> = bind(first);
-    expect(wrong).toBe("idle");
+    // suppressed: "busy" is not in the second actor's union
+    bind(second, (name: "busy") => name);
+    expect(seenFirst[0]).toBe("idle");
   });
 
   test("snapshot.error keeps its narrowed type on presence", () => {
