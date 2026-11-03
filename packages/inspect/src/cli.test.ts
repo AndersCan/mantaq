@@ -35,3 +35,11 @@ describe("--check", () => {
     expect(run(["--iterations", "200", fixture("throwing.ts")]).status).toBe(0);
   });
 });
+
+describe("--live", () => {
+  test("cannot be combined with --json", () => {
+    const result = run(["--live", fixture("checkout.ts")]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--live and --json cannot be combined");
+  });
+});

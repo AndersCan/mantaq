@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { searchForWorkspaceRoot } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 
-const STYLESHEETS = ["@mantaq/viz/viewer.css", "@mantaq/viz/page.css"];
+export const STYLESHEETS = ["@mantaq/viz/viewer.css", "@mantaq/viz/page.css"];
 
 export interface MantaqVizOptions {
   /** Files that export machines: paths or globs, relative to the Vite root. */
@@ -35,8 +35,8 @@ export interface MantaqVizOptions {
 
 const DEV_ITERATIONS = 500;
 
-const TARGETS = "virtual:mantaq/targets";
-const TARGETS_RESOLVED = `\0${TARGETS}`;
+export const TARGETS = "virtual:mantaq/targets";
+export const TARGETS_RESOLVED = `\0${TARGETS}`;
 
 function createExpression(found: MachineExport, index: number): string {
   const callee = `m${index}[${JSON.stringify(found.name)}]`;
@@ -55,7 +55,7 @@ function createExpression(found: MachineExport, index: number): string {
  * be recreated, so it gets none. Like the server-side inspection, plain actors
  * are skipped when a file has factories.
  */
-function targetsSource(files: ReadonlyArray<string>): string {
+export function targetsSource(files: ReadonlyArray<string>): string {
   const core = fileURLToPath(import.meta.resolve("@mantaq/core"));
   const imports: string[] = [];
   const entries: string[] = [];

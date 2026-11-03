@@ -9,6 +9,7 @@ export default defineConfig({
       vite: "src/vite.ts",
       drive: "src/drive.ts",
       "live-entry": "src/live-entry.ts",
+      "live-embedded": "src/live-embedded.ts",
     },
     dts: {
       generator: "tsgo",
