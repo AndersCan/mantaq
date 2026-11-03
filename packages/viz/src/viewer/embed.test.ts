@@ -73,6 +73,32 @@ describe("mountVizText", () => {
     expect(root.querySelector('.panel [data-doc="state"]')).toBeNull();
   });
 
+  test("the walkthrough shows the doc of the current state's effects", () => {
+    const withEffect: VizMachine = {
+      ...door,
+      states: door.states.map((each) =>
+        each.id === "open" ? { ...each, effects: [{ name: "greet", sends: [] }] } : each,
+      ),
+      edges: [
+        ...door.edges,
+        {
+          ...edge("open", "effect:open", "open"),
+          kind: "effect",
+          doc: "Greets whoever walks in.",
+        },
+      ],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect] }));
+    expect(root.querySelector('.explore-effects [data-doc="edge"]')?.textContent).toBe(
+      "Greets whoever walks in.",
+    );
+    expect(
+      mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] })).querySelector(
+        ".explore-effects",
+      ),
+    ).toBeNull();
+  });
+
   test("draws a valid document and walks it to Done", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelectorAll(".graph g[data-node-id]")).toHaveLength(2);

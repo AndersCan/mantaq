@@ -172,6 +172,15 @@ describe("AST: JSDoc becomes doc", () => {
     expect(docOfEvent("last")).toBeNull();
   });
 
+  test("a JSDoc above m.effect becomes the doc of the state's effect edge", () => {
+    const effectDoc = (name: string) =>
+      machine.edges.find((edge) => edge.kind === "effect" && edge.from === name)?.doc;
+    expect(effectDoc("waiting")).toBe("Greets the visitor.\n\nPlays a chime.");
+    expect(effectDoc("done")).toBeNull();
+    expect(effectDoc("idle")).toBe("Counts the hours.\n\nRings the bell.");
+    expect(machine.edges.find((edge) => edge.kind === "effect")?.explanation).toBeNull();
+  });
+
   test("undocumented state, event and handler are null", () => {
     expect(machine.states.find((state) => state.id === "done")?.doc).toBeNull();
     expect(machine.events.find((event) => event.id === "finish")?.doc).toBeNull();
