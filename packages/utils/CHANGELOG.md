@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.5
+
+<sub>2026-11-03</sub>
+
+- _(patch)_ `Either.right()` with no argument builds a void right, so ports can return `Either<E, void>`.
+
 ## 0.0.4
 
 <sub>2026-09-04</sub>

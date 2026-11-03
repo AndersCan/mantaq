@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3
+
+<sub>2026-11-03</sub>
+
+- _(patch)_ Run in runtimes without a global `AbortController` (such as Bare): effects fall back to an internal controller.
+
 ## 0.5.2
 
 <sub>2026-11-03</sub>
