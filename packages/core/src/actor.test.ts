@@ -181,6 +181,39 @@ describe("Actor effects", () => {
     expect({ pending: clock.hasPending() }).toEqual({ pending: false });
   });
 
+  test("effects and timers run without global AbortController, AbortSignal or EventTarget", () => {
+    const names = ["AbortController", "AbortSignal", "EventTarget"] as const;
+    const g = globalThis as unknown as Record<string, unknown>;
+    const saved = names.map((name) => [name, g[name]] as const);
+    for (const name of names) delete g[name];
+    try {
+      const idle = state("idle")();
+      const done = state("done")().final();
+      const tick = event("TICK")();
+      const clock = VirtualClock();
+      const actor = Actor({
+        clock,
+        inputs: [],
+        internal: [tick],
+        states: [idle, done],
+        initial: idle,
+        setup: (m) => {
+          m.effect(idle, {
+            name: "armTickTimer",
+            fn: ({ emit, signal }) => {
+              clock.setTimeout(500, { cb: () => emit(tick.create()), signal });
+            },
+          });
+          m.on(idle, { event: tick, to: [done], handler: () => ({ state: done }) });
+        },
+      });
+      clock.advance(500);
+      expect(actor.snapshot().path[0]).toBe("done");
+    } finally {
+      for (const [name, value] of saved) g[name] = value;
+    }
+  });
+
   test("the actor calls effects on final state entry", () => {
     const pending = state("pending")();
     const done = state("done")().final();

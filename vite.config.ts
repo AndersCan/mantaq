@@ -41,6 +41,7 @@ export default defineConfig({
       {
         files: [
           "packages/core/src/virtual-clock.ts",
+          "packages/core/src/abort.ts",
           "packages/core/src/actor.ts",
           "packages/core/src/builder.ts",
           "packages/sugar/src/actors/actor-map.ts",
@@ -51,6 +52,20 @@ export default defineConfig({
           // rule (NaN/Infinity clock input, undeclared initial state,
           // unregistered regions, registry LEFTs, malformed graphs). Runtime
           // error flow still uses Either + the error state, never thrown.
+          "mantaq/no-throw": "off",
+        },
+      },
+      {
+        // The abort fallback mirrors AbortController dispatch: every listener
+        // runs even if an earlier one throws, so the loop must catch.
+        files: ["packages/core/src/abort.ts"],
+        rules: {
+          "mantaq/no-try-catch": "off",
+        },
+      },
+      {
+        files: ["packages/core/src/abort.mutation.test.ts"],
+        rules: {
           "mantaq/no-throw": "off",
         },
       },

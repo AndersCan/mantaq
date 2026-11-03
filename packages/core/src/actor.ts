@@ -27,6 +27,7 @@ import { buildSnapshot, cloneValue } from "./snapshot.ts";
 import { StateRef, isStateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
 import { Subscribers } from "./subscribers.ts";
+import { createAbortController } from "./abort.ts";
 import { VirtualClock } from "./virtual-clock.ts";
 import { Either } from "@mantaq/utils";
 
@@ -493,7 +494,7 @@ export function Actor<
       effectAbort = undefined;
       return [];
     }
-    const abort = new AbortController();
+    const abort = createAbortController();
     effectAbort = abort;
     const lastGood: LastKnownState = lastEntry ?? {
       state: currentState,
