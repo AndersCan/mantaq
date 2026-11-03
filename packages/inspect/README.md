@@ -24,6 +24,8 @@ export default defineConfig({
 // open /__mantaq/ while `vp dev` runs
 ```
 
+The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
+
 Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations }`; default 500 iterations so a save redraws fast).
 
 **Library**: one call per machine.
