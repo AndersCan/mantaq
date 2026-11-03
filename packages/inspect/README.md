@@ -10,7 +10,7 @@ It finds every exported actor, or function that builds one, from the file's type
 
 ## Three ways in
 
-**CLI**: `mantaq-inspect <file.ts>... [--out FILE] [--json] [--no-fuzz] [--iterations N] [--config FILE] [--mode MODE] [--no-open] [--check]`. `--config` loads the files with that Vite config (env, aliases, plugins) and `--mode` picks its mode; without `--config` no project config is read. `--check` exits 1 if a warning was printed or fuzzing found a handler error (printed as `error:`), so CI can gate on design errors. `--json` writes the viz document instead of the page. Seed: `MANTAQ_SEED` (default from `@mantaq/pbt`). Same seed → same output.
+**CLI**: `mantaq-inspect <file.ts>... [--out FILE] [--json] [--live] [--no-fuzz] [--iterations N] [--config FILE] [--mode MODE] [--no-open] [--check]`. `--config` loads the files with that Vite config (env, aliases, plugins) and `--mode` picks its mode; without `--config` no project config is read. `--check` exits 1 if a warning was printed or fuzzing found a handler error (printed as `error:`), so CI can gate on design errors. `--json` writes the viz document instead of the page. `--live` bundles your machine files into the page with Vite, so it is still one offline HTML file but its steps run the real actors (same rules as the Vite plugin's live page); it cannot be combined with `--json`. Seed: `MANTAQ_SEED` (default from `@mantaq/pbt`). Same seed → same output.
 
 **Vite plugin**: a live page on your dev server that redraws, keeping your walk, when you save.
 
@@ -50,6 +50,7 @@ const json = serializeViz(vizDocument([machine]));
 - **Exports.** An actor, or a function that returns one (or `{ actor }`). Functions are called with no arguments, with a `VirtualClock` when the first parameter is a clock, or with `{ clock }` when it is an options object with a `clock`. Functions with other required parameters are skipped. Discovery reads types only; nothing is called to find out.
 - **A fresh actor per call**, to fuzz. A file that only exports one actor instance is drawn, not fuzzed. When a file has factories, its actor instances are skipped.
 - **Exported factories.** Export a factory that takes ports and a clock, not only a built instance. See [Machines in an application](https://anderscan.github.io/mantaq/guides/machines-in-an-app/).
+- **A factory, for `--live`.** The live page recreates the actor on every step, so it needs an exported factory; a file that only exports an instance stays a static walk, with the usual warning.
 - **A `VirtualClock`**, to fuzz. An actor on the real clock is drawn, with a warning.
 
 Every part that cannot run is skipped with a warning, never guessed.
