@@ -18,4 +18,11 @@ Either.getRight(ok); // { done: true }
 Either.map(ok, (v) => v.done); // [undefined, true]
 ```
 
+A right with nothing to carry is `Either.right()`, typed `Right<void>`:
+
+```ts
+const done: Either<Error, void> = Either.right(); // [undefined, undefined]
+Either.isRight(done); // true
+```
+
 Errors flow as values. No exceptions.
