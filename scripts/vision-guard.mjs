@@ -43,8 +43,8 @@ const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 // params, descriptive identifiers). Same behavior, more lines. core/src impl
 // went 1445 -> ~1756 and actor.ts 545 -> 630.
 // Raised again 2026-11-03: internal AbortController fallback for runtimes without
-// the global (Bare), so core runs there. Net +~45 in abort.ts.
-const BUDGET_TOTAL_LINES = 1850;
+// the global (Bare), so core runs there. Net +~52 in abort.ts (ceiling 1860).
+const BUDGET_TOTAL_LINES = 1860;
 const BUDGET_FILE_LINES = 650;
 const BUDGET_EXPORTS = 32;
 

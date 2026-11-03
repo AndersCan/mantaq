@@ -64,7 +64,7 @@ export default defineConfig({
         },
       },
       {
-        files: ["packages/core/src/abort.test.ts"],
+        files: ["packages/core/src/abort.mutation.test.ts"],
         rules: {
           "mantaq/no-throw": "off",
         },
