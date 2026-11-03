@@ -18,7 +18,9 @@ The viewer keeps a cursor on one state, starting at the initial one. The panel l
 
 Take a step with a panel button, by clicking a pulsing edge, or by clicking a state that exactly one next step reaches. An undetermined edge (`to: null`) offers each target its AST explanation names. Without one, it cannot be taken. A final state ends the walk. **Back** (or ←), **Reset** and the path list undo steps. The standalone page keeps the walk in the URL: `?step=` holds one edge id per step, plus `~target` for an undetermined edge.
 
-Nothing runs. The walk follows declarations, so guards are not evaluated, and a path may not happen at runtime. The logic is in `src/moves.ts`: `movesFrom`, `unhandledSends`, `decodePath`.
+**Static walk** (standalone HTML, `mantaq-inspect --out`): nothing runs. The walk follows declarations, so guards are not evaluated, and a path may not happen at runtime. The logic is in `src/moves.ts`: `movesFrom`, `unhandledSends`, `decodePath`.
+
+**Live** (the Vite plugin page, or `mountViewer(root, doc, { driver })`): steps run the real actor through `createDriver` from `@mantaq/inspect/drive`, so guards are evaluated. Timers advance by button, and **Back** replays the path from a fresh actor.
 
 ## Schema (v8)
 
