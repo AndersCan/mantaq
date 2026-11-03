@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2
+
+<sub>2026-11-03</sub>
+
+- _(patch)_
+  Docs: reading state in a UI with `actor.state.name`, and how a dead machine (`__error`) differs from a failed state the machine models.
+
 ## 0.5.1
 
 <sub>2026-11-02</sub>
