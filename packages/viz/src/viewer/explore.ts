@@ -97,8 +97,12 @@ function effectsSection(doc: Document, machine: VizMachine, current: string): HT
   const unhandled = unhandledSends(machine, current);
   const isUnhandled = (effect: string, event: string) =>
     unhandled.some((each) => each.effect === effect && each.event === event);
+  const effectDoc = machine.edges.find(
+    (edge) => edge.kind === "effect" && edge.from === current,
+  )?.doc;
   return html(doc, "div", { class: "explore-effects" }, [
     html(doc, "p", {}, [`Entering ${current} runs:`]),
+    docNote(doc, { text: effectDoc ?? null, scope: "edge" }),
     html(
       doc,
       "ul",

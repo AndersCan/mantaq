@@ -35,6 +35,8 @@ export interface LoadedSource {
   stateDocs: Map<string, string>;
   /** Leading JSDoc by event type, from `const x = event("X")()` declarations. */
   eventDocs: Map<string, string>;
+  /** JSDoc above each `m.effect(state, ...)` call by state name, in registration order. */
+  effectDocs: Map<string, string[]>;
 }
 
 /**
@@ -76,6 +78,21 @@ function callDoc(call: ts.CallExpression): string | null {
     top = top.parent;
   }
   return docOf(ts.isExpressionStatement(top.parent) ? top.parent : call);
+}
+
+function collectEffectDoc(
+  checker: ts.TypeChecker,
+  call: ts.CallExpression,
+  effectDocs: Map<string, string[]>,
+): void {
+  if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "effect")
+    return;
+  const [stateArg] = call.arguments;
+  if (stateArg === undefined) return;
+  const state = literalProperty(checker, stateArg, "name");
+  const doc = callDoc(call);
+  if (state === null || doc === null) return;
+  effectDocs.set(state, [...(effectDocs.get(state) ?? []), doc]);
 }
 
 function compilerOptions(source: AnalysisSource): ts.CompilerOptions {
@@ -175,14 +192,25 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
     const registrations: Registration[] = [];
     const stateDocs = new Map<string, string>();
     const eventDocs = new Map<string, string>();
+    const effectDocs = new Map<string, string[]>();
     const visit = (node: ts.Node): void => {
       const found = ts.isCallExpression(node) ? toRegistration(checker, node) : null;
       if (found) registrations.push(found);
       if (ts.isVariableStatement(node)) collectDeclarationDocs(node, { stateDocs, eventDocs });
       ts.forEachChild(node, visit);
+      // After the children, so a chained `.effect` link follows the links before it.
+      if (ts.isCallExpression(node)) collectEffectDoc(checker, node, effectDocs);
     };
     visit(sourceFile);
-    return { checker, sourceFile, root: source.root, registrations, stateDocs, eventDocs };
+    return {
+      checker,
+      sourceFile,
+      root: source.root,
+      registrations,
+      stateDocs,
+      eventDocs,
+      effectDocs,
+    };
   });
   if (Either.isLeft(loaded)) return Either.left(`compiler failed: ${String(loaded[0])}`);
   const value = loaded[1];
