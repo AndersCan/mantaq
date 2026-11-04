@@ -5,7 +5,11 @@ import type { AnyStateRef } from "./state.ts";
 
 export type RuntimeTransitionHandler<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
-  options: { context: Context<ActorContext>; actor: AnyActor<ActorContext> },
+  options: {
+    context: Context<ActorContext>;
+    actor: AnyActor<ActorContext>;
+    state: { name: string; payload: unknown };
+  },
 ) => TransitionResult<States[number], string>;
 
 /**
@@ -16,6 +20,7 @@ export type RuntimeTransitionHandler<States extends readonly AnyStateRef[], Acto
  *
  * The runtime contract guarantees the envelope matches at dispatch time
  * (`Actor` only routes events whose `type` key was used at registration).
+ * It is also where the `state` payload type is restored, like `parseEffectFn`.
  */
 export function parseTransitionHandler<States extends readonly AnyStateRef[], ActorContext>(
   candidate: unknown,

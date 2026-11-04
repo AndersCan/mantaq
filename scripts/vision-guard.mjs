@@ -44,7 +44,9 @@ const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 // went 1445 -> ~1756 and actor.ts 545 -> 630.
 // Raised again 2026-11-03: internal AbortController fallback for runtimes without
 // the global (Bare), so core runs there. Net +~52 in abort.ts (ceiling 1860).
-const BUDGET_TOTAL_LINES = 1860;
+// Raised again 2026-11-04: handlers receive the typed current state (`state`), +~19
+// lines of option types and call sites (ceiling 1880).
+const BUDGET_TOTAL_LINES = 1880;
 const BUDGET_FILE_LINES = 650;
 const BUDGET_EXPORTS = 32;
 

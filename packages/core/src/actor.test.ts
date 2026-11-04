@@ -866,3 +866,83 @@ describe("Actor transition observability", () => {
     expect(new Set(seen.map((s) => `${s.from}->${s.to}`))).toEqual(new Set(["a->b", "b->c"]));
   });
 });
+
+describe("Actor handler state", () => {
+  test("an on handler carries the current payload into the next state without a guard", () => {
+    const pending = state("pending")<{ id: string }>();
+    const approved = state("approved")<{ id: string }>();
+    const approve = event("APPROVE")();
+
+    const actor = Actor({
+      inputs: [approve],
+      states: [pending, approved],
+      initial: pending.create({ id: "c-1" }),
+      setup: (m) => {
+        m.on(pending, {
+          event: approve,
+          to: [approved],
+          handler: (_e, { state }) => ({ state: approved.create(state.payload) }),
+        });
+      },
+    });
+
+    actor.send(approve.create());
+    expect(actor.snapshot()).toMatchObject({ path: ["approved"], payload: { id: "c-1" } });
+  });
+
+  test("an onAny handler narrows on state.name", () => {
+    const pending = state("pending")<{ id: string }>();
+    const idle = state("idle")();
+    const ping = event("PING")();
+    const seen: string[] = [];
+
+    const actor = Actor({
+      inputs: [ping],
+      states: [idle, pending],
+      initial: pending.create({ id: "c-2" }),
+      setup: (m) => {
+        m.onAny({
+          event: ping,
+          handler: (_e, { state }) => {
+            seen.push(state.name === "pending" ? state.payload.id : state.name);
+            return {};
+          },
+        });
+      },
+    });
+
+    actor.send(ping.create());
+    expect(seen).toEqual(["c-2"]);
+  });
+
+  test("the handler state follows the machine after a transition", () => {
+    const first = state("first")<{ n: number }>();
+    const second = state("second")<{ n: number }>();
+    const next = event("NEXT")();
+    const seen: Array<{ name: string; payload: unknown }> = [];
+
+    const actor = Actor({
+      inputs: [next],
+      states: [first, second],
+      initial: first.create({ n: 1 }),
+      setup: (m) => {
+        m.on(first, {
+          event: next,
+          to: [second],
+          handler: (_e, { state }) => ({ state: second.create({ n: state.payload.n + 1 }) }),
+        });
+        m.on(second, {
+          event: next,
+          handler: (_e, { state }) => {
+            seen.push(state);
+            return {};
+          },
+        });
+      },
+    });
+
+    actor.send(next.create());
+    actor.send(next.create());
+    expect(seen).toEqual([{ name: "second", payload: { n: 2 } }]);
+  });
+});

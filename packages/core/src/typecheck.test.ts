@@ -656,3 +656,70 @@ describe("public type surface — nameable helper types", () => {
   });
 });
 /* oxlint-enable oxlinter/comments-multiline-jsdoc */
+
+describe("handler state typing", () => {
+  test("state.payload in on(s) is the payload of s", () => {
+    const pending = state("pending")<{ id: string }>();
+    const idle = state("idle")();
+    const go = event("GO")();
+
+    Actor({
+      inputs: [go],
+      states: [pending, idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(pending, {
+          event: go,
+          handler: (_e, { state }) => {
+            expectTypeOf(state.name).toEqualTypeOf<"pending">();
+            expectTypeOf(state.payload).toEqualTypeOf<PayloadOf<typeof pending>>();
+            return {};
+          },
+        });
+      },
+    });
+  });
+
+  test("a payload-less state payload is not assignable to another state's payload", () => {
+    const pending = state("pending")<{ id: string }>();
+    const idle = state("idle")();
+    const go = event("GO")();
+
+    Actor({
+      inputs: [go],
+      states: [pending, idle],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, {
+          event: go,
+          to: [pending],
+          // @ts-expect-error idle carries no payload, so it cannot build pending
+          handler: (_e, { state }) => ({ state: pending.create(state.payload) }),
+        });
+      },
+    });
+  });
+
+  test("onAny state is a union narrowed by name", () => {
+    const pending = state("pending")<{ id: string }>();
+    const idle = state("idle")();
+    const go = event("GO")();
+
+    Actor({
+      inputs: [go],
+      states: [pending, idle],
+      initial: idle,
+      setup: (m) => {
+        m.onAny({
+          event: go,
+          handler: (_e, { state }) => {
+            if (state.name === "pending") {
+              expectTypeOf(state.payload).toEqualTypeOf<{ id: string }>();
+            }
+            return {};
+          },
+        });
+      },
+    });
+  });
+});

@@ -100,7 +100,11 @@ type TransitionDispatch<States extends readonly AnyStateRef[], ActorContext> = R
 
 type TransitionStepFn<States extends readonly AnyStateRef[], ActorContext> = (
   event: InternalEvent,
-  options: { context: Context<ActorContext>; actor: AnyActor<ActorContext> },
+  options: {
+    context: Context<ActorContext>;
+    actor: AnyActor<ActorContext>;
+    state: { name: string; payload: unknown };
+  },
 ) => TransitionResult<States[number], string>;
 
 interface StepOutcome {
@@ -402,6 +406,7 @@ export function Actor<
         const next = handler.transition(event, {
           context: contextHandle,
           actor: selfReference(),
+          state: { name: currentState.name, payload: currentPayload },
         });
         if (next.emit) queue.push(...next.emit);
         if (next.state) {
@@ -434,6 +439,7 @@ export function Actor<
         const next = transition(event, {
           context: contextHandle,
           actor: selfReference(),
+          state: { name: currentState.name, payload: currentPayload },
         });
         if (next.state && handler.allowTransition) {
           const entered = applyTransition(event, { step: next });
