@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+<sub>2026-11-04</sub>
+
+- _(minor)_
+  `mantaq-inspect --live` writes a standalone HTML page that drives the real machines offline: the machine files and the driver are bundled in with Vite.
+
 ## 0.2.3
 
 <sub>2026-11-03</sub>
