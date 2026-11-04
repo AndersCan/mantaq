@@ -1,6 +1,9 @@
 <div align="center">
 
-# Mantaq
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/docs/src/assets/logo-dark.svg">
+  <img alt="Mantaq" src="apps/docs/src/assets/logo-light.svg" height="80">
+</picture>
 
 [![CI](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml/badge.svg)](https://github.com/AndersCan/mantaq/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://anderscan.github.io/mantaq/)
