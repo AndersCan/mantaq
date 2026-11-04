@@ -18,6 +18,12 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Mantaq",
+      logo: {
+        light: "./src/assets/logo-light.svg",
+        dark: "./src/assets/logo-dark.svg",
+        alt: "Mantaq",
+        replacesTitle: true,
+      },
       plugins: [
         starlightLlmsTxt({
           projectName: "Mantaq",
