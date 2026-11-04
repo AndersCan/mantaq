@@ -143,6 +143,8 @@ setup: (m) => {
 
 Handler return: `{ state?; payload?; emit? }` or `{}` to stay in place. `state` must be listed in `to`; omit `to` when the handler only stays. `to` is what the builder records, so diagrams show every transition without running handlers.
 
+Handlers are called as `(event, { context, actor, state })`. `state` is `{ name, payload }` for the current state: in `on(s, ...)` the payload is typed from `s`; in `onAny` it is a union you narrow on `state.name`. Inside handlers `state.payload` is the typed read; `actor.snapshot()` is for readers outside the machine.
+
 Effects run on every state entry. Each takes a required camelCase `name`;
 executed effects are recorded in history as `{ stateName, effectName }`, and
 tests can assert on them by name (`harness.assertEffectRan(stateName,

@@ -32,18 +32,26 @@ export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> 
   effects: Record<string, Array<EffectEntry<ActorContext>>>;
 }
 
+type StateInput<S> = S extends AnyStateRef ? { name: S["name"]; payload: PayloadOf<S> } : never;
+
 /** Handler may only return states listed in `to`; no `to` means it can only stay. */
 type HandlerFn<
+  Current extends AnyStateRef,
   To extends AnyStateRef,
   Outputs extends readonly AnyEventRef[],
   ActorContext,
   E extends AnyEventRef,
 > = (
   event: E extends EventRef<infer Type, infer P> ? CreatedOfEvent<Type, P> : never,
-  opts: { context: Context<ActorContext>; actor: AnyActor<ActorContext> },
+  opts: {
+    context: Context<ActorContext>;
+    actor: AnyActor<ActorContext>;
+    state: StateInput<Current>;
+  },
 ) => TransitionResult<To, EventTypeOf<Outputs[number]>>;
 
 interface HandlerOptions<
+  Current extends AnyStateRef,
   To extends readonly AnyStateRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext,
@@ -51,7 +59,7 @@ interface HandlerOptions<
 > {
   event: E;
   to?: To;
-  handler: HandlerFn<NoInfer<To[number]>, Outputs, ActorContext, E>;
+  handler: HandlerFn<Current, NoInfer<To[number]>, Outputs, ActorContext, E>;
 }
 
 export interface ActorBuilder<
@@ -67,13 +75,13 @@ export interface ActorBuilder<
     const To extends readonly States[number][] = readonly [],
   >(
     stateRef: S,
-    options: HandlerOptions<To, Outputs, ActorContext, E>,
+    options: HandlerOptions<S, To, Outputs, ActorContext, E>,
   ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
   onAny<
     E extends Inputs[number] | Internal[number],
     const To extends readonly States[number][] = readonly [],
   >(
-    options: HandlerOptions<To, Outputs, ActorContext, E>,
+    options: HandlerOptions<States[number], To, Outputs, ActorContext, E>,
   ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
   /** `sends`: internal events `fn` may emit; `emit` only accepts those. Omit for untyped `emit`. */
   effect<S extends States[number], const E extends SendList<Internal> = undefined>(

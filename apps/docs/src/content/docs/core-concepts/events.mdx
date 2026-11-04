@@ -44,6 +44,18 @@ m.on(shippingAddress, submitShipping, (event, { context }) => {
 
 `event.payload` is typed from the event ref.
 
+The handler's second argument also carries the current state as `state: { name, payload }`, typed from the state ref. Carry a payload forward without a guard:
+
+```ts
+m.on(shipping, {
+  event: confirm,
+  to: [shipped],
+  handler: (_e, { state }) => ({
+    state: shipped.create(state.payload),
+  }),
+});
+```
+
 ## Guards (conditional transitions)
 
 No guard syntax. Plain `if` in the handler picks which `{ state }` to return.
