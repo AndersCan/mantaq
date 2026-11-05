@@ -361,3 +361,38 @@ describe("mountViewer with a driver", () => {
     expect(clickStep(withEvents, { path: [], selection, live: "done" })).toBeNull();
   });
 });
+
+describe("effect chip hover", () => {
+  const withEffect: VizMachine = {
+    ...door,
+    states: door.states.map((each) =>
+      each.id === "open" ? { ...each, effects: [{ name: "greet", sends: ["go"] }] } : each,
+    ),
+  };
+
+  test("hovering a chip highlights the edges it sends, labels them and dims the rest", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect] }));
+    const chip = root.querySelector(".chip");
+    const sent = root.querySelector('[data-edge-id="open-go-done"]');
+    expect(sent?.querySelector("title")?.textContent).toBe("emitted by greet");
+    chip?.dispatchEvent(new Event("mouseenter"));
+    expect(sent?.classList.contains("sent")).toBe(true);
+    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(true);
+    chip?.dispatchEvent(new Event("mouseleave"));
+    expect(sent?.classList.contains("sent")).toBe(false);
+    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(false);
+  });
+
+  test("a chip without declared sends changes nothing", () => {
+    const none = {
+      ...withEffect,
+      states: withEffect.states.map((each) => ({
+        ...each,
+        effects: each.effects.map((effect) => ({ ...effect, sends: null })),
+      })),
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [none] }));
+    root.querySelector(".chip")?.dispatchEvent(new Event("mouseenter"));
+    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(false);
+  });
+});
