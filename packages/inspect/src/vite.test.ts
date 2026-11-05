@@ -55,6 +55,28 @@ describe("mantaqViz", () => {
     expect(sent).toEqual([{ type: "custom", event: UPDATE_EVENT }]);
   });
 
+  test("a recorded runs file change tells the page to redraw", async () => {
+    const sent: unknown[] = [];
+    const send = server.ws.send.bind(server.ws);
+    server.ws.send = (payload: unknown) => sent.push(payload);
+    server.watcher.emit(
+      "all",
+      "change",
+      join(import.meta.dirname, "fixtures", "__runs__", "x.test.json"),
+    );
+    server.ws.send = send;
+    expect(sent).toEqual([{ type: "custom", event: UPDATE_EVENT }]);
+  });
+
+  test("an unrelated json change sends nothing", async () => {
+    const sent: unknown[] = [];
+    const send = server.ws.send.bind(server.ws);
+    server.ws.send = (payload: unknown) => sent.push(payload);
+    server.watcher.emit("all", "change", join(import.meta.dirname, "fixtures", "data.json"));
+    server.ws.send = send;
+    expect(sent).toEqual([]);
+  });
+
   test("other paths fall through to Vite", async () => {
     expect((await fetch(`${origin}/__mantaq/nope`)).status).toBe(404);
   });
