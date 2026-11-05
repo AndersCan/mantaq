@@ -61,6 +61,7 @@ Every part that cannot run is skipped with a warning, never guessed.
 
 The viewer's "Coverage from" picker dims elements with zero hits. What dimmed means depends on the source:
 
+- **examples + fuzz** (`reached`): neither an example nor fuzzing reached this. The default when both sources are present, and the same merge `expectReached` uses. Fix a miss by adding an example to `tests`.
 - **example tests** (`tested`): no test exercises this. Collected by replaying the event sequences you pass as `tests`, each on a fresh actor.
 - **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
 
