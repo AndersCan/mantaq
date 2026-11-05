@@ -8,9 +8,6 @@
     "url": "https://github.com/AndersCan/mantaq",
     "directory": "packages/inspect"
   },
-  "bin": {
-    "mantaq-inspect": "./src/cli.ts"
-  },
   "files": [
     "dist"
   ],
@@ -18,19 +15,14 @@
   "exports": {
     ".": "./src/index.ts",
     "./drive": "./src/drive.ts",
-    "./live-embedded": "./src/live-embedded.ts",
     "./live-entry": "./src/live-entry.ts",
     "./vite": "./src/vite.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
-    "bin": {
-      "mantaq-inspect": "./dist/cli.mjs"
-    },
     "exports": {
       ".": "./dist/index.mjs",
       "./drive": "./dist/drive.mjs",
-      "./live-embedded": "./dist/live-embedded.mjs",
       "./live-entry": "./dist/live-entry.mjs",
       "./vite": "./dist/vite.mjs",
       "./package.json": "./package.json"

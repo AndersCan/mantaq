@@ -5,16 +5,14 @@ export default defineConfig({
   pack: {
     entry: {
       index: "src/index.ts",
-      cli: "src/cli.ts",
       vite: "src/vite.ts",
       drive: "src/drive.ts",
       "live-entry": "src/live-entry.ts",
-      "live-embedded": "src/live-embedded.ts",
     },
     dts: {
       generator: "tsgo",
     },
-    exports: { devExports: true, exclude: ["cli"], bin: { "mantaq-inspect": "./src/cli.ts" } },
+    exports: { devExports: true },
   },
   lint: {
     options: {

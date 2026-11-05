@@ -16,7 +16,7 @@ of doing things.
 | Handler targets               | Builder `to` lands in `actor.options.targets` (done, #297). No core change.                                                                               |
 | Effects                       | Core's `transition.effects` event already reports them (`packages/inspect/src/fuzz/run.ts:142`). No core change.                                          |
 | Timer labels                  | Sugar `withTimeout` will pass `eventName` when scheduling (planned, T2; `VirtualClock` already accepts it); the factory is pure per the handler contract. |
-| Handler throws                | A reported error, never an edge. `mantaq-inspect --check` will fail on them (planned, T3).                                                                |
+| Handler throws                | A reported error, never an edge. `expectNoDesignErrors` fails on them.                                                                                    |
 | `onAny` routing on live state | Stays a warning (`routingWarnings`).                                                                                                                      |
 | Regions                       | Peer child actors, always active. Glossary corrected.                                                                                                     |
 | Unknown targets               | `to: null`, drawn as undetermined (ADR 0001).                                                                                                             |
@@ -31,5 +31,5 @@ No core change is needed for any of these.
 
 ## Consequences
 
-- Design errors become CI failures through `--check` (planned, T3; not yet implemented).
+- Design errors become CI failures through `expectNoDesignErrors`.
 - The `eventName` label is informational; the fired event is unchanged.

@@ -1,4 +1,4 @@
-/** Entry of the self-contained HTML page `mantaq-inspect` writes. */
+/** Entry of the self-contained static page. */
 import { mountEmbedded } from "./page.ts";
 
 const root = document.querySelector<HTMLElement>("#app");
