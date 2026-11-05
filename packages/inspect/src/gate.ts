@@ -3,9 +3,17 @@ import type { VizMachine } from "@mantaq/viz";
 import { inspect } from "./inspect.ts";
 import type { InspectTarget } from "./inspect.ts";
 
-/** States no edge path leads to from an initial state. Empty when an undetermined edge hides the answer. */
+/**
+ * States no edge path leads to from the initial state. Empty when an undetermined
+ * edge hides the answer. Region states are never reported: the graph does not
+ * record where a region starts.
+ */
 export function unreachableStates(machine: VizMachine): string[] {
-  const reached = new Set(machine.states.filter((state) => state.initial).map((state) => state.id));
+  const reached = new Set(
+    machine.states
+      .filter((state) => state.initial || state.region !== null)
+      .map((state) => state.id),
+  );
   const queue = [...reached];
   let undetermined = false;
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
