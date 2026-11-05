@@ -417,3 +417,9 @@
   font-size: 12px;
   background: var(--region-bg);
 }
+
+.viz .explore-context mark.context-changed {
+  background: var(--banner-bg);
+  color: var(--banner-fg);
+  font-weight: 600;
+}

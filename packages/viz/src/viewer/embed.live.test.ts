@@ -245,3 +245,26 @@ describe("live step encoding", () => {
     expect(payloadSamples(checkout, "submit")).toEqual([{ amount: 5 }, { amount: 9 }]);
   });
 });
+
+describe("context highlight", () => {
+  const marked = (root: HTMLElement) =>
+    [...root.querySelectorAll("[data-live-context] [data-context-changed]")].map((node) =>
+      node.textContent?.trim(),
+    );
+
+  test("nothing is marked before a step, the changed lines after", () => {
+    const { root } = mount();
+    expect(marked(root)).toEqual([]);
+    const box = root.querySelector<HTMLTextAreaElement>("[data-payload-json]");
+    if (box) box.value = '{"amount":42}';
+    click(root, '[data-send="submit"]');
+    expect(marked(root)).toEqual(['"amount": 42']);
+  });
+
+  test("Back highlights against the step before", () => {
+    const { root } = mount({ steps: ['submit={"amount":42}', "@800"] });
+    expect(marked(root)).toEqual([]);
+    click(root, '[data-explore-action="back"]');
+    expect(marked(root)).toEqual(['"amount": 42']);
+  });
+});

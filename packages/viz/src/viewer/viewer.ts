@@ -1,4 +1,11 @@
-import type { VizDocument, VizDriver, VizLiveState, VizMachine, VizStep } from "../schema.ts";
+import type {
+  VizDocument,
+  VizDriver,
+  VizJson,
+  VizLiveState,
+  VizMachine,
+  VizStep,
+} from "../schema.ts";
 import { html } from "./dom.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
@@ -27,6 +34,8 @@ interface ViewState {
   path: ExploreStep[];
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
+  /** Context before the last live step; undefined when no step ran. */
+  previous: VizJson | undefined;
 }
 
 function effectiveMode(view: ViewState, machine: VizMachine): CoverageMode {
@@ -149,9 +158,10 @@ export function mountViewer(
         ? []
         : decodePath(first, options.steps ?? []),
     live: null,
+    previous: undefined,
   };
   const { driver } = options;
-  if (driver !== undefined) view.live = replay(driver, decodeLiveSteps(options.steps ?? []));
+  if (driver !== undefined) replayInto(view, driver, decodeLiveSteps(options.steps ?? []));
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   root.addEventListener("keydown", (event) => {
@@ -178,7 +188,9 @@ export function mountViewer(
           path: view.path,
           take,
           rewind,
-          ...(view.live === null ? {} : { live: { state: view.live, send } }),
+          ...(view.live === null
+            ? {}
+            : { live: { state: view.live, send, previous: view.previous } }),
         }),
         renderPanel(doc, machine, { selection: view.selection, select }),
       );
@@ -195,6 +207,7 @@ export function mountViewer(
     };
     const send = (step: VizStep) => {
       if (driver === undefined) return;
+      view.previous = view.live?.context;
       view.live = stepSafely(driver, { before: view.live, step });
       walked();
     };
@@ -209,7 +222,7 @@ export function mountViewer(
     };
     const rewind = (length: number) => {
       if (driver !== undefined && view.live !== null) {
-        view.live = replay(driver, view.live.steps.slice(0, Math.max(0, length)));
+        replayInto(view, driver, view.live.steps.slice(0, Math.max(0, length)));
         walked();
         return;
       }
@@ -251,6 +264,12 @@ export function mountViewer(
 }
 
 /** A driver that throws leaves the state where it was and shows the message as a handler error. */
+/** Sets `view.live` to the state after `steps` and `view.previous` to the context before the last of them. */
+function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<VizStep>): void {
+  view.previous = steps.length === 0 ? undefined : replay(driver, steps.slice(0, -1)).context;
+  view.live = replay(driver, steps);
+}
+
 function stepSafely(
   driver: VizDriver,
   context: { before: VizLiveState | null; step: VizStep },
