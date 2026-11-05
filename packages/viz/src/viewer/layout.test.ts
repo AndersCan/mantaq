@@ -151,6 +151,52 @@ describe("separateLabels", () => {
     }
   });
 
+  test("searches 0, +1, -1, +2 rows with a 2px gap", () => {
+    const out = separateLabels([
+      { x: 0, y: 100, ...size },
+      { x: 0, y: 100, ...size },
+      { x: 0, y: 100, ...size },
+      { x: 0, y: 100, ...size },
+    ]);
+    expect(out.map((box) => box.y)).toEqual([100, 118, 82, 136]);
+  });
+
+  test("keeps a label that only just clears the gap", () => {
+    const out = separateLabels([
+      { x: 0, y: 0, ...size },
+      { x: 0, y: 18, ...size },
+      { x: 0, y: 17, ...size },
+    ]);
+    expect(out[1]?.y).toBe(18);
+    expect(out[2]?.y).toBe(53);
+  });
+
+  test("does not move labels that are close in y but far apart in x", () => {
+    const out = separateLabels([
+      { x: 0, y: 0, ...size },
+      { x: 200, y: 4, ...size },
+    ]);
+    expect(out.map((box) => box.y)).toEqual([0, 4]);
+  });
+
+  test("keeps order and count", () => {
+    const input = [3, 1, 2].map((x) => ({ x, y: 0, ...size }));
+    expect(separateLabels(input).map((box) => box.x)).toEqual([3, 1, 2]);
+    expect(separateLabels([])).toEqual([]);
+  });
+
+  test("labels of two self-loops on one node do not overlap", () => {
+    const machine = machineOf(
+      ["first"],
+      [
+        edge({ from: "first", event: "alpha", target: "first" }),
+        edge({ from: "first", event: "beta", target: "first" }),
+      ],
+    );
+    const [a, b] = layoutMachine(machine).edges;
+    expect(Math.abs((a?.label.y ?? 0) - (b?.label.y ?? 0))).toBeGreaterThanOrEqual(18);
+  });
+
   test("labels of parallel edges get distinct rows", () => {
     const machine = machineOf(
       ["first", "b"],
