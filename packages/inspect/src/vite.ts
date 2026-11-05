@@ -219,7 +219,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
         return text;
       };
       server.watcher.on("all", (_event, path) => {
-        if (!/\.[cm]?[jt]sx?$/.test(path)) return;
+        if (!/\.[cm]?[jt]sx?$/.test(path) && !/[\\/]__runs__[\\/][^\\/]+\.json$/.test(path)) return;
         cached = null;
         const generated = server.moduleGraph.getModuleById(TARGETS_RESOLVED);
         if (generated !== undefined) server.moduleGraph.invalidateModule(generated);
