@@ -6,6 +6,7 @@ import {
   dotGapFor,
   layoutMachine,
   pathLength,
+  separateLabels,
 } from "./layout.ts";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -126,5 +127,86 @@ describe("pathLength", () => {
 
   test("is zero for fewer than two points", () => {
     expect(pathLength([{ x: 1, y: 1 }])).toBe(0);
+  });
+});
+
+describe("separateLabels", () => {
+  const size = { width: 60, height: 16 };
+
+  test("moves stacked labels apart and keeps a free label in place", () => {
+    const out = separateLabels([
+      { x: 0, y: 0, ...size },
+      { x: 5, y: 3, ...size },
+      { x: 2, y: -2, ...size },
+      { x: 500, y: 0, ...size },
+    ]);
+    expect(out[0]?.y).toBe(0);
+    expect(out[3]).toEqual({ x: 500, y: 0, ...size });
+    const ys = new Set(out.slice(0, 3).map((box) => box.y));
+    expect(ys.size).toBe(3);
+    for (const a of out.slice(0, 3)) {
+      for (const b of out.slice(0, 3)) {
+        if (a !== b) expect(Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(16);
+      }
+    }
+  });
+
+  test("searches 0, +1, -1, +2 rows with a 2px gap", () => {
+    const out = separateLabels([
+      { x: 0, y: 100, ...size },
+      { x: 0, y: 100, ...size },
+      { x: 0, y: 100, ...size },
+      { x: 0, y: 100, ...size },
+    ]);
+    expect(out.map((box) => box.y)).toEqual([100, 118, 82, 136]);
+  });
+
+  test("keeps a label that only just clears the gap", () => {
+    const out = separateLabels([
+      { x: 0, y: 0, ...size },
+      { x: 0, y: 18, ...size },
+      { x: 0, y: 17, ...size },
+    ]);
+    expect(out[1]?.y).toBe(18);
+    expect(out[2]?.y).toBe(53);
+  });
+
+  test("does not move labels that are close in y but far apart in x", () => {
+    const out = separateLabels([
+      { x: 0, y: 0, ...size },
+      { x: 200, y: 4, ...size },
+    ]);
+    expect(out.map((box) => box.y)).toEqual([0, 4]);
+  });
+
+  test("keeps order and count", () => {
+    const input = [3, 1, 2].map((x) => ({ x, y: 0, ...size }));
+    expect(separateLabels(input).map((box) => box.x)).toEqual([3, 1, 2]);
+    expect(separateLabels([])).toEqual([]);
+  });
+
+  test("labels of two self-loops on one node do not overlap", () => {
+    const machine = machineOf(
+      ["first"],
+      [
+        edge({ from: "first", event: "alpha", target: "first" }),
+        edge({ from: "first", event: "beta", target: "first" }),
+      ],
+    );
+    const [a, b] = layoutMachine(machine).edges;
+    expect(Math.abs((a?.label.y ?? 0) - (b?.label.y ?? 0))).toBeGreaterThanOrEqual(18);
+  });
+
+  test("labels of parallel edges get distinct rows", () => {
+    const machine = machineOf(
+      ["first", "b"],
+      [
+        edge({ from: "first", event: "alpha", target: "b" }),
+        edge({ from: "first", event: "beta", target: "b" }),
+        edge({ from: "first", event: "gamma", target: "b" }),
+      ],
+    );
+    const rows = layoutMachine(machine).edges.map((placed) => Math.round(placed.label.y));
+    expect(new Set(rows).size).toBe(3);
   });
 });
