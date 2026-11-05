@@ -36,7 +36,7 @@ describe("inspect", () => {
       id: "door",
       create: () => createDoorActor(),
       fuzz: false,
-      tests: [[{ kind: "event", event: "knock", payload: null }]],
+      tests: [{ name: "knock", steps: [{ kind: "event", event: "knock", payload: null }] }],
     });
     const knock = machine.edges.find((edge) => edge.event === "knock");
     const open = machine.edges.find((edge) => edge.event === "open");
@@ -50,7 +50,7 @@ describe("inspect", () => {
       id: "door",
       create: () => createDoorActor(),
       fuzz: { iterations: 0 },
-      tests: [knock],
+      tests: [{ name: "knock", steps: knock }],
     });
     expect(machine.fuzz?.corpus.map((sequence) => sequence.steps)).toContainEqual(knock);
   });

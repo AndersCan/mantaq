@@ -36,12 +36,14 @@ const { machine, warnings } = inspect({
   id: "cart",
   create: () => createCart(), // a fresh actor every call
   source: { file: "/abs/src/cart.ts", root: "/abs" }, // optional: explanations + payloads from types
-  tests: [[{ kind: "event", event: "addItem", payload: { sku: "A1" } }]], // optional: "example tests" coverage
+  tests: [
+    { name: "add an item", steps: [{ kind: "event", event: "addItem", payload: { sku: "A1" } }] },
+  ], // optional: named runs for "example tests" coverage
 });
 const json = serializeViz(vizDocument([machine]));
 ```
 
-`inspectFile(file)` / `inspectModule(file, { load })` do the discovery the Vite plugin does. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
+`inspectFile(file)` / `inspectModule(file, { load })` do the discovery the Vite plugin does, and read recorded runs from `__runs__/*.json` next to the machine file (`{ [machineId]: { name, end, steps }[] }`). A run is replayed on a fresh actor; internal events the replay already produces (timers, synchronous emits) are dropped, and a run that replays to a different state than `end` is dropped with a warning. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
 
 ## What it needs from your file
 
@@ -58,7 +60,7 @@ Every part that cannot run is skipped with a warning, never guessed.
 The viewer's "Coverage from" picker dims elements with zero hits. What dimmed means depends on the source:
 
 - **examples + fuzz** (`reached`): neither an example nor fuzzing reached this. The default when both sources are present, and the same merge `expectReached` uses. Fix a miss by adding an example to `tests`.
-- **example tests** (`tested`): no test exercises this. Collected by replaying the event sequences you pass as `tests`, each on a fresh actor.
+- **example tests** (`tested`): no test exercises this. Collected by replaying the named runs you pass as `tests`, each on a fresh actor.
 - **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
 
 ## How each tool works

@@ -58,7 +58,7 @@ export function missedReach(machine: VizMachine, expected: ReachExpectation): st
 function failOnMiss(machine: VizMachine, misses: string[]): void {
   if (misses.length === 0) return;
   throw new Error(
-    `${machine.id} missed ${misses.length} expected ${misses.length === 1 ? "reach" : "reaches"}:\n${misses.map((each) => `  - ${each}`).join("\n")}\nAdd an example run to \`tests\`, or raise \`fuzz.iterations\`, to cover it.`,
+    `${machine.id} missed ${misses.length} expected ${misses.length === 1 ? "reach" : "reaches"}:\n${misses.map((each) => `  - ${each}`).join("\n")}\nAdd a named run to \`tests\`, or raise \`fuzz.iterations\`, to cover it.`,
   );
 }
 

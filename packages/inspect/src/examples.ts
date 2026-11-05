@@ -5,7 +5,7 @@ import { createCreditActor } from "./fixtures/credit.ts";
 import { createRetryActor } from "./fixtures/retry.ts";
 import { createSagaActor } from "./fixtures/saga.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
-import type { VizJson, VizStep } from "@mantaq/viz";
+import type { VizJson, VizRun, VizStep } from "@mantaq/viz";
 import { VirtualClock } from "@mantaq/core";
 import { join, resolve } from "node:path";
 import type { AnyActor } from "@mantaq/core";
@@ -142,6 +142,21 @@ export function handWrittenBaselines(): Record<string, VizStep[][]> {
     credit: [cr(["apply", "reset"]), cr(["setTier"])],
     retry: [r(["connect", "failed", "opened"])],
   };
+}
+
+function runName(steps: ReadonlyArray<VizStep>): string {
+  const names = steps.map((step) => (step.kind === "event" ? step.event : `@${step.ms}`));
+  return names.length === 0 ? "no events" : names.join(" → ");
+}
+
+/** `handWrittenBaselines` as named runs, each called after its events. */
+export function handWrittenRuns(): Record<string, VizRun[]> {
+  return Object.fromEntries(
+    Object.entries(handWrittenBaselines()).map(([id, sequences]) => [
+      id,
+      sequences.map((steps) => ({ name: runName(steps), steps })),
+    ]),
+  );
 }
 
 /** Structure-only inputs for the examples (fresh actors, no run). */

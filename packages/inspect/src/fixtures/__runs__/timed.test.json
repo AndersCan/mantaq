@@ -1,0 +1,18 @@
+{
+  "timed": [
+    {
+      "end": "error",
+      "name": "times out",
+      "steps": [
+        { "event": "start", "kind": "event", "payload": null },
+        { "kind": "advance", "ms": 800 },
+        { "event": "expired", "kind": "event", "payload": null }
+      ]
+    },
+    {
+      "end": "waiting",
+      "name": "waits",
+      "steps": [{ "event": "start", "kind": "event", "payload": null }]
+    }
+  ]
+}

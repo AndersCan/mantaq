@@ -24,7 +24,7 @@ function createActor() {
 
 const target = { id: "flow", create: () => createActor(), fuzz: { iterations: 300 } };
 const structureOnly = { id: "flow", create: () => createActor(), fuzz: false as const };
-const goOnly = [[{ kind: "event" as const, event: "go", payload: null }]];
+const goOnly = [{ name: "go", steps: [{ kind: "event" as const, event: "go", payload: null }] }];
 
 describe("expectReached", () => {
   test("passes when fuzzing visits the states and transitions", () => {
