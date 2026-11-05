@@ -404,3 +404,16 @@
   stroke: var(--accent);
   stroke-dasharray: 4 3;
 }
+
+.viz .explore-context summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.viz .explore-context pre {
+  margin: 4px 0 0;
+  overflow: auto;
+  max-height: 40vh;
+  font-size: 12px;
+  background: var(--region-bg);
+}

@@ -341,8 +341,27 @@ function outcomeText(last: VizLiveStep): string {
   return ` ignored in ${last.from}: no handler`;
 }
 
-function liveResultSection(doc: Document, state: VizLiveState): HTMLElement {
-  const { last } = state;
+const collapsedContexts = new WeakSet<object>();
+
+/** Collapsible, pretty-printed context. The fold survives the panel redraw after each step. */
+function contextSection(doc: Document, value: unknown, viewer: object): HTMLElement {
+  const section = html(doc, "details", { class: "explore-context", "data-live-context": "" }, [
+    html(doc, "summary", {}, ["Context"]),
+    html(doc, "pre", {}, [JSON.stringify(value, null, 2) ?? "undefined"]),
+  ]);
+  section.open = !collapsedContexts.has(viewer);
+  section.addEventListener("toggle", () => {
+    if (section.open) collapsedContexts.delete(viewer);
+    else collapsedContexts.add(viewer);
+  });
+  return section;
+}
+
+function liveResultSection(
+  doc: Document,
+  live: { state: VizLiveState; send: (step: VizStep) => void },
+): HTMLElement {
+  const { last } = live.state;
   return html(doc, "div", { class: "explore-live" }, [
     last === null
       ? html(doc, "p", { class: "muted" }, ["Nothing has run yet."])
@@ -363,10 +382,7 @@ function liveResultSection(doc: Document, state: VizLiveState): HTMLElement {
                 `Handler threw: ${last.error}`,
               ]),
         ]),
-    html(doc, "p", { "data-live-context": "" }, [
-      "Context: ",
-      code(doc, JSON.stringify(state.context)),
-    ]),
+    contextSection(doc, live.state.context, live.send),
   ]);
 }
 
@@ -426,7 +442,7 @@ export function explorePanel(doc: Document, context: ExploreContext): HTMLElemen
       ...nowSection(doc, machine, { current, final }),
       ...(live
         ? [
-            liveResultSection(doc, live.state),
+            liveResultSection(doc, live),
             liveMovesSection(doc, machine, { state: live.state, send: live.send, final }),
             final ? null : timersSection(doc, { state: live.state, send: live.send }),
           ]

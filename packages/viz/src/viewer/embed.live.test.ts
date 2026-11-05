@@ -167,7 +167,9 @@ describe("live controls", () => {
     if (box) box.value = '{"amount":42}';
     click(root, '[data-send="submit"]');
     expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { amount: 42 } }]);
-    expect(root.querySelector("[data-live-context]")?.textContent).toBe('Context: {"amount":42}');
+    expect(root.querySelector("[data-live-context]")?.textContent).toBe(
+      'Context{\n  "amount": 42\n}',
+    );
   });
 
   test("invalid JSON sends nothing", () => {
