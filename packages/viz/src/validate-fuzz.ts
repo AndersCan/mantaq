@@ -1,4 +1,4 @@
-import type { VizFuzz, VizFuzzError, VizFuzzSequence, VizStep } from "./schema.ts";
+import type { VizFuzz, VizFuzzError, VizFuzzSequence, VizRun, VizStep } from "./schema.ts";
 import {
   isRecord,
   readInteger,
@@ -24,6 +24,13 @@ function readStep(reader: Reader, record: JsonObject, path: string): VizStep {
 
 function readSteps(reader: Reader, record: JsonObject, path: string): VizStep[] {
   return readList(reader, { record, key: "steps", path }, (item, at) => readStep(reader, item, at));
+}
+
+export function readRuns(reader: Reader, at: { record: JsonObject; path: string }): VizRun[] {
+  return readList(reader, { record: at.record, key: "runs", path: at.path }, (item, path) => ({
+    name: readString(reader, { record: item, key: "name", path }),
+    steps: readSteps(reader, item, path),
+  }));
 }
 
 function readSequence(reader: Reader, record: JsonObject, path: string): VizFuzzSequence {

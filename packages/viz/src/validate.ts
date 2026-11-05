@@ -9,7 +9,7 @@ import type {
   VizState,
 } from "./schema.ts";
 import { readExplanation } from "./validate-explanation.ts";
-import { readFuzz } from "./validate-fuzz.ts";
+import { readFuzz, readRuns } from "./validate-fuzz.ts";
 import {
   isRecord,
   readBoolean,
@@ -112,6 +112,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
       readEdge(reader, item, at),
     ),
     fuzz: readFuzz(reader, { record, path }),
+    runs: readRuns(reader, { record, path }),
   };
   checkReferences(reader, machine, path);
   return machine;

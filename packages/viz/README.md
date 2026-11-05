@@ -22,9 +22,9 @@ Take a step with a panel button, by clicking a pulsing edge, or by clicking a st
 
 **Live** (the Vite plugin page, or `mountViewer(root, doc, { driver })`): steps run the real actor through `createDriver` from `@mantaq/inspect/drive`, so guards are evaluated. Timers advance by button, and **Back** replays the path from a fresh actor.
 
-## Schema (v8)
+## Schema (v9)
 
-`VizDocument { schemaVersion: 8, machines: VizMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
+`VizDocument { schemaVersion: 9, machines: VizMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
 
 | field              | meaning                                                                                                                                                                                                                                                                                                                               |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -36,6 +36,7 @@ Take a step with a panel button, by clicking a pulsing edge, or by clicking a st
 | `edge.origin`      | `declared` (builder `to`, vouched for by the type checker) · `probe` (synthetic traversal, undeclared actors) · `fuzz` (observed only while fuzzing)                                                                                                                                                                                  |
 | `edge.explanation` | `null` (no handler: initial/effect, or AST not run) · `{ status: "analyzed", location, registration, branches, payloadReads, contextReads, contextWrites, readsActorState, comparisons, literals }` · `{ status: "not_analyzed", location, reason, snippet }`                                                                         |
 | `edge.doc`         | leading JSDoc of the `m.on` / `m.onAny` call behind the edge, or of the `m.effect` calls of the state for an `effect` edge (joined in order); `null` = undocumented, no handler, or AST not run                                                                                                                                       |
+| `machine.runs[]`   | named example runs, replayable on the live page: `{ name, steps }`, each step an event (`{ kind: "event", event, payload }`) or a clock advance (`{ kind: "advance", ms }`). Empty = none supplied                                                                                                                                    |
 | `machine.fuzz`     | `null` or `{ seed, iterations, corpus: [{ steps, discovered }], errors: [{ from, event, message, steps }] }`; every sequence is shrunk and replayable from a fresh actor                                                                                                                                                              |
 
 Bump `VIZ_SCHEMA_VERSION` on any breaking change. The validator accepts only the current version.

@@ -124,7 +124,7 @@ console.log(JSON.stringify({ results, page, entryStatus, schemaVersion: doc.sche
     "plugin page carries a stylesheet",
   );
   check(out.entryStatus === 200, "plugin page serves the live entry");
-  check(out.schemaVersion === 8, "plugin serves a v8 document");
+  check(out.schemaVersion === 9, "plugin serves a v9 document");
 } catch (error) {
   fail(String(error));
 } finally {

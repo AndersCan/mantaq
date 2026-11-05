@@ -172,7 +172,7 @@ export function toVizMachine(input: VizInput): VizMachine {
     ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
   ].sort();
 
-  return { id: input.id, initial, regions, states, events, edges, fuzz: null };
+  return { id: input.id, initial, regions, states, events, edges, fuzz: null, runs: [] };
 }
 
 export function toViz(inputs: ReadonlyArray<VizInput>): VizDocument {

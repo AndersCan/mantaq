@@ -7,6 +7,38 @@ import type { VizDocument } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 
+describe("parseViz runs", () => {
+  const withRuns = (runs: unknown): string => {
+    const [machine] = toViz(exampleInputs()).machines;
+    return JSON.stringify({
+      schemaVersion: VIZ_SCHEMA_VERSION,
+      machines: [{ ...machine, runs }],
+    });
+  };
+
+  test("accepts named runs of events and advances", () => {
+    const runs = [
+      {
+        name: "a",
+        steps: [
+          { kind: "event", event: "go", payload: { n: 1 } },
+          { kind: "advance", ms: 5 },
+        ],
+      },
+    ];
+    const parsed = Either.getRight(parseViz(withRuns(runs)));
+    expect(parsed?.machines[0]?.runs).toEqual(runs);
+  });
+
+  test("rejects a run without a name or with a bad step", () => {
+    expect(Either.isLeft(parseViz(withRuns([{ steps: [] }])))).toBe(true);
+    expect(Either.isLeft(parseViz(withRuns([{ name: "a", steps: [{ kind: "jump" }] }])))).toBe(
+      true,
+    );
+    expect(Either.isLeft(parseViz(withRuns("nope")))).toBe(true);
+  });
+});
+
 describe("parseViz", () => {
   test("round-trips every exported example", () => {
     const viz = toViz(exampleInputs());
