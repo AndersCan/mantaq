@@ -81,7 +81,7 @@ describe("viewer: checkout", () => {
   test("declared back edges draw real targets; no ? nodes", () => {
     const root = mount(checkout());
     const back = [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
-      edge.textContent?.includes("back"),
+      edge.querySelector("text")?.textContent?.includes("back"),
     );
     expect(back.length).toBeGreaterThan(0);
     expect(back.some((edge) => edge.classList.contains("undetermined"))).toBe(false);
@@ -91,7 +91,7 @@ describe("viewer: checkout", () => {
   test("undetermined edges are stubs, each to its own ? node", () => {
     const root = mount(undeterminedBack(checkout()));
     const back = [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
-      edge.textContent?.includes("back"),
+      edge.querySelector("text")?.textContent?.includes("back"),
     );
     expect(back.length).toBeGreaterThan(0);
     for (const edge of back) {
@@ -103,7 +103,9 @@ describe("viewer: checkout", () => {
 
   test("internal events and effects are marked distinctly", () => {
     const root = mount(checkout());
-    const internal = [...root.querySelectorAll(".edge.internal")].map((edge) => edge.textContent);
+    const internal = [...root.querySelectorAll(".edge.internal")].map(
+      (edge) => edge.querySelector("text")?.textContent,
+    );
     expect(internal).toContain("paymentOk");
     expect(internal).not.toContain("back");
     expect(root.querySelector(".edge.effect")).toBeNull();
@@ -323,7 +325,7 @@ describe("viewer: onAny", () => {
     expect(root.querySelectorAll(".any-node").length).toBe(1);
     expect(root.querySelector(".any-node")?.textContent).toBe("any state");
     const cancel = [...root.querySelectorAll<SVGGElement>(".edge")].filter(
-      (edge) => edge.textContent === "CANCEL",
+      (edge) => edge.querySelector("text")?.textContent === "CANCEL",
     );
     expect(cancel.map((edge) => edge.dataset["from"])).toEqual(["*", "*"]);
     expect(cancel[0]?.getAttribute("aria-label")).toMatch(/^any state on CANCEL to /);
