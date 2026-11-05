@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+<sub>2026-11-05</sub>
+
+- _(patch)_ The live page redraws when a `__runs__/*.json` file changes, so re-recorded test runs show up without a save.
+
 ## 0.5.0
 
 <sub>2026-11-05</sub>
