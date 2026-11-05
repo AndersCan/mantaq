@@ -341,6 +341,22 @@ function outcomeText(last: VizLiveStep): string {
   return ` ignored in ${last.from}: no handler`;
 }
 
+const collapsedContexts = new WeakSet<Document>();
+
+/** Collapsible, pretty-printed context. The fold survives the panel redraw after each step. */
+function contextSection(doc: Document, value: unknown): HTMLElement {
+  const section = html(doc, "details", { class: "explore-context", "data-live-context": "" }, [
+    html(doc, "summary", {}, ["Context"]),
+    html(doc, "pre", {}, [JSON.stringify(value, null, 2) ?? "undefined"]),
+  ]);
+  section.open = !collapsedContexts.has(doc);
+  section.addEventListener("toggle", () => {
+    if (section.open) collapsedContexts.delete(doc);
+    else collapsedContexts.add(doc);
+  });
+  return section;
+}
+
 function liveResultSection(doc: Document, state: VizLiveState): HTMLElement {
   const { last } = state;
   return html(doc, "div", { class: "explore-live" }, [
@@ -363,10 +379,7 @@ function liveResultSection(doc: Document, state: VizLiveState): HTMLElement {
                 `Handler threw: ${last.error}`,
               ]),
         ]),
-    html(doc, "p", { "data-live-context": "" }, [
-      "Context: ",
-      code(doc, JSON.stringify(state.context)),
-    ]),
+    contextSection(doc, state.context),
   ]);
 }
 
