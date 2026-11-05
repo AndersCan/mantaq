@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 8;
+export const VIZ_SCHEMA_VERSION = 9;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -154,6 +154,12 @@ export interface VizEdge {
   tested: VizCoverage | null;
 }
 
+/** A named example run: the steps a test took from a fresh actor. */
+export interface VizRun {
+  name: string;
+  steps: VizStep[];
+}
+
 export interface VizMachine {
   id: string;
   initial: string | null;
@@ -164,6 +170,8 @@ export interface VizMachine {
   edges: VizEdge[];
   /** null = not fuzzed. */
   fuzz: VizFuzz | null;
+  /** Named example runs, replayable on the live page. Empty = none supplied. */
+  runs: VizRun[];
 }
 
 export type VizJson = null | boolean | number | string | VizJson[] | { [key: string]: VizJson };

@@ -52,6 +52,7 @@ const door: VizMachine = {
     { ...edge("open", "go", "done"), doc: "Walk through and close up." },
   ],
   fuzz: null,
+  runs: [],
 };
 
 function mount(text: string): HTMLElement {
@@ -71,6 +72,15 @@ describe("mountVizText", () => {
     ).toBe("Walk through and close up.");
     root.querySelector<HTMLButtonElement>('[data-take="open-go-done"]')?.click();
     expect(root.querySelector('.panel [data-doc="state"]')).toBeNull();
+  });
+
+  test("without a driver there is no Runs section", () => {
+    const withRuns: VizMachine = {
+      ...door,
+      runs: [{ name: "goes", steps: [{ kind: "event", event: "go", payload: null }] }],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRuns] }));
+    expect(root.querySelector("[data-runs]")).toBeNull();
   });
 
   test("the walkthrough shows the doc of the current state's effects", () => {

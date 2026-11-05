@@ -19,7 +19,13 @@ export interface ExploreContext {
   /** Keep the first `length` steps. */
   rewind: (length: number) => void;
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
-  live?: { state: VizLiveState; send: (step: VizStep) => void; previous?: VizJson };
+  live?: {
+    state: VizLiveState;
+    send: (step: VizStep) => void;
+    previous?: VizJson;
+    /** Replace the walk with these steps from a fresh actor. */
+    play: (steps: ReadonlyArray<VizStep>) => void;
+  };
 }
 
 const GROUP_TITLES: Record<MoveGroup, string> = {
@@ -336,6 +342,30 @@ function liveMovesSection(
   ]);
 }
 
+function runsSection(
+  doc: Document,
+  machine: VizMachine,
+  live: { play: (steps: ReadonlyArray<VizStep>) => void },
+): HTMLElement | null {
+  if (machine.runs.length === 0) return null;
+  return html(doc, "div", { class: "explore-runs", "data-runs": "" }, [
+    html(doc, "h3", {}, ["Runs"]),
+    html(
+      doc,
+      "ul",
+      {},
+      machine.runs.map((run) =>
+        html(doc, "li", {}, [
+          button(doc, [run.name], {
+            onClick: () => live.play(run.steps),
+            attrs: { "data-run": run.name },
+          }),
+        ]),
+      ),
+    ),
+  ]);
+}
+
 function outcomeText(last: VizLiveStep): string {
   if (last.outcome === "transition") return ` ${last.from} → ${last.to}`;
   if (last.outcome === "stay") return ` handled in ${last.from}: stays`;
@@ -478,6 +508,7 @@ export function explorePanel(doc: Document, context: ExploreContext): HTMLElemen
           attrs: { "data-explore-action": "reset" },
         }),
       ]),
+      live ? runsSection(doc, machine, live) : null,
       live ? livePathSection(doc, context, live.state) : pathSection(doc, context),
     ],
   );

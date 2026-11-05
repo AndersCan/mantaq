@@ -155,7 +155,7 @@ export function mountViewer(
           rewind,
           ...(view.live === null
             ? {}
-            : { live: { state: view.live, send, previous: view.previous } }),
+            : { live: { state: view.live, send, previous: view.previous, play } }),
         }),
         renderPanel(doc, machine, { selection: view.selection, select }),
       );
@@ -183,6 +183,10 @@ export function mountViewer(
         return;
       }
       view.path = [...view.path, step];
+      walked();
+    };
+    const play = (steps: ReadonlyArray<VizStep>) => {
+      if (driver !== undefined) replayInto(view, driver, steps);
       walked();
     };
     const rewind = (length: number) => {

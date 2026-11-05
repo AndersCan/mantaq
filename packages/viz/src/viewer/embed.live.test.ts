@@ -46,6 +46,7 @@ const checkout: VizMachine = {
     { id: "paymentTimeout", internal: true, doc: null, payloadType: null },
   ],
   edges: [edge("idle", "submit", "paying"), edge("paying", "paymentTimeout", "error")],
+  runs: [],
   fuzz: {
     seed: 1,
     iterations: 1,
@@ -218,6 +219,50 @@ describe("live controls", () => {
     expect(second.root.querySelector("[data-live-context]")?.textContent).toBe(
       first.root.querySelector("[data-live-context]")?.textContent,
     );
+  });
+});
+
+describe("runs", () => {
+  const submit: VizStep = { kind: "event", event: "submit", payload: { amount: 5 } };
+  const withRuns: VizMachine = {
+    ...checkout,
+    runs: [
+      { name: "pays and times out", steps: [submit, { kind: "advance", ms: 800 }] },
+      { name: "submits", steps: [submit] },
+    ],
+  };
+
+  function mountRuns(onNavigate: (w: { steps: string[] }) => void = () => undefined) {
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRuns] },
+      { driver: driver(), onNavigate },
+    );
+    return root;
+  }
+
+  test("lists each run by name", () => {
+    const root = mountRuns();
+    const names = [...root.querySelectorAll("[data-run]")].map((each) => each.textContent);
+    expect(names).toEqual(["pays and times out", "submits"]);
+  });
+
+  test("clicking a run replays it from a fresh actor and updates the URL steps", () => {
+    const seen: string[][] = [];
+    const root = mountRuns((where) => seen.push(where.steps));
+    click(root, '[data-send="submit"]');
+    click(root, '[data-run="pays and times out"]');
+    expect(current(root)).toBe("error");
+    expect(seen.at(-1)).toEqual(['submit={"amount":5}', "@800"]);
+    click(root, '[data-run="submits"]');
+    expect(current(root)).toBe("paying");
+    expect(seen.at(-1)).toEqual(['submit={"amount":5}']);
+  });
+
+  test("a machine without runs shows no Runs section", () => {
+    const { root } = mount();
+    expect(root.querySelector("[data-runs]")).toBeNull();
   });
 });
 
