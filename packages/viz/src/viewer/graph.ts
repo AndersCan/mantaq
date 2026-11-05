@@ -1,4 +1,5 @@
 import { isAnyState } from "../schema.ts";
+import { movesFrom } from "../moves.ts";
 import type { VizCoverage, VizEdge, VizMachine } from "../schema.ts";
 import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
@@ -77,6 +78,7 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
         class: "chip",
         "data-effect": effect.name,
         "data-state": placed.state.id,
+        tabindex: 0,
         "aria-label": `effect ${effect.name}`,
       },
       [
@@ -236,6 +238,45 @@ function wireHover(root: SVGSVGElement): void {
   }
 }
 
+/** Edges a chip's effect sends, including `onAny` handlers, by edge id. */
+function sentEdges(root: SVGSVGElement, machine: VizMachine, chip: SVGGElement): SVGGElement[] {
+  const effect = chip.dataset["effect"] ?? "";
+  const ids = new Set(
+    movesFrom(machine, chip.dataset["state"] ?? "")
+      .filter((move) => move.sentBy.includes(effect))
+      .map((move) => move.edge.id),
+  );
+  return [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
+    ids.has(edge.dataset["edgeId"] ?? ""),
+  );
+}
+
+/** Hovering or focusing a chip highlights the edges for its `sends` and dims the rest. */
+function wireChips(root: SVGSVGElement, doc: Document, machine: VizMachine): void {
+  const emitters = new Map<SVGGElement, string[]>();
+  for (const chip of root.querySelectorAll<SVGGElement>(".chip")) {
+    const edges = sentEdges(root, machine, chip);
+    const effect = chip.dataset["effect"] ?? "";
+    for (const edge of edges) emitters.set(edge, [...(emitters.get(edge) ?? []), effect]);
+    const on = () => {
+      if (edges.length === 0) return;
+      root.classList.add("chip-active");
+      for (const edge of edges) edge.classList.add("sent");
+    };
+    const off = () => {
+      root.classList.remove("chip-active");
+      for (const edge of edges) edge.classList.remove("sent");
+    };
+    chip.addEventListener("mouseenter", on);
+    chip.addEventListener("mouseleave", off);
+    chip.addEventListener("focusin", on);
+    chip.addEventListener("focusout", off);
+  }
+  for (const [edge, names] of emitters) {
+    edge.prepend(svg(doc, "title", {}, [`emitted by ${names.join(", ")}`]));
+  }
+}
+
 /** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. */
 export function renderGraph(
   doc: Document,
@@ -266,5 +307,6 @@ export function renderGraph(
     ],
   );
   wireHover(root);
+  wireChips(root, doc, machine);
   return root;
 }

@@ -252,6 +252,19 @@
   stroke-width: 2.5;
 }
 
+.viz .chip {
+  cursor: help;
+}
+
+.viz .graph.chip-active .edge:not(.sent) {
+  opacity: 0.2;
+}
+
+.viz .edge.sent path {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
 .viz .state:focus-visible .frame,
 .viz .edge:focus-visible path {
   stroke: var(--accent);
