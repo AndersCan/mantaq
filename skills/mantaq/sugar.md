@@ -1,6 +1,6 @@
 # Sugar Reference
 
-Ergonomic layer over `@mantaq/core`: `npm install @mantaq/sugar`. Written against `@mantaq/sugar` 1.0.
+Ergonomic layer over `@mantaq/core`: `npm install @mantaq/sugar`. Written against `@mantaq/sugar` 2.0.
 
 This lists what exists and when to reach for it. Get exact signatures from
 `node_modules/@mantaq/sugar/dist/*.d.ts` or `packages/examples/`.

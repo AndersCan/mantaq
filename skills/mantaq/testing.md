@@ -1,6 +1,6 @@
 # Testing Mantaq
 
-Deterministic tests with the VirtualClock + vitest. Harness and coverage from `@mantaq/test` (`npm install @mantaq/test`) and `@mantaq/traversal`. Written against `@mantaq/core` 0.4, `@mantaq/test` 1.0, `@mantaq/traversal` 0.2. Check exact signatures against the installed types.
+Deterministic tests with the VirtualClock + vitest. Harness and coverage from `@mantaq/test` (`npm install @mantaq/test`) and `@mantaq/traversal`. Written against `@mantaq/core` 0.5, `@mantaq/test` 2.0, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.5. Check exact signatures against the installed types.
 
 ## Deterministic Tests (VirtualClock)
 
@@ -60,6 +60,34 @@ h.assertAllTransitionsVisited();
 Other assertions cover a specific state, transition or effect being visited or never visited, and a context predicate that must never hold. List them from the `@mantaq/test` types; they take option objects.
 
 `@mantaq/traversal` exposes graph algorithms (reachability, paths, cycles, unreachable states). Use unreachable-state analysis to find states you declared but never wired.
+
+## Record Runs
+
+Wrap the machine factory once per test file. Each passing test that builds an actor with it is recorded as a named run in `__runs__/<test file>.json`, which the live page lists.
+
+```ts
+import { recordRuns } from "@mantaq/inspect/record";
+
+const make = recordRuns(createInviteLinkActor);
+```
+
+Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a stale file fails the test. Name tests as user-visible journeys: the test name is the run's label.
+
+## Design Gate
+
+```ts
+import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
+
+const target = { id: "inviteLink", create: () => createInviteLinkActor({ clock: VirtualClock() }) };
+expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, unreachable states
+expectAllStatesReached(target);
+expectReached(target, { transitions: [{ from: "pending", event: "ACCEPT" }] });
+expectNoDesignErrors({ ...target, fuzz: false }); // structure only, no fuzzing
+```
+
+Fuzz throws in app code are real findings: fix them, never suppress.
+
+With `@mantaq/test` 2.0 the `*` any-node (`m.onAny`) counts in coverage: it is one node, covered once its event fires from any state.
 
 ## Test Design
 

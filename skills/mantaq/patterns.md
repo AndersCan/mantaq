@@ -1,6 +1,6 @@
 # Patterns
 
-Proven recipes. Code is a sketch written against `@mantaq/core` 0.4 and `@mantaq/sugar` 1.0. Copy the shape, not the exact signatures: check them against the installed types. Full working versions live in the mantaq repo under `packages/examples/` (e.g. `checkout.test.ts`, `saga-orchestrator.test.ts`, `request-response.test.ts`).
+Proven recipes. Code is a sketch written against `@mantaq/core` 0.5 and `@mantaq/sugar` 2.0. Copy the shape, not the exact signatures: check them against the installed types. Full working versions live in the mantaq repo under `packages/examples/` (e.g. `checkout.test.ts`, `saga-orchestrator.test.ts`, `request-response.test.ts`).
 
 ## Async Work → Effect + Internal Event
 
@@ -53,7 +53,7 @@ Events that do the same thing in every state (cancel, disconnect, purge). The ta
 m.onAny({ event: disconnect, to: [disconnected], handler: () => ({ state: disconnected }) });
 ```
 
-Target depends on the current state (back, next)? One `m.on` per state, not `onAny` branching on `actor.state`. Each registration then declares its exact target and the diagram shows exact source/target pairs (`@mantaq/inspect` warns otherwise).
+Target depends on the current state (back, next)? One `m.on` per state, not `onAny` branching on the handler's `state`. Each registration then declares its exact target and the diagram shows exact source/target pairs (`@mantaq/inspect` warns otherwise).
 
 ```ts
 m.on(payment, { event: back, to: [shippingAddress], handler: () => ({ state: shippingAddress }) });
