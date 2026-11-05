@@ -1,16 +1,16 @@
 # Changelog
 
-
 ## 0.5.0
+
 <sub>2026-11-05</sub>
 
-- *(minor)*
+- _(minor)_
   `vite build` with `mantaqViz` writes the live page as a static site (`index.html`, `viz.json` and a script under `base`).
-- *(minor)*
+- _(minor)_
   `tests` takes named runs (`{ name, steps }[]`) instead of bare step lists, and they show up as `machine.runs`. `inspectModule` reads recorded runs from `__runs__/*.json` next to the machine file, drops internal events a replay already produces, and drops runs that replay to a different end state with a warning. Breaking: wrap each step list in `{ name, steps }`.
-- *(minor)*
+- _(minor)_
   Add `recordRuns(factory)` (`@mantaq/inspect/record`) for vitest. Wrap a machine factory in a test file and each passing test is recorded to `__runs__/<test file>.json` next to it, where `inspectModule` picks it up as a named run. With `CI` set, a stale file fails the test. `vitest` is an optional peer dependency.
-- *(patch)*
+- _(patch)_
   The viz document (schema v9) carries named `runs` per machine, and the live page lists them in a Runs section. Clicking a run replays its steps on the actor and updates the shareable `?step=` link. Pages without a live driver show no Runs section.
 
 ## 0.4.0
