@@ -2,9 +2,9 @@
 /**
  * Pack smoke test: install the packed tarballs of @mantaq/viz and
  * @mantaq/inspect (plus their workspace dependencies) into a directory outside
- * the workspace, next to a real `vite`, and check what a user would run: the
- * CLI (--json and --out), every @mantaq/viz export, and the mantaqViz plugin
- * page, which must carry a stylesheet.
+ * the workspace, next to a real `vite`, and check what a user would run: every
+ * @mantaq/viz export, and the mantaqViz plugin page, which must carry a
+ * stylesheet.
  *
  * Run it after `vp run ready` (not inside `vp run`: the task runner breaks the
  * nested `vp pack` that `prepack` starts).
