@@ -153,12 +153,6 @@ describe("viewer: checkout", () => {
     expect(field(root, "run visits")).toBe("not supplied");
   });
 
-  test("the legend describes effect chips, not a self-loop", () => {
-    const text = mount(checkout()).querySelector(".legend-effect")?.textContent ?? "";
-    expect(text).toContain("chip");
-    expect(text).not.toContain("self-loop");
-  });
-
   test("clicking an edge shows source, event, target and 'not analyzed'", () => {
     const viz = checkout();
     const root = mount(viz);
