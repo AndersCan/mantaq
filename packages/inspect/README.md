@@ -22,6 +22,8 @@ export default defineConfig({
 
 The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
 
+`vite build` with the plugin also writes the page as a static site: `index.html`, `viz.json` and a script under `base` (set `base: "/"` to put them at the output root). Machines load through your Vite config, and the fuzz runs at build time.
+
 Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations }`; default 500 iterations so a save redraws fast).
 
 **Library**: one call per machine.

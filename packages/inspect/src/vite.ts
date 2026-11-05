@@ -5,6 +5,9 @@
  *   import { mantaqViz } from "@mantaq/inspect/vite";
  *   export default defineConfig({ plugins: [mantaqViz({ machines: "src/**\/*.machine.ts" })] });
  *
+ * `vite build` with the plugin also writes the page as a static site
+ * (`index.html`, `viz.json`, a script) under `base`.
+ *
  * Open `/__mantaq/` while the dev server runs. Machines load through your own
  * Vite config (aliases, tsconfig paths), are inspected on the server, and the
  * page redraws, keeping the walk, when you save a file.
@@ -14,10 +17,10 @@ import type { FuzzSettings } from "./inspect.ts";
 import { vizDocument, machineId, projectRoot } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
 import type { MachineExport } from "./ast/discover.ts";
-import { entryId, inspectEntry, runOf } from "./load.ts";
+import { entryId, inspectEntry, inspectFile, runOf } from "./load.ts";
 import { Either } from "@mantaq/utils";
-import { globSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { existsSync, globSync, readFileSync } from "node:fs";
+import { dirname, isAbsolute, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { searchForWorkspaceRoot } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
@@ -104,6 +107,75 @@ async function documentText(
   };
 }
 
+function stylesheets(): string {
+  return STYLESHEETS.map((id) => readFileSync(fileURLToPath(import.meta.resolve(id)), "utf8")).join(
+    "\n",
+  );
+}
+
+/** Build mode: write the page, `viz.json` and the viewer script under `base`. */
+function siteBuild(context: {
+  base: string;
+  patterns: ReadonlyArray<string>;
+  fuzz: false | FuzzSettings;
+  live: string;
+  project: { configFile: string | undefined };
+  root: () => string;
+}): Plugin {
+  let standalone = false;
+  return {
+    name: "mantaq-viz-build",
+    apply: "build",
+    // Never replace the app's own entry: only stand in as the input when the
+    // project has none (no `input` and no root index.html).
+    config: (config) => {
+      const input = config.build?.rollupOptions?.input;
+      const root = resolve(config.root ?? process.cwd());
+      standalone = input === undefined && !existsSync(resolve(root, "index.html"));
+      return standalone
+        ? { build: { rollupOptions: { input: { "mantaq-live": context.live } } } }
+        : {};
+    },
+    buildStart() {
+      if (!standalone) this.emitFile({ type: "chunk", id: context.live, name: "mantaq-live" });
+    },
+    async generateBundle(_options, bundle) {
+      const results = [];
+      for (const file of machineFiles(context.root(), context.patterns)) {
+        const load = { config: context.project.configFile };
+        try {
+          results.push(await inspectFile(file, { fuzz: context.fuzz }, load));
+        } catch (error) {
+          this.warn(`[mantaq-viz] ${file}: could not inspect (${String(error)})`);
+        }
+      }
+      for (const warning of results.flatMap((result) => result.warnings)) {
+        this.warn(`[mantaq-viz] ${warning}`);
+      }
+      const text = serializeViz(vizDocument(results.flatMap((result) => result.machines)));
+      const dir = context.base.replace(/^\//, "");
+      const entry = Object.values(bundle).find(
+        (chunk) => chunk.type === "chunk" && chunk.isEntry && chunk.name === "mantaq-live",
+      );
+      if (entry === undefined) {
+        this.error("[mantaq-viz] the live page entry was not bundled");
+        return;
+      }
+      this.emitFile({ type: "asset", fileName: `${dir}viz.json`, source: text });
+      this.emitFile({
+        type: "asset",
+        fileName: `${dir}index.html`,
+        source: livePageHtml({
+          title: "mantaq viz",
+          source: "viz.json",
+          entry: posix.relative(dir === "" ? "." : dir, entry.fileName),
+          css: stylesheets(),
+        }),
+      });
+    },
+  };
+}
+
 export function mantaqViz(options: MantaqVizOptions): Plugin[] {
   const base = (options.base ?? "/__mantaq/").replace(/\/?$/, "/");
   const patterns = Array.isArray(options.machines) ? options.machines : [options.machines];
@@ -113,11 +185,12 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
   );
   const viz = dirname(dirname(fileURLToPath(import.meta.resolve("@mantaq/viz/live"))));
   let root = process.cwd();
+  const project: { configFile: string | undefined } = { configFile: undefined };
   const targets: Plugin = {
     name: "mantaq-viz-targets",
-    apply: "serve",
     configResolved: (config) => {
       root = config.root;
+      project.configFile = config.configFile;
     },
     resolveId: (id) => (id === TARGETS ? TARGETS_RESOLVED : null),
     load: (id) => (id === TARGETS_RESOLVED ? targetsSource(machineFiles(root, patterns)) : null),
@@ -178,9 +251,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
           title: "mantaq viz",
           source: `${base}viz.json`,
           entry: `/@fs${live}`,
-          css: STYLESHEETS.map((id) =>
-            readFileSync(fileURLToPath(import.meta.resolve(id)), "utf8"),
-          ).join("\n"),
+          css: stylesheets(),
         });
         void server.transformIndexHtml(request.url ?? base, html).then((page) => {
           response.setHeader("content-type", "text/html");
@@ -192,5 +263,6 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       });
     },
   };
-  return [inspectEntry(), targets, plugin];
+  const site = siteBuild({ base, patterns, fuzz, live, project, root: () => root });
+  return [inspectEntry(), targets, site, plugin];
 }
