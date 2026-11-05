@@ -6,6 +6,7 @@ export default defineConfig({
     entry: {
       index: "src/index.ts",
       vite: "src/vite.ts",
+      record: "src/record.ts",
       drive: "src/drive.ts",
       "live-entry": "src/live-entry.ts",
     },
