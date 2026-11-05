@@ -218,6 +218,53 @@ export function dotGapFor(length: number): number {
   return Math.min(MAX_DOT_GAP, Math.max(MIN_DOT_GAP, length * DOT_GAP_PER_LENGTH));
 }
 
+export interface LabelBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const LABEL_GAP = 2;
+
+function collides(a: LabelBox, b: LabelBox): boolean {
+  return (
+    Math.abs(a.x - b.x) < (a.width + b.width) / 2 + LABEL_GAP &&
+    Math.abs(a.y - b.y) < (a.height + b.height) / 2 + LABEL_GAP
+  );
+}
+
+/**
+ * Moves each label vertically (0, +1, -1, +2, -2 steps) to the first spot that
+ * clears every label placed before it. Pure and order-stable.
+ */
+export function separateLabels(boxes: ReadonlyArray<LabelBox>): LabelBox[] {
+  const placed: LabelBox[] = [];
+  for (const labelBox of boxes) {
+    let candidate = labelBox;
+    for (let step = 1; placed.some((other) => collides(candidate, other)); step++) {
+      const shift = (LABEL_HEIGHT + LABEL_GAP) * Math.ceil(step / 2);
+      candidate = { ...labelBox, y: labelBox.y + (step % 2 === 1 ? shift : -shift) };
+    }
+    placed.push(candidate);
+  }
+  return placed;
+}
+
+function avoidLabelCollisions(edges: PlacedEdge[]): PlacedEdge[] {
+  const moved = separateLabels(
+    edges.map((placed) => ({
+      ...placed.label,
+      width: edgeText(placed.edge).length * CHAR_WIDTH + 8,
+      height: LABEL_HEIGHT,
+    })),
+  );
+  return edges.map((placed, index) => ({
+    ...placed,
+    label: { x: placed.label.x, y: moved[index]?.y ?? placed.label.y },
+  }));
+}
+
 function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
   const loopsSeen = new Map<string, number>();
   return machine.edges
@@ -280,7 +327,7 @@ export function layoutMachine(machine: VizMachine): MachineLayout {
     width: size.width ?? 0,
     height: size.height ?? 0,
     nodes: placeNodes(graph, machine),
-    edges: placeEdges(graph, machine),
+    edges: avoidLabelCollisions(placeEdges(graph, machine)),
     regions: machine.regions.map((region) => ({
       region,
       ...box(graph.node(regionNodeId(region))),
