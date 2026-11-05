@@ -1,5 +1,5 @@
 import { routingWarnings, unhandledSends, VIZ_SCHEMA_VERSION } from "@mantaq/viz";
-import type { VizDocument, VizJson, VizMachine, VizStep } from "@mantaq/viz";
+import type { VizDocument, VizJson, VizMachine, VizRun } from "@mantaq/viz";
 import { analyzeModule, annotateWith } from "./ast/annotate.ts";
 import type { ModuleAnalysis } from "./ast/annotate.ts";
 import type { MachineExport } from "./ast/discover.ts";
@@ -14,6 +14,8 @@ import { DEFAULT_SEED } from "@mantaq/pbt";
 import { Either } from "@mantaq/utils";
 import { VirtualClock } from "@mantaq/core";
 import type { AnyActor, Clock } from "@mantaq/core";
+import { normalizeRun, readRuns } from "./runs.ts";
+import type { RecordedRuns } from "./runs.ts";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 
@@ -33,8 +35,8 @@ export interface InspectTarget {
   source?: AnalysisSource;
   /** Sample payloads per event; replace the ones read from types. */
   payloads?: Readonly<Record<string, ReadonlyArray<VizJson>>>;
-  /** Event sequences your tests send, for "Coverage from: example tests". */
-  tests?: ReadonlyArray<ReadonlyArray<VizStep>>;
+  /** Named runs your tests take: "Coverage from: example tests", fuzz seeds, and the live page's Runs list. */
+  tests?: ReadonlyArray<VizRun>;
   /** `false` = structure only. */
   fuzz?: false | FuzzSettings;
 }
@@ -103,12 +105,20 @@ function driven(
           fuzz(run[1], {
             seed: settings?.seed ?? DEFAULT_SEED,
             iterations: settings?.iterations ?? DEFAULT_ITERATIONS,
-            ...(target.tests === undefined ? {} : { initial: target.tests }),
+            ...(target.tests === undefined
+              ? {}
+              : { initial: target.tests.map((run) => run.steps) }),
             ...guidance(structure),
           }),
         );
   const machine =
-    target.tests === undefined ? fuzzed : withTestCoverage(run[1], fuzzed, target.tests);
+    target.tests === undefined
+      ? fuzzed
+      : withTestCoverage(
+          run[1],
+          fuzzed,
+          target.tests.map((each) => each.steps),
+        );
   return { machine, skipped: [] };
 }
 
@@ -124,7 +134,7 @@ function inspectWith(
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
     analysis === null ? [] : [Either.getLeft(analysis)].filter((each) => each !== undefined);
-  const annotated = annotate(machine);
+  const annotated = annotate({ ...machine, runs: [...(target.tests ?? [])] });
   return {
     machine: annotated,
     warnings: [...unanalyzed, ...(quiet ? [] : skipped), ...warningsOf(annotated)],
@@ -189,6 +199,27 @@ function actorFactory(found: MachineExport, value: unknown): (() => AnyActor<unk
   };
 }
 
+/** The recorded runs of one machine that replay faithfully, and a warning for each that does not. */
+function replayedRuns(
+  id: string,
+  create: () => AnyActor<unknown>,
+  recorded: RecordedRuns,
+): { runs: VizRun[]; warnings: string[] } {
+  const found = recorded[id] ?? [];
+  if (found.length === 0) return { runs: [], warnings: [] };
+  const run = runner({ id, create }, {});
+  if (Either.isLeft(run)) return { runs: [], warnings: [`runs not shown: ${run[0]}`] };
+  const results = found.map((each) => ({ each, result: normalizeRun(run[1], each) }));
+  return {
+    runs: results.flatMap(({ each, result }) =>
+      Either.isRight(result) ? [{ name: each.name, steps: result[1] }] : [],
+    ),
+    warnings: results.flatMap(({ each, result }) =>
+      Either.isLeft(result) ? [`run "${each.name}" dropped: ${result[0]}`] : [],
+    ),
+  };
+}
+
 export interface ModuleOptions {
   /** Import the file and return its exports (e.g. Vite's `runnerImport`, `ssrLoadModule`). */
   load: (file: string) => Promise<Record<string, unknown>>;
@@ -228,6 +259,7 @@ export async function inspectModule(
     return { machines: [], warnings: [`${file}: no exported actor or actor factory found`] };
   }
   const exports = await options.load(file);
+  const { runs: recorded, warnings: runWarnings } = readRuns(dirname(file));
   const results = chosen.map((each) => {
     const id = machineId(each.name);
     const create = actorFactory(each, exports[each.name]);
@@ -235,17 +267,41 @@ export async function inspectModule(
       return { machine: null, warnings: [`${id}: ${each.name} did not return an actor`] };
     const fuzzSettings: false | FuzzSettings =
       each.call === "instance" ? false : (options.fuzz ?? {});
-    const inspected = inspectWith({ id, create, source, fuzz: fuzzSettings }, analysis);
+    const replayed =
+      each.call === "instance"
+        ? {
+            runs: [],
+            warnings:
+              (recorded[id] ?? []).length === 0
+                ? []
+                : ["runs not shown: exported as one actor, so they cannot be replayed safely"],
+          }
+        : replayedRuns(id, create, recorded);
+    const inspected = inspectWith(
+      {
+        id,
+        create,
+        source,
+        fuzz: fuzzSettings,
+        ...(replayed.runs.length === 0 ? {} : { tests: replayed.runs }),
+      },
+      analysis,
+    );
     const instance =
       each.call === "instance" ? ["not fuzzed: exported as one actor, not a factory"] : [];
     return {
       machine: inspected.machine,
-      warnings: [...instance, ...inspected.warnings].map((warning) => `${id}: ${warning}`),
+      warnings: [...instance, ...replayed.warnings, ...inspected.warnings].map(
+        (warning) => `${id}: ${warning}`,
+      ),
     };
   });
   return {
     machines: results.flatMap((result) => (result.machine === null ? [] : [result.machine])),
-    warnings: results.flatMap((result) => result.warnings),
+    warnings: [
+      ...runWarnings.map((warning) => `${file}: ${warning}`),
+      ...results.flatMap((result) => result.warnings),
+    ],
   };
 }
 

@@ -20,7 +20,7 @@ import { annotateMachine } from "./ast/annotate.ts";
 import { VIZ_SCHEMA_VERSION, serializeViz } from "@mantaq/viz";
 import { inspect } from "./inspect.ts";
 import type { Inspected } from "./inspect.ts";
-import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "./examples.ts";
+import { EXAMPLE_ROOT, exampleTargets, handWrittenRuns } from "./examples.ts";
 import type { Example } from "./examples.ts";
 import { compareArms, renderComparison } from "./fuzz/compare.ts";
 import { SEED_ENV, parseSeed } from "@mantaq/pbt";
@@ -57,7 +57,7 @@ function exampleMachine(example: Example, options: ExportOptions): Inspected {
     create: () => example.create().actor,
     ...(options.ast ? { source: { file: example.source, root: EXAMPLE_ROOT } } : {}),
     payloads: example.payloads ?? {},
-    tests: handWrittenBaselines()[example.id] ?? [],
+    tests: handWrittenRuns()[example.id] ?? [],
     fuzz:
       options.iterations === null ? false : { seed: options.seed, iterations: options.iterations },
   });

@@ -44,7 +44,7 @@ The reachability check is static. It reads the graph, so it needs no fuzzing: pa
 
 ## Assert what gets reached
 
-Reaching is proof. A state or transition counts as reached when the fuzzer or one of your example `tests` visited it.
+Reaching is proof. A state or transition counts as reached when the fuzzer or one of your named `tests` runs visited it.
 
 ```ts
 test("the happy path is covered", () => {
@@ -64,7 +64,7 @@ A miss is a prompt to look, not proof of a bug: the fuzzer may not have found a 
 ```
 checkout missed 1 expected reach:
   - state success was not reached
-Add an example run to `tests`, or raise `fuzz.iterations`, to cover it.
+Add a named run to `tests`, or raise `fuzz.iterations`, to cover it.
 ```
 
 Fix a miss by adding an example run, or by raising `fuzz.iterations` (default 2000):
@@ -74,10 +74,13 @@ const target = {
   id: "checkout",
   create: () => createCheckoutActor(),
   tests: [
-    [
-      { kind: "event", event: "submitBasicInfo", payload: null },
-      { kind: "event", event: "submitShipping", payload: null },
-    ],
+    {
+      name: "basic info, then shipping",
+      steps: [
+        { kind: "event", event: "submitBasicInfo", payload: null },
+        { kind: "event", event: "submitShipping", payload: null },
+      ],
+    },
   ],
   fuzz: { iterations: 5000 },
 };
