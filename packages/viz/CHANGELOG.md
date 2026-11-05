@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+<sub>2026-11-05</sub>
+
+- _(minor)_
+  The viz document (schema v9) carries named `runs` per machine, and the live page lists them in a Runs section. Clicking a run replays its steps on the actor and updates the shareable `?step=` link. Pages without a live driver show no Runs section.
+
 ## 0.3.0
 
 <sub>2026-11-05</sub>
