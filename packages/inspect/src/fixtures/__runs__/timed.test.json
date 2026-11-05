@@ -7,7 +7,7 @@
         {
           "kind": "event",
           "event": "start",
-          "payload": null
+          "payload": {}
         },
         {
           "kind": "advance",
@@ -16,7 +16,7 @@
         {
           "kind": "event",
           "event": "expired",
-          "payload": null
+          "payload": {}
         }
       ]
     },
@@ -27,7 +27,7 @@
         {
           "kind": "event",
           "event": "start",
-          "payload": null
+          "payload": {}
         }
       ]
     }

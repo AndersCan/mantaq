@@ -103,6 +103,53 @@ describe("recordRuns", () => {
     expect(() => readFileSync(file, "utf8")).toThrow();
   });
 
+  test("a factory called in beforeEach is recorded under the test's name", () => {
+    const dir = join(SCRATCH, "hook");
+    const file = testFile(
+      dir,
+      `import { beforeEach } from "vitest";
+let actor: ReturnType<typeof make>;
+beforeEach(() => { actor = make(); });
+test("hooked", () => { actor.send({ type: "start" }); });`,
+    );
+    const result = run(dir, {});
+    expect(result.ok).toBe(true);
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as { timed: { name: string }[] };
+    expect(recorded.timed.map((each) => each.name)).toEqual(["hooked"]);
+  });
+
+  test("a retried test is recorded once under its plain name", () => {
+    const dir = join(SCRATCH, "retry");
+    const file = testFile(
+      dir,
+      `let tries = 0;
+test("flaky", { retry: 2 }, () => {
+  make().send({ type: "start" });
+  tries += 1;
+  expect(tries).toBe(2);
+});`,
+    );
+    run(dir, {});
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as { timed: { name: string }[] };
+    expect(recorded.timed.map((each) => each.name)).toEqual(["flaky"]);
+  });
+
+  test("a Map payload is not recorded and warns, an empty object is kept", () => {
+    const dir = join(SCRATCH, "lossy");
+    const file = testFile(
+      dir,
+      `test("map", () => { make().send({ type: "start", payload: new Map() } as never); });
+test("empty", () => { make().send({ type: "start", payload: {} } as never); });`,
+    );
+    const result = run(dir, {});
+    expect(result.output).toContain('"map" not recorded, payload is not JSON');
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as {
+      timed: { name: string; steps: { payload: unknown }[] }[];
+    };
+    expect(recorded.timed.map((each) => each.name)).toEqual(["empty"]);
+    expect(recorded.timed[0]?.steps[0]?.payload).toEqual({});
+  });
+
   test("inspect shows the recorded runs on the fixture", async () => {
     const { machines } = await inspectModule(
       join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/timed.ts"),

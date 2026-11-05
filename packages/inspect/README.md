@@ -85,7 +85,7 @@ import { recordRuns } from "@mantaq/inspect/record";
 const make = recordRuns(createInviteLinkActor);
 ```
 
-Every passing test that builds an actor with `make` writes its events and clock moves to `__runs__/<test file>.json` next to the test, keyed by machine id. `inspectModule` and the Vite plugin read those files, so each test shows up in the live page's Runs list and counts as an example run. Run the whole test file to refresh it. With `CI` set, a run that differs from the committed file fails the test, like a stale snapshot. Runs with a payload that is not JSON are skipped with a warning. `vitest` is an optional peer dependency.
+Every passing test that builds an actor with `make` writes its events and clock moves to `__runs__/<test file>.json` next to the test, keyed by machine id. `inspectModule` and the Vite plugin read those files, so each test shows up in the live page's Runs list and counts as an example run. Run the whole test file to refresh it. With `CI` set, a run that differs from the committed file fails the test, like a stale snapshot. The factory may be called in the test or in `beforeEach`; a retried test is recorded once. Runs with a payload that does not survive JSON (functions, `bigint`, `Map`, class instances) are skipped with a warning. `vitest` is an optional peer dependency.
 
 ## What it cannot show
 
