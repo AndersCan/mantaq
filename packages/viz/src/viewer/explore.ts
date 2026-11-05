@@ -8,6 +8,7 @@ import type {
   VizMachine,
   VizStep,
 } from "../schema.ts";
+import { contextLines } from "./context-diff.ts";
 import { html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 
@@ -18,7 +19,7 @@ export interface ExploreContext {
   /** Keep the first `length` steps. */
   rewind: (length: number) => void;
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
-  live?: { state: VizLiveState; send: (step: VizStep) => void };
+  live?: { state: VizLiveState; send: (step: VizStep) => void; previous?: VizJson };
 }
 
 const GROUP_TITLES: Record<MoveGroup, string> = {
@@ -344,10 +345,25 @@ function outcomeText(last: VizLiveStep): string {
 const collapsedContexts = new WeakSet<object>();
 
 /** Collapsible, pretty-printed context. The fold survives the panel redraw after each step. */
-function contextSection(doc: Document, value: unknown, viewer: object): HTMLElement {
+function contextSection(
+  doc: Document,
+  value: VizJson,
+  context: { viewer: object; previous: VizJson | undefined },
+): HTMLElement {
+  const { viewer, previous } = context;
   const section = html(doc, "details", { class: "explore-context", "data-live-context": "" }, [
     html(doc, "summary", {}, ["Context"]),
-    html(doc, "pre", {}, [JSON.stringify(value, null, 2) ?? "undefined"]),
+    html(
+      doc,
+      "pre",
+      {},
+      contextLines(value, previous).flatMap((line, index) => [
+        index === 0 ? "" : "\n",
+        line.changed
+          ? html(doc, "mark", { class: "context-changed", "data-context-changed": "" }, [line.text])
+          : line.text,
+      ]),
+    ),
   ]);
   section.open = !collapsedContexts.has(viewer);
   section.addEventListener("toggle", () => {
@@ -359,7 +375,7 @@ function contextSection(doc: Document, value: unknown, viewer: object): HTMLElem
 
 function liveResultSection(
   doc: Document,
-  live: { state: VizLiveState; send: (step: VizStep) => void },
+  live: { state: VizLiveState; send: (step: VizStep) => void; previous?: VizJson },
 ): HTMLElement {
   const { last } = live.state;
   return html(doc, "div", { class: "explore-live" }, [
@@ -382,7 +398,7 @@ function liveResultSection(
                 `Handler threw: ${last.error}`,
               ]),
         ]),
-    contextSection(doc, live.state.context, live.send),
+    contextSection(doc, live.state.context, { viewer: live.send, previous: live.previous }),
   ]);
 }
 
