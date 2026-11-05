@@ -44,7 +44,7 @@ function legend(
     ["legend-final", "double border: final state"],
     ["legend-undetermined", "dashed edge to ?: target undetermined"],
     ["legend-internal", "dotted edge, italic label: internal event"],
-    ["legend-effect", "faint self-loop: state runs effects on entry"],
+    ["legend-effect", "chip in a state: effect run on entry (highlighted while there)"],
     ["legend-current", "thick accent border: where the walk is"],
     ["legend-next", "pulsing: a possible next step"],
     ["legend-taken", "bold accent: path taken"],

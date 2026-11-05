@@ -110,6 +110,53 @@ describe("viewer: checkout", () => {
     expect(root.querySelector('.state [data-effect="chargeCard"]')?.textContent).toBe("chargeCard");
   });
 
+  test("effects are chips sized into their state, with no effect edges or self-loops", () => {
+    const viz = checkout();
+    const root = mount(viz);
+    const machine = viz.machines[0];
+    for (const state of machine?.states ?? []) {
+      const node = root.querySelector(`[data-node-id="${state.id}"]`);
+      const chips = [...(node?.querySelectorAll(".chip") ?? [])];
+      expect(chips.map((chip) => chip.getAttribute("data-effect"))).toEqual(
+        state.effects.map((effect) => effect.name),
+      );
+      const frame = node?.querySelector("rect.frame:not(.inner)");
+      expect(Number(frame?.getAttribute("height"))).toBe(36 + 20 * state.effects.length);
+    }
+    const effectEdges = machine?.edges.filter((edge) => edge.kind === "effect") ?? [];
+    expect(effectEdges.length).toBeGreaterThan(0);
+    for (const edge of effectEdges) {
+      expect(root.querySelector(`[data-edge-id="${edge.id}"]`)).toBeNull();
+    }
+  });
+
+  test("effect edges with an undetermined target draw no unknown node", () => {
+    const viz = checkout();
+    const withNull: VizDocument = {
+      ...viz,
+      machines: viz.machines.map((machine) => ({
+        ...machine,
+        edges: machine.edges.map((edge) => (edge.kind === "effect" ? { ...edge, to: null } : edge)),
+      })),
+    };
+    const root = mount(withNull);
+    expect(root.querySelectorAll(".unknown-node").length).toBe(0);
+  });
+
+  test("clicking a chip selects its state", () => {
+    const root = mount(checkout());
+    root
+      .querySelector('[data-node-id="submitting"] .chip')
+      ?.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(field(root, "run visits")).toBe("not supplied");
+  });
+
+  test("the legend describes effect chips, not a self-loop", () => {
+    const text = mount(checkout()).querySelector(".legend-effect")?.textContent ?? "";
+    expect(text).toContain("chip");
+    expect(text).not.toContain("self-loop");
+  });
+
   test("clicking an edge shows source, event, target and 'not analyzed'", () => {
     const viz = checkout();
     const root = mount(viz);
@@ -450,6 +497,9 @@ describe("viewer: explore", () => {
     expect(groupEvents(root, "input")).toEqual([]);
     const running = root.querySelector(".graph .chip.running");
     expect(running?.getAttribute("data-state")).toBe("submitting");
+    take(root, "paymentOk");
+    expect(current(root)).toBe("success");
+    expect(root.querySelector(".graph .chip.running")).toBeNull();
   });
 
   test("a timeout leads to error, and back retries payment", () => {
