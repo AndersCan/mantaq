@@ -1,0 +1,94 @@
+---
+title: Design gate in vitest
+description: Fail your test suite on design errors and assert which states and transitions get reached, using @mantaq/inspect.
+---
+
+`@mantaq/inspect` fuzzes a machine and checks its structure. Two groups of helpers turn that into vitest assertions, so CI catches design errors without a separate command.
+
+```ts
+import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
+```
+
+Each helper takes an inspect target: an `id` and a `create` function that returns a fresh actor on a `VirtualClock`.
+
+```ts
+const target = { id: "checkout", create: () => createCheckoutActor() };
+```
+
+## Fail on design errors
+
+```ts
+import { test } from "vitest";
+
+test("checkout has no design errors", () => {
+  expectNoDesignErrors(target);
+});
+```
+
+`expectNoDesignErrors` throws when it finds:
+
+- a handler or effect that throws under fuzzing,
+- an effect that sends an event its state does not handle,
+- a declared state with no path from the initial state.
+
+The message lists one line per error:
+
+```
+checkout has 1 design error:
+  - state archived is declared but no path leads to it from the initial state
+```
+
+Unreached edges and `onAny` routing warnings are not errors. They show in the visualizer and the Vite plugin's output, and do not fail the test.
+
+The reachability check is static. It reads the graph, so it needs no fuzzing: pass `fuzz: false` to skip the fuzz run. When an edge has an unknown target, the check cannot tell and reports nothing.
+
+## Assert what gets reached
+
+Reaching is proof. A state or transition counts as reached when the fuzzer or one of your example `tests` visited it.
+
+```ts
+test("the happy path is covered", () => {
+  expectReached(target, {
+    states: ["success"],
+    transitions: [{ from: "payment", event: "paymentOk", to: "success" }],
+  });
+});
+
+test("every state is visited", () => {
+  expectAllStatesReached(target);
+});
+```
+
+A miss is a prompt to look, not proof of a bug: the fuzzer may not have found a path, or a guard may block it. The message says so:
+
+```
+checkout missed 1 expected reach:
+  - state success was not reached
+Add an example run to `tests`, or raise `fuzz.iterations`, to cover it.
+```
+
+Fix a miss by adding an example run, or by raising `fuzz.iterations` (default 2000):
+
+```ts
+const target = {
+  id: "checkout",
+  create: () => createCheckoutActor(),
+  tests: [
+    [
+      { kind: "event", event: "submitBasicInfo", payload: null },
+      { kind: "event", event: "submitShipping", payload: null },
+    ],
+  ],
+  fuzz: { iterations: 5000 },
+};
+```
+
+Naming a state or transition the machine does not declare also fails, with "does not exist". Omit `to` in a transition to accept any target.
+
+## Stable in CI
+
+Runs are seeded, so the same machine gives the same result on every run. Pass `fuzz: { seed }` to change the seed.
+
+## Custom checks
+
+`designErrors`, `unreachableStates`, `missedReach` and `reachedStates` return the same data as lines or ids when you want your own assertion. They take the machine from `inspect(target).machine`.

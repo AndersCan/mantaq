@@ -10,6 +10,8 @@ It finds every exported actor, or function that builds one, from the file's type
 
 ## Three ways in
 
+**Gate in tests**: see the docs page "Design gate in vitest" for `expectNoDesignErrors`, `expectReached` and `expectAllStatesReached`.
+
 **CLI**: `mantaq-inspect <file.ts>... [--out FILE] [--json] [--live] [--no-fuzz] [--iterations N] [--config FILE] [--mode MODE] [--no-open] [--check]`. `--config` loads the files with that Vite config (env, aliases, plugins) and `--mode` picks its mode; without `--config` no project config is read. `--check` exits 1 if a warning was printed or fuzzing found a handler error (printed as `error:`), so CI can gate on design errors. `--json` writes the viz document instead of the page. `--live` bundles your machine files into the page with Vite, so it is still one offline HTML file but its steps run the real actors (same rules as the Vite plugin's live page); it cannot be combined with `--json`. Seed: `MANTAQ_SEED` (default from `@mantaq/pbt`). Same seed → same output.
 
 **Vite plugin**: a live page on your dev server that redraws, keeping your walk, when you save.
