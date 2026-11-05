@@ -52,6 +52,7 @@ export default defineConfig({
             { label: "Testing", slug: "guides/actor-testing" },
             { label: "Test Harness", slug: "guides/testing-guide" },
             { label: "Machines in an app", slug: "guides/machines-in-an-app" },
+            { label: "Visualizer", slug: "guides/visualizer" },
           ],
         },
         {
