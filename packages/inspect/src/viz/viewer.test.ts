@@ -401,17 +401,17 @@ describe("viewer: fuzz vs test coverage", () => {
     return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] };
   }
 
-  test("tests are the default source; dimmed = not exercised by any test", () => {
+  test("examples + fuzz is the default; a state or edge either source reached is not dimmed", () => {
     const root = mount(fuzzedAndTested("checkout"));
-    expect(root.querySelector<HTMLSelectElement>(".coverage-mode")?.value).toBe("tests");
-    // The example tests never fire paymentFail, so that edge is untested.
+    expect(root.querySelector<HTMLSelectElement>(".coverage-mode")?.value).toBe("reached");
+    // The example tests never fire paymentFail, but fuzzing does.
     const paymentFail = () =>
       root.querySelector(
         '.edge[data-from="submitting"][data-to="error"][aria-label*="paymentFail"]',
       );
-    expect(paymentFail()?.classList.contains("unreached")).toBe(true);
-    pick(root, "run");
     expect(paymentFail()?.classList.contains("unreached")).toBe(false);
+    pick(root, "tests");
+    expect(paymentFail()?.classList.contains("unreached")).toBe(true);
   });
 
   test("declared edge no fuzz run produced gets the 'guards may never allow it' note", () => {

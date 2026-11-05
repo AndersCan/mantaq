@@ -62,7 +62,7 @@ function machineSelect(
 }
 
 function isMode(value: string): value is CoverageMode {
-  return value === "off" || value === "run" || value === "tests";
+  return value === "off" || value === "run" || value === "tests" || value === "reached";
 }
 
 function coveragePicker(
