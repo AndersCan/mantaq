@@ -1,4 +1,5 @@
 import { isAnyState } from "../schema.ts";
+import { movesFrom } from "../moves.ts";
 import type { VizCoverage, VizEdge, VizMachine } from "../schema.ts";
 import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
@@ -77,7 +78,6 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
         class: "chip",
         "data-effect": effect.name,
         "data-state": placed.state.id,
-        "data-sends": JSON.stringify(effect.sends ?? []),
         tabindex: 0,
         "aria-label": `effect ${effect.name}`,
       },
@@ -196,7 +196,6 @@ function edgeGroup(
         unreached: isUnreached(measure(context.callbacks.mode, edge)),
       }),
       "data-edge-id": edge.id,
-      "data-event": edge.event,
       "data-from": edge.from,
       "data-to": placed.target,
       "aria-label": edgeAria(edge, text),
@@ -239,24 +238,26 @@ function wireHover(root: SVGSVGElement): void {
   }
 }
 
-/** Edges a chip's effect sends: handlers of its own state for the declared events. */
-function sentEdges(root: SVGSVGElement, chip: SVGGElement): SVGGElement[] {
-  const sends: unknown = JSON.parse(chip.dataset["sends"] ?? "[]");
-  const events = new Set(Array.isArray(sends) ? sends : []);
-  return [...root.querySelectorAll<SVGGElement>(".edge")].filter(
-    (edge) => edge.dataset["from"] === chip.dataset["state"] && events.has(edge.dataset["event"]),
+/** Edges a chip's effect sends, including `onAny` handlers, by edge id. */
+function sentEdges(root: SVGSVGElement, machine: VizMachine, chip: SVGGElement): SVGGElement[] {
+  const effect = chip.dataset["effect"] ?? "";
+  const ids = new Set(
+    movesFrom(machine, chip.dataset["state"] ?? "")
+      .filter((move) => move.sentBy.includes(effect))
+      .map((move) => move.edge.id),
+  );
+  return [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
+    ids.has(edge.dataset["edgeId"] ?? ""),
   );
 }
 
 /** Hovering or focusing a chip highlights the edges for its `sends` and dims the rest. */
-function wireChips(root: SVGSVGElement, doc: Document): void {
+function wireChips(root: SVGSVGElement, doc: Document, machine: VizMachine): void {
+  const emitters = new Map<SVGGElement, string[]>();
   for (const chip of root.querySelectorAll<SVGGElement>(".chip")) {
-    const edges = sentEdges(root, chip);
+    const edges = sentEdges(root, machine, chip);
     const effect = chip.dataset["effect"] ?? "";
-    for (const edge of edges) {
-      if (edge.querySelector("title")) continue;
-      edge.prepend(svg(doc, "title", {}, [`emitted by ${effect}`]));
-    }
+    for (const edge of edges) emitters.set(edge, [...(emitters.get(edge) ?? []), effect]);
     const on = () => {
       if (edges.length === 0) return;
       root.classList.add("chip-active");
@@ -270,6 +271,9 @@ function wireChips(root: SVGSVGElement, doc: Document): void {
     chip.addEventListener("mouseleave", off);
     chip.addEventListener("focusin", on);
     chip.addEventListener("focusout", off);
+  }
+  for (const [edge, names] of emitters) {
+    edge.prepend(svg(doc, "title", {}, [`emitted by ${names.join(", ")}`]));
   }
 }
 
@@ -303,6 +307,6 @@ export function renderGraph(
     ],
   );
   wireHover(root);
-  wireChips(root, doc);
+  wireChips(root, doc, machine);
   return root;
 }
