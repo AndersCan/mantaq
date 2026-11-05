@@ -6,11 +6,11 @@
 import { parseViz } from "../validate.ts";
 import type { VizIssue } from "../validate.ts";
 import { html } from "./dom.ts";
-import { FUZZ_NOTE, STRUCTURE_BANNER, mountViewer } from "./viewer.ts";
+import { mountViewer } from "./viewer.ts";
 import type { ViewerOptions } from "./viewer.ts";
 import { Either } from "@mantaq/utils";
 
-export { FUZZ_NOTE, STRUCTURE_BANNER, mountViewer };
+export { mountViewer };
 export type { ViewerOptions };
 
 /** Replace `root` with a list of reasons `source` cannot be shown. */

@@ -30,13 +30,13 @@ describe("mountDriven", () => {
       text: await documentText(),
       targets: { checkout: create },
     });
-    expect(root.textContent).toContain("Live");
+    expect(root.querySelector("[data-send]")).not.toBeNull();
   });
 
   test("without a target the viewer is the static walk", async () => {
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: await documentText(), targets: {} });
-    expect(root.textContent).not.toContain("Live: the real machine");
+    expect(root.querySelector("[data-send]")).toBeNull();
   });
 
   test("an invalid document lists its issues", () => {
@@ -58,7 +58,7 @@ describe("mountDriven targets", () => {
       text: await documentText(),
       targets: { checkout: create },
     });
-    expect(root.textContent).not.toContain("Live: the real machine");
+    expect(root.querySelector("[data-send]")).toBeNull();
   });
 });
 

@@ -49,7 +49,7 @@ describe("mantaq-inspect --live", () => {
     const html = readFileSync(out, "utf8");
     expect(html).not.toMatch(/<script[^>]* src=/);
     load(html);
-    expect(document.querySelector("#app")?.textContent).toContain("Live");
+    expect(document.querySelector("[data-send]")).not.toBeNull();
     click('[data-send="start"]');
     expect(current()).toBe("waiting");
     click("[data-advance-timer]");
@@ -60,7 +60,7 @@ describe("mantaq-inspect --live", () => {
     const { result, out } = write("instance.html", ["--live", fixture("instance.ts")]);
     expect(result.stderr).toMatch(/warning:/);
     load(readFileSync(out, "utf8"));
-    expect(document.querySelector("#app")?.textContent).not.toContain("Live: the real machine");
+    expect(document.querySelector("[data-send]")).toBeNull();
     expect(document.querySelector(".explore")).not.toBeNull();
   });
 

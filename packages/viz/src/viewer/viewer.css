@@ -46,19 +46,8 @@
   margin: 0;
 }
 
-.viz .banner {
-  background: var(--banner-bg);
-  color: var(--banner-fg);
-  padding: 8px 12px;
-  border-radius: 6px;
-}
-
-.viz .legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 18px;
-  padding: 0;
-  list-style: none;
+.viz .help-link {
+  margin-left: auto;
   color: var(--muted);
   font-size: 12px;
 }
