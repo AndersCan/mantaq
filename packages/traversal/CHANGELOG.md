@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4
+
+<sub>2026-11-05</sub>
+
+- _(patch)_ Updated dependency `@mantaq/core` v0.5.4
+
 ## 0.3.3
 
 <sub>2026-11-03</sub>
