@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0
+
+<sub>2026-11-05</sub>
+
+- _(minor)_
+  The viewer drops its always-on legend and fuzz note and links to the visualizer docs page instead. The `STRUCTURE_BANNER` and `FUZZ_NOTE` exports from `@mantaq/viz/viewer` are removed.
+- _(patch)_ The viewer's live context is now a collapsible, pretty-printed panel; the fold state is kept as you step.
+- _(patch)_ State nodes show their effects as chips, and effects no longer draw self-loop edges.
+- _(patch)_ The live context panel highlights the lines that changed in the last step.
+- _(patch)_ Hovering or focusing an effect chip highlights the edges it sends and labels them with the effect name.
+- _(patch)_ Effect chips without a declared `sends` show a "?" with the hint "declare `sends` to see links".
+- _(patch)_
+  Layout keeps a minimum edge length and node separation, and dotted edges scale their dot spacing with edge length so they never read as solid lines.
+- _(patch)_ The coverage overlay merges reach from example runs with fuzz reach.
+- _(patch)_ Edge labels in the viewer no longer overlap each other.
+
 ## 0.2.3
 
 <sub>2026-11-03</sub>

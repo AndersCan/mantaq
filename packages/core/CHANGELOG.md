@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.4
+
+<sub>2026-11-05</sub>
+
+- _(patch)_
+  Transition handlers receive the typed current state as `state: { name, payload }`, so a handler can carry the payload into the next state without a guard.
+
 ## 0.5.3
 
 <sub>2026-11-03</sub>
