@@ -31,10 +31,3 @@ export function modeLabel(mode: CoverageMode, machine: VizMachine): string {
   if (mode === "run") return machine.fuzz === null ? "supplied run" : "fuzz runs";
   return "off";
 }
-
-/** Legend text for a dimmed element: what "unreached" means for this source. */
-export function unreachedText(mode: CoverageMode, machine: VizMachine): string {
-  if (mode === "tests") return "dimmed and dashed: no test exercises this";
-  if (machine.fuzz === null) return "dimmed and dashed: never taken in the supplied run";
-  return "dimmed and dashed: never observed while fuzzing (declared edges here may be unreachable)";
-}

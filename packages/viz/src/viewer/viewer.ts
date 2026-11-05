@@ -9,21 +9,14 @@ import type {
 import { html } from "./dom.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
-import { availableModes, modeLabel, unreachedText } from "./coverage-mode.ts";
+import { availableModes, modeLabel } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
 import { decodeLiveSteps, decodePath, encodeLiveStep, encodeStep } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore } from "./explore.ts";
 
-export const STRUCTURE_BANNER =
-  "Click a pulsing edge, or a state it leads to, to walk the machine. Edges come from each handler's declared `to` list and effects' `sends`; guards are not evaluated, so a path here may not happen at runtime.";
-
-const LIVE_BANNER =
-  "Live: the real machine runs. Send an input and the cursor follows its actual state; guards and effects run.";
-
-export const FUZZ_NOTE =
-  "Green edges were observed while fuzzing but not declared. Fuzzing finds behaviour; it never proves an edge is impossible.";
+const DOCS_URL = "https://anderscan.github.io/mantaq/guides/visualizer/";
 
 interface ViewState {
   machineId: string;
@@ -43,34 +36,6 @@ function effectiveMode(view: ViewState, machine: VizMachine): CoverageMode {
   if (view.coverage === "off") return "off";
   if (view.coverage !== null && modes.includes(view.coverage)) return view.coverage;
   return modes[0] ?? "off";
-}
-
-function legend(
-  doc: Document,
-  { mode, machine }: { mode: CoverageMode; machine: VizMachine },
-): HTMLUListElement {
-  const entries: Array<[string, string]> = [
-    ["legend-final", "double border: final state"],
-    ["legend-undetermined", "dashed edge to ?: target undetermined"],
-    ["legend-internal", "dotted edge, italic label: internal event"],
-    ["legend-effect", "chip in a state: effect run on entry (highlighted while there)"],
-    ["legend-current", "thick accent border: where the walk is"],
-    ["legend-next", "pulsing: a possible next step"],
-    ["legend-taken", "bold accent: path taken"],
-  ];
-  if (machine.fuzz !== null) {
-    entries.push(
-      ["legend-fuzz", "green: observed only while fuzzing"],
-      ["legend-stay", "dotted self-loop: handled, no state change"],
-    );
-  }
-  if (mode !== "off") entries.push(["legend-unreached", unreachedText(mode, machine)]);
-  return html(
-    doc,
-    "ul",
-    { class: "legend" },
-    entries.map(([name, text]) => html(doc, "li", { class: name }, [text])),
-  );
 }
 
 function machineSelect(
@@ -248,10 +213,6 @@ export function mountViewer(
         onNavigate: options.onNavigate,
         live: driver !== undefined,
       }),
-      html(doc, "p", { class: "banner", role: "note" }, [
-        driver === undefined ? banner(machine) : LIVE_BANNER,
-      ]),
-      legend(doc, { mode, machine }),
       html(doc, "div", { class: "viz-main" }, [
         html(doc, "div", { class: "canvas" }, [renderGraph(doc, machine, { select, mode })]),
         panel,
@@ -330,11 +291,13 @@ function headerOf(
         render();
       },
     }),
+    html(
+      doc,
+      "a",
+      { class: "help-link", href: DOCS_URL, target: "_blank", rel: "noopener noreferrer" },
+      ["How this works"],
+    ),
   ]);
-}
-
-function banner(machine: VizMachine): string {
-  return machine.fuzz === null ? STRUCTURE_BANNER : `${STRUCTURE_BANNER} ${FUZZ_NOTE}`;
 }
 
 function markSelection(root: HTMLElement, selection: Selection | null): void {

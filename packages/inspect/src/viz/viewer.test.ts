@@ -11,7 +11,7 @@ import type { VizDocument, VizExplanation } from "@mantaq/viz";
 import { fuzz } from "../fuzz/fuzz.ts";
 import { fuzzedMachine } from "../fuzz/to-viz.ts";
 import { VIZ_SCHEMA_VERSION } from "@mantaq/viz";
-import { FUZZ_NOTE, STRUCTURE_BANNER, mountViewer } from "@mantaq/viz/viewer";
+import { mountViewer } from "@mantaq/viz/viewer";
 import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -214,9 +214,15 @@ describe("viewer: checkout", () => {
     expect(root.querySelectorAll(".highlight").length).toBe(0);
   });
 
-  test("shows the probing banner; no coverage picker without a run", () => {
+  test("shows no help text, only a link to the docs page; no coverage picker without a run", () => {
     const root = mount(checkout());
-    expect(root.querySelector(".banner")?.textContent).toBe(STRUCTURE_BANNER);
+    expect(root.querySelector(".banner")).toBeNull();
+    expect(root.querySelector(".legend")).toBeNull();
+    const link = root.querySelector("a.help-link");
+    expect(link?.textContent).toBe("How this works");
+    expect(link?.getAttribute("href")).toBe(
+      "https://anderscan.github.io/mantaq/guides/visualizer/",
+    );
     expect(root.querySelector(".coverage-mode")).toBeNull();
     expect(root.querySelector(".machine-select")).toBeNull();
   });
@@ -236,7 +242,7 @@ function checkoutWithRun(): VizDocument {
 }
 
 describe("viewer: coverage and switching", () => {
-  test("unreached edges and states are marked, and the legend explains it", () => {
+  test("unreached edges and states are marked", () => {
     const root = mount(checkoutWithRun());
     expect(root.querySelector(".coverage-mode")).not.toBeNull();
     expect(root.classList.contains("coverage-on")).toBe(true);
@@ -247,9 +253,6 @@ describe("viewer: coverage and switching", () => {
       root.querySelector('[data-node-id="shippingAddress"]')?.classList.contains("unreached"),
     ).toBe(false);
     expect(root.querySelectorAll(".edge.unreached").length).toBeGreaterThan(0);
-    expect(root.querySelector(".legend-unreached")?.textContent).toBe(
-      "dimmed and dashed: never taken in the supplied run",
-    );
   });
 
   test("picking 'off' turns the overlay off", () => {
@@ -257,7 +260,6 @@ describe("viewer: coverage and switching", () => {
     pick(root, "off");
     expect(root.classList.contains("coverage-on")).toBe(false);
     expect(root.querySelectorAll(".unreached").length).toBe(0);
-    expect(root.querySelector(".legend-unreached")).toBeNull();
   });
 
   test("switcher renders every example without manual positioning", () => {
@@ -288,13 +290,11 @@ function fuzzed(id: string): VizDocument {
 describe("viewer: fuzz results", () => {
   test("fuzz-observed stays are drawn distinctly; declared transitions need no fuzz edge", () => {
     const root = mount(fuzzed("retry"));
-    expect(root.querySelector(".banner")?.textContent).toBe(`${STRUCTURE_BANNER} ${FUZZ_NOTE}`);
     const fuzzTransitions = [...root.querySelectorAll<SVGGElement>(".edge.fuzz")].filter(
       (edge) => !edge.classList.contains("stay"),
     );
     expect(fuzzTransitions).toEqual([]);
     expect(root.querySelectorAll(".edge.fuzz.stay").length).toBeGreaterThan(0);
-    expect(root.querySelector(".legend-fuzz")).not.toBeNull();
   });
 
   test("edge panel shows origin and the replay sequence that reached it", () => {
@@ -410,9 +410,6 @@ describe("viewer: fuzz vs test coverage", () => {
   test("tests are the default source; dimmed = not exercised by any test", () => {
     const root = mount(fuzzedAndTested("checkout"));
     expect(root.querySelector<HTMLSelectElement>(".coverage-mode")?.value).toBe("tests");
-    expect(root.querySelector(".legend-unreached")?.textContent).toBe(
-      "dimmed and dashed: no test exercises this",
-    );
     // The example tests never fire paymentFail, so that edge is untested.
     const paymentFail = () =>
       root.querySelector(
