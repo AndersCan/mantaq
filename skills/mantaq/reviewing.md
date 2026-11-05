@@ -1,6 +1,6 @@
 # Reviewing Mantaq Actors
 
-Review actor code against the Rules in `SKILL.md`, then check what typechecking misses. Written against `@mantaq/core` 0.4; when behavior is in doubt, check the installed package.
+Review actor code against the Rules in `SKILL.md`, then check what typechecking misses. Written against `@mantaq/core` 0.5; when behavior is in doubt, check the installed package.
 
 ## Structure
 
@@ -12,6 +12,10 @@ Review actor code against the Rules in `SKILL.md`, then check what typechecking 
 
 - No real `setTimeout` / `Date.now` / `Math.random` in logic or effects. Any environment-dependent read is a bug.
 
+## Docs
+
+- Every state, event and handler has a one-sentence doc comment in domain words. The live page shows it.
+
 ## Typing
 
 - No casts, no `any`. Payload types declared at every boundary.
@@ -21,7 +25,7 @@ Review actor code against the Rules in `SKILL.md`, then check what typechecking 
 
 ## Effects
 
-- Every effect has a unique camelCase `name`.
+- Every effect has a unique camelCase `name` and declares `sends`.
 - Honours the abort signal, checks `signal.aborted` before emitting, passes the signal to timers.
 - Async effects return their promise.
 - Actor tolerates effects running at construction (initial state).
@@ -29,7 +33,7 @@ Review actor code against the Rules in `SKILL.md`, then check what typechecking 
 ## Wiring
 
 - Every emitted event is declared and handled in every state that can receive it.
-- No handler branches on `actor.state` without knowing whether it is the previous or new state. Prefer payload/context.
+- Handlers read the current state from their `state` argument, not `actor.state`.
 - Emit chains are short and bounded. A chain of 20 emits should raise eyebrows.
 
 ## Errors
