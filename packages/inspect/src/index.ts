@@ -22,7 +22,6 @@ export type {
 export { inspectFile } from "./load.ts";
 export type { FileOptions } from "./load.ts";
 export { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts";
-export { htmlPage } from "./page.ts";
 export { analyzeModule } from "./ast/annotate.ts";
 export type { ModuleAnalysis } from "./ast/annotate.ts";
 export type { MachineExport } from "./ast/discover.ts";
