@@ -26,3 +26,5 @@ export { htmlPage } from "./page.ts";
 export { analyzeModule } from "./ast/annotate.ts";
 export type { ModuleAnalysis } from "./ast/annotate.ts";
 export type { MachineExport } from "./ast/discover.ts";
+export { expectAllStatesReached, expectReached, missedReach, reachedStates } from "./reach.ts";
+export type { ReachExpectation, ReachTransition } from "./reach.ts";
