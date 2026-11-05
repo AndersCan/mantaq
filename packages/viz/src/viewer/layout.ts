@@ -81,8 +81,12 @@ function regionNodeId(region: string): string {
   return `region:${region}`;
 }
 
+const HINT_WIDTH = 14;
+
 function stateWidth(state: VizState): number {
-  const chips = state.effects.map((effect) => effect.name.length * CHAR_WIDTH + 24);
+  const chips = state.effects.map(
+    (effect) => effect.name.length * CHAR_WIDTH + 24 + (effect.sends === null ? HINT_WIDTH : 0),
+  );
   return Math.max(80, state.label.length * CHAR_WIDTH + 24, ...chips);
 }
 

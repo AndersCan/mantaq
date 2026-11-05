@@ -448,3 +448,34 @@ describe("effect chip hover edge cases", () => {
     expect(root.querySelector(".sent")).toBeNull();
   });
 });
+
+describe("effect chip sends hint", () => {
+  const withEffect = (sends: string[] | null): VizMachine => ({
+    ...door,
+    states: door.states.map((each) =>
+      each.id === "open" ? { ...each, effects: [{ name: "announcement", sends }] } : each,
+    ),
+  });
+  const render = (sends: string[] | null) =>
+    mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect(sends)] }));
+
+  test("an effect without declared sends shows a ? with the hint", () => {
+    const hint = render(null).querySelector(".chip .hint");
+    expect(hint?.textContent).toContain("?");
+    expect(hint?.querySelector("title")?.textContent).toBe("declare `sends` to see links");
+  });
+
+  test("the chip reserves room for the hint and is labelled for keyboard users", () => {
+    const chipWidth = (sends: string[] | null) =>
+      Number(render(sends).querySelector(".chip rect")?.getAttribute("width"));
+    expect(chipWidth(null)).toBeGreaterThan(chipWidth(["go"]));
+    expect(render(null).querySelector(".chip")?.getAttribute("aria-label")).toContain(
+      "declare sends",
+    );
+  });
+
+  test("declared sends, including an empty list, show no hint", () => {
+    expect(render(["go"]).querySelector(".chip .hint")).toBeNull();
+    expect(render([]).querySelector(".chip .hint")).toBeNull();
+  });
+});

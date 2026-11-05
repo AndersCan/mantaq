@@ -177,6 +177,12 @@
   font-size: 11px;
 }
 
+.viz .chip .hint {
+  font-weight: bold;
+  fill: var(--unknown);
+  cursor: help;
+}
+
 .viz .edge.undetermined path {
   stroke: var(--unknown);
   stroke-dasharray: 6 4;

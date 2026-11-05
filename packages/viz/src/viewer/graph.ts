@@ -79,11 +79,22 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
         "data-effect": effect.name,
         "data-state": placed.state.id,
         tabindex: 0,
-        "aria-label": `effect ${effect.name}`,
+        "aria-label":
+          effect.sends === null
+            ? `effect ${effect.name} (declare sends to see links)`
+            : `effect ${effect.name}`,
       },
       [
         svg(doc, "rect", { x: placed.x - width / 2, y, width, height: 16, rx: 8 }),
         svg(doc, "text", { x: placed.x, y: y + 12, "text-anchor": "middle" }, [effect.name]),
+        effect.sends === null
+          ? svg(
+              doc,
+              "text",
+              { class: "hint", x: placed.x + width / 2 - 8, y: y + 12, "text-anchor": "middle" },
+              ["?", svg(doc, "title", {}, ["declare `sends` to see links"])],
+            )
+          : null,
       ],
     );
   });
