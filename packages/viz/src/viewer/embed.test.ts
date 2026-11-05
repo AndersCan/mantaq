@@ -224,18 +224,42 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector(".graph g[data-node-id='done']")?.classList).toContain("current");
   });
 
-  test("context is collapsible and stays folded across steps", () => {
+  test("context is collapsible and stays folded across redraws", () => {
     const root = mountLive();
     const fold = () => root.querySelector<HTMLDetailsElement>("[data-live-context]");
-    send(root, "go");
+    send(root, "peek");
+    const before = fold();
+    expect(before?.open).toBe(true);
+    if (before) {
+      before.open = false;
+      before.dispatchEvent(new Event("toggle"));
+    }
+    send(root, "peek");
+    const after = fold();
+    expect(after).not.toBe(before);
+    expect(after?.open).toBe(false);
+    if (after) {
+      after.open = true;
+      after.dispatchEvent(new Event("toggle"));
+    }
+    send(root, "peek");
     expect(fold()?.open).toBe(true);
-    const details = fold();
+  });
+
+  test("folding one viewer's context leaves another viewer open", () => {
+    const first = mountLive();
+    const second = mountLive();
+    send(first, "peek");
+    send(second, "peek");
+    const details = first.querySelector<HTMLDetailsElement>("[data-live-context]");
     if (details) {
       details.open = false;
       details.dispatchEvent(new Event("toggle"));
     }
-    send(root, "go");
-    expect(fold()?.open).toBe(false);
+    send(first, "peek");
+    send(second, "peek");
+    expect(first.querySelector<HTMLDetailsElement>("[data-live-context]")?.open).toBe(false);
+    expect(second.querySelector<HTMLDetailsElement>("[data-live-context]")?.open).toBe(true);
   });
 
   test("stay and ignored outcomes keep the cursor", () => {
