@@ -84,6 +84,14 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
       [
         svg(doc, "rect", { x: placed.x - width / 2, y, width, height: 16, rx: 8 }),
         svg(doc, "text", { x: placed.x, y: y + 12, "text-anchor": "middle" }, [effect.name]),
+        effect.sends === null
+          ? svg(
+              doc,
+              "text",
+              { class: "hint", x: placed.x + width / 2 - 8, y: y + 12, "text-anchor": "middle" },
+              ["?", svg(doc, "title", {}, ["declare `sends` to see links"])],
+            )
+          : null,
       ],
     );
   });
