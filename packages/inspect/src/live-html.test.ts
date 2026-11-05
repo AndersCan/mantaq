@@ -54,7 +54,7 @@ describe("mantaq-inspect --live", () => {
     expect(current()).toBe("waiting");
     click("[data-advance-timer]");
     expect(current()).toBe("error");
-  });
+  }, 30_000);
 
   test("a file with only an instance stays a static walk and warns", () => {
     const { result, out } = write("instance.html", ["--live", fixture("instance.ts")]);

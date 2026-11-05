@@ -103,6 +103,7 @@ function driven(
           fuzz(run[1], {
             seed: settings?.seed ?? DEFAULT_SEED,
             iterations: settings?.iterations ?? DEFAULT_ITERATIONS,
+            ...(target.tests === undefined ? {} : { initial: target.tests }),
             ...guidance(structure),
           }),
         );
