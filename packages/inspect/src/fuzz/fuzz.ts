@@ -18,6 +18,8 @@ export interface FuzzOptions {
    * the run in the corpus as a stepping stone even without new coverage.
    */
   guide?: (trace: Trace) => boolean;
+  /** Known-good sequences (e.g. example tests) the corpus starts from, before any mutation. */
+  initial?: ReadonlyArray<ReadonlyArray<VizStep>>;
 }
 
 export interface CorpusEntry {
@@ -110,6 +112,7 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   }
 
   consider([], 0);
+  for (const steps of options.initial ?? []) consider([...steps], 0);
   for (let iteration = 1; iteration <= options.iterations; iteration += 1) {
     const at = context.rng.int(corpus.length);
     const parent = { steps: corpus[at]?.steps ?? [], contextSteps: contextSteps[at] ?? [] };

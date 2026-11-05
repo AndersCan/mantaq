@@ -211,3 +211,31 @@ describe("loops over context-changing steps", () => {
     expect(events).toEqual(["connect", ...Array.from({ length: 11 }, () => "failed")]);
   });
 });
+
+describe("fuzz initial corpus", () => {
+  const target = exampleTargets()[0];
+  const baseline = target ? (handWrittenBaselines()[target.id] ?? []) : [];
+
+  test("initial sequences seed the corpus at iteration 0", () => {
+    if (!target) throw new Error("no example targets");
+    const wanted = featuresOfAll(target, baseline);
+    const result = fuzz(target, { seed: DEFAULT_SEED, iterations: 0, initial: baseline });
+    const reached = featuresOfAll(
+      target,
+      result.corpus.map((entry) => entry.steps),
+    );
+    expect([...wanted].filter((feature) => !reached.has(feature))).toEqual([]);
+  });
+
+  test("seeded runs are reproducible per seed", () => {
+    if (!target) throw new Error("no example targets");
+    const run = () => fuzz(target, { seed: 7, iterations: 200, initial: baseline });
+    expect(run().corpus).toEqual(run().corpus);
+  });
+
+  test("no initial sequences matches the unseeded run", () => {
+    if (!target) throw new Error("no example targets");
+    const options = { seed: 7, iterations: 200 };
+    expect(fuzz(target, { ...options, initial: [] }).corpus).toEqual(fuzz(target, options).corpus);
+  });
+});
