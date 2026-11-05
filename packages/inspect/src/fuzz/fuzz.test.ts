@@ -238,4 +238,13 @@ describe("fuzz initial corpus", () => {
     const options = { seed: 7, iterations: 200 };
     expect(fuzz(target, { ...options, initial: [] }).corpus).toEqual(fuzz(target, options).corpus);
   });
+
+  test("seeding with iterations still changes the corpus", () => {
+    if (!target) throw new Error("no example targets");
+    const options = { seed: 7, iterations: 50 };
+    const seeded = fuzz(target, { ...options, initial: baseline });
+    const sequences = (result: typeof seeded) => result.corpus.map((entry) => entry.steps);
+    expect(sequences(seeded)).not.toEqual(sequences(fuzz(target, options)));
+    expect(seeded.corpus.some((entry) => entry.iteration === 0)).toBe(true);
+  });
 });

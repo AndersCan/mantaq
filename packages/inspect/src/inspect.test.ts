@@ -44,6 +44,17 @@ describe("inspect", () => {
     expect(open?.tested).toEqual({ hits: 0 });
   });
 
+  test("example tests seed the fuzz corpus", () => {
+    const knock = [{ kind: "event" as const, event: "knock", payload: null }];
+    const { machine } = inspect({
+      id: "door",
+      create: () => createDoorActor(),
+      fuzz: { iterations: 0 },
+      tests: [knock],
+    });
+    expect(machine.fuzz?.corpus.map((sequence) => sequence.steps)).toContainEqual(knock);
+  });
+
   test("given payloads replace the ones read from types", () => {
     const given = { by: "code", code: "given", tags: [], at: { floor: 7, urgent: true } };
     const { machine } = inspect({
