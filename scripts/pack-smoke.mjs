@@ -79,16 +79,11 @@ try {
   run("npm", ["install", "--no-audit", "--no-fund"], app);
   copyFileSync(join(ROOT, "packages/inspect/src/fixtures/retry.ts"), join(app, "retry.ts"));
 
-  const bin = join(app, "node_modules/.bin/mantaq-inspect");
-  run(bin, ["retry.ts", "--json", "--out", "x.json", "--no-open"], app);
-  const json = JSON.parse(readFileSync(join(app, "x.json"), "utf8"));
-  check(json.schemaVersion === 8 && json.machines.length > 0, "CLI --json writes a v8 document");
-  run(bin, ["retry.ts", "--out", "x.html", "--no-open"], app);
-  const html = readFileSync(join(app, "x.html"), "utf8");
-  check(
-    html.includes("<style>") && html.includes("viz-header") && html.includes("mantaq-viz-document"),
-    "CLI --out writes a styled page",
+  const installed = JSON.parse(
+    readFileSync(join(app, "node_modules/@mantaq/inspect/package.json"), "utf8"),
   );
+  check(!("bin" in installed), "inspect tarball has no bin");
+  check(!("./live-embedded" in installed.exports), "inspect tarball has no live-embedded export");
 
   writeFileSync(
     join(app, "check.mjs"),

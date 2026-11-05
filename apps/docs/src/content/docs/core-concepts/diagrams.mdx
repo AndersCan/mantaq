@@ -49,19 +49,7 @@ keeps the walk in the URL (`?step=`), so a link opens the same path.
 
 ## Draw your own
 
-Point `mantaq-inspect` (from `@mantaq/inspect`) at the file that exports your
-machine, or a function that builds it:
-
-```sh
-mantaq-inspect src/cart.ts
-```
-
-It writes `mantaq-viz.html`, one file that opens without a server. Handler
-explanations and sample payloads come from the file's types. Machines on a
-`VirtualClock` are also fuzzed, which adds coverage and finds edges the
-declarations miss.
-
-On Vite, add the plugin instead and keep the page open while you edit:
+Add the Vite plugin from `@mantaq/inspect` and keep the page open while you edit:
 
 ```ts
 // vite.config.ts
