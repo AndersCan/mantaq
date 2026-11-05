@@ -65,6 +65,28 @@ function regionGroup(doc: Document, placed: PlacedRegion): SVGGElement {
   ]);
 }
 
+function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
+  const top = placed.y - placed.height / 2;
+  const width = placed.width - 16;
+  return placed.state.effects.map((effect, index) => {
+    const y = top + 36 + index * 20 - 8;
+    return svg(
+      doc,
+      "g",
+      {
+        class: "chip",
+        "data-effect": effect.name,
+        "data-state": placed.state.id,
+        "aria-label": `effect ${effect.name}`,
+      },
+      [
+        svg(doc, "rect", { x: placed.x - width / 2, y, width, height: 16, rx: 8 }),
+        svg(doc, "text", { x: placed.x, y: y + 12, "text-anchor": "middle" }, [effect.name]),
+      ],
+    );
+  });
+}
+
 function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallbacks): SVGGElement {
   const { state } = placed;
   const left = placed.x - placed.width / 2;
@@ -95,7 +117,8 @@ function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallback
             class: "frame inner",
           })
         : null,
-      svg(doc, "text", { x: placed.x, y: placed.y + 4, "text-anchor": "middle" }, [state.label]),
+      svg(doc, "text", { x: placed.x, y: top + 22, "text-anchor": "middle" }, [state.label]),
+      ...chipGroups(doc, placed),
     ],
   );
   activatable(group, () => callbacks.select({ kind: "state", id: state.id }));
@@ -146,7 +169,6 @@ function nodeGroup(
 }
 
 function edgeAria(edge: VizEdge, text: string): string {
-  if (edge.kind === "effect") return `${edge.from} ${text} on entry`;
   if (edge.kind === "stay") return `${sourceText(edge.from)} on ${text} stays`;
   return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}`;
 }
@@ -158,14 +180,13 @@ function edgeGroup(
 ): SVGGElement {
   const { edge } = placed;
   const internal = context.machine.events.find((event) => event.id === edge.event)?.internal;
-  const text = edgeText(edge, context.machine);
+  const text = edgeText(edge);
   const group = svg(
     doc,
     "g",
     {
       class: classes({
         edge: true,
-        effect: edge.kind === "effect",
         stay: edge.kind === "stay",
         fuzz: edge.origin === "fuzz",
         undetermined: edge.to === null,

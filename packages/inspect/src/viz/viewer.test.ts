@@ -61,7 +61,9 @@ describe("viewer: checkout", () => {
     const root = mount(viz);
     const machine = viz.machines[0];
     expect(root.querySelectorAll(".state").length).toBe(machine?.states.length);
-    const drawn = machine?.edges.filter((edge) => edge.kind !== "initial").length;
+    const drawn = machine?.edges.filter(
+      (edge) => edge.kind !== "initial" && edge.kind !== "effect",
+    ).length;
     expect(root.querySelectorAll(".edge").length).toBe(drawn);
     expect(root.querySelectorAll(".entry").length).toBe(1);
   });
@@ -104,7 +106,8 @@ describe("viewer: checkout", () => {
     const internal = [...root.querySelectorAll(".edge.internal")].map((edge) => edge.textContent);
     expect(internal).toContain("paymentOk");
     expect(internal).not.toContain("back");
-    expect(root.querySelector(".edge.effect")?.textContent).toBe("runs chargeCard");
+    expect(root.querySelector(".edge.effect")).toBeNull();
+    expect(root.querySelector('.state [data-effect="chargeCard"]')?.textContent).toBe("chargeCard");
   });
 
   test("clicking an edge shows source, event, target and 'not analyzed'", () => {
@@ -445,8 +448,8 @@ describe("viewer: explore", () => {
     );
     expect(groupEvents(root, "effect")).toEqual(["paymentFail", "paymentOk", "paymentTimeout"]);
     expect(groupEvents(root, "input")).toEqual([]);
-    const running = root.querySelector(".graph .edge.effect.running");
-    expect(running?.getAttribute("data-from")).toBe("submitting");
+    const running = root.querySelector(".graph .chip.running");
+    expect(running?.getAttribute("data-state")).toBe("submitting");
   });
 
   test("a timeout leads to error, and back retries payment", () => {

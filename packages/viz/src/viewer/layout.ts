@@ -64,6 +64,7 @@ export interface MachineLayout {
 
 const CHAR_WIDTH = 7;
 const NODE_HEIGHT = 36;
+const CHIP_ROW_HEIGHT = 20;
 const LABEL_HEIGHT = 16;
 const UNKNOWN_SIZE = 28;
 const ANY_LABEL = "any state";
@@ -81,7 +82,12 @@ function regionNodeId(region: string): string {
 }
 
 function stateWidth(state: VizState): number {
-  return Math.max(80, state.label.length * CHAR_WIDTH + 24);
+  const chips = state.effects.map((effect) => effect.name.length * CHAR_WIDTH + 24);
+  return Math.max(80, state.label.length * CHAR_WIDTH + 24, ...chips);
+}
+
+function stateHeight(state: VizState): number {
+  return NODE_HEIGHT + state.effects.length * CHIP_ROW_HEIGHT;
 }
 
 function parentRegion(region: string): string | null {
@@ -103,7 +109,7 @@ function addRegions(graph: LayoutGraph, regions: ReadonlyArray<string>): void {
 
 function addStates(graph: LayoutGraph, machine: VizMachine): void {
   for (const state of machine.states) {
-    graph.setNode(state.id, { width: stateWidth(state), height: NODE_HEIGHT });
+    graph.setNode(state.id, { width: stateWidth(state), height: stateHeight(state) });
     if (state.region !== null) graph.setParent(state.id, regionNodeId(state.region));
   }
 }
@@ -120,7 +126,7 @@ function addAnyNodes(graph: LayoutGraph, machine: VizMachine): void {
 
 function addEdges(graph: LayoutGraph, machine: VizMachine): void {
   for (const edge of machine.edges) {
-    if (edge.kind === "initial" || edge.to === edge.from) continue;
+    if (edge.kind === "initial" || edge.kind === "effect" || edge.to === edge.from) continue;
     const target = edge.to ?? unknownNodeId(edge);
     if (edge.to === null) {
       graph.setNode(target, { width: UNKNOWN_SIZE, height: UNKNOWN_SIZE });
@@ -128,7 +134,7 @@ function addEdges(graph: LayoutGraph, machine: VizMachine): void {
       if (region !== null) graph.setParent(target, regionNodeId(region));
     }
     const label: EdgeLabel = {
-      width: edgeText(edge, machine).length * CHAR_WIDTH + 8,
+      width: edgeText(edge).length * CHAR_WIDTH + 8,
       height: LABEL_HEIGHT,
       labelpos: "c",
     };
@@ -151,7 +157,7 @@ function placeNodes(
     ...box(graph.node(state.id)),
   }));
   const unknowns: PlacedUnknown[] = machine.edges
-    .filter((edge) => edge.kind !== "initial" && edge.to === null)
+    .filter((edge) => edge.kind !== "initial" && edge.kind !== "effect" && edge.to === null)
     .map((edge) => ({
       kind: "unknown",
       id: unknownNodeId(edge),
@@ -188,7 +194,7 @@ function selfLoop(node: NodeLabel, nth: number): { path: string; label: Point } 
 function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
   const loopsSeen = new Map<string, number>();
   return machine.edges
-    .filter((edge) => edge.kind !== "initial")
+    .filter((edge) => edge.kind !== "initial" && edge.kind !== "effect")
     .map((edge) => {
       if (edge.to === edge.from) {
         const nth = loopsSeen.get(edge.from) ?? 0;

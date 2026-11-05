@@ -487,10 +487,9 @@ export function markExplore(
     const id = element.dataset["edgeId"] ?? "";
     element.classList.toggle("taken", taken.has(id));
     element.classList.toggle("next", next.has(id));
-    element.classList.toggle(
-      "running",
-      element.classList.contains("effect") && element.dataset["from"] === current,
-    );
+  }
+  for (const element of root.querySelectorAll<SVGGElement>(".graph g.chip")) {
+    element.classList.toggle("running", element.dataset["state"] === current);
   }
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
     const id = element.dataset["nodeId"];

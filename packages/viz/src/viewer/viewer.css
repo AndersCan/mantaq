@@ -167,8 +167,14 @@
   font-style: italic;
 }
 
-.viz .edge.effect {
-  opacity: 0.45;
+.viz .chip rect {
+  fill: var(--accent);
+  fill-opacity: 0.12;
+  stroke: var(--accent);
+}
+
+.viz .chip text {
+  font-size: 11px;
 }
 
 .viz .edge.undetermined path {
@@ -316,8 +322,8 @@
   font-weight: 700;
 }
 
-.viz .edge.effect.running {
-  opacity: 1;
+.viz .chip.running rect {
+  fill-opacity: 0.35;
 }
 
 .viz .running path {
