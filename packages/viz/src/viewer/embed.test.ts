@@ -99,6 +99,27 @@ describe("mountVizText", () => {
     ).toBeNull();
   });
 
+  test("internal and stay edges carry a dot gap variable and never an inline dasharray", () => {
+    const machine: VizMachine = {
+      ...door,
+      events: [{ id: "go", internal: true, doc: null, payloadType: null }],
+      edges: [
+        edge("__initial__", "", "open"),
+        edge("open", "go", "done"),
+        { ...edge("open", "stay", "open"), kind: "stay" },
+      ],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    const paths = root.querySelectorAll<SVGPathElement>(".graph g.edge path");
+    expect(paths.length).toBe(2);
+    for (const path of paths) {
+      expect(path.getAttribute("style")).toMatch(/^--viz-dot-gap: \d+(\.\d)?$/);
+      expect(path.getAttribute("style")).not.toContain("stroke-dasharray");
+    }
+    const plain = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
+  });
+
   test("draws a valid document and walks it to Done", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelectorAll(".graph g[data-node-id]")).toHaveLength(2);

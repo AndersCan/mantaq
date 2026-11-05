@@ -212,7 +212,14 @@ function edgeGroup(
       "aria-label": edgeAria(edge, text),
     },
     [
-      svg(doc, "path", { d: placed.path, "marker-end": "url(#viz-arrow)" }),
+      svg(doc, "path", {
+        d: placed.path,
+        "marker-end": "url(#viz-arrow)",
+        style:
+          internal === true || edge.kind === "stay"
+            ? `--viz-dot-gap: ${placed.dotGap.toFixed(1)}`
+            : null,
+      }),
       svg(doc, "text", { x: placed.label.x, y: placed.label.y + 4, "text-anchor": "middle" }, [
         text,
       ]),

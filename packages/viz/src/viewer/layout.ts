@@ -42,6 +42,8 @@ export interface PlacedEdge {
   /** SVG path data. */
   path: string;
   label: Point;
+  /** Gap between the dots of a dotted edge: grows with the edge so dots never merge into a line. */
+  dotGap: number;
 }
 
 export interface PlacedRegion {
@@ -67,6 +69,12 @@ const NODE_HEIGHT = 36;
 const CHIP_ROW_HEIGHT = 20;
 const LABEL_HEIGHT = 16;
 const UNKNOWN_SIZE = 28;
+/** Shortest drawn edge between two nodes, and the closest two nodes may sit. */
+export const MIN_EDGE_LENGTH = 72;
+export const NODE_SEPARATION = 36;
+const MIN_DOT_GAP = 3;
+const MAX_DOT_GAP = 12;
+const DOT_GAP_PER_LENGTH = 1 / 24;
 const ANY_LABEL = "any state";
 
 function anyIds(machine: VizMachine): string[] {
@@ -195,6 +203,21 @@ function selfLoop(node: NodeLabel, nth: number): { path: string; label: Point } 
   return { path, label: { x, y: top - rise * 0.75 - 4 } };
 }
 
+export function pathLength(points: ReadonlyArray<Point>): number {
+  let total = 0;
+  for (let index = 1; index < points.length; index++) {
+    const from = points[index - 1];
+    const to = points[index];
+    if (from === undefined || to === undefined) continue;
+    total += Math.hypot(to.x - from.x, to.y - from.y);
+  }
+  return total;
+}
+
+export function dotGapFor(length: number): number {
+  return Math.min(MAX_DOT_GAP, Math.max(MIN_DOT_GAP, length * DOT_GAP_PER_LENGTH));
+}
+
 function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
   const loopsSeen = new Map<string, number>();
   return machine.edges
@@ -203,7 +226,12 @@ function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
       if (edge.to === edge.from) {
         const nth = loopsSeen.get(edge.from) ?? 0;
         loopsSeen.set(edge.from, nth + 1);
-        return { edge, target: edge.from, ...selfLoop(graph.node(edge.from), nth) };
+        return {
+          edge,
+          target: edge.from,
+          dotGap: dotGapFor(MIN_EDGE_LENGTH),
+          ...selfLoop(graph.node(edge.from), nth),
+        };
       }
       const target = edge.to ?? unknownNodeId(edge);
       const label = graph.edge(edge.from, target, edge.id);
@@ -212,6 +240,7 @@ function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
         target,
         path: polyline(label.points ?? []),
         label: { x: label.x ?? 0, y: label.y ?? 0 },
+        dotGap: dotGapFor(pathLength(label.points ?? [])),
       };
     });
 }
@@ -234,8 +263,8 @@ export function layoutMachine(machine: VizMachine): MachineLayout {
   });
   graph.setGraph({
     rankdir: "LR",
-    nodesep: 28,
-    ranksep: 64,
+    nodesep: NODE_SEPARATION,
+    ranksep: MIN_EDGE_LENGTH,
     edgesep: 14,
     marginx: 48,
     // Room above the top rank for hand-drawn self-loops.
