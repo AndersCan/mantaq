@@ -53,6 +53,7 @@ export default defineConfig({
             { label: "Test Harness", slug: "guides/testing-guide" },
             { label: "Machines in an app", slug: "guides/machines-in-an-app" },
             { label: "Visualizer", slug: "guides/visualizer" },
+            { label: "Design gate", slug: "guides/design-gate" },
           ],
         },
         {
