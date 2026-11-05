@@ -4,7 +4,7 @@ Turns your Mantaq machine into a picture you can walk: add the Vite plugin, no o
 
 It finds every exported actor, or function that builds one, from the file's types. It reads handler explanations and sample payloads from the source, fuzzes each machine that runs on a `VirtualClock`, and shows them in a live page on your Vite dev server. The viewer is [`@mantaq/viz`](../viz/README.md).
 
-## Two ways in
+## Ways in
 
 **Gate in tests**: see the docs page "Design gate in vitest" for `expectNoDesignErrors`, `expectReached` and `expectAllStatesReached`.
 
@@ -39,14 +39,14 @@ const { machine, warnings } = inspect({
 const json = serializeViz(vizDocument([machine]));
 ```
 
-`inspectFile(file)` / `inspectModule(file, { load })` do the discovery the CLI does. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
+`inspectFile(file)` / `inspectModule(file, { load })` do the discovery the Vite plugin does. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
 
 ## What it needs from your file
 
 - **Exports.** An actor, or a function that returns one (or `{ actor }`). Functions are called with no arguments, with a `VirtualClock` when the first parameter is a clock, or with `{ clock }` when it is an options object with a `clock`. Functions with other required parameters are skipped. Discovery reads types only; nothing is called to find out.
 - **A fresh actor per call**, to fuzz. A file that only exports one actor instance is drawn, not fuzzed. When a file has factories, its actor instances are skipped.
 - **Exported factories.** Export a factory that takes ports and a clock, not only a built instance. See [Machines in an application](https://anderscan.github.io/mantaq/guides/machines-in-an-app/).
-- **A factory, for `--live`.** The live page recreates the actor on every step, so it needs an exported factory; a file that only exports an instance stays a static walk, with the usual warning.
+- **A factory, for the live page.** The page recreates the actor on every step, so it needs an exported factory; a file that only exports an instance stays a static walk, with the usual warning.
 - **A `VirtualClock`**, to fuzz. An actor on the real clock is drawn, with a warning.
 
 Every part that cannot run is skipped with a warning, never guessed.
