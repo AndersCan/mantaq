@@ -1,3 +1,5 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import { join } from "node:path";
@@ -45,12 +47,12 @@ describe("normalizeRun", () => {
 
 describe("readRuns", () => {
   test("merges the sidecars of a directory by machine id", () => {
-    const runs = readRuns(FIXTURES);
+    const { runs } = readRuns(FIXTURES);
     expect(runs["timed"]?.map((run) => run.name)).toEqual(["times out", "waits"]);
   });
 
   test("no __runs__ folder: nothing", () => {
-    expect(readRuns(join(FIXTURES, "nowhere"))).toEqual({});
+    expect(readRuns(join(FIXTURES, "nowhere"))).toEqual({ runs: {}, warnings: [] });
   });
 });
 
@@ -76,5 +78,89 @@ describe("inspectModule with recorded runs", () => {
     const first = await inspectModule(file, options);
     const second = await inspectModule(file, options);
     expect(second.machines).toEqual(first.machines);
+  });
+});
+
+describe("recorded runs that cannot be trusted", () => {
+  const load = (path: string) => import(path);
+
+  test("an unknown event drops the run with a warning", async () => {
+    const sidecar = JSON.stringify({
+      retry: [
+        {
+          name: "stale",
+          end: "idle",
+          steps: [{ kind: "event", event: "nonexistent", payload: null }],
+        },
+      ],
+    });
+    const dir = mkdtempSync(join(tmpdir(), "runs-"));
+    mkdirSync(join(dir, "__runs__"));
+    writeFileSync(join(dir, "__runs__", "a.json"), sidecar);
+    writeFileSync(
+      join(dir, "retry.ts"),
+      `export * from ${JSON.stringify(join(FIXTURES, "retry.ts"))};\n`,
+    );
+    const result = await inspectModule(join(dir, "retry.ts"), { load, fuzz: { iterations: 0 } });
+    expect(result.warnings.join("\n")).toContain('run "stale" dropped');
+  });
+
+  test("a negative advance is malformed and warned about", () => {
+    const dir = mkdtempSync(join(tmpdir(), "runs-"));
+    mkdirSync(join(dir, "__runs__"));
+    writeFileSync(
+      join(dir, "__runs__", "a.json"),
+      JSON.stringify({ m: [{ name: "x", end: "idle", steps: [{ kind: "advance", ms: -5 }] }] }),
+    );
+    const { runs, warnings } = readRuns(dir);
+    expect(runs["m"]).toEqual([]);
+    expect(warnings).toEqual(['__runs__/a.json: 1 malformed run(s) for "m" ignored']);
+  });
+
+  test("corrupt JSON is warned about", () => {
+    const dir = mkdtempSync(join(tmpdir(), "runs-"));
+    mkdirSync(join(dir, "__runs__"));
+    writeFileSync(join(dir, "__runs__", "a.json"), "{nope");
+    expect(readRuns(dir).warnings).toEqual(["__runs__/a.json: not a JSON object, ignored"]);
+  });
+
+  test("a run whose end differs is dropped with the replay warning", async () => {
+    const file = join(FIXTURES, "timed.ts");
+    const dir = mkdtempSync(join(tmpdir(), "runs-"));
+    mkdirSync(join(dir, "__runs__"));
+    writeFileSync(
+      join(dir, "__runs__", "a.json"),
+      JSON.stringify({ timed: [{ name: "wrong", end: "error", steps: [start] }] }),
+    );
+    writeFileSync(join(dir, "timed.ts"), `export * from ${JSON.stringify(file)};\n`);
+    const result = await inspectModule(join(dir, "timed.ts"), { load, fuzz: { iterations: 0 } });
+    expect(result.warnings).toContain(
+      'timed: run "wrong" dropped: replays to waiting, the test ended in error',
+    );
+  });
+
+  test("an instance export is left untouched and its runs are not shown", async () => {
+    const file = join(FIXTURES, "instance.ts");
+    const dir = mkdtempSync(join(tmpdir(), "runs-"));
+    mkdirSync(join(dir, "__runs__"));
+    writeFileSync(
+      join(dir, "__runs__", "a.json"),
+      JSON.stringify({
+        retry: [
+          {
+            name: "c",
+            end: "connecting",
+            steps: [{ kind: "event", event: "connect", payload: null }],
+          },
+        ],
+      }),
+    );
+    writeFileSync(join(dir, "instance.ts"), `export * from ${JSON.stringify(file)};\n`);
+    const exported = await import(file);
+    const before = exported.retry.state.name;
+    const result = await inspectModule(join(dir, "instance.ts"), { load });
+    expect(exported.retry.state.name).toBe(before);
+    expect(result.machines[0]?.runs ?? []).toEqual([]);
+    expect(result.warnings.join("\n")).toContain("retry: runs not shown");
   });
 });

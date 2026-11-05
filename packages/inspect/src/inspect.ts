@@ -259,7 +259,7 @@ export async function inspectModule(
     return { machines: [], warnings: [`${file}: no exported actor or actor factory found`] };
   }
   const exports = await options.load(file);
-  const recorded = readRuns(dirname(file));
+  const { runs: recorded, warnings: runWarnings } = readRuns(dirname(file));
   const results = chosen.map((each) => {
     const id = machineId(each.name);
     const create = actorFactory(each, exports[each.name]);
@@ -267,7 +267,16 @@ export async function inspectModule(
       return { machine: null, warnings: [`${id}: ${each.name} did not return an actor`] };
     const fuzzSettings: false | FuzzSettings =
       each.call === "instance" ? false : (options.fuzz ?? {});
-    const replayed = replayedRuns(id, create, recorded);
+    const replayed =
+      each.call === "instance"
+        ? {
+            runs: [],
+            warnings:
+              (recorded[id] ?? []).length === 0
+                ? []
+                : ["runs not shown: exported as one actor, so they cannot be replayed safely"],
+          }
+        : replayedRuns(id, create, recorded);
     const inspected = inspectWith(
       {
         id,
@@ -289,7 +298,10 @@ export async function inspectModule(
   });
   return {
     machines: results.flatMap((result) => (result.machine === null ? [] : [result.machine])),
-    warnings: results.flatMap((result) => result.warnings),
+    warnings: [
+      ...runWarnings.map((warning) => `${file}: ${warning}`),
+      ...results.flatMap((result) => result.warnings),
+    ],
   };
 }
 

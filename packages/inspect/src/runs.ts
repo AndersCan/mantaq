@@ -1,7 +1,7 @@
 import type { VizJson, VizRun, VizStep } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { applyStep, eventCatalog } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
@@ -35,6 +35,12 @@ export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<strin
   const internal = new Set(eventCatalog(actor).internal);
   let produced: string[] = [];
   actor.on("transition", { fn: ({ event }) => void produced.push(event.type) });
+  const known = new Set([...eventCatalog(actor).inputs, ...internal]);
+  const unknown = run.steps.find((step) => step.kind === "event" && !known.has(step.event));
+  if (unknown?.kind === "event") {
+    actor.dispose();
+    return Either.left(`unknown event "${unknown.event}"`);
+  }
   const kept: VizStep[] = [];
   for (const step of run.steps) {
     if (step.kind === "event" && internal.has(step.event) && dropOne(produced, step.event))
@@ -61,7 +67,7 @@ function isJson(value: unknown): value is VizJson {
 
 function isStep(value: unknown): value is VizStep {
   if (!isRecord(value)) return false;
-  if (value["kind"] === "advance") return typeof value["ms"] === "number";
+  if (value["kind"] === "advance") return typeof value["ms"] === "number" && value["ms"] >= 0;
   return (
     value["kind"] === "event" && typeof value["event"] === "string" && isJson(value["payload"])
   );
@@ -77,29 +83,42 @@ function isRecorded(value: unknown): value is RecordedRun {
   );
 }
 
-function readFile(file: string): RecordedRuns {
+function readFile(file: string): { runs: RecordedRuns; warnings: string[] } {
+  const name = basename(file);
   const text = Either.from(() => JSON.parse(readFileSync(file, "utf8")));
-  if (Either.isLeft(text) || !isRecord(text[1])) return {};
-  return Object.fromEntries(
-    Object.entries(text[1]).map(([id, runs]) => [
-      id,
-      Array.isArray(runs) ? runs.filter(isRecorded) : [],
-    ]),
-  );
+  if (Either.isLeft(text) || !isRecord(text[1])) {
+    return { runs: {}, warnings: [`${RUNS_DIR}/${name}: not a JSON object, ignored`] };
+  }
+  const entries = Object.entries(text[1]).map(([id, runs]) => {
+    const list: unknown[] = Array.isArray(runs) ? runs : [];
+    const valid = list.filter(isRecorded);
+    const bad = Array.isArray(runs) ? list.length - valid.length : 1;
+    return { id, valid, bad };
+  });
+  return {
+    runs: Object.fromEntries(entries.map(({ id, valid }) => [id, valid])),
+    warnings: entries
+      .filter(({ bad }) => bad > 0)
+      .map(({ id, bad }) => `${RUNS_DIR}/${name}: ${bad} malformed run(s) for "${id}" ignored`),
+  };
 }
 
 /**
  * Every run recorded for the test files in `dir`: the `__runs__/*.json` files
- * next to them, merged by machine id in file-name order.
+ * next to them, merged by machine id in file-name order, and a warning for
+ * each file or run that could not be read.
  */
-export function readRuns(dir: string): RecordedRuns {
+export function readRuns(dir: string): { runs: RecordedRuns; warnings: string[] } {
   const listing = Either.from(() => readdirSync(join(dir, RUNS_DIR)).sort());
-  if (Either.isLeft(listing)) return {};
+  if (Either.isLeft(listing)) return { runs: {}, warnings: [] };
   const merged: RecordedRuns = {};
+  const warnings: string[] = [];
   for (const name of listing[1].filter((each) => each.endsWith(".json"))) {
-    for (const [id, runs] of Object.entries(readFile(join(dir, RUNS_DIR, name)))) {
+    const read = readFile(join(dir, RUNS_DIR, name));
+    warnings.push(...read.warnings);
+    for (const [id, runs] of Object.entries(read.runs)) {
       merged[id] = [...(merged[id] ?? []), ...runs];
     }
   }
-  return merged;
+  return { runs: merged, warnings };
 }
