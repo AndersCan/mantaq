@@ -148,7 +148,7 @@
 }
 
 .viz .edge.internal path {
-  stroke-dasharray: 1 3;
+  stroke-dasharray: 1 var(--viz-dot-gap, 3);
   stroke-linecap: round;
 }
 
@@ -186,7 +186,7 @@
 }
 
 .viz .edge.stay path {
-  stroke-dasharray: 1 3;
+  stroke-dasharray: 1 var(--viz-dot-gap, 3);
   stroke-linecap: round;
 }
 
