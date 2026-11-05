@@ -19,7 +19,7 @@ import { analyzeModule } from "./ast/annotate.ts";
 import type { MachineExport } from "./ast/discover.ts";
 import { entryId, inspectEntry, inspectFile, runOf } from "./load.ts";
 import { Either } from "@mantaq/utils";
-import { globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { searchForWorkspaceRoot } from "vite";
@@ -122,17 +122,32 @@ function siteBuild(context: {
   project: { configFile: string | undefined };
   root: () => string;
 }): Plugin {
+  let standalone = false;
   return {
     name: "mantaq-viz-build",
     apply: "build",
-    config: () => ({
-      build: { rollupOptions: { input: { "mantaq-live": context.live } } },
-    }),
+    // Never replace the app's own entry: only stand in as the input when the
+    // project has none (no `input` and no root index.html).
+    config: (config) => {
+      const input = config.build?.rollupOptions?.input;
+      const root = resolve(config.root ?? process.cwd());
+      standalone = input === undefined && !existsSync(resolve(root, "index.html"));
+      return standalone
+        ? { build: { rollupOptions: { input: { "mantaq-live": context.live } } } }
+        : {};
+    },
+    buildStart() {
+      if (!standalone) this.emitFile({ type: "chunk", id: context.live, name: "mantaq-live" });
+    },
     async generateBundle(_options, bundle) {
       const results = [];
       for (const file of machineFiles(context.root(), context.patterns)) {
         const load = { config: context.project.configFile };
-        results.push(await inspectFile(file, { fuzz: context.fuzz }, load));
+        try {
+          results.push(await inspectFile(file, { fuzz: context.fuzz }, load));
+        } catch (error) {
+          this.warn(`[mantaq-viz] ${file}: could not inspect (${String(error)})`);
+        }
       }
       for (const warning of results.flatMap((result) => result.warnings)) {
         this.warn(`[mantaq-viz] ${warning}`);
