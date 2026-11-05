@@ -74,6 +74,7 @@ function driver(): VizDriver & { log: VizStep[][] } {
     let context: VizLiveState["context"] = null;
     for (const step of steps) {
       if (step.kind === "advance") now += step.ms;
+      else if (step.event === "nope") throw new Error("unknown event nope");
       else if (step.event === "submit" && current === "idle") {
         current = "paying";
         deadline = now + 800;
@@ -229,6 +230,8 @@ describe("runs", () => {
     runs: [
       { name: "pays and times out", steps: [submit, { kind: "advance", ms: 800 }] },
       { name: "submits", steps: [submit] },
+      { name: "empty", steps: [] },
+      { name: "breaks", steps: [{ kind: "event", event: "nope", payload: null }, submit] },
     ],
   };
 
@@ -245,7 +248,7 @@ describe("runs", () => {
   test("lists each run by name", () => {
     const root = mountRuns();
     const names = [...root.querySelectorAll("[data-run]")].map((each) => each.textContent);
-    expect(names).toEqual(["pays and times out", "submits"]);
+    expect(names).toEqual(["pays and times out", "submits", "empty", "breaks"]);
   });
 
   test("clicking a run replays it from a fresh actor and updates the URL steps", () => {
@@ -258,6 +261,20 @@ describe("runs", () => {
     click(root, '[data-run="submits"]');
     expect(current(root)).toBe("paying");
     expect(seen.at(-1)).toEqual(['submit={"amount":5}']);
+  });
+
+  test("a run with no steps resets to the initial state", () => {
+    const root = mountRuns();
+    click(root, '[data-send="submit"]');
+    click(root, '[data-run="empty"]');
+    expect(current(root)).toBe("idle");
+  });
+
+  test("a run stops at the first step that errors", () => {
+    const root = mountRuns();
+    click(root, '[data-run="breaks"]');
+    expect(current(root)).toBe("idle");
+    expect(root.textContent).toContain("unknown event nope");
   });
 
   test("a machine without runs shows no Runs section", () => {
