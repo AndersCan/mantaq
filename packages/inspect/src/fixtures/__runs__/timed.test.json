@@ -1,18 +1,35 @@
 {
   "timed": [
     {
-      "end": "error",
       "name": "times out",
+      "end": "error",
       "steps": [
-        { "event": "start", "kind": "event", "payload": null },
-        { "kind": "advance", "ms": 800 },
-        { "event": "expired", "kind": "event", "payload": null }
+        {
+          "kind": "event",
+          "event": "start",
+          "payload": {}
+        },
+        {
+          "kind": "advance",
+          "ms": 800
+        },
+        {
+          "kind": "event",
+          "event": "expired",
+          "payload": {}
+        }
       ]
     },
     {
-      "end": "waiting",
       "name": "waits",
-      "steps": [{ "event": "start", "kind": "event", "payload": null }]
+      "end": "waiting",
+      "steps": [
+        {
+          "kind": "event",
+          "event": "start",
+          "payload": {}
+        }
+      ]
     }
   ]
 }

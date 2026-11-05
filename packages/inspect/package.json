@@ -16,6 +16,7 @@
     ".": "./src/index.ts",
     "./drive": "./src/drive.ts",
     "./live-entry": "./src/live-entry.ts",
+    "./record": "./src/record.ts",
     "./vite": "./src/vite.ts",
     "./package.json": "./package.json"
   },
@@ -24,6 +25,7 @@
       ".": "./dist/index.mjs",
       "./drive": "./dist/drive.mjs",
       "./live-entry": "./dist/live-entry.mjs",
+      "./record": "./dist/record.mjs",
       "./vite": "./dist/vite.mjs",
       "./package.json": "./package.json"
     },
@@ -53,9 +55,19 @@
     "@typescript/native-preview": "catalog:",
     "happy-dom": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
-    "vite": "*"
+    "vite": "*",
+    "vitest": "*"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "inlinedDependencies": {
+    "vite-plus": "1.4.0"
   }
 }

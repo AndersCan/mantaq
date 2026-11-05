@@ -75,6 +75,18 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 
 **Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See `docs/atlas/phase5-comparison.md`.
 
+## Record runs from your tests
+
+In a vitest file, wrap the factory once and your tests become runs:
+
+```ts
+import { recordRuns } from "@mantaq/inspect/record";
+
+const make = recordRuns(createInviteLinkActor);
+```
+
+Every passing test that builds an actor with `make` writes its events and clock moves to `__runs__/<test file>.json` next to the test, keyed by machine id. `inspectModule` and the Vite plugin read those files, so each test shows up in the live page's Runs list and counts as an example run. Run the whole test file to refresh it. With `CI` set, a run that differs from the committed file fails the test, like a stale snapshot. The factory may be called in the test or in `beforeEach`; a retried test is recorded once. Runs with a payload that does not survive JSON (functions, `bigint`, `Map`, class instances) are skipped with a warning. `vitest` is an optional peer dependency.
+
 ## What it cannot show
 
 - **Guards** are not evaluated. A declared edge says "the handler may return this", not "some input reaches it". Fuzz coverage and the AST's branch conditions are the evidence; neither is proof.

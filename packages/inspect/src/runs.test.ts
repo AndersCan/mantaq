@@ -20,8 +20,8 @@ const timed: FuzzTarget = {
   },
 };
 
-const start = { kind: "event" as const, event: "start", payload: null };
-const expired = { kind: "event" as const, event: "expired", payload: null };
+const start = { kind: "event" as const, event: "start", payload: {} };
+const expired = { kind: "event" as const, event: "expired", payload: {} };
 const advance = { kind: "advance" as const, ms: 800 };
 
 describe("normalizeRun", () => {
