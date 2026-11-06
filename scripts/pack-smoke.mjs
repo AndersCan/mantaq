@@ -10,7 +10,15 @@
  * nested `vp pack` that `prepack` starts).
  */
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -71,6 +79,7 @@ try {
       dependencies: {
         "@mantaq/inspect": `file:${files.inspect}`,
         "@mantaq/sugar": `file:${files.sugar}`,
+        astro: "^7.2.0",
         vite: "latest",
       },
       overrides,
@@ -125,6 +134,32 @@ console.log(JSON.stringify({ results, page, entryStatus, schemaVersion: doc.sche
   );
   check(out.entryStatus === 200, "plugin page serves the live entry");
   check(out.schemaVersion === 9, "plugin serves a v9 document");
+
+  const site = join(app, "site");
+  mkdirSync(join(site, "src", "pages"), { recursive: true });
+  copyFileSync(join(app, "retry.ts"), join(site, "retry.ts"));
+  writeFileSync(
+    join(site, "astro.config.mjs"),
+    `import { defineConfig } from "astro/config";
+import { mantaqViz } from "@mantaq/inspect/astro";
+export default defineConfig({ integrations: [mantaqViz({ machines: ["retry.ts"], fuzz: false })] });
+`,
+  );
+  writeFileSync(
+    join(site, "src/pages/index.astro"),
+    `---
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+---
+<html><body><Machine src="retry.ts" /></body></html>
+`,
+  );
+  run(join(app, "node_modules/.bin/astro"), ["build", "--root", site], app);
+  const html = readFileSync(join(site, "dist/index.html"), "utf8");
+  check(html.includes("mantaq-machine"), "astro build renders a Machine");
+  check(
+    readdirSync(join(site, "dist/_astro")).some((file) => file.endsWith(".js")),
+    "astro build emits the viewer script",
+  );
 } catch (error) {
   fail(String(error));
 } finally {

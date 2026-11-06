@@ -20,18 +20,31 @@ function only(viz: VizDocument, machine: string | null): VizDocument {
   return { ...viz, machines: chosen === undefined ? [] : [chosen] };
 }
 
+/** The walk in the address bar, only when it names a machine of this document. */
+function ownWalk(viz: VizDocument): ReturnType<typeof linkOptions> {
+  const linked = linkOptions();
+  const own =
+    linked.machine === undefined || viz.machines.some((each) => each.id === linked.machine);
+  return own ? linked : { onNavigate: linked.onNavigate };
+}
+
 /** Mount the document at `text`; machines with a target run live, the rest stay static walks. */
 export function mountDriven(
   root: HTMLElement,
-  context: { source: string; text: string; targets: LiveTargets },
+  context: {
+    source: string;
+    text: string;
+    targets: LiveTargets;
+    heading?: "h1" | "h2" | "h3";
+  },
 ): void {
   const parsed = parseViz(context.text);
   if (Either.isLeft(parsed)) {
     showIssues(root, { source: context.source, issues: parsed[0] });
     return;
   }
-  const options = linkOptions();
   const viz = parsed[1];
+  const options = ownWalk(viz);
   const shown = only(viz, options.machine ?? null);
   const id = shown.machines[0]?.id ?? "";
   const target = context.targets[id];
@@ -65,6 +78,7 @@ export function mountDriven(
   root.replaceChildren(...(picker ? [bar] : []), viewer);
   mountViewer(viewer, shown, {
     ...options,
+    ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...(create === undefined ? {} : { driver: createDriver({ id, create }) }),
   });
 }

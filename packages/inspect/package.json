@@ -9,25 +9,32 @@
     "directory": "packages/inspect"
   },
   "files": [
-    "dist"
+    "dist",
+    "src/astro/Machine.astro"
   ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./astro": "./src/astro.ts",
+    "./astro-client": "./src/astro/client.ts",
     "./drive": "./src/drive.ts",
     "./live-entry": "./src/live-entry.ts",
     "./record": "./src/record.ts",
     "./vite": "./src/vite.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./astro/Machine.astro": "./src/astro/Machine.astro"
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
+      "./astro": "./dist/astro.mjs",
+      "./astro-client": "./dist/astro-client.mjs",
       "./drive": "./dist/drive.mjs",
       "./live-entry": "./dist/live-entry.mjs",
       "./record": "./dist/record.mjs",
       "./vite": "./dist/vite.mjs",
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./astro/Machine.astro": "./src/astro/Machine.astro"
     },
     "access": "public"
   },
@@ -53,17 +60,22 @@
     "@mantaq/sugar": "workspace:*",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "catalog:",
+    "astro": "^7.2.0",
     "happy-dom": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "astro": "^7.0.0",
     "vite": "*",
     "vitest": "*"
   },
   "peerDependenciesMeta": {
     "vitest": {
+      "optional": true
+    },
+    "astro": {
       "optional": true
     }
   },
