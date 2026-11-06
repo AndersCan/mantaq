@@ -58,6 +58,23 @@ const json = serializeViz(vizDocument([machine]));
     font-size: var(--sl-text-sm);
   }
 
+  /* Fullscreen has room for the side panel and needs no card chrome. */
+  .viz-embed.viz:fullscreen {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+  }
+
+  .viz-embed.viz:fullscreen .viz-main {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  .viz-embed.viz:fullscreen .panel {
+    border-left: 1px solid var(--sl-color-gray-5);
+    border-top: none;
+    padding: 0 0 0 1rem;
+  }
+
   /* The content column is too narrow for a side panel: stack it under the graph. */
   .viz-embed .viz-main {
     grid-template-columns: minmax(0, 1fr);

@@ -437,3 +437,24 @@
   color: var(--banner-fg);
   font-weight: 600;
 }
+
+.viz .fullscreen-toggle {
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--state-bg);
+  border: 1px solid var(--state-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.viz:fullscreen {
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 16px;
+}
+
+.viz:fullscreen .viz-main {
+  min-height: 0;
+}
