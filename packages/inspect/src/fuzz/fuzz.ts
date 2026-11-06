@@ -1,6 +1,6 @@
 import type { VizFuzzError, VizStep } from "@mantaq/viz";
 import { mutate } from "./mutate.ts";
-import type { LiteralPool, MutationContext } from "./mutate.ts";
+import type { LiteralPool, MutationContext, Parent } from "./mutate.ts";
 import { createRng } from "./rng.ts";
 import { eventCatalog, execute } from "./run.ts";
 import type { FuzzTarget, Trace } from "./run.ts";
@@ -43,16 +43,27 @@ function covers(target: FuzzTarget, steps: ReadonlyArray<VizStep>, wanted: Reado
   return wanted.every((feature) => reached.has(feature));
 }
 
-/** Greedy one-step deletion, last to first, while `wanted` stays covered. Deterministic. */
+/**
+ * Greedy one-step deletion, last to first, while `wanted` stays covered;
+ * passes repeat until one removes nothing, so the result is 1-minimal (one
+ * pass is not: a removal can make an earlier-kept step removable). Deterministic.
+ */
 export function shrink(
   target: FuzzTarget,
   steps: ReadonlyArray<VizStep>,
   wanted: ReadonlyArray<string>,
 ): VizStep[] {
   let current = [...steps];
-  for (let at = current.length - 1; at >= 0; at -= 1) {
-    const candidate = current.filter((_, index) => index !== at);
-    if (covers(target, candidate, wanted)) current = candidate;
+  let removed = true;
+  while (removed) {
+    removed = false;
+    for (let at = current.length - 1; at >= 0; at -= 1) {
+      const candidate = current.filter((_, index) => index !== at);
+      if (covers(target, candidate, wanted)) {
+        current = candidate;
+        removed = true;
+      }
+    }
   }
   return current;
 }
@@ -94,8 +105,8 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   const seen = new Set<string>();
   const firstHit = new Map<string, number>();
   const corpus: CorpusEntry[] = [];
-  /** Parallel to `corpus`: which steps of each entry changed context. */
-  const contextSteps: number[][] = [];
+  /** Parallel to `corpus`: which steps of each entry changed context, and their cycles. */
+  const loops: Array<Pick<Parent, "contextSteps" | "loopStarts">> = [];
 
   function consider(steps: VizStep[], iteration: number): void {
     const trace = execute(target, steps);
@@ -107,7 +118,7 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
     }
     if (discovered.length > 0 || guided) {
       corpus.push({ steps, discovered, iteration });
-      contextSteps.push(trace.contextSteps);
+      loops.push({ contextSteps: trace.contextSteps, loopStarts: trace.loopStarts });
     }
   }
 
@@ -115,7 +126,11 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   for (const steps of options.initial ?? []) consider([...steps], 0);
   for (let iteration = 1; iteration <= options.iterations; iteration += 1) {
     const at = context.rng.int(corpus.length);
-    const parent = { steps: corpus[at]?.steps ?? [], contextSteps: contextSteps[at] ?? [] };
+    const parent = {
+      steps: corpus[at]?.steps ?? [],
+      contextSteps: loops[at]?.contextSteps ?? [],
+      loopStarts: loops[at]?.loopStarts ?? [],
+    };
     consider(mutate(parent, context), iteration);
   }
 

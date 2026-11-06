@@ -1,0 +1,83 @@
+---
+/**
+ * Viz viewer for a docs machine. The viz document is built from the real
+ * actor at docs build time, so the diagram cannot drift from its source file.
+ * Edge explanations come from the AST annotator; seeded fuzzing adds coverage
+ * ("Coverage from: fuzz runs") and any handler errors. In the browser the
+ * same factory runs live behind the viewer: guards are evaluated, events ask
+ * for their payload, and the Context tab shows what each step changed.
+ */
+import { inspect, vizDocument } from "@mantaq/inspect";
+import { serializeViz } from "@mantaq/viz";
+import { resolve } from "node:path";
+import { docsMachines } from "./docs-machines.ts";
+import type { DocsMachineId } from "./docs-machines.ts";
+
+interface Props {
+  id: DocsMachineId;
+}
+
+const { id } = Astro.props;
+const { file, create: fresh } = docsMachines[id];
+const create = () => fresh().actor;
+// Astro runs with the docs app as cwd; the AST annotator needs real paths.
+const docsRoot = process.cwd();
+const { machine } = inspect({
+  id,
+  create,
+  source: { file: resolve(docsRoot, "src/content/docs", file), root: resolve(docsRoot, "../..") },
+  // Seeded, so every docs build draws the same coverage. 2000 iterations miss
+  // the saga's five-step path to `completed` on this seed; 5000 take ~0.3s.
+  fuzz: { seed: 1, iterations: 5000 },
+});
+const json = serializeViz(vizDocument([machine]));
+---
+
+<div class="viz-embed not-content" data-viz={json} data-machine={id}>
+  <noscript>The interactive state diagram needs JavaScript.</noscript>
+</div>
+
+<script>
+  import { mountVizText } from "@mantaq/viz/viewer";
+  import "@mantaq/viz/viewer.css";
+  import { createDriver } from "@mantaq/inspect/drive";
+  import { docsMachines, isDocsMachineId } from "./docs-machines.ts";
+
+  for (const root of document.querySelectorAll<HTMLElement>(".viz-embed")) {
+    const { viz: text, machine: id } = root.dataset;
+    if (text === undefined || id === undefined || !isDocsMachineId(id)) continue;
+    const driver = createDriver({ id, create: docsMachines[id].create });
+    mountVizText(root, { source: `${id} viz`, text }, { driver, heading: "h3" });
+  }
+</script>
+
+<style is:global>
+  /* Follow Starlight's theme toggle instead of the OS color scheme. */
+  .viz-embed.viz {
+    --bg: var(--sl-color-bg);
+    --fg: var(--sl-color-white);
+    --muted: var(--sl-color-gray-3);
+    --line: var(--sl-color-gray-2);
+    --state-bg: var(--sl-color-bg);
+    --state-border: var(--sl-color-gray-2);
+    --region-bg: var(--sl-color-gray-6);
+    --accent: var(--sl-color-accent);
+    --unknown: var(--sl-color-orange);
+    --fuzz: var(--sl-color-green);
+    --banner-bg: var(--sl-color-orange-low);
+    --banner-fg: var(--sl-color-orange-high);
+    color-scheme: inherit;
+    margin-block: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    font-size: var(--sl-text-sm);
+  }
+
+  /* Fullscreen needs no card chrome. */
+  .viz-embed.viz:fullscreen {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+  }
+</style>
