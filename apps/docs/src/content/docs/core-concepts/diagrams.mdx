@@ -3,7 +3,7 @@ title: Diagrams
 description: The state graph drawn from the builder's declared targets.
 ---
 
-import CheckoutViz from "../../../components/CheckoutViz.astro";
+import MachineViz from "../../../components/MachineViz.astro";
 
 ## What
 
@@ -15,7 +15,7 @@ The diagram below is the docs' checkout machine
 ([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)),
 generated when the site is built. It cannot drift from the code.
 
-<CheckoutViz />
+<MachineViz id="checkout" />
 
 ## Reading it
 
@@ -32,20 +32,82 @@ and what it reads and writes in context.
 
 ## Walking it
 
-The diagram starts in the initial state. Pulsing edges are the steps you can
-take next. Click one, click the state it leads to, or use the buttons in the
-panel. The panel groups the next steps:
+The panel runs the real machine in your browser, on a virtual clock. It starts
+in the initial state, and the pulsing edges are the steps you can take next.
+Click one, or use the **Step** tab:
 
-- **Send an input**: what a user or caller can send.
-- **Effect reports back**: the events an effect of this state declares in
-  `sends`. Entering `submitting` runs `chargeCard`, which sends `paymentOk`,
-  `paymentFail` or `paymentTimeout`. Pick one to say how the charge went.
-- **Other internal events**: internal events that no effect of this state
-  declares.
+- **Send**: every event the current state handles, plus the inputs it ignores.
+  An event that carries a payload asks for one first, in a popover on the
+  diagram next to its edge, filled in with a sample from fuzzing. Edit the
+  JSON or pick another sample, then send.
+- **Time**: pending timers. Advance the clock to fire one, or by any number of
+  milliseconds.
 
-Nothing runs: the walk follows the drawn edges, so no network or service is
-needed. **Back**, **Reset** and the path list undo steps. The standalone viewer
-keeps the walk in the URL (`?step=`), so a link opens the same path.
+Because the handlers run, guards are evaluated: you only go where the code
+really goes. The **Context** tab shows the machine's data after each step, with
+the lines the step changed marked. **Path** lists the steps so far; **Back**,
+**Reset** and the path list undo them by replaying from a fresh actor.
+
+Effects in the docs machines are stubs. Entering `submitting` runs
+`chargeCard`, which reports back with `paymentOk`, `paymentFail` or
+`paymentTimeout`: send one to say how the charge went.
+
+## A bigger machine
+
+The checkout is a straight line. The saga orchestrator
+([`saga.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/saga.ts))
+is closer to real work. An order runs through inventory, payment, shipment and
+notification. Each step is an effect that reports back. When a step fails, the
+saga undoes the finished ones in reverse: refund the payment, then release the
+inventory. `CANCEL` is an `onAny` handler, so it works from any state, drawn
+from the dashed `*` box.
+
+<MachineViz id="saga" />
+
+### Coverage from fuzzing
+
+The diagram is built from the `to` lists, so it shows what each handler
+_declares_. The docs build also fuzzes the machine: it sends thousands of
+seeded event sequences to a real actor and records which states and edges they
+actually reach. Pick **Coverage from: fuzz runs** to dim everything no run
+reached.
+
+Here one edge stays dim: `compensatingRefund` → `failed` on `REFUND_DONE`. The
+handler lists both `failed` and `compensatingRelease` in `to`, but it only goes
+to `failed` when no inventory was reserved. A refund only happens after a
+payment, and payment only starts once inventory is reserved, so that branch
+never runs. The declaration is not wrong, only wider than the machine needs.
+Click the edge: the panel says so.
+
+Fuzzing is not proof. A dim edge was not reached, which is not the same as
+impossible. Read the handler before deleting anything.
+
+## A machine that decides with its context
+
+In the checkout and the saga, context mostly records what happened. In the
+login lockout
+([`login.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/login.ts))
+context decides where the machine goes next. It counts wrong passwords. After
+a rejection the handler reads that count: below three, back to the form; the
+third in a row, `lockedOut`. Each lockout also counts, and the next one lasts
+twice as long.
+
+The states are what the person sees: the form, a pending check, signed in,
+locked out. The data the check needs (username and password) and the signed-in
+user ride on state payloads, so context holds only the counters.
+
+<MachineViz id="login" />
+
+Try it: send `SUBMIT` with a wrong password (the popover starts with a fuzz
+sample; `ada` / `lovelace` is the account that works). `checking` starts a
+300 ms timer: advance it in the **Time** section, and you are back at the form.
+Open the **Context** tab: `failedAttempts` went up by one. Do it twice more and
+the third rejection goes to `lockedOut`, with a 30 s unlock timer. The diagram
+draws both targets of `REJECTED`; the count in context picks one.
+
+Fuzzing finds the lockout too. A single extra `REJECTED` is not enough, since
+the form ignores it: the fuzzer repeats the whole cycle that bumped the count,
+`SUBMIT` then `REJECTED`, until the guard flips.
 
 ## Draw your own
 
