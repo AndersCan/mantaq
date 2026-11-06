@@ -2,6 +2,12 @@ import { defineConfig } from "vite-plus";
 
 // oxlint-disable-next-line oxlinter/named-exports-only -- framework-mandated default export for vite config
 export default defineConfig({
+  pack: {
+    dts: {
+      generator: "tsgo",
+    },
+    exports: { devExports: true },
+  },
   lint: {
     options: {
       typeAware: true,
