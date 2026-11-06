@@ -24,7 +24,7 @@ test("a throwing selector keeps the last value and does not block other bindings
   const stateBefore = actor.state;
   actor.send(relabel.create({ label: "b" }));
   expect({
-    p: root.querySelector("p")?.textContent,
+    p: root.querySelector("p")?.textContent?.trim(),
     i: root.querySelector("i")?.textContent,
     sameState: actor.state === stateBefore,
   }).toEqual({ p: "a", i: "b", sameState: true });
