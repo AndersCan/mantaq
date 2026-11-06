@@ -1,7 +1,6 @@
 import { Actor, VirtualClock, state, event } from "./index.ts";
-import { cloneValue } from "./snapshot.ts";
 import { fc, runProperty } from "@mantaq/pbt";
-import { test, describe, expect } from "vite-plus/test";
+import { test, describe } from "vite-plus/test";
 
 /**
  * A handler/subscriber explosion is a programmer bug, i.e. an assert-style bad
@@ -11,107 +10,88 @@ function isErrorBomb(message: string): never {
   throw new Error(message);
 }
 
-describe("cloneValue preserves non-JSON-serializable values", () => {
-  test("structured-clone path keeps Date and Map identity that JSON would lose", () => {
-    const date = new Date(0);
-    const clonedDate = cloneValue(date);
-    expect(clonedDate).toBeInstanceOf(Date);
-    expect((clonedDate as Date).getTime()).toBe(0);
-
-    const map = new Map<string, number>([["a", 1]]);
-    const clonedMap = cloneValue(map);
-    expect(clonedMap).toBeInstanceOf(Map);
-    expect((clonedMap as Map<string, number>).get("a")).toBe(1);
-
-    // A value holding `undefined` must survive (JSON drops keys with undefined values).
-    const withUndefined = { a: 1, b: undefined as number | undefined };
-    const cloned = cloneValue(withUndefined);
-    expect(cloned).toEqual(withUndefined);
-  });
-});
-
-describe("Snapshot context isolation property tests", () => {
-  test("the delivered context is a deep copy that keeps live state isolated (#226)", () => {
+describe("Snapshot live context property tests", () => {
+  test("in-place edits keep snapshot().context === actor.context and untouched items by reference", () => {
     runProperty(
       fc.record({
-        initial: fc.integer({ min: -1000, max: 1000 }),
-        set: fc.integer({ min: -1000, max: 1000 }),
+        items: fc.array(fc.integer({ min: -1000, max: 1000 }), { minLength: 1, maxLength: 8 }),
+        edits: fc.array(fc.nat(), { maxLength: 8 }),
       }),
-      ({ initial, set }) => {
+      ({ items, edits }) => {
         const idle = state("idle")();
-        const trigger = event("GO")();
+        const rename = event("RENAME")<{ at: number }>();
         const actor = Actor({
           clock: VirtualClock(),
-          inputs: [trigger],
+          inputs: [rename],
           states: [idle],
           initial: idle,
-          context: { n: initial },
+          context: { items: items.map((n) => ({ n })) },
           setup: (m) => {
             m.on(idle, {
-              event: trigger,
-              handler: (_e, { context }) => {
-                context.set({ n: set });
+              event: rename,
+              handler: (e, { context }) => {
+                const target = context.get().items[e.payload.at];
+                if (target !== undefined) target.n += 1;
+                context.set(context.get());
                 return {};
               },
             });
           },
         });
-        const snap = actor.snapshot();
-        if (snap.context.n !== initial) return false;
-        /**
-         * The delivered context is a copy, not the live reference: mutating it
-         * must never reach the live actor context (issue #226).
-         */
-        snap.context.n = 99999;
-        if (actor.context.n !== initial) return false;
-        return true;
+        const before = [...actor.context.items];
+        const touched = new Set<number>();
+        for (const edit of edits) {
+          const at = edit % items.length;
+          touched.add(at);
+          actor.send(rename.create({ at }));
+          if (actor.snapshot().context !== actor.context) return false;
+        }
+        const after = actor.snapshot().context.items;
+        return before.every((item, i) => after[i] === item);
       },
     );
   });
 
-  test("unchanged context keeps a stable reference; changed context gets a fresh copy (#226)", () => {
-    runProperty(fc.integer({ min: -1000, max: 1000 }), (n) => {
-      const idle = state("idle")();
-      const trigger = event("GO")();
-      const set = event("SET")();
-      const actor = Actor({
-        clock: VirtualClock(),
-        inputs: [trigger, set],
-        states: [idle],
-        initial: idle,
-        context: { n },
-        setup: (m) => {
-          m.on(idle, { event: trigger, to: [idle], handler: () => ({ state: idle }) }); // state/event only, no context change
-          m.on(idle, {
-            event: set,
-            handler: (_e, { context }) => {
-              context.set({ n: n + 1 });
-              return {};
-            },
-          });
-        },
-      });
-      const a = actor.snapshot().context;
-      actor.send(trigger.create()); // state-only transition
-      const b = actor.snapshot().context;
-      /**
-       * unchanged context keeps the same reference
-       * context change
-       */
-      if (b !== a) return false;
-      actor.send(set.create());
-      const c = actor.snapshot().context;
-      if (c === b) return false; // changed context gets a new reference
-      if (c.n !== n + 1) return false;
-      // Mutating the fresh copy must not leak into the cached or live context.
-      c.n = 99999;
-      if (b.n !== n) return false;
-      if (actor.context.n !== n + 1) return false;
-      return true;
-    });
+  test("replacement handlers keep untouched items by reference", () => {
+    runProperty(
+      fc.record({
+        items: fc.array(fc.integer({ min: -1000, max: 1000 }), { minLength: 2, maxLength: 8 }),
+        at: fc.nat(),
+        n: fc.integer({ min: -1000, max: 1000 }),
+      }),
+      ({ items, at, n }) => {
+        const idle = state("idle")();
+        const edit = event("EDIT")<{ id: number; n: number }>();
+        const actor = Actor({
+          clock: VirtualClock(),
+          inputs: [edit],
+          states: [idle],
+          initial: idle,
+          context: { items: items.map((v, id) => ({ id, n: v })) },
+          setup: (m) => {
+            m.on(idle, {
+              event: edit,
+              handler: (e, { context }) => {
+                const c = context.get();
+                context.set({
+                  ...c,
+                  items: c.items.map((i) => (i.id === e.payload.id ? { ...i, n: e.payload.n } : i)),
+                });
+                return {};
+              },
+            });
+          },
+        });
+        const id = at % items.length;
+        const before = actor.snapshot().context.items;
+        actor.send(edit.create({ id, n }));
+        const after = actor.snapshot().context.items;
+        return before.every((item, i) => (i === id ? after[i] !== item : after[i] === item));
+      },
+    );
   });
 
-  test("error.context is a deep copy that keeps the live context isolated (#226)", () => {
+  test("error.context is the context reference from before the failing event", () => {
     runProperty(fc.integer({ min: -1000, max: 1000 }), (n) => {
       const idle = state("idle")();
       const bad = event("BAD")();
@@ -125,23 +105,10 @@ describe("Snapshot context isolation property tests", () => {
           m.onAny({ event: bad, handler: () => isErrorBomb("boom") });
         },
       });
+      const before = actor.context;
       actor.send(bad.create());
-      const snap = actor.snapshot();
-      const errorView = snap.error;
-      if (errorView === undefined) return false;
-      const errorContext = errorView.context;
-      if (typeof errorContext !== "object" || errorContext === null || !("n" in errorContext))
-        return false;
-      if (errorContext.n !== n) return false;
-      errorContext.n = 99999;
-      if (actor.context.n !== n) return false; // live untouched
-      const freshSnap = actor.snapshot();
-      if (freshSnap.error === undefined) return false;
-      const freshContext = freshSnap.error.context;
-      if (typeof freshContext !== "object" || freshContext === null || !("n" in freshContext))
-        return false;
-      if (freshContext.n !== n) return false; // next snapshot fresh
-      return true;
+      const errorView = actor.snapshot().error;
+      return errorView !== undefined && errorView.context === before;
     });
   });
 });

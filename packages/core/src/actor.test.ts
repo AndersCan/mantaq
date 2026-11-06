@@ -519,25 +519,6 @@ describe("Actor context change detection", () => {
     expect(kinds).toEqual(["", "state", "context"]);
   });
 
-  test("the snapshot returns a copy of the live context, not the reference (#226)", () => {
-    const idle = state("idle")();
-    const active = state("active")();
-    const trigger = event("GO")();
-    const actor = Actor({
-      inputs: [trigger],
-      states: [idle, active],
-      initial: idle,
-      context: { n: 0 },
-      setup: (m) => {
-        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
-      },
-    });
-    const snap = actor.snapshot();
-    expect(snap.context).not.toBe(actor.context);
-    snap.context.n = 99;
-    expect(actor.context.n).toBe(0);
-  });
-
   test("unchanged snapshots keep the same context identity (#226)", () => {
     const idle = state("idle")();
     const active = state("active")();

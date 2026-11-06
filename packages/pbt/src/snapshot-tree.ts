@@ -3,7 +3,7 @@ import fc from "fast-check";
 
 export interface SnapshotTree {
   path: string[];
-  context: unknown;
+  context: object;
   regions: Record<string, SnapshotTree>;
   done?: boolean;
 }
