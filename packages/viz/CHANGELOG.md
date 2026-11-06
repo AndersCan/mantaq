@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+<sub>2026-11-06</sub>
+
+- _(minor)_ Add a fullscreen button to the viewer.
+
 ## 0.4.0
 
 <sub>2026-11-05</sub>
