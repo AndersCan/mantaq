@@ -1,18 +1,47 @@
 {
   "name": "@mantaq/lit",
   "version": "0.0.0",
-  "private": true,
+  "description": "Bind mantaq actors into lit-html templates with one directive.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndersCan/mantaq",
+    "directory": "packages/lit"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
   "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
     "test": "vp test",
-    "check": "vp check"
+    "check": "vp check",
+    "prepublishOnly": "vp run build",
+    "prepack": "vp run build"
   },
   "devDependencies": {
+    "@mantaq/core": "workspace:^",
     "@typescript/native-preview": "catalog:",
     "happy-dom": "catalog:",
     "lit": "catalog:",
     "lit-html": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@mantaq/core": "workspace:^",
+    "lit-html": "^3.3.0"
   }
 }

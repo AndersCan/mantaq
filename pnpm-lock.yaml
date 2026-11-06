@@ -282,6 +282,9 @@ importers:
 
   packages/lit:
     devDependencies:
+      '@mantaq/core':
+        specifier: workspace:^
+        version: link:../core
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
