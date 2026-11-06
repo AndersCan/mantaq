@@ -129,10 +129,7 @@ export function mountViewer(
   if (driver !== undefined) replayInto(view, driver, decodeLiveSteps(options.steps ?? []));
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
-  root.addEventListener("keydown", (event) => {
-    if (!("key" in event) || event.target instanceof HTMLSelectElement) return;
-    if (event.key === "ArrowLeft") back();
-  });
+  listenOnRoot(root, () => back());
 
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
@@ -208,6 +205,7 @@ export function mountViewer(
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(
       headerOf(doc, {
+        root,
         viz,
         machine,
         view,
@@ -259,9 +257,41 @@ function stepSafely(
   }
 }
 
+function setFullscreenLabel(button: HTMLButtonElement, active: boolean): void {
+  button.textContent = active ? "Exit full screen" : "Full screen";
+  button.setAttribute("aria-pressed", String(active));
+}
+
+/** Listeners that outlive each render: ArrowLeft steps back, and the button label follows fullscreen. */
+function listenOnRoot(root: HTMLElement, back: () => void): void {
+  root.addEventListener("keydown", (event) => {
+    if (!("key" in event) || event.target instanceof HTMLSelectElement) return;
+    if (event.key === "ArrowLeft") back();
+  });
+  root.addEventListener("fullscreenchange", () => {
+    const toggle = root.querySelector<HTMLButtonElement>(".fullscreen-toggle");
+    if (toggle !== null) setFullscreenLabel(toggle, root.ownerDocument.fullscreenElement === root);
+  });
+}
+
+/** Null where the browser cannot fullscreen an element (no API, or blocked by the host page). */
+function fullscreenButton(doc: Document, root: HTMLElement): HTMLButtonElement | null {
+  if (!doc.fullscreenEnabled || typeof root.requestFullscreen !== "function") return null;
+  const button = html(doc, "button", { type: "button", class: "fullscreen-toggle" });
+  setFullscreenLabel(button, doc.fullscreenElement === root);
+  button.addEventListener("click", () => {
+    const request =
+      doc.fullscreenElement === root ? doc.exitFullscreen() : root.requestFullscreen();
+    // A refused request leaves the viewer as it was.
+    request.catch(() => undefined);
+  });
+  return button;
+}
+
 function headerOf(
   doc: Document,
   context: {
+    root: HTMLElement;
     viz: VizDocument;
     machine: VizMachine;
     view: ViewState;
@@ -301,6 +331,7 @@ function headerOf(
       { class: "help-link", href: DOCS_URL, target: "_blank", rel: "noopener noreferrer" },
       ["How this works"],
     ),
+    fullscreenButton(doc, context.root),
   ]);
 }
 
