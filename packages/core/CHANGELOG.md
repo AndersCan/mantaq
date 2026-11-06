@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+<sub>2026-11-06</sub>
+
+- _(minor)_
+  Snapshots hand out the live context instead of a deep copy (reverses #226). Unchanged parts keep identity; `Snapshot.context` is typed `Readonly<C>`.
+
 ## 0.5.4
 
 <sub>2026-11-05</sub>
