@@ -23,7 +23,7 @@ import type { InternalEvent } from "./index.ts";
 import { parseContextOption } from "./parse-context-option.ts";
 import { InternalQueue } from "./queue.ts";
 import { RealClock } from "./real-clock.ts";
-import { buildSnapshot, cloneValue } from "./snapshot.ts";
+import { buildSnapshot } from "./snapshot.ts";
 import { StateRef, isStateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
 import { Subscribers } from "./subscribers.ts";
@@ -168,16 +168,6 @@ export function Actor<
   let currentState: States[number] | ErrorState;
   let currentPayload: unknown;
   let contextValue = parseContextOption<ActorContext>(options.context);
-  /**
-   * Last context object handed to subscribers. The actor never exposes the
-   * live `contextValue`. It clones it and caches the copy so that unchanged
-   * snapshots keep a stable identity (subscribers rely on stable identity to
-   * detect context changes) while a mutated snapshot cannot reach live state
-   * (issue #226)
-   */
-  let deliveredContext: ActorContext | undefined;
-  /** Set when `contextValue` has changed since the last delivered snapshot. */
-  let contextDirty = true;
   let lastState: AnyStateRef;
   let regionActors: Record<string, AnyActor> = {};
   let queue = InternalQueue();
@@ -197,7 +187,6 @@ export function Actor<
     set: (value: ActorContext) => {
       contextValue = value;
       contextWritten = true;
-      contextDirty = true;
     },
   });
 
@@ -309,8 +298,6 @@ export function Actor<
     contextValue = target.context;
     lastState = target.state;
     contextWritten = false;
-    contextDirty = true;
-    deliveredContext = undefined;
     lastEntry = undefined;
     pendingEffects = [];
     subs.emitChange(snapshot());
@@ -457,14 +444,10 @@ export function Actor<
   }
 
   function snapshot(): Snapshot<ActorContext> {
-    if (deliveredContext === undefined || contextDirty) {
-      deliveredContext = cloneValue(contextValue);
-      contextDirty = false;
-    }
     return buildSnapshot({
       stateRef: currentState,
       regions: regionActors,
-      context: deliveredContext,
+      context: contextValue,
       error: errorInfo,
       payload: currentPayload,
     });

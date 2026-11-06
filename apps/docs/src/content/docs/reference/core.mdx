@@ -196,12 +196,14 @@ Real timers via `globalThis.setTimeout`. Default for actors.
 ```ts
 interface Snapshot<C = unknown> {
   path: string[];
-  context: C;
+  context: Readonly<C>;
   regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
   error?: ErrorInfo;
 }
 ```
+
+`context` is the live context object, typed `Readonly<C>`, not a copy. Parts a handler did not replace keep their identity between snapshots. Do not mutate it from a subscriber.
 
 `done` set on final state including `__error`, so a died machine reports `done: true` and `error`. `done` alone means successful completion. `error` means it died. Either way sends are ignored.
 

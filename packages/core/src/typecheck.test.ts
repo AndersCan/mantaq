@@ -104,6 +104,20 @@ describe("API type safety", () => {
     actor.send(tick.create());
     expect(actor.context.count).toBe(1);
   });
+
+  test("snapshot context is read-only", () => {
+    const idle = state("idle")();
+    const actor = Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      context: { n: 0 },
+      setup: () => {},
+    });
+    // @ts-expect-error snapshot context is read-only
+    // suppressed: assigning through Readonly<C> must not compile
+    actor.snapshot().context.n = 1;
+  });
 });
 
 describe("type level contract — type = behavior", () => {

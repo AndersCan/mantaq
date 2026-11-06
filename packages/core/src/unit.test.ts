@@ -6,7 +6,7 @@ import { runEffects } from "./effects.ts";
 import { event } from "./event.ts";
 import { InternalQueue } from "./queue.ts";
 import { RealClock } from "./real-clock.ts";
-import { buildSnapshot, cloneValue } from "./snapshot.ts";
+import { buildSnapshot } from "./snapshot.ts";
 import { state } from "./state.ts";
 import { Subscribers } from "./subscribers.ts";
 import { VirtualClock } from "./virtual-clock.ts";
@@ -529,11 +529,20 @@ describe("buildSnapshot", () => {
     expect(snap.done).toBe(true);
   });
 
-  test("returns a copy of error.context, not the live reference (#226)", () => {
+  test("region snapshots keep their identity (public contract)", () => {
+    const sub: Snapshot = { path: ["leaf"], context: {}, regions: {} };
+    const snap = buildSnapshot({
+      stateRef: state("root")(),
+      regions: { sub: { snapshot: () => sub } },
+      context: {},
+    });
+    expect(snap.regions.sub).toBe(sub);
+  });
+
+  test("error.context is the live context reference", () => {
     const ctx = { count: 0 };
-    const myError = new Error("boom");
     const err: ErrorInfo = {
-      error: myError,
+      error: new Error("boom"),
       state: state("root")(),
       context: ctx,
       event: { type: "GO" },
@@ -545,66 +554,8 @@ describe("buildSnapshot", () => {
       context: ctx,
       error: err,
     });
-    // Every ErrorInfo field is preserved (the spread must not be dropped).
-    const errorView = snap.error;
-    if (!errorView) {
-      expect(errorView).toBeDefined();
-      return;
-    }
-    expect(errorView).toEqual({
-      error: myError,
-      state: err.state,
-      event: { type: "GO" },
-      reason: "transition",
-      // error.context is a deep copy of the live context.
-      context: { count: 0 },
-    });
-    // Mutating the handed-out copy cannot reach the live context.
-    const handedOutContext = errorView.context;
-    if (
-      typeof handedOutContext === "object" &&
-      handedOutContext !== null &&
-      "count" in handedOutContext
-    ) {
-      handedOutContext.count = 99;
-    }
-    expect(ctx.count).toBe(0);
-  });
-});
-
-describe("cloneValue", () => {
-  test("cloneValue keeps nested mutations isolated via structuredClone", () => {
-    const src = { a: 1, nested: { b: [1, 2, 3] } };
-    const out = cloneValue(src);
-    expect(out).toEqual(src);
-    expect(out).not.toBe(src);
-    out.nested.b.push(4);
-    expect(src.nested.b).toEqual([1, 2, 3]);
-  });
-
-  test("cloneValue handles missing structuredClone with a JSON round-trip", () => {
-    const original = Reflect.get(globalThis, "structuredClone");
-    Reflect.set(globalThis, "structuredClone", undefined);
-    try {
-      const src = { a: 1, nested: { b: [1, 2, 3] } };
-      const out = cloneValue(src);
-      expect(out).toEqual(src);
-      expect(out).not.toBe(src);
-      out.nested.b.push(4);
-      expect(src.nested.b).toEqual([1, 2, 3]);
-    } finally {
-      Reflect.set(globalThis, "structuredClone", original);
-    }
-  });
-
-  test("region snapshots keep their identity (public contract)", () => {
-    const sub: Snapshot = { path: ["leaf"], context: {}, regions: {} };
-    const snap = buildSnapshot({
-      stateRef: state("root")(),
-      regions: { sub: { snapshot: () => sub } },
-      context: {},
-    });
-    expect(snap.regions.sub).toBe(sub);
+    expect(snap.error).toBe(err);
+    expect(snap.error?.context).toBe(ctx);
   });
 });
 

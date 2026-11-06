@@ -180,13 +180,15 @@ Read-only view of actor state: `path` is the state-name chain from the root, `co
 ```ts
 interface Snapshot<C = unknown> {
   path: string[];
-  context: C;
+  context: Readonly<C>;
   payload?: unknown;
   regions: Record<string, Snapshot<unknown>>;
   done?: boolean;
   error?: ErrorInfo;
 }
 ```
+
+`context` is the live context object, not a copy, typed `Readonly<C>`. Parts a handler did not replace keep their identity from one snapshot to the next, so subscribers can compare references. Do not mutate it from a subscriber; change context through handlers.
 
 `done` and `error` are not mutually exclusive: the machine sets `error` when it dies, and the error state is itself terminal, so `done` is also set. `done` alone means the machine completed successfully; `error` means it died. The machine is dead either way. Sends are ignored.
 

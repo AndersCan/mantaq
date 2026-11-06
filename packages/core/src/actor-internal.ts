@@ -5,7 +5,7 @@ import type { AnyStateRef } from "./state.ts";
 
 export interface Snapshot<C = unknown> {
   path: string[];
-  context: C;
+  context: Readonly<C>;
   payload?: unknown;
   regions: Record<string, Snapshot<unknown>>;
   done?: boolean;

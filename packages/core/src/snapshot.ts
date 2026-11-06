@@ -25,26 +25,8 @@ export function buildSnapshot<C>(options: {
     snap.done = true;
   }
   if (options.error !== undefined) {
-    /**
-     * `error.context` points at the live actor context. Hand out a copy so a
-     * subscriber cannot mutate internal state (see issue #226). `state` and
-     * `event` are read-only handles and are left by reference
-     */
-    snap.error = { ...options.error, context: cloneValue(options.error.context) };
+    snap.error = options.error;
   }
 
   return snap;
-}
-
-/**
- * Deep-clones a plain-data value, used to hand subscribers copies of actor
- * context (issue #226). Prefers the structured-clone global and falls back to
- * a JSON round-trip for environments without it. Actor contexts are expected
- * to be serializable state-machine data
- */
-export function cloneValue<T>(value: T): T {
-  if (typeof structuredClone === "function") {
-    return structuredClone(value);
-  }
-  return JSON.parse(JSON.stringify(value));
 }
