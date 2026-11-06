@@ -13,6 +13,8 @@ process.env["ASTRO_TELEMETRY_DISABLED"] = "1";
 let site = "";
 const retry = "../fixtures/retry.ts";
 const orphan = "../fixtures/orphan.ts";
+const retryAgain = "../fixtures/retry-again.ts";
+const empty = "../fixtures/no-machines.ts";
 
 function page(sources: string[]): string {
   const tags = sources.map((src) => `<Machine src="${src}" />`).join("\n");
@@ -86,6 +88,26 @@ describe("mantaqViz for Astro", () => {
       await expect(buildSite(root, [retry])).rejects.toThrow(
         /not in the machines given to mantaqViz/,
       );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  test("the same machine id in two files fails the build naming both", async () => {
+    const root = makeSite([retry, retryAgain]);
+    try {
+      await expect(buildSite(root, [retry, retryAgain])).rejects.toThrow(
+        /comes from both .*retry\.ts and .*retry-again\.ts/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  test("a file with no exported machines fails the build", async () => {
+    const root = makeSite([empty]);
+    try {
+      await expect(buildSite(root, [empty])).rejects.toThrow(/no exported actor or actor factory/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -95,6 +95,12 @@ export function astroMachines(context: {
       if (id === CLIENT) return client;
       return null;
     },
+    handleHotUpdate({ file, server }) {
+      if (!context.files.includes(file)) return;
+      documents = null;
+      const module = server.moduleGraph.getModuleById(DOCUMENTS_RESOLVED);
+      if (module !== undefined) server.moduleGraph.invalidateModule(module);
+    },
     load(id) {
       if (id === TARGETS_RESOLVED) return targetsSource(context.files);
       if (id !== DOCUMENTS_RESOLVED) return null;
