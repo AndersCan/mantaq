@@ -26,6 +26,32 @@ The live page runs the real actor, so it needs an exported factory on a `Virtual
 
 Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations }`; default 500 iterations so a save redraws fast).
 
+**Astro**: publish a site where each page is prose plus the diagram. Add the integration, list the machine files, and put `<Machine>` on a page.
+
+```js
+// astro.config.mjs
+import { defineConfig } from "astro/config";
+import { mantaqViz } from "@mantaq/inspect/astro";
+
+export default defineConfig({
+  integrations: [mantaqViz({ machines: ["src/machines/checkout.ts"] })],
+});
+```
+
+```astro
+---
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+---
+<Machine src="src/machines/checkout.ts" />
+```
+
+`astro build` writes, per `<Machine>`, a box of design findings (unreachable states, handlers that throw under fuzzing, effects sending events nobody handles) followed by the diagram with the live panel. `?machine=<id>&step=` walks work as on the Vite page.
+
+- **Two lists.** A file is named twice: in `machines` (paths, not globs; relative to the Astro root or absolute) and in the page's `src`. The browser script is built before pages render, so it cannot learn the list from the pages.
+- **What fails the build.** An empty `machines`, a missing file, a file that cannot load, two files exporting the same machine id, a `src` that is not in `machines`, and a file with no exported actor. Design findings never fail the build; they show on the page.
+- **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations }`. Default: seeded, 2000 iterations, so builds are reproducible.
+- Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the static walk.
+
 **Library**: one call per machine.
 
 ```ts
