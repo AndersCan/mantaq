@@ -12,7 +12,7 @@ export default defineConfig({
     benchmark: { include: ["src/**/*.bench.ts"] },
     // benchmarks must not compete for CPU
     fileParallelism: false,
-    execArgv: ["--expose-gc", "--max-semi-space-size=128"],
+    execArgv: ["--expose-gc", "--min-semi-space-size=128", "--max-semi-space-size=128"],
   },
   fmt: {},
 });
