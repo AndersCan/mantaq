@@ -62,6 +62,29 @@ export default defineConfig({
 
 Then open `/__mantaq/` on the dev server. It redraws on save and keeps your walk. `vite build` writes the same page as a static site under the same path.
 
+### Publish it with Astro
+
+To put the diagram on a page next to your prose, use the Astro integration. List the machine files once in the config, then add one component per machine:
+
+```js
+// astro.config.mjs
+import { defineConfig } from "astro/config";
+import { mantaqViz } from "@mantaq/inspect/astro";
+
+export default defineConfig({
+  integrations: [mantaqViz({ machines: ["src/machines/checkout.ts"] })],
+});
+```
+
+```astro
+---
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+---
+<Machine src="src/machines/checkout.ts" />
+```
+
+`astro build` renders the design findings above the diagram and bakes in the live panel. A file missing from `machines`, or one that cannot load, fails the build; findings never do.
+
 ## What it does not tell you
 
 Guards are not evaluated. An edge means the handler _may_ go there, not that it

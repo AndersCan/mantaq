@@ -40,6 +40,7 @@ const PACKAGE_INDEX = new Map([
   ["@mantaq/traversal", TRAVERSAL_INDEX],
   ["@mantaq/inspect", join(ROOT, "packages/inspect/src/index.ts")],
   ["@mantaq/inspect/vite", join(ROOT, "packages/inspect/src/vite.ts")],
+  ["@mantaq/inspect/astro", join(ROOT, "packages/inspect/src/astro.ts")],
   ["@mantaq/viz", join(ROOT, "packages/viz/src/index.ts")],
 ]);
 
