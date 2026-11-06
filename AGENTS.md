@@ -114,6 +114,10 @@ Type-level tests: `packages/core/src/typecheck.test.ts` (`expectTypeOf` + `@ts-e
 
 <!--VISION ENFORCEMENT END-->
 
+## Versioning
+
+Stay on 0.x. Never a `major` bump file: a breaking change is `minor` (0.5 → 0.6). `vp run bump:check` fails on `major`. (`@mantaq/sugar` and `@mantaq/test` reached 2.x by mistake.)
+
 ## Agent skills
 
 ### Issue tracker
