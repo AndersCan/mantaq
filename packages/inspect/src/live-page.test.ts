@@ -115,3 +115,51 @@ describe("mountDriven with several machines", () => {
     expect(buttons.map((b) => b.disabled)).toEqual([false, true]);
   });
 });
+
+describe("mountDriven heading and walk ownership", () => {
+  const create = () => {
+    const clock = VirtualClock();
+    return { actor: createCheckoutActor(clock), clock };
+  };
+  const current = (root: HTMLElement) =>
+    root.querySelector<HTMLElement>(".explore")?.dataset["current"];
+
+  test("heading sets the title level; the default is h1", async () => {
+    history.replaceState(null, "", "?");
+    const text = await documentText();
+    const plain = document.createElement("div");
+    mountDriven(plain, { source: "test", text, targets: {} });
+    const small = document.createElement("div");
+    mountDriven(small, { source: "test", text, targets: {}, heading: "h2" });
+    expect(plain.querySelector("h1")).not.toBeNull();
+    expect(small.querySelector("h1")).toBeNull();
+    expect(small.querySelector("h2")).not.toBeNull();
+  });
+
+  test("a walk for another machine's id is not replayed here", async () => {
+    history.replaceState(null, "", "?");
+    const text = await documentText();
+    const first = document.createElement("div");
+    mountDriven(first, { source: "test", text, targets: { checkout: create } });
+    const start = current(first);
+    for (const send of first.querySelectorAll<HTMLElement>("[data-send]")) {
+      if (current(first) !== start) break;
+      send.click();
+    }
+    expect(current(first)).not.toBe(start);
+    const walk = new URLSearchParams(location.search);
+    expect(walk.getAll("step").length).toBeGreaterThan(0);
+
+    walk.set("machine", "somewhere-else");
+    history.replaceState(null, "", `?${walk.toString()}`);
+    const second = document.createElement("div");
+    mountDriven(second, { source: "test", text, targets: { checkout: create } });
+    expect(current(second)).toBe(start);
+
+    walk.set("machine", "checkout");
+    history.replaceState(null, "", `?${walk.toString()}`);
+    const third = document.createElement("div");
+    mountDriven(third, { source: "test", text, targets: { checkout: create } });
+    expect(current(third)).not.toBe(start);
+  });
+});

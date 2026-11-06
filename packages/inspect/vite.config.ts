@@ -6,6 +6,8 @@ export default defineConfig({
     entry: {
       index: "src/index.ts",
       vite: "src/vite.ts",
+      astro: "src/astro.ts",
+      "astro-client": "src/astro/client.ts",
       record: "src/record.ts",
       drive: "src/drive.ts",
       "live-entry": "src/live-entry.ts",
@@ -13,7 +15,14 @@ export default defineConfig({
     dts: {
       generator: "tsgo",
     },
-    exports: { devExports: true },
+    exports: {
+      devExports: true,
+      // Shipped as source: Astro compiles it in the user's site.
+      customExports: (exports) => ({
+        ...exports,
+        "./astro/Machine.astro": "./src/astro/Machine.astro",
+      }),
+    },
   },
   lint: {
     options: {

@@ -1,0 +1,55 @@
+---
+import { resolve } from "node:path";
+import { documents, root } from "virtual:mantaq/documents";
+
+const { src } = Astro.props;
+const abs = resolve(root, src);
+const doc = documents[abs];
+if (doc === undefined) {
+  throw new Error(
+    `<Machine src="${src}">: not in the machines given to mantaqViz() in astro.config (resolved to ${abs}). Add it to machines.`,
+  );
+}
+if (doc.machines.length === 0) {
+  throw new Error(`<Machine src="${src}">: no exported actor or actor factory found in ${abs}`);
+}
+const count = doc.findings.length;
+---
+
+<section class="mantaq-findings" data-count={count}>
+  {
+    count > 0 ? (
+      <>
+        <p>
+          <strong>
+            {count} design finding{count === 1 ? "" : "s"}
+          </strong>
+        </p>
+        <ul>
+          {doc.findings.map((finding) => (
+            <li>
+              <code>{finding.machine}</code>: {finding.message}
+            </li>
+          ))}
+        </ul>
+      </>
+    ) : (
+      <p>No design findings.{doc.fuzzed ? "" : " Fuzzing is off."}</p>
+    )
+  }
+</section>
+<div class="mantaq-machine" data-mantaq-viz={doc.text} data-mantaq-src={src}>
+  <noscript>The interactive diagram needs JavaScript.</noscript>
+</div>
+<script>
+  import "virtual:mantaq/astro-client";
+</script>
+
+<style>
+  .mantaq-findings[data-count]:not([data-count="0"]) {
+    background: var(--banner-bg, #fff6e0);
+    color: var(--banner-fg, #5a3e00);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+  }
+</style>
