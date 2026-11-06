@@ -1,7 +1,7 @@
 /** Pure helpers for the bump:check gate. */
 
 /** `{ name, level }` per frontmatter entry; reserved `$` keys skipped. */
-export function extractBumps(source) {
+function extractBumps(source) {
   const lines = source.split(/\r?\n/);
   if (lines[0] !== "---") return [];
   const end = lines.indexOf("---", 1);
