@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+<sub>2026-11-06</sub>
+
+- _(minor)_ Publish machine pages from Astro: `mantaqViz` from `@mantaq/inspect/astro` and `<Machine src>`.
+- _(patch)_ Document the Astro integration in the README.
+
 ## 0.5.2
 
 <sub>2026-11-06</sub>

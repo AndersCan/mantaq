@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/inspect",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Turn a Mantaq machine into a viz document: structure, handler explanations (AST), fuzz and test coverage. Vite plugin included.",
   "license": "MIT",
   "repository": {
