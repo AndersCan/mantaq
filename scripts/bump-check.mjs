@@ -4,7 +4,7 @@
  * package that does not exist (e.g. "@mantaq/testkit" for "@mantaq/test"), so
  * the fix ships with no version bump and CI stays green. Fail on it instead.
  *
- * Also fails on a `major` bump: Mantaq stays on 0.x, breaking changes are minor.
+ * Also fails on a `major` bump: Mantaq takes no majors, breaking changes are minor.
  *
  * Run with `vp run bump:check`. Wired into the root `ready` script.
  */
@@ -59,7 +59,7 @@ for (const file of readdirSync(bumpDir)) {
   }
   for (const name of findMajorBumps(source)) {
     failures.push(
-      `.bumpy/${file}: "${name}": major. Mantaq stays on 0.x; use minor for breaking changes`,
+      `.bumpy/${file}: "${name}": major. Mantaq takes no majors; use minor for breaking changes`,
     );
   }
 }

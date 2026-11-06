@@ -25,9 +25,9 @@ export function findUnknownNames({ source, known }) {
 }
 
 /**
- * Packages a bump file would take to a new major. Mantaq stays on 0.x: a
- * breaking change is a minor bump (0.5 → 0.6). `@mantaq/sugar` and
- * `@mantaq/test` reached 2.x by mistake; this keeps it from happening again.
+ * Packages a bump file would take to a new major. No package takes a major:
+ * a breaking change is a minor bump (0.5 → 0.6). `@mantaq/sugar` and
+ * `@mantaq/test` reached 2.x by mistake and stay there (2.0 → 2.1).
  */
 export function findMajorBumps(source) {
   return extractBumps(source)
