@@ -1,0 +1,24 @@
+{
+  "name": "@mantaq/example-lit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Todo list rendered with lit-html: rows keep their DOM nodes through add, remove, move and edit.",
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@mantaq/core": "workspace:^",
+    "@mantaq/lit": "workspace:^",
+    "lit-html": "catalog:"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "happy-dom": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
