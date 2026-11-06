@@ -124,13 +124,20 @@ function mount(options: { steps?: string[]; onNavigate?: (w: { steps: string[] }
 
 const click = (root: HTMLElement, selector: string) =>
   root.querySelector<HTMLButtonElement>(selector)?.click();
+/** Opens the payload form of `submit`, optionally types JSON, then sends. */
+function sendSubmit(root: HTMLElement, json?: string) {
+  click(root, '[data-send="submit"]');
+  const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
+  if (box && json !== undefined) box.value = json;
+  click(root, '[data-payload-send="submit"]');
+}
 const current = (root: HTMLElement) => root.querySelector(".explore")?.getAttribute("data-current");
 
 describe("live controls", () => {
   test("a timer button advances the clock to its deadline", () => {
     const { root } = mount();
     expect(root.querySelector("[data-advance-timer]")).toBeNull();
-    click(root, '[data-send="submit"]');
+    sendSubmit(root);
     const timer = root.querySelector("[data-advance-timer]");
     expect(timer?.textContent).toBe("advance 800 ms → paymentTimeout");
     click(root, "[data-advance-timer]");
@@ -140,7 +147,7 @@ describe("live controls", () => {
 
   test("the timer label counts down the time already advanced", () => {
     const { root } = mount();
-    click(root, '[data-send="submit"]');
+    sendSubmit(root);
     const input = root.querySelector<HTMLInputElement>("[data-advance-ms]");
     if (input) input.value = "300";
     click(root, "[data-advance]");
@@ -165,41 +172,69 @@ describe("live controls", () => {
 
   test("JSON payload is sent with the event", () => {
     const { root, live } = mount();
-    const box = root.querySelector<HTMLTextAreaElement>("[data-payload-json]");
-    if (box) box.value = '{"amount":42}';
-    click(root, '[data-send="submit"]');
+    sendSubmit(root, '{"amount":42}');
     expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { amount: 42 } }]);
-    expect(root.querySelector("[data-live-context]")?.textContent).toBe(
-      'Context{\n  "amount": 42\n}',
+    expect(root.querySelector("[data-live-context]")?.textContent).toBe('{\n  "amount": 42\n}');
+  });
+
+  test("invalid JSON sends nothing and keeps the form open", () => {
+    const { root, live } = mount();
+    sendSubmit(root, "{nope");
+    expect(live.log).toEqual([]);
+    expect(root.querySelector(".explore-payload [role=alert]")?.hasAttribute("hidden")).toBe(false);
+  });
+
+  test("an event with a payload asks for it, filled with the first sample", () => {
+    const { root, live } = mount();
+    click(root, '[data-send="submit"]');
+    expect(live.log).toEqual([]);
+    const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
+    expect(box?.value).toBe('{"amount":5}');
+    const samples = [...root.querySelectorAll('[data-payload-form="submit"] [data-sample]')];
+    expect(samples.map((each) => each.textContent)).toEqual(["sample 1", "sample 2"]);
+    click(root, '[data-payload-form="submit"] [data-sample="1"]');
+    expect(box?.value).toBe('{"amount":9}');
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { amount: 9 } }]);
+    expect(root.querySelector("[data-payload-form]")).toBeNull();
+  });
+
+  test("cancel closes the form without sending", () => {
+    const { root, live } = mount();
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-cancel="submit"]');
+    expect(live.log).toEqual([]);
+    expect(root.querySelector("[data-payload-form]")).toBeNull();
+  });
+
+  test("clicking an edge that carries a payload opens its form", () => {
+    const { root, live } = mount();
+    root
+      .querySelector('[data-edge-id="idle-submit-paying"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(live.log).toEqual([]);
+    expect(
+      root.querySelector('.canvas .payload-popover [data-payload-form="submit"]'),
+    ).not.toBeNull();
+    expect(root.querySelector(".payload-popover")?.getAttribute("aria-label")).toBe(
+      "Payload for submit",
     );
   });
 
-  test("invalid JSON sends nothing", () => {
+  test("the Send list opens the same popover on the diagram, and Escape closes it", () => {
     const { root, live } = mount();
-    const box = root.querySelector<HTMLTextAreaElement>("[data-payload-json]");
-    if (box) box.value = "{nope";
     click(root, '[data-send="submit"]');
+    const popover = root.querySelector(".canvas .payload-popover");
+    expect(popover).not.toBeNull();
+    expect(root.querySelector(".panel [data-payload-form]")).toBeNull();
+    popover?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(root.querySelector(".payload-popover")).toBeNull();
     expect(live.log).toEqual([]);
-    expect(root.querySelector(".explore-moves [role=alert]")?.hasAttribute("hidden")).toBe(false);
-  });
-
-  test("a fuzz sample is offered once and sent", () => {
-    const { root, live } = mount();
-    const options = [...root.querySelectorAll('[data-sample="submit"] option')];
-    expect(options.map((each) => each.textContent)).toEqual([
-      "no payload",
-      '{"amount":5}',
-      '{"amount":9}',
-    ]);
-    const select = root.querySelector<HTMLSelectElement>('[data-sample="submit"]');
-    if (select) select.value = '{"amount":9}';
-    click(root, '[data-send="submit"]');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { amount: 9 } }]);
   });
 
   test("back replays the log without the last step", () => {
     const { root } = mount();
-    click(root, '[data-send="submit"]');
+    sendSubmit(root);
     click(root, "[data-advance-timer]");
     click(root, '[data-explore-action="back"]');
     expect(current(root)).toBe("paying");
@@ -209,9 +244,7 @@ describe("live controls", () => {
   test("the URL steps round-trip to the same state", () => {
     const seen: string[][] = [];
     const first = mount({ onNavigate: (where) => seen.push(where.steps) });
-    const box = first.root.querySelector<HTMLTextAreaElement>("[data-payload-json]");
-    if (box) box.value = '{"amount":42}';
-    click(first.root, '[data-send="submit"]');
+    sendSubmit(first.root, '{"amount":42}');
     click(first.root, "[data-advance-timer]");
     const steps = seen.at(-1) ?? [];
     expect(steps).toEqual(['submit={"amount":42}', "@800"]);
@@ -254,7 +287,7 @@ describe("runs", () => {
   test("clicking a run replays it from a fresh actor and updates the URL steps", () => {
     const seen: string[][] = [];
     const root = mountRuns((where) => seen.push(where.steps));
-    click(root, '[data-send="submit"]');
+    sendSubmit(root);
     click(root, '[data-run="pays and times out"]');
     expect(current(root)).toBe("error");
     expect(seen.at(-1)).toEqual(['submit={"amount":5}', "@800"]);
@@ -265,7 +298,7 @@ describe("runs", () => {
 
   test("a run with no steps resets to the initial state", () => {
     const root = mountRuns();
-    click(root, '[data-send="submit"]');
+    sendSubmit(root);
     click(root, '[data-run="empty"]');
     expect(current(root)).toBe("idle");
   });
@@ -317,9 +350,7 @@ describe("context highlight", () => {
   test("nothing is marked before a step, the changed lines after", () => {
     const { root } = mount();
     expect(marked(root)).toEqual([]);
-    const box = root.querySelector<HTMLTextAreaElement>("[data-payload-json]");
-    if (box) box.value = '{"amount":42}';
-    click(root, '[data-send="submit"]');
+    sendSubmit(root, '{"amount":42}');
     expect(marked(root)).toEqual(['"amount": 42']);
   });
 

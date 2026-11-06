@@ -251,46 +251,32 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
     expect(root.querySelector('[data-outcome="transition"]')?.textContent).toContain("open → done");
     expect(root.querySelector("[data-live-effects]")?.textContent).toBe("Effects run: closeUp");
-    expect(root.querySelector("[data-live-context]")?.textContent).toBe('Context{\n  "n": 1\n}');
+    expect(root.querySelector("[data-live-context]")?.textContent).toBe('{\n  "n": 1\n}');
     expect(root.querySelector(".graph g[data-node-id='done']")?.classList).toContain("current");
   });
 
-  test("context is collapsible and stays folded across redraws", () => {
+  test("the panel is tabbed and the Context tab counts changed lines", () => {
     const root = mountLive();
-    const fold = () => root.querySelector<HTMLDetailsElement>("[data-live-context]");
-    send(root, "peek");
-    const before = fold();
-    expect(before?.open).toBe(true);
-    if (before) {
-      before.open = false;
-      before.dispatchEvent(new Event("toggle"));
-    }
-    send(root, "peek");
-    const after = fold();
-    expect(after).not.toBe(before);
-    expect(after?.open).toBe(false);
-    if (after) {
-      after.open = true;
-      after.dispatchEvent(new Event("toggle"));
-    }
-    send(root, "peek");
-    expect(fold()?.open).toBe(true);
+    const labels = () => [...root.querySelectorAll("[data-tab]")].map((tab) => tab.textContent);
+    const shown = () =>
+      [...root.querySelectorAll("[data-tab-panel]")]
+        .filter((panel) => !panel.hasAttribute("hidden"))
+        .map((panel) => panel.getAttribute("data-tab-panel"));
+    expect(labels()).toEqual(["Step", "Context", "Path", "Details"]);
+    expect(shown()).toEqual(["step"]);
+    send(root, "go");
+    expect(labels()[1]).toBe("Context (1 changed)");
+    root.querySelector<HTMLButtonElement>('[data-tab="context"]')?.click();
+    expect(shown()).toEqual(["context"]);
+    expect(root.querySelector('[data-tab="context"]')?.getAttribute("aria-selected")).toBe("true");
   });
 
-  test("folding one viewer's context leaves another viewer open", () => {
-    const first = mountLive();
-    const second = mountLive();
-    send(first, "peek");
-    send(second, "peek");
-    const details = first.querySelector<HTMLDetailsElement>("[data-live-context]");
-    if (details) {
-      details.open = false;
-      details.dispatchEvent(new Event("toggle"));
-    }
-    send(first, "peek");
-    send(second, "peek");
-    expect(first.querySelector<HTMLDetailsElement>("[data-live-context]")?.open).toBe(false);
-    expect(second.querySelector<HTMLDetailsElement>("[data-live-context]")?.open).toBe(true);
+  test("selecting an element that is not a next step opens Details", () => {
+    const root = mountLive();
+    root
+      .querySelector("[data-node-id='open']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector('[data-tab-panel="details"]')?.hasAttribute("hidden")).toBe(false);
   });
 
   test("stay and ignored outcomes keep the cursor", () => {

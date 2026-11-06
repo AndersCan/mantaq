@@ -12,9 +12,19 @@ import type { Selection } from "./graph.ts";
 import { availableModes, modeLabel } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
-import { decodeLiveSteps, decodePath, encodeLiveStep, encodeStep } from "../moves.ts";
+import {
+  decodeLiveSteps,
+  decodePath,
+  encodeLiveStep,
+  encodeStep,
+  payloadSamples,
+} from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
-import { clickStep, explorePanel, markExplore } from "./explore.ts";
+import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
+import type { ExploreContext, ExploreParts } from "./explore.ts";
+import { showPayloadPopover } from "./payload-popover.ts";
+import { tabs } from "./tabs.ts";
+import type { Tab } from "./tabs.ts";
 
 const DOCS_URL = "https://anderscan.github.io/mantaq/guides/visualizer/";
 
@@ -29,7 +39,13 @@ interface ViewState {
   live: VizLiveState | null;
   /** Context before the last live step; undefined when no step ran. */
   previous: VizJson | undefined;
+  /** Live: the event whose payload form is open. */
+  composing: string | null;
+  /** The panel tab shown. */
+  tab: PanelTab;
 }
+
+type PanelTab = "step" | "context" | "path" | "details";
 
 function effectiveMode(view: ViewState, machine: VizMachine): CoverageMode {
   const modes = availableModes(machine);
@@ -124,6 +140,8 @@ export function mountViewer(
         : decodePath(first, options.steps ?? []),
     live: null,
     previous: undefined,
+    composing: null,
+    tab: "step",
   };
   const { driver } = options;
   if (driver !== undefined) replayInto(view, driver, decodeLiveSteps(options.steps ?? []));
@@ -134,7 +152,7 @@ export function mountViewer(
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
     root.replaceChildren();
-    root.classList.add("viz");
+    root.classList.add("viz", "not-content");
     if (!machine) {
       root.append(html(doc, "p", { class: "empty" }, ["Document has no machines."]));
       return;
@@ -144,20 +162,16 @@ export function mountViewer(
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     const refresh = () => {
-      panel.replaceChildren(
-        explorePanel(doc, {
-          machine,
-          path: view.path,
-          take,
-          rewind,
-          ...(view.live === null
-            ? {}
-            : { live: { state: view.live, send, previous: view.previous, play } }),
-        }),
-        renderPanel(doc, machine, { selection: view.selection, select }),
-      );
-      markExplore(root, { machine, path: view.path, ...liveState(view) });
-      markSelection(root, view.selection);
+      const parts = explorePanel(doc, {
+        machine,
+        path: view.path,
+        take,
+        rewind,
+        ...liveOf(view, { send, play, compose }),
+      });
+      const details = renderPanel(doc, machine, { selection: view.selection, select });
+      panel.replaceChildren(panelTabs(doc, { view, parts, details, refresh }));
+      markDiagram(root, { machine, view, send, compose });
     };
     const walked = () => {
       const steps =
@@ -169,14 +183,16 @@ export function mountViewer(
     };
     const send = (step: VizStep) => {
       if (driver === undefined) return;
-      view.previous = view.live?.context;
-      view.live = stepSafely(driver, { before: view.live, step });
+      stepInto(view, driver, step);
       walked();
+    };
+    const compose = (event: string | null) => {
+      view.composing = event;
+      refresh();
     };
     const take = (step: ExploreStep) => {
       if (driver !== undefined) {
-        const event = machine.edges.find((edge) => edge.id === step.edge)?.event;
-        if (event !== undefined) send({ kind: "event", event, payload: null });
+        liveTake(machine, step, { send, compose });
         return;
       }
       view.path = [...view.path, step];
@@ -199,8 +215,9 @@ export function mountViewer(
     const select = (selection: Selection) => {
       const step = clickStep(machine, { path: view.path, selection, ...liveState(view) });
       view.selection = selection;
-      if (step === null) refresh();
-      else take(step);
+      if (step !== null) return take(step);
+      view.tab = "details";
+      refresh();
     };
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(
@@ -226,11 +243,74 @@ export function mountViewer(
   render();
 }
 
+type LiveContext = NonNullable<ExploreContext["live"]>;
+
+/** Step, Context (live only), Path and Details as tabs; Context counts the lines the last step changed. */
+function panelTabs(
+  doc: Document,
+  context: { view: ViewState; parts: ExploreParts; details: HTMLElement; refresh: () => void },
+): HTMLElement {
+  const { view, parts } = context;
+  const changed = view.live === null ? 0 : changedLines(view.live, view.previous);
+  const all: Array<Tab<PanelTab> | null> = [
+    { id: "step", label: "Step", content: parts.step },
+    parts.context === null
+      ? null
+      : {
+          id: "context",
+          label: changed === 0 ? "Context" : `Context (${changed} changed)`,
+          content: parts.context,
+        },
+    { id: "path", label: "Path", content: parts.path },
+    { id: "details", label: "Details", content: context.details },
+  ];
+  const shown = all.filter((tab): tab is Tab<PanelTab> => tab !== null);
+  const active = shown.some((tab) => tab.id === view.tab) ? view.tab : "step";
+  return tabs(doc, {
+    tabs: shown,
+    active,
+    onSelect: (id) => {
+      view.tab = id;
+      context.refresh();
+    },
+  });
+}
+
+function liveOf(
+  view: ViewState,
+  handlers: Pick<LiveContext, "send" | "play" | "compose">,
+): { live?: LiveContext } {
+  if (view.live === null) return {};
+  return {
+    live: { state: view.live, previous: view.previous, ...handlers },
+  };
+}
+
+/** A live click on an edge: an event that carries a payload opens its form, as in the Send list. */
+function liveTake(
+  machine: VizMachine,
+  step: ExploreStep,
+  handlers: Pick<LiveContext, "send" | "compose">,
+): void {
+  const event = machine.edges.find((edge) => edge.id === step.edge)?.event;
+  if (event === undefined) return;
+  if (payloadSamples(machine, event).length > 0) handlers.compose(event);
+  else handlers.send({ kind: "event", event, payload: null });
+}
+
+/** Takes one live step: the context before it becomes `previous`, and an open payload form closes. */
+function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
+  view.previous = view.live?.context;
+  view.live = stepSafely(driver, { before: view.live, step });
+  view.composing = null;
+}
+
 /** A driver that throws leaves the state where it was and shows the message as a handler error. */
 /** Sets `view.live` to the state after `steps` and `view.previous` to the context before the last of them. */
 function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<VizStep>): void {
   view.previous = steps.length === 0 ? undefined : replay(driver, steps.slice(0, -1)).context;
   view.live = replay(driver, steps);
+  view.composing = null;
 }
 
 function stepSafely(
@@ -333,6 +413,18 @@ function headerOf(
     ),
     fullscreenButton(doc, context.root),
   ]);
+}
+
+/** Everything drawn over the graph: walk marks, selection, and the open payload popover. */
+function markDiagram(
+  root: HTMLElement,
+  context: { machine: VizMachine; view: ViewState } & Pick<LiveContext, "send" | "compose">,
+): void {
+  const { machine, view } = context;
+  markExplore(root, { machine, path: view.path, ...liveState(view) });
+  markSelection(root, view.selection);
+  const canvas = root.querySelector<HTMLElement>(".canvas");
+  if (canvas) showPayloadPopover(canvas, { ...context, ...view });
 }
 
 function markSelection(root: HTMLElement, selection: Selection | null): void {
