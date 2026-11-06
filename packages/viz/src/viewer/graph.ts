@@ -296,6 +296,19 @@ function wireChips(root: SVGSVGElement, doc: Document, machine: VizMachine): voi
 }
 
 /** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. */
+/** Label size in viewBox units (`.graph text`). */
+const LABEL_UNITS = 12;
+
+/**
+ * Width relative to the viewer's text (em), so labels track it and the
+ * reader's font settings: fills the canvas, labels between 0.85em and 1.4em.
+ * Below the floor the canvas scrolls sideways rather than shrink unreadably.
+ */
+function graphWidth(units: number): string {
+  const em = (scale: number) => `${((units * scale) / LABEL_UNITS).toFixed(2)}em`;
+  return `width: clamp(${em(0.85)}, 100%, ${em(1.4)})`;
+}
+
 export function renderGraph(
   doc: Document,
   machine: VizMachine,
@@ -311,8 +324,7 @@ export function renderGraph(
       // Natural size; the standalone page scales to fit, embeds may scroll instead.
       width: Math.ceil(placed.width),
       height: Math.ceil(placed.height),
-      // Scales down to fit the canvas; never up past natural size.
-      style: `max-width: ${Math.ceil(placed.width)}px`,
+      style: graphWidth(placed.width),
       role: "group",
       "aria-label": `machine ${machine.id}`,
     },
