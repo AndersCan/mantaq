@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/lit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Bind mantaq actors into lit-html templates with one directive.",
   "license": "MIT",
   "repository": {
