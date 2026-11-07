@@ -19,6 +19,12 @@ export type {
   InspectTarget,
   ModuleOptions,
 } from "./inspect.ts";
+export type {
+  AnyExpectations,
+  ContextMatch,
+  Expectations,
+  StateExpectations,
+} from "./expectations.ts";
 export { inspectFile } from "./load.ts";
 export type { FileOptions } from "./load.ts";
 export { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts";

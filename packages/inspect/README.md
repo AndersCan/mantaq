@@ -106,6 +106,7 @@ const json = serializeViz(vizDocument([machine]));
 - **A fresh actor per call**, to fuzz. A file that only exports one actor instance is drawn, not fuzzed. When a file has factories, its actor instances are skipped.
 - **Exported factories.** Export a factory that takes ports and a clock, not only a built instance. See [Machines in an application](https://anderscan.github.io/mantaq/guides/machines-in-an-app/).
 - **A factory, for the live page.** The page recreates the actor on every step, so it needs an exported factory; a file that only exports an instance stays a static walk, with the usual warning.
+- **Expectations, optional.** Export `<machine id>Expectations` (type `Expectations<typeof createXActor>`) with `neverSee` and `mustSee` contexts per state. Fuzzing reports a never-see that was reached, and a must-see that no run reached. See [Design gate](https://anderscan.github.io/mantaq/guides/design-gate/).
 - **A `VirtualClock`**, to fuzz. An actor on the real clock is drawn, with a warning.
 
 Every part that cannot run is skipped with a warning, never guessed.

@@ -27,7 +27,7 @@ const stepB: VizStep = { kind: "event", event: "b", payload: null } as VizStep;
 describe("machineFindings", () => {
   test("a machine without findings has none", () => {
     const machine = build({
-      states: [vizState("idle", { initial: true }), vizState("done")],
+      states: [vizState("idle", { initial: true }), vizState("done", { final: true })],
       edges: [vizEdge("idle", "done")],
     });
     expect(machineFindings(machine)).toEqual([]);
@@ -36,6 +36,7 @@ describe("machineFindings", () => {
   test("handler error names its state and carries the fuzz steps", () => {
     const machine = build({
       states: [vizState("idle", { initial: true })],
+      edges: [vizEdge("idle", "idle", "stay")],
       fuzz: {
         errors: [{ from: "idle", event: "pick", message: "boom", steps: [stepA] }],
         corpus: [],
@@ -49,6 +50,7 @@ describe("machineFindings", () => {
   test("unreachable state has no path", () => {
     const machine = build({
       states: [vizState("idle", { initial: true }), vizState("orphan")],
+      edges: [vizEdge("idle", "idle", "stay")],
     });
     expect(machineFindings(machine)).toEqual([
       {
@@ -59,6 +61,58 @@ describe("machineFindings", () => {
       },
     ]);
     expect(unreachableStates(machine)).toEqual(["orphan"]);
+  });
+
+  describe("dead end", () => {
+    const waiting = (extra: Record<string, unknown>, edges: unknown[] = []) =>
+      build({
+        states: [vizState("idle", { initial: true }), vizState("waiting", extra)],
+        edges: [vizEdge("idle", "waiting"), ...edges],
+      });
+
+    test("a non-final state with no handler and no effect is reported", () => {
+      expect(machineFindings(waiting({}))).toEqual([
+        {
+          kind: "deadEnd",
+          state: "waiting",
+          message: "state waiting has no way out and is not final",
+          steps: null,
+        },
+      ]);
+    });
+
+    test("takes the shortest corpus path", () => {
+      const machine = build({
+        states: [vizState("idle", { initial: true }), vizState("waiting")],
+        edges: [vizEdge("idle", "waiting")],
+        fuzz: { errors: [], corpus: [{ steps: [stepA], discovered: ["state:waiting"] }] },
+      });
+      expect(machineFindings(machine)[0]?.steps).toEqual([stepA]);
+    });
+
+    test("a final state is fine", () => {
+      expect(machineFindings(waiting({ final: true }))).toEqual([]);
+    });
+
+    test("a state that only stays is fine", () => {
+      expect(machineFindings(waiting({}, [vizEdge("waiting", "waiting", "stay")]))).toEqual([]);
+    });
+
+    test("a state covered by an onAny handler is fine", () => {
+      expect(machineFindings(waiting({}, [vizEdge("*", "idle", "reset")]))).toEqual([]);
+    });
+
+    test("a state with an effect is fine", () => {
+      expect(machineFindings(waiting({ effects: [{ name: "poll", sends: [] }] }))).toEqual([]);
+    });
+
+    test("an unreachable state is reported only as unreachable", () => {
+      const machine = build({
+        states: [vizState("idle", { initial: true }), vizState("orphan")],
+        edges: [vizEdge("idle", "idle", "stay")],
+      });
+      expect(machineFindings(machine).map((f) => f.kind)).toEqual(["unreachableState"]);
+    });
   });
 
   const sending = (initial: boolean, fuzz: unknown) =>
@@ -111,12 +165,85 @@ describe("machineFindings", () => {
     expect(machineFindings(machine)[0]?.steps).toBeNull();
   });
 
+  const failed = (kind: string, steps: unknown) => ({
+    kind,
+    state: "payment",
+    match: '{"address":""}',
+    steps,
+  });
+
+  test("never-see carries the shrunk steps", () => {
+    const machine = build({
+      states: [vizState("payment", { initial: true })],
+      edges: [vizEdge("payment", "payment", "stay")],
+      fuzz: {
+        iterations: 2000,
+        errors: [],
+        corpus: [],
+        failedExpectations: [failed("neverSee", [stepA, stepB])],
+      },
+    });
+    expect(machineFindings(machine)).toEqual([
+      {
+        kind: "neverSee",
+        state: "payment",
+        message: 'state payment reached never-see context {"address":""}',
+        steps: [stepA, stepB],
+      },
+    ]);
+  });
+
+  test("must-see names the run count and has no path", () => {
+    const machine = build({
+      states: [vizState("payment", { initial: true })],
+      edges: [vizEdge("payment", "payment", "stay")],
+      fuzz: {
+        iterations: 2000,
+        errors: [],
+        corpus: [],
+        failedExpectations: [failed("mustSee", null)],
+      },
+    });
+    expect(machineFindings(machine)).toEqual([
+      {
+        kind: "mustSee",
+        state: "payment",
+        message: 'state payment never reached must-see context {"address":""} in 2000 fuzz runs',
+        steps: null,
+      },
+    ]);
+  });
+
+  test("orders handler errors, never-see, must-see, unhandled sends, then unreachable states", () => {
+    const machine = build({
+      states: [
+        vizState("idle", { initial: true, effects: [{ name: "notify", sends: ["ping"] }] }),
+        vizState("orphan"),
+      ],
+      edges: [vizEdge("idle", "idle", "stay")],
+      fuzz: {
+        iterations: 1,
+        errors: [{ from: "idle", event: "pick", message: "boom", steps: [] }],
+        corpus: [],
+        failedExpectations: [failed("mustSee", null), failed("neverSee", [])],
+      },
+    });
+    expect(machineFindings(machine).map((finding) => finding.kind)).toEqual([
+      "handlerError",
+      "neverSee",
+      "mustSee",
+      "unhandledSend",
+      "unreachableState",
+    ]);
+  });
+
   test("lists handler errors, then unhandled sends, then unreachable states", () => {
     const machine = build({
       states: [
         vizState("idle", { initial: true, effects: [{ name: "notify", sends: ["ping"] }] }),
         vizState("orphan"),
       ],
+      edges: [vizEdge("idle", "idle", "stay")],
       fuzz: { errors: [{ from: "idle", event: "pick", message: "boom", steps: [] }], corpus: [] },
     });
     expect(machineFindings(machine).map((finding) => finding.kind)).toEqual([
@@ -130,7 +257,10 @@ describe("machineFindings", () => {
 describe("FINDING_KINDS", () => {
   test("titles every kind", () => {
     expect(Object.keys(FINDING_KINDS).sort()).toEqual([
+      "deadEnd",
       "handlerError",
+      "mustSee",
+      "neverSee",
       "unhandledSend",
       "unreachableState",
     ]);

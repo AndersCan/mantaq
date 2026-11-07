@@ -24,7 +24,7 @@ describe("validateViz rejects", () => {
 
   test("version 9 documents and a missing outputs list", () => {
     expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
-      "$.schemaVersion: expected 10, got 9",
+      "$.schemaVersion: expected 11, got 9",
     ]);
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["outputs"];
@@ -77,12 +77,33 @@ describe("validateViz rejects", () => {
         },
       ],
       errors: [],
+      failedExpectations: [],
     };
     expect(issues(doc)).toEqual([
       "$.machines[0].fuzz.corpus[0].steps[0].kind: expected event or advance",
       "$.machines[0].fuzz.corpus[0].steps[0].event: expected string",
       "$.machines[0].fuzz.corpus[0].steps[0].payload: expected JSON value",
       "$.machines[0].fuzz.corpus[0].steps[1].payload: expected JSON value",
+    ]);
+  });
+
+  test("fuzz.failedExpectations: kind must be neverSee or mustSee, steps null or a list", () => {
+    const doc = valid();
+    if (typeof doc !== "object" || doc === null || !("machines" in doc)) return;
+    const machines = doc.machines;
+    if (!Array.isArray(machines)) return;
+    machines[0].fuzz = {
+      seed: 1,
+      iterations: 1,
+      corpus: [],
+      errors: [],
+      failedExpectations: [
+        { kind: "maybe", state: "a", match: "{}", steps: null },
+        { kind: "mustSee", state: "a", match: "{}", steps: null },
+      ],
+    };
+    expect(issues(doc)).toEqual([
+      "$.machines[0].fuzz.failedExpectations[0].kind: expected neverSee or mustSee",
     ]);
   });
 

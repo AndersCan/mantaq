@@ -45,13 +45,14 @@ const machine: VizMachine = {
   states: [state("idle", { initial: true }), state("picked"), state("orphan")],
   events: [{ id: "pick", internal: false, doc: null, payloadType: null }],
   outputs: [],
-  edges: [edge("idle", "pick", "picked")],
+  edges: [edge("idle", "pick", "picked"), edge("picked", "pick", "idle")],
   runs: [],
   fuzz: {
     seed: 1,
     iterations: 1,
     corpus: [],
     errors: [{ from: "idle", event: "pick", message: "boom", steps: [pick] }],
+    failedExpectations: [],
   },
 };
 
@@ -119,8 +120,28 @@ describe("finding marks", () => {
       iterations: 1,
       corpus: [],
       errors: [{ from: "picked", event: "pick", message: "boom", steps: [pick] }],
+      failedExpectations: [],
     },
   };
+
+  test("a must-see finding says no run reached the context and offers no replay", () => {
+    const mustSee: VizMachine = {
+      ...machine,
+      fuzz: {
+        seed: 1,
+        iterations: 5,
+        corpus: [],
+        errors: [],
+        failedExpectations: [{ kind: "mustSee", state: "idle", match: '{"a":1}', steps: null }],
+      },
+    };
+    const root = mount(undefined, mustSee);
+    mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
+    const finding = root.querySelector('.finding[data-kind="mustSee"]');
+    expect(finding?.textContent).toContain("Must-see context missed");
+    expect(finding?.textContent).toContain("No fuzz run reached this context.");
+    expect(finding?.querySelector("[data-replay]")).toBeNull();
+  });
 
   test("clicking a mark on a next-step state does not take the step", () => {
     const root = mount(undefined, nextMarked);

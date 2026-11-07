@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 10;
+export const VIZ_SCHEMA_VERSION = 11;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -226,7 +226,7 @@ export interface VizDriver {
 export interface VizFuzzSequence {
   /** Shrunk replayable sequence, starting from a fresh actor. */
   steps: VizStep[];
-  /** Coverage features this sequence was kept for, e.g. `edge:a>go>b`. */
+  /** Coverage features this sequence was kept for, e.g. `edge:a>go>b`; also `never:<state>:<i>` and `must:<state>:<i>` when the machine file has expectations. */
   discovered: string[];
 }
 
@@ -238,11 +238,24 @@ export interface VizFuzzError {
   steps: VizStep[];
 }
 
+/** An expectation from the machine file that fuzzing broke. */
+export interface VizFailedExpectation {
+  kind: "neverSee" | "mustSee";
+  /** Top-level state id the expectation is written on. */
+  state: string;
+  /** The context as written, printed: {"address":""}. */
+  match: string;
+  /** neverSee: shrunk steps from a fresh actor that reach it ([] = the initial context). mustSee: null. */
+  steps: VizStep[] | null;
+}
+
 export interface VizFuzz {
   seed: number;
   iterations: number;
   corpus: VizFuzzSequence[];
   errors: VizFuzzError[];
+  /** [] = none written, or all held. Order: machine state order, neverSee before mustSee, then as written. */
+  failedExpectations: VizFailedExpectation[];
 }
 
 export interface VizDocument {

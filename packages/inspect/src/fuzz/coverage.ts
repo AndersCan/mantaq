@@ -33,15 +33,21 @@ function driven(edge: VizEdge): boolean {
 
 /**
  * Stateful `done` for `fuzz`: true once the runs seen so far reached every
- * state and every handler edge of `machine`, counted as the viz counts hits.
+ * state and every handler edge of `machine`, counted as the viz counts hits,
+ * and every `must` feature (must-see expectations) was hit.
  */
-export function coverageGoal(machine: VizMachine): (trace: Trace) => boolean {
+export function coverageGoal(
+  machine: VizMachine,
+  must: ReadonlyArray<string> = [],
+): (trace: Trace) => boolean {
   const states = new Set(machine.states.map((state) => state.id));
+  const unmet = new Set(must);
   let edges = machine.edges.filter(driven);
   return (trace) => {
     for (const state of trace.visited) states.delete(state);
+    for (const feature of trace.features) unmet.delete(feature);
     edges = edges.filter((edge) => !trace.observations.some((seen) => matches(edge, seen)));
-    return states.size === 0 && edges.length === 0;
+    return states.size === 0 && edges.length === 0 && unmet.size === 0;
   };
 }
 

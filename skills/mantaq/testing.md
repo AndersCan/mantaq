@@ -79,13 +79,17 @@ Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a 
 import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
 
 const target = { id: "inviteLink", create: () => createInviteLinkActor({ clock: VirtualClock() }) };
-expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, unreachable states
+expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, dead ends, unreachable states
 expectAllStatesReached(target);
 expectReached(target, { transitions: [{ from: "pending", event: "ACCEPT" }] });
 expectNoDesignErrors({ ...target, fuzz: false }); // structure only, no fuzzing
 ```
 
 Fuzz throws in app code are real findings: fix them, never suppress.
+
+Bad data without a crash: export `<machine id>Expectations` beside the factory, `payment: { neverSee: [{ address: "" }] }` typed `Expectations<typeof createXActor>`.
+`mustSee` lists contexts some run must reach. Tests can pass the block as `expectations` on the target.
+Payloads come from `source`; without it, payload events are sent without one.
 
 With `@mantaq/test` 2.0 the `*` any-node (`m.onAny`) counts in coverage: it is one node, covered once its event fires from any state.
 

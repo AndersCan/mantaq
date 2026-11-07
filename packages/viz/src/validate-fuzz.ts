@@ -1,4 +1,11 @@
-import type { VizFuzz, VizFuzzError, VizFuzzSequence, VizRun, VizStep } from "./schema.ts";
+import type {
+  VizFailedExpectation,
+  VizFuzz,
+  VizFuzzError,
+  VizFuzzSequence,
+  VizRun,
+  VizStep,
+} from "./schema.ts";
 import {
   isRecord,
   readInteger,
@@ -49,6 +56,22 @@ function readError(reader: Reader, record: JsonObject, path: string): VizFuzzErr
   };
 }
 
+function readFailedExpectation(
+  reader: Reader,
+  record: JsonObject,
+  path: string,
+): VizFailedExpectation {
+  const kind = record["kind"];
+  if (kind !== "neverSee" && kind !== "mustSee")
+    report(reader, { path: `${path}.kind`, message: "expected neverSee or mustSee" });
+  return {
+    kind: kind === "mustSee" ? "mustSee" : "neverSee",
+    state: readString(reader, { record, key: "state", path }),
+    match: readString(reader, { record, key: "match", path }),
+    steps: record["steps"] === null ? null : readSteps(reader, record, path),
+  };
+}
+
 export function readFuzz(reader: Reader, at: { record: JsonObject; path: string }): VizFuzz | null {
   const value = at.record["fuzz"];
   if (value === null) return null;
@@ -65,6 +88,11 @@ export function readFuzz(reader: Reader, at: { record: JsonObject; path: string 
     ),
     errors: readList(reader, { record: value, key: "errors", path }, (item, itemPath) =>
       readError(reader, item, itemPath),
+    ),
+    failedExpectations: readList(
+      reader,
+      { record: value, key: "failedExpectations", path },
+      (item, itemPath) => readFailedExpectation(reader, item, itemPath),
     ),
   };
 }
