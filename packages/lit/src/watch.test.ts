@@ -168,3 +168,59 @@ test("infers the context type from the actor", () => {
     return s.context.missing;
   });
 });
+
+test("nested watch over two machines keeps the element and one subscription each", () => {
+  const a = makeActor();
+  const b = makeActor();
+  const { spy: spyA, wrapped: wrappedA } = spyOn(a);
+  const { spy: spyB, wrapped: wrappedB } = spyOn(b);
+  const root = container();
+  render(
+    html`<p>
+      ${watch(
+        wrappedA,
+        (sa) =>
+          html`<span>${watch(wrappedB, (sb) => `${sa.context.label}-${sb.context.label}`)}</span>`,
+      )}
+    </p>`,
+    root,
+  );
+  const p = root.querySelector("p");
+  const span = root.querySelector("span");
+  for (const label of ["a1", "a2", "a3"]) a.send(relabel.create({ label }));
+  for (const label of ["b1", "b2", "b3"]) b.send(relabel.create({ label }));
+  expect({
+    text: root.textContent?.trim(),
+    activeA: spyA.active,
+    activeB: spyB.active,
+    totalB: spyB.total,
+    sameP: root.querySelector("p") === p,
+    sameSpan: root.querySelector("span") === span,
+  }).toEqual({ text: "a3-b3", activeA: 1, activeB: 1, totalB: 1, sameP: true, sameSpan: true });
+});
+
+test("inner watch is released when the outer select stops returning it", () => {
+  const a = makeActor();
+  const b = makeActor();
+  const { spy: spyB, wrapped: wrappedB } = spyOn(b);
+  const root = container();
+  render(
+    html`<p>
+      ${watch(a, (sa) =>
+        sa.context.label !== "off"
+          ? watch(wrappedB, (sb) => `${sa.context.label}-${sb.context.label}`)
+          : "off",
+      )}
+    </p>`,
+    root,
+  );
+  expect(spyB.active).toBe(1);
+  a.send(relabel.create({ label: "off" }));
+  expect(spyB.active).toBe(0);
+  const text = root.textContent?.trim();
+  b.send(relabel.create({ label: "late" }));
+  expect({ text: root.textContent?.trim(), initial: text }).toEqual({
+    text: "off",
+    initial: "off",
+  });
+});
