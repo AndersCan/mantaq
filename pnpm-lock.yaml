@@ -261,6 +261,9 @@ importers:
 
   packages/inspect:
     dependencies:
+      '@dagrejs/dagre':
+        specifier: 'catalog:'
+        version: 3.1.2
       '@mantaq/core':
         specifier: workspace:*
         version: link:../core

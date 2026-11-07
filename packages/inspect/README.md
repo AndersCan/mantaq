@@ -52,6 +52,17 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 - **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations }`. Default: seeded, 2000 iterations, so builds are reproducible.
 - Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the static walk.
 
+**Overview of all machines.** `<Machines pages={...} />` draws every machine given to `mantaqViz` as a box, with an arrow from A to B labelled `e` when `e` is in A's declared `outputs` and B handles `e` as an input (same event id, internal events excluded).
+
+```astro
+---
+import Machines from "@mantaq/inspect/astro/Machines.astro";
+---
+<Machines pages={{ "": ["src/machines/cart.ts"], checkout: ["src/machines/checkout.ts"] }} />
+```
+
+`pages` maps a page path under the site base (`""` is the home page) to the machine files shown on it, as given to `machines`. Clicking a box opens that page with `?machine=<id>` selected. The build fails when a listed file is not in `machines` or a machine's file is on no page. It is plain SVG; no script runs.
+
 **Library**: one call per machine.
 
 ```ts

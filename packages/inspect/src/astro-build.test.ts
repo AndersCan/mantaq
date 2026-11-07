@@ -15,6 +15,7 @@ const retry = "../fixtures/retry.ts";
 const orphan = "../fixtures/orphan.ts";
 const retryAgain = "../fixtures/retry-again.ts";
 const empty = "../fixtures/no-machines.ts";
+const linked = "../fixtures/linked.ts";
 
 function page(sources: string[]): string {
   const tags = sources.map((src) => `<Machine src="${src}" />`).join("\n");
@@ -34,6 +35,10 @@ function built(): string {
   return readFileSync(join(site, "dist", "index.html"), "utf8").replace(/<link[^>]*>/g, "");
 }
 
+function overviewPage(pages: Record<string, string[]>): string {
+  return `---\nimport Machines from "@mantaq/inspect/astro/Machines.astro";\n---\n<html><body>\n<Machines pages={${JSON.stringify(pages)}} />\n</body></html>\n`;
+}
+
 function makeSite(sources: string[]): string {
   const root = mkdtempSync(join(import.meta.dirname, "astro-site-"));
   mkdirSync(join(root, "src", "pages"), { recursive: true });
@@ -43,7 +48,11 @@ function makeSite(sources: string[]): string {
 
 beforeAll(async () => {
   site = makeSite([retry, orphan]);
-  await buildSite(site, [retry, orphan]);
+  writeFileSync(
+    join(site, "src", "pages", "machines.astro"),
+    overviewPage({ "": [linked], other: [retry, orphan] }),
+  );
+  await buildSite(site, [retry, orphan, linked]);
 }, 120_000);
 
 afterAll(() => {
@@ -81,6 +90,49 @@ describe("mantaqViz for Astro", () => {
       expect(root?.querySelector<HTMLElement>(".explore")?.dataset["current"]).not.toBe(before),
     );
   });
+
+  test("Machines draws linked machines and links boxes to their pages", () => {
+    const html = readFileSync(join(site, "dist", "machines", "index.html"), "utf8").replace(
+      /<link[^>]*>/g,
+      "",
+    );
+    document.documentElement.innerHTML = html;
+    expect(document.querySelector<HTMLElement>(".mantaq-machines")?.dataset["links"]).toBe("1");
+    const link = document.querySelectorAll('.link[data-from="sender"][data-to="receiver"]');
+    expect(link).toHaveLength(1);
+    expect(link[0]?.textContent).toContain("handedOver");
+    expect(document.querySelector('a.box[data-machine="sender"]')?.getAttribute("href")).toMatch(
+      /\?machine=sender$/,
+    );
+    expect(document.querySelector('a.box[data-machine="retry"]')?.getAttribute("href")).toContain(
+      "/other/",
+    );
+    expect(document.querySelector("figcaption")?.textContent).toContain(
+      "Click a machine to open its page.",
+    );
+  });
+
+  test("a Machines page listing a file not in machines fails the build", async () => {
+    const root = makeSite([retry]);
+    writeFileSync(join(root, "src", "pages", "machines.astro"), overviewPage({ "": [linked] }));
+    try {
+      await expect(buildSite(root, [retry])).rejects.toThrow(
+        /not in the machines given to mantaqViz/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  test("a machine on no page fails the build", async () => {
+    const root = makeSite([retry]);
+    writeFileSync(join(root, "src", "pages", "machines.astro"), overviewPage({ "": [retry] }));
+    try {
+      await expect(buildSite(root, [retry, linked])).rejects.toThrow(/is on no page/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   test("a Machine whose src is not in machines fails the build", async () => {
     const root = makeSite([retry, orphan]);

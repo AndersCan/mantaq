@@ -1,0 +1,106 @@
+---
+import { resolve } from "node:path";
+import { documents, overview, root } from "virtual:mantaq/documents";
+
+const { pages } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/*$/, "/");
+const pageOf = new Map();
+for (const [key, files] of Object.entries(pages)) {
+  for (const file of files) {
+    const abs = resolve(root, file);
+    if (documents[abs] === undefined) {
+      throw new Error(
+        `<Machines>: pages["${key}"] lists ${file}, which is not in the machines given to mantaqViz() in astro.config (resolved to ${abs}). Add it to machines.`,
+      );
+    }
+    if (!pageOf.has(abs)) pageOf.set(abs, key);
+  }
+}
+const boxes = overview.boxes.map((box) => {
+  const key = pageOf.get(box.file);
+  if (key === undefined) {
+    throw new Error(
+      `<Machines>: machine ${box.id} (${box.file}) is on no page in pages. Add its file to pages.`,
+    );
+  }
+  const path = key.replace(/^\/+|\/+$/g, "");
+  const href = `${base}${path === "" ? "" : `${path}/`}?machine=${encodeURIComponent(box.id)}`;
+  return { ...box, href };
+});
+const line = (points) =>
+  points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`).join(" ");
+---
+
+<figure class="mantaq-machines" data-links={overview.links.length}>
+  <svg
+    viewBox={`0 0 ${overview.width} ${overview.height}`}
+    width={overview.width}
+    height={overview.height}
+    role="img"
+    aria-label="How the machines connect"
+  >
+    <defs>
+      <marker
+        id="mantaq-machines-arrow"
+        viewBox="0 0 10 10"
+        refX="10"
+        refY="5"
+        markerWidth="8"
+        markerHeight="8"
+        orient="auto-start-reverse"
+      >
+        <path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path>
+      </marker>
+    </defs>
+    {
+      overview.links.map((link) => (
+        <g class="link" data-from={link.from} data-to={link.to}>
+          <path d={line(link.points)} marker-end="url(#mantaq-machines-arrow)" />
+          <text x={link.labelAt.x} y={link.labelAt.y} text-anchor="middle">
+            {link.label}
+          </text>
+        </g>
+      ))
+    }
+    {
+      boxes.map((box) => (
+        <a class="box" href={box.href} data-machine={box.id}>
+          <rect x={box.x} y={box.y} width={box.width} height={box.height} rx="6"></rect>
+          <text x={box.x + box.width / 2} y={box.y + box.height / 2} text-anchor="middle">
+            {box.id}
+          </text>
+        </a>
+      ))
+    }
+  </svg>
+  <figcaption>
+    An arrow is an event one machine sends out and another takes in. Click a machine to open its
+    page.
+  </figcaption>
+</figure>
+
+<style>
+  .mantaq-machines svg {
+    max-width: 100%;
+    height: auto;
+    color: currentColor;
+  }
+  .mantaq-machines path {
+    fill: none;
+    stroke: currentColor;
+  }
+  .mantaq-machines marker path {
+    stroke: none;
+  }
+  .mantaq-machines text {
+    fill: currentColor;
+    dominant-baseline: middle;
+  }
+  .mantaq-machines .link text {
+    font-size: 0.8em;
+  }
+  .mantaq-machines rect {
+    fill: Canvas;
+    stroke: currentColor;
+  }
+</style>
