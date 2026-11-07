@@ -66,7 +66,7 @@ States, then edges, then runs. Follow the user's order. Write each step into the
 
 ## 6. Runs
 
-Each test builds the actor through `recordRuns(factory)` (`@mantaq/inspect/record`). Name tests as user-visible journeys: the name is the run's label. Run the whole test file after each change so the Runs list updates. A journey linked from docs is a top-level test (no `describe`), so the run name is its title. Build it with only `{ clock }`, as the page does, so it replays the same there.
+Each test builds the actor through `recordRuns(factory)` (`@mantaq/inspect/record`). Name tests as user-visible journeys: the name is the run's label. Run the whole test file after each change so the Runs list updates. A journey linked from docs is a top-level test (no `describe`), so the run name is its title. Build it with only `{ clock }`, as the page does, so it replays the same there. The user can also save a journey from the live page; see section 11.
 
 The page fuzzes each machine on a budget and warns on states it never reached. A deep state at 0 hits is a budget miss, not proof it is unreachable: raise `fuzz: { timeLimitMs }` or `fuzz: { iterations }` in `mantaqViz` (or `expectNoDesignErrors`), or add a test journey that reaches it (a named run in `tests`).
 
@@ -105,6 +105,7 @@ When the user says "apply the viz notes" (or "the notes"):
 
 1. Find them: `rg -l "^mantaq notes v1" -g '*.notes.md'`. Read every item with `status: open`. Skip `done`.
 2. `on:` names a state (`on: state paymentPending`) or an arrow by its source state and event (`on: edge paymentPending CANCEL`). `machine:` is the machine id. An arrow note is about the handler for that event in that state (`m.on(paymentPending, { event: CANCEL })`; source `*` or `<region>.*` is `m.onAny({ event: CANCEL })`): change that handler and what it needs, nothing else. One handler can draw several arrows; if the note does not say which outcome it means, ask. A note on a state may ask for a change near it: "needs a cancel" means a new edge out of that state.
+   - `on: walk` is a journey the user clicked, not a change to the machine. `note:` is its name, `end:` the state it ended in, `steps:` the inputs from a fresh actor (`event` steps are sends, `advance` steps are `clock.advance(ms)`). Add one top-level test (section 6), titled exactly `note:`, in the machine's test file, building the actor through `recordRuns(factory)` with only `{ clock }`, and send the steps in order. Run the test file, then check `__runs__/<test file>.json` has a run with that name whose `end` equals `end:`. Not equal: fix the test, never the note. Then `status: done` and `result: run "<name>" in <test file>`. A step whose event is `internal: true` in `viz.json` is an effect's answer, which this does not cover yet: leave the note open with `question:`.
 3. Change the real machine file (section 1), with JSDoc as in section 4. Two notes that contradict each other: apply neither and ask which one.
 4. Run the section 8 checks.
 5. Then, for each note you applied, change `status: open` to `status: done` and add one line under it: `  result: <what changed, one line>`. Not sure what a note means: leave it open, add `  question: <one question>`, and ask the same question in chat.
