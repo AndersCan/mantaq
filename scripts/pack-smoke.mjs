@@ -9,7 +9,7 @@
  * Run it after `vp run ready` (not inside `vp run`: the task runner breaks the
  * nested `vp pack` that `prepack` starts).
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   copyFileSync,
   mkdirSync,
@@ -91,7 +91,17 @@ try {
   const installed = JSON.parse(
     readFileSync(join(app, "node_modules/@mantaq/inspect/package.json"), "utf8"),
   );
-  check(!("bin" in installed), "inspect tarball has no bin");
+  check(
+    installed.bin?.["mantaq-check-site"] !== undefined,
+    "inspect tarball has the mantaq-check-site bin",
+  );
+  const usage = spawnSync(join(app, "node_modules/.bin/mantaq-check-site"), [], {
+    encoding: "utf8",
+  });
+  check(
+    usage.status === 2 && usage.stderr.includes("usage: mantaq-check-site <dir>"),
+    "mantaq-check-site with no arguments exits 2 with the usage line (needs no playwright)",
+  );
   check(!("./live-embedded" in installed.exports), "inspect tarball has no live-embedded export");
 
   writeFileSync(
