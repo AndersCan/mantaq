@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  Breaking: viz documents are version 13. `VizFuzz.expectations` lists every rule the machine file writes (`neverSee` and `mustSee`) with `held`, whether fuzzing kept it; `failedExpectations` still lists the ones that broke. Stored viz.json files must be exported again; documents from mantaq docs and the Vite plugin regenerate at build.
+- _(minor)_ A state's details panel lists the rules the machine file writes for it, under Rules, with whether fuzzing kept each one.
+
 ## 0.14.0
 
 <sub>2026-11-07</sub>
