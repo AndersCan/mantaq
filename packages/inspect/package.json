@@ -23,6 +23,9 @@
     "url": "https://github.com/AndersCan/mantaq",
     "directory": "packages/inspect"
   },
+  "bin": {
+    "mantaq-check-site": "./src/check-site-cli.ts"
+  },
   "files": [
     "dist",
     "src/astro/Machine.astro",
@@ -42,6 +45,9 @@
     "./astro/Machines.astro": "./src/astro/Machines.astro"
   },
   "publishConfig": {
+    "bin": {
+      "mantaq-check-site": "./dist/check-site-cli.mjs"
+    },
     "exports": {
       ".": "./dist/index.mjs",
       "./astro": "./dist/astro.mjs",
@@ -81,12 +87,14 @@
     "@typescript/native-preview": "catalog:",
     "astro": "^7.2.0",
     "happy-dom": "catalog:",
+    "playwright": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
     "astro": "^7.0.0",
+    "playwright": ">=1.50.0",
     "vite": "*",
     "vitest": "*"
   },
@@ -95,6 +103,9 @@
       "optional": true
     },
     "astro": {
+      "optional": true
+    },
+    "playwright": {
       "optional": true
     }
   },

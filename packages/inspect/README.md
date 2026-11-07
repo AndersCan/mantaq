@@ -102,6 +102,22 @@ const json = serializeViz(vizDocument([machine]));
 
 `inspectFile(file)` / `inspectModule(file, { load })` do the discovery the Vite plugin does, and read recorded runs from `__runs__/*.json` next to the machine file (`{ [machineId]: { name, end, steps }[] }`). A run is replayed on a fresh actor; internal events the replay already produces (timers, synchronous emits) are dropped, and a run that replays to a different state than `end` is dropped with a warning. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
 
+## Check the built site
+
+```sh
+npm i -D playwright && npx playwright install chromium
+astro build && mantaq-check-site dist --base /docs
+```
+
+`mantaq-check-site <dir> [--base <path>]` serves the built Astro site, opens every page that holds a machine in headless Chromium and prints one line per problem, naming the page and the machine:
+
+- a machine draws no diagram;
+- a live machine handles none of the events it offers;
+- an overview box (`<Machines>`) links to a page that was not built, or to a page that shows no viewer for that machine (the overview is what makes "this page shows its machine" checkable);
+- a page throws or logs an error in the browser.
+
+`--base` is the Astro `base` (default `/`). Exit codes: 0 ok, 1 problems found, 2 could not run (usage, no `playwright`, no Chromium). `playwright` is an optional peer dependency; set `CHROMIUM_PATH` to use a Chromium you already have.
+
 ## What it needs from your file
 
 - **Exports.** An actor, or a function that returns one (or `{ actor }`). Functions are called with no arguments, with a `VirtualClock` when the first parameter is a clock, or with `{ clock }` when it is an options object with a `clock`. Functions with other required parameters are skipped. Discovery reads types only; nothing is called to find out.
