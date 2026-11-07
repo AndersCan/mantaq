@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_ Breaking: `expectNoDesignErrors` fails on dead ends: a non-final state where no event is handled and no effect runs.
+- _(minor)_
+  Write `<machine>Expectations` next to a machine: `neverSee` and `mustSee` contexts per state, checked on every fuzz run. `expectNoDesignErrors` reports a hit with the events that reach it.
+- _(minor)_
+  Fuzz budget as time: `fuzz: { timeLimitMs }` stops at full coverage, the iteration cap, or the time limit, still seeded. `iterations` is now a cap: fuzzing stops early once every state and edge is covered, and `fuzz.iterations` in viz.json reports how many ran. The Vite dev default is `{ timeLimitMs: 2000 }` (was 500 iterations); `vite build` now defaults to 2000 iterations like `inspect` and Astro. Warns which states and edges fuzz never reached, with the iterations run and why it stopped, and when `inspect` without `source` sends events without payloads. A user timer callback that throws under `clock.advance` is now a fuzz error (event `advance`) with its replay path, instead of aborting `inspect`.
+- _(patch)_
+  Breaking: viz documents are version 11 (`fuzz.failedExpectations`); export stored `viz.json` files again. Findings gain the kinds never-see and must-see.
+- _(patch)_
+  READMEs rewritten against the current API (`Actor({...})`, `m.on(state, { event, to, handler })`, `VirtualClock()`, `setTimeout(ms, { cb, signal })`, `on("change", { fn })`); every README `ts` snippet now typechecks in `docs:check`. Core README gains "See your machine" (`@mantaq/inspect` Vite plugin) and the agent-skill install line. Packages declare `homepage`, `repository`, `bugs` and `keywords`.
+
 ## 0.8.0
 
 <sub>2026-11-07</sub>

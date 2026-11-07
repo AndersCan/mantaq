@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/pbt",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Seeded fast-check property-based testing helpers and shared generators.",
   "keywords": [
     "actor",
