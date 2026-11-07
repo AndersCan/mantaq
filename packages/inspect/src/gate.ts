@@ -15,11 +15,10 @@ function stepText(step: VizStep): string {
 }
 
 /** One line per finding, plus the events that lead there for fuzz-found ones. */
-function findingLines(machine: VizMachine): string[] {
+export function findingLines(machine: VizMachine): string[] {
   return machineFindings(machine).flatMap((finding) => {
     const line = `  - ${finding.message}`;
-    const shown = finding.kind === "handlerError" || finding.kind === "neverSee";
-    if (!shown || finding.steps === null || finding.steps.length === 0) return [line];
+    if (finding.steps === null || finding.steps.length === 0) return [line];
     return [line, `    after: ${finding.steps.map(stepText).join(" → ")}`];
   });
 }
