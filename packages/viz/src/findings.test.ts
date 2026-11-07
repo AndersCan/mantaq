@@ -111,6 +111,75 @@ describe("machineFindings", () => {
     expect(machineFindings(machine)[0]?.steps).toBeNull();
   });
 
+  const failed = (kind: string, steps: unknown) => ({
+    kind,
+    state: "payment",
+    match: '{"address":""}',
+    steps,
+  });
+
+  test("never-see carries the shrunk steps", () => {
+    const machine = build({
+      states: [vizState("payment", { initial: true })],
+      fuzz: {
+        iterations: 2000,
+        errors: [],
+        corpus: [],
+        failedExpectations: [failed("neverSee", [stepA, stepB])],
+      },
+    });
+    expect(machineFindings(machine)).toEqual([
+      {
+        kind: "neverSee",
+        state: "payment",
+        message: 'state payment reached never-see context {"address":""}',
+        steps: [stepA, stepB],
+      },
+    ]);
+  });
+
+  test("must-see names the run count and has no path", () => {
+    const machine = build({
+      states: [vizState("payment", { initial: true })],
+      fuzz: {
+        iterations: 2000,
+        errors: [],
+        corpus: [],
+        failedExpectations: [failed("mustSee", null)],
+      },
+    });
+    expect(machineFindings(machine)).toEqual([
+      {
+        kind: "mustSee",
+        state: "payment",
+        message: 'state payment never reached must-see context {"address":""} in 2000 fuzz runs',
+        steps: null,
+      },
+    ]);
+  });
+
+  test("orders handler errors, never-see, must-see, unhandled sends, then unreachable states", () => {
+    const machine = build({
+      states: [
+        vizState("idle", { initial: true, effects: [{ name: "notify", sends: ["ping"] }] }),
+        vizState("orphan"),
+      ],
+      fuzz: {
+        iterations: 1,
+        errors: [{ from: "idle", event: "pick", message: "boom", steps: [] }],
+        corpus: [],
+        failedExpectations: [failed("mustSee", null), failed("neverSee", [])],
+      },
+    });
+    expect(machineFindings(machine).map((finding) => finding.kind)).toEqual([
+      "handlerError",
+      "neverSee",
+      "mustSee",
+      "unhandledSend",
+      "unreachableState",
+    ]);
+  });
+
   test("lists handler errors, then unhandled sends, then unreachable states", () => {
     const machine = build({
       states: [
@@ -131,6 +200,8 @@ describe("FINDING_KINDS", () => {
   test("titles every kind", () => {
     expect(Object.keys(FINDING_KINDS).sort()).toEqual([
       "handlerError",
+      "mustSee",
+      "neverSee",
       "unhandledSend",
       "unreachableState",
     ]);
