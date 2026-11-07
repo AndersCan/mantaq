@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  Live viewer asks for an event's payload in a popover on the diagram, filled with a fuzz sample, instead of sending the event without one. The panel is tabbed (Step, Context, Path, Details) and sits below the graph unless the viewer is wide; text and graph size in rem/em, and host page styles no longer leak in.
+- _(minor)_
+  `?machine=<id>&run=<name>` opens a recorded run by name, and clicking a run puts that link in the address bar. An unknown name shows a notice instead of silently opening the start.
+
 ## 0.5.0
 
 <sub>2026-11-06</sub>

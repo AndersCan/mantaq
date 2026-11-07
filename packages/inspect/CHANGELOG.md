@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.1
+
+<sub>2026-11-07</sub>
+
+- _(patch)_
+  Fuzzer: the loop operator repeats the whole cycle that changed context (`submit, rejected`), not only its last step, so counters bumped by a round trip are reached. Kept sequences are shrunk until no step can go.
+- _(patch)_
+  `?machine=<id>&run=<name>` opens a recorded run by name, and clicking a run puts that link in the address bar. An unknown name shows a notice instead of silently opening the start.
+
 ## 0.6.0
 
 <sub>2026-11-06</sub>
