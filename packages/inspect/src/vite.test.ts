@@ -135,6 +135,14 @@ describe("notes endpoint", () => {
   beforeAll(() => rmSync(credit, { force: true }));
   afterAll(() => rmSync(credit, { force: true }));
 
+  function post(body: unknown): Promise<Response> {
+    return fetch(`${origin}/__mantaq/notes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
   function sentDuring(run: () => void): unknown[] {
     const sent: unknown[] = [];
     const send = server.ws.send.bind(server.ws);
@@ -149,7 +157,7 @@ describe("notes endpoint", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = (await response.json()) as { file: string; notes: Array<{ id: string }> };
     expect(body.file).toBe("retry.notes.md");
-    expect(body.notes.map((note) => note.id)).toEqual(["n1", "n2"]);
+    expect(body.notes.map((note) => note.id)).toEqual(["n1", "n2", "n3"]);
   });
 
   test("saves a note next to the machine file, and its own write does not redraw", async () => {
@@ -166,6 +174,28 @@ describe("notes endpoint", () => {
     expect(response.status).toBe(200);
     expect(readFileSync(credit, "utf8")).toContain("  note: first\n");
     expect(sentDuring(() => server.watcher.emit("all", "change", credit))).toEqual([]);
+  });
+
+  test("saves a note on an arrow", async () => {
+    const response = await post({
+      version: 1,
+      machine: "credit",
+      target: { kind: "edge", from: "idle", event: "apply" },
+      note: "arrow note",
+    });
+    expect(response.status).toBe(200);
+    expect(readFileSync(credit, "utf8")).toContain("  on: edge idle apply\n");
+  });
+
+  test("refuses a state the machine does not have", async () => {
+    const response = await post({
+      version: 1,
+      machine: "credit",
+      target: { kind: "state", state: "nope" },
+      note: "x",
+    });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "no state nope in credit" });
   });
 
   test("an outside edit redraws the page and keeps the cached document", async () => {

@@ -4,13 +4,16 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import {
   appendNote,
+  arrowsOf,
   cleanNoteText,
   isNoteTarget,
   notesFileOf,
   parseNotes,
   parseTarget,
+  targetProblem,
   targetText,
 } from "./notes.ts";
+import type { MachineShape } from "./notes.ts";
 
 const golden = readFileSync(join(import.meta.dirname, "fixtures", "retry.notes.md"), "utf8");
 
@@ -25,16 +28,34 @@ function twice(): string {
     target: state("connecting"),
     note: "needs a cancel",
   });
-  return appendNote(first.text, {
+  const second = appendNote(first.text, {
     file: "src/retry.ts",
     machine: "retry",
     target: state("lockedOut"),
     note: "lock out only after three tries",
+  });
+  return appendNote(second.text, {
+    file: "src/retry.ts",
+    machine: "retry",
+    target: { kind: "edge", from: "connecting", event: "failed" },
+    note: "count failures only while connecting",
   }).text;
 }
 
+const shape: MachineShape = {
+  states: [{ id: "s" }, { id: "t" }],
+  edges: [
+    { from: "s", event: "GO", kind: "transition" },
+    { from: "s", event: "GO", kind: "transition" },
+    { from: "*", event: "STOP", kind: "transition" },
+    { from: "t", event: "PING", kind: "stay" },
+    { from: "s", event: "effect:s", kind: "effect" },
+    { from: "__initial__", event: "", kind: "initial" },
+  ],
+};
+
 describe("notes file", () => {
-  test("two appends produce the golden file byte for byte", () => {
+  test("three appends produce the golden file byte for byte", () => {
     expect(twice()).toBe(golden);
   });
 
@@ -43,7 +64,42 @@ describe("notes file", () => {
     expect(Either.getRight(parsed)?.map((note) => [note.id, note.target, note.status])).toEqual([
       ["n1", state("connecting"), "open"],
       ["n2", state("lockedOut"), "open"],
+      ["n3", { kind: "edge", from: "connecting", event: "failed" }, "open"],
     ]);
+  });
+
+  test("parseTarget reads both kinds and round-trips", () => {
+    expect(parseTarget("edge a B")).toEqual({ kind: "edge", from: "a", event: "B" });
+    expect(parseTarget("edge a")).toBeUndefined();
+    expect(parseTarget("edge a B c")).toBeUndefined();
+    for (const target of [state("a"), { kind: "edge", from: "*", event: "finish" } as const]) {
+      expect(parseTarget(targetText(target))).toEqual(target);
+    }
+  });
+
+  test("isNoteTarget accepts edges with word parts only", () => {
+    expect(isNoteTarget({ kind: "edge", from: "a", event: "B" })).toBe(true);
+    expect(isNoteTarget({ kind: "edge", from: "", event: "B" })).toBe(false);
+    expect(isNoteTarget({ kind: "edge", from: "a", event: "a b" })).toBe(false);
+    expect(isNoteTarget({ kind: "edge", from: "a" })).toBe(false);
+    expect(isNoteTarget({ kind: "arrow", from: "a", event: "B" })).toBe(false);
+    expect(isNoteTarget({ kind: "edge", state: "a" })).toBe(false);
+  });
+
+  test("targetProblem checks states and arrows against the machine", () => {
+    const check = (target: Parameters<typeof targetProblem>[1]["target"]) =>
+      targetProblem(shape, { machine: "m", target });
+    expect(check(state("s"))).toBeUndefined();
+    expect(check({ kind: "edge", from: "s", event: "GO" })).toBeUndefined();
+    expect(check({ kind: "edge", from: "*", event: "STOP" })).toBeUndefined();
+    expect(check({ kind: "edge", from: "t", event: "PING" })).toBeUndefined();
+    expect(check(state("nope"))).toBe("no state nope in m");
+    expect(check({ kind: "edge", from: "s", event: "NOPE" })).toBe("no arrow NOPE from s in m");
+    expect(check({ kind: "edge", from: "t", event: "GO" })).toBe("no arrow GO from t in m");
+    expect(check({ kind: "edge", from: "s", event: "effect:s" })).toBe(
+      "no arrow effect:s from s in m",
+    );
+    expect(arrowsOf(shape, { from: "s", event: "GO" })).toBe(2);
   });
 
   test("parses a hand-edited file", () => {

@@ -7,6 +7,8 @@
 import type { VizMachine } from "@mantaq/viz";
 import { NOTES_VERSION, MAX_NOTE_LENGTH } from "./notes.ts";
 import type { Note, NoteTarget } from "./notes.ts";
+
+type StateTarget = Extract<NoteTarget, { kind: "state" }>;
 import type { ViewerSelection } from "@mantaq/viz/viewer";
 
 type Phase =
@@ -92,7 +94,7 @@ export function notesFooter(
   section.className = "notes";
   section.hidden = true;
   let phase: Phase = { kind: "loading" };
-  let target: NoteTarget | undefined;
+  let target: StateTarget | undefined;
   let status = "";
   let saving = false;
   let draft = "";
@@ -184,7 +186,7 @@ export function notesFooter(
   void load();
 
   return (selection) => {
-    const next: NoteTarget | undefined =
+    const next: StateTarget | undefined =
       selection?.kind === "state" ? { kind: "state", state: selection.id } : undefined;
     if (next?.state !== target?.state) {
       target = next;
@@ -214,7 +216,7 @@ function noteItem(doc: Document, each: Note): HTMLLIElement {
 }
 
 function noteList(doc: Document, state: string, notes: Note[]): HTMLElement {
-  const mine = notes.filter((each) => each.target?.state === state);
+  const mine = notes.filter((each) => each.target?.kind === "state" && each.target.state === state);
   if (mine.length === 0) {
     const hint = doc.createElement("p");
     hint.className = "hint";

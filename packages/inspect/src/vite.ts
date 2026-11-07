@@ -13,6 +13,7 @@
  * page redraws, keeping the walk, when you save a file.
  */
 import { UPDATE_EVENT, livePageHtml, serializeViz } from "@mantaq/viz";
+import type { VizMachine } from "@mantaq/viz";
 import type { FuzzSettings } from "./inspect.ts";
 import { vizDocument, machineId, projectRoot } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
@@ -96,12 +97,21 @@ function machineFiles(root: string, patterns: ReadonlyArray<string>): string[] {
   return [...new Set(files.map((file) => (isAbsolute(file) ? file : resolve(root, file))))].sort();
 }
 
+interface Built {
+  text: string;
+  owners: Map<string, { file: string; machine: VizMachine }>;
+}
+
 async function documentText(
   server: ViteDevServer,
   context: { files: ReadonlyArray<string>; fuzz: false | FuzzSettings },
-): Promise<{ text: string; warnings: string[]; owners: Map<string, string> }> {
+): Promise<{
+  text: string;
+  warnings: string[];
+  owners: Map<string, { file: string; machine: VizMachine }>;
+}> {
   const results = [];
-  const owners = new Map<string, string>();
+  const owners = new Map<string, { file: string; machine: VizMachine }>();
   for (const file of context.files) {
     const run = runOf(await server.ssrLoadModule(entryId(file)));
     const result =
@@ -109,7 +119,7 @@ async function documentText(
         ? { machines: [], warnings: [`${file}: could not load the inspector`] }
         : await run({ fuzz: context.fuzz });
     for (const machine of result.machines) {
-      if (!owners.has(machine.id)) owners.set(machine.id, file);
+      if (!owners.has(machine.id)) owners.set(machine.id, { file, machine });
     }
     results.push(result);
   }
@@ -300,9 +310,9 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       },
     }),
     configureServer(server) {
-      let cached: Promise<{ text: string; owners: Map<string, string> }> | null = null;
+      let cached: Promise<Built> | null = null;
       const written = new Map<string, string>();
-      const build = async (): Promise<{ text: string; owners: Map<string, string> }> => {
+      const build = async (): Promise<Built> => {
         const files = machineFiles(server.config.root, patterns);
         const { text, warnings, owners } = await documentText(server, { files, fuzz });
         for (const warning of warnings) server.config.logger.warn(`[mantaq-viz] ${warning}`);
@@ -313,8 +323,8 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
         owner: async (machine) => {
           cached ??= build();
           try {
-            const file = (await cached).owners.get(machine);
-            return file === undefined ? Either.left("unknown" as const) : Either.right(file);
+            const found = (await cached).owners.get(machine);
+            return found === undefined ? Either.left("unknown" as const) : Either.right(found);
           } catch {
             cached = null;
             return Either.left("load" as const);
