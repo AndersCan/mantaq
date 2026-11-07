@@ -1,10 +1,24 @@
 import type { VizDriver, VizJson, VizLiveState, VizLiveStep, VizStep } from "@mantaq/viz";
 import { applyStep, contextText, eventCatalog, messageOf, parsed } from "./fuzz/run.ts";
-import type { VirtualClock } from "@mantaq/core";
+import type { AnyActor, VirtualClock } from "@mantaq/core";
+import { Either } from "@mantaq/utils";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
 function json(text: string | null): VizJson {
   return parsed(text) as VizJson;
+}
+
+/** The current state's payload as JSON, or null when there is none or it is not serializable (functions, cycles). */
+function payloadOf(actor: AnyActor<unknown>): VizJson {
+  const payload = actor.snapshot().payload;
+  if (payload === undefined) return null;
+  const text = Either.from(() =>
+    JSON.stringify(payload, (_key, value: unknown) => {
+      if (typeof value === "function") throw new Error("function in payload");
+      return value;
+    }),
+  );
+  return Either.isRight(text) && text[1] !== undefined ? json(text[1]) : null;
 }
 
 /** Each timer callback starts a new top-level dispatch; report it so follow-ups are only matched within one dispatch. */
@@ -93,6 +107,7 @@ export function createDriver(target: FuzzTarget): VizDriver {
         eventName: timer.eventName ?? null,
       })),
       context: json(contextText(actor)),
+      payload: payloadOf(actor),
     };
   }
 

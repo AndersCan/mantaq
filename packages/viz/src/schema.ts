@@ -234,6 +234,8 @@ export interface VizLiveState {
   after: VizLiveStep[];
   timers: VizLiveTimer[];
   context: VizJson;
+  /** The current state's payload; null when it has none or is not serializable. */
+  payload: VizJson;
 }
 
 /**

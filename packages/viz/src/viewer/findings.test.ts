@@ -77,6 +77,7 @@ function driver(): VizDriver {
     after: [],
     timers: [],
     context: null,
+    payload: null,
   });
   return { reset: () => run([]), step: (step) => run([step]) };
 }

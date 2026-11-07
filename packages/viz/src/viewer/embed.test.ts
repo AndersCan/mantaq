@@ -152,6 +152,7 @@ function fakeDriver(): VizDriver {
     after: [],
     timers: [],
     context: { n: steps.length },
+    payload: null,
   });
   const run = (steps: VizStep[]): VizLiveState => {
     let current = live("open", [], null);

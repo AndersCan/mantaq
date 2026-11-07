@@ -281,3 +281,50 @@ describe("createDriver sync effect sending two events", () => {
     expect(live.after.map((entry) => entry.event)).toEqual(["one", "two"]);
   });
 });
+
+describe("createDriver payload", () => {
+  const home = state("home")();
+  const waitingFor = state("waitingFor")<{ code: string }>();
+  const holding = state("holding")<{ run: () => void }>();
+  const ask = event("ask")();
+  const hold = event("hold")();
+  const payloads: FuzzTarget = {
+    id: "payloads",
+    create: () => {
+      const clock = VirtualClock();
+      const actor = Actor({
+        inputs: [ask, hold],
+        states: [home, waitingFor, holding],
+        initial: home,
+        clock,
+        setup: (m) => {
+          m.on(home, {
+            event: ask,
+            to: [waitingFor],
+            handler: () => ({ state: waitingFor, payload: { code: "c1" } }),
+          });
+          m.on(home, {
+            event: hold,
+            to: [holding],
+            handler: () => ({ state: holding, payload: { run: () => {} } }),
+          });
+        },
+      });
+      return { actor, clock };
+    },
+  };
+
+  test("null after reset, the payload after entering the state", () => {
+    const driver = createDriver(payloads);
+    expect(driver.reset().payload).toBeNull();
+    expect(driver.step({ kind: "event", event: "ask", payload: null }).payload).toEqual({
+      code: "c1",
+    });
+  });
+
+  test("a payload holding a function reports null", () => {
+    const driver = createDriver(payloads);
+    driver.reset();
+    expect(driver.step({ kind: "event", event: "hold", payload: null }).payload).toBeNull();
+  });
+});
