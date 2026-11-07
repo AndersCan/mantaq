@@ -145,7 +145,7 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 <Machine src="src/machines/checkout.ts" />
 ```
 
-`astro build` renders the design findings above the diagram and bakes in the live panel. A file missing from `machines`, or one that cannot load, fails the build; findings never do.
+`astro build` renders the design findings above the diagram and bakes in the live panel. A file missing from `machines`, or one that cannot load, fails the build; findings do not, unless you pass `failOnFindings: true`: then `astro build` also fails on any design finding, a machine that could not be fuzzed, or an expectation that is not checked, listing each with the events that lead there. `astro dev` is unchanged.
 
 ## What it does not tell you
 

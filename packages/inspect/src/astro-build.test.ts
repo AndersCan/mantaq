@@ -12,21 +12,29 @@ process.env["ASTRO_TELEMETRY_DISABLED"] = "1";
 
 let site = "";
 const retry = "../fixtures/retry.ts";
+const clean = "../fixtures/clean.ts";
 const orphan = "../fixtures/orphan.ts";
 const retryAgain = "../fixtures/retry-again.ts";
 const empty = "../fixtures/no-machines.ts";
 const linked = "../fixtures/linked.ts";
+const deadEnd = "../fixtures/dead-end.ts";
+const instance = "../fixtures/instance.ts";
+const badExpectations = "../fixtures/bad-expectations.ts";
 
 function page(sources: string[]): string {
   const tags = sources.map((src) => `<Machine src="${src}" />`).join("\n");
   return `---\nimport Machine from "@mantaq/inspect/astro/Machine.astro";\n---\n<html><body>\n${tags}\n</body></html>\n`;
 }
 
-async function buildSite(root: string, machines: string[]) {
+async function buildSite(
+  root: string,
+  machines: string[],
+  options: Partial<Parameters<typeof mantaqViz>[0]> = {},
+) {
   await build({
     root,
     logLevel: "silent",
-    integrations: [mantaqViz({ machines, fuzz: false })],
+    integrations: [mantaqViz({ machines, fuzz: false, ...options })],
   });
 }
 
@@ -172,4 +180,81 @@ describe("mantaqViz for Astro", () => {
       rmSync(root, { recursive: true, force: true });
     }
   }, 120_000);
+
+  describe("failOnFindings", () => {
+    async function withSite(sources: string[], run: (root: string) => Promise<void>) {
+      const root = makeSite(sources);
+      try {
+        await run(root);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+
+    test("lists a structural finding", async () => {
+      await withSite([orphan], async (root) => {
+        await expect(buildSite(root, [orphan], { failOnFindings: true })).rejects.toThrow(
+          /failOnFindings: 2 problems stop the build\n.*orphan in .*orphan\.ts:\n  - state orphan is declared but no path leads to it/,
+        );
+      });
+    }, 120_000);
+
+    test("lists a fuzz finding with the events that lead there", async () => {
+      await withSite([deadEnd], async (root) => {
+        await expect(
+          buildSite(root, [deadEnd], { fuzz: { iterations: 200 }, failOnFindings: true }),
+        ).rejects.toThrow(
+          /  - state waitingForReply has no way out and is not final\n {4}after: replyRequested/,
+        );
+      });
+    }, 120_000);
+
+    test("builds when every machine is clean and fuzzed", async () => {
+      await withSite([clean], async (root) => {
+        await buildSite(root, [clean], { fuzz: { iterations: 200 }, failOnFindings: true });
+      });
+    }, 120_000);
+
+    test("a machine that cannot be fuzzed fails, unless fuzz is off", async () => {
+      await withSite([instance], async (root) => {
+        await expect(
+          buildSite(root, [instance], { fuzz: {}, failOnFindings: true }),
+        ).rejects.toThrow(/  - not fuzzed: exported as one actor, not a factory/);
+        await buildSite(root, [instance], { fuzz: false, failOnFindings: true });
+      });
+    }, 120_000);
+
+    test("a malformed expectation fails", async () => {
+      await withSite([badExpectations], async (root) => {
+        await expect(
+          buildSite(root, [badExpectations], { fuzz: { iterations: 200 }, failOnFindings: true }),
+        ).rejects.toThrow(/expectations for /);
+      });
+    }, 120_000);
+
+    test("astro dev does not fail", async () => {
+      const hook = mantaqViz({ machines: [orphan], fuzz: false, failOnFindings: true }).hooks[
+        "astro:config:setup"
+      ];
+      let plugin: { load?: (this: unknown, id: string) => unknown } | undefined;
+      const config = { root: pathToFileURL(`${import.meta.dirname}/astro-dev-root/`) };
+      await hook?.({
+        command: "dev",
+        config,
+        updateConfig: (update: {
+          vite?: {
+            plugins?: Array<{ name?: string; load?: (this: unknown, id: string) => unknown }>;
+          };
+        }) => {
+          plugin = update.vite?.plugins?.find((p) => p.name === "mantaq-viz-astro");
+          return config;
+        },
+      } as never);
+      const warn = vi.fn();
+      const error = vi.fn();
+      const source = await plugin?.load?.call({ warn, error }, "\0virtual:mantaq/documents");
+      expect(typeof source).toBe("string");
+      expect(error).not.toHaveBeenCalled();
+    });
+  });
 });

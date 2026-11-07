@@ -20,10 +20,11 @@ import type { Plugin } from "vite";
 import { vizDocument } from "./inspect.ts";
 import type { FuzzSettings } from "./inspect.ts";
 import { layoutOverview, machineLinks } from "./astro/overview.ts";
+import { findingLines } from "./gate.ts";
 import { inspectEntry, inspectFile } from "./load.ts";
 import { TARGETS, TARGETS_RESOLVED, targetsSource } from "./vite.ts";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface MantaqAstroOptions {
@@ -31,28 +32,74 @@ export interface MantaqAstroOptions {
   machines: string[];
   /** `false` = structure only. Default: inspect's default run (seeded, 2000 iterations). */
   fuzz?: false | FuzzSettings;
+  /**
+   * `astro build` fails when any machine has a design finding, could not be
+   * fuzzed (unless `fuzz: false`), or has an expectation that is not checked.
+   * The error lists each with the events that lead there. `astro dev` only
+   * shows them on the page. Default false.
+   */
+  failOnFindings?: boolean;
 }
 
 const DOCUMENTS = "virtual:mantaq/documents";
 const DOCUMENTS_RESOLVED = `\0${DOCUMENTS}`;
 const CLIENT = "virtual:mantaq/astro-client";
 
+const NOT_FUZZED = /^[^:]*: not fuzzed: /;
+
+function failureReport(
+  fuzzed: boolean,
+  files: ReadonlyArray<{ rel: string; machines: VizMachine[]; warnings: string[] }>,
+): string {
+  const blocks: string[] = [];
+  let count = 0;
+  for (const { rel, machines, warnings } of files) {
+    for (const machine of machines) {
+      const items = findingLines(machine);
+      if (fuzzed && machine.fuzz === null) {
+        const reason = warnings.find((w) => NOT_FUZZED.test(w))?.replace(NOT_FUZZED, "");
+        items.push(
+          `  - not fuzzed: ${reason ?? "no fuzz run"}; handler throws, never-see and must-see cannot be found. Export a factory on a VirtualClock, or pass fuzz: false to mantaqViz`,
+        );
+      }
+      if (items.length === 0) continue;
+      count += items.filter((line) => line.startsWith("  - ")).length;
+      blocks.push(`${machine.id} in ${rel}:`, ...items);
+    }
+    const expectations = warnings.filter((w) => /\bexpectations\b/i.test(w));
+    if (expectations.length > 0) {
+      count += expectations.length;
+      blocks.push(`${rel}:`, ...expectations.map((w) => `  - ${w}`));
+    }
+  }
+  if (count === 0) return "";
+  const head = `[mantaq-viz] failOnFindings: ${count} ${count === 1 ? "problem stops" : "problems stop"} the build`;
+  return [head, ...blocks].join("\n");
+}
+
 async function documentsSource(
   context: {
     root: string;
     files: ReadonlyArray<string>;
     fuzz: false | FuzzSettings;
+    failOnFindings?: boolean;
   },
   plugin: { warn: (message: string) => void; error: (message: string) => never },
 ): Promise<string> {
   const documents: Record<string, unknown> = {};
   const owners = new Map<string, string>();
   const all: Array<{ file: string; machine: VizMachine }> = [];
+  const reported: Array<{ rel: string; machines: VizMachine[]; warnings: string[] }> = [];
   for (const file of context.files) {
     const loaded = await inspectFile(file, { fuzz: context.fuzz });
     if (loaded.failed) {
       plugin.error(`[mantaq-viz] ${file}: could not load: ${loaded.warnings.join("; ")}`);
     }
+    reported.push({
+      rel: relative(context.root, file).split(sep).join("/"),
+      machines: loaded.machines,
+      warnings: loaded.warnings,
+    });
     for (const warning of loaded.warnings) plugin.warn(`[mantaq-viz] ${warning}`);
     for (const machine of loaded.machines) {
       const other = owners.get(machine.id);
@@ -78,6 +125,10 @@ async function documentsSource(
       fuzzed: context.fuzz !== false,
     };
   }
+  if (context.failOnFindings === true) {
+    const report = failureReport(context.fuzz !== false, reported);
+    if (report !== "") plugin.error(report);
+  }
   return [
     `export const root = ${JSON.stringify(context.root)};`,
     `export const documents = ${JSON.stringify(documents)};`,
@@ -94,6 +145,7 @@ export function astroMachines(context: {
   root: string;
   files: ReadonlyArray<string>;
   fuzz: false | FuzzSettings;
+  failOnFindings?: boolean;
 }): Plugin {
   const client = fileURLToPath(
     import.meta.resolve(
@@ -131,7 +183,7 @@ export function mantaqViz(options: MantaqAstroOptions): AstroIntegration {
   return {
     name: "@mantaq/inspect/astro",
     hooks: {
-      "astro:config:setup": ({ config, updateConfig }) => {
+      "astro:config:setup": ({ command, config, updateConfig }) => {
         const root = fileURLToPath(config.root);
         if (options.machines.length === 0) {
           throw new Error("mantaqViz: machines is empty; list the machine files to draw");
@@ -147,7 +199,15 @@ export function mantaqViz(options: MantaqAstroOptions): AstroIntegration {
         });
         updateConfig({
           vite: {
-            plugins: [inspectEntry(), astroMachines({ root, files, fuzz: options.fuzz ?? {} })],
+            plugins: [
+              inspectEntry(),
+              astroMachines({
+                root,
+                files,
+                fuzz: options.fuzz ?? {},
+                failOnFindings: options.failOnFindings === true && command === "build",
+              }),
+            ],
           },
         });
       },
