@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_ `<Machine>` shows a one-line findings summary; the findings are marked on the states.
+
 ## 0.7.0
 
 <sub>2026-11-07</sub>

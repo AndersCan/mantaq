@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_ States with design findings carry a ! mark; click it to read the finding and replay the path that found it.
+
 ## 0.7.0
 
 <sub>2026-11-07</sub>
