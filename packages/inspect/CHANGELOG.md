@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  The dev server reads and appends notes next to machine files (`<file>.notes.md`, mantaq notes v1) at `/__mantaq/notes`, for this computer and the live page only. Breaking: none.
+- _(minor)_
+  Breaking: viz documents are version 12. `VizEvent.payloadType` is replaced by `payload` (the fields of the event's payload type, read from the types and their JSDoc), and `VizMachine.context` lists the fields of the actor's context type. Stored viz.json files must be exported again; documents from mantaq docs and the Vite plugin regenerate at build.
+- _(minor)_ Click a state on the live page to leave a note for your coding agent. Breaking: none.
+
 ## 0.10.1
 
 <sub>2026-11-07</sub>
