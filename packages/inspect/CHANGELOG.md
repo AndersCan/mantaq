@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  The machine document records each machine's declared `outputs` (format version 10). Documents from older versions are refused; regenerate them.
+- _(minor)_ `<Machines pages>` draws every machine and the events that link them.
+- _(patch)_ `machineFindings` lists each design finding with its kind, state and the event path that reaches it.
+
 ## 0.6.1
 
 <sub>2026-11-07</sub>
