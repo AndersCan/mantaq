@@ -15,7 +15,7 @@ const actor = Actor({ clock, ... });
 
 actor.send(submit.create({ ... }));
 clock.advance(800);                       // fires timers, drains queue — synchronous
-expect(matches(actor, "success")).toBe(true);
+expect(matches(actor, "submitted")).toBe(true);
 ```
 
 No awaits needed for timer work. For promise-based effects, `await actor.settled()`. Pending timers are not queued events, so `settled()` does not advance time.

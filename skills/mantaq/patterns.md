@@ -6,9 +6,8 @@ Proven recipes. Code is a sketch. Copy the shape, not the exact signatures: chec
 
 State enters "working", effect runs the async job, emits internal event, transition completes.
 
-const fillingForm = state("fillingForm")();
-
 ```ts
+const fillingForm = state("fillingForm")();
 const submitting = state("submitting")();
 const submitted = state("submitted")().final();
 const submittingDone = event("SUBMITTING_DONE")();
