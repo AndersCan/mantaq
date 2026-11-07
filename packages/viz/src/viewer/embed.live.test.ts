@@ -379,6 +379,22 @@ describe("runs", () => {
     expect(root.querySelector("[data-run-missing]")?.textContent).toContain("<b>x</b>");
   });
 
+  test("switching machine clears the run notice", () => {
+    const other: VizMachine = { ...checkout, id: "other" };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRuns, other] },
+      { run: "nope", machine: withRuns.id },
+    );
+    expect(root.querySelector("[data-run-missing]")).not.toBeNull();
+    const picker = root.querySelector("select");
+    if (picker === null) throw new Error("no machine picker");
+    picker.value = "other";
+    picker.dispatchEvent(new Event("change"));
+    expect(root.querySelector("[data-run-missing]")).toBeNull();
+  });
+
   test("a machine without runs shows no Runs section", () => {
     const { root } = mount();
     expect(root.querySelector("[data-runs]")).toBeNull();

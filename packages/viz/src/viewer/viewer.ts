@@ -444,6 +444,7 @@ function headerOf(
             view.machineId = id;
             view.selection = null;
             view.path = [];
+            view.notice = null;
             context.onNavigate?.({ machine: id, steps: [] });
             render();
           },
