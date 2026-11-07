@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/viz",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Draw and walk a Mantaq machine in the browser, from a versioned, deterministic JSON document.",
   "keywords": [
     "actor",
