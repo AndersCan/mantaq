@@ -370,7 +370,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 12
+  "schemaVersion": 13
 }
 "
 `;
@@ -683,7 +683,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 12
+  "schemaVersion": 13
 }
 "
 `;
@@ -1282,7 +1282,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 12
+  "schemaVersion": 13
 }
 "
 `;

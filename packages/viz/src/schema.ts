@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 12;
+export const VIZ_SCHEMA_VERSION = 13;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -273,6 +273,17 @@ export interface VizFailedExpectation {
   steps: VizStep[] | null;
 }
 
+/** A rule the machine file writes for a state, and whether fuzzing kept it. */
+export interface VizExpectation {
+  kind: "neverSee" | "mustSee";
+  /** Top-level state id the rule is written on. */
+  state: string;
+  /** The context as written, printed: {"role":"member"}. */
+  match: string;
+  /** neverSee: no fuzz run reached it. mustSee: some fuzz run reached it. */
+  held: boolean;
+}
+
 export interface VizFuzz {
   seed: number;
   iterations: number;
@@ -280,6 +291,8 @@ export interface VizFuzz {
   errors: VizFuzzError[];
   /** [] = none written, or all held. Order: machine state order, neverSee before mustSee, then as written. */
   failedExpectations: VizFailedExpectation[];
+  /** Every rule the machine file writes, checked by this run. Same order as failedExpectations: machine state order, neverSee before mustSee, then as written. [] = none written. */
+  expectations: VizExpectation[];
 }
 
 export interface VizDocument {

@@ -109,6 +109,7 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): VizMachin
       corpus: result.corpus.map((entry) => ({ steps: entry.steps, discovered: entry.discovered })),
       errors: result.errors,
       failedExpectations: result.failedExpectations,
+      expectations: result.expectations,
     },
   };
 }
