@@ -55,3 +55,11 @@ export function contextLines(value: VizJson, before: VizJson | undefined): Conte
   const marked = lines(value, { before, depth: 0, label: "", comma: "" });
   return before === undefined ? marked.map((line) => ({ ...line, changed: false })) : marked;
 }
+
+/** Top-level keys whose JSON differs between two contexts, in the order of `after` then keys only in `before`. */
+export function changedKeys(before: VizJson | undefined, after: VizJson | undefined): string[] {
+  const keysOf = (value: VizJson | undefined): string[] =>
+    value !== null && typeof value === "object" && !Array.isArray(value) ? Object.keys(value) : [];
+  const keys = [...new Set([...keysOf(after), ...keysOf(before)])];
+  return keys.filter((key) => !same(childOf(before, key), childOf(after, key)));
+}

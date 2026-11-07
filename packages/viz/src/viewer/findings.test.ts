@@ -73,6 +73,7 @@ function driver(): VizDriver {
             context: null,
             error: "boom",
           },
+    after: [],
     timers: [],
     context: null,
   });

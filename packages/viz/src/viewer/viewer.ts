@@ -145,6 +145,8 @@ export function mountViewer(
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   listenOnRoot(root, () => back());
+  let redraw: () => void = () => undefined;
+  watchDriver(view, { driver, redraw: () => redraw() });
 
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
@@ -174,13 +176,11 @@ export function mountViewer(
       fillPanel(panel, { doc, view, parts, details, refresh, footer: options.panelFooter });
       markDiagram(root, { machine, view, send, compose });
     };
+    redraw = refresh;
     const walked = (run?: string) => {
       view.notice = null;
       root.querySelector("[data-run-missing]")?.remove();
-      const steps =
-        view.live === null
-          ? view.path.map((step) => encodeStep(machine, step))
-          : view.live.steps.map(encodeLiveStep);
+      const steps = walkedSteps(machine, view);
       options.onNavigate?.({ machine: machine.id, steps, ...(run === undefined ? {} : { run }) });
       refresh();
     };
@@ -364,6 +364,23 @@ function liveTake(
   else handlers.send({ kind: "event", event, payload: null });
 }
 
+/** An effect result that arrives later replaces the live state. */
+function watchDriver(
+  view: ViewState,
+  context: { driver: VizDriver | undefined; redraw: () => void },
+): void {
+  context.driver?.listen?.((state) => {
+    view.live = state;
+    context.redraw();
+  });
+}
+
+function walkedSteps(machine: VizMachine, view: ViewState): string[] {
+  return view.live === null
+    ? view.path.map((step) => encodeStep(machine, step))
+    : view.live.steps.map(encodeLiveStep);
+}
+
 /** Takes one live step: the context before it becomes `previous`, and an open payload form closes. */
 function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   view.previous = view.live?.context;
@@ -399,6 +416,7 @@ function stepSafely(
         context: before.context,
         error: error instanceof Error ? error.message : String(error),
       },
+      after: before.after,
     };
   }
 }

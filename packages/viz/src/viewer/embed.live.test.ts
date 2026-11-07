@@ -1,6 +1,14 @@
 // @vitest-environment happy-dom
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
-import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
+import type {
+  VizDriver,
+  VizEdge,
+  VizLiveState,
+  VizLiveStep,
+  VizMachine,
+  VizState,
+  VizStep,
+} from "../schema.ts";
 import { decodeLiveSteps, encodeLiveStep, payloadSamples } from "../moves.ts";
 import { mountViewer } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -89,6 +97,7 @@ function driver(): VizDriver & { log: VizStep[][] } {
       state: current,
       steps,
       last: null,
+      after: [],
       timers:
         current === "paying" && deadline !== null
           ? [{ id: "t1", ms: 800, deadline, eventName: "paymentTimeout" }]
@@ -687,5 +696,165 @@ describe("field forms and the context table", () => {
     const { root } = mountFields({ ...fieldsMachine, context: null });
     expect(root.querySelector("[data-context-fields]")).toBeNull();
     expect(root.querySelector("[data-live-context] pre")).not.toBeNull();
+  });
+});
+
+describe("what ran", () => {
+  const branching: VizMachine = {
+    ...checkout,
+    edges: [
+      {
+        ...edge("idle", "submit", "paying"),
+        explanation: {
+          status: "analyzed",
+          location: { file: "m.ts", line: 1, column: 1 },
+          registration: "on",
+          branches: [
+            { conditions: ["payload.amount > 5"], target: { kind: "state", state: "paying" } },
+            { conditions: ["!(payload.amount > 5)"], target: { kind: "stay" } },
+          ],
+          payloadReads: [],
+          contextReads: [],
+          contextWrites: [],
+          readsActorState: false,
+          comparisons: [],
+          literals: [],
+        },
+      },
+    ],
+  };
+  const mountWith = (machine: VizMachine, live: VizDriver) => {
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver: live });
+    return root;
+  };
+  const text = (root: HTMLElement, hook: string) =>
+    root.querySelector(`[data-live-${hook}]`)?.textContent;
+  const submit = { kind: "event", event: "submit", payload: { amount: 9 } } as const;
+
+  function stepped(
+    entry: Partial<VizLiveState["last"] & object>,
+    after: VizLiveState["after"] = [],
+  ) {
+    const base: VizLiveStep = {
+      from: "idle",
+      event: "submit",
+      to: "paying",
+      outcome: "transition",
+      effects: [],
+      context: { amount: 9 },
+      error: null,
+    };
+    const last: VizLiveStep = { ...base, ...entry };
+    let onChange: (state: VizLiveState) => void = () => undefined;
+    const live: VizDriver = {
+      reset: () => ({ state: "idle", steps: [], last: null, after: [], timers: [], context: {} }),
+      step: (step) => ({
+        state: last.to,
+        steps: [step],
+        last,
+        after,
+        timers: [],
+        context: last.context,
+      }),
+      listen: (callback) => {
+        onChange = callback;
+      },
+    };
+    return { live, push: (state: VizLiveState) => onChange(state) };
+  }
+
+  test("Because shows the condition for a transition and a stay", () => {
+    const move = mountWith(branching, stepped({}).live);
+    click(move, '[data-send="submit"]');
+    click(move, '[data-payload-send="submit"]');
+    expect(text(move, "outcome")).toBe("submit: idle → paying");
+    expect(text(move, "because")).toBe("Because: payload.amount > 5");
+
+    const stay = mountWith(branching, stepped({ to: "idle", outcome: "stay", context: {} }).live);
+    click(stay, '[data-send="submit"]');
+    click(stay, '[data-payload-send="submit"]');
+    expect(text(stay, "outcome")).toBe("submit: handled in idle, stays");
+    expect(text(stay, "because")).toBe("Because: !(payload.amount > 5)");
+  });
+
+  test("Because is absent when every branch shares a target", () => {
+    const plain: VizMachine = {
+      ...branching,
+      edges: branching.edges.map((candidate) =>
+        candidate.explanation?.status === "analyzed"
+          ? {
+              ...candidate,
+              explanation: {
+                ...candidate.explanation,
+                branches: [
+                  { conditions: ["a"], target: { kind: "state", state: "paying" } },
+                  { conditions: ["!a"], target: { kind: "state", state: "paying" } },
+                ],
+              },
+            }
+          : candidate,
+      ),
+    };
+    const root = mountWith(plain, stepped({}).live);
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-send="submit"]');
+    expect(root.querySelector("[data-live-because]")).toBeNull();
+  });
+
+  test("Changed names the keys and Effects started names the effects", () => {
+    const root = mountWith(
+      branching,
+      stepped({ effects: ["charge"], context: { amount: 9, tag: "x" } }).live,
+    );
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-send="submit"]');
+    expect(text(root, "changed")).toBe("Changed: amount, tag");
+    expect(text(root, "effects")).toBe("Effects started: charge");
+  });
+
+  test("an async result renders without another click", () => {
+    const { live, push } = stepped({});
+    const root = mountWith(branching, live);
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-send="submit"]');
+    expect(root.querySelector("[data-live-after]")).toBeNull();
+    push({
+      state: "error",
+      steps: [submit],
+      last: {
+        from: "idle",
+        event: "submit",
+        to: "paying",
+        outcome: "transition",
+        effects: [],
+        context: { amount: 9 },
+        error: null,
+      },
+      after: [
+        {
+          from: "paying",
+          event: "paymentTimeout",
+          to: "error",
+          outcome: "transition",
+          effects: [],
+          context: { amount: 9, failed: true },
+          error: null,
+        },
+      ],
+      timers: [],
+      context: { amount: 9, failed: true },
+    });
+    const after = root.querySelector("[data-live-after]");
+    expect(after?.textContent).toContain("Then paymentTimeout came back");
+    expect(after?.textContent).toContain("paymentTimeout: paying → error");
+    expect(after?.textContent).toContain("Changed: failed");
+  });
+
+  test("an ignored event says nothing ran", () => {
+    const root = mountWith(branching, stepped({ to: "idle", outcome: "ignored" }).live);
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-send="submit"]');
+    expect(text(root, "outcome")).toBe("No handler for submit in idle. Nothing ran.");
   });
 });

@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { VizJson } from "../schema.ts";
-import { contextLines } from "./context-diff.ts";
+import { changedKeys, contextLines } from "./context-diff.ts";
 
 const text = (value: VizJson, before: VizJson | undefined) =>
   contextLines(value, before)
@@ -48,4 +48,15 @@ test("marks array items that differ", () => {
 test("a type change is marked", () => {
   expect(changed({ a: { b: 1 } }, { a: 1 })).toEqual(['"b": 1']);
   expect(changed({ a: 1 }, { a: null })).toEqual(['"a": 1']);
+});
+
+test("changedKeys lists top-level keys whose JSON differs", () => {
+  expect(changedKeys({ a: 1, b: { c: 1 }, d: 2 }, { a: 1, b: { c: 2 }, d: 2, e: 3 })).toEqual([
+    "b",
+    "e",
+  ]);
+  expect(changedKeys({ a: 1, gone: 1 }, { a: 1 })).toEqual(["gone"]);
+  expect(changedKeys({ a: 1 }, { a: 1 })).toEqual([]);
+  expect(changedKeys(undefined, { a: 1 })).toEqual(["a"]);
+  expect(changedKeys(1, 2)).toEqual([]);
 });

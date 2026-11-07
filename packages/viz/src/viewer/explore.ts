@@ -1,4 +1,5 @@
 import { asksForPayload, movesFrom, stateAfter, unhandledSends } from "../moves.ts";
+import { coveredByAny } from "../schema.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
 import type {
   VizField,
@@ -9,7 +10,7 @@ import type {
   VizMachine,
   VizStep,
 } from "../schema.ts";
-import { contextLines } from "./context-diff.ts";
+import { changedKeys, contextLines } from "./context-diff.ts";
 import { html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 
@@ -535,12 +536,6 @@ function runsSection(
   ]);
 }
 
-function outcomeText(last: VizLiveStep): string {
-  if (last.outcome === "transition") return ` ${last.from} → ${last.to}`;
-  if (last.outcome === "stay") return ` handled in ${last.from}: stays`;
-  return ` ignored in ${last.from}: no handler`;
-}
-
 function fieldValue(value: VizJson, name: string): string {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return "not set";
   return Object.hasOwn(value, name) ? (JSON.stringify(value[name]) ?? "not set") : "not set";
@@ -625,27 +620,111 @@ export function changedLines(state: VizLiveState, previous: VizJson | undefined)
   return contextLines(state.context, previous).filter((line) => line.changed).length;
 }
 
-function liveResultSection(doc: Document, live: { state: VizLiveState }): HTMLElement {
-  const { last } = live.state;
+function localState(id: string): string {
+  return id.slice(id.lastIndexOf(".") + 1);
+}
+
+/** The conditions that sent the handler to where this step went; null when the outcome did not depend on a condition. */
+function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
+  if (step.outcome === "ignored") return null;
+  const edge = machine.edges.find(
+    (candidate) =>
+      (candidate.kind === "transition" || candidate.kind === "stay") &&
+      candidate.event === step.event &&
+      (candidate.from === step.from || coveredByAny(candidate.from, step.from)) &&
+      candidate.explanation?.status === "analyzed",
+  );
+  if (edge?.explanation?.status !== "analyzed") return null;
+  const { branches } = edge.explanation;
+  const targets = new Set(branches.map((branch) => JSON.stringify(branch.target)));
+  if (targets.size <= 1) return null;
+  const matching = branches.filter((branch) =>
+    step.outcome === "stay"
+      ? branch.target.kind === "stay"
+      : branch.target.kind === "state" && branch.target.state === localState(step.to),
+  );
+  if (matching.every((branch) => branch.conditions.length === 0)) {
+    return null;
+  }
+  return matching.map((branch) => branch.conditions);
+}
+
+function stepLines(
+  doc: Document,
+  context: { machine: VizMachine; step: VizLiveStep; before: VizJson | undefined },
+): Array<HTMLElement | null> {
+  const { machine, step, before } = context;
+  const because = becauseOf(machine, step);
+  const changed = changedKeys(before, step.context);
+  return [
+    html(
+      doc,
+      "p",
+      { "data-live-outcome": "" },
+      step.outcome === "ignored"
+        ? ["No handler for ", code(doc, step.event), ` in ${step.from}. Nothing ran.`]
+        : [
+            code(doc, step.event),
+            step.outcome === "transition"
+              ? `: ${step.from} → ${step.to}`
+              : `: handled in ${step.from}, stays`,
+          ],
+    ),
+    because === null
+      ? null
+      : html(doc, "p", { "data-live-because": "" }, [
+          because.length === 1 ? "Because: " : "Because one of: ",
+          ...because.flatMap((conditions, index) => [
+            index === 0 ? "" : "; ",
+            code(doc, conditions.join(" && ")),
+          ]),
+        ]),
+    changed.length === 0
+      ? null
+      : html(doc, "p", { "data-live-changed": "" }, [`Changed: ${changed.join(", ")}`]),
+    step.effects.length === 0
+      ? null
+      : html(doc, "p", { "data-live-effects": "" }, [
+          "Effects started: ",
+          ...step.effects.flatMap((name, index) => [index === 0 ? "" : ", ", code(doc, name)]),
+        ]),
+  ];
+}
+
+function liveResultSection(
+  doc: Document,
+  live: { machine: VizMachine; state: VizLiveState; previous: VizJson | undefined },
+): HTMLElement {
+  const { machine, state, previous } = live;
+  const { last, after } = state;
   return html(doc, "div", { class: "explore-live" }, [
     last === null
       ? html(doc, "p", { class: "muted" }, ["Nothing has run yet."])
       : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
-          html(doc, "p", {}, [code(doc, last.event), outcomeText(last)]),
-          last.effects.length === 0
-            ? null
-            : html(doc, "p", { "data-live-effects": "" }, [
-                "Effects run: ",
-                ...last.effects.flatMap((name, index) => [
-                  index === 0 ? "" : ", ",
-                  code(doc, name),
-                ]),
-              ]),
+          ...stepLines(doc, { machine, step: last, before: previous }),
           last.error === null
             ? null
             : html(doc, "p", { class: "explore-warning", role: "alert", "data-live-error": "" }, [
                 `Handler threw: ${last.error}`,
               ]),
+          ...after.map((step, index) =>
+            html(doc, "div", { "data-live-after": "" }, [
+              html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"]),
+              ...stepLines(doc, {
+                machine,
+                step,
+                before: (index === 0 ? last : after[index - 1])?.context,
+              }),
+              step.error === null
+                ? null
+                : html(
+                    doc,
+                    "p",
+                    { class: "explore-warning", role: "alert", "data-live-error": "" },
+                    [`Handler threw: ${step.error}`],
+                  ),
+            ]),
+          ),
         ]),
   ]);
 }
@@ -719,7 +798,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       ...nowSection(doc, machine, { current, final }),
       ...(live
         ? [
-            liveResultSection(doc, live),
+            liveResultSection(doc, { machine, state: live.state, previous: live.previous }),
             liveMovesSection(doc, machine, {
               state: live.state,
               send: live.send,

@@ -230,6 +230,8 @@ export interface VizLiveState {
   state: string;
   steps: VizStep[];
   last: VizLiveStep | null;
+  /** Transitions an effect caused after the step's own one, sync or later, in order. */
+  after: VizLiveStep[];
   timers: VizLiveTimer[];
   context: VizJson;
 }
@@ -241,6 +243,8 @@ export interface VizLiveState {
 export interface VizDriver {
   reset(): VizLiveState;
   step(step: VizStep): VizLiveState;
+  /** Called with the new state whenever the actor changes outside step()/reset() (an async effect result). */
+  listen?(onChange: (state: VizLiveState) => void): void;
 }
 
 export interface VizFuzzSequence {

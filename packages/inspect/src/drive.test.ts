@@ -134,3 +134,65 @@ describe("createDriver", () => {
     expect(driver.step({ kind: "advance", ms: 800 }).state).toBe("idle");
   });
 });
+
+const ping = event("ping")();
+const pong = event("pong")();
+const asyncTarget = (mode: "sync" | "async"): FuzzTarget => ({
+  id: "async",
+  create: () => {
+    const clock = VirtualClock();
+    const actor = Actor({
+      inputs: [ping],
+      internal: [pong],
+      states: [idle, waiting, timedOut],
+      initial: idle,
+      clock,
+      setup: (m) => {
+        m.on(idle, { event: ping, to: [waiting], handler: () => ({ state: waiting }) });
+        m.effect(waiting, {
+          name: "reply",
+          sends: [pong],
+          fn: async ({ emit }) => {
+            if (mode === "async") await Promise.resolve();
+            emit(pong.create());
+          },
+        });
+        m.on(waiting, { event: pong, to: [timedOut], handler: () => ({ state: timedOut }) });
+      },
+    });
+    return { actor, clock };
+  },
+});
+const macrotask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const pingStep = { kind: "event", event: "ping", payload: null } as const;
+
+describe("createDriver effect results", () => {
+  test("a sync effect follow-up is in after, not overwriting last", () => {
+    const driver = createDriver(asyncTarget("sync"));
+    const live = driver.step(pingStep);
+    expect(live.last).toMatchObject({ event: "ping", to: "waiting", effects: ["reply"] });
+    expect(live.after).toEqual([expect.objectContaining({ event: "pong", to: "timedOut" })]);
+  });
+
+  test("an async effect result calls listen with one after entry", async () => {
+    const driver = createDriver(asyncTarget("async"));
+    const seen: Array<{ state: string; after: number }> = [];
+    driver.listen?.((live) => seen.push({ state: live.state, after: live.after.length }));
+    const first = driver.step(pingStep);
+    expect(first.state).toBe("waiting");
+    expect(first.after).toEqual([]);
+    expect(seen).toEqual([]);
+    await macrotask();
+    expect(seen).toEqual([{ state: "timedOut", after: 1 }]);
+  });
+
+  test("reset during a pending async effect never calls back", async () => {
+    const driver = createDriver(asyncTarget("async"));
+    const seen: string[] = [];
+    driver.listen?.((live) => seen.push(live.state));
+    driver.step(pingStep);
+    driver.reset();
+    await macrotask();
+    expect(seen).toEqual([]);
+  });
+});
