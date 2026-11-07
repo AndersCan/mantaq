@@ -7,14 +7,22 @@ import { Actor, VirtualClock, event, state } from "@mantaq/core";
 
 type RetryContext = { attempts: number };
 
+/** No connection yet. */
 const idle = state("idle")();
+/** Trying to connect. */
 const connecting = state("connecting")();
+/** The connection is up. */
 const connected = state("connected")().final();
+/** Too many failed tries; locked out. */
 const lockedOut = state("lockedOut")();
 
+/** A connection attempt was requested. */
 const connect = event("connect")();
+/** The lockout was cleared. */
 const reset = event("reset")();
+/** The connection attempt failed. */
 const failed = event("failed")<{ reason: string }>();
+/** The connection opened. */
 const opened = event("opened")();
 
 export function createRetryActor(clock: VirtualClock = VirtualClock()) {

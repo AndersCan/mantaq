@@ -241,6 +241,8 @@ describe("inspect with expectations", () => {
     expect(machineFindings(result.machines[0]!).map((each) => each.kind)).toEqual([
       "neverSee",
       "mustSee",
+      "vagueName",
+      "vagueName",
     ]);
   });
 

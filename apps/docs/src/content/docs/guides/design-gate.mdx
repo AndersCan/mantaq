@@ -51,6 +51,14 @@ The same findings show on the diagram. A state with a finding carries a "!" mark
 
 <Machine src="src/content/docs/checkout-with-bugs.ts" />
 
+## Names
+
+A state or event is reported when every word in its name is a generic status word, so it says how something went but not what: ok, ready, idle, loading, loaded, error, failed, failure, success, succeeded, done, finished, complete, completed, pending, busy, active, waiting, start, started, init, status, result, data, update, updated, change, changed, act, acted. `loading` is vague and `loadingPhotos` is not; `LOAD_FAILED` passes because it says what failed. A state or event with no `/** */` comment above its declaration is reported too.
+
+These checks need the machine file, so they run on the docs site, with `inspectFile`, and with `source` in `expectNoDesignErrors`. Without the file, they are skipped.
+
+Before: an event named LOADED. After: one named photosLoaded, with a comment saying the photos arrived.
+
 ## Tell the fuzzer what to expect
 
 Some bugs are not crashes: the machine runs fine and holds the wrong data. Say what must never happen in a block next to the factory, named `<machine id>Expectations`. It is a partial object per state: list only the context keys you care about.

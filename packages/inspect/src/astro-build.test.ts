@@ -69,9 +69,9 @@ describe("mantaqViz for Astro", () => {
     }
     const findings = [...document.querySelectorAll<HTMLElement>(".mantaq-findings")];
     expect(findings).toHaveLength(2);
-    expect(findings[0]?.dataset["count"]).toBe("0");
-    expect(findings[1]?.dataset["count"]).toBe("1");
-    expect(findings[1]?.textContent).toContain("1 design finding, marked with ! on the diagram");
+    expect(findings[0]?.dataset["count"]).toBe("2");
+    expect(findings[1]?.dataset["count"]).toBe("2");
+    expect(findings[1]?.textContent).toContain("2 design findings, marked with ! on the diagram");
     expect(findings[1]?.querySelector("ul")).toBeNull();
   });
 

@@ -156,11 +156,18 @@ export function locationOf(node: ts.Node, root: string): VizLocation {
   };
 }
 
-/** Name literal of `state("x")()` / `event("X")()`, with which builder it came from. */
+/** Name literal of `state("x")()` / `state("x")().final()` / `event("X")()`, with which builder it came from. */
 function declaredName(init: ts.Expression): { builder: string; name: string } | null {
-  if (!ts.isCallExpression(init) || !ts.isCallExpression(init.expression)) return null;
-  const builder = init.expression.expression;
-  const [name] = init.expression.arguments;
+  let call = init;
+  while (
+    ts.isCallExpression(call) &&
+    ts.isPropertyAccessExpression(call.expression) &&
+    call.expression.name.text === "final"
+  )
+    call = call.expression.expression;
+  if (!ts.isCallExpression(call) || !ts.isCallExpression(call.expression)) return null;
+  const builder = call.expression.expression;
+  const [name] = call.expression.arguments;
   if (!ts.isIdentifier(builder) || name === undefined || !ts.isStringLiteralLike(name)) return null;
   return { builder: builder.text, name: name.text };
 }
