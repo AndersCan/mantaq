@@ -20,6 +20,7 @@ export function createThrowingActor(clock: VirtualClock = VirtualClock()) {
         to: [picked],
         handler: (e) => ({ state: routes[e.payload.side]!.next }),
       });
+      m.on(picked, { event: pick, to: [idle], handler: () => ({ state: idle }) });
     },
   });
 }

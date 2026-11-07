@@ -7,6 +7,7 @@ export type VizFindingKind =
   | "neverSee"
   | "mustSee"
   | "unhandledSend"
+  | "deadEnd"
   | "unreachableState";
 
 export interface VizFinding {
@@ -44,6 +45,12 @@ export const FINDING_KINDS: Readonly<
     title: "Event nobody handles",
     sentence:
       "An effect here sends an event this state has no handler for: an input is dropped without a trace, and an internal event puts the actor in its error state.",
+    noSteps: "No fuzz run reached this state.",
+  },
+  deadEnd: {
+    title: "Dead end",
+    sentence:
+      "The actor can get here, but nothing can happen next: no event is handled, no effect runs, and the state is not final. A way out is missing, or the state should be final.",
     noSteps: "No fuzz run reached this state.",
   },
   unreachableState: {
@@ -128,11 +135,27 @@ export function machineFindings(machine: VizMachine): VizFinding[] {
       steps: pathTo(machine, state.id),
     })),
   );
-  const orphans = unreachableStates(machine).map((id): VizFinding => ({
+  const unreachable = unreachableStates(machine);
+  const dead = machine.states
+    .filter(
+      (state) =>
+        !state.final &&
+        state.region === null &&
+        state.effects.length === 0 &&
+        !unreachable.includes(state.id) &&
+        !machine.edges.some((edge) => edge.from === state.id || coveredByAny(edge.from, state.id)),
+    )
+    .map((state): VizFinding => ({
+      kind: "deadEnd",
+      state: state.id,
+      message: `state ${state.id} has no way out and is not final`,
+      steps: pathTo(machine, state.id),
+    }));
+  const orphans = unreachable.map((id): VizFinding => ({
     kind: "unreachableState",
     state: id,
     message: `state ${id} is declared but no path leads to it from the initial state`,
     steps: null,
   }));
-  return [...thrown, ...never, ...must, ...sends, ...orphans];
+  return [...thrown, ...never, ...must, ...sends, ...dead, ...orphans];
 }
