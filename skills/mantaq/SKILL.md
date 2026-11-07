@@ -1,6 +1,6 @@
 ---
 name: mantaq
-description: Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for designing a machine with the live viz page ("show me how X works", "design the Y flow"). Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
+description: Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for designing a machine with the live viz page ("show me how X works", "design the Y flow"). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
 allowed-tools: Read Grep Glob Edit Write Bash Shell
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Read Grep Glob Edit Write Bash Shell
 
 Actor-model state machine library for TypeScript. `npm install @mantaq/core`. Minimal primitives: states + events, context, effects, regions, one injectable clock.
 
-**Written against:** `@mantaq/core` 0.5, `@mantaq/sugar` 2.0, `@mantaq/test` 2.0, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.5, `@mantaq/viz` 0.4.
+**Written against:** `@mantaq/core` 0.6, `@mantaq/sugar` 2.0, `@mantaq/test` 2.0, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.6, `@mantaq/viz` 0.6.
 
 ## Trust the installed package over this skill
 
@@ -44,7 +44,7 @@ One way to do things; don't invent competing patterns.
 - **Transition handler.** Pure decision: gets `(event, { context, state })`, where `state` is the typed current state. Read them, return the next state and/or events to emit. Registered per state (`m.on`) or for every state (`m.onAny`), with `to` listing every state it may return (compile-checked; omit `to` for a handler that only stays). `to` is what the diagram draws, and returning a state not in `to` fails to compile.
 - **Clock.** The only source of time. `VirtualClock` in tests, `RealClock` in production.
 - **Regions.** Child actors composed into a parent. Forwarding events into a child is manual.
-- **Actor.** Wires the above together: declared `inputs` (what callers send), `internal` events (emitted back to itself), `outputs` (emitted outward), states, initial state, context, clock, and a `setup` that registers handlers and effects.
+- **Actor.** Build it with `Actor({...})` (a function, no `new`). Wires the above together: declared `inputs` (what callers send), `internal` events (emitted back to itself), `outputs` (emitted outward), states, initial state, context, clock, and a `setup` that registers handlers and effects.
 
 Everything runs synchronously in one call stack with `VirtualClock`. No awaits needed for timer work in tests.
 
@@ -76,7 +76,7 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 
 ## Live design
 
-To design or explain a machine with the live viz page, read `designing.md`.
+To set mantaq up, design or explain a machine with the live viz page, read `designing.md`.
 
 ## Sibling Files
 

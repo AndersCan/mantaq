@@ -1,6 +1,32 @@
 # Designing with the live page
 
-Design a machine by editing its real file while the live viz page shows the result. Written against `@mantaq/core` 0.5, `@mantaq/inspect` 0.5. Signatures: check the installed types.
+Design a machine by editing its real file while the live viz page shows the result. Written against `@mantaq/core` 0.6, `@mantaq/inspect` 0.6. Signatures: check the installed types.
+
+## 0. Set up (no mantaq or no live page yet)
+
+Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the vite config.
+
+1. Vite only. No `vite` in package.json: say the live viewer runs on Vite and ask before adding it.
+2. Use the project's package manager.
+3. Install `@mantaq/core` and `-D @mantaq/inspect`, no versions. Check one core with `npm ls @mantaq/core`. Two versions: install core at the version `@mantaq/inspect` depends on.
+4. Vite config. None: create `vite.config.ts`:
+
+   ```ts
+   import { defineConfig } from "vite";
+   import { mantaqViz } from "@mantaq/inspect/vite";
+
+   export default defineConfig({
+     plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })],
+   });
+   ```
+
+   One exists: add the import and the plugin to `plugins`, change nothing else. Machines kept elsewhere: change the glob to match.
+
+5. Machine file `src/<name>.machine.ts`. Export a factory, not an instance: `export function create<Name>({ clock }: { clock: Clock } = { clock: VirtualClock() })` returning `Actor({ ..., clock, ... })`. Ports go in the same options object, each with a working default. States, events and JSDoc as in sections 4 and 5.
+6. Typecheck: `npx tsc --noEmit` (or the repo's script). Fix against the types.
+7. Start the server in the background: `npx vite --open "/__mantaq/?machine=<id>"`. Read the output: the `Local:` URL and `mantaq viz: /__mantaq/`. Any `[mantaq-viz]` line is a problem to fix.
+8. Check it is drawn: `curl -s <Local URL>__mantaq/viz.json | grep -c '"id": "<id>"'` is at least 1.
+9. Reply with the link `<Local URL>__mantaq/?machine=<id>` and the states in one line. Leave the server running while the user designs.
 
 ## 1. The machine in the code is the design
 
