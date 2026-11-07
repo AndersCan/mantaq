@@ -87,6 +87,10 @@ expectNoDesignErrors({ ...target, fuzz: false }); // structure only, no fuzzing
 
 Fuzz throws in app code are real findings: fix them, never suppress.
 
+Bad data without a crash: export `<machine id>Expectations` beside the factory, `payment: { neverSee: [{ address: "" }] }` typed `Expectations<typeof createXActor>`.
+`mustSee` lists contexts some run must reach. Tests can pass the block as `expectations` on the target.
+Payloads come from `source`; without it, payload events are sent without one.
+
 With `@mantaq/test` 2.0 the `*` any-node (`m.onAny`) counts in coverage: it is one node, covered once its event fires from any state.
 
 ## Test Design
