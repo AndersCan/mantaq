@@ -11,6 +11,7 @@ import type { VizDocument, VizDriver } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
+import { notesFooter } from "./notes-page.ts";
 
 export type LiveTargets = Readonly<Record<string, FuzzTarget["create"]>>;
 
@@ -45,6 +46,8 @@ export function mountDriven(
     text: string;
     targets: LiveTargets;
     heading?: "h1" | "h2" | "h3";
+    /** URL of the dev server's notes endpoint; unset = no notes section. */
+    notes?: string;
   },
 ): void {
   const parsed = parseViz(context.text);
@@ -81,8 +84,12 @@ export function mountDriven(
   }
   const viewer = doc.createElement("div");
   root.replaceChildren(...(picker ? [bar] : []), viewer);
+  const machine = shown.machines[0];
   mountViewer(viewer, shown, {
     ...options,
+    ...(context.notes === undefined || machine === undefined
+      ? {}
+      : { panelFooter: notesFooter(doc, { url: context.notes, machine }) }),
     ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...(create === undefined ? {} : { driver: createDriver({ id, create }) }),
   });
@@ -177,7 +184,7 @@ function mountCompare(
 /** Fetch the document from `source` and mount it; call again to redraw, keeping the walk. */
 export async function mountLiveDriven(
   root: HTMLElement,
-  context: { source: string; targets: LiveTargets },
+  context: { source: string; targets: LiveTargets; notes?: string },
 ): Promise<void> {
   const response = await fetch(context.source).catch(() => null);
   if (response === null || !response.ok) {

@@ -12,7 +12,16 @@ const source = root?.dataset["src"];
 const current: { targets: LiveTargets } = { targets };
 
 if (root && source !== undefined) {
-  const draw = () => void mountLiveDriven(root, { source, targets: current.targets });
+  const notes =
+    import.meta.hot === undefined
+      ? undefined
+      : new URL("notes", new URL(source, location.href)).pathname;
+  const draw = () =>
+    void mountLiveDriven(root, {
+      source,
+      targets: current.targets,
+      ...(notes === undefined ? {} : { notes }),
+    });
   draw();
   import.meta.hot?.on(UPDATE_EVENT, draw);
   import.meta.hot?.accept("virtual:mantaq/targets", (module) => {
