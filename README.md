@@ -19,6 +19,12 @@ A TypeScript state machine library built around actors, events, and hierarchical
 
 **Docs**: [anderscan.github.io/mantaq](https://anderscan.github.io/mantaq/)
 
+[![The checkout machine in the mantaq viewer](docs/assets/checkout-diagram.png)](https://anderscan.github.io/mantaq/)
+
+A built-in fuzzer sends random event sequences to every machine and reports states nothing reaches, handlers that throw, and events an effect sends that no state handles.
+
+**[Start with your coding agent ->](https://anderscan.github.io/mantaq/getting-started/with-an-agent/)**
+
 </div>
 
 ## Packages
@@ -58,7 +64,7 @@ const success = state("success")().final();
 const submitBasicInfo = event("submitBasicInfo")();
 const submitPayment = event("submitPayment")();
 
-const checkout = new Actor({
+const checkout = Actor({
   inputs: [submitBasicInfo, submitPayment],
   states: [basicInfo, payment, success],
   initial: basicInfo,
@@ -88,10 +94,10 @@ page. Entity IDs are fixed: the same states and events everywhere.
 Agent skills for **end users** building with `@mantaq/core`. Writing, testing, and reviewing actor-model code. These are **not** for developing the library itself.
 
 ```bash
-npx skills add AndersCan/mantaq
+npx skills add AndersCan/mantaq -a claude-code -y
 ```
 
-The `mantaq` skill covers philosophy, building blocks, and transition rules, with sibling files for patterns, testing, sugar helpers, and review conventions.
+The `mantaq` skill covers philosophy, building blocks, and transition rules, with sibling files for patterns, testing, sugar helpers, and review conventions. See [Start with your coding agent](https://anderscan.github.io/mantaq/getting-started/with-an-agent/).
 
 ## Development
 

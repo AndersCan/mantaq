@@ -9,9 +9,12 @@ hero:
     light: ../../assets/logo-light.svg
     alt: Mantaq
   actions:
+    - text: Start with your agent
+      link: /mantaq/getting-started/with-an-agent/
+      icon: right-arrow
     - text: Get Started
       link: /mantaq/getting-started/introduction/
-      icon: right-arrow
+      variant: minimal
     - text: GitHub
       link: https://github.com/anderscan/mantaq
       icon: external
@@ -19,8 +22,15 @@ hero:
 ---
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
+import MachineViz from "../../components/MachineViz.astro";
 
 State machine library for TypeScript. You declare states and events; Mantaq runs transitions, effects, timeouts, child actors, and cleanup. All types inferred from declarations.
+
+## See it
+
+<MachineViz id="checkout" />
+
+A built-in fuzzer sends random event sequences to every machine and reports states nothing reaches, handlers that throw, and events an effect sends that no state handles.
 
 ## Why Mantaq?
 
