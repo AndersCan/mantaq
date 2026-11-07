@@ -196,3 +196,88 @@ describe("createDriver effect results", () => {
     expect(seen).toEqual([]);
   });
 });
+
+describe("createDriver ordering inside one step", () => {
+  const toB = event("toB")();
+  const toA = event("toA")();
+  const stateA = state("a")();
+  const stateB = state("b")();
+  const cycle: FuzzTarget = {
+    id: "cycle",
+    create: () => {
+      const clock = VirtualClock();
+      const actor = Actor({
+        inputs: [],
+        internal: [toB, toA],
+        states: [stateA, stateB],
+        initial: stateA,
+        clock,
+        setup: (m) => {
+          m.effect(stateA, {
+            name: "waitA",
+            sends: [toB],
+            fn: (input) => withTimeout(100, { input, event: () => toB.create() }),
+          });
+          m.effect(stateB, {
+            name: "waitB",
+            sends: [toA],
+            fn: (input) => withTimeout(100, { input, event: () => toA.create() }),
+          });
+          m.on(stateA, { event: toB, to: [stateB], handler: () => ({ state: stateB }) });
+          m.on(stateB, { event: toA, to: [stateA], handler: () => ({ state: stateA }) });
+        },
+      });
+      return { actor, clock };
+    },
+  };
+
+  test("timers that cycle between states stay in chronological order", () => {
+    const live = createDriver(cycle).step({ kind: "advance", ms: 250 });
+    expect(live.last).toMatchObject({ event: "toB", from: "a", to: "b" });
+    expect(live.after).toEqual([expect.objectContaining({ event: "toA", from: "b", to: "a" })]);
+  });
+});
+
+describe("createDriver sync effect sending two events", () => {
+  const go = event("go")();
+  const one = event("one")();
+  const two = event("two")();
+  const s0 = state("s0")();
+  const s1 = state("s1")();
+  const s2 = state("s2")();
+  const s3 = state("s3")();
+  test("both follow-ups come after the starter, in order", () => {
+    const driver = createDriver({
+      id: "two",
+      create: () => {
+        const clock = VirtualClock();
+        const actor = Actor({
+          inputs: [go],
+          internal: [one, two],
+          states: [s0, s1, s2, s3],
+          initial: s0,
+          clock,
+          setup: (m) => {
+            m.on(s0, { event: go, to: [s1], handler: () => ({ state: s1 }) });
+            m.effect(s1, {
+              name: "fan",
+              sends: [one],
+              fn: ({ emit }) => emit(one.create()),
+            });
+            m.on(s1, { event: one, to: [s2], handler: () => ({ state: s2 }) });
+            m.effect(s2, {
+              name: "fan2",
+              sends: [two],
+              fn: ({ emit }) => emit(two.create()),
+            });
+            m.on(s2, { event: two, to: [s3], handler: () => ({ state: s3 }) });
+          },
+        });
+        return { actor, clock };
+      },
+    });
+    const live = driver.step({ kind: "event", event: "go", payload: null });
+    expect(live.last).toMatchObject({ event: "go", from: "s0", to: "s1" });
+    expect(live.after.map((entry) => entry.event)).toEqual(["one", "two"]);
+  });
+});
