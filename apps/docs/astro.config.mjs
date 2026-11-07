@@ -22,6 +22,7 @@ export default defineConfig({
         "src/content/docs/checkout.ts",
         "src/content/docs/saga.ts",
         "src/content/docs/login.ts",
+        "src/content/docs/checkout-with-bugs.ts",
       ],
       // Seeded, so every build draws the same coverage. 2000 runs miss the saga's
       // five-step path to `completed` on this seed; 5000 take ~0.3s.

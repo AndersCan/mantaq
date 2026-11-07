@@ -45,7 +45,7 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 <Machine src="src/machines/checkout.ts" />
 ```
 
-`astro build` writes, per `<Machine>`, a box of design findings (unreachable states, handlers that throw under fuzzing, effects sending events nobody handles) followed by the diagram with the live panel. `?machine=<id>&step=` walks work as on the Vite page. `?machine=<id>&run=<name>` opens a recorded run by name; use it for links in docs and issues.
+`astro build` writes, per `<Machine>`, a one-line count of design findings, then the diagram with the live panel. Each state with a finding (unreachable, a handler that throws under fuzzing, an effect sending an event nobody handles) carries a ! mark; click it to read the finding and replay the path. `?machine=<id>&step=` walks work as on the Vite page. `?machine=<id>&run=<name>` opens a recorded run by name; use it for links in docs and issues.
 
 - **Two lists.** A file is named twice: in `machines` (paths, not globs; relative to the Astro root or absolute) and in the page's `src`. The browser script is built before pages render, so it cannot learn the list from the pages.
 - **What fails the build.** An empty `machines`, a missing file, a file that cannot load, two files exporting the same machine id, a `src` that is not in `machines`, and a file with no exported actor. Design findings never fail the build; they show on the page.

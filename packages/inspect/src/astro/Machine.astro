@@ -24,14 +24,8 @@ const count = doc.findings.length;
           <strong>
             {count} design finding{count === 1 ? "" : "s"}
           </strong>
+          , marked with ! on the diagram. Click a mark to see the bug and replay it.
         </p>
-        <ul>
-          {doc.findings.map((finding) => (
-            <li>
-              <code>{finding.machine}</code>: {finding.message}
-            </li>
-          ))}
-        </ul>
       </>
     ) : (
       <p>No design findings.{doc.fuzzed ? "" : " Fuzzing is off."}</p>
