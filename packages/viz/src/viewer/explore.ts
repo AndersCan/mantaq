@@ -306,16 +306,20 @@ function fieldInput(doc: Document, field: VizField): HTMLInputElement | HTMLSele
 }
 
 /** The value one field's input holds, or undefined to leave the field out; bad json is an error. */
-function readField(field: VizField, value: string): { value: VizJson | undefined } | { bad: true } {
+function readField(
+  field: VizField,
+  value: string,
+): { value: VizJson | undefined } | { bad: true } | { missing: true } {
   if (field.input === "text") {
     return { value: value !== "" || !field.optional ? value : undefined };
   }
   if (field.input === "number") {
     const number = Number(value);
-    return { value: value.trim() !== "" && Number.isFinite(number) ? number : undefined };
+    if (value.trim() !== "" && Number.isFinite(number)) return { value: number };
+    return field.optional ? { value: undefined } : { missing: true };
   }
-  if (value.trim() === "" || (field.input === "choice" && value === "")) {
-    return { value: undefined };
+  if (value.trim() === "") {
+    return field.optional ? { value: undefined } : { missing: true };
   }
   try {
     return { value: JSON.parse(value) as VizJson };
@@ -328,11 +332,12 @@ function readField(field: VizField, value: string): { value: VizJson | undefined
 function readFields(
   fields: ReadonlyArray<VizField>,
   inputs: ReadonlyMap<string, HTMLInputElement | HTMLSelectElement>,
-): { payload: Record<string, VizJson> } | { bad: string } {
+): { payload: Record<string, VizJson> } | { bad: string } | { missing: string } {
   const payload: Record<string, VizJson> = {};
   for (const field of fields) {
     const read = readField(field, inputs.get(field.name)?.value ?? "");
     if ("bad" in read) return { bad: field.name };
+    if ("missing" in read) return { missing: field.name };
     if (read.value !== undefined) payload[field.name] = read.value;
   }
   return { payload };
@@ -352,8 +357,11 @@ function fieldsForm(
   const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" });
   const submit = () => {
     const read = readFields(fields, inputs);
-    if ("bad" in read) {
-      problem.textContent = `Not sent: ${read.bad} is not valid JSON.`;
+    if ("bad" in read || "missing" in read) {
+      problem.textContent =
+        "bad" in read
+          ? `Not sent: ${read.bad} is not valid JSON.`
+          : `Not sent: ${read.missing} is required.`;
       problem.removeAttribute("hidden");
       return;
     }
