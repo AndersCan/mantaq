@@ -181,6 +181,7 @@ describe("machineFindings", () => {
         errors: [],
         corpus: [],
         failedExpectations: [failed("neverSee", [stepA, stepB])],
+        expectations: [],
       },
     });
     expect(machineFindings(machine)).toEqual([
@@ -202,6 +203,7 @@ describe("machineFindings", () => {
         errors: [],
         corpus: [],
         failedExpectations: [failed("mustSee", null)],
+        expectations: [],
       },
     });
     expect(machineFindings(machine)).toEqual([
@@ -226,6 +228,7 @@ describe("machineFindings", () => {
         errors: [{ from: "idle", event: "pick", message: "boom", steps: [] }],
         corpus: [],
         failedExpectations: [failed("mustSee", null), failed("neverSee", [])],
+        expectations: [],
       },
     });
     expect(machineFindings(machine).map((finding) => finding.kind)).toEqual([

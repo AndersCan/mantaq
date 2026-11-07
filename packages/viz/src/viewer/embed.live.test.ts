@@ -72,6 +72,7 @@ const checkout: VizMachine = {
     ],
     errors: [],
     failedExpectations: [],
+    expectations: [],
   },
 };
 
@@ -898,6 +899,7 @@ describe("live effect reports", () => {
       iterations: 1,
       errors: [],
       failedExpectations: [],
+      expectations: [],
       corpus: [],
     },
   };

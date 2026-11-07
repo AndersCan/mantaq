@@ -118,6 +118,23 @@ describe("fuzz with expectations", () => {
     });
   });
 
+  test("every rule is listed with whether it held", () => {
+    const broken = fuzz(target(), { seed: 1, iterations: 500 });
+    expect(broken.expectations).toEqual([
+      { kind: "neverSee", state: "counting", match: '{"count":3}', held: false },
+      { kind: "mustSee", state: "counting", match: '{"count":-1}', held: false },
+    ]);
+    const held = fuzz(
+      target({ counting: { neverSee: [{ count: -5 }], mustSee: [{ count: 2 }] } }),
+      {
+        seed: 1,
+        iterations: 500,
+      },
+    );
+    expect(held.expectations.map((each) => each.held)).toEqual([true, true]);
+    expect(held.failedExpectations).toEqual([]);
+  });
+
   test("a must-see that is reached passes", () => {
     const result = fuzz(target({ counting: { mustSee: [{ count: 2 }] } }), {
       seed: 1,
@@ -149,6 +166,7 @@ describe("fuzz with expectations", () => {
     const first = fuzz(plain, { seed: 3, iterations: 300 });
     const second = fuzz(empty, { seed: 3, iterations: 300 });
     expect(first.failedExpectations).toEqual([]);
+    expect(first.expectations).toEqual([]);
     expect(second.corpus).toEqual(first.corpus);
     expect(second.errors).toEqual(first.errors);
     expect([...second.firstHit]).toEqual([...first.firstHit]);

@@ -54,6 +54,7 @@ const machine: VizMachine = {
     corpus: [],
     errors: [{ from: "idle", event: "pick", message: "boom", steps: [pick] }],
     failedExpectations: [],
+    expectations: [],
   },
 };
 
@@ -123,6 +124,7 @@ describe("finding marks", () => {
       corpus: [],
       errors: [{ from: "picked", event: "pick", message: "boom", steps: [pick] }],
       failedExpectations: [],
+      expectations: [],
     },
   };
 
@@ -135,6 +137,7 @@ describe("finding marks", () => {
         corpus: [],
         errors: [],
         failedExpectations: [{ kind: "mustSee", state: "idle", match: '{"a":1}', steps: null }],
+        expectations: [],
       },
     };
     const root = mount(undefined, mustSee);

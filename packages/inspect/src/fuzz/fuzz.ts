@@ -1,4 +1,4 @@
-import type { VizFailedExpectation, VizFuzzError, VizStep } from "@mantaq/viz";
+import type { VizExpectation, VizFailedExpectation, VizFuzzError, VizStep } from "@mantaq/viz";
 import { mutate } from "./mutate.ts";
 import type { LiteralPool, MutationContext, Parent } from "./mutate.ts";
 import { createRng } from "./rng.ts";
@@ -50,6 +50,8 @@ export interface FuzzResult {
   errors: VizFuzzError[];
   /** In `FuzzTarget.expectations` order; empty when none were written or all held. */
   failedExpectations: VizFailedExpectation[];
+  /** Every rule written, held or not, in `FuzzTarget.expectations` order. */
+  expectations: VizExpectation[];
 }
 
 function covers(target: FuzzTarget, steps: ReadonlyArray<VizStep>, wanted: ReadonlyArray<string>) {
@@ -109,19 +111,28 @@ function collectErrors(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): 
   );
 }
 
-function failedExpectations(
+function checkExpectations(
   target: FuzzTarget,
   context: { kept: ReadonlyArray<CorpusEntry>; firstHit: ReadonlyMap<string, number> },
-): VizFailedExpectation[] {
-  return (target.expectations ?? []).flatMap((each): VizFailedExpectation[] => {
+): { rule: VizExpectation; failed: VizFailedExpectation | null }[] {
+  return (target.expectations ?? []).map((each) => {
     const { kind, state } = each;
     const match = each.text;
     if (kind === "mustSee") {
-      return context.firstHit.has(each.feature) ? [] : [{ kind, state, match, steps: null }];
+      const held = context.firstHit.has(each.feature);
+      return {
+        rule: { kind, state, match, held },
+        failed: held ? null : { kind, state, match, steps: null },
+      };
     }
     const entry = context.kept.find((candidate) => candidate.discovered.includes(each.feature));
-    if (entry === undefined) return [];
-    return [{ kind, state, match, steps: shrink(target, entry.steps, [each.feature]) }];
+    return {
+      rule: { kind, state, match, held: entry === undefined },
+      failed:
+        entry === undefined
+          ? null
+          : { kind, state, match, steps: shrink(target, entry.steps, [each.feature]) },
+    };
   });
 }
 
@@ -187,6 +198,7 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   const kept = corpus
     .filter((entry) => entry.discovered.length > 0)
     .map((entry) => ({ ...entry, steps: shrink(target, entry.steps, entry.discovered) }));
+  const checked = checkExpectations(target, { kept, firstHit });
   return {
     seed: options.seed,
     iterations: iteration - 1,
@@ -194,6 +206,7 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
     corpus: kept,
     firstHit,
     errors: collectErrors(target, kept),
-    failedExpectations: failedExpectations(target, { kept, firstHit }),
+    failedExpectations: checked.flatMap((each) => (each.failed === null ? [] : [each.failed])),
+    expectations: checked.map((each) => each.rule),
   };
 }
