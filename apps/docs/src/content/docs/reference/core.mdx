@@ -185,7 +185,7 @@ class RealClock implements Clock {
 }
 ```
 
-Real timers via `globalThis.setTimeout`. Default for actors.
+Real timers via `globalThis.setTimeout`. Default for actors. `now()`: milliseconds. RealClock: since the Unix epoch. VirtualClock: virtual time, starting at 0.
 
 ---
 

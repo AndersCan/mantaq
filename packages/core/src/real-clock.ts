@@ -3,7 +3,6 @@ import type { Clock, ClockIntervalOptions, ClockTimerOptions } from "./clock.ts"
 type ListenerEntry = { signal: AbortSignal; onAbort: () => void };
 
 export function RealClock(): Clock {
-  const start = Date.now();
   const listeners = new Map<number, ListenerEntry>();
 
   function clearListener(listenerId: number): void {
@@ -15,7 +14,7 @@ export function RealClock(): Clock {
 
   return {
     now(): number {
-      return Date.now() - start;
+      return Date.now();
     },
 
     setTimeout(delay: number, { signal, cb }: ClockTimerOptions): number {

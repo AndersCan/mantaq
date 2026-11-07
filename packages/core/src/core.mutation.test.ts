@@ -125,9 +125,9 @@ describe("VirtualClock", () => {
 });
 
 describe("RealClock", () => {
-  test("now returns time relative to construction, not epoch time", () => {
+  test("now returns epoch milliseconds", () => {
     const clock = RealClock();
-    expect(clock.now()).toBeLessThan(1000);
+    expect(Math.abs(clock.now() - Date.now())).toBeLessThan(50);
   });
 
   test("setTimeout with options but no signal still sets up the callback", () => {
