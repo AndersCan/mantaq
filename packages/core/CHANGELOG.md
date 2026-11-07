@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  Breaking: `RealClock().now()` now returns milliseconds since the Unix epoch (`Date.now()`), not milliseconds since the clock was constructed. `VirtualClock` is unchanged and still starts at 0.
+
 ## 0.6.1
 
 <sub>2026-11-07</sub>
