@@ -22,9 +22,9 @@ Take a step with a panel button, by clicking a pulsing edge, or by clicking a st
 
 **Live** (the Vite plugin page, or `mountViewer(root, doc, { driver })`): steps run the real actor through `createDriver` from `@mantaq/inspect/drive`, so guards are evaluated. An event fuzzing sent with a payload asks for one before it is sent, from the Send list or a click on its edge, in a popover on the diagram next to that edge (Escape closes it): the form starts with the first fuzz sample, the other samples are one click away, and the JSON is editable. Events without samples send at once, or open the same form via **with payload**. Timers advance by button, and **Back** replays the path from a fresh actor.
 
-## Schema (v10)
+## Schema (v11)
 
-`VizDocument { schemaVersion: 10, machines: VizMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
+`VizDocument { schemaVersion: 11, machines: VizMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
 
 | field              | meaning                                                                                                                                                                                                                                                                                                                               |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

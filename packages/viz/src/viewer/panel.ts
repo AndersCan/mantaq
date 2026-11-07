@@ -166,11 +166,11 @@ function findingArticle(
   finding: VizFinding,
   replay: ((steps: ReadonlyArray<VizStep>) => void) | undefined,
 ): HTMLElement {
-  const { title, sentence } = FINDING_KINDS[finding.kind];
+  const { title, sentence, noSteps } = FINDING_KINDS[finding.kind];
   const { steps } = finding;
   const path =
     steps === null
-      ? [html(doc, "p", {}, ["No event path reaches this state."])]
+      ? [html(doc, "p", {}, [noSteps])]
       : steps.length === 0
         ? []
         : [

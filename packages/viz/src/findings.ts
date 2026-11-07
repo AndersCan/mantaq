@@ -2,7 +2,12 @@ import { unhandledSends } from "./moves.ts";
 import { coveredByAny } from "./schema.ts";
 import type { VizMachine, VizStep } from "./schema.ts";
 
-export type VizFindingKind = "handlerError" | "unhandledSend" | "unreachableState";
+export type VizFindingKind =
+  | "handlerError"
+  | "neverSee"
+  | "mustSee"
+  | "unhandledSend"
+  | "unreachableState";
 
 export interface VizFinding {
   kind: VizFindingKind;
@@ -14,24 +19,40 @@ export interface VizFinding {
   steps: VizStep[] | null;
 }
 
-export const FINDING_KINDS: Readonly<Record<VizFindingKind, { title: string; sentence: string }>> =
-  {
-    handlerError: {
-      title: "Handler throws",
-      sentence:
-        "Fuzzing sent this event in this state and the handler threw, so the actor ends up in its error state instead of where you meant it to go.",
-    },
-    unhandledSend: {
-      title: "Event nobody handles",
-      sentence:
-        "An effect here sends an event this state has no handler for: an input is dropped without a trace, and an internal event puts the actor in its error state.",
-    },
-    unreachableState: {
-      title: "Unreachable state",
-      sentence:
-        "No sequence of events leads here from the initial state: a transition into it is missing, or the state is not needed.",
-    },
-  };
+export const FINDING_KINDS: Readonly<
+  Record<VizFindingKind, { title: string; sentence: string; noSteps: string }>
+> = {
+  handlerError: {
+    title: "Handler throws",
+    sentence:
+      "Fuzzing sent this event in this state and the handler threw, so the actor ends up in its error state instead of where you meant it to go.",
+    noSteps: "No fuzz run reached it.",
+  },
+  neverSee: {
+    title: "Never-see context reached",
+    sentence:
+      "A fuzz run reached this state with a context the machine file marks as a bug here (neverSee).",
+    noSteps: "No fuzz run reached it.",
+  },
+  mustSee: {
+    title: "Must-see context missed",
+    sentence:
+      "No fuzz run reached this state with a context the machine file says some run must reach (mustSee). A path to it is missing or blocked, or the fuzzer needs a recorded test run that gets there.",
+    noSteps: "No fuzz run reached this context.",
+  },
+  unhandledSend: {
+    title: "Event nobody handles",
+    sentence:
+      "An effect here sends an event this state has no handler for: an input is dropped without a trace, and an internal event puts the actor in its error state.",
+    noSteps: "No fuzz run reached this state.",
+  },
+  unreachableState: {
+    title: "Unreachable state",
+    sentence:
+      "No sequence of events leads here from the initial state: a transition into it is missing, or the state is not needed.",
+    noSteps: "No event path reaches this state.",
+  },
+};
 
 /**
  * States no edge path leads to from the initial state. Empty when an undetermined
@@ -82,6 +103,23 @@ export function machineFindings(machine: VizMachine): VizFinding[] {
     message: `${error.event} in ${error.from} throws: ${error.message}`,
     steps: error.steps,
   }));
+  const expectations = machine.fuzz?.failedExpectations ?? [];
+  const never = expectations
+    .filter((f) => f.kind === "neverSee")
+    .map((f): VizFinding => ({
+      kind: "neverSee",
+      state: f.state,
+      message: `state ${f.state} reached never-see context ${f.match}`,
+      steps: f.steps,
+    }));
+  const must = expectations
+    .filter((f) => f.kind === "mustSee")
+    .map((f): VizFinding => ({
+      kind: "mustSee",
+      state: f.state,
+      message: `state ${f.state} never reached must-see context ${f.match} in ${machine.fuzz?.iterations ?? 0} fuzz runs`,
+      steps: null,
+    }));
   const sends = machine.states.flatMap((state) =>
     unhandledSends(machine, state.id).map(({ effect, event }): VizFinding => ({
       kind: "unhandledSend",
@@ -96,5 +134,5 @@ export function machineFindings(machine: VizMachine): VizFinding[] {
     message: `state ${id} is declared but no path leads to it from the initial state`,
     steps: null,
   }));
-  return [...thrown, ...sends, ...orphans];
+  return [...thrown, ...never, ...must, ...sends, ...orphans];
 }
