@@ -30,7 +30,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 async function draw(options: {
   get: Response;
-  post?: Response;
+  post?: Response | Promise<Response>;
   notes?: boolean;
   driver?: boolean;
 }) {
@@ -78,6 +78,7 @@ describe("journey box", () => {
     const input = type(root, "Two sends");
     const button = root.querySelector<HTMLButtonElement>("section.journey button")!;
     expect(button.disabled).toBe(false);
+    const hint = root.querySelector("section.journey [data-walk]")?.textContent;
     root
       .querySelector("section.journey form")!
       .dispatchEvent(new Event("submit", { cancelable: true }));
@@ -87,6 +88,9 @@ describe("journey box", () => {
     expect(body.target).toEqual({ kind: "walk" });
     expect(body.note).toBe("Two sends");
     expect(body.steps.length).toBeGreaterThan(0);
+    expect(body.end).toMatch(/\S/);
+    expect(hint).toBe(`${body.steps.length} steps, ends in ${body.end}.`);
+    expect(button.disabled).toBe(true);
     expect(root.querySelector("section.journey p[role=status]")?.textContent).toBe(
       "Journey saved. Ask your agent to apply the viz notes.",
     );
@@ -117,6 +121,32 @@ describe("journey box", () => {
       "Could not save this journey: the journey needs a name. Your name is still here.",
     );
     expect(input.value).toBe("Keep me");
+  });
+
+  test("two quick submits send one request", async () => {
+    let release: (response: Response) => void = () => {};
+    const held = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const { root, posts } = await draw({ get: ok(), post: held });
+    root.querySelector<HTMLElement>("[data-send]")?.click();
+    type(root, "Once");
+    const form = root.querySelector("section.journey form")!;
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    expect(posts).toHaveLength(1);
+    release(new Response("{}"));
+    await tick();
+  });
+
+  test("a refusal from the endpoint is shown in the box", async () => {
+    const { root } = await draw({
+      get: new Response(JSON.stringify({ error: "no such machine here" }), { status: 409 }),
+    });
+    const section = root.querySelector<HTMLElement>("section.journey")!;
+    expect(section.hidden).toBe(false);
+    expect(section.textContent).toContain("no such machine here");
+    expect(section.querySelector("input")).toBeNull();
   });
 
   test("hidden when the notes endpoint does not answer", async () => {
