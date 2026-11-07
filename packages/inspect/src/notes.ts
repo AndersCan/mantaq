@@ -3,6 +3,7 @@
  * saved as a Markdown list next to the machine file. Pure text in, text out,
  * so the page and the dev server share it.
  */
+import type { VizStep } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 
 export const NOTES_VERSION = 1;
@@ -10,12 +11,14 @@ export const MAX_NOTE_LENGTH = 2000;
 
 export type NoteTarget =
   | { kind: "state"; state: string }
-  | { kind: "edge"; from: string; event: string };
+  | { kind: "edge"; from: string; event: string }
+  | { kind: "walk" };
 
 /** What a target is checked against; a VizMachine satisfies it. */
 export interface MachineShape {
   states: ReadonlyArray<{ id: string }>;
   edges: ReadonlyArray<{ from: string; event: string; kind: string }>;
+  events: ReadonlyArray<{ id: string }>;
 }
 
 export interface Note {
@@ -30,6 +33,10 @@ export interface Note {
   note: string;
   result: string | undefined;
   question: string | undefined;
+  /** Walk notes: the state the walk ended in; undefined for other notes or when missing. */
+  end: string | undefined;
+  /** Walk notes: the steps from a fresh actor; undefined when missing or not valid VizStep JSON. */
+  steps: VizStep[] | undefined;
 }
 
 export interface NotesList {
@@ -48,7 +55,7 @@ export interface NoteAdded {
 const MACHINE_EXTENSION = /\.(?:[cm]?[jt]sx?)$/;
 const VERSION_LINE = /^mantaq notes v(\d+)\b/;
 const ITEM_LINE = /^- id: ?(.*)$/;
-const FIELD_LINE = /^ {2}(machine|on|status|note|result|question): ?(.*)$/;
+const FIELD_LINE = /^ {2}(machine|on|status|note|result|question|end|steps): ?(.*)$/;
 const GENERATED_ID = /^n(\d+)$/;
 
 /** `src/checkout.machine.ts` → `src/checkout.machine.notes.md`. */
@@ -57,11 +64,13 @@ export function notesFileOf(machineFile: string): string {
 }
 
 export function targetText(target: NoteTarget): string {
+  if (target.kind === "walk") return "walk";
   return target.kind === "state" ? `state ${target.state}` : `edge ${target.from} ${target.event}`;
 }
 
 export function parseTarget(text: string): NoteTarget | undefined {
   const trimmed = text.trim();
+  if (trimmed === "walk") return { kind: "walk" };
   const state = /^state (\S+)$/.exec(trimmed);
   if (state !== null) return { kind: "state", state: state[1] ?? "" };
   const edge = /^edge (\S+) (\S+)$/.exec(trimmed);
@@ -74,7 +83,13 @@ function isWord(value: unknown): value is string {
 
 export function isNoteTarget(value: unknown): value is NoteTarget {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as { kind?: unknown; state?: unknown; from?: unknown; event?: unknown };
+  const candidate = value as {
+    kind?: unknown;
+    state?: unknown;
+    from?: unknown;
+    event?: unknown;
+  };
+  if (candidate.kind === "walk") return true;
   if (candidate.kind === "state") return isWord(candidate.state);
   return candidate.kind === "edge" && isWord(candidate.from) && isWord(candidate.event);
 }
@@ -95,6 +110,7 @@ export function targetProblem(
   input: { machine: string; target: NoteTarget },
 ): string | undefined {
   const { target, machine } = input;
+  if (target.kind === "walk") return undefined;
   if (target.kind === "state") {
     return shape.states.some((state) => state.id === target.state)
       ? undefined
@@ -107,10 +123,37 @@ export function targetProblem(
 
 /** One line: control characters become spaces, whitespace runs collapse, ends trimmed. */
 export function cleanNoteText(text: string): string {
-  return text
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    text
+      // oxlint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+}
+
+function isVizStep(value: unknown): value is VizStep {
+  if (typeof value !== "object" || value === null) return false;
+  const step = value as { kind?: unknown; event?: unknown; ms?: unknown };
+  if (step.kind === "advance") {
+    return typeof step.ms === "number" && Number.isFinite(step.ms) && step.ms >= 0;
+  }
+  return (
+    step.kind === "event" &&
+    typeof step.event === "string" &&
+    step.event !== "" &&
+    "payload" in step
+  );
+}
+
+export function isVizSteps(value: unknown): value is VizStep[] {
+  return Array.isArray(value) && value.every(isVizStep);
+}
+
+function parseSteps(text: string | undefined): VizStep[] | undefined {
+  if (text === undefined) return undefined;
+  const parsed = Either.from(() => JSON.parse(text) as unknown);
+  return Either.isRight(parsed) && isVizSteps(parsed[1]) ? parsed[1] : undefined;
 }
 
 function lines(text: string): string[] {
@@ -145,16 +188,22 @@ export function parseNotes(text: string, file: string): Either<string, Note[]> {
     if (field !== null && current !== undefined) current[field[1] ?? ""] = (field[2] ?? "").trim();
   }
   return Either.right<Note[]>(
-    items.map((item): Note => ({
-      id: item["id"] ?? "",
-      machine: item["machine"] === "" ? undefined : item["machine"],
-      on: item["on"] ?? "",
-      target: parseTarget(item["on"] ?? ""),
-      status: (item["status"] ?? "").toLowerCase() === "done" ? "done" : "open",
-      note: item["note"] ?? "",
-      result: item["result"],
-      question: item["question"],
-    })),
+    items.map((item): Note => {
+      const steps = parseSteps(item["steps"]);
+      const unreadable = item["steps"] !== undefined && steps === undefined;
+      return {
+        id: item["id"] ?? "",
+        machine: item["machine"] === "" ? undefined : item["machine"],
+        on: item["on"] ?? "",
+        target: parseTarget(item["on"] ?? ""),
+        status: (item["status"] ?? "").toLowerCase() === "done" ? "done" : "open",
+        note: unreadable ? `[unreadable steps] ${item["note"] ?? ""}` : (item["note"] ?? ""),
+        result: item["result"],
+        question: item["question"],
+        end: item["end"] === "" ? undefined : item["end"],
+        steps,
+      };
+    }),
   );
 }
 
@@ -173,7 +222,13 @@ function nextId(existing: string): string {
  */
 export function appendNote(
   existing: string | undefined,
-  input: { file: string; machine: string; target: NoteTarget; note: string },
+  input: {
+    file: string;
+    machine: string;
+    target: NoteTarget;
+    note: string;
+    walk?: { end: string; steps: VizStep[] };
+  },
 ): { text: string; note: Note } {
   const id = nextId(existing ?? "");
   const on = targetText(input.target);
@@ -183,6 +238,9 @@ export function appendNote(
     `  on: ${on}`,
     "  status: open",
     `  note: ${input.note}`,
+    ...(input.walk === undefined
+      ? []
+      : [`  end: ${input.walk.end}`, `  steps: ${JSON.stringify(input.walk.steps)}`]),
     "",
   ].join("\n");
   const basename = input.file.split(/[\\/]/).pop() ?? input.file;
@@ -202,6 +260,8 @@ export function appendNote(
       note: input.note,
       result: undefined,
       question: undefined,
+      end: input.walk?.end,
+      steps: input.walk?.steps,
     },
   };
 }

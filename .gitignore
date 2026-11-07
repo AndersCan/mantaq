@@ -42,3 +42,4 @@ packages/*/reports
 .vitest/
 packages/inspect/src/fixtures/credit.notes.md
 packages/inspect/src/astro-site-*
+packages/inspect/src/check-site-*/
