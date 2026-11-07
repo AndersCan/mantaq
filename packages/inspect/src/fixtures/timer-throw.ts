@@ -1,7 +1,8 @@
 /**
  * An effect whose timer callback reads the payload the handler stored. Sent
  * without a payload, the callback throws under `clock.advance`, outside the
- * handler and effect body core guards.
+ * handler and effect body core guards. `refunded` has no way in, so fuzz never
+ * reaches full coverage and cannot stop before it finds the crash.
  */
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 
@@ -11,6 +12,7 @@ const idle = state("idle")();
 const charging = state("charging")();
 const paid = state("paid")();
 const declined = state("declined")();
+const refunded = state("refunded")();
 
 const pay = event("pay")<Payment>();
 const ok = event("ok")();
@@ -21,7 +23,7 @@ export function createTimerThrowActor(clock: VirtualClock = VirtualClock()) {
   return Actor({
     inputs: [pay],
     internal: [ok, no],
-    states: [idle, charging, paid, declined],
+    states: [idle, charging, paid, declined, refunded],
     initial: idle,
     clock,
     context: initial,

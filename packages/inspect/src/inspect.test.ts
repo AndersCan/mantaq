@@ -13,7 +13,8 @@ describe("inspect", () => {
   test("payloads read from the event types let fuzzing reach a payload-guarded state", () => {
     const { machine, warnings } = inspect({ id: "door", create: () => createDoorActor(), source });
     expect(warnings).toEqual([]);
-    expect(machine.fuzz?.iterations).toBe(2000);
+    // Full coverage ends the run before the 2000 cap.
+    expect(machine.fuzz?.iterations).toBeLessThan(2000);
     expect(machine.states.find((state) => state.id === "opened")?.coverage?.hits).toBeGreaterThan(
       0,
     );
@@ -96,9 +97,13 @@ describe("inspect: fuzz budget", () => {
     expect(run().machine).toEqual(machine);
   });
 
-  test("without timeLimitMs, iterations is an exact count: no early stop", () => {
-    const { machine } = inspect({ ...checkout, fuzz: { iterations: 1500 } });
-    expect(machine.fuzz?.iterations).toBe(1500);
+  test("without timeLimitMs, iterations is a cap: stops at full coverage, seeded", () => {
+    const run = () => inspect({ ...checkout, fuzz: { iterations: 50_000 } });
+    const { machine, warnings } = run();
+    expect(warnings).toEqual([]);
+    expect(machine.fuzz?.iterations).toBeLessThan(50_000);
+    expect(machine.states.every((state) => (state.coverage?.hits ?? 0) > 0)).toBe(true);
+    expect(run().machine).toEqual(machine);
   });
 
   test("states and edges fuzz missed are a warning with the iterations run and why it stopped", () => {

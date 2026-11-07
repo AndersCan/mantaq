@@ -36,7 +36,7 @@ The live page runs the real actor, so it needs an exported factory on a `Virtual
 
 Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations, timeLimitMs }`).
 
-- `timeLimitMs`: wall-time budget per machine. With it, fuzzing stops at the first of: every state and edge covered, `iterations` (no cap if unset), or the time limit. Runs stay seeded (same seed, same sequence); only how many ran depends on machine speed.
+- `timeLimitMs`: wall-time budget per machine. Fuzzing stops at the first of: every state and edge covered, `iterations` (no cap if only `timeLimitMs` is set), or the time limit. Runs stay seeded (same seed, same sequence); only how many ran depends on machine speed.
 - Dev default: `{ timeLimitMs: 2000 }`. A small machine stops at full coverage in milliseconds, so a save redraws fast; one fuzz cannot cover costs at most 2 s.
 - `vite build` default: 2000 iterations, no time limit, so `viz.json` is reproducible.
 - A state or edge fuzz never reached is a warning in the `[mantaq-viz]` log, with the iterations run and why it stopped. Raise `timeLimitMs` / `iterations`, or add a named run.
@@ -64,7 +64,7 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 
 - **Two lists.** A file is named twice: in `machines` (paths, not globs; relative to the Astro root or absolute) and in the page's `src`. The browser script is built before pages render, so it cannot learn the list from the pages.
 - **What fails the build.** An empty `machines`, a missing file, a file that cannot load, two files exporting the same machine id, a `src` that is not in `machines`, and a file with no exported actor. Design findings never fail the build; they show on the page.
-- **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations, timeLimitMs }` (see the Vite options). Default: seeded, 2000 iterations, no time limit, so builds are reproducible.
+- **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations, timeLimitMs }` (see the Vite options). Default: seeded, up to 2000 iterations (stops early at full coverage), no time limit, so builds are reproducible.
 - Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the static walk.
 
 **Overview of all machines.** `<Machines pages={...} />` draws every machine given to `mantaqViz` as a box, with an arrow from A to B labelled `e` when `e` is in A's declared `outputs` and B handles `e` as an input (same event id, internal events excluded).

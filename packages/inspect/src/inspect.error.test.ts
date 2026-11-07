@@ -64,8 +64,12 @@ describe("inspect: fuzz that cannot finish or crashes is reported, not fatal", (
     // The shrunk event path that reproduces it: pay with no card, then time passes.
     expect(crash?.steps.map((step) => step.kind)).toEqual(["event", "advance"]);
     expect(crash?.steps[0]).toMatchObject({ event: "pay", payload: {} });
-    // Runs with a card still reach both outcomes.
-    expect(warnings).toEqual([]);
+    // The crash ends one run, not the fuzz: it runs to the cap (`refunded` keeps
+    // coverage short) and still reaches both outcomes.
+    expect(machine.fuzz?.iterations).toBe(2000);
+    expect(warnings.filter((w) => w.startsWith("fuzz never reached"))).toEqual([
+      "fuzz never reached: refunded (ran 2000 iterations, stopped: iteration cap). Raise fuzz.timeLimitMs / iterations or add a named run to `tests`.",
+    ]);
     const hits = (id: string) => machine.states.find((state) => state.id === id)?.coverage?.hits;
     expect(hits("paid")).toBeGreaterThan(0);
     expect(hits("declined")).toBeGreaterThan(0);

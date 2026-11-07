@@ -24,11 +24,10 @@ const DEFAULT_ITERATIONS = 2000;
 
 export interface FuzzSettings {
   seed?: number;
-  /** Most runs to try. Default 2000; no cap when `timeLimitMs` is set alone. */
+  /** Most runs to try; fuzzing stops sooner once every state and edge is covered. Default 2000; no cap when `timeLimitMs` is set alone. */
   iterations?: number;
   /**
-   * Wall-time budget for one machine. With it, fuzzing also stops as soon as
-   * every state and edge is covered. The runs stay seeded (same seed, same
+   * Wall-time budget for one machine. The runs stay seeded (same seed, same
    * sequence); only how many ran depends on the machine's speed, so leave it
    * out for a reproducible export.
    */
@@ -44,16 +43,17 @@ const STOPPED: Record<FuzzStop, string> = {
   time: "time limit",
 };
 
-/** Fuzz options for the settings: an iteration count, or a time budget that ends on full coverage. */
+/** Fuzz options for the settings: an iteration cap and/or a time budget, both ending on full coverage. */
 function budget(
   settings: FuzzSettings | undefined,
   structure: VizMachine,
 ): Pick<FuzzOptions, "iterations" | "done" | "deadline"> {
   const limit = settings?.timeLimitMs;
-  if (limit === undefined) return { iterations: settings?.iterations ?? DEFAULT_ITERATIONS };
+  const done = coverageGoal(structure);
+  if (limit === undefined) return { iterations: settings?.iterations ?? DEFAULT_ITERATIONS, done };
   return {
     iterations: settings?.iterations ?? Number.POSITIVE_INFINITY,
-    done: coverageGoal(structure),
+    done,
     deadline: { ms: limit, now: wallClock },
   };
 }
