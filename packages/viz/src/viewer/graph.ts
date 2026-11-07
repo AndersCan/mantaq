@@ -1,3 +1,5 @@
+import { FINDING_KINDS, machineFindings } from "../findings.ts";
+import type { VizFinding } from "../findings.ts";
 import { isAnyState } from "../schema.ts";
 import { movesFrom } from "../moves.ts";
 import type { VizCoverage, VizEdge, VizMachine } from "../schema.ts";
@@ -13,6 +15,8 @@ export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: stri
 
 export interface GraphCallbacks {
   select(selection: Selection): void;
+  /** Show the details of a selection without taking a step. */
+  showDetails(selection: Selection): void;
   /** Coverage source the overlay dims by. */
   mode: CoverageMode;
 }
@@ -100,7 +104,52 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
   });
 }
 
-function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallbacks): SVGGElement {
+function findingMark(
+  doc: Document,
+  placed: PlacedState,
+  context: { findings: ReadonlyArray<VizFinding>; callbacks: GraphCallbacks },
+): SVGGElement {
+  const { findings, callbacks } = context;
+  const id = placed.state.id;
+  const cx = placed.x + placed.width / 2 - 2;
+  const cy = placed.y - placed.height / 2 + 2;
+  const titles = findings.map((finding) => FINDING_KINDS[finding.kind].title).join(", ");
+  const noun = findings.length === 1 ? "finding" : "findings";
+  const mark = svg(
+    doc,
+    "g",
+    {
+      class: "finding-mark",
+      "data-finding-count": findings.length,
+      tabindex: 0,
+      role: "button",
+      "aria-label": `${findings.length} ${noun} on ${id}: ${titles}`,
+    },
+    [
+      svg(doc, "circle", { cx, cy, r: 8 }),
+      svg(doc, "text", { x: cx, y: cy + 4, "text-anchor": "middle" }, ["!"]),
+    ],
+  );
+  const open = () => callbacks.showDetails({ kind: "state", id });
+  mark.addEventListener("click", (event) => {
+    event.stopPropagation();
+    open();
+  });
+  mark.addEventListener("keydown", (event) => {
+    if (!("key" in event) || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    open();
+  });
+  return mark;
+}
+
+function stateGroup(
+  doc: Document,
+  placed: PlacedState,
+  context: { callbacks: GraphCallbacks; findings: ReadonlyArray<VizFinding> },
+): SVGGElement {
+  const { callbacks, findings } = context;
   const { state } = placed;
   const left = placed.x - placed.width / 2;
   const top = placed.y - placed.height / 2;
@@ -132,6 +181,7 @@ function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallback
         : null,
       svg(doc, "text", { x: placed.x, y: top + 22, "text-anchor": "middle" }, [state.label]),
       ...chipGroups(doc, placed),
+      findings.length === 0 ? null : findingMark(doc, placed, { findings, callbacks }),
     ],
   );
   activatable(group, () => callbacks.select({ kind: "state", id: state.id }));
@@ -175,9 +225,12 @@ function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
 function nodeGroup(
   doc: Document,
   node: PlacedState | PlacedUnknown | PlacedAny,
-  callbacks: GraphCallbacks,
+  context: { callbacks: GraphCallbacks; findings: ReadonlyMap<string, VizFinding[]> },
 ): SVGGElement {
-  if (node.kind === "state") return stateGroup(doc, node, callbacks);
+  if (node.kind === "state") {
+    const findings = context.findings.get(node.state.id) ?? [];
+    return stateGroup(doc, node, { callbacks: context.callbacks, findings });
+  }
   return node.kind === "any" ? anyGroup(doc, node) : unknownGroup(doc, node);
 }
 
@@ -315,6 +368,10 @@ export function renderGraph(
   callbacks: GraphCallbacks,
 ): SVGSVGElement {
   const placed = layoutMachine(machine);
+  const findings = new Map<string, VizFinding[]>();
+  for (const finding of machineFindings(machine)) {
+    findings.set(finding.state, [...(findings.get(finding.state) ?? []), finding]);
+  }
   const root = svg(
     doc,
     "svg",
@@ -333,7 +390,7 @@ export function renderGraph(
       ...placed.regions.map((region) => regionGroup(doc, region)),
       ...placed.edges.map((edge) => edgeGroup(doc, edge, { machine, callbacks })),
       placed.entry ? entryArrow(doc, placed.entry) : null,
-      ...placed.nodes.map((node) => nodeGroup(doc, node, callbacks)),
+      ...placed.nodes.map((node) => nodeGroup(doc, node, { callbacks, findings })),
     ],
   );
   wireHover(root);

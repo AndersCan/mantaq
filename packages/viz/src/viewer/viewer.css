@@ -566,3 +566,23 @@
   border-radius: 4px;
   margin: 0 0 8px;
 }
+
+.viz .finding-mark {
+  cursor: pointer;
+}
+
+.viz .finding-mark circle {
+  fill: var(--banner-bg);
+  stroke: var(--banner-fg);
+}
+
+.viz .finding-mark text {
+  fill: var(--banner-fg);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.viz .finding-mark:focus-visible circle {
+  stroke: var(--accent);
+  stroke-width: 3;
+}

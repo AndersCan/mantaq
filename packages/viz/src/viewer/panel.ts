@@ -1,6 +1,8 @@
 import { routingWarnings } from "../routing.ts";
 import { coveredByAny, isAnyState } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState, VizStep } from "../schema.ts";
+import { FINDING_KINDS, machineFindings } from "../findings.ts";
+import type { VizFinding } from "../findings.ts";
 import { activatable, html } from "./dom.ts";
 import { renderExplanation } from "./explanation.ts";
 import type { Selection } from "./graph.ts";
@@ -159,12 +161,69 @@ function edgePanel(doc: Document, edge: VizEdge, machine: VizMachine): HTMLEleme
   ]);
 }
 
+function findingArticle(
+  doc: Document,
+  finding: VizFinding,
+  replay: ((steps: ReadonlyArray<VizStep>) => void) | undefined,
+): HTMLElement {
+  const { title, sentence } = FINDING_KINDS[finding.kind];
+  const { steps } = finding;
+  const path =
+    steps === null
+      ? [html(doc, "p", {}, ["No event path reaches this state."])]
+      : steps.length === 0
+        ? []
+        : [
+            html(doc, "p", {}, ["Found by:"]),
+            html(
+              doc,
+              "ol",
+              { class: "steps" },
+              steps.map((step) => html(doc, "li", {}, [stepText(step)])),
+            ),
+          ];
+  const button =
+    replay === undefined || steps === null || steps.length === 0
+      ? null
+      : html(doc, "button", { type: "button", "data-replay": "" }, ["Replay"]);
+  button?.addEventListener("click", () => replay?.(steps ?? []));
+  return html(doc, "article", { class: "finding", "data-kind": finding.kind }, [
+    html(doc, "h4", {}, [title]),
+    html(doc, "p", {}, [sentence]),
+    html(doc, "p", {}, [html(doc, "code", {}, [finding.message])]),
+    ...path,
+    button,
+  ]);
+}
+
+function findingsSection(
+  doc: Document,
+  findings: ReadonlyArray<VizFinding>,
+  replay: ((steps: ReadonlyArray<VizStep>) => void) | undefined,
+): HTMLElement | null {
+  if (findings.length === 0) return null;
+  return html(
+    doc,
+    "section",
+    { class: "state-findings", "data-findings": String(findings.length) },
+    [
+      html(doc, "h3", {}, ["Findings"]),
+      ...findings.map((finding) => findingArticle(doc, finding, replay)),
+    ],
+  );
+}
+
 function statePanel(
   doc: Document,
   state: VizState,
-  context: { machine: VizMachine; select: (selection: Selection) => void },
+  context: {
+    machine: VizMachine;
+    select: (selection: Selection) => void;
+    replay?: (steps: ReadonlyArray<VizStep>) => void;
+  },
 ): HTMLElement {
-  const { machine, select } = context;
+  const { machine, select, replay } = context;
+  const findings = machineFindings(machine).filter((finding) => finding.state === state.id);
   const flags = [state.initial ? "initial" : "", state.final ? "final" : ""].filter(Boolean);
   const outgoing = machine.edges.filter(
     (edge) => edge.from === state.id || (!state.final && coveredByAny(edge.from, state.id)),
@@ -172,6 +231,7 @@ function statePanel(
   const incoming = machine.edges.filter((edge) => edge.to === state.id && edge.kind !== "initial");
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
     html(doc, "h2", {}, [`State ${state.id}`]),
+    findingsSection(doc, findings, replay),
     list(doc, [
       ["id", state.id],
       ["doc", state.doc ?? "none"],
@@ -227,7 +287,11 @@ function fuzzSummary(doc: Document, machine: VizMachine): HTMLElement | null {
 export function renderPanel(
   doc: Document,
   machine: VizMachine,
-  context: { selection: Selection | null; select: (selection: Selection) => void },
+  context: {
+    selection: Selection | null;
+    select: (selection: Selection) => void;
+    replay?: (steps: ReadonlyArray<VizStep>) => void;
+  },
 ): HTMLElement {
   const { selection } = context;
   if (selection?.kind === "edge") {
@@ -236,7 +300,8 @@ export function renderPanel(
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);
-    if (state) return statePanel(doc, state, { machine, select: context.select });
+    if (state)
+      return statePanel(doc, state, { machine, select: context.select, replay: context.replay });
   }
   return html(doc, "div", {}, [
     html(doc, "p", { class: "hint" }, ["Select a state or edge."]),
