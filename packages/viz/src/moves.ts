@@ -185,3 +185,10 @@ export function payloadSamples(machine: VizMachine, event: string): VizJson[] {
   }
   return [...seen.values()];
 }
+
+/** True when sending `event` should ask first: it declares payload fields, or fuzzing sent it a payload. */
+export function asksForPayload(machine: VizMachine, event: string): boolean {
+  const fields = machine.events.find((each) => each.id === event)?.payload ?? null;
+  if (fields !== null && fields.length > 0) return true;
+  return payloadSamples(machine, event).length > 0;
+}

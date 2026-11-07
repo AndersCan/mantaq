@@ -586,3 +586,29 @@
   stroke: var(--accent);
   stroke-width: 3;
 }
+
+.viz .explore-note {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.viz .explore-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz .explore-context table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  width: 100%;
+}
+
+.viz .explore-context th,
+.viz .explore-context td {
+  text-align: left;
+  vertical-align: top;
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--state-border);
+}

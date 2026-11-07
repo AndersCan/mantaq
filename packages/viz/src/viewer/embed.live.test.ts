@@ -449,3 +449,243 @@ describe("context highlight", () => {
     expect(marked(root)).toEqual(['"amount": 42']);
   });
 });
+
+describe("field forms and the context table", () => {
+  const fieldsMachine: VizMachine = {
+    ...checkout,
+    events: [
+      {
+        id: "submit",
+        internal: false,
+        doc: null,
+        payload: [
+          {
+            name: "validFor",
+            type: '"10m" | "1h"',
+            optional: false,
+            doc: "How long it works.",
+            input: "choice",
+            choices: ["10m", "1h"],
+            sample: "10m",
+          },
+          {
+            name: "note",
+            type: "string",
+            optional: true,
+            doc: null,
+            input: "text",
+            choices: [],
+            sample: "sample",
+          },
+          {
+            name: "flags",
+            type: "{ a: boolean }",
+            optional: true,
+            doc: null,
+            input: "json",
+            choices: [],
+            sample: { a: true },
+          },
+        ],
+      },
+      { id: "ping", internal: false, doc: null, payload: null },
+    ],
+    context: [
+      {
+        name: "amount",
+        type: "number",
+        optional: false,
+        doc: "What is owed.",
+        input: "number",
+        choices: [],
+        sample: 1,
+      },
+    ],
+    fuzz: null,
+  };
+
+  function mountFields(machine: VizMachine = fieldsMachine) {
+    const root = document.createElement("div");
+    const live = driver();
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver: live });
+    return { root, live };
+  }
+  const field = (root: HTMLElement, name: string) =>
+    root.querySelector<HTMLInputElement & HTMLSelectElement>(`[data-field="${name}"]`);
+
+  test("the note is present when live and absent without a driver", () => {
+    expect(mountFields().root.querySelector("[data-live-note]")).not.toBeNull();
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [fieldsMachine] });
+    expect(root.querySelector("[data-live-note]")).toBeNull();
+  });
+
+  test("a form has one input per field, prefilled, and sends the changed choice", () => {
+    const { root, live } = mountFields();
+    click(root, '[data-send="submit"]');
+    expect(root.querySelectorAll("[data-field]").length).toBe(3);
+    expect(field(root, "validFor")?.value).toBe('"10m"');
+    expect(field(root, "flags")?.value).toBe("");
+    const select = field(root, "validFor");
+    if (select) select.value = '"1h"';
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { validFor: "1h" } }]);
+  });
+
+  test("optional fields left empty are left out; a typed json field is parsed", () => {
+    const { root, live } = mountFields();
+    click(root, '[data-send="submit"]');
+    const flags = field(root, "flags");
+    if (flags) flags.value = '{"a":false}';
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { validFor: "10m", flags: { a: false } } },
+    ]);
+  });
+
+  test("bad json in a json field sends nothing and names the field", () => {
+    const { root, live } = mountFields();
+    click(root, '[data-send="submit"]');
+    const flags = field(root, "flags");
+    if (flags) flags.value = "{";
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log).toEqual([]);
+    expect(root.querySelector(".explore-payload [role=alert]")?.textContent).toBe(
+      "Not sent: flags is not valid JSON.",
+    );
+  });
+
+  test("an event with no payload fields and no samples sends at once", () => {
+    const { root, live } = mountFields();
+    click(root, '[data-send="ping"]');
+    expect(live.log[0]).toEqual([{ kind: "event", event: "ping", payload: null }]);
+    expect(root.querySelector('[data-send-custom="ping"]')).not.toBeNull();
+  });
+
+  test("the Context tab lists each declared field with its meaning and value", () => {
+    const { root } = mountFields();
+    click(root, '[data-send="ping"]');
+    const row = root.querySelector('[data-context-field="amount"]');
+    expect(row?.textContent).toContain("What is owed.");
+    expect(row?.textContent).toContain("not set");
+    expect(root.querySelector("[data-context-note]")).not.toBeNull();
+    expect(root.querySelector("[data-context-changed]")).toBeNull();
+  });
+
+  const requiredMachine: VizMachine = {
+    ...fieldsMachine,
+    events: [
+      {
+        id: "submit",
+        internal: false,
+        doc: null,
+        payload: [
+          {
+            name: "amount",
+            type: "number",
+            optional: false,
+            doc: null,
+            input: "number",
+            choices: [],
+            sample: 1,
+          },
+          {
+            name: "label",
+            type: "string",
+            optional: false,
+            doc: null,
+            input: "text",
+            choices: [],
+            sample: "hi",
+          },
+        ],
+      },
+    ],
+  };
+
+  test("a number field sends a number and a required text field sends its string", () => {
+    const { root, live } = mountFields(requiredMachine);
+    click(root, '[data-send="submit"]');
+    const amount = field(root, "amount");
+    if (amount) amount.value = "7.5";
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } },
+    ]);
+  });
+
+  test("a required text field cleared sends an empty string", () => {
+    const { root, live } = mountFields(requiredMachine);
+    click(root, '[data-send="submit"]');
+    const label = field(root, "label");
+    if (label) label.value = "";
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 1, label: "" } },
+    ]);
+  });
+
+  test("a cleared or non-numeric required number sends nothing and names the field", () => {
+    for (const value of ["", "abc"]) {
+      const { root, live } = mountFields(requiredMachine);
+      click(root, '[data-send="submit"]');
+      const amount = field(root, "amount");
+      if (amount) amount.value = value;
+      click(root, '[data-payload-send="submit"]');
+      expect(live.log).toEqual([]);
+      expect(root.querySelector(".explore-payload [role=alert]")?.textContent).toBe(
+        "Not sent: amount is required.",
+      );
+    }
+  });
+
+  test("a cleared required json field sends nothing and names the field", () => {
+    const jsonMachine: VizMachine = {
+      ...requiredMachine,
+      events: [
+        {
+          id: "submit",
+          internal: false,
+          doc: null,
+          payload: [
+            {
+              name: "flags",
+              type: "{ a: boolean }",
+              optional: false,
+              doc: null,
+              input: "json",
+              choices: [],
+              sample: { a: true },
+            },
+          ],
+        },
+      ],
+    };
+    const { root, live } = mountFields(jsonMachine);
+    click(root, '[data-send="submit"]');
+    const flags = field(root, "flags");
+    if (flags) flags.value = "";
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log).toEqual([]);
+    expect(root.querySelector(".explore-payload [role=alert]")?.textContent).toBe(
+      "Not sent: flags is required.",
+    );
+  });
+
+  test("the context table marks a field the last step changed", () => {
+    const { root } = mountFields(requiredMachine);
+    click(root, '[data-send="submit"]');
+    const amount = field(root, "amount");
+    if (amount) amount.value = "7";
+    click(root, '[data-payload-send="submit"]');
+    const row = root.querySelector('[data-context-field="amount"]');
+    expect(row?.hasAttribute("data-context-changed")).toBe(true);
+    expect(row?.textContent).toContain("7");
+  });
+
+  test("a context without declared fields falls back to the JSON view", () => {
+    const { root } = mountFields({ ...fieldsMachine, context: null });
+    expect(root.querySelector("[data-context-fields]")).toBeNull();
+    expect(root.querySelector("[data-live-context] pre")).not.toBeNull();
+  });
+});

@@ -66,6 +66,7 @@ export function showPayloadPopover(
     payloadForm(doc, {
       event,
       samples: payloadSamples(machine, event),
+      fields: machine.events.find((each) => each.id === event)?.payload ?? null,
       send: context.send,
       close,
     }),
@@ -75,5 +76,5 @@ export function showPayloadPopover(
   });
   canvas.append(popover);
   place(popover, canvas, anchorOf(canvas, { machine, state: live.state, event }));
-  popover.querySelector("textarea")?.focus({ preventScroll: true });
+  popover.querySelector<HTMLElement>("textarea, input, select")?.focus({ preventScroll: true });
 }
