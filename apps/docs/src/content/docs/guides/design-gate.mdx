@@ -3,6 +3,8 @@ title: Design gate in vitest
 description: Fail your test suite on design errors and assert which states and transitions get reached, using @mantaq/inspect.
 ---
 
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+
 `@mantaq/inspect` fuzzes a machine and checks its structure. Two groups of helpers turn that into vitest assertions, so CI catches design errors without a separate command.
 
 ```ts
@@ -41,6 +43,12 @@ checkout has 1 design error:
 Unreached edges and `onAny` routing warnings are not errors. They show in the visualizer and the Vite plugin's output, and do not fail the test.
 
 The reachability check is static. It reads the graph, so it needs no fuzzing: pass `fuzz: false` to skip the fuzz run. When an edge has an unknown target, the check cannot tell and reports nothing.
+
+## On the diagram
+
+The same findings show on the diagram. A state with a finding carries a "!" mark: click it to read what the bug is, then press Replay to run the events that found it. This checkout has two planted bugs: `archived` has no way in, and going `back` from `payment` throws.
+
+<Machine src="src/content/docs/checkout-with-bugs.ts" />
 
 ## Assert what gets reached
 

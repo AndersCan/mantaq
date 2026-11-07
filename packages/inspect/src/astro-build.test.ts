@@ -71,9 +71,8 @@ describe("mantaqViz for Astro", () => {
     expect(findings).toHaveLength(2);
     expect(findings[0]?.dataset["count"]).toBe("0");
     expect(findings[1]?.dataset["count"]).toBe("1");
-    expect(findings[1]?.textContent).toContain(
-      "state orphan is declared but no path leads to it from the initial state",
-    );
+    expect(findings[1]?.textContent).toContain("1 design finding, marked with ! on the diagram");
+    expect(findings[1]?.querySelector("ul")).toBeNull();
   });
 
   test("the built script drives the machine live", async () => {
