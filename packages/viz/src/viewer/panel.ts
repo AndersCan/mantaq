@@ -6,6 +6,7 @@ import type { VizFinding } from "../findings.ts";
 import { activatable, html } from "./dom.ts";
 import { renderExplanation } from "./explanation.ts";
 import type { Selection } from "./graph.ts";
+import { rulesSection } from "./rules.ts";
 
 type Row = [label: string, value: Node | string];
 
@@ -232,6 +233,7 @@ function statePanel(
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
     html(doc, "h2", {}, [`State ${state.id}`]),
     findingsSection(doc, findings, replay),
+    rulesSection(doc, machine, state.id),
     list(doc, [
       ["id", state.id],
       ["doc", state.doc ?? "none"],
