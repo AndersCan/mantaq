@@ -83,7 +83,12 @@ function isWord(value: unknown): value is string {
 
 export function isNoteTarget(value: unknown): value is NoteTarget {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as { kind?: unknown; state?: unknown; from?: unknown; event?: unknown };
+  const candidate = value as {
+    kind?: unknown;
+    state?: unknown;
+    from?: unknown;
+    event?: unknown;
+  };
   if (candidate.kind === "walk") return true;
   if (candidate.kind === "state") return isWord(candidate.state);
   return candidate.kind === "edge" && isWord(candidate.from) && isWord(candidate.event);
@@ -118,10 +123,13 @@ export function targetProblem(
 
 /** One line: control characters become spaces, whitespace runs collapse, ends trimmed. */
 export function cleanNoteText(text: string): string {
-  return text
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    text
+      // oxlint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 function isVizStep(value: unknown): value is VizStep {
@@ -180,18 +188,22 @@ export function parseNotes(text: string, file: string): Either<string, Note[]> {
     if (field !== null && current !== undefined) current[field[1] ?? ""] = (field[2] ?? "").trim();
   }
   return Either.right<Note[]>(
-    items.map((item): Note => ({
-      id: item["id"] ?? "",
-      machine: item["machine"] === "" ? undefined : item["machine"],
-      on: item["on"] ?? "",
-      target: parseTarget(item["on"] ?? ""),
-      status: (item["status"] ?? "").toLowerCase() === "done" ? "done" : "open",
-      note: item["note"] ?? "",
-      result: item["result"],
-      question: item["question"],
-      end: item["end"] === "" ? undefined : item["end"],
-      steps: parseSteps(item["steps"]),
-    })),
+    items.map((item): Note => {
+      const steps = parseSteps(item["steps"]);
+      const unreadable = item["steps"] !== undefined && steps === undefined;
+      return {
+        id: item["id"] ?? "",
+        machine: item["machine"] === "" ? undefined : item["machine"],
+        on: item["on"] ?? "",
+        target: parseTarget(item["on"] ?? ""),
+        status: (item["status"] ?? "").toLowerCase() === "done" ? "done" : "open",
+        note: unreadable ? `[unreadable steps] ${item["note"] ?? ""}` : (item["note"] ?? ""),
+        result: item["result"],
+        question: item["question"],
+        end: item["end"] === "" ? undefined : item["end"],
+        steps,
+      };
+    }),
   );
 }
 

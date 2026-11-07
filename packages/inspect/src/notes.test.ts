@@ -71,7 +71,11 @@ describe("notes file", () => {
   });
 
   test("parseTarget reads both kinds and round-trips", () => {
-    expect(parseTarget("edge a B")).toEqual({ kind: "edge", from: "a", event: "B" });
+    expect(parseTarget("edge a B")).toEqual({
+      kind: "edge",
+      from: "a",
+      event: "B",
+    });
     expect(parseTarget("edge a")).toBeUndefined();
     expect(parseTarget("edge a B c")).toBeUndefined();
     for (const target of [state("a"), { kind: "edge", from: "*", event: "finish" } as const]) {
@@ -167,7 +171,12 @@ describe("notes file", () => {
   });
 
   test("an empty existing file gets the header", () => {
-    const added = appendNote("", { file: "a/b.ts", machine: "m", target: state("s"), note: "n" });
+    const added = appendNote("", {
+      file: "a/b.ts",
+      machine: "m",
+      target: state("s"),
+      note: "n",
+    });
     expect(added.text.startsWith("# Notes on b.ts\n\nmantaq notes v1.")).toBe(true);
   });
 
@@ -236,7 +245,22 @@ describe("walk notes", () => {
       const [note] = Either.getRight(parseNotes(text, "x")) ?? [];
       expect(note?.target).toEqual({ kind: "walk" });
       expect(note?.steps).toBeUndefined();
+      expect(note?.note).toMatch(/^\[unreadable steps\]/);
     }
+  });
+
+  test("a payload with a newline and field-like text stays inside the steps", () => {
+    const steps = [{ kind: "event" as const, event: "GO", payload: "a\n  end: x\n- id: n9" }];
+    const added = appendNote(undefined, {
+      file: "m.ts",
+      machine: "m",
+      target: { kind: "walk" },
+      note: "hi",
+      walk: { end: "t", steps },
+    });
+    const [note] = Either.getRight(parseNotes(added.text, "x")) ?? [];
+    expect(note?.end).toBe("t");
+    expect(note?.steps).toEqual(steps);
   });
 
   test("walk target text, parse, guard", () => {
