@@ -121,6 +121,11 @@ export interface ViewerOptions {
   run?: string;
   /** Called after every walk or machine change, e.g. to keep the URL shareable. `run` is set when the walk is a run just played from the Runs list. */
   onNavigate?: (where: { machine: string; steps: string[]; run?: string }) => void;
+  /**
+   * Content under the panel tabs for the selected state or edge (undefined: nothing selected).
+   * Called on every panel refresh; may return the same node each time. The live page shows notes here.
+   */
+  panelFooter?: (selection: Selection | undefined) => Node | undefined;
 }
 
 /**
@@ -166,7 +171,7 @@ export function mountViewer(
         select,
         replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
       });
-      panel.replaceChildren(panelTabs(doc, { view, parts, details, refresh }));
+      fillPanel(panel, { doc, view, parts, details, refresh, footer: options.panelFooter });
       markDiagram(root, { machine, view, send, compose });
     };
     const walked = (run?: string) => {
@@ -403,10 +408,32 @@ function setFullscreenLabel(button: HTMLButtonElement, active: boolean): void {
   button.setAttribute("aria-pressed", String(active));
 }
 
+function fillPanel(
+  panel: HTMLElement,
+  context: Parameters<typeof panelTabs>[1] & {
+    doc: Document;
+    footer: ViewerOptions["panelFooter"];
+  },
+): void {
+  const { doc, footer, ...tabs } = context;
+  const node = footer?.(tabs.view.selection ?? undefined);
+  panel.replaceChildren(panelTabs(doc, tabs), ...(node === undefined ? [] : [node]));
+}
+
+/** Arrow keys belong to the control while typing or choosing in it. */
+function isTextControl(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
 /** Listeners that outlive each render: ArrowLeft steps back, and the button label follows fullscreen. */
 function listenOnRoot(root: HTMLElement, back: () => void): void {
   root.addEventListener("keydown", (event) => {
-    if (!("key" in event) || event.target instanceof HTMLSelectElement) return;
+    if (!("key" in event) || isTextControl(event.target)) return;
     if (event.key === "ArrowLeft") back();
   });
   root.addEventListener("fullscreenchange", () => {

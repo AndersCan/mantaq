@@ -4,6 +4,7 @@ import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } 
 import { serializeViz } from "../serialize.ts";
 import { clickStep } from "./explore.ts";
 import { mountViewer, mountVizText } from "./embed.ts";
+import type { ViewerSelection } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
@@ -495,5 +496,84 @@ describe("effect chip sends hint", () => {
   test("declared sends, including an empty list, show no hint", () => {
     expect(render(["go"]).querySelector(".chip .hint")).toBeNull();
     expect(render([]).querySelector(".chip .hint")).toBeNull();
+  });
+});
+
+describe("panelFooter", () => {
+  const three: VizMachine = {
+    ...door,
+    states: [state("open", { initial: true }), state("done"), state("end", { final: true })],
+    edges: [
+      edge("__initial__", "", "open"),
+      edge("open", "go", "done"),
+      edge("open", "skip", "end"),
+      edge("done", "go", "end"),
+    ],
+  };
+  const live = (calls: Array<ViewerSelection | undefined>, node: Node) => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [three] },
+      {
+        panelFooter: (selection) => {
+          calls.push(selection);
+          return node;
+        },
+      },
+    );
+    return root;
+  };
+  const footer = () => {
+    const f = document.createElement("div");
+    f.id = "f";
+    return f;
+  };
+  const click = (root: HTMLElement, id: string) =>
+    root
+      .querySelector(`[data-node-id='${id}']`)
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+  test("the footer renders under the tabs with no selection", () => {
+    const calls: Array<ViewerSelection | undefined> = [];
+    const root = live(calls, footer());
+    expect(root.querySelector("aside.panel")?.lastElementChild?.id).toBe("f");
+    expect(calls.at(-1)).toBeUndefined();
+  });
+
+  test("clicking a state that is not a next step passes the state selection", () => {
+    const calls: Array<ViewerSelection | undefined> = [];
+    const root = live(calls, footer());
+    click(root, "end");
+    expect(calls.at(-1)).toEqual({ kind: "state", id: "end" });
+  });
+
+  test("a click that walks still passes the selection", () => {
+    const calls: Array<ViewerSelection | undefined> = [];
+    const root = live(calls, footer());
+    click(root, "done");
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
+    expect(calls.at(-1)).toEqual({ kind: "state", id: "done" });
+  });
+
+  test("the same node returned on every refresh appears once", () => {
+    const root = live([], footer());
+    click(root, "done");
+    click(root, "end");
+    expect(root.querySelectorAll("aside.panel #f")).toHaveLength(1);
+  });
+
+  test("ArrowLeft in a text field does not step back", () => {
+    const area = document.createElement("textarea");
+    const f = footer();
+    f.append(area);
+    const root = live([], f);
+    click(root, "done");
+    click(root, "end");
+    area.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("end");
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
   });
 });
