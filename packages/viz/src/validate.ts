@@ -105,6 +105,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
     states: readList(reader, { record, key: "states", path }, (item, at) =>
       readState(reader, item, at),
     ),
+    outputs: readStrings(reader, { record, key: "outputs", path }),
     events: readList(reader, { record, key: "events", path }, (item, at) =>
       readEvent(reader, item, at),
     ),

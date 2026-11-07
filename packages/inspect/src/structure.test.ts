@@ -5,6 +5,7 @@ import { createCheckoutActor, submitBasicInfo } from "./fixtures/checkout.ts";
 import { createSagaActor } from "./fixtures/saga.ts";
 import { createConditionalActor } from "./fixtures/conditional.ts";
 import { serializeViz } from "@mantaq/viz";
+import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -114,5 +115,35 @@ describe("coverage", () => {
       (e) => e.from === "basicInfo" && e.event === "submitBasicInfo",
     );
     expect(edge?.coverage).toEqual({ hits: 1 });
+  });
+});
+
+describe("toViz outputs", () => {
+  const idle = state("idle")();
+  const go = event("go")();
+  const x = event("x")();
+  const y = event("y")();
+
+  test("declared outputs are listed sorted by id", () => {
+    const actor = Actor({
+      inputs: [go],
+      outputs: [y, x],
+      states: [idle],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: () => {},
+    });
+    expect(toViz([{ id: "m", actor }]).machines[0]?.outputs).toEqual(["x", "y"]);
+  });
+
+  test("no declared outputs gives an empty list", () => {
+    const actor = Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: () => {},
+    });
+    expect(toViz([{ id: "m", actor }]).machines[0]?.outputs).toEqual([]);
   });
 });

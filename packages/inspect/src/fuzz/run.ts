@@ -58,7 +58,7 @@ export interface Trace {
 
 const ERROR_STATE = "__error";
 
-function eventTypes(options: unknown, key: "inputs" | "internal"): string[] {
+export function eventTypes(options: unknown, key: "inputs" | "internal" | "outputs"): string[] {
   if (typeof options !== "object" || options === null) return [];
   const list: unknown = Reflect.get(options, key);
   if (!Array.isArray(list)) return [];

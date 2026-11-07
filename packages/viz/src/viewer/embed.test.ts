@@ -47,6 +47,7 @@ const door: VizMachine = {
     state("done", { final: true }),
   ],
   events: [{ id: "go", internal: false, doc: null, payloadType: null }],
+  outputs: [],
   edges: [
     edge("__initial__", "", "open"),
     { ...edge("open", "go", "done"), doc: "Walk through and close up." },

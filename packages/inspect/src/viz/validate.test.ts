@@ -46,6 +46,15 @@ describe("parseViz", () => {
     expect(Either.getRight(parsed)).toEqual(viz);
   });
 
+  test("keeps declared outputs", () => {
+    const [machine] = toViz(exampleInputs()).machines;
+    const text = JSON.stringify({
+      schemaVersion: VIZ_SCHEMA_VERSION,
+      machines: [{ ...machine, outputs: ["x", "y"] }],
+    });
+    expect(Either.getRight(parseViz(text))?.machines[0]?.outputs).toEqual(["x", "y"]);
+  });
+
   test("round-trips fuzzed machines, including null payloads", () => {
     const machines = exampleTargets().map((target) =>
       fuzzedMachine(target, fuzz(target, { seed: 3, iterations: 300 })),

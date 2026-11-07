@@ -8,6 +8,7 @@ import type {
   VizState,
 } from "@mantaq/viz";
 import type { AnyActor } from "@mantaq/core";
+import { eventTypes } from "./fuzz/run.ts";
 import {
   INITIAL_NODE_ID,
   buildGraph,
@@ -172,7 +173,8 @@ export function toVizMachine(input: VizInput): VizMachine {
     ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
   ].sort();
 
-  return { id: input.id, initial, regions, states, events, edges, fuzz: null, runs: [] };
+  const outputs = eventTypes(input.actor.options, "outputs").sort();
+  return { id: input.id, initial, regions, states, events, outputs, edges, fuzz: null, runs: [] };
 }
 
 export function toViz(inputs: ReadonlyArray<VizInput>): VizDocument {
