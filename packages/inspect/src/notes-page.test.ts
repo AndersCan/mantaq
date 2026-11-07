@@ -4,6 +4,7 @@ import { serializeViz } from "@mantaq/viz";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { createCreditActor } from "./fixtures/credit.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven } from "./live-page.ts";
 
@@ -37,15 +38,36 @@ const create = () => {
 };
 
 async function mount(): Promise<HTMLElement> {
-  history.replaceState(null, "", "?");
+  return mountText(await documentText(), { checkout: create }, "?");
+}
+
+async function mountCredit(): Promise<HTMLElement> {
+  const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "credit.ts"), {
+    load: async () => ({ createCreditActor }),
+    fuzz: false,
+  });
+  const text = serializeViz(vizDocument(inspected.machines));
+  return mountText(
+    text,
+    {
+      credit: () => {
+        const clock = VirtualClock();
+        return { actor: createCreditActor(clock), clock };
+      },
+    },
+    "?machine=credit",
+  );
+}
+
+async function mountText(
+  text: string,
+  targets: Record<string, () => unknown>,
+  query: string,
+): Promise<HTMLElement> {
+  history.replaceState(null, "", query);
   const root = document.createElement("div");
   document.body.append(root);
-  mountDriven(root, {
-    source: "test",
-    text: await documentText(),
-    targets: { checkout: create },
-    notes: url,
-  });
+  mountDriven(root, { source: "test", text, targets: targets as never, notes: url });
   await new Promise((resolve) => setTimeout(resolve, 0));
   return root;
 }
@@ -54,6 +76,11 @@ const section = (root: HTMLElement) => root.querySelector<HTMLElement>("section.
 const click = (root: HTMLElement, id: string) =>
   root
     .querySelector(`[data-node-id='${id}']`)
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+const clickEdge = (root: HTMLElement, id: string) =>
+  root
+    .querySelector(`[data-edge-id='${id}']`)
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -245,5 +272,126 @@ describe("notes section", () => {
     mountDriven(root, { source: "test", text: await documentText(), targets: {} });
     expect(root.querySelector("section.notes")).toBeNull();
     expect(calls).toEqual([]);
+  });
+
+  describe("arrows", () => {
+    const empty = async () => json(200, { version: 1, file: "x", exists: false, notes: [] });
+    const edgeNote = (id: string, over: Record<string, unknown> = {}) =>
+      note(id, {
+        on: "edge payment back",
+        target: { kind: "edge", from: "payment", event: "back" },
+        ...over,
+      });
+    const type = (root: HTMLElement, text: string) => {
+      const field = section(root)?.querySelector("textarea");
+      if (field === null || field === undefined) throw new Error("no field");
+      field.value = text;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    const submit = async (root: HTMLElement) => {
+      section(root)
+        ?.querySelector("form")
+        ?.dispatchEvent(new Event("submit", { cancelable: true }));
+      await flush();
+    };
+
+    test("a clicked arrow lists its own notes, not the state's", async () => {
+      respond = async () =>
+        json(200, { version: 1, file: "x", exists: true, notes: [edgeNote("n1"), note("n2")] });
+      const root = await mount();
+      clickEdge(root, "payment-back-shippingAddress");
+      const node = section(root);
+      expect(node?.querySelector("h3")?.textContent).toBe("Notes on back from payment");
+      expect(
+        [...(node?.querySelectorAll<HTMLElement>("li[data-note-id]") ?? [])].map(
+          (each) => each.dataset["noteId"],
+        ),
+      ).toEqual(["n1"]);
+      expect(node?.textContent).not.toContain("share these notes");
+    });
+
+    test("saving posts the arrow target", async () => {
+      respond = async (_url, init) =>
+        init?.method === "POST"
+          ? json(200, { version: 1, file: "x", note: edgeNote("n1", { note: "go back twice" }) })
+          : empty();
+      const root = await mount();
+      clickEdge(root, "payment-back-shippingAddress");
+      type(root, "go back twice");
+      await submit(root);
+      const post = calls.find((each) => each.init?.method === "POST");
+      expect(JSON.parse(String(post?.init?.body))).toEqual({
+        version: 1,
+        machine: "checkout",
+        target: { kind: "edge", from: "payment", event: "back" },
+        note: "go back twice",
+      });
+      expect(section(root)?.querySelector(".notes-status")?.textContent).toBe("Note saved");
+      expect(section(root)?.querySelector("li[data-note-id=n1]")).not.toBeNull();
+    });
+
+    test("a refused arrow shows the reason and keeps the text", async () => {
+      respond = async (_url, init) =>
+        init?.method === "POST"
+          ? json(404, { error: "no arrow back from payment in checkout" })
+          : empty();
+      const root = await mount();
+      clickEdge(root, "payment-back-shippingAddress");
+      type(root, "keep me");
+      await submit(root);
+      expect(section(root)?.querySelector(".notes-status")?.textContent).toBe(
+        "Could not save this note: no arrow back from payment in checkout. Your text is still here.",
+      );
+      expect(section(root)?.querySelector("textarea")?.value).toBe("keep me");
+    });
+
+    test("an arrow with no notes says so", async () => {
+      respond = empty;
+      const root = await mount();
+      clickEdge(root, "payment-back-shippingAddress");
+      expect(section(root)?.querySelector(".hint")?.textContent).toBe(
+        "No notes on back from payment yet.",
+      );
+    });
+
+    test("effect loops and the start arrow get no section", async () => {
+      respond = empty;
+      const root = await mount();
+      clickEdge(root, "submitting-effect:submitting-submitting");
+      expect(section(root)?.hidden).toBe(true);
+      clickEdge(root, "__initial__->basicInfo");
+      expect(section(root)?.hidden).toBe(true);
+    });
+
+    test("switching from a state to an arrow clears the draft", async () => {
+      respond = async () =>
+        json(200, { version: 1, file: "x", exists: true, notes: [note("n2"), edgeNote("n1")] });
+      const root = await mount();
+      click(root, "payment");
+      type(root, "state draft");
+      clickEdge(root, "payment-back-shippingAddress");
+      expect(section(root)?.querySelector("textarea")?.value).toBe("");
+      expect(section(root)?.textContent).not.toContain("note n2");
+    });
+
+    test("arrows of one handler share notes and the draft", async () => {
+      respond = empty;
+      const root = await mountCredit();
+      clickEdge(root, "idle-apply-approved");
+      expect(section(root)?.querySelector("h3")?.textContent).toBe("Notes on apply from idle");
+      expect(section(root)?.querySelector(".hint")?.textContent).toBe(
+        "The 3 arrows for apply from idle share these notes.",
+      );
+      type(root, "half a thought");
+      clickEdge(root, "idle-apply-rejected");
+      expect(section(root)?.querySelector("textarea")?.value).toBe("half a thought");
+    });
+
+    test("a stay arrow can be noted", async () => {
+      respond = empty;
+      const root = await mountCredit();
+      clickEdge(root, "idle-setTier-stay");
+      expect(section(root)?.querySelector("h3")?.textContent).toBe("Notes on setTier from idle");
+    });
   });
 });

@@ -99,15 +99,15 @@ Only when the user asks for two designs or alternatives. Otherwise section 1 hol
 
 ## 11. Notes from the live page
 
-On the dev server the user can click a state and write a note. Notes for a machine file are in the file next to it with `.notes.md` in place of the extension (`checkout.machine.ts` → `checkout.machine.notes.md`). Needs the `@mantaq/inspect` release that ships this section.
+On the dev server the user can click a state or an arrow and write a note. Notes for a machine file are in the file next to it with `.notes.md` in place of the extension (`checkout.machine.ts` → `checkout.machine.notes.md`). Needs the `@mantaq/inspect` release that ships this section.
 
 When the user says "apply the viz notes" (or "the notes"):
 
 1. Find them: `rg -l "^mantaq notes v1" -g '*.notes.md'`. Read every item with `status: open`. Skip `done`.
-2. `on:` names a state (`on: state paymentPending`). `machine:` is the machine id. A note on a state may ask for a change near it: "needs a cancel" means a new edge out of that state.
+2. `on:` names a state (`on: state paymentPending`) or an arrow by its source state and event (`on: edge paymentPending CANCEL`). `machine:` is the machine id. An arrow note is about the handler for that event in that state (`m.on(paymentPending, { event: CANCEL })`; source `*` or `<region>.*` is `m.onAny({ event: CANCEL })`): change that handler and what it needs, nothing else. One handler can draw several arrows; if the note does not say which outcome it means, ask. A note on a state may ask for a change near it: "needs a cancel" means a new edge out of that state.
 3. Change the real machine file (section 1), with JSDoc as in section 4. Two notes that contradict each other: apply neither and ask which one.
 4. Run the section 8 checks.
 5. Then, for each note you applied, change `status: open` to `status: done` and add one line under it: `  result: <what changed, one line>`. Not sure what a note means: leave it open, add `  question: <one question>`, and ask the same question in chat.
-6. Renamed or removed a state or an event: update every `on:` line that names it, done notes too.
+6. Renamed or removed a state or an event: update every `on:` line that names it (`state <id>` and both parts of `edge <from> <event>`), done notes too.
 7. Never delete a note, never change its `id:`, `machine:` or `note:` lines, never add a note. Keep one field per line with the two-space indent.
 8. Reply with one line per note: `<id> <on>: <what changed>. done` or `<id> <on>: asked "<question>"`. The page redraws and shows each note as Done.

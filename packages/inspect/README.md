@@ -30,7 +30,7 @@ export default defineConfig({
 
 Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the export name without `create` / `Actor` (`createCheckoutActor` → `checkout`). `?machine=<a>&compare=<b>` shows two machines side by side, each with its own walk, for choosing between two drafts.
 
-On the dev server, click a state to leave a note; it is saved in `<machine file>.notes.md` next to the machine for your coding agent (see the mantaq skill).
+On the dev server, click a state or an arrow to leave a note; it is saved in `<machine file>.notes.md` next to the machine for your coding agent (see the mantaq skill).
 
 The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
 
