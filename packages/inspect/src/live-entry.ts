@@ -4,7 +4,7 @@
  */
 import { UPDATE_EVENT } from "@mantaq/viz";
 import { targets } from "virtual:mantaq/targets";
-import { mountLiveDriven } from "./live-page.ts";
+import { mountLiveDriven, readStorage } from "./live-page.ts";
 import type { LiveTargets } from "./live-page.ts";
 
 const root = document.querySelector<HTMLElement>("#app");
@@ -16,13 +16,15 @@ if (root && source !== undefined) {
     import.meta.hot === undefined
       ? undefined
       : new URL("notes", new URL(source, location.href)).pathname;
-  const draw = () =>
+  const draw = () => {
+    const seen = import.meta.hot === undefined ? undefined : readStorage(() => sessionStorage);
     void mountLiveDriven(root, {
       source,
       targets: current.targets,
       ...(notes === undefined ? {} : { notes }),
-      ...(import.meta.hot === undefined ? {} : { seen: sessionStorage }),
+      ...(seen === undefined ? {} : { seen }),
     });
+  };
   draw();
   import.meta.hot?.on(UPDATE_EVENT, draw);
   import.meta.hot?.accept("virtual:mantaq/targets", (module) => {

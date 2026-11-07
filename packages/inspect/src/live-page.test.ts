@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { inspectModule, vizDocument } from "./index.ts";
-import { mountDriven, mountLiveDriven } from "./live-page.ts";
+import { mountDriven, mountLiveDriven, readStorage } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
 
 const file = join(import.meta.dirname, "fixtures", "checkout.ts");
@@ -433,7 +433,12 @@ describe("mountDriven what changed", () => {
     expect(draw(changed, seen).querySelector("section.changes")).toBeNull();
   });
 
-  test.each(["{", '{"states":3}'])("a corrupt stored value %s is overwritten", async (bad) => {
+  test.each([
+    "{",
+    '{"states":3}',
+    '{"states":[],"arrows":[{"from":"a","event":"e","to":null,"kind":"bad"}]}',
+    '{"states":[],"arrows":[{"from":"a","event":"e","to":3,"kind":"stay"}]}',
+  ])("a corrupt stored value %s is overwritten", async (bad) => {
     const seen = fakeStorage();
     seen.map.set(`mantaq:seen:v1:${source}:checkout`, bad);
     const root = draw(await documentText(), seen);
@@ -441,6 +446,16 @@ describe("mountDriven what changed", () => {
     expect(JSON.parse(seen.map.get(`mantaq:seen:v1:${source}:checkout`) ?? "")).toHaveProperty(
       "states",
     );
+  });
+
+  test("storage whose read throws gives no storage", () => {
+    expect(
+      readStorage(() => {
+        throw new Error("SecurityError");
+      }),
+    ).toBeUndefined();
+    const storage = fakeStorage();
+    expect(readStorage(() => storage)).toBe(storage);
   });
 
   test("storage that throws leaves the page working without a list", async () => {

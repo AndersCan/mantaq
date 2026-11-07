@@ -61,6 +61,12 @@ function isMachineOutline(value: unknown): value is MachineOutline {
   );
 }
 
+/** The storage `get` returns, or undefined when the browser blocks reading it. */
+export function readStorage(get: () => SeenStorage): SeenStorage | undefined {
+  const found = Either.from(get);
+  return Either.isRight(found) ? found[1] : undefined;
+}
+
 const seenKey = (source: string, machine: string) => `mantaq:seen:v1:${source}:${machine}`;
 
 /** The outline stored for `machine`, or undefined when missing, unreadable or malformed. */
