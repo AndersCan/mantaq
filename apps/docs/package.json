@@ -8,7 +8,7 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "test": "vp test run",
+    "test": "vp test run --passWithNoTests",
     "astro": "astro"
   },
   "dependencies": {
