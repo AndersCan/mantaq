@@ -5,9 +5,10 @@
  * new code.
  */
 import { mountViewer, showIssues } from "@mantaq/viz/viewer";
+import type { ViewerOptions } from "@mantaq/viz/viewer";
 import { linkOptions } from "@mantaq/viz/page";
-import { parseViz } from "@mantaq/viz";
-import type { VizDocument, VizDriver } from "@mantaq/viz";
+import { outlineOf, parseViz } from "@mantaq/viz";
+import type { MachineOutline, VizDocument, VizDriver, VizMachine } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -38,6 +39,71 @@ function liveCreate(targets: LiveTargets, id: string): FuzzTarget["create"] | un
     : undefined;
 }
 
+export type SeenStorage = Pick<Storage, "getItem" | "setItem">;
+
+function isMachineOutline(value: unknown): value is MachineOutline {
+  if (typeof value !== "object" || value === null) return false;
+  const { states, arrows } = value as Record<string, unknown>;
+  return (
+    Array.isArray(states) &&
+    states.every((each) => typeof each === "string") &&
+    Array.isArray(arrows) &&
+    arrows.every((each) => {
+      if (typeof each !== "object" || each === null) return false;
+      const arrow = each as Record<string, unknown>;
+      return (
+        typeof arrow["from"] === "string" &&
+        typeof arrow["event"] === "string" &&
+        (arrow["to"] === null || typeof arrow["to"] === "string") &&
+        (arrow["kind"] === "transition" || arrow["kind"] === "stay")
+      );
+    })
+  );
+}
+
+/** The storage `get` returns, or undefined when the browser blocks reading it. */
+export function readStorage(get: () => SeenStorage): SeenStorage | undefined {
+  const found = Either.from(get);
+  return Either.isRight(found) ? found[1] : undefined;
+}
+
+const seenKey = (source: string, machine: string) => `mantaq:seen:v1:${source}:${machine}`;
+
+/** The outline stored for `machine`, or undefined when missing, unreadable or malformed. */
+function storedOutline(
+  seen: SeenStorage,
+  source: string,
+  machine: string,
+): MachineOutline | undefined {
+  const read = Either.from(() => seen.getItem(seenKey(source, machine)));
+  if (Either.isLeft(read) || read[1] === null) return undefined;
+  const raw = read[1];
+  const parsed = Either.from((): unknown => JSON.parse(raw));
+  return Either.isRight(parsed) && isMachineOutline(parsed[1]) ? parsed[1] : undefined;
+}
+
+function storeOutline(seen: SeenStorage, source: string, machine: VizMachine): void {
+  Either.from(() => seen.setItem(seenKey(source, machine.id), JSON.stringify(outlineOf(machine))));
+}
+
+/** Records first sightings and returns the viewer's `changes` option; empty without storage. */
+function changesOption(
+  context: { source: string; seen?: SeenStorage; text: string },
+  machine: VizMachine | undefined,
+  all: VizMachine[],
+): { changes?: NonNullable<ViewerOptions["changes"]> } {
+  const { seen, source } = context;
+  if (seen === undefined || machine === undefined) return {};
+  for (const each of all) {
+    if (storedOutline(seen, source, each.id) === undefined) storeOutline(seen, source, each);
+  }
+  const before = storedOutline(seen, source, machine.id);
+  if (before === undefined) return {};
+  return {
+    changes: { machine: machine.id, before, onSeen: () => storeOutline(seen, source, machine) },
+  };
+}
+
 /** Mount the document at `text`; machines with a target run live, the rest stay static walks. */
 export function mountDriven(
   root: HTMLElement,
@@ -48,6 +114,8 @@ export function mountDriven(
     heading?: "h1" | "h2" | "h3";
     /** URL of the dev server's notes endpoint; unset = no notes section. */
     notes?: string;
+    /** Where the dev page keeps each machine's outline for "what changed"; unset = no marks. */
+    seen?: SeenStorage;
   },
 ): void {
   const parsed = parseViz(context.text);
@@ -85,8 +153,10 @@ export function mountDriven(
   const viewer = doc.createElement("div");
   root.replaceChildren(...(picker ? [bar] : []), viewer);
   const machine = shown.machines[0];
+  const changes = changesOption(context, machine, viz.machines);
   mountViewer(viewer, shown, {
     ...options,
+    ...changes,
     ...(context.notes === undefined || machine === undefined
       ? {}
       : { panelFooter: notesFooter(doc, { url: context.notes, machine }) }),
@@ -184,7 +254,7 @@ function mountCompare(
 /** Fetch the document from `source` and mount it; call again to redraw, keeping the walk. */
 export async function mountLiveDriven(
   root: HTMLElement,
-  context: { source: string; targets: LiveTargets; notes?: string },
+  context: { source: string; targets: LiveTargets; notes?: string; seen?: SeenStorage },
 ): Promise<void> {
   const response = await fetch(context.source).catch(() => null);
   if (response === null || !response.ok) {
