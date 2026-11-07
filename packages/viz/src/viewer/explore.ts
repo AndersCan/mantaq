@@ -470,46 +470,63 @@ export function payloadForm(
   ]);
 }
 
-function liveMovesSection(doc: Document, machine: VizMachine, moves: LiveMoves): HTMLElement {
-  const current = moves.state.state;
-  if (moves.final) {
+function liveMovesSection(doc: Document, machine: VizMachine, live: LiveMoves): HTMLElement {
+  const current = live.state.state;
+  if (live.final) {
     return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
       html(doc, "strong", {}, ["Done."]),
       ` ${current} is final: the actor has stopped.`,
     ]);
   }
-  const handled = new Set(movesFrom(machine, current).map((move) => move.edge.event));
+  const moves = movesFrom(machine, current);
+  const handled = new Set(moves.map((move) => move.edge.event));
   const inputs = machine.events.filter((event) => !event.internal).map((event) => event.id);
   const events = [...new Set([...handled, ...inputs])].sort();
-  return html(doc, "div", { class: "explore-moves" }, [
-    html(doc, "h3", {}, ["Send an event"]),
-    html(
-      doc,
-      "ul",
-      { "data-group": "live" },
-      events.map((event) => {
-        // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
-        const asks = asksForPayload(machine, event);
-        const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
-        return html(doc, "li", { "data-send-item": event }, [
-          button(doc, [code(doc, event), asks ? " …" : ""], {
-            onClick: () =>
-              asks ? moves.compose(event) : moves.send({ kind: "event", event, payload: null }),
-            attrs: { "data-send": event },
-          }),
-          asks || declared !== null
-            ? null
-            : button(doc, ["with payload"], {
-                onClick: () => moves.compose(event),
-                attrs: { class: "link", "data-send-custom": event },
-              }),
-          handled.has(event)
-            ? null
-            : html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`]),
-        ]);
+  const groups: MoveGroup[] = ["input", "effect", "internal"];
+  const item = (event: string) => {
+    // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
+    const asks = asksForPayload(machine, event);
+    const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
+    const move = moves.find((each) => each.edge.event === event);
+    return html(doc, "li", { "data-send-item": event }, [
+      button(doc, [code(doc, event), asks ? " …" : ""], {
+        onClick: () =>
+          asks ? live.compose(event) : live.send({ kind: "event", event, payload: null }),
+        attrs: { "data-send": event },
       }),
-    ),
-  ]);
+      asks || declared !== null
+        ? null
+        : button(doc, ["with payload"], {
+            onClick: () => live.compose(event),
+            attrs: { class: "link", "data-send-custom": event },
+          }),
+      handled.has(event)
+        ? null
+        : html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`]),
+      move === undefined || move.sentBy.length === 0
+        ? null
+        : html(doc, "span", { class: "muted", "data-sent-by": move.sentBy.join(",") }, [
+            ` from ${move.sentBy.join(", ")}`,
+          ]),
+      move === undefined ? null : docNote(doc, { text: move.edge.doc, scope: "edge" }),
+    ]);
+  };
+  const groupOf = (event: string): MoveGroup =>
+    moves.find((each) => each.edge.event === event)?.group ?? "input";
+  return html(
+    doc,
+    "div",
+    { class: "explore-moves" },
+    groups.flatMap((group) => {
+      const members = events.filter((event) => groupOf(event) === group);
+      return members.length === 0
+        ? []
+        : [
+            html(doc, "h3", {}, [GROUP_TITLES[group]]),
+            html(doc, "ul", { "data-group": group }, members.map(item)),
+          ];
+    }),
+  );
 }
 
 function runsSection(
@@ -792,13 +809,14 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
     [
       live
         ? html(doc, "p", { class: "explore-note", "data-live-note": "" }, [
-            "The real machine runs here, in your browser. Effects run too, with the defaults the machine uses when it is built from a clock alone. Time stands still: timers fire only when you advance them.",
+            "The real machine runs here, in your browser. Effects run with the defaults the machine uses when it is built from a clock alone. While a state's effect runs, you can answer for it: pick what it reports under Effect reports back. Time stands still: timers fire only when you advance them.",
           ])
         : null,
       ...nowSection(doc, machine, { current, final }),
       ...(live
         ? [
             liveResultSection(doc, { machine, state: live.state, previous: live.previous }),
+            effectsSection(doc, machine, current),
             liveMovesSection(doc, machine, {
               state: live.state,
               send: live.send,
