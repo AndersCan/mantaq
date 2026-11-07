@@ -12,3 +12,8 @@ mantaq notes v1. Written by the live viz page. Your coding agent applies the not
   on: state lockedOut
   status: open
   note: lock out only after three tries
+- id: n3
+  machine: retry
+  on: edge connecting failed
+  status: open
+  note: count failures only while connecting

@@ -12,8 +12,9 @@ import {
   isNoteTarget,
   notesFileOf,
   parseNotes,
+  targetProblem,
 } from "./notes.ts";
-import type { Note, NoteAdded, NoteTarget, NotesList } from "./notes.ts";
+import type { MachineShape, Note, NoteAdded, NoteTarget, NotesList } from "./notes.ts";
 import { posix, relative, sep } from "node:path";
 
 export const MAX_BODY_BYTES = 16384;
@@ -30,8 +31,10 @@ export interface NotesRequest {
 export interface NotesContext {
   /** Vite root, for the path shown to the person. */
   root: string;
-  /** Right = the machine file; Left = the id is unknown, or the machines failed to load. */
-  owner: (machine: string) => Promise<Either<"unknown" | "load", string>>;
+  /** Right = the machine file and shape; Left = the id is unknown, or the machines failed to load. */
+  owner: (
+    machine: string,
+  ) => Promise<Either<"unknown" | "load", { file: string; machine: MachineShape }>>;
   files: {
     read: (path: string) => string | undefined;
     write: (path: string, text: string) => Either<string, void>;
@@ -117,9 +120,15 @@ function parsePost(body: string): Either<NotesResponse, Record<string, unknown>>
   return Either.right(parsed);
 }
 
-function checkPost(body: Record<string, unknown>, machine: string): Either<NotesResponse, Post> {
+function checkPost(
+  body: Record<string, unknown>,
+  machine: string,
+  shape: MachineShape,
+): Either<NotesResponse, Post> {
   const target = body["target"];
-  if (!isNoteTarget(target)) return Either.left(fail(400, "the note needs a state"));
+  if (!isNoteTarget(target)) return Either.left(fail(400, "the note needs a state or an arrow"));
+  const problem = targetProblem(shape, { machine, target });
+  if (problem !== undefined) return Either.left(fail(404, problem));
   const text = typeof body["note"] === "string" ? cleanNoteText(body["note"]) : "";
   if (text === "") return Either.left(fail(400, "the note is empty"));
   if (text.length > MAX_NOTE_LENGTH) {
@@ -190,15 +199,15 @@ export async function answerNotes(
   const machine = get ? (request.query.get("machine") ?? "") : String(body[1]["machine"]);
   const owner = await context.owner(machine);
   if (Either.isLeft(owner)) return ownerFailure(owner[0], machine);
-  const path = notesFileOf(owner[1]);
+  const path = notesFileOf(owner[1].file);
   const where = {
-    machineFile: owner[1],
+    machineFile: owner[1].file,
     path,
     file: shown(context.root, path),
     existing: context.files.read(path),
   };
   if (get) return list(where, machine);
-  const post = checkPost(body[1], machine);
+  const post = checkPost(body[1], machine, owner[1].machine);
   if (Either.isLeft(post)) return post[0];
   return refusedVersion(where) ?? save(context, where, post[1]);
 }

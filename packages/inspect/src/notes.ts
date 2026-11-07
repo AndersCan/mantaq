@@ -8,7 +8,15 @@ import { Either } from "@mantaq/utils";
 export const NOTES_VERSION = 1;
 export const MAX_NOTE_LENGTH = 2000;
 
-export type NoteTarget = { kind: "state"; state: string };
+export type NoteTarget =
+  | { kind: "state"; state: string }
+  | { kind: "edge"; from: string; event: string };
+
+/** What a target is checked against; a VizMachine satisfies it. */
+export interface MachineShape {
+  states: ReadonlyArray<{ id: string }>;
+  edges: ReadonlyArray<{ from: string; event: string; kind: string }>;
+}
 
 export interface Note {
   id: string;
@@ -49,22 +57,52 @@ export function notesFileOf(machineFile: string): string {
 }
 
 export function targetText(target: NoteTarget): string {
-  return `state ${target.state}`;
+  return target.kind === "state" ? `state ${target.state}` : `edge ${target.from} ${target.event}`;
 }
 
 export function parseTarget(text: string): NoteTarget | undefined {
-  const found = /^state (\S+)$/.exec(text.trim());
-  return found === null ? undefined : { kind: "state", state: found[1] ?? "" };
+  const trimmed = text.trim();
+  const state = /^state (\S+)$/.exec(trimmed);
+  if (state !== null) return { kind: "state", state: state[1] ?? "" };
+  const edge = /^edge (\S+) (\S+)$/.exec(trimmed);
+  return edge === null ? undefined : { kind: "edge", from: edge[1] ?? "", event: edge[2] ?? "" };
+}
+
+function isWord(value: unknown): value is string {
+  return typeof value === "string" && /^\S+$/.test(value);
 }
 
 export function isNoteTarget(value: unknown): value is NoteTarget {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as { kind?: unknown; state?: unknown };
-  return (
-    candidate.kind === "state" &&
-    typeof candidate.state === "string" &&
-    /^\S+$/.test(candidate.state)
-  );
+  const candidate = value as { kind?: unknown; state?: unknown; from?: unknown; event?: unknown };
+  if (candidate.kind === "state") return isWord(candidate.state);
+  return candidate.kind === "edge" && isWord(candidate.from) && isWord(candidate.event);
+}
+
+/** Edges of kind transition or stay with this from and event (the arrows one handler draws). */
+export function arrowsOf(shape: MachineShape, target: { from: string; event: string }): number {
+  return shape.edges.filter(
+    (edge) =>
+      edge.from === target.from &&
+      edge.event === target.event &&
+      (edge.kind === "transition" || edge.kind === "stay"),
+  ).length;
+}
+
+/** Undefined = the machine has the target; else the 404 error text. */
+export function targetProblem(
+  shape: MachineShape,
+  input: { machine: string; target: NoteTarget },
+): string | undefined {
+  const { target, machine } = input;
+  if (target.kind === "state") {
+    return shape.states.some((state) => state.id === target.state)
+      ? undefined
+      : `no state ${target.state} in ${machine}`;
+  }
+  return arrowsOf(shape, target) > 0
+    ? undefined
+    : `no arrow ${target.event} from ${target.from} in ${machine}`;
 }
 
 /** One line: control characters become spaces, whitespace runs collapse, ends trimmed. */

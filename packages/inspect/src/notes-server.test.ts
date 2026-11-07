@@ -1,7 +1,19 @@
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 import { answerNotes } from "./notes-server.ts";
+import type { MachineShape } from "./notes.ts";
 import type { NotesContext, NotesRequest } from "./notes-server.ts";
+
+const shape: MachineShape = {
+  states: [{ id: "s" }, { id: "t" }],
+  edges: [
+    { from: "s", event: "GO", kind: "transition" },
+    { from: "*", event: "STOP", kind: "transition" },
+    { from: "t", event: "PING", kind: "stay" },
+    { from: "s", event: "effect:s", kind: "effect" },
+    { from: "__initial__", event: "", kind: "initial" },
+  ],
+};
 
 function setup(initial: Record<string, string> = {}) {
   const store = new Map(Object.entries(initial));
@@ -10,7 +22,9 @@ function setup(initial: Record<string, string> = {}) {
     root: "/proj",
     owner: async (machine) => {
       if (machine === "boom") return Either.left("load" as const);
-      return machine === "m" ? Either.right("/proj/src/m.ts") : Either.left("unknown" as const);
+      return machine === "m"
+        ? Either.right({ file: "/proj/src/m.ts", machine: shape })
+        : Either.left("unknown" as const);
     },
     files: {
       read: (path) => store.get(path),
@@ -124,7 +138,31 @@ describe("answerNotes errors", () => {
     "target",
     post({ ...valid, target: { kind: "state", state: "a b" } }),
     400,
-    "the note needs a state",
+    "the note needs a state or an arrow",
+  );
+  add(
+    "unknown state",
+    post({ ...valid, target: { kind: "state", state: "nope" } }),
+    404,
+    "no state nope in m",
+  );
+  add(
+    "unknown arrow",
+    post({ ...valid, target: { kind: "edge", from: "s", event: "NOPE" } }),
+    404,
+    "no arrow NOPE from s in m",
+  );
+  add(
+    "arrow from the wrong state",
+    post({ ...valid, target: { kind: "edge", from: "t", event: "GO" } }),
+    404,
+    "no arrow GO from t in m",
+  );
+  add(
+    "effect loop",
+    post({ ...valid, target: { kind: "edge", from: "s", event: "effect:s" } }),
+    404,
+    "no arrow effect:s from s in m",
   );
   add("empty", post({ ...valid, note: " \n " }), 400, "the note is empty");
   add("not text", post({ ...valid, note: 5 }), 400, "the note is empty");
@@ -160,12 +198,35 @@ describe("answerNotes errors", () => {
     const { context } = setup();
     const answer = await answerNotes(post(valid), {
       ...context,
-      owner: async () => Either.right("/proj/denied.ts"),
+      owner: async () => Either.right({ file: "/proj/denied.ts", machine: shape }),
     });
     expect(answer).toEqual({
       status: 500,
       body: { error: "could not write denied.notes.md (EACCES)" },
     });
+  });
+
+  test("a refused target writes nothing", async () => {
+    const { context, writes } = setup();
+    await answerNotes(post({ ...valid, target: { kind: "state", state: "nope" } }), context);
+    expect(writes).toEqual([]);
+  });
+
+  test("arrow notes are saved, including onAny and stay arrows", async () => {
+    const { context, store } = setup();
+    for (const [from, event] of [
+      ["*", "STOP"],
+      ["t", "PING"],
+    ]) {
+      const answer = await answerNotes(
+        post({ ...valid, target: { kind: "edge", from, event } }),
+        context,
+      );
+      expect(answer.status).toBe(200);
+    }
+    const text = store.get("/proj/src/m.notes.md") ?? "";
+    expect(text).toContain("  on: edge * STOP\n");
+    expect(text).toContain("  on: edge t PING\n");
   });
 
   test("a v2 file is not written", async () => {
