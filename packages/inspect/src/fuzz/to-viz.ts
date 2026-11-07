@@ -90,7 +90,7 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): VizMachin
     ...base.events,
     ...[...new Set(added.map((edge) => edge.event))]
       .filter((id) => !known.has(id))
-      .map((id) => ({ id, internal: internal.has(id), doc: null, payloadType: null })),
+      .map((id) => ({ id, internal: internal.has(id), doc: null, payload: null })),
   ].sort(byId);
   return {
     ...base,

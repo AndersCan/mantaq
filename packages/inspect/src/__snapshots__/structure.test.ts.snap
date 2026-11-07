@@ -4,6 +4,7 @@ exports[`determinism > auth snapshot 1`] = `
 "{
   "machines": [
     {
+      "context": null,
       "edges": [
         {
           "contexts": [
@@ -225,43 +226,43 @@ exports[`determinism > auth snapshot 1`] = `
           "doc": null,
           "id": "MONITOR_TICK",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "RETRY",
           "internal": false,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "SIGNING_OUT_DONE",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "SIGN_IN",
           "internal": false,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "SIGN_IN_DONE",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "SIGN_IN_ERROR",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "SIGN_OUT",
           "internal": false,
-          "payloadType": null
+          "payload": null
         }
       ],
       "fuzz": null,
@@ -369,7 +370,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 11
+  "schemaVersion": 12
 }
 "
 `;
@@ -378,6 +379,7 @@ exports[`determinism > checkout snapshot 1`] = `
 "{
   "machines": [
     {
+      "context": null,
       "edges": [
         {
           "contexts": [],
@@ -557,43 +559,43 @@ exports[`determinism > checkout snapshot 1`] = `
           "doc": null,
           "id": "back",
           "internal": false,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "paymentFail",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "paymentOk",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "paymentTimeout",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "submitBasicInfo",
           "internal": false,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "submitPayment",
           "internal": false,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "submitShipping",
           "internal": false,
-          "payloadType": null
+          "payload": null
         }
       ],
       "fuzz": null,
@@ -681,7 +683,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 11
+  "schemaVersion": 12
 }
 "
 `;
@@ -690,6 +692,7 @@ exports[`determinism > saga snapshot 1`] = `
 "{
   "machines": [
     {
+      "context": null,
       "edges": [
         {
           "contexts": [],
@@ -1041,85 +1044,85 @@ exports[`determinism > saga snapshot 1`] = `
           "doc": null,
           "id": "CANCEL",
           "internal": false,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "INVENTORY_FAILED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "INVENTORY_RESERVED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "NOTIFICATION_FAILED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "NOTIFICATION_SENT",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "PAYMENT_FAILED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "PAYMENT_PROCESSED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "REFUND_DONE",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "REFUND_FAILED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "RELEASE_DONE",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "RELEASE_FAILED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "SHIPMENT_CREATED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "SHIPMENT_FAILED",
           "internal": true,
-          "payloadType": null
+          "payload": null
         },
         {
           "doc": null,
           "id": "START",
           "internal": false,
-          "payloadType": null
+          "payload": null
         }
       ],
       "fuzz": null,
@@ -1279,7 +1282,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 11
+  "schemaVersion": 12
 }
 "
 `;

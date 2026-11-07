@@ -1,8 +1,8 @@
-import type { VizEdge, VizExplanation, VizJson, VizMachine } from "@mantaq/viz";
+import type { VizEdge, VizExplanation, VizField, VizJson, VizMachine } from "@mantaq/viz";
 import { machineExports } from "./discover.ts";
 import type { MachineExport } from "./discover.ts";
 import { explainRegistration } from "./handler.ts";
-import { payloadSamples } from "./payloads.ts";
+import { payloadFields, payloadSamples } from "./payloads.ts";
 import { loadSource } from "./program.ts";
 import type { AnalysisSource, LoadedSource } from "./program.ts";
 import { Either } from "@mantaq/utils";
@@ -23,6 +23,7 @@ export interface SourceDocs {
   stateDocs: ReadonlyMap<string, string>;
   eventDocs: ReadonlyMap<string, string>;
   effectDocs: ReadonlyMap<string, ReadonlyArray<string>>;
+  eventPayloads: ReadonlyMap<string, VizField[]>;
 }
 
 function sitesOf(loaded: LoadedSource): HandlerSite[] {
@@ -60,6 +61,7 @@ function docsOf(loaded: LoadedSource): SourceDocs {
     stateDocs: loaded.stateDocs,
     eventDocs: loaded.eventDocs,
     effectDocs: loaded.effectDocs,
+    eventPayloads: payloadFields(loaded),
   };
 }
 
@@ -69,6 +71,7 @@ export interface ModuleAnalysis {
   stateDocs: ReadonlyMap<string, string>;
   eventDocs: ReadonlyMap<string, string>;
   effectDocs: ReadonlyMap<string, ReadonlyArray<string>>;
+  eventPayloads: ReadonlyMap<string, VizField[]>;
   payloads: Record<string, VizJson[]>;
   machines: MachineExport[];
 }
@@ -154,14 +157,18 @@ export function annotateWith(
     };
   });
   if (Either.isLeft(analysis)) return { ...machine, edges };
-  const { stateDocs, eventDocs } = analysis[1];
+  const { stateDocs, eventDocs, eventPayloads } = analysis[1];
   return {
     ...machine,
     states: machine.states.map((state) => ({
       ...state,
       doc: stateDocs.get(localState(state.id)) ?? null,
     })),
-    events: machine.events.map((event) => ({ ...event, doc: eventDocs.get(event.id) ?? null })),
+    events: machine.events.map((event) => ({
+      ...event,
+      doc: eventDocs.get(event.id) ?? null,
+      payload: eventPayloads.get(event.id) ?? null,
+    })),
     edges,
   };
 }

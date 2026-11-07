@@ -14,16 +14,21 @@ function analysis(name: string): ModuleAnalysis | undefined {
 describe("analyzeModule: machine exports", () => {
   test("each factory shape is called the way its type allows", () => {
     expect(analysis("factories")?.machines).toEqual([
-      { name: "createDoorActor", call: "clock", unwrap: "self" },
-      { name: "createGate", call: "options", unwrap: "actor" },
-      { name: "createRealDoor", call: "call", unwrap: "self" },
-      { name: "sharedDoor", call: "instance", unwrap: "self" },
+      { name: "createDoorActor", call: "clock", unwrap: "self", context: null },
+      { name: "createGate", call: "options", unwrap: "actor", context: null },
+      { name: "createRealDoor", call: "call", unwrap: "self", context: null },
+      { name: "sharedDoor", call: "instance", unwrap: "self", context: null },
     ]);
   });
 
   test("an actor instance is found when it is the only export", () => {
     expect(analysis("instance")?.machines).toEqual([
-      { name: "retry", call: "instance", unwrap: "self" },
+      {
+        name: "retry",
+        call: "instance",
+        unwrap: "self",
+        context: [expect.objectContaining({ name: "attempts", input: "number" })],
+      },
     ]);
   });
 
@@ -49,5 +54,46 @@ describe("analyzeModule: payload samples from event types", () => {
     expect(analysis("saga")?.payloads["START"]).toEqual([
       { order: { orderId: "sample", items: ["sample"], amount: 1 } },
     ]);
+  });
+});
+
+describe("analyzeModule: context and payload fields from types", () => {
+  const fields = analysis("fields");
+
+  test("context fields keep declaration order, docs and input kinds; functions are skipped", () => {
+    const [found] = fields?.machines ?? [];
+    expect(found?.context?.map((field) => [field.name, field.input])).toEqual([
+      ["folderId", "text"],
+      ["validFor", "choice"],
+      ["count", "number"],
+      ["enabled", "choice"],
+      ["flags", "json"],
+    ]);
+    expect(found?.context?.[0]).toEqual({
+      name: "folderId",
+      type: "string",
+      optional: false,
+      doc: "The album.",
+      input: "text",
+      choices: [],
+      sample: "sample",
+    });
+    expect(found?.context?.[1]).toMatchObject({ choices: ["10m", "1h"], sample: "10m", doc: null });
+    expect(found?.context?.[2]).toMatchObject({ sample: 1 });
+    expect(found?.context?.[3]).toMatchObject({ choices: [false, true] });
+    expect(found?.context?.[4]).toMatchObject({ optional: true, type: "{ a: boolean; }" });
+  });
+
+  test("payload fields per event; events without payload have none", () => {
+    expect(fields?.eventPayloads.get("submit")).toMatchObject([{ name: "code", input: "text" }]);
+    expect(fields?.eventPayloads.get("choose")).toMatchObject([
+      { name: "validFor", input: "choice", doc: "How long it lasts." },
+      { name: "code", input: "text", optional: true },
+    ]);
+    expect(fields?.eventPayloads.has("touch")).toBe(false);
+  });
+
+  test("a machine without a declared context has none", () => {
+    expect(analysis("documented")?.machines[0]?.context).toBeNull();
   });
 });

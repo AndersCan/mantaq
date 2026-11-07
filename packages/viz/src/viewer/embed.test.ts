@@ -47,8 +47,9 @@ const door: VizMachine = {
     { ...state("open", { initial: true }), doc: "The door stands open." },
     state("done", { final: true }),
   ],
-  events: [{ id: "go", internal: false, doc: null, payloadType: null }],
+  events: [{ id: "go", internal: false, doc: null, payload: null }],
   outputs: [],
+  context: null,
   edges: [
     edge("__initial__", "", "open"),
     { ...edge("open", "go", "done"), doc: "Walk through and close up." },
@@ -114,7 +115,7 @@ describe("mountVizText", () => {
   test("internal and stay edges carry a dot gap variable and never an inline dasharray", () => {
     const machine: VizMachine = {
       ...door,
-      events: [{ id: "go", internal: true, doc: null, payloadType: null }],
+      events: [{ id: "go", internal: true, doc: null, payload: null }],
       edges: [
         edge("__initial__", "", "open"),
         edge("open", "go", "done"),
@@ -220,9 +221,9 @@ describe("mountViewer with a driver", () => {
     ...door,
     events: [
       ...door.events,
-      { id: "peek", internal: false, doc: null, payloadType: null },
-      { id: "boom", internal: false, doc: null, payloadType: null },
-      { id: "idle", internal: false, doc: null, payloadType: null },
+      { id: "peek", internal: false, doc: null, payload: null },
+      { id: "boom", internal: false, doc: null, payload: null },
+      { id: "idle", internal: false, doc: null, payload: null },
     ],
   };
   const mountLive = (): HTMLElement => {
@@ -431,8 +432,8 @@ describe("effect chip hover edge cases", () => {
       state("done", { final: true }),
     ],
     events: [
-      { id: "go", internal: true, doc: null, payloadType: null },
-      { id: "nothing", internal: true, doc: null, payloadType: null },
+      { id: "go", internal: true, doc: null, payload: null },
+      { id: "nothing", internal: true, doc: null, payload: null },
     ],
     edges: [edge("__initial__", "", "open"), edge("*", "go", "done")],
   };

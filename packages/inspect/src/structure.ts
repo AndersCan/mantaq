@@ -167,14 +167,25 @@ export function toVizMachine(input: VizInput): VizMachine {
       id: eventId,
       internal: internalIds.has(eventId),
       doc: null,
-      payloadType: null,
+      payload: null,
     }));
   const regions = [
     ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
   ].sort();
 
   const outputs = eventTypes(input.actor.options, "outputs").sort();
-  return { id: input.id, initial, regions, states, events, outputs, edges, fuzz: null, runs: [] };
+  return {
+    id: input.id,
+    initial,
+    regions,
+    states,
+    events,
+    outputs,
+    context: null,
+    edges,
+    fuzz: null,
+    runs: [],
+  };
 }
 
 export function toViz(inputs: ReadonlyArray<VizInput>): VizDocument {

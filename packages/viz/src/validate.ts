@@ -5,6 +5,9 @@ import type {
   VizEdgeKind,
   VizEdgeOrigin,
   VizEvent,
+  VizField,
+  VizFieldInput,
+  VizJson,
   VizMachine,
   VizState,
 } from "./schema.ts";
@@ -15,6 +18,7 @@ import {
   readBoolean,
   readCoverage,
   readEnum,
+  readJson,
   readList,
   readNullableString,
   readNullableStrings,
@@ -22,12 +26,13 @@ import {
   readStrings,
   report,
 } from "./validate-read.ts";
-import type { VizIssue, JsonObject, Reader } from "./validate-read.ts";
+import type { VizIssue, JsonObject, Reader, Field } from "./validate-read.ts";
 import { Either } from "@mantaq/utils";
 
 export type { VizIssue } from "./validate-read.ts";
 
 const EDGE_KINDS: ReadonlyArray<VizEdgeKind> = ["initial", "transition", "effect", "stay"];
+const FIELD_INPUTS: ReadonlyArray<VizFieldInput> = ["text", "number", "choice", "json"];
 const EDGE_ORIGINS: ReadonlyArray<VizEdgeOrigin> = ["declared", "probe", "fuzz"];
 
 function readState(reader: Reader, record: JsonObject, path: string): VizState {
@@ -48,15 +53,37 @@ function readState(reader: Reader, record: JsonObject, path: string): VizState {
 }
 
 function readEvent(reader: Reader, record: JsonObject, path: string): VizEvent {
-  if (record["payloadType"] !== null) {
-    report(reader, { path: `${path}.payloadType`, message: "expected null" });
-  }
   return {
     id: readString(reader, { record, key: "id", path }),
     internal: readBoolean(reader, { record, key: "internal", path }),
     doc: readNullableString(reader, { record, key: "doc", path }),
-    payloadType: null,
+    payload: readFields(reader, { record, key: "payload", path }),
   };
+}
+
+function readChoices(reader: Reader, at: Field): VizJson[] {
+  const value = readJson(reader, at);
+  if (Array.isArray(value)) return value;
+  report(reader, { path: `${at.path}.${at.key}`, message: "expected array" });
+  return [];
+}
+
+function readField(reader: Reader, record: JsonObject, path: string): VizField {
+  return {
+    name: readString(reader, { record, key: "name", path }),
+    type: readString(reader, { record, key: "type", path }),
+    optional: readBoolean(reader, { record, key: "optional", path }),
+    doc: readNullableString(reader, { record, key: "doc", path }),
+    input: readEnum(reader, { record, key: "input", path }, FIELD_INPUTS) ?? "json",
+    choices: readChoices(reader, { record, key: "choices", path }),
+    sample: readJson(reader, { record, key: "sample", path }),
+  };
+}
+
+function readFields(reader: Reader, at: Field): VizField[] | null {
+  return at.record[at.key] === null
+    ? null
+    : readList(reader, at, (item, path) => readField(reader, item, path));
 }
 
 function readEdge(reader: Reader, record: JsonObject, path: string): VizEdge {
@@ -106,6 +133,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
       readState(reader, item, at),
     ),
     outputs: readStrings(reader, { record, key: "outputs", path }),
+    context: readFields(reader, { record, key: "context", path }),
     events: readList(reader, { record, key: "events", path }, (item, at) =>
       readEvent(reader, item, at),
     ),

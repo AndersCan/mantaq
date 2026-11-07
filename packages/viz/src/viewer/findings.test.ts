@@ -43,8 +43,9 @@ const machine: VizMachine = {
   initial: "idle",
   regions: [],
   states: [state("idle", { initial: true }), state("picked"), state("orphan")],
-  events: [{ id: "pick", internal: false, doc: null, payloadType: null }],
+  events: [{ id: "pick", internal: false, doc: null, payload: null }],
   outputs: [],
+  context: null,
   edges: [edge("idle", "pick", "picked"), edge("picked", "pick", "idle")],
   runs: [],
   fuzz: {

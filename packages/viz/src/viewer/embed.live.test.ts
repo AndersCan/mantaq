@@ -42,10 +42,11 @@ const checkout: VizMachine = {
   regions: [],
   states: [state("idle", { initial: true }), state("paying"), state("error", { final: true })],
   events: [
-    { id: "submit", internal: false, doc: null, payloadType: null },
-    { id: "paymentTimeout", internal: true, doc: null, payloadType: null },
+    { id: "submit", internal: false, doc: null, payload: null },
+    { id: "paymentTimeout", internal: true, doc: null, payload: null },
   ],
   outputs: [],
+  context: null,
   edges: [edge("idle", "submit", "paying"), edge("paying", "paymentTimeout", "error")],
   runs: [],
   fuzz: {

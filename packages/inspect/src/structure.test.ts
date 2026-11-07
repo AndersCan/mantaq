@@ -65,7 +65,7 @@ describe("toViz structure", () => {
     const machine = toViz([{ id: "checkout", actor: createCheckoutActor() }]).machines[0];
     expect(machine?.states.every((s) => s.coverage === null)).toBe(true);
     expect(machine?.edges.every((e) => e.coverage === null)).toBe(true);
-    expect(machine?.events.every((e) => e.payloadType === null)).toBe(true);
+    expect(machine?.events.every((e) => e.payload === null)).toBe(true);
   });
 });
 

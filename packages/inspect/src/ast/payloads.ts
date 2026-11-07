@@ -1,4 +1,4 @@
-import type { VizJson } from "@mantaq/viz";
+import type { VizField, VizJson } from "@mantaq/viz";
 import ts from "typescript";
 import type { LoadedSource } from "./program.ts";
 
@@ -7,7 +7,7 @@ const MAX_SAMPLES = 8;
 /** Deepest nesting followed; deeper values become null. */
 const MAX_DEPTH = 5;
 
-interface Walk {
+export interface Walk {
   checker: ts.TypeChecker;
   node: ts.Node;
   depth: number;
@@ -81,6 +81,78 @@ function samplesOf(type: ts.Type, walk: Walk): VizJson[] {
   }
   if (checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0) return [];
   return flags & ts.TypeFlags.Object || type.isIntersection() ? objectSamples(type, walk) : [null];
+}
+
+function literalValue(type: ts.Type, checker: ts.TypeChecker): VizJson | undefined {
+  if (type.isStringLiteral()) return type.value;
+  if (type.isNumberLiteral()) return type.value;
+  if (type.getFlags() & ts.TypeFlags.BooleanLiteral) return checker.typeToString(type) === "true";
+  return undefined;
+}
+
+/** Literal members of a union (or the one literal), or null when any member is not a literal. */
+function literalChoices(type: ts.Type, checker: ts.TypeChecker): VizJson[] | null {
+  const members = type.isUnion() ? type.types : [type];
+  const values = members.map((member) => literalValue(member, checker));
+  const literals = values.filter((value) => value !== undefined);
+  return literals.length === values.length && literals.length > 0 ? literals : null;
+}
+
+function inputOf(type: ts.Type, checker: ts.TypeChecker): Pick<VizField, "input" | "choices"> {
+  const choices = literalChoices(type, checker);
+  if (choices !== null) return { input: "choice", choices };
+  const flags = type.getFlags();
+  if (!type.isUnion() && flags & ts.TypeFlags.StringLike) return { input: "text", choices: [] };
+  if (!type.isUnion() && flags & ts.TypeFlags.NumberLike) return { input: "number", choices: [] };
+  return { input: "json", choices: [] };
+}
+
+/**
+ * Top-level fields of an object type, in declaration order, with their doc
+ * comment and how a form should ask for them. Null when the type is not a
+ * plain object type. Function-typed properties are skipped.
+ */
+export function fieldsOf(type: ts.Type, walk: Walk): VizField[] | null {
+  const { checker } = walk;
+  const plain =
+    (type.getFlags() & ts.TypeFlags.Object || type.isIntersection()) &&
+    !checker.isArrayType(type) &&
+    !checker.isTupleType(type) &&
+    checker.getSignaturesOfType(type, ts.SignatureKind.Call).length === 0;
+  if (!plain) return null;
+  return checker.getPropertiesOfType(type).flatMap((symbol): VizField[] => {
+    const fieldType = checker.getTypeOfSymbolAtLocation(symbol, walk.node);
+    if (checker.getSignaturesOfType(fieldType, ts.SignatureKind.Call).length > 0) return [];
+    const plainType = checker.getNonNullableType(fieldType);
+    const doc = ts.displayPartsToString(symbol.getDocumentationComment(checker));
+    return [
+      {
+        name: symbol.getName(),
+        type: checker.typeToString(plainType),
+        optional: (symbol.getFlags() & ts.SymbolFlags.Optional) !== 0,
+        doc: doc === "" ? null : doc,
+        ...inputOf(plainType, checker),
+        sample: samplesOf(plainType, { ...walk, depth: walk.depth + 1 })[0] ?? null,
+      },
+    ];
+  });
+}
+
+/** Payload fields per event, read from the same payload types as the samples. */
+export function payloadFields(loaded: LoadedSource): Map<string, VizField[]> {
+  return new Map(
+    loaded.registrations.flatMap((registration): Array<[string, VizField[]]> => {
+      if (registration.event === null) return [];
+      const type = payloadType(loaded.checker, registration.eventRef);
+      if (type === null) return [];
+      const fields = fieldsOf(type, {
+        checker: loaded.checker,
+        node: registration.eventRef,
+        depth: 0,
+      });
+      return fields === null ? [] : [[registration.event, fields]];
+    }),
+  );
 }
 
 /** Payload type of an EventRef: the parameter of its one-argument `create` overload. */
