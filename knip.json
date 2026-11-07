@@ -16,13 +16,13 @@
       "entry": ["scripts/bench-compare.mjs"]
     },
     "apps/docs": {
-      "entry": ["src/content/docs/checkout.ts"]
+      "entry": ["src/content/docs/*.ts"]
     },
     "packages/codemod": {
       "ignoreDependencies": ["@mantaq/core"]
     },
     "packages/inspect": {
-      "entry": ["src/fixtures/*.ts", "src/astro/Machine.astro"],
+      "entry": ["src/fixtures/*.ts"],
       "ignoreDependencies": ["vitest"]
     }
   }

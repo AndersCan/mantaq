@@ -1,0 +1,28 @@
+/* Follow Starlight's theme toggle instead of the OS color scheme. */
+.mantaq-machine .viz {
+  --bg: var(--sl-color-bg);
+  --fg: var(--sl-color-white);
+  --muted: var(--sl-color-gray-3);
+  --line: var(--sl-color-gray-2);
+  --state-bg: var(--sl-color-bg);
+  --state-border: var(--sl-color-gray-2);
+  --region-bg: var(--sl-color-gray-6);
+  --accent: var(--sl-color-accent);
+  --unknown: var(--sl-color-orange);
+  --fuzz: var(--sl-color-green);
+  --banner-bg: var(--sl-color-orange-low);
+  --banner-fg: var(--sl-color-orange-high);
+  color-scheme: inherit;
+  margin-block: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+  font-size: var(--sl-text-sm);
+}
+
+/* Fullscreen needs no card chrome. */
+.mantaq-machine .viz:fullscreen {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}

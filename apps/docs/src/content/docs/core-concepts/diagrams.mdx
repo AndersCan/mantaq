@@ -3,7 +3,7 @@ title: Diagrams
 description: The state graph drawn from the builder's declared targets.
 ---
 
-import MachineViz from "../../../components/MachineViz.astro";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
 
 ## What
 
@@ -15,7 +15,7 @@ The diagram below is the docs' checkout machine
 ([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)),
 generated when the site is built. It cannot drift from the code.
 
-<MachineViz id="checkout" />
+<Machine src="src/content/docs/checkout.ts" />
 
 ## Reading it
 
@@ -62,7 +62,7 @@ saga undoes the finished ones in reverse: refund the payment, then release the
 inventory. `CANCEL` is an `onAny` handler, so it works from any state, drawn
 from the dashed `*` box.
 
-<MachineViz id="saga" />
+<Machine src="src/content/docs/saga.ts" />
 
 ### Coverage from fuzzing
 
@@ -96,7 +96,7 @@ The states are what the person sees: the form, a pending check, signed in,
 locked out. The data the check needs (username and password) and the signed-in
 user ride on state payloads, so context holds only the counters.
 
-<MachineViz id="login" />
+<Machine src="src/content/docs/login.ts" />
 
 Try it: send `SUBMIT` with a wrong password (the popover starts with a fuzz
 sample; `ada` / `lovelace` is the account that works). `checking` starts a
