@@ -19,9 +19,12 @@ import { analyzeModule } from "./ast/annotate.ts";
 import type { MachineExport } from "./ast/discover.ts";
 import { entryId, inspectEntry, inspectFile, runOf } from "./load.ts";
 import { Either } from "@mantaq/utils";
-import { existsSync, globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { MAX_BODY_BYTES, answerNotes } from "./notes-server.ts";
+import type { NotesContext } from "./notes-server.ts";
 import { searchForWorkspaceRoot } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 
@@ -96,20 +99,101 @@ function machineFiles(root: string, patterns: ReadonlyArray<string>): string[] {
 async function documentText(
   server: ViteDevServer,
   context: { files: ReadonlyArray<string>; fuzz: false | FuzzSettings },
-): Promise<{ text: string; warnings: string[] }> {
+): Promise<{ text: string; warnings: string[]; owners: Map<string, string> }> {
   const results = [];
+  const owners = new Map<string, string>();
   for (const file of context.files) {
     const run = runOf(await server.ssrLoadModule(entryId(file)));
-    results.push(
+    const result =
       run === null
         ? { machines: [], warnings: [`${file}: could not load the inspector`] }
-        : await run({ fuzz: context.fuzz }),
-    );
+        : await run({ fuzz: context.fuzz });
+    for (const machine of result.machines) {
+      if (!owners.has(machine.id)) owners.set(machine.id, file);
+    }
+    results.push(result);
   }
   return {
+    owners,
     text: serializeViz(vizDocument(results.flatMap((result) => result.machines))),
     warnings: results.flatMap((result) => result.warnings),
   };
+}
+
+function errorMessage(error: unknown): string {
+  const code = (error as { code?: unknown } | undefined)?.code;
+  return typeof code === "string" ? code : String(error);
+}
+
+/** The request body as text, or `undefined` once it passes the byte limit. */
+function readBody(request: IncomingMessage): Promise<string | undefined> {
+  return new Promise((done) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) done(undefined);
+      else chunks.push(chunk);
+    });
+    request.on("end", () => done(Buffer.concat(chunks).toString("utf8")));
+    request.on("error", () => done(undefined));
+  });
+}
+
+function header(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function notesFiles(written: Map<string, string>): NotesContext["files"] {
+  return {
+    read: (path) => {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return undefined;
+      }
+    },
+    write: (path, text) => {
+      try {
+        writeFileSync(path, text);
+        written.set(path, text);
+        return Either.right();
+      } catch (error) {
+        return Either.left(errorMessage(error));
+      }
+    },
+  };
+}
+
+function serveNotes(
+  http: { request: IncomingMessage; response: ServerResponse },
+  notes: { search: string; context: NotesContext },
+): void {
+  const { request, response } = http;
+  void readBody(request).then(async (body) => {
+    const answer =
+      body === undefined
+        ? { status: 413, body: { error: "the note is longer than 2000 characters" } }
+        : await answerNotes(
+            {
+              method: request.method ?? "GET",
+              query: new URLSearchParams(notes.search),
+              headers: {
+                host: header(request.headers.host),
+                origin: header(request.headers.origin),
+                contentType: header(request.headers["content-type"]),
+                secFetchSite: header(request.headers["sec-fetch-site"]),
+              },
+              remote: request.socket.remoteAddress,
+              body,
+            },
+            notes.context,
+          );
+    response.statusCode = answer.status;
+    response.setHeader("content-type", "application/json");
+    response.setHeader("cache-control", "no-store");
+    response.end(JSON.stringify(answer.body));
+  });
 }
 
 function stylesheets(): string {
@@ -216,14 +300,39 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       },
     }),
     configureServer(server) {
-      let cached: Promise<string> | null = null;
-      const build = async (): Promise<string> => {
+      let cached: Promise<{ text: string; owners: Map<string, string> }> | null = null;
+      const written = new Map<string, string>();
+      const build = async (): Promise<{ text: string; owners: Map<string, string> }> => {
         const files = machineFiles(server.config.root, patterns);
-        const { text, warnings } = await documentText(server, { files, fuzz });
+        const { text, warnings, owners } = await documentText(server, { files, fuzz });
         for (const warning of warnings) server.config.logger.warn(`[mantaq-viz] ${warning}`);
-        return text;
+        return { text, owners };
+      };
+      const notesContext: NotesContext = {
+        root: server.config.root,
+        owner: async (machine) => {
+          cached ??= build();
+          try {
+            const file = (await cached).owners.get(machine);
+            return file === undefined ? Either.left("unknown" as const) : Either.right(file);
+          } catch {
+            cached = null;
+            return Either.left("load" as const);
+          }
+        },
+        files: notesFiles(written),
       };
       server.watcher.on("all", (_event, path) => {
+        if (path.endsWith(".notes.md")) {
+          // Machines did not change: tell the page, keep the cache. Skip the page's own write.
+          try {
+            if (readFileSync(path, "utf8") === written.get(path)) return;
+          } catch {
+            // unreadable: let the page look again
+          }
+          server.ws.send({ type: "custom", event: UPDATE_EVENT });
+          return;
+        }
         if (!/\.[cm]?[jt]sx?$/.test(path) && !/[\\/]__runs__[\\/][^\\/]+\.json$/.test(path)) return;
         cached = null;
         const generated = server.moduleGraph.getModuleById(TARGETS_RESOLVED);
@@ -232,11 +341,15 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
         server.ws.send({ type: "custom", event: UPDATE_EVENT });
       });
       server.middlewares.use((request, response, next) => {
-        const path = request.url?.split("?")[0];
+        const [path, search] = (request.url ?? "").split("?");
+        if (path === `${base}notes`) {
+          serveNotes({ request, response }, { search: search ?? "", context: notesContext });
+          return;
+        }
         if (path === `${base}viz.json`) {
           cached ??= build();
           cached.then(
-            (text) => {
+            ({ text }) => {
               response.setHeader("content-type", "application/json");
               response.end(text);
             },

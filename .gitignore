@@ -40,3 +40,4 @@ packages/*/reports
 # Astro cache (auto-generated)
 .astro/
 .vitest/
+packages/inspect/src/fixtures/credit.notes.md
