@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  Design findings: a state or event whose name is only generic status words (ok, loading, done, ...) or that has no doc comment is reported when the machine file is read. Breaking: pages and `expectNoDesignErrors` with `source` can report new findings; `VizFindingKind` gains `vagueName` and `undocumented`.
+
 ## 0.11.0
 
 <sub>2026-11-07</sub>
