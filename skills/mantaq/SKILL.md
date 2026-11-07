@@ -1,6 +1,6 @@
 ---
 name: mantaq
-description: Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for designing a machine with the live viz page ("show me how X works", "design the Y flow"). Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
+description: Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for designing a machine with the live viz page ("show me how X works", "design the Y flow"). Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also for applying notes left on the live viz page ("apply the viz notes"). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
 allowed-tools: Read Grep Glob Edit Write Bash Shell
 ---
 

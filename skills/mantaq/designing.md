@@ -96,3 +96,18 @@ Only when the user asks for two designs or alternatives. Otherwise section 1 hol
 5. Reply in at most 4 lines: `Two drafts ready, both typecheck.`, then one line per design (`A (<what it chooses>): <n> states, <m> edges.`), then `Compare: <Local URL>__mantaq/?machine=<feature>DraftA&compare=<feature>DraftB`. Needs `@mantaq/inspect` 0.10 or later; older pages ignore `compare=` and show design A only.
 6. Feedback on one design: edit that draft. The page redraws and keeps both walks.
 7. The pick ("keep A", "the first"): move the kept draft into the real machine file (existing feature) or a new file named the repo's way (new feature), rename the export to the real name, fix every caller the typechecker flags, delete both draft files, then run the section 8 checks. Reply in at most 3 lines: the file, the checks that passed, and `<Local URL>__mantaq/?machine=<id>`. If the pick is unclear, ask one question. If the user drops both, delete the drafts and say so in one line. Never leave a draft file behind.
+
+## 11. Notes from the live page
+
+On the dev server the user can click a state and write a note. Notes for a machine file are in the file next to it with `.notes.md` in place of the extension (`checkout.machine.ts` → `checkout.machine.notes.md`). Needs the `@mantaq/inspect` release that ships this section.
+
+When the user says "apply the viz notes" (or "the notes"):
+
+1. Find them: `rg -l "^mantaq notes v1" -g '*.notes.md'`. Read every item with `status: open`. Skip `done`.
+2. `on:` names a state (`on: state paymentPending`). `machine:` is the machine id. A note on a state may ask for a change near it: "needs a cancel" means a new edge out of that state.
+3. Change the real machine file (section 1), with JSDoc as in section 4. Two notes that contradict each other: apply neither and ask which one.
+4. Run the section 8 checks.
+5. Then, for each note you applied, change `status: open` to `status: done` and add one line under it: `  result: <what changed, one line>`. Not sure what a note means: leave it open, add `  question: <one question>`, and ask the same question in chat.
+6. Renamed or removed a state or an event: update every `on:` line that names it, done notes too.
+7. Never delete a note, never change its `id:`, `machine:` or `note:` lines, never add a note. Keep one field per line with the two-space indent.
+8. Reply with one line per note: `<id> <on>: <what changed>. done` or `<id> <on>: asked "<question>"`. The page redraws and shows each note as Done.

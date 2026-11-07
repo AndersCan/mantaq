@@ -46,6 +46,26 @@ describe("mantaqViz build", () => {
     const root = document.querySelector("#app");
     await vi.waitFor(() => expect(root?.querySelector("[data-send]")).not.toBeNull());
   });
+
+  test("the built page never asks for notes and ships no notes file text", async () => {
+    const files = readdirSync(out, { recursive: true }).map(String);
+    expect(files.some((file) => file.endsWith(".notes.md"))).toBe(false);
+    for (const file of files.filter((each) => each.endsWith(".js"))) {
+      expect(readFileSync(join(out, file), "utf8")).not.toContain("mantaq notes v1");
+    }
+    const urls: string[] = [];
+    const text = readFileSync(join(out, "viz.json"), "utf8");
+    globalThis.fetch = async (input) => {
+      urls.push(String(input));
+      return new Response(text);
+    };
+    const html = readFileSync(join(out, "index.html"), "utf8");
+    const entry = html.match(/<script type="module" src="([^"]+)"/)?.[1] ?? "";
+    document.body.innerHTML = '<main id="app" data-src="viz.json"></main>';
+    await import(/* @vite-ignore */ `${pathToFileURL(join(out, entry)).href}?again`);
+    await vi.waitFor(() => expect(document.querySelector("#app [data-send]")).not.toBeNull());
+    expect(urls.filter((each) => each.includes("notes"))).toEqual([]);
+  });
 });
 
 describe("mantaqViz build alongside an app", () => {

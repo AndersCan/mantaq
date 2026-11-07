@@ -329,3 +329,53 @@ describe("compare", () => {
     expect(root.textContent).toContain("Cannot show");
   });
 });
+
+describe("mountLiveDriven notes", () => {
+  const create = () => {
+    const clock = VirtualClock();
+    return { actor: createCheckoutActor(clock), clock };
+  };
+
+  async function fetched(search: string, notes: string | undefined): Promise<string[]> {
+    history.replaceState(null, "", search);
+    const doc = JSON.parse(await documentText());
+    doc.machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
+    const urls: string[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (input: string) => {
+      urls.push(String(input));
+      return String(input).includes("notes")
+        ? new Response("{}", { status: 404 })
+        : new Response(JSON.stringify(doc));
+    }) as typeof fetch;
+    try {
+      const root = document.createElement("div");
+      await mountLiveDriven(root, {
+        source: "/viz.json",
+        targets: { checkout: create, second: create },
+        ...(notes === undefined ? {} : { notes }),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      globalThis.fetch = original;
+    }
+    return urls;
+  }
+
+  test("without a notes url nothing asks for notes", async () => {
+    const urls = await fetched("?machine=checkout", undefined);
+    expect(urls.filter((each) => each.includes("notes"))).toEqual([]);
+  });
+
+  test("with a notes url one machine asks for its notes", async () => {
+    const urls = await fetched("?machine=checkout", "/__mantaq/notes");
+    expect(urls.filter((each) => each.includes("notes"))).toEqual([
+      "/__mantaq/notes?machine=checkout",
+    ]);
+  });
+
+  test("compare mode never asks for notes", async () => {
+    const urls = await fetched("?machine=checkout&compare=second", "/__mantaq/notes");
+    expect(urls.filter((each) => each.includes("notes"))).toEqual([]);
+  });
+});
