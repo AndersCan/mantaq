@@ -14,9 +14,11 @@ const retry = "../fixtures/retry.ts";
 const linked = "../fixtures/linked.ts";
 const deaf = "../fixtures/deaf.ts";
 const orphan = "../fixtures/orphan.ts";
+const stay = "../fixtures/stay.ts";
 
 let good = "";
 let broken = "";
+let quiet = "";
 let empty = "";
 const roots: string[] = [];
 
@@ -51,6 +53,12 @@ beforeAll(async () => {
     "pair.astro": viewerPage(linked),
     "machines.astro": overviewPage({ "": [retry], pair: [linked] }),
   });
+  quiet = await makeSite([stay], {
+    "index.astro": viewerPage(
+      stay,
+      `<link rel="icon" href="/favicon.ico">\n<script is:inline>console.log("hello");console.warn("careful")</script>\n`,
+    ),
+  });
   broken = await makeSite([retry, linked, deaf, orphan], {
     "index.astro": viewerPage(retry, `<script is:inline>throw new Error("boom")</script>\n`),
     "deaf.astro": viewerPage(deaf),
@@ -84,6 +92,10 @@ describe("checkSite", () => {
         "/machines/: overview box sender links to /gone/?machine=sender, which is not built",
       ].sort(),
     );
+  }, 120_000);
+
+  test("ignores console logs, warnings and a missing favicon, and counts a staying handler as handled", async () => {
+    expect(await checkSite(quiet, "/")).toEqual(Either.right({ pages: 1, failures: [] }));
   }, 120_000);
 
   test("a wrong base says so", async () => {

@@ -20,7 +20,7 @@ jobs:
         run: |
           git status --porcelain
           test -z "$(git status --porcelain)"
-      - run: vp exec playwright install --with-deps chromium
+      - run: vp exec -F @mantaq/inspect playwright install --with-deps chromium
       - run: vp run ready
       - run: node scripts/pack-smoke.mjs
 
