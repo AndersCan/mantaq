@@ -65,7 +65,7 @@ a.send(click.create());
 
 ### RealClock
 
-Wall-clock `Clock` via platform timers; the default. No public surface beyond `Clock`.
+Wall-clock `Clock` via platform timers; the default. No public surface beyond `Clock`. `now()`: milliseconds. RealClock: since the Unix epoch. VirtualClock: virtual time, starting at 0.
 
 ```ts
 class RealClock implements Clock {
