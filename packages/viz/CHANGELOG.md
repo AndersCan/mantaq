@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  The live panel asks for an event's declared payload fields (a dropdown for a fixed set of values, a number box, a text box, one input per field, already filled in), lists the machine's context fields with their meaning and current value on the Context tab, and says at the top what runs in the browser.
+- _(minor)_
+  After an event, the live panel says what ran: what happened, the condition that decided it, the context fields that changed and the effects started. Results an effect sends back later show up on their own. Breaking: `VizLiveState` gains `after`; a hand-written `VizDriver` must fill it (it may also add `listen`). No known drivers outside `@mantaq/inspect`.
+
 ## 0.10.0
 
 <sub>2026-11-07</sub>
