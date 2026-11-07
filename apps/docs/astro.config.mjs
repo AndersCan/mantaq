@@ -34,6 +34,7 @@ export default defineConfig({
         {
           label: "Getting Started",
           items: [
+            { label: "Start with your agent", slug: "getting-started/with-an-agent" },
             { label: "Introduction", slug: "getting-started/introduction" },
             { label: "State Machines & Statecharts", slug: "getting-started/state-machines" },
             { label: "Installation", slug: "getting-started/installation" },

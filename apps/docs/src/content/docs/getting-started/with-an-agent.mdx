@@ -1,0 +1,50 @@
+---
+title: Start with your coding agent
+description: From an empty Vite project to your machine in the live viewer, with one prompt.
+---
+
+## You need
+
+- Node.js 22.12 or later
+- A Vite project
+- [Claude Code](https://claude.com/claude-code)
+
+No project yet:
+
+```sh
+npm create vite@latest my-app -- --template vanilla-ts
+cd my-app && npm install
+```
+
+## 1. Install the skill
+
+```sh
+npx skills add AndersCan/mantaq -a claude-code -y
+```
+
+## 2. Tell your agent what to model
+
+```text
+Use the mantaq skill. Model our checkout: the customer fills in basic info, then pays, and it ends in success. Set it up and open it in the live viewer.
+```
+
+Or describe your own flow in plain words.
+
+## 3. What you get
+
+The agent installs `@mantaq/core` and `@mantaq/inspect`, writes `src/checkout.machine.ts` and the Vite plugin, and starts the dev server. The browser opens `http://localhost:5173/__mantaq/?machine=checkout`.
+
+The Vite config looks like this:
+
+```ts
+import { defineConfig } from "vite";
+import { mantaqViz } from "@mantaq/inspect/vite";
+
+export default defineConfig({
+  plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })],
+});
+```
+
+## 4. Keep going
+
+Click a pulsing edge to take a step. Ask for changes in chat; saving the file redraws the page.
