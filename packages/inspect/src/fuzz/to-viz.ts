@@ -108,7 +108,7 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): VizMachin
       iterations: result.iterations,
       corpus: result.corpus.map((entry) => ({ steps: entry.steps, discovered: entry.discovered })),
       errors: result.errors,
-      failedExpectations: [],
+      failedExpectations: result.failedExpectations,
     },
   };
 }

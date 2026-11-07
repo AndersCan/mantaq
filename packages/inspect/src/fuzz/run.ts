@@ -1,6 +1,8 @@
 import type { VizJson, VizStep } from "@mantaq/viz";
 import type { AnyActor, InternalEvent, VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
+import { matches } from "../expectations.ts";
+import type { CheckedExpectation } from "../expectations.ts";
 
 /** A machine the fuzzer can drive: a fresh actor plus the virtual clock it runs on. */
 export interface FuzzTarget {
@@ -12,6 +14,8 @@ export interface FuzzTarget {
    * sent without a payload.
    */
   payloads?: Readonly<Record<string, ReadonlyArray<VizJson>>>;
+  /** Contexts the machine file marks; each hit becomes a coverage feature. */
+  expectations?: ReadonlyArray<CheckedExpectation>;
 }
 
 export interface Observation {
@@ -146,6 +150,14 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   const errors: RunError[] = [];
   const contextSteps: number[] = [];
   const loopStarts: number[] = [];
+  const expected = target.expectations ?? [];
+  const hits = new Set<string>();
+  const seeing = (state: string, context: unknown): void => {
+    for (const each of expected) {
+      if (each.state === state && matches(each.pattern, context)) hits.add(each.feature);
+    }
+  };
+  if (expected.length > 0) seeing(actor.state.name, parsed(contextText(actor)));
   /** The actor's state before each step. */
   const statesBefore: string[] = [];
   let index = 0;
@@ -163,6 +175,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
         context,
       });
       if (transitioned) visited.push(to);
+      if (expected.length > 0) seeing(transitioned ? to : from, context);
     },
   });
   actor.on("error", {
@@ -189,6 +202,6 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     index += 1;
   }
   actor.dispose();
-  const features = featuresOf({ visited, observations, errors });
+  const features = [...new Set([...featuresOf({ visited, observations, errors }), ...hits])].sort();
   return { visited, observations, errors, contextSteps, loopStarts, features };
 }
