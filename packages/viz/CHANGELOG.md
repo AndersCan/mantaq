@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  The viewer takes `changes: { machine, before, onSeen }`: it outlines states and arrows added since `before` and lists what was added and removed, with a Mark as seen button. New `outlineOf`, `outlineChanges`, `isUnchanged`. Breaking: none.
+
 ## 0.13.0
 
 <sub>2026-11-07</sub>

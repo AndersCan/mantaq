@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_
+  The live dev page outlines the states and arrows your last edits added and lists what they removed, until you press Mark as seen. Breaking: none.
+
 ## 0.13.0
 
 <sub>2026-11-07</sub>
