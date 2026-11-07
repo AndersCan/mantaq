@@ -1,8 +1,10 @@
 import { VirtualClock } from "@mantaq/core";
 import { machineFindings } from "@mantaq/viz";
+import type { VizStep } from "@mantaq/viz";
 import { describe, expect, expectTypeOf, test } from "vite-plus/test";
 import { checkExpectations, matches, printPattern } from "./expectations.ts";
 import type { Expectations } from "./expectations.ts";
+import { createChainedActor } from "./fixtures/chained.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createExpectedActor, expectedExpectations } from "./fixtures/expected.ts";
 import { createThrowingActor } from "./fixtures/throwing.ts";
@@ -150,6 +152,42 @@ describe("fuzz with expectations", () => {
     expect(second.corpus).toEqual(first.corpus);
     expect(second.errors).toEqual(first.errors);
     expect([...second.firstHit]).toEqual([...first.firstHit]);
+  });
+});
+
+describe("expectations during a step", () => {
+  const chained = (expectations: unknown): FuzzTarget => ({
+    id: "chained",
+    create: () => {
+      const clock = VirtualClock();
+      return { actor: createChainedActor(clock), clock };
+    },
+    expectations: checkExpectations(expectations, ["idle", "first", "second", "last"]).checked,
+  });
+  const steps: VizStep[] = [
+    { kind: "event", event: "start", payload: null },
+    { kind: "advance", ms: 1000 },
+  ];
+
+  test("a must-see in a state passed through inside one step is hit", () => {
+    const trace = execute(chained({ second: { mustSee: [{ phase: 1 }] } }), steps);
+    expect(trace.visited).toEqual(["idle", "first", "second", "last"]);
+    expect(trace.features).toContain("must:second:0");
+  });
+
+  test("a never-see only visible mid-step is hit", () => {
+    const trace = execute(chained({ second: { neverSee: [{ phase: 1 }] } }), steps);
+    expect(trace.features).toContain("never:second:0");
+  });
+
+  test("the state a step ends in is checked too", () => {
+    const trace = execute(chained({ last: { neverSee: [{ phase: 2 }] } }), steps);
+    expect(trace.features).toContain("never:last:0");
+  });
+
+  test("a state inside a region is unknown to expectations", () => {
+    const { warnings } = checkExpectations({ nested: { neverSee: [{ a: 1 }] } }, ["idle"]);
+    expect(warnings).toEqual(['expectations for unknown state "nested" ignored']);
   });
 });
 

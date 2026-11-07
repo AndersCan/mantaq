@@ -199,7 +199,6 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
       const start = statesBefore.lastIndexOf(actor.state.name);
       loopStarts.push(start === -1 ? index : start);
     }
-    if (expected.length > 0) seeing(actor.state.name, parsed(contextText(actor)));
     index += 1;
   }
   actor.dispose();
