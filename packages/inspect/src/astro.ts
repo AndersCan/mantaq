@@ -14,11 +14,13 @@
  * channel: it stops the build and prints the message.
  */
 import { serializeViz } from "@mantaq/viz";
+import type { VizMachine } from "@mantaq/viz";
 import type { AstroIntegration } from "astro";
 import type { Plugin } from "vite";
 import { designErrors } from "./gate.ts";
 import { vizDocument } from "./inspect.ts";
 import type { FuzzSettings } from "./inspect.ts";
+import { layoutOverview, machineLinks } from "./astro/overview.ts";
 import { inspectEntry, inspectFile } from "./load.ts";
 import { TARGETS, TARGETS_RESOLVED, targetsSource } from "./vite.ts";
 import { existsSync } from "node:fs";
@@ -46,6 +48,7 @@ async function documentsSource(
 ): Promise<string> {
   const documents: Record<string, unknown> = {};
   const owners = new Map<string, string>();
+  const all: Array<{ file: string; machine: VizMachine }> = [];
   for (const file of context.files) {
     const loaded = await inspectFile(file, { fuzz: context.fuzz });
     if (loaded.failed) {
@@ -60,6 +63,7 @@ async function documentsSource(
         );
       }
       owners.set(machine.id, file);
+      all.push({ file, machine });
     }
     documents[file] = {
       text: serializeViz(vizDocument(loaded.machines)),
@@ -73,6 +77,12 @@ async function documentsSource(
   return [
     `export const root = ${JSON.stringify(context.root)};`,
     `export const documents = ${JSON.stringify(documents)};`,
+    `export const overview = ${JSON.stringify(
+      layoutOverview(
+        all.map(({ file, machine }) => ({ id: machine.id, file })),
+        machineLinks(all),
+      ),
+    )};`,
   ].join("\n");
 }
 

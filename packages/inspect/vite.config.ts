@@ -21,6 +21,7 @@ export default defineConfig({
       customExports: (exports) => ({
         ...exports,
         "./astro/Machine.astro": "./src/astro/Machine.astro",
+        "./astro/Machines.astro": "./src/astro/Machines.astro",
       }),
     },
   },

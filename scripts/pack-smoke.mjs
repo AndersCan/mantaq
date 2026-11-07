@@ -153,9 +153,21 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 <html><body><Machine src="retry.ts" /></body></html>
 `,
   );
+  writeFileSync(
+    join(site, "src/pages/machines.astro"),
+    `---
+import Machines from "@mantaq/inspect/astro/Machines.astro";
+---
+<html><body><Machines pages={{ "": ["retry.ts"] }} /></body></html>
+`,
+  );
   run(join(app, "node_modules/.bin/astro"), ["build", "--root", site], app);
   const html = readFileSync(join(site, "dist/index.html"), "utf8");
   check(html.includes("mantaq-machine"), "astro build renders a Machine");
+  check(
+    readFileSync(join(site, "dist/machines/index.html"), "utf8").includes("mantaq-machines"),
+    "astro build renders Machines",
+  );
   check(
     readdirSync(join(site, "dist/_astro")).some((file) => file.endsWith(".js")),
     "astro build emits the viewer script",

@@ -10,7 +10,8 @@
   },
   "files": [
     "dist",
-    "src/astro/Machine.astro"
+    "src/astro/Machine.astro",
+    "src/astro/Machines.astro"
   ],
   "type": "module",
   "exports": {
@@ -22,7 +23,8 @@
     "./record": "./src/record.ts",
     "./vite": "./src/vite.ts",
     "./package.json": "./package.json",
-    "./astro/Machine.astro": "./src/astro/Machine.astro"
+    "./astro/Machine.astro": "./src/astro/Machine.astro",
+    "./astro/Machines.astro": "./src/astro/Machines.astro"
   },
   "publishConfig": {
     "exports": {
@@ -34,7 +36,8 @@
       "./record": "./dist/record.mjs",
       "./vite": "./dist/vite.mjs",
       "./package.json": "./package.json",
-      "./astro/Machine.astro": "./src/astro/Machine.astro"
+      "./astro/Machine.astro": "./src/astro/Machine.astro",
+      "./astro/Machines.astro": "./src/astro/Machines.astro"
     },
     "access": "public"
   },
@@ -49,6 +52,7 @@
     "prepack": "vp run build"
   },
   "dependencies": {
+    "@dagrejs/dagre": "catalog:",
     "@mantaq/core": "workspace:*",
     "@mantaq/pbt": "workspace:*",
     "@mantaq/traversal": "workspace:*",
