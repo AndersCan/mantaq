@@ -77,11 +77,11 @@ function driver(): VizDriver {
   return { reset: () => run([]), step: (step) => run([step]) };
 }
 
-function mount(live?: VizDriver): HTMLElement {
+function mount(live?: VizDriver, shown: VizMachine = machine): HTMLElement {
   const root = document.createElement("div");
   mountViewer(
     root,
-    { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+    { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shown] },
     live === undefined ? {} : { driver: live },
   );
   return root;
@@ -112,6 +112,42 @@ describe("finding marks", () => {
     expect(finding?.textContent).toContain('pick {"side":"b"}');
   });
 
+  const nextMarked: VizMachine = {
+    ...machine,
+    fuzz: {
+      seed: 1,
+      iterations: 1,
+      corpus: [],
+      errors: [{ from: "picked", event: "pick", message: "boom", steps: [pick] }],
+    },
+  };
+
+  test("clicking a mark on a next-step state does not take the step", () => {
+    const root = mount(undefined, nextMarked);
+    const target = mark(root, "picked");
+    expect(target).not.toBeNull();
+    target?.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("idle");
+    expect(root.querySelector('.finding[data-kind="handlerError"]')).not.toBeNull();
+  });
+
+  test("Space on a focused mark opens the details and prevents scrolling", () => {
+    const root = mount(undefined, nextMarked);
+    const event = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    mark(root, "picked")?.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("idle");
+    expect(root.querySelector('.finding[data-kind="handlerError"]')).not.toBeNull();
+  });
+
+  test("other keys on a mark do nothing", () => {
+    const root = mount();
+    const event = new KeyboardEvent("keydown", { key: "a", bubbles: true, cancelable: true });
+    mark(root, "orphan")?.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(root.querySelector(".finding")).toBeNull();
+  });
+
   test("Enter on a focused mark does the same", () => {
     const root = mount();
     mark(root, "orphan")?.dispatchEvent(
@@ -139,7 +175,11 @@ describe("finding marks", () => {
   test("with a driver, Replay runs the steps and shows the Step tab", () => {
     const root = mount(driver());
     mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
+    const activeTab = () =>
+      root.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute("data-tab");
+    expect(activeTab()).toBe("details");
     root.querySelector<HTMLButtonElement>("[data-replay]")?.click();
+    expect(activeTab()).toBe("step");
     expect(root.querySelector("[data-live-error]")?.textContent).toContain("boom");
   });
 });
