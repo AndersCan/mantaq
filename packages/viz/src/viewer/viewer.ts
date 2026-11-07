@@ -161,7 +161,11 @@ export function mountViewer(
         rewind,
         ...liveOf(view, { send, play, compose }),
       });
-      const details = renderPanel(doc, machine, { selection: view.selection, select });
+      const details = renderPanel(doc, machine, {
+        selection: view.selection,
+        select,
+        replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
+      });
       panel.replaceChildren(panelTabs(doc, { view, parts, details, refresh }));
       markDiagram(root, { machine, view, send, compose });
     };
@@ -192,7 +196,8 @@ export function mountViewer(
       view.path = [...view.path, step];
       walked();
     };
-    const play = (steps: ReadonlyArray<VizStep>, run?: string) => {
+    const play = (steps: ReadonlyArray<VizStep>, run?: string, tab?: ViewState["tab"]) => {
+      if (tab !== undefined) view.tab = tab;
       if (driver !== undefined) replayInto(view, driver, steps);
       walked(run);
     };
@@ -205,13 +210,16 @@ export function mountViewer(
       view.path = view.path.slice(0, Math.max(0, length));
       walked();
     };
+    const showDetails = (selection: Selection) => {
+      view.selection = selection;
+      view.tab = "details";
+      refresh();
+    };
     // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {
       const step = clickStep(machine, { path: view.path, selection, ...liveState(view) });
-      view.selection = selection;
-      if (step !== null) return take(step);
-      view.tab = "details";
-      refresh();
+      if (step !== null) view.selection = selection;
+      return step === null ? showDetails(selection) : take(step);
     };
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(
@@ -228,7 +236,9 @@ export function mountViewer(
         live: driver !== undefined,
       }),
       html(doc, "div", { class: "viz-main" }, [
-        html(doc, "div", { class: "canvas" }, [renderGraph(doc, machine, { select, mode })]),
+        html(doc, "div", { class: "canvas" }, [
+          renderGraph(doc, machine, { select, showDetails, mode }),
+        ]),
         panel,
       ]),
     );
