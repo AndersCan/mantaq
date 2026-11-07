@@ -38,19 +38,32 @@ export type CheckoutContext = {
   orderId?: string;
 };
 
+/** The visitor enters their name and email. */
 export const basicInfo = state("basicInfo")();
+/** The visitor enters where to ship the order. */
 export const shippingAddress = state("shippingAddress")();
+/** The visitor enters their card details. */
 export const payment = state("payment")();
+/** The card is being charged; the visitor waits. */
 export const submitting = state("submitting")();
+/** The order went through. */
 export const success = state("success")().final();
+/** The payment failed and the visitor sees why. */
 export const error = state("error")();
 
+/** The visitor sent their name and email. */
 export const submitBasicInfo = event("submitBasicInfo")<BasicInfo>();
+/** The visitor sent their shipping address. */
 export const submitShipping = event("submitShipping")<ShippingAddress>();
+/** The visitor sent their card details. */
 export const submitPayment = event("submitPayment")<PaymentInfo>();
+/** The visitor went back a step. */
 export const back = event("back")();
+/** The card was charged. */
 export const paymentOk = event("paymentOk")<{ orderId: string }>();
+/** The card was declined. */
 export const paymentFail = event("paymentFail")<{ reason: string }>();
+/** The card charge took too long. */
 export const paymentTimeout = event("paymentTimeout")();
 
 export function chargeCard(cardNumber: string): Promise<string> {

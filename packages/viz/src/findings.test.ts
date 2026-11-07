@@ -252,6 +252,132 @@ describe("machineFindings", () => {
       "unreachableState",
     ]);
   });
+
+  test("names the two naming findings", () => {
+    expect(FINDING_KINDS.vagueName.title).toBe("Vague name");
+    expect(FINDING_KINDS.undocumented.title).toBe("No description");
+  });
+});
+
+function analyzedEdge(from: string, to: string, event: string) {
+  return { ...vizEdge(from, to, event), explanation: { status: "analyzed" } };
+}
+
+function named(parts: Record<string, unknown>): VizMachine {
+  return build({ initial: "showingHome", ...parts });
+}
+
+function namingKinds(machine: VizMachine) {
+  return machineFindings(machine).filter(
+    (finding) => finding.kind === "vagueName" || finding.kind === "undocumented",
+  );
+}
+
+function stateNamed(id: string, doc: string | null = "Doc.") {
+  return vizState(id, { doc });
+}
+
+function eventNamed(id: string, doc: string | null = "Doc.") {
+  return { id, internal: false, doc, payload: null };
+}
+
+describe("naming findings", () => {
+  const vagueTable: [string, boolean, boolean][] = [
+    ["ok", true, true],
+    ["OK", true, true],
+    ["Ok", true, true],
+    ["ERROR", false, true],
+    ["ACT_FAILED", false, true],
+    ["STATUS_FAILED", false, true],
+    ["region1.idle", true, true],
+    ["loadingPhotos", true, false],
+    ["LOAD_FAILED", false, false],
+    ["STATUS_SEEN", false, false],
+    ["BATCH_DONE", false, false],
+    ["paymentOk", true, false],
+    ["waitingForAdminApproval", true, false],
+    ["SAVED", false, false],
+    ["NEXT", false, false],
+    ["OPEN", false, false],
+    ["QRCodeReady", true, false],
+  ];
+
+  test.each(vagueTable)("%s (state: %s) is vague: %s", (name, isState, vague) => {
+    const machine = isState
+      ? named({
+          states: [stateNamed("showingHome", "Doc."), stateNamed(name)],
+          edges: [analyzedEdge("showingHome", name, "go")],
+          events: [eventNamed("go")],
+        })
+      : named({
+          states: [stateNamed("showingHome")],
+          edges: [analyzedEdge("showingHome", "showingHome", name)],
+          events: [eventNamed(name)],
+        });
+    const found = namingKinds(machine).filter((finding) => finding.kind === "vagueName");
+    expect(found.length > 0).toBe(vague);
+  });
+
+  test("exact findings for a vague state, a vague event and a missing comment", () => {
+    const machine = named({
+      initial: "ready",
+      states: [stateNamed("ready", "Cart is shown."), stateNamed("showingCart", null)],
+      edges: [analyzedEdge("ready", "showingCart", "DONE")],
+      events: [eventNamed("DONE", "Paid.")],
+    });
+    expect(namingKinds(machine)).toEqual([
+      {
+        kind: "vagueName",
+        state: "ready",
+        message:
+          "state ready has a vague name (only generic words: ready); name what the person sees, like showingPhotos",
+        steps: null,
+      },
+      {
+        kind: "vagueName",
+        state: "ready",
+        message:
+          "event DONE has a vague name (only generic words: done); name what happened, like photosLoaded",
+        steps: null,
+      },
+      {
+        kind: "undocumented",
+        state: "showingCart",
+        message:
+          'state showingCart has no doc comment: add /** what the person sees here */ above state("showingCart")',
+        steps: null,
+      },
+    ]);
+  });
+
+  test("a machine whose source was not read has no naming findings", () => {
+    const machine = named({
+      states: [stateNamed("ready", null)],
+      edges: [vizEdge("ready", "ready", "DONE")],
+      events: [eventNamed("DONE", null)],
+    });
+    expect(namingKinds(machine)).toEqual([]);
+  });
+
+  test("an onAny event is placed on the first state it covers", () => {
+    const machine = named({
+      initial: "alpha",
+      states: [stateNamed("alpha"), stateNamed("beta")],
+      edges: [analyzedEdge("*", "beta", "DONE")],
+      events: [eventNamed("DONE")],
+    });
+    expect(namingKinds(machine).map((finding) => finding.state)).toEqual(["alpha"]);
+  });
+
+  test("a comment of only whitespace counts as missing", () => {
+    const machine = named({
+      initial: "alpha",
+      states: [stateNamed("alpha", "  ")],
+      edges: [analyzedEdge("alpha", "alpha", "stay")],
+      events: [eventNamed("stay")],
+    });
+    expect(namingKinds(machine).map((finding) => finding.kind)).toEqual(["undocumented"]);
+  });
 });
 
 describe("FINDING_KINDS", () => {
@@ -261,8 +387,10 @@ describe("FINDING_KINDS", () => {
       "handlerError",
       "mustSee",
       "neverSee",
+      "undocumented",
       "unhandledSend",
       "unreachableState",
+      "vagueName",
     ]);
   });
 });

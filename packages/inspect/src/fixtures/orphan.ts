@@ -1,8 +1,12 @@
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 
+/** Nothing is running. */
 const idle = state("idle")();
+/** Work is in progress. */
 const running = state("running")();
+/** A state nothing leads to. */
 const orphan = state("orphan")();
+/** Work was started. */
 const go = event("go")();
 
 export function createOrphanActor(clock: VirtualClock = VirtualClock()) {

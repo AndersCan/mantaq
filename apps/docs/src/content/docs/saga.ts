@@ -30,24 +30,36 @@ const sagaStates = states(
   "compensatingRefund",
   "compensatingRelease",
 );
+/** Every step finished and the order is placed. */
 const completed = state("completed")().final();
+/** A step failed and everything done so far was undone. */
 const failed = state("failed")().final();
 
+/** An order was submitted. */
 const START = event("START")<{ order: OrderRequest }>();
 const { CANCEL } = events("CANCEL");
+/** The stock was set aside for the order. */
 const INVENTORY_RESERVED = event("INVENTORY_RESERVED")<{ result: { reservationId: string } }>();
+/** The stock could not be set aside. */
 const INVENTORY_FAILED = event("INVENTORY_FAILED")<{ error: string }>();
+/** The payment was taken. */
 const PAYMENT_PROCESSED = event("PAYMENT_PROCESSED")<{ result: { transactionId: string } }>();
+/** The payment was refused. */
 const PAYMENT_FAILED = event("PAYMENT_FAILED")<{ error: string }>();
+/** A shipment was booked. */
 const SHIPMENT_CREATED = event("SHIPMENT_CREATED")<{ result: { trackingNumber: string } }>();
+/** The shipment could not be booked. */
 const SHIPMENT_FAILED = event("SHIPMENT_FAILED")<{ error: string }>();
 const { NOTIFICATION_SENT, REFUND_DONE, RELEASE_DONE } = events(
   "NOTIFICATION_SENT",
   "REFUND_DONE",
   "RELEASE_DONE",
 );
+/** The confirmation could not be sent. */
 const NOTIFICATION_FAILED = event("NOTIFICATION_FAILED")<{ error: string }>();
+/** The refund could not be made. */
 const REFUND_FAILED = event("REFUND_FAILED")<{ error: string }>();
+/** The reserved stock could not be released. */
 const RELEASE_FAILED = event("RELEASE_FAILED")<{ error: string }>();
 
 type SagaContext = {

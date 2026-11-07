@@ -5,13 +5,20 @@
 import type { Expectations } from "@mantaq/inspect";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 
+/** The visitor enters their name and email. */
 const basicInfo = state("basicInfo")();
+/** The visitor enters where to ship the order. */
 const shippingAddress = state("shippingAddress")();
+/** The visitor enters their card details. */
 const payment = state("payment")();
+/** An old order the visitor can no longer reach. */
 const archived = state("archived")();
 
+/** The visitor sent their name and email. */
 const submitBasicInfo = event("submitBasicInfo")<{ email: string }>();
+/** The visitor sent their shipping address. */
 const submitShipping = event("submitShipping")<{ address: string }>();
+/** The visitor went back a step. */
 const back = event("back")();
 
 const initialContext: { email: string; address: string } = { email: "", address: "" };

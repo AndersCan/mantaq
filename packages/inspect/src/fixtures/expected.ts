@@ -5,13 +5,20 @@
 import type { Expectations } from "../expectations.ts";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 
+/** Nothing has started yet. */
 const idle = state("idle")();
+/** The counter is running. */
 const counting = state("counting")();
+/** The count is finished. */
 const done = state("done")().final();
 
+/** The counter was started. */
 const begin = event("begin")();
+/** The count went up by one. */
 const bump = event("bump")();
+/** A note was attached to the count. */
 const tag = event("tag")<{ note: string }>();
+/** The counter was stopped. */
 const finish = event("finish")();
 
 export function createExpectedActor(clock: VirtualClock = VirtualClock()) {

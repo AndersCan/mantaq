@@ -1,9 +1,13 @@
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { createDoorActor } from "./fixtures/factories.ts";
+import { createVagueNamesActor } from "./fixtures/vague-names.ts";
 import { createThrowingActor } from "./fixtures/throwing.ts";
 import { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts";
 import { inspect } from "./inspect.ts";
+import { join } from "node:path";
+
+const FIXTURES = join(import.meta.dirname, "fixtures");
 
 const idle = state("idle")();
 const running = state("running")();
@@ -54,6 +58,34 @@ describe("expectNoDesignErrors", () => {
     const { machine } = inspect({ id: "orphan", create: () => createOrphanActor(), fuzz: false });
     const edges = machine.edges.map((edge) => (edge.event === "go" ? { ...edge, to: null } : edge));
     expect(unreachableStates({ ...machine, edges })).toEqual([]);
+  });
+});
+
+describe("names", () => {
+  const source = { file: join(FIXTURES, "vague-names.ts"), root: FIXTURES };
+
+  test("with source, a vague name and a missing comment fail the gate, in order", () => {
+    expect(() =>
+      expectNoDesignErrors({
+        id: "vague",
+        create: () => createVagueNamesActor(),
+        source,
+        fuzz: false,
+      }),
+    ).toThrow(
+      [
+        "vague has 3 design errors:",
+        "  - state ready has a vague name (only generic words: ready); name what the person sees, like showingPhotos",
+        "  - event DONE has a vague name (only generic words: done); name what happened, like photosLoaded",
+        '  - state showingCart has no doc comment: add /** what the person sees here */ above state("showingCart")',
+      ].join("\n"),
+    );
+  });
+
+  test("without source, the same machine passes", () => {
+    expect(() =>
+      expectNoDesignErrors({ id: "vague", create: () => createVagueNamesActor(), fuzz: false }),
+    ).not.toThrow();
   });
 });
 
