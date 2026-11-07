@@ -1,15 +1,14 @@
 /**
  * The notes section of the live page: under the panel, for the selected
- * state, the notes already left on it and a box to add one. It talks to the
+ * state or arrow, the notes already left on it and a box to add one. It talks to the
  * dev-server endpoint and stays hidden when that does not answer (static
  * hosts, older servers, visitors from another computer).
  */
+import { isAnyState } from "@mantaq/viz";
 import type { VizMachine } from "@mantaq/viz";
-import { NOTES_VERSION, MAX_NOTE_LENGTH } from "./notes.ts";
-import type { Note, NoteTarget } from "./notes.ts";
-
-type StateTarget = Extract<NoteTarget, { kind: "state" }>;
 import type { ViewerSelection } from "@mantaq/viz/viewer";
+import { NOTES_VERSION, MAX_NOTE_LENGTH, arrowsOf, isNoteTarget, targetText } from "./notes.ts";
+import type { Note, NoteTarget } from "./notes.ts";
 
 type Phase =
   | { kind: "loading" }
@@ -25,12 +24,11 @@ function readNote(value: unknown): Note | undefined {
   if (!isRecord(value)) return undefined;
   const { id, machine, on, target, status, note, result, question } = value;
   if (typeof id !== "string" || typeof note !== "string") return undefined;
-  const state = isRecord(target) && typeof target["state"] === "string" ? target["state"] : "";
   return {
     id,
     machine: typeof machine === "string" ? machine : undefined,
     on: typeof on === "string" ? on : "",
-    target: state === "" ? undefined : { kind: "state", state },
+    target: isNoteTarget(target) ? target : undefined,
     status: status === "done" ? "done" : "open",
     note,
     result: typeof result === "string" ? result : undefined,
@@ -94,7 +92,7 @@ export function notesFooter(
   section.className = "notes";
   section.hidden = true;
   let phase: Phase = { kind: "loading" };
-  let target: StateTarget | undefined;
+  let target: NoteTarget | undefined;
   let status = "";
   let saving = false;
   let draft = "";
@@ -114,12 +112,21 @@ export function notesFooter(
       else section.hidden = true;
       return;
     }
-    const state = target.state;
+    const label = targetLabel(target);
     const heading = doc.createElement("h3");
-    heading.textContent = `Notes on ${state}`;
+    heading.textContent = `Notes on ${label}`;
     section.append(heading);
-    section.append(noteList(doc, state, phase.notes));
-    section.append(form(state), statusLine);
+    if (target.kind === "edge") {
+      const shared = arrowsOf(context.machine, target);
+      if (shared > 1) {
+        const hint = doc.createElement("p");
+        hint.className = "hint";
+        hint.textContent = `The ${shared} arrows for ${label} share these notes.`;
+        section.append(hint);
+      }
+    }
+    section.append(noteList(doc, target, phase.notes));
+    section.append(form(target), statusLine);
     if (phase.exists || justSaved) {
       const where = doc.createElement("p");
       where.className = "notes-file";
@@ -128,7 +135,7 @@ export function notesFooter(
     }
   };
 
-  const form = (state: string): HTMLFormElement => {
+  const form = (forTarget: NoteTarget): HTMLFormElement => {
     const element = doc.createElement("form");
     const label = doc.createElement("label");
     label.textContent = "Add a note";
@@ -149,13 +156,13 @@ export function notesFooter(
     });
     element.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (!saving && draft.trim() !== "") void save(state, draft);
+      if (!saving && draft.trim() !== "") void save(forTarget, draft);
     });
     element.append(label, button);
     return element;
   };
 
-  const save = async (state: string, text: string) => {
+  const save = async (forTarget: NoteTarget, text: string) => {
     saving = true;
     justSaved = false;
     status = "";
@@ -163,7 +170,7 @@ export function notesFooter(
     const body = JSON.stringify({
       version: NOTES_VERSION,
       machine: context.machine.id,
-      target: { kind: "state", state },
+      target: forTarget,
       note: text,
     });
     const reason = await post(context.url, body);
@@ -186,9 +193,8 @@ export function notesFooter(
   void load();
 
   return (selection) => {
-    const next: StateTarget | undefined =
-      selection?.kind === "state" ? { kind: "state", state: selection.id } : undefined;
-    if (next?.state !== target?.state) {
+    const next = targetOf(selection, context.machine);
+    if (key(next) !== key(target)) {
       target = next;
       draft = "";
       status = "";
@@ -197,6 +203,37 @@ export function notesFooter(
     }
     return section;
   };
+}
+
+function key(target: NoteTarget | undefined): string {
+  return target === undefined ? "" : targetText(target);
+}
+
+function word(value: string): boolean {
+  return /^\S+$/.test(value);
+}
+
+/** What a click can carry a note: a state, or an arrow a handler draws. */
+function targetOf(
+  selection: ViewerSelection | undefined,
+  machine: VizMachine,
+): NoteTarget | undefined {
+  if (selection?.kind === "state") {
+    return word(selection.id) && !isAnyState(selection.id)
+      ? { kind: "state", state: selection.id }
+      : undefined;
+  }
+  if (selection?.kind !== "edge") return undefined;
+  const edge = machine.edges.find((each) => each.id === selection.id);
+  if (edge === undefined || (edge.kind !== "transition" && edge.kind !== "stay")) return undefined;
+  return word(edge.from) && word(edge.event)
+    ? { kind: "edge", from: edge.from, event: edge.event }
+    : undefined;
+}
+
+function targetLabel(target: NoteTarget): string {
+  if (target.kind === "state") return target.state;
+  return `${target.event} from ${isAnyState(target.from) ? "any state" : target.from}`;
 }
 
 function noteItem(doc: Document, each: Note): HTMLLIElement {
@@ -215,12 +252,12 @@ function noteItem(doc: Document, each: Note): HTMLLIElement {
   return item;
 }
 
-function noteList(doc: Document, state: string, notes: Note[]): HTMLElement {
-  const mine = notes.filter((each) => each.target?.kind === "state" && each.target.state === state);
+function noteList(doc: Document, target: NoteTarget, notes: Note[]): HTMLElement {
+  const mine = notes.filter((each) => key(each.target) === key(target));
   if (mine.length === 0) {
     const hint = doc.createElement("p");
     hint.className = "hint";
-    hint.textContent = `No notes on ${state} yet.`;
+    hint.textContent = `No notes on ${targetLabel(target)} yet.`;
     return hint;
   }
   const list = doc.createElement("ul");
