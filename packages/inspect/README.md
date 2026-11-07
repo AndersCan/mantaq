@@ -28,7 +28,7 @@ export default defineConfig({
 });
 ```
 
-Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the export name without `create` / `Actor` (`createCheckoutActor` → `checkout`).
+Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the export name without `create` / `Actor` (`createCheckoutActor` → `checkout`). `?machine=<a>&compare=<b>` shows two machines side by side, each with its own walk, for choosing between two drafts.
 
 The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
 

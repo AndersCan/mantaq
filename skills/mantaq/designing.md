@@ -32,7 +32,7 @@ Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the v
 
 ## 1. The machine in the code is the design
 
-Edit the real machine file and fix every caller the typechecker flags. Never make a sketch copy or a second file for the same machine.
+Edit the real machine file and fix every caller the typechecker flags. Never make a sketch copy or a second file for the same machine, unless the user asks for two designs (section 10).
 
 ## 2. Find the machine from plain words
 
@@ -84,3 +84,15 @@ Edit, save, run the test file, then reply in at most 3 lines: changed states and
 ## 9. Changing a singleton
 
 If the machine is a built instance, offer to convert it to an exported factory first (one change, its own step), then continue.
+
+## 10. Two designs, side by side
+
+Only when the user asks for two designs or alternatives. Otherwise section 1 holds.
+
+1. Files: `<feature>.design-a.machine.ts` and `<feature>.design-b.machine.ts`, next to where the real machine lives or will live. Export `create<Feature>DraftAActor` and `create<Feature>DraftBActor`, so the ids are `<feature>DraftA` and `<feature>DraftB`. Changing an existing machine: both drafts start as copies of it, and the real file stays untouched until the pick. No tests for drafts.
+2. Two real designs, equal effort, that differ in a decision the user cares about (who approves, what happens on expiry). Use the same state and event names wherever the domain is the same, so the user compares decisions, not names. JSDoc on both, as in section 4. Never recommend one unless asked.
+3. Serve both: pass both files to the repo's live-page script, or check that the `machines` glob matches them (widen the glob; do not move the files).
+4. Before sending the link: the typecheck passes, the server output has no `[mantaq-viz]` line for either file, and `curl -s <Local URL>__mantaq/viz.json` lists both ids. Otherwise fix first.
+5. Reply in at most 4 lines: `Two drafts ready, both typecheck.`, then one line per design (`A (<what it chooses>): <n> states, <m> edges.`), then `Compare: <Local URL>__mantaq/?machine=<feature>DraftA&compare=<feature>DraftB`. Needs `@mantaq/inspect` 0.10 or later; older pages ignore `compare=` and show design A only.
+6. Feedback on one design: edit that draft. The page redraws and keeps both walks.
+7. The pick ("keep A", "the first"): move the kept draft into the real machine file (existing feature) or a new file named the repo's way (new feature), rename the export to the real name, fix every caller the typechecker flags, delete both draft files, then run the section 8 checks. Reply in at most 3 lines: the file, the checks that passed, and `<Local URL>__mantaq/?machine=<id>`. If the pick is unclear, ask one question. If the user drops both, delete the drafts and say so in one line. Never leave a draft file behind.

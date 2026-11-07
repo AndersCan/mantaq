@@ -219,3 +219,113 @@ describe("mountDriven runs by name", () => {
     expect(root.querySelector("[data-run-missing]")).toBeNull();
   });
 });
+
+describe("compare", () => {
+  const create = () => {
+    const clock = VirtualClock();
+    return { actor: createCheckoutActor(clock), clock };
+  };
+  const targets = { checkout: create, second: create };
+  const current = (root: Element) =>
+    root.querySelector<HTMLElement>(".explore")?.dataset["current"];
+
+  async function twoText(): Promise<string> {
+    const doc = JSON.parse(await documentText());
+    doc.machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
+    return JSON.stringify(doc);
+  }
+
+  async function draw(search: string, text?: string): Promise<HTMLElement> {
+    history.replaceState(null, "", search);
+    const body = text ?? (await twoText());
+    const root = document.createElement("div");
+    document.body.append(root);
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(body)) as typeof fetch;
+    try {
+      await mountLiveDriven(root, { source: "/viz.json", targets });
+    } finally {
+      globalThis.fetch = original;
+    }
+    return root;
+  }
+  const texts = (root: ParentNode, selector: string) =>
+    [...root.querySelectorAll(selector)].map((each) => each.textContent);
+  const section = (root: ParentNode, design: string) =>
+    root.querySelector(`section.compare-design[data-design="${design}"]`) as HTMLElement;
+
+  test("two ids show Design A and Design B side by side", async () => {
+    const root = await draw("?machine=checkout&compare=second");
+    expect(texts(root, "h1")).toEqual(["Compare designs"]);
+    expect(
+      [...root.querySelectorAll<HTMLElement>("section.compare-design")].map(
+        (each) => each.dataset["design"],
+      ),
+    ).toEqual(["a", "b"]);
+    expect(texts(root, "h2")).toEqual(["Design A", "Design B"]);
+    expect(texts(root, "h3").filter((t) => t?.startsWith("Viz: "))).toEqual([
+      "Viz: checkout",
+      "Viz: second",
+    ]);
+    expect(root.querySelector("nav.machines")).toBeNull();
+    expect(section(root, "a").querySelector("[data-send]")).not.toBeNull();
+    expect(section(root, "b").querySelector("[data-send]")).not.toBeNull();
+  });
+
+  test("a design not in the document shows a notice in its column and never another machine", async () => {
+    const root = await draw("?machine=checkout&compare=nope");
+    expect(section(root, "b").querySelector(".compare-missing")?.textContent).toBe(
+      "Design B: nope is not on this page. Ask your agent to check the dev server output.",
+    );
+    expect(section(root, "b").querySelector("h3")).toBeNull();
+    expect(section(root, "a").querySelector("h3")?.textContent).toBe("Viz: checkout");
+    expect(root.textContent).not.toContain("Viz: second");
+  });
+
+  test("neither design in the document shows one notice", async () => {
+    const root = await draw("?machine=x&compare=y");
+    expect(root.querySelector("section.compare-design")).toBeNull();
+    expect(texts(root, ".compare-missing")).toEqual([
+      "Neither draft is on this page. Ask your agent to check the dev server output.",
+    ]);
+  });
+
+  test("compare equal to machine, or without machine, is the single viewer", async () => {
+    for (const search of ["?machine=checkout&compare=checkout", "?compare=second"]) {
+      const root = await draw(search);
+      expect(root.querySelector("nav.machines")).not.toBeNull();
+      expect(root.querySelector("section.compare-design")).toBeNull();
+    }
+  });
+
+  test("each design keeps its own walk in the URL across a redraw", async () => {
+    const root = await draw("?machine=checkout&compare=second");
+    const walk = (column: HTMLElement) => {
+      const start = current(column);
+      for (const send of column.querySelectorAll<HTMLElement>("[data-send]")) {
+        if (current(column) !== start) break;
+        send.click();
+      }
+    };
+    const startA = current(section(root, "a"));
+    walk(section(root, "b"));
+    const params = () => new URLSearchParams(location.search);
+    expect(params().getAll("stepB").length).toBeGreaterThan(0);
+    expect(params().getAll("step").length).toBe(0);
+    const stepB = params().getAll("stepB");
+    walk(section(root, "a"));
+    expect(params().getAll("step").length).toBeGreaterThan(0);
+    expect(params().getAll("stepB")).toEqual(stepB);
+    expect(params().get("compare")).toBe("second");
+    const after = [current(section(root, "a")), current(section(root, "b"))];
+    expect(after[0]).not.toBe(startA);
+
+    const again = await draw(location.search);
+    expect([current(section(again, "a")), current(section(again, "b"))]).toEqual(after);
+  });
+
+  test("an invalid document in compare mode lists its issues", async () => {
+    const root = await draw("?machine=checkout&compare=second", "{}");
+    expect(root.textContent).toContain("Cannot show");
+  });
+});
