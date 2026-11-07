@@ -6,16 +6,18 @@ Proven recipes. Code is a sketch. Copy the shape, not the exact signatures: chec
 
 State enters "working", effect runs the async job, emits internal event, transition completes.
 
+const fillingForm = state("fillingForm")();
+
 ```ts
 const submitting = state("submitting")();
-const success = state("success")().final();
+const submitted = state("submitted")().final();
 const submittingDone = event("SUBMITTING_DONE")();
 
 Actor({
   inputs: [submit],
   internal: [submittingDone],
-  states: [idle, submitting, success],
-  initial: idle,
+  states: [fillingForm, submitting, submitted],
+  initial: fillingForm,
   clock: VirtualClock(),
   setup: (m) => {
     m.effect(submitting, {
@@ -24,8 +26,8 @@ Actor({
     });
     m.on(submitting, {
       event: submittingDone,
-      to: [success],
-      handler: () => ({ state: success }),
+      to: [submitted],
+      handler: () => ({ state: submitted }),
     });
   },
 });

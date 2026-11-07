@@ -81,7 +81,7 @@ import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@ma
 const target = { id: "inviteLink", create: () => createInviteLinkActor({ clock: VirtualClock() }) };
 expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, dead ends, unreachable states
 expectAllStatesReached(target);
-expectReached(target, { transitions: [{ from: "pending", event: "ACCEPT" }] });
+expectReached(target, { transitions: [{ from: "waitingForAnswer", event: "ACCEPT" }] });
 expectNoDesignErrors({ ...target, fuzz: false }); // structure only, no fuzzing
 ```
 
