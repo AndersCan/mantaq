@@ -149,6 +149,7 @@ function fakeDriver(): VizDriver {
     state,
     steps,
     last,
+    after: [],
     timers: [],
     context: { n: steps.length },
   });
@@ -253,7 +254,7 @@ describe("mountViewer with a driver", () => {
     send(root, "go");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
     expect(root.querySelector('[data-outcome="transition"]')?.textContent).toContain("open → done");
-    expect(root.querySelector("[data-live-effects]")?.textContent).toBe("Effects run: closeUp");
+    expect(root.querySelector("[data-live-effects]")?.textContent).toBe("Effects started: closeUp");
     expect(root.querySelector("[data-live-context]")?.textContent).toBe('{\n  "n": 1\n}');
     expect(root.querySelector(".graph g[data-node-id='done']")?.classList).toContain("current");
   });
@@ -287,7 +288,7 @@ describe("mountViewer with a driver", () => {
     send(root, "peek");
     expect(root.querySelector('[data-outcome="stay"]')?.textContent).toContain("stays");
     send(root, "idle");
-    expect(root.querySelector('[data-outcome="ignored"]')?.textContent).toContain("no handler");
+    expect(root.querySelector('[data-outcome="ignored"]')?.textContent).toContain("Nothing ran.");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 
