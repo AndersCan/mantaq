@@ -1,4 +1,4 @@
-import type { VizFuzzError, VizStep } from "@mantaq/viz";
+import type { VizFailedExpectation, VizFuzzError, VizStep } from "@mantaq/viz";
 import { mutate } from "./mutate.ts";
 import type { LiteralPool, MutationContext, Parent } from "./mutate.ts";
 import { createRng } from "./rng.ts";
@@ -36,6 +36,8 @@ export interface FuzzResult {
   /** Feature -> iteration that first reached it. */
   firstHit: Map<string, number>;
   errors: VizFuzzError[];
+  /** In `FuzzTarget.expectations` order; empty when none were written or all held. */
+  failedExpectations: VizFailedExpectation[];
 }
 
 function covers(target: FuzzTarget, steps: ReadonlyArray<VizStep>, wanted: ReadonlyArray<string>) {
@@ -95,6 +97,22 @@ function collectErrors(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): 
   );
 }
 
+function failedExpectations(
+  target: FuzzTarget,
+  context: { kept: ReadonlyArray<CorpusEntry>; firstHit: ReadonlyMap<string, number> },
+): VizFailedExpectation[] {
+  return (target.expectations ?? []).flatMap((each): VizFailedExpectation[] => {
+    const { kind, state } = each;
+    const match = each.text;
+    if (kind === "mustSee") {
+      return context.firstHit.has(each.feature) ? [] : [{ kind, state, match, steps: null }];
+    }
+    const entry = context.kept.find((candidate) => candidate.discovered.includes(each.feature));
+    if (entry === undefined) return [];
+    return [{ kind, state, match, steps: shrink(target, entry.steps, [each.feature]) }];
+  });
+}
+
 /**
  * Coverage-guided fuzzing. Each iteration mutates a corpus entry, runs it on a
  * fresh actor and keeps it if it reaches a feature (state, edge, stay, error)
@@ -143,5 +161,6 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
     corpus: kept,
     firstHit,
     errors: collectErrors(target, kept),
+    failedExpectations: failedExpectations(target, { kept, firstHit }),
   };
 }

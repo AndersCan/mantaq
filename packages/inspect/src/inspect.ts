@@ -7,6 +7,7 @@ import type { AnalysisSource } from "./ast/program.ts";
 import { withTestCoverage } from "./fuzz/coverage.ts";
 import { fuzz } from "./fuzz/fuzz.ts";
 import { guidance } from "./fuzz/guided.ts";
+import { contextText } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import { fuzzedMachine } from "./fuzz/to-viz.ts";
 import { toVizMachine } from "./structure.ts";
@@ -14,6 +15,8 @@ import { DEFAULT_SEED } from "@mantaq/pbt";
 import { Either } from "@mantaq/utils";
 import { VirtualClock } from "@mantaq/core";
 import type { AnyActor, Clock } from "@mantaq/core";
+import { checkExpectations } from "./expectations.ts";
+import type { AnyExpectations, CheckedExpectation } from "./expectations.ts";
 import { normalizeRun, readRuns } from "./runs.ts";
 import type { RecordedRuns } from "./runs.ts";
 import { dirname, join } from "node:path";
@@ -39,6 +42,8 @@ export interface InspectTarget {
   tests?: ReadonlyArray<VizRun>;
   /** `false` = structure only. */
   fuzz?: false | FuzzSettings;
+  /** Contexts that are a bug in a state (`neverSee`) or that some run must reach (`mustSee`). */
+  expectations?: AnyExpectations;
 }
 
 export interface Inspected {
@@ -66,6 +71,7 @@ function warningsOf(machine: VizMachine): string[] {
 function runner(
   target: InspectTarget,
   payloads: Readonly<Record<string, ReadonlyArray<VizJson>>>,
+  expectations: ReadonlyArray<CheckedExpectation>,
 ): Either<string, FuzzTarget> {
   if (!isVirtualClock(target.create().clock)) {
     return Either.left("not fuzzed: the actor does not run on a VirtualClock");
@@ -77,6 +83,7 @@ function runner(
       return { actor, clock: isVirtualClock(actor.clock) ? actor.clock : VirtualClock() };
     },
     payloads,
+    ...(expectations.length === 0 ? {} : { expectations }),
   });
 }
 
@@ -122,6 +129,22 @@ function driven(
   return { machine, skipped: [] };
 }
 
+/** Why written expectations are not checked, if they are not. */
+function uncheckedExpectations(
+  target: InspectTarget,
+  context: {
+    expected: { checked: ReadonlyArray<CheckedExpectation> };
+    run: Either<string, FuzzTarget>;
+    structure: VizMachine;
+  },
+): string[] {
+  if (context.expected.checked.length === 0) return [];
+  if (target.fuzz === false) return ["expectations not checked: fuzzing is off"];
+  if (Either.isLeft(context.run)) return [`expectations not checked: ${context.run[0]}`];
+  const fresh = context.run[1].create().actor;
+  return contextText(fresh) === null ? ["expectations not checked: the context is not JSON"] : [];
+}
+
 function inspectWith(
   target: InspectTarget,
   analysis: Either<string, ModuleAnalysis> | null,
@@ -129,15 +152,26 @@ function inspectWith(
   const annotate = annotator(target, analysis);
   const inferred = Either.getRight(analysis ?? Either.left("none"))?.payloads ?? {};
   const structure = annotate(toVizMachine({ id: target.id, actor: target.create() }));
-  const run = runner(target, { ...inferred, ...target.payloads });
+  const expected = checkExpectations(
+    target.expectations,
+    structure.states.filter((each) => each.region === null).map((each) => each.id),
+  );
+  const run = runner(target, { ...inferred, ...target.payloads }, expected.checked);
   const { machine, skipped } = driven(target, { structure, run });
+  const unchecked = uncheckedExpectations(target, { expected, run, structure });
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
     analysis === null ? [] : [Either.getLeft(analysis)].filter((each) => each !== undefined);
   const annotated = annotate({ ...machine, runs: [...(target.tests ?? [])] });
   return {
     machine: annotated,
-    warnings: [...unanalyzed, ...(quiet ? [] : skipped), ...warningsOf(annotated)],
+    warnings: [
+      ...unanalyzed,
+      ...expected.warnings,
+      ...unchecked,
+      ...(quiet ? [] : skipped),
+      ...warningsOf(annotated),
+    ],
   };
 }
 
@@ -148,6 +182,25 @@ function inspectWith(
  */
 export function inspect(target: InspectTarget): Inspected {
   return inspectWith(target, target.source === undefined ? null : analyzeModule(target.source));
+}
+
+function isExpectations(value: unknown): value is AnyExpectations {
+  return typeof value === "object" && value !== null;
+}
+
+/** An export named `...Expectations` that no machine claims. */
+function unclaimed(
+  file: string,
+  exports: Readonly<Record<string, unknown>>,
+  ids: ReadonlyArray<string>,
+): string[] {
+  const claimed = ids.map((id) => `${id}Expectations`);
+  return Object.keys(exports)
+    .filter((name) => name.endsWith("Expectations") && !claimed.includes(name))
+    .map(
+      (name) =>
+        `${file}: ${name} matches no machine; name it <machine id>Expectations (machines: ${ids.join(", ")})`,
+    );
 }
 
 /** Directory of the nearest package.json above `file`: locations are reported relative to it. */
@@ -207,7 +260,7 @@ function replayedRuns(
 ): { runs: VizRun[]; warnings: string[] } {
   const found = recorded[id] ?? [];
   if (found.length === 0) return { runs: [], warnings: [] };
-  const run = runner({ id, create }, {});
+  const run = runner({ id, create }, {}, []);
   if (Either.isLeft(run)) return { runs: [], warnings: [`runs not shown: ${run[0]}`] };
   const results = found.map((each) => ({ each, result: normalizeRun(run[1], each) }));
   return {
@@ -277,12 +330,14 @@ export async function inspectModule(
                 : ["runs not shown: exported as one actor, so they cannot be replayed safely"],
           }
         : replayedRuns(id, create, recorded);
+    const claimed = exports[`${id}Expectations`];
     const inspected = inspectWith(
       {
         id,
         create,
         source,
         fuzz: fuzzSettings,
+        ...(claimed === undefined || !isExpectations(claimed) ? {} : { expectations: claimed }),
         ...(replayed.runs.length === 0 ? {} : { tests: replayed.runs }),
       },
       analysis,
@@ -300,6 +355,11 @@ export async function inspectModule(
     machines: results.flatMap((result) => (result.machine === null ? [] : [result.machine])),
     warnings: [
       ...runWarnings.map((warning) => `${file}: ${warning}`),
+      ...unclaimed(
+        file,
+        exports,
+        chosen.map((each) => machineId(each.name)),
+      ),
       ...results.flatMap((result) => result.warnings),
     ],
   };
