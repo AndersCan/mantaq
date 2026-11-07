@@ -5,7 +5,7 @@
 Bind a mantaq actor into a [lit-html](https://lit.dev/docs/libraries/standalone-templates/) template with one function, `watch(actor, select)`. It renders `select(snapshot)` now and again on every change, synchronously, so the DOM is current when `send` returns.
 
 ```sh
-pnpm add @mantaq/lit lit-html
+npm install @mantaq/core @mantaq/lit lit-html
 ```
 
 ## Quick start
@@ -13,7 +13,32 @@ pnpm add @mantaq/lit lit-html
 ```ts
 import { html, render } from "lit-html";
 import { repeat } from "lit-html/directives/repeat.js";
+import { Actor, state, event } from "@mantaq/core";
 import { watch } from "@mantaq/lit";
+
+type Todo = { id: string; text: string };
+
+const editing = state("editing")();
+const add = event("ADD")<Todo>();
+const initialContext: { items: Todo[] } = { items: [] };
+
+const todos = Actor({
+  inputs: [add],
+  states: [editing],
+  initial: editing,
+  context: initialContext,
+  setup: (m) => {
+    m.on(editing, {
+      event: add,
+      handler: (event, { context }) => {
+        const s = context.get();
+        s.items.push(event.payload);
+        context.set(s);
+        return {};
+      },
+    });
+  },
+});
 
 const row = (t: Todo) => html`<li data-id=${t.id}><span>${t.text}</span></li>`;
 
@@ -23,6 +48,8 @@ render(
   </ul>`,
   document.body,
 );
+
+todos.send(add.create({ id: "1", text: "Write docs" })); // the list now has one row
 ```
 
 `watch` subscribes while the part is connected and unsubscribes when it is cleared. Passing a new inline `select` on each render does not resubscribe, and the latest `select` is the one used. Passing a different actor moves the subscription.

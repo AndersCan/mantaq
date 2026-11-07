@@ -6,15 +6,21 @@
  *          pages exists in the canonical registry (checkout example).
  * Gate B — API truth. Every @mantaq/* import in docs is a real package export.
  * Gate C — Canonical example typechecks (packages/examples).
+ * Gate D — README snippets typecheck. Every ```ts block in README.md and
+ *          packages/<pkg>/README.md compiles against the workspace packages.
+ *          Opt out (rare: intentionally partial snippets) with
+ *          `<!-- docs-check: skip -->` on the line before the fence.
  *
  * Narrative pages: all of apps/docs/src/content/docs except reference/*.
  * Reference pages are exempt from Gate A but still checked by Gate B.
  */
 
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
   extractExports,
+  extractTsBlocks,
   extractIds,
   extractImports,
   read,
@@ -133,6 +139,92 @@ if (tsc.status === 0) {
   pass("packages/examples typechecks");
 } else {
   fail("packages/examples failed typecheck:\n" + tsc.stdout + tsc.stderr);
+}
+
+// ── Gate D: README snippets typecheck ─────────────────────────────────────
+console.log("Gate D — README snippets typecheck");
+
+const SNIPPET_DIR = join(ROOT, "node_modules/.cache/mantaq-readme-snippets");
+rmSync(SNIPPET_DIR, { recursive: true, force: true });
+mkdirSync(join(SNIPPET_DIR, "node_modules/@mantaq"), { recursive: true });
+mkdirSync(join(SNIPPET_DIR, "node_modules/@types"), { recursive: true });
+
+const readmes = [join(ROOT, "README.md")];
+for (const dir of readdirSync(join(ROOT, "packages"))) {
+  const pkgDir = join(ROOT, "packages", dir);
+  const pkgJson = join(pkgDir, "package.json");
+  if (!existsSync(pkgJson)) continue;
+  const name = JSON.parse(read(pkgJson)).name;
+  if (name?.startsWith("@mantaq/")) {
+    symlinkSync(pkgDir, join(SNIPPET_DIR, "node_modules", name), "dir");
+  }
+  if (existsSync(join(pkgDir, "README.md"))) readmes.push(join(pkgDir, "README.md"));
+}
+// Third-party modules README snippets import, borrowed from the package that depends on them.
+for (const [module, owner] of [
+  ["vitest", "core"],
+  ["vite", "core"],
+  ["@types/node", "core"],
+  ["lit-html", "lit"],
+]) {
+  const target = join(ROOT, "packages", owner, "node_modules", module);
+  symlinkSync(target, join(SNIPPET_DIR, "node_modules", module), "dir");
+}
+
+const snippetOrigin = new Map();
+let skipped = 0;
+for (const readme of readmes) {
+  const slug = relative(ROOT, readme).replace(/[^\w]+/g, "_");
+  for (const block of extractTsBlocks(read(readme))) {
+    if (block.skip) {
+      skipped++;
+      continue;
+    }
+    const file = `${slug}__L${block.line}.ts`;
+    snippetOrigin.set(file, `${relative(ROOT, readme)}:${block.line}`);
+    writeFileSync(join(SNIPPET_DIR, file), block.code + "\n");
+  }
+}
+writeFileSync(join(SNIPPET_DIR, "package.json"), JSON.stringify({ type: "module" }));
+writeFileSync(
+  join(SNIPPET_DIR, "tsconfig.json"),
+  JSON.stringify({
+    compilerOptions: {
+      target: "esnext",
+      lib: ["es2023", "dom", "dom.iterable"],
+      moduleDetection: "force",
+      module: "nodenext",
+      moduleResolution: "nodenext",
+      types: ["node", "vite/client"],
+      strict: true,
+      noEmit: true,
+      allowImportingTsExtensions: true,
+      isolatedModules: true,
+      verbatimModuleSyntax: true,
+      skipLibCheck: true,
+    },
+    include: ["*.ts"],
+  }),
+);
+
+const snippetTsc = spawnSync(
+  join(ROOT, "packages/examples/node_modules/.bin/tsc"),
+  ["-p", SNIPPET_DIR, "--pretty", "false"],
+  { encoding: "utf8" },
+);
+if (snippetTsc.status === 0) {
+  pass(`${snippetOrigin.size} README snippets typecheck (${skipped} opted out)`);
+} else {
+  const output = (snippetTsc.stdout + snippetTsc.stderr).replace(
+    /(?:[^\s(]*\/)?(?<file>\w+__L(?<blockLine>\d+)\.ts)\((?<line>\d+),(?<col>\d+)\)/g,
+    (...match) => {
+      const { file, blockLine, line, col } = match.at(-1);
+      const origin = snippetOrigin.get(file) ?? file;
+      const readmeLine = Number(blockLine) + Number(line);
+      return `${origin.split(":")[0]}:${readmeLine}:${col} (block at line ${blockLine})`;
+    },
+  );
+  fail("README snippets failed typecheck:\n" + output);
 }
 
 console.log("");

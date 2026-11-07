@@ -33,6 +33,9 @@ A built-in fuzzer sends random event sequences to every machine and reports stat
 - **sugar**. Convenience helpers: batch state/event creation, matching, effect utilities, dynamic children.
 - **traversal**. Graph build, coverage instrumentation, and history for testing state machines.
 - **test**. Test harness and coverage assertions for actor behavior.
+- **inspect**. Vite plugin and Astro integration: draws every exported machine, fuzzes it, live page at `/__mantaq/`.
+- **viz**. Browser viewer for the viz document `inspect` produces. Walk the graph step by step.
+- **lit**. `watch(actor, select)` binds an actor into a lit-html template.
 - **pbt**. Seeded property-based testing helpers (generators, `runProperty`).
 - **utils**. Shared internal utilities.
 - **examples**. Real working examples (checkout, auth, saga, event sourcing, undo/redo, and more).
@@ -69,14 +72,20 @@ const checkout = Actor({
   states: [basicInfo, payment, success],
   initial: basicInfo,
   setup: (m) => {
-    m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
-    m.on(payment, submitPayment, () => ({ state: success }));
+    m.on(basicInfo, {
+      event: submitBasicInfo,
+      to: [payment],
+      handler: () => ({ state: payment }),
+    });
+    m.on(payment, { event: submitPayment, to: [success], handler: () => ({ state: success }) });
   },
 });
 
 checkout.send(submitBasicInfo.create());
-checkout.snapshot().path[0]; // "payment"
+checkout.state.name; // "payment"
 ```
+
+See it drawn: add `@mantaq/inspect` to your Vite config ([how](packages/core/README.md#see-your-machine)).
 
 ## Docs
 
@@ -86,7 +95,9 @@ page. Entity IDs are fixed: the same states and events everywhere.
 
 - Canonical example: `packages/examples/checkout.test.ts`
 - `vp run docs:check`. Verifies docs use only canonical IDs, imports match real
-  package exports, and the canonical example typechecks.
+  package exports, the canonical example typechecks, and every `ts` block in
+  `README.md` and `packages/*/README.md` typechecks (opt out a partial snippet
+  with `<!-- docs-check: skip -->` on the line before its fence; keep it rare).
 - `docs/canonical-example.mdx`. Entity-ID registry the docs check reads.
 
 ## Skills
@@ -132,7 +143,10 @@ mantaq/
 │   ├── core/        # State machine runtime
 │   ├── sugar/       # Convenience helpers
 │   ├── traversal/   # Graph + coverage testing tools
-│   ├── test/        # Test harness
+│   ├── testkit/     # Test harness (@mantaq/test)
+│   ├── inspect/     # Vite/Astro diagram + fuzzer
+│   ├── viz/         # Diagram viewer
+│   ├── lit/         # lit-html binding
 │   ├── pbt/         # Seeded property-based testing helpers
 │   ├── utils/       # Shared utilities
 │   └── examples/    # Usage examples

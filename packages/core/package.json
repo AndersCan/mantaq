@@ -2,6 +2,21 @@
   "name": "@mantaq/core",
   "version": "0.6.0",
   "description": "State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock.",
+  "keywords": [
+    "actor",
+    "actor-model",
+    "deterministic",
+    "fsm",
+    "mantaq",
+    "state-machine",
+    "statechart",
+    "typescript",
+    "virtual-clock"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -6,7 +6,26 @@ Draws a Mantaq machine in the browser and lets you walk it. Input is a viz docum
 - `@mantaq/viz/viewer`: `mountViewer(root, document)` / `mountVizText(root, { source, text })` to embed it in a page, plus `@mantaq/viz/viewer.css`.
 - `@mantaq/viz/standalone`, `@mantaq/viz/live`: whole-page entries used by the Vite plugin (live page).
 
-Dev page with the bundled examples: `vp run viz:export`, then `cd packages/viz && vp dev`. It loads `examples/examples.json`, `?src=<url>`, or a picked file.
+Most apps never import this package directly: add the [`@mantaq/inspect`](https://www.npmjs.com/package/@mantaq/inspect) Vite plugin and open `/__mantaq/` on your dev server (`npx vite` or `npm run dev`).
+
+## Embed the viewer
+
+```sh
+npm install @mantaq/viz
+```
+
+```ts
+import { mountVizText } from "@mantaq/viz/viewer";
+import "@mantaq/viz/viewer.css";
+
+const root = document.getElementById("viz");
+if (root) {
+  const text = await (await fetch("/viz.json")).text(); // a document from @mantaq/inspect
+  mountVizText(root, { source: "/viz.json", text });
+}
+```
+
+`mountVizText` validates the JSON and lists every issue in place of the diagram when it is not a current viz document. `mountViewer(root, document)` takes an already-parsed document.
 
 ## Walking the graph
 
@@ -49,3 +68,7 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 - **examples + fuzz** (`reached`): neither an example nor fuzzing reached this. The default when both sources are present, and the same merge `expectReached` uses. Fix a miss by adding an example to `tests`.
 - **example tests** (`tested`): no test exercises this. It is the classic "what is untested" view. Supply the event sequences your tests send (`inspect({ tests })`).
 - **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
+
+## Contributing (repo only)
+
+Dev page with the bundled examples, from the [mantaq repo](https://github.com/AndersCan/mantaq): `vp run viz:export`, then `vp dev` in `packages/viz`. It loads `examples/examples.json`, `?src=<url>`, or a picked file.

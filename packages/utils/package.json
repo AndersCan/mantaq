@@ -2,6 +2,18 @@
   "name": "@mantaq/utils",
   "version": "0.0.5",
   "description": "Zero-dependency utility library — Either type as a [left, right] tuple.",
+  "keywords": [
+    "actor",
+    "either",
+    "mantaq",
+    "state-machine",
+    "typescript",
+    "utilities"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

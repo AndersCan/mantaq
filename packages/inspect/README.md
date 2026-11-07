@@ -4,6 +4,14 @@ Turns your Mantaq machine into a picture you can walk: add the Vite plugin, no o
 
 It finds every exported actor, or function that builds one, from the file's types. It reads handler explanations and sample payloads from the source, fuzzes each machine that runs on a `VirtualClock`, and shows them in a live page on your Vite dev server. The viewer is [`@mantaq/viz`](../viz/README.md).
 
+## Install
+
+```sh
+npm install -D @mantaq/inspect vite
+```
+
+`vite` is a peer dependency; `vitest` (for `@mantaq/inspect/record`) and `astro` are optional peers.
+
 ## Ways in
 
 **Gate in tests**: see the docs page "Design gate in vitest" for `expectNoDesignErrors`, `expectReached` and `expectAllStatesReached`.
@@ -12,13 +20,15 @@ It finds every exported actor, or function that builds one, from the file's type
 
 ```ts
 // vite.config.ts
+import { defineConfig } from "vite";
 import { mantaqViz } from "@mantaq/inspect/vite";
 
 export default defineConfig({
   plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })],
 });
-// open /__mantaq/ while `vp dev` runs
 ```
+
+Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the export name without `create` / `Actor` (`createCheckoutActor` → `checkout`).
 
 The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
 
@@ -68,6 +78,9 @@ import Machines from "@mantaq/inspect/astro/Machines.astro";
 ```ts
 import { inspect, vizDocument } from "@mantaq/inspect";
 import { serializeViz } from "@mantaq/viz";
+import type { AnyActor } from "@mantaq/core";
+
+declare function createCart(): AnyActor<unknown>;
 
 const { machine, warnings } = inspect({
   id: "cart",
@@ -110,7 +123,7 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 
 **AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { event, handler })` / `m.onAny({ event, handler })` and resolves names from the literal types of `state.name` / `event.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. A specific `on` wins over `onAny`, as at runtime.
 
-**Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See `docs/atlas/phase5-comparison.md`.
+**Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See [`docs/atlas/phase5-comparison.md`](https://github.com/AndersCan/mantaq/blob/main/docs/atlas/phase5-comparison.md).
 
 ## Record runs from your tests
 
@@ -118,6 +131,9 @@ In a vitest file, wrap the factory once and your tests become runs:
 
 ```ts
 import { recordRuns } from "@mantaq/inspect/record";
+import type { AnyActor, VirtualClock } from "@mantaq/core";
+
+declare function createInviteLinkActor(clock?: VirtualClock): AnyActor<unknown>;
 
 const make = recordRuns(createInviteLinkActor);
 ```
@@ -135,11 +151,15 @@ Every passing test that builds an actor with `make` writes its events and clock 
 - **History** cannot distinguish an ignored event from a self-loop. The fuzzer can (`stay` vs `transition`), but probe-only coverage cannot.
 - **Fuzzing is not proof.** An edge that is absent was not reached; it is not shown to be impossible.
 
-## Fixtures
+## Contributing (repo only)
+
+These sections apply to the [mantaq repo](https://github.com/AndersCan/mantaq), not to the npm package.
+
+### Fixtures
 
 `src/fixtures/{checkout,auth,saga}.ts` copy the handlers of `packages/examples/*.test.ts` verbatim, with effects stubbed. The examples live in test files and cannot be imported, so the copies can drift from them. `credit.ts` (conditional handlers, far literals), `retry.ts` (context counter, `attempts > 10`) and `switchy.ts` (unsupported control flow) exist for the AST, loop and guidance tests.
 
-## Repo scripts
+### Repo scripts
 
 ```sh
 vp run viz:export     # bundled examples -> packages/viz/public/examples/*.json (the viz dev page loads them)

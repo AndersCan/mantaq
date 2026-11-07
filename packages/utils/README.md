@@ -15,12 +15,14 @@ const ok = Either.right({ done: true });
 
 Either.isRight(ok); // true
 Either.getRight(ok); // { done: true }
-Either.map(ok, (v) => v.done); // [undefined, true]
+Either.map(ok, { onRight: (v) => v.done }); // [undefined, true]
 ```
 
 A right with nothing to carry is `Either.right()`, typed `Right<void>`:
 
 ```ts
+import { Either } from "@mantaq/utils";
+
 const done: Either<Error, void> = Either.right(); // [undefined, undefined]
 Either.isRight(done); // true
 ```

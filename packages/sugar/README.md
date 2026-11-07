@@ -1,15 +1,11 @@
 # @mantaq/sugar
 
-Convenience helpers for [@mantaq/core](../core) actors. State/event batching, pattern matching, effect utilities, and dynamic child management.
+Convenience helpers for [@mantaq/core](https://www.npmjs.com/package/@mantaq/core) actors. State/event batching, pattern matching, effect utilities, and dynamic child management.
 
 ## Install
 
 ```bash
-npm install @mantaq/sugar
-# or
-pnpm add @mantaq/sugar
-# or
-yarn add @mantaq/sugar
+npm install @mantaq/core @mantaq/sugar
 ```
 
 ## Quick Start
@@ -21,23 +17,23 @@ import { Actor, VirtualClock } from "@mantaq/core";
 const s = states("idle", "loading", "success", "error");
 const e = events("fetch", "resolve", "fail");
 
-const clock = new VirtualClock();
+const clock = VirtualClock();
 
-const machine = new Actor({
+const machine = Actor({
   inputs: [e.fetch],
   internal: [e.resolve, e.fail],
-  context: {},
   states: [s.idle, s.loading, s.success, s.error],
   initial: s.idle,
   clock,
   setup: (m) => {
-    m.on(s.idle, e.fetch, () => ({ state: s.loading }));
+    m.on(s.idle, { event: e.fetch, to: [s.loading], handler: () => ({ state: s.loading }) });
     m.effect(s.loading, {
       name: "startFetchTimeout",
-      fn: (input) => withTimeout(2000, input, () => e.resolve.create()),
+      sends: [e.resolve],
+      fn: (input) => withTimeout(2000, { input, event: () => e.resolve.create() }),
     });
-    m.on(s.loading, e.resolve, () => ({ state: s.success }));
-    m.on(s.loading, e.fail, () => ({ state: s.error }));
+    m.on(s.loading, { event: e.resolve, to: [s.success], handler: () => ({ state: s.success }) });
+    m.on(s.loading, { event: e.fail, to: [s.error], handler: () => ({ state: s.error }) });
   },
 });
 
@@ -52,113 +48,90 @@ matches(machine, "success"); // true
 
 ### Type-safe state groups with `states()`
 
-Use `states()` to create a record of `StateRef`s with full type safety. The returned keys match the input strings exactly.
+`states()` returns a record of `StateRef`s. The keys match the input strings exactly; `{ name, final: true }` makes a final state.
 
 ```ts
 import { states } from "@mantaq/sugar";
 
-const s = states("idle", "loading", "success", "error");
+const s = states("idle", "loading", { name: "success", final: true });
 
 s.idle.name; // "idle"
-s.success.final(); // StateRef with isFinal = true
-
-const actor = new Actor({
-  states: [s.idle, s.loading, s.success, s.error],
-  initial: s.idle,
-  // ...
-});
+s.success.isFinal; // true
 ```
 
-**Anti-pattern:** Creating states manually without `states()` and losing type safety:
-
-```ts
-import { state } from "@mantaq/core";
-
-const idle = state("idle")();
-const loading = state("loading")();
-const success = state("success")();
-const error = state("error")();
-// No single record — easy to miss one, no autocomplete, no compile check
-```
-
-`states()` guarantees all names exist as typed keys. Manual creation requires you to keep references in sync yourself.
+Creating states one by one with `state("idle")()` works too, but there is no single record: easy to miss one, and no autocomplete over the group.
 
 ### Type-safe event groups with `events()`
 
-Same as `states()` but for events. Creates a typed record with `.create()`, `.is()`, and other `EventRef` methods.
+Same as `states()` but for payload-less events. Each entry is an `EventRef` with `.create()` and `.is()`.
 
 ```ts
 import { events } from "@mantaq/sugar";
 
 const e = events("fetch", "resolve", "fail");
 
-e.fetch.create(); // { type: "fetch" }
-e.resolve.is(emittedEvent); // boolean
-
-const actor = new Actor({
-  inputs: [e.fetch],
-  internal: [e.resolve],
-  // ...
-});
+const sent = e.fetch.create(); // { type: "fetch" }
+e.resolve.is(sent); // false
 ```
 
-**Anti-pattern:** Scattering event refs across files without a shared group:
-
-```ts
-import { event } from "@mantaq/core";
-
-const fetchEvent = event("fetch")();
-const resolveEvent = event("resolve")();
-const failEvent = event("fail")();
-// No single source of truth — naming drift, typos not caught
-```
-
-`events()` creates a single typed object. Any typo in a key is a compile error.
+Events that carry a payload still use `event("ID")<Payload>()` from core.
 
 ### Pattern matching with `matches()`
 
 `matches()` uses dot-separated paths. The format alternates between state names and region keys: `"state.regionKey.state"`.
 
 ```ts
+import { Actor, state, event } from "@mantaq/core";
 import { matches } from "@mantaq/sugar";
 
-// flat
-matches(actor, "idle"); // true if in idle
+const off = state("off")();
+const on = state("on")();
+const playing = state("playing")();
+const flip = event("FLIP")();
 
-// hierarchical — state, region key, nested state
-matches(actor, "connected.default.active");
+const player = Actor({
+  inputs: [],
+  states: [playing],
+  initial: playing,
+  setup: () => {},
+});
 
-// parallel — match any region
-matches(actor, "player.playing");
+const actor = Actor({
+  inputs: [flip],
+  states: [off, on],
+  initial: on,
+  regions: { player },
+  setup: (m) => {
+    m.on(on, { event: flip, to: [off], handler: () => ({ state: off }) });
+  },
+});
+
+matches(actor, "on"); // true: flat
+matches(actor, "on.player.playing"); // true: state, region key, nested state
+
+matches(actor, "player.playing.on"); // false: region key must follow its parent state
+matches(actor, "on."); // false: trailing dot
+matches(actor, ""); // false: empty string
 ```
 
-**Anti-pattern:** Using wrong path format:
-
-```ts
-// WRONG — region key must come after parent state
-matches(actor, "active.connected.default");
-
-// WRONG — trailing dot always returns false
-matches(actor, "idle.");
-
-// WRONG — empty string returns false
-matches(actor, "");
-```
-
-Path format: `"parentState.regionKey.childState"`. The region key is the key you passed to the actor's `regions` option, not the nested state's name.
+The region key is the key you passed to the actor's `regions` option, not the nested state's name.
 
 ### Using `tag()` for state grouping
 
-`tag()` groups multiple `StateRef`s and tests if a snapshot matches any of them. Useful for UI that needs to branch on state categories.
+`tag()` groups `StateRef`s and tests if a snapshot is in any of them, at any depth. Useful for UI that branches on state categories.
 
 ```ts
-import { tag } from "@mantaq/sugar";
+import { states, tag } from "@mantaq/sugar";
+import type { Snapshot } from "@mantaq/core";
+
+declare const snapshot: Snapshot;
+declare function showSpinner(): void;
+declare function showResult(): void;
 
 const s = states("idle", "loading", "success", "error");
 const busy = tag(s.idle, s.loading);
 const terminal = tag(s.success, s.error);
 
-// In UI
 if (busy.has(snapshot)) {
   showSpinner();
 } else if (terminal.has(snapshot)) {
@@ -166,137 +139,118 @@ if (busy.has(snapshot)) {
 }
 ```
 
-**Anti-pattern:** Testing individual states manually with `matches()`:
+Chaining `matches(actor, "idle") || matches(actor, "loading")` breaks when the hierarchy changes. `tag()` searches parallel regions and nested hierarchies recursively.
+
+### ActorMap: dynamic children by key
+
+`createActorMap(factory)` manages children keyed by string. The factory builds the child for a key. `ensure()` spawns only when the key is missing; `spawn()` always replaces (the previous child is disposed).
 
 ```ts
-if (matches(actor, "idle") || matches(actor, "loading")) {
-  showSpinner();
-}
-// Breaks when hierarchy changes, verbose, error-prone
-```
+import { Actor, state, event } from "@mantaq/core";
+import { createActorMap, isIn } from "@mantaq/sugar";
 
-`tag()` searches recursively through parallel regions and nested hierarchies. Works regardless of depth.
+const idle = state("idle")();
+const active = state("active")();
+const activate = event("ACTIVATE")();
 
-### ActorMap patterns
-
-`ActorMap` manages dynamic children by string key. Always use `ensure()` to avoid duplicate spawns.
-
-```ts
-import { ActorMap, isIn } from "@mantaq/sugar";
-
-const map = new ActorMap(parentActor);
-
-// Safe spawn — no-op if key exists
-map.ensure("child1", () => createChild());
-
-// Send events
-map.send("child1", someEvent);
-
-// Snapshot a child
-const snap = map.snapshot("child1");
-if (snap && isIn(snap, "active")) {
-  // child is active
-}
-
-// Kill when done
-map.kill("child1");
-```
-
-**Anti-pattern:** Using `spawn()` without checking for duplicates:
-
-```ts
-map.spawn("child1", () => createChild());
-map.spawn("child1", () => createChild()); // warns, aborts the previous child, replaces
-```
-
-`ensure()` is idempotent. Safe to call repeatedly. `spawn()` always replaces.
-
-### Effect utilities: `withPromise` vs manual handling
-
-Always use `withPromise()` for promise-to-event bridging. It handles abort signals automatically.
-
-```ts
-import { withPromise } from "@mantaq/sugar";
-
-// Correct — abort-aware
-withPromise(fetchData(), input.signal, input.emit, {
-  success: (data) => ({ type: "loaded", payload: data }),
-  error: (err) => ({ type: "loadFailed", payload: String(err) }),
-});
-```
-
-**Anti-pattern:** Manual `.then()/.catch()` without abort handling:
-
-```ts
-fetchData()
-  .then((data) => {
-    input.emit({ type: "loaded", payload: data }); // fires even if actor destroyed
-  })
-  .catch((err) => {
-    input.emit({ type: "loadFailed", payload: String(err) }); // same problem
+function createChild(id: string) {
+  return Actor({
+    inputs: [activate],
+    states: [idle, active],
+    initial: idle,
+    context: { id },
+    setup: (m) => {
+      m.on(idle, { event: activate, to: [active], handler: () => ({ state: active }) });
+    },
   });
-```
+}
 
-`withPromise` checks `signal.aborted` before each emit. Manual chains fire events into destroyed actors.
+const map = createActorMap((id) => createChild(id), { autoReap: true });
 
-## Helpers
-
-### `matches(actor, pattern)`
-
-Dot-notation state pattern matching against an actor's snapshot. Works with flat, hierarchical, and parallel states.
-
-```ts
-import { matches } from "@mantaq/sugar";
-
-// flat
-matches(actor, "idle"); // true/false
-
-// hierarchical — region path
-matches(actor, "connected.default.active");
-
-// parallel — any region matches
-matches(actor, "player.playback.playing");
-```
-
-Pattern format: `"state.regionKey.state"` or just `"state"` for flat. Empty string or trailing dots return `false`.
-
-### `ActorMap`
-
-Dynamic child actor registry. Spawns, sends to, kills, and snapshots children by string key. Optionally wires child output to a parent actor.
-
-```ts
-import { ActorMap, isIn } from "@mantaq/sugar";
-
-const map = new ActorMap(); // or new ActorMap(parentActor)
-
-map.spawn("child1", () => childActor);
-map.spawn("child2", () => otherActor);
-
-map.send("child1", someEvent);
-map.kill("child2");
-map.keys(); // ["child1"]
+map.ensure("child1"); // spawns
+map.ensure("child1"); // no-op: already there
+map.send("child1", activate.create());
 
 const snap = map.snapshot("child1"); // Snapshot | undefined
 if (snap && isIn(snap, "active")) {
   // child is active
 }
+
+map.keys(); // ["child1"]
+map.kill("child1");
 ```
 
-**`ensure(key, factory)`**. Spawn only if key missing:
+`autoReap: true` removes a child once it reaches a final state.
+
+**Typing children:** `ActorMap` is untyped by design. Check children with `snapshot()` + `isIn` / `matches`, or keep your own typed references.
+
+### Effect utilities: `withPromise` vs manual handling
+
+Use `withPromise()` to bridge a promise into events. It checks `signal.aborted` before each emit, so a promise that settles after the state exits emits nothing.
 
 ```ts
-map.ensure("child1", () => childActor); // no-op if exists
+import { Actor, state, event } from "@mantaq/core";
+import { withPromise } from "@mantaq/sugar";
+
+declare function fetchData(): Promise<string[]>;
+
+const loading = state("loading")();
+const loaded = state("loaded")();
+const failed = state("failed")();
+const loadedEvent = event("loaded")<{ items: string[] }>();
+const failedEvent = event("loadFailed")<{ message: string }>();
+
+Actor({
+  inputs: [],
+  internal: [loadedEvent, failedEvent],
+  states: [loading, loaded, failed],
+  initial: loading,
+  setup: (m) => {
+    m.effect(loading, {
+      name: "fetchData",
+      sends: [loadedEvent, failedEvent],
+      fn: (input) =>
+        withPromise({
+          promise: fetchData(),
+          signal: input.signal,
+          emit: input.emit,
+          events: {
+            success: (items) => loadedEvent.create({ items }),
+            error: (err) => failedEvent.create({ message: String(err) }),
+          },
+        }),
+    });
+    m.on(loading, { event: loadedEvent, to: [loaded], handler: () => ({ state: loaded }) });
+    m.on(loading, { event: failedEvent, to: [failed], handler: () => ({ state: failed }) });
+  },
+});
 ```
 
-**Typing children:** `ActorMap` is untyped by design. Access children through your own typed references or use `matches()` / `snapshot()` for type-safe checks.
+**Anti-pattern.** A manual `fetchData().then((data) => input.emit(...))` fires even after the state exits or the actor is disposed, unless you check `input.signal.aborted` yourself.
 
-**Parent wiring:** When constructed with a parent actor, child outputs are automatically forwarded to the parent:
+## Helpers
+
+### `matches(actor, pattern)`
+
+Dot-notation state pattern matching against an actor's snapshot. Works with flat, hierarchical, and parallel states. Pattern format: `"state.regionKey.state"` or just `"state"` for flat. Empty string or trailing dots return `false`. See [Pattern matching](#pattern-matching-with-matches).
+
+### `isIn(snapshot, name)` / `activeLeaves(snapshot)`
+
+`isIn` is true when the snapshot, or any region in it, is in the named state. `activeLeaves` lists every active leaf as a dotted path.
 
 ```ts
-const map = new ActorMap(parentActor);
-map.spawn("child", () => childActor);
-// child emits → parent receives
+import { isIn, activeLeaves } from "@mantaq/sugar";
+import type { Snapshot } from "@mantaq/core";
+
+declare const snapshot: Snapshot;
+
+isIn(snapshot, "playing");
+activeLeaves(snapshot); // e.g. ["on.player.playing"]
 ```
+
+### `createActorMap(factory, { autoReap? })`
+
+Dynamic child actor registry: `spawn`, `ensure`, `send`, `kill`, `has`, `keys`, `snapshot`, `size`, `dispose`. See [ActorMap](#actormap-dynamic-children-by-key).
 
 ### `broadcast(map, event)`
 
@@ -304,22 +258,57 @@ Send an event to every key in an `ActorMap` (or any `SendableMap`):
 
 ```ts
 import { broadcast } from "@mantaq/sugar";
+import type { ActorMap } from "@mantaq/sugar";
+
+declare const map: ActorMap;
 
 broadcast(map, { type: "ping" });
 ```
 
-Works with `ActorMap` or any object implementing `{ keys(): string[]; send(key, event): void }`.
+Works with any object implementing `{ keys(): string[]; send(key, event): void }`.
 
 ### `onOutput(actor, handler)`
 
 Route an actor's emitted outputs to a handler. `regions` auto-wire child
-outputs into the parent; ActorMap children do not. This is the public
-wrapper for that wiring seam, no internal import needed:
+outputs into the parent; ActorMap children do not. `onOutput` is the public
+wrapper for that wiring:
 
 ```ts
-import { ActorMap, onOutput } from "@mantaq/sugar";
+import { Actor, state, event } from "@mantaq/core";
+import { createActorMap, onOutput } from "@mantaq/sugar";
 
-const requests = new ActorMap(
+const result = event("RESULT")<{ id: string }>();
+const finish = event("FINISH")();
+const working = state("working")();
+const done = state("done")().final();
+const collecting = state("collecting")();
+
+const parent = Actor({
+  inputs: [result],
+  states: [collecting],
+  initial: collecting,
+  setup: (m) => {
+    m.on(collecting, { event: result, handler: () => ({}) });
+  },
+});
+
+function createHandler(id: string) {
+  return Actor({
+    inputs: [finish],
+    outputs: [result],
+    states: [working, done],
+    initial: working,
+    setup: (m) => {
+      m.on(working, {
+        event: finish,
+        to: [done],
+        handler: () => ({ state: done, emit: [result.create({ id })] }),
+      });
+    },
+  });
+}
+
+const requests = createActorMap(
   (id) => {
     const child = createHandler(id);
     onOutput(child, (e) => {
@@ -329,143 +318,120 @@ const requests = new ActorMap(
   },
   { autoReap: true },
 );
+
+requests.spawn("r1");
+requests.send("r1", finish.create());
 ```
 
 The `is()` guard narrows the output to the receiver's declared input.
 
 ### `tag(...stateRefs)`
 
-Group multiple `StateRef`s and test if a snapshot matches any of them. Useful for UI state grouping.
+Group `StateRef`s; `tag(...).has(snapshot)` is true if the snapshot is in any of them, at any depth. See [tag()](#using-tag-for-state-grouping).
 
-```ts
-import { tag } from "@mantaq/sugar";
-import { state } from "@mantaq/core";
+### `states(...names)` / `events(...names)`
 
-const idle = state("idle")();
-const loading = state("loading")();
-const busy = tag(idle, loading);
+Batch-create `StateRef`s / payload-less `EventRef`s as a typed record. See [states()](#type-safe-state-groups-with-states) and [events()](#type-safe-event-groups-with-events).
 
-busy.has(snapshot); // true if snapshot is idle or loading (any depth)
-```
+### `withPromise({ promise, signal, emit, events })`
 
-Searches recursively through parallel regions and nested hierarchies.
-
-### `states(...names)`
-
-Batch-create `StateRef`s as a typed record:
-
-```ts
-import { states } from "@mantaq/sugar";
-
-const s = states("idle", "loading", "success");
-s.idle.name; // "idle"
-s.success.final(); // StateRef with isFinal = true
-```
-
-### `events(...names)`
-
-Batch-create `EventRef`s as a typed record:
-
-```ts
-import { events } from "@mantaq/sugar";
-
-const e = events("click", "submit");
-e.click.create(); // { type: "click" }
-e.click.is(emittedEvent); // boolean
-```
-
-### `withPromise(promise, signal, emit, events)`
-
-Bridge a promise into actor events. Emits `success` on resolve, `error` on reject. Respects `AbortSignal`. Skips emit if aborted before settlement.
-
-```ts
-import { withPromise } from "@mantaq/sugar";
-
-withPromise(fetchData(), input.signal, input.emit, {
-  success: (data) => ({ type: "loaded", payload: data }),
-  error: (err) => ({ type: "loadFailed", payload: String(err) }),
-});
-```
+Bridge a promise into actor events. Emits `events.success(data)` on resolve, `events.error(err)` on reject. Skips the emit if `signal` aborted before settlement. Returns a promise, so returning it from an effect lets `actor.settled()` wait for it.
 
 #### Errors as values
 
 When a port returns `Promise<Either<PortError, Loaded>>`, map the result with `Either.match` inside `success`. No new helper is needed, and both branches stay typed without a cast:
 
 ```ts
+import { Actor, state, event } from "@mantaq/core";
+import type { CreatedOf } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import { withPromise } from "@mantaq/sugar";
 
-m.effect(loading, {
-  name: "load",
-  sends: [loaded, failed, loadRejected],
-  fn: (input) =>
-    withPromise({
-      promise: port.load(),
-      signal: input.signal,
-      emit: input.emit,
-      events: {
-        success: (result) =>
-          Either.match(result, {
-            onLeft: (e): LoadEvent => failed.create(e), // e: PortError
-            onRight: (v): LoadEvent => loaded.create(v), // v: Loaded
-          }),
-        error: (err) => loadRejected.create({ message: String(err) }),
-      },
-    }),
+type PortError = { code: string };
+type Loaded = { items: string[] };
+declare const port: { load(): Promise<Either<PortError, Loaded>> };
+
+const loading = state("loading")();
+const ready = state("ready")();
+const loaded = event("loaded")<Loaded>();
+const failed = event("failed")<PortError>();
+const loadRejected = event("loadRejected")<{ message: string }>();
+type LoadEvent = CreatedOf<typeof loaded> | CreatedOf<typeof failed>;
+
+Actor({
+  inputs: [],
+  internal: [loaded, failed, loadRejected],
+  states: [loading, ready],
+  initial: loading,
+  setup: (m) => {
+    m.effect(loading, {
+      name: "load",
+      sends: [loaded, failed, loadRejected],
+      fn: (input) =>
+        withPromise({
+          promise: port.load(),
+          signal: input.signal,
+          emit: input.emit,
+          events: {
+            success: (result) =>
+              Either.match(result, {
+                onLeft: (e): LoadEvent => failed.create(e), // e: PortError
+                onRight: (v): LoadEvent => loaded.create(v), // v: Loaded
+              }),
+            error: (err) => loadRejected.create({ message: String(err) }),
+          },
+        }),
+    });
+    m.on(loading, { event: loaded, to: [ready], handler: () => ({ state: ready }) });
+    m.on(loading, { event: failed, handler: () => ({}) });
+    m.on(loading, { event: loadRejected, handler: () => ({}) });
+  },
 });
 ```
 
-`LoadEvent` is the union of the two event shapes; annotating both handlers with it lets `Either.match` infer one result type. A rejected promise still goes through `error`, and an effect aborted before the promise settles emits nothing. See `src/effects/promise.either.test.ts`.
+`LoadEvent` is the union of the two event shapes; annotating both handlers with it lets `Either.match` infer one result type. A rejected promise still goes through `error`, and an effect aborted before the promise settles emits nothing.
 
-### `withTimeout(ms, input, eventFn)`
+### `withTimeout(ms, { input, event })`
 
-Schedule a timeout event through the actor's clock. Aborts cleanly if the actor is destroyed before timeout fires.
+Schedule a timeout event through the effect's clock. Cleared when the state exits.
 
 ```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
 import { withTimeout } from "@mantaq/sugar";
 
-withTimeout(5000, input, () => ({ type: "timeout", payload: { reason: "exceeded" } }));
+const waiting = state("waiting")();
+const expired = state("expired")();
+const timeout = event("timeout")<{ reason: string }>();
+
+Actor({
+  inputs: [],
+  internal: [timeout],
+  states: [waiting, expired],
+  initial: waiting,
+  clock: VirtualClock(),
+  setup: (m) => {
+    m.effect(waiting, {
+      name: "expireAfter5s",
+      sends: [timeout],
+      fn: (input) =>
+        withTimeout(5000, { input, event: () => timeout.create({ reason: "exceeded" }) }),
+    });
+    m.on(waiting, { event: timeout, to: [expired], handler: () => ({ state: expired }) });
+  },
+});
 ```
 
 ## Migration from Core
 
 Starting with `@mantaq/core`? Here's what sugar adds.
 
-| Core                                    | Sugar                                        | Benefit                                                                   |
-| --------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------- |
-| `state("idle")()` × N                   | `states("idle", "loading")`                  | Single call. Typed record. No missed names.                               |
-| `event("FETCH")()` × N                  | `events("FETCH", "RESOLVE")`                 | Single call. Typed record. Shared source of truth.                        |
-| `snapshot().path.includes("active")`    | `matches(actor, "active")`                   | Works on actor directly. Dot-notation for hierarchies: `"idle.region.a"`. |
-| Manual `.then()/.catch()` + abort check | `withPromise(promise, signal, emit, events)` | Auto abort-aware. No forgotten `signal.aborted` guard.                    |
-| Group states by variable naming         | `tag(stateA, stateB).has(snapshot)`          | Recursive matching. Works through parallel regions.                       |
-
-**Core alone:**
-
-```ts
-import { state, event } from "@mantaq/core";
-
-const idle = state("idle")();
-const loading = state("loading")();
-const success = state("success")();
-const failEvent = event("FAIL")();
-
-actor.snapshot().path.includes("idle"); // flat name only
-```
-
-**With sugar:**
-
-```ts
-import { states, events, matches, tag } from "@mantaq/sugar";
-
-const s = states("idle", "loading", "success");
-const e = events("FAIL");
-
-matches(actor, "idle"); // actor, not snapshot
-matches(actor, "connected.default.active"); // hierarchical
-
-const busy = tag(s.idle, s.loading);
-busy.has(actor.snapshot()); // recursive
-```
+| Core                                    | Sugar                                            | Benefit                                                                   |
+| --------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------- |
+| `state("idle")()` × N                   | `states("idle", "loading")`                      | Single call. Typed record. No missed names.                               |
+| `event("FETCH")()` × N                  | `events("FETCH", "RESOLVE")`                     | Single call. Typed record. Shared source of truth.                        |
+| `snapshot().path.includes("active")`    | `matches(actor, "active")`                       | Works on actor directly. Dot-notation for hierarchies: `"idle.region.a"`. |
+| Manual `.then()/.catch()` + abort check | `withPromise({ promise, signal, emit, events })` | Auto abort-aware. No forgotten `signal.aborted` guard.                    |
+| Group states by variable naming         | `tag(stateA, stateB).has(snapshot)`              | Recursive matching. Works through parallel regions.                       |
 
 No migration needed. Sugar wraps core. Use both side by side.
 

@@ -73,3 +73,31 @@ function splitImportNames(list) {
     .map((s) => s.split(" as ")[0].trim())
     .filter(Boolean);
 }
+
+const SNIPPET_SKIP_MARKER = "<!-- docs-check: skip -->";
+
+/**
+ * ```ts fenced blocks in a markdown file, with their 1-based start line.
+ * A block whose previous non-blank line is SNIPPET_SKIP_MARKER is flagged `skip`.
+ */
+export function extractTsBlocks(source) {
+  const lines = source.split("\n");
+  const blocks = [];
+  for (let index = 0; index < lines.length; index++) {
+    const open = lines[index].match(/^(\s*)```(?:ts|typescript)\s*$/);
+    if (!open) continue;
+    const indent = open[1].length;
+    const body = [];
+    let close = index + 1;
+    while (close < lines.length && !/^\s*```\s*$/.test(lines[close])) {
+      body.push(lines[close].slice(Math.min(indent, lines[close].search(/\S|$/))));
+      close++;
+    }
+    let previous = index - 1;
+    while (previous >= 0 && lines[previous].trim() === "") previous--;
+    const skip = previous >= 0 && lines[previous].trim() === SNIPPET_SKIP_MARKER;
+    blocks.push({ line: index + 1, code: body.join("\n"), skip });
+    index = close;
+  }
+  return blocks;
+}

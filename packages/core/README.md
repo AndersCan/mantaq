@@ -8,18 +8,41 @@ State machine library. Small API surface. Cook the primitives, not the framework
 npm install @mantaq/core
 ```
 
+**Using an AI agent?** Install the mantaq skill: `npx skills add AndersCan/mantaq`.
+
+## See your machine
+
+`@mantaq/inspect` draws every exported machine on your Vite dev server, fuzzes it, and lets you walk it.
+
+```bash
+npm install -D @mantaq/inspect vite
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import { mantaqViz } from "@mantaq/inspect/vite";
+
+export default defineConfig({
+  plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })],
+});
+```
+
+Run `npx vite` and open `http://localhost:5173/__mantaq/?machine=<id>`. The id is the export name without `create` / `Actor`: `createCheckoutActor` → `checkout`. Export a factory that takes a `VirtualClock` so the page can run and fuzz it. See [`@mantaq/inspect`](https://www.npmjs.com/package/@mantaq/inspect).
+
 ## Quick Reference
 
 | Pattern         | Correct                                            | Anti-pattern                          |
 | --------------- | -------------------------------------------------- | ------------------------------------- |
 | Type context    | `const c: MyContext = {...}`, `context: c`         | `as` cast on the context value        |
 | Write context   | `const s = context.get(); s.x = y; context.set(s)` | mutate without `set()`                |
-| Type events     | `event("ID")<Payload>()`                           | `event("ID")()` without generic       |
+| Type events     | `event("ID")<Payload>()`                           | untyped payloads                      |
 | Send events     | `actor.send(signInEvent.create(data))`             | raw `{ type: "ID", payload }` objects |
+| Transitions     | `m.on(state, { event, to: [next], handler })`      | returning a state not listed in `to`  |
 | Effect data     | Use state payload                                  | Depend on `event` in effect           |
 | Error handling  | Emit internal event                                | Throw in effect or transition         |
 | Internal events | Declare in `internal: [...]`                       | Put user events in internal           |
-| Signal check    | `if (signal.aborted) return`                       | Skip abort check in async work        |
+| Timers          | `clock.setTimeout(ms, { cb, signal })`             | global `setTimeout`                   |
 | Regions         | Child outputs in parent `internal`                 | Forget to declare child outputs       |
 | Snapshot        | `snapshot()` carries path + context + payload      | Re-serialize context by hand          |
 | Any handler     | Universal events only (CANCEL)                     | State-specific logic in `onAny`       |
@@ -27,6 +50,7 @@ npm install @mantaq/core
 ## Contents
 
 - [Install](#install)
+- [See your machine](#see-your-machine)
 - [Quick Reference](#quick-reference)
 - [Quick Start](#quick-start)
 - [Docs](#docs)
@@ -39,6 +63,7 @@ npm install @mantaq/core
   - [Snapshot & Restore](#snapshot--restore)
   - [Dynamic Children (Regions)](#dynamic-children-regions)
   - [Error Handling](#error-handling)
+  - [Reading state in a UI](#reading-state-in-a-ui)
   - [Any Handler](#any-handler)
   - [Testing with VirtualClock](#testing-with-virtualclock)
 - [Development](#development)
@@ -48,8 +73,8 @@ npm install @mantaq/core
 ## Quick Start
 
 Transitions and effects are registered in a `setup` callback. The builder is
-type-safe: targets validate against your declared `states`, `inputs`, and
-`internal` events at compile time.
+type-safe: `event` must be one of your `inputs` or `internal` events, and the
+handler may only return states listed in `to` (no `to` means it can only stay).
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";
@@ -58,19 +83,19 @@ const idle = state("idle")();
 const active = state("active")();
 const toggle = event("TOGGLE")();
 
-const actor = new Actor({
+const actor = Actor({
   inputs: [toggle],
   states: [idle, active],
   initial: idle,
   setup: (m) => {
-    m.on(idle, toggle, () => ({ state: active }));
-    m.on(active, toggle, () => ({ state: idle }));
+    m.on(idle, { event: toggle, to: [active], handler: () => ({ state: active }) });
+    m.on(active, { event: toggle, to: [idle], handler: () => ({ state: idle }) });
   },
 });
 
-actor.on("change", (snap) => console.log(snap.path)); // fires immediately: ["idle"]
-actor.send(toggle.create());
-// "change" fires again: ["active"]
+actor.on("change", { fn: (snap) => console.log(snap.path) });
+actor.send(toggle.create()); // logs ["active"]
+actor.state.name; // "active"
 ```
 
 ## Docs
@@ -81,375 +106,321 @@ See [anderscan.github.io/mantaq](https://anderscan.github.io/mantaq) for full do
 
 ### Typed Actor Context
 
-Declare the context value with its type once, then pass it to the constructor. Handlers receive the typed context automatically. `as` on the context is an anti-pattern: it hides missing fields.
+Declare the context value with its type once, then pass it to `Actor`. Handlers receive the typed context automatically. `as` on the context is an anti-pattern: it hides missing fields.
 
 ```ts
+import { Actor, state, event } from "@mantaq/core";
+
 interface AuthContext {
-  user?: User;
   phoneNumber?: string;
 }
 
+const idleState = state("idle")();
+const signingInState = state("signingIn")();
+const signInEvent = event("SIGN_IN")<{ phoneNumber: string }>();
+
 const initialContext: AuthContext = {};
 
-const actor = new Actor({
+const actor = Actor({
   inputs: [signInEvent],
   states: [idleState, signingInState],
   initial: idleState,
   context: initialContext,
   setup: (m) => {
-    m.on(idleState, signInEvent, (event, opts) => {
-      // ✅ typed — context.get()/set() flow the constructor type
-      const s = opts!.context.get();
-      s.phoneNumber = event.payload.phoneNumber;
-      opts!.context.set(s);
-      return { state: signingInState };
+    m.on(idleState, {
+      event: signInEvent,
+      to: [signingInState],
+      handler: (event, { context }) => {
+        // ✅ typed: context.get()/set() carry AuthContext
+        const s = context.get();
+        s.phoneNumber = event.payload.phoneNumber;
+        context.set(s);
+        return { state: signingInState };
+      },
     });
   },
 });
+
+actor.send(signInEvent.create({ phoneNumber: "+1234567890" }));
+actor.context.phoneNumber; // "+1234567890"
 ```
 
-Context is user land. Mutate it freely. `set()` is the write signal: any `set()` triggers `change`, even with the same reference. Call it after you mutate:
+Context is user land. Mutate it freely. `set()` is the write signal: any `set()` triggers `change`, even with the same reference. Call it after you mutate. Mutating without `set()` never signals, so subscribers and persistence stay silent.
 
-```ts
-const s = opts.context.get();
-s.phoneNumber = event.payload.phoneNumber;
-opts.context.set(s);
-```
-
-**Never mutate without `set()`:**
-
-```ts
-// ❌ mutation without set() — never signals; subscribers and persistence stay silent
-opts!.context.phoneNumber = event.payload.phoneNumber;
-```
-
-**Anti-pattern. Casting in every handler:**
-
-```ts
-setup: (m) => {
-  m.on(idleState, signInEvent, (event, opts) => {
-    const c = opts!.context as AuthContext; // ❌ unnecessary — already typed
-    const s = c.get();
-    s.phoneNumber = event.payload.phoneNumber;
-    c.set(s);
-    return { state: signingInState };
-  });
-},
-```
+**Anti-pattern.** Casting the context (`context.get() as AuthContext`) in a handler. It is already typed; the cast only hides mistakes.
 
 ### Proper Event Typing
 
-Define events with `event("ID")<Payload>()`. The payload type flows through to handlers automatically.
+Define events with `event("ID")<Payload>()`. The payload type flows through to handlers and `.create()`.
 
 ```ts
+import { event } from "@mantaq/core";
+
 const signInEvent = event("SIGN_IN")<{ phoneNumber: string }>();
 const signOutEvent = event("SIGN_OUT")(); // no payload
 const dataEvent = event("DATA_LOADED")<{ items: string[]; count: number }>();
 
-// Creating events
-actor.send(signInEvent.create({ phoneNumber: "+1234567890" }));
-actor.send(signOutEvent.create()); // no payload
+signInEvent.create({ phoneNumber: "+1234567890" });
+signOutEvent.create();
+dataEvent.create({ items: ["a"], count: 1 });
+
+// @ts-expect-error: a payload-less event takes no payload
+signOutEvent.create({ phoneNumber: "+1234567890" });
+
+// @ts-expect-error: the payload is checked
+signInEvent.create({ phone: 1 });
 ```
 
-Handlers receive the correct payload type:
+Handlers receive the payload type: in `m.on(idleState, { event: signInEvent, handler: (event) => ... })`, `event.payload.phoneNumber` is a `string`.
 
-```ts
-setup: (m) => {
-  m.on(idleState, signInEvent, (event) => {
-    event.payload.phoneNumber; // ✅ string
-    return { state: signingInState };
-  });
-},
-```
-
-**Anti-pattern. Skipping the generic parameter:**
-
-```ts
-// ❌ payload is `unknown`, no type safety
-const badEvent = event("SIGN_IN")();
-
-// ✅ always provide the payload type
-const goodEvent = event("SIGN_IN")<{ phoneNumber: string }>();
-```
-
-**Anti-pattern. Sending raw objects instead of using `.create()`:**
-
-```ts
-// ✅ typed
-actor.send(signInEvent.create({ phoneNumber: "+1234567890" }));
-
-// ❌ bypasses type checking
-actor.send({ type: "SIGN_IN", payload: { phoneNumber: "+1234567890" } });
-```
+**Anti-pattern. Sending raw objects instead of `.create()`.** `actor.send({ type: "SIGN_IN", payload })` has the right shape, but `signInEvent.is()` rejects it: `.create()` brands the event. Always send `ref.create(...)`.
 
 ### Effects and Event Typing
 
 Effects run when entering a state. The `event` parameter in effects is typed `InternalEvent`, `{ type, payload? }` with `payload: unknown`, not the specific event that triggered the transition. This is by design: effects live on states, not transitions. Multiple transitions can lead to the same state, so the effect cannot know which event caused entry.
 
-**Pass data to effects via state payload.** Set the payload in the transition return, read it from `state.payload` in the effect.
+**Pass data to effects via state payload.** Return `state.create(payload)` from the transition, read `state.payload` in the effect.
 
 ```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+
+const idleState = state("idle")();
 const loadingState = state("loading")<{ url: string }>();
 const loadedState = state("loaded")();
 const fetchEvent = event("FETCH")<{ url: string }>();
 const doneEvent = event("LOADED")();
 
-const actor = new Actor({
+const actor = Actor({
   inputs: [fetchEvent],
   internal: [doneEvent],
   states: [idleState, loadingState, loadedState],
   initial: idleState,
+  clock: VirtualClock(),
   setup: (m) => {
     m.effect(loadingState, {
       name: "fetchUrl",
-      fn: ({ state, emit, clock }) => {
+      sends: [doneEvent],
+      fn: ({ state, emit, clock, signal }) => {
         // state.payload is typed to the state's declared payload: { url: string }
-        const url = state.payload.url;
-        clock.setTimeout(1000, () => {
-          emit(doneEvent.create());
-        });
+        console.log("loading", state.payload.url);
+        clock.setTimeout(1000, { signal, cb: () => emit(doneEvent.create()) });
       },
     });
-    m.on(idleState, fetchEvent, (event) => {
-      return { state: loadingState.create({ url: event.payload.url }) };
+    m.on(idleState, {
+      event: fetchEvent,
+      to: [loadingState],
+      handler: (event) => ({ state: loadingState.create({ url: event.payload.url }) }),
     });
-    m.on(loadingState, doneEvent, () => ({ state: loadedState }));
+    m.on(loadingState, {
+      event: doneEvent,
+      to: [loadedState],
+      handler: () => ({ state: loadedState }),
+    });
   },
 });
 ```
 
 **Context is also possible but less precise.** Context is shared across all states. Writing to context in one state leaks into others. Prefer state payload for data that belongs to a specific state entry.
 
-```ts
-// ✅ state payload — scoped to this state entry
-return { state: loadingState.create({ url: event.payload.url }) };
-
-// ⚠️ context — works but shared across all states
-const s = opts!.context.get();
-s.url = event.payload.url;
-opts!.context.set(s);
-return { state: loadingState };
-```
-
-**Anti-pattern. Depending on `event` in effects:**
-
-```ts
-m.effect(loadingState, {
-  name: "fetchUrl",
-  fn: ({ event, emit }) => {
-    // ❌ event is InternalEvent — payload is unknown, not the triggering event's payload
-    emit(doneEvent.create()); // fine — but event.payload.url would be a type error
-  },
-});
-```
-
-The `event` parameter exists for convenience (e.g., logging), not for business logic. Use state payload or context to pass data to effects.
+The `event` parameter in an effect exists for convenience (e.g., logging), not for business logic. Use state payload or context to pass data to effects.
 
 ### Two-Queue Architecture
 
 Mantaq uses two event queues: **external** (user-sent) and **internal** (effect-emitted). Understanding the difference prevents subtle bugs.
 
-**External events** are sent via `actor.send()`. They trigger transitions on the current state.
+**External events** are sent via `actor.send()` and must be declared in `inputs`. They trigger transitions on the current state.
 
-**Internal events** are emitted from effects via `emit()`. They are queued and processed after the current transition completes.
+**Internal events** are emitted from effects via `emit()` and must be declared in `internal`. They are queued and processed after the current transition completes.
 
 ```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+
+const idleState = state("idle")();
+const connectedState = state("connected")();
 const tickEvent = event("TICK")();
 const connectEvent = event("CONNECT")();
 
-const actor = new Actor({
-  inputs: [connectEvent], // external — user triggers
-  internal: [tickEvent], // internal — effects emit
+const actor = Actor({
+  inputs: [connectEvent], // external: user triggers
+  internal: [tickEvent], // internal: effects emit
   states: [idleState, connectedState],
   initial: idleState,
+  clock: VirtualClock(),
   setup: (m) => {
     m.effect(idleState, {
       name: "scheduleTick",
-      fn: ({ emit, clock }) => {
-        clock.setTimeout(1000, () => {
-          emit(tickEvent.create()); // goes to internal queue
-        });
+      sends: [tickEvent],
+      fn: ({ emit, clock, signal }) => {
+        clock.setTimeout(1000, { signal, cb: () => emit(tickEvent.create()) }); // internal queue
       },
     });
-    m.on(idleState, connectEvent, () => ({ state: connectedState })); // external handler
-    m.on(idleState, tickEvent, () => ({})); // internal handler
+    m.on(idleState, {
+      event: connectEvent,
+      to: [connectedState],
+      handler: () => ({ state: connectedState }),
+    });
+    m.on(idleState, { event: tickEvent, handler: () => ({}) }); // stays in idle
   },
 });
+
+actor.send(connectEvent.create());
+// @ts-expect-error: internal events cannot be sent from outside
+actor.send(tickEvent.create());
 ```
 
-**Ordering:** External events process one at a time. Internal events emitted during a transition process depth-first after that transition. Internal events from effects process after the effect completes. This is a common source of bugs. If an effect emits an internal event and the actor is in a different state by the time that event processes, the handler may not exist or may behave unexpectedly.
-
-**Anti-pattern. Mixing internal/external incorrectly:**
-
-```ts
-// ❌ declaring a user-sent event as internal
-internal: [connectEvent], // user can't send internal events via actor.send()
-
-// ✅ keep external events in inputs
-inputs: [connectEvent],
-```
+**Ordering:** External events process one at a time. Internal events emitted during a transition process depth-first after that transition. Internal events from effects process after the effect completes. If an effect emits an internal event and the actor is in a different state by the time that event processes, the handler may not exist: an internal event with no handler routes the machine to `__error` (`reason: "unhandled"`). Pass `signal` to timers so they are cleared on state exit.
 
 ### Effect Pattern
 
-Effects run on state entry. They receive typed context, an AbortSignal, and an emit function. Each effect carries a required camelCase `name` describing what it does — tests can assert on it (`harness.assertEffectRan(stateName, effectName)`) and executed effects appear in history as `{ stateName, effectName }`.
+Effects run on state entry. They receive the typed context, an `AbortSignal`, the clock, and an `emit` function. Each effect carries a required camelCase `name` describing what it does. Tests can assert on it (`harness.assertEffectRan(stateName, effectName)`), and executed effects appear in history as `{ stateName, effectName }`. `sends` lists the internal events the effect may emit; `emit` then only accepts those.
 
 ```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+
 type MyContext = { retryCount: number; maxRetries: number };
+
+const idleState = state("idle")();
+const workingState = state("working")();
+const doneState = state("done")().final();
+const errorState = state("error")();
 
 const startEvent = event("START")();
 const doneEvent = event("WORK_DONE")();
 const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
-function createActor() {
+export function createWorkerActor(clock = VirtualClock()) {
   const initialContext: MyContext = { retryCount: 0, maxRetries: 3 };
-  return new Actor({
+  return Actor({
     inputs: [startEvent],
     internal: [doneEvent, failedEvent],
     states: [idleState, workingState, doneState, errorState],
     initial: idleState,
     context: initialContext,
+    clock,
     setup: (m) => {
       m.effect(workingState, {
         name: "attemptWork",
+        sends: [doneEvent, failedEvent],
         fn: ({ signal, context, emit, clock }) => {
-          // context is MyContext — typed from the constructor generic
-          if (context.retryCount >= context.maxRetries) {
+          const { retryCount, maxRetries } = context.get();
+          if (retryCount >= maxRetries) {
             emit(failedEvent.create({ error: "Max retries exceeded" }));
             return;
           }
-
-          clock.setTimeout(2000, () => {
-            if (signal.aborted) return; // ✅ check signal before emitting
-            emit(doneEvent.create());
-          });
+          // ✅ signal clears the timer when the state exits
+          clock.setTimeout(2000, { signal, cb: () => emit(doneEvent.create()) });
         },
       });
-      m.on(idleState, startEvent, () => ({ state: workingState }));
-      m.on(workingState, doneEvent, () => ({ state: doneState }));
-      m.on(workingState, failedEvent, (_event, opts) => {
-        const s = opts!.context.get();
-        s.retryCount += 1;
-        opts!.context.set(s);
-        return { state: errorState };
+      m.on(idleState, {
+        event: startEvent,
+        to: [workingState],
+        handler: () => ({ state: workingState }),
+      });
+      m.on(workingState, {
+        event: doneEvent,
+        to: [doneState],
+        handler: () => ({ state: doneState }),
+      });
+      m.on(workingState, {
+        event: failedEvent,
+        to: [errorState],
+        handler: (_event, { context }) => {
+          const s = context.get();
+          s.retryCount += 1;
+          context.set(s);
+          return { state: errorState };
+        },
       });
     },
   });
 }
 ```
 
-**Anti-pattern. Not checking `signal.aborted`:**
-
-```ts
-m.effect(workingState, {
-  name: "attemptWork",
-  fn: ({ signal, emit, clock }) => {
-    // ❌ if state changes before timeout, this still fires
-    clock.setTimeout(2000, () => {
-      emit(doneEvent.create());
-    });
-  },
-});
-```
-
-```ts
-m.effect(workingState, {
-  name: "attemptWork",
-  fn: ({ signal, emit, clock }) => {
-    // ✅ guard with abort check
-    clock.setTimeout(2000, () => {
-      if (signal.aborted) return;
-      emit(doneEvent.create());
-    });
-  },
-});
-```
+**Anti-pattern. Timers without `signal`.** `clock.setTimeout(2000, { cb })` still fires after the state exits. Pass `signal`, or check `signal.aborted` in the callback, or `clock.clearTimeout(id)` in an abort listener.
 
 ### Snapshot & Restore
 
 `actor.snapshot()` returns a `Snapshot`: `{ path, context, payload?, regions, done?, error? }`. Context is included; `payload` is the payload the current state was entered with (present only when the transition carried one). Use it to save/restore actor state across sessions.
 
 ```ts
-// Snapshot carries path, context, and regions — serialize it directly
+import type { Snapshot } from "@mantaq/core";
+
+declare const actor: { snapshot(): Snapshot<{ count: number }> };
+
+// Snapshot carries path, context, and regions: serialize it directly
 const saved = actor.snapshot();
 localStorage.setItem("actor", JSON.stringify(saved));
 
 const raw = localStorage.getItem("actor");
 if (raw) {
-  const data = JSON.parse(raw) as Snapshot;
-  // rebuild the actor from data.path (re-seed context from data.context if needed)
+  const data: Snapshot<{ count: number }> = JSON.parse(raw);
+  // rebuild the actor at data.path[0], seeded with data.context
+  console.log(data.path, data.context.count);
 }
 ```
 
-**Anti-pattern. Re-serializing context by hand:**
-
-```ts
-// ❌ snapshot() already includes context — no manual step needed
-const snap = actor.snapshot();
-snap.context; // exists
-
-// ✅ save the snapshot as-is
-const stateData = actor.snapshot();
-```
+`snapshot().context` already holds the context. No manual step needed.
 
 ### Dynamic Children (Regions)
 
-Regions let you compose actors. The parent actor manages child lifecycle; child outputs are routed as parent internal events.
+Regions compose actors. The parent owns the child's lifecycle; the child's `outputs` reach the parent as internal events, so declare them in the parent's `internal`.
 
 ```ts
-const healthCheckResult = event("HEALTH_CHECK_RESULT")<{ healthy: boolean }>();
+import { Actor, state, event } from "@mantaq/core";
+import { matches } from "@mantaq/sugar";
 
-const healthMonitor = new Actor({
-  inputs: [healthCheckResult],
+const healthCheck = event("HEALTH_CHECK")<{ healthy: boolean }>();
+const degraded = event("DEGRADED")();
+const connectEvent = event("CONNECT")();
+
+const unknownState = state("unknown")();
+const healthyState = state("healthy")();
+const degradedState = state("degraded")();
+
+const healthMonitor = Actor({
+  inputs: [healthCheck],
+  outputs: [degraded],
   states: [unknownState, healthyState, degradedState],
   initial: unknownState,
   setup: (m) => {
-    m.on(unknownState, healthCheckResult, (event) => ({
-      state: event.payload.healthy ? healthyState : degradedState,
-    }));
-    m.on(healthyState, healthCheckResult, (event) => ({
-      state: event.payload.healthy ? healthyState : degradedState,
-    }));
-  },
-});
-
-const manager = new Actor({
-  inputs: [connectEvent],
-  internal: [healthCheckResult], // child output must be declared here
-  states: [disconnectedState, connectedState],
-  initial: disconnectedState,
-  regions: { health: healthMonitor }, // child named "health"
-  setup: (m) => {
-    m.on(connectedState, healthCheckResult, (event, opts) => {
-      // access child via actor.regions
-      manager.regions.health.send(healthCheckResult.create({ healthy: event.payload.healthy }));
-      return {};
+    m.on(unknownState, {
+      event: healthCheck,
+      to: [healthyState, degradedState],
+      handler: (event) =>
+        event.payload.healthy
+          ? { state: healthyState }
+          : { state: degradedState, emit: [degraded.create()] },
     });
   },
 });
 
-// Query child state with dot notation (matches is from @mantaq/sugar)
-matches(manager, "connected.health.healthy"); // ✅
-```
+const disconnectedState = state("disconnected")();
+const connectedState = state("connected")();
 
-**Anti-pattern. Child outputs not declared as parent internal events:**
-
-```ts
-const child = new Actor({
-  outputs: [someOutputEvent], // child emits this
-  // ...
+const manager = Actor({
+  inputs: [connectEvent],
+  internal: [degraded], // ✅ child output declared here, or it is dropped
+  states: [disconnectedState, connectedState],
+  initial: disconnectedState,
+  regions: { health: healthMonitor }, // child named "health"
+  setup: (m) => {
+    m.on(disconnectedState, {
+      event: connectEvent,
+      to: [connectedState],
+      handler: () => ({ state: connectedState }),
+    });
+    m.on(connectedState, {
+      event: degraded,
+      to: [disconnectedState],
+      handler: () => ({ state: disconnectedState }),
+    });
+  },
 });
 
-// ❌ parent doesn't declare it as internal — event gets dropped
-const parent = new Actor({
-  internal: [], // missing!
-  regions: { child },
-});
-
-// ✅ child output must be in parent's internal array
-const parent = new Actor({
-  internal: [someOutputEvent],
-  regions: { child },
-});
+manager.send(connectEvent.create());
+manager.regions.health?.send(healthCheck.create({ healthy: true }));
+// Query child state with dot notation: state.regionKey.childState
+matches(manager, "connected.health.healthy"); // true
 ```
 
 ### Error Handling
@@ -457,7 +428,10 @@ const parent = new Actor({
 Never throw from effects or transitions. Emit an error as an internal event and let a transition handle it. If user code throws anyway, the machine does **not** misbehave silently: it dies into a built-in terminal `__error` state, records `snapshot().error` (the thrown value, the state/context at the point of failure, the bad event), drops remaining events, and ignores later `send`s. Errors never escape `send()` and the machine stays deterministic. Same inputs, same trace.
 
 ```ts
-const snap = actor.snapshot();
+import type { Snapshot } from "@mantaq/core";
+
+declare const snap: Snapshot;
+
 if (snap.error) {
   snap.error.reason; // "transition" | "effect" | "budget" | "output" | "internal" | "async" | "unhandled"
   snap.error.state.name; // the state at the point of failure
@@ -475,73 +449,71 @@ A dead machine can be manually resumed with `actor.recover({ state, context })`.
 Catch errors inside effects and emit recovery events:
 
 ```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+
+declare function riskyOperation(): void;
+
+const workingState = state("working")();
+const doneState = state("done")().final();
+const errorState = state("error")<{ error: string }>();
 const doneEvent = event("WORK_DONE")();
 const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
-setup: (m) => {
-  m.effect(workingState, {
-    name: "runRiskyOperation",
-    fn: ({ signal, emit, clock }) => {
-      clock.setTimeout(100, () => {
-        if (signal.aborted) return;
-        try {
-          const result = riskyOperation();
-          emit(doneEvent.create());
-        } catch (err) {
-          // ✅ emit error as internal event — lets transition handle it
-          emit(failedEvent.create({ error: String(err) }));
-        }
-      });
-    },
-  });
-  m.on(workingState, doneEvent, () => ({ state: doneState }));
-  m.on(workingState, failedEvent, (event) => {
-    // handle error in transition, not in effect
-    return { state: errorState.create({ error: event.payload.error }) };
-  });
-},
-```
-
-**Anti-pattern. Re-throwing in effects:**
-
-```ts
-try {
-  const result = riskyOperation();
-  emit(doneEvent.create());
-} catch (err) {
-  throw err; // ❌ throw in effect — the machine dies into __error
-}
-```
-
-**Anti-pattern. Throwing in transition handlers:**
-
-```ts
-m.on(idleState, submitEvent, (event) => {
-  if (!event.payload.data) throw new Error("missing data"); // ❌ kills the machine
-  return { state: doneState };
+Actor({
+  inputs: [],
+  internal: [doneEvent, failedEvent],
+  states: [workingState, doneState, errorState],
+  initial: workingState,
+  clock: VirtualClock(),
+  setup: (m) => {
+    m.effect(workingState, {
+      name: "runRiskyOperation",
+      sends: [doneEvent, failedEvent],
+      fn: ({ signal, emit, clock }) => {
+        clock.setTimeout(100, {
+          signal,
+          cb: () => {
+            try {
+              riskyOperation();
+              emit(doneEvent.create());
+            } catch (err) {
+              // ✅ emit the error as an internal event; a transition handles it
+              emit(failedEvent.create({ error: String(err) }));
+            }
+          },
+        });
+      },
+    });
+    m.on(workingState, {
+      event: doneEvent,
+      to: [doneState],
+      handler: () => ({ state: doneState }),
+    });
+    m.on(workingState, {
+      event: failedEvent,
+      to: [errorState],
+      handler: (event) => ({ state: errorState.create({ error: event.payload.error }) }),
+    });
+  },
 });
 ```
 
-Prefer storing the error in context and transitioning to an error state:
-
-```ts
-m.on(idleState, submitEvent, (event, opts) => {
-  if (!event.payload.data) {
-    const s = opts!.context.get();
-    s.error = "missing data";
-    opts!.context.set(s);
-    return { state: errorState };
-  }
-  return { state: doneState };
-});
-```
+**Anti-pattern.** Re-throwing in an effect, or throwing in a transition handler (`if (!event.payload.data) throw ...`). Either kills the machine into `__error`. Return an error state instead (`{ state: errorState.create({ error: "missing data" }) }`), or store the error in context and transition.
 
 ### Reading state in a UI
 
 `actor.state.name` is the typed state name: a union of your declared states plus `"__error"`. Read it, not `snapshot().path[0]`, which is an untyped `string`.
 
 ```ts
-const render = () => show(actor.state.name);
+import { Actor, state, event } from "@mantaq/core";
+
+declare function show(name: string): void;
+
+const idle = state("idle")();
+const toggle = event("TOGGLE")();
+const actor = Actor({ inputs: [toggle], states: [idle], initial: idle, setup: () => {} });
+
+const render = () => show(actor.state.name); // "idle" | "__error"
 actor.on("change", { fn: render });
 render();
 ```
@@ -558,7 +530,7 @@ To bind any actor without naming `Actor`'s five generics, type the binder on the
 ```ts
 import type { Snapshot } from "@mantaq/core";
 
-function bind<
+export function bind<
   A extends {
     state: { name: string };
     on(event: "change", options: { fn: () => void }): () => void;
@@ -573,60 +545,64 @@ function bind<
 
 ### Any Handler
 
-Use `onAny` to intercept events across all states. Useful for universal error handling, cleanup, or logging.
+Use `onAny` to intercept an event in every state. Useful for universal cancel, cleanup, or logging. A state's own `m.on` for the same event wins.
 
 ```ts
-setup: (m) => {
-  // CANCEL works from any state
-  m.onAny(cancelEvent, (_event, opts) => {
-    const s = opts!.context.get();
-    s.cancelled = true;
-    opts!.context.set(s);
-    return { state: cancelledState };
-  });
-  // State-specific handlers still run for their state
-  m.on(idleState, startEvent, () => ({ state: runningState }));
-},
+import { Actor, state, event } from "@mantaq/core";
+
+const idleState = state("idle")();
+const runningState = state("running")();
+const cancelledState = state("cancelled")().final();
+const startEvent = event("START")();
+const cancelEvent = event("CANCEL")();
+
+const initialContext: { cancelled: boolean } = { cancelled: false };
+
+Actor({
+  inputs: [startEvent, cancelEvent],
+  states: [idleState, runningState, cancelledState],
+  initial: idleState,
+  context: initialContext,
+  setup: (m) => {
+    // CANCEL works from any state
+    m.onAny({
+      event: cancelEvent,
+      to: [cancelledState],
+      handler: (_event, { context }) => {
+        const s = context.get();
+        s.cancelled = true;
+        context.set(s);
+        return { state: cancelledState };
+      },
+    });
+    m.on(idleState, {
+      event: startEvent,
+      to: [runningState],
+      handler: () => ({ state: runningState }),
+    });
+  },
+});
 ```
 
-**Anti-pattern. Using `onAny` for everything:**
-
-```ts
-setup: (m) => {
-  // ❌ state-specific logic in onAny defeats the purpose
-  m.onAny(submitBasicInfoEvent, (event, opts) => {
-    const s = opts!.context.get();
-    s.basicInfo = event; // wrong — only makes sense in basicInfo state
-    opts!.context.set(s);
-    return { state: shippingAddressState };
-  });
-
-  // ✅ keep state-specific logic in state handlers
-  m.on(basicInfoState, submitBasicInfoEvent, (event, opts) => {
-    const s = opts!.context.get();
-    s.basicInfo = event;
-    opts!.context.set(s);
-    return { state: shippingAddressState };
-  });
-},
-```
+**Anti-pattern. Using `onAny` for everything.** State-specific logic (submitting a form step) belongs in `m.on(thatState, ...)`. In `onAny` it runs in states where it makes no sense, and the diagram can only draw it as "from any state".
 
 ### Testing with VirtualClock
 
-`VirtualClock` replaces real timers for deterministic tests. Advance time manually, verify state instantly.
+`VirtualClock()` replaces real timers for deterministic tests. Advance time manually, verify state instantly. Without `clock`, an actor uses the real clock.
 
 #### Basic Usage
 
 ```ts
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { expect } from "vitest";
 
-const clock = new VirtualClock();
+const clock = VirtualClock();
 const timer = event("timer")();
 
 const idle = state("idle")();
 const timedOut = state("timedOut")();
 
-const actor = new Actor({
+const actor = Actor({
   inputs: [],
   internal: [timer],
   states: [idle, timedOut],
@@ -635,11 +611,12 @@ const actor = new Actor({
   setup: (m) => {
     m.effect(idle, {
       name: "armIdleTimeout",
-      fn: ({ emit, clock }) => {
-        clock.setTimeout(5000, () => emit(timer.create()));
+      sends: [timer],
+      fn: ({ emit, clock, signal }) => {
+        clock.setTimeout(5000, { signal, cb: () => emit(timer.create()) });
       },
     });
-    m.on(idle, timer, () => ({ state: timedOut }));
+    m.on(idle, { event: timer, to: [timedOut], handler: () => ({ state: timedOut }) });
   },
 });
 
@@ -650,30 +627,23 @@ expect(actor.state.name).toBe("timedOut");
 expect(clock.hasPending()).toBe(false);
 ```
 
-**Anti-pattern. Using `new Date()` or `setTimeout` directly:**
-
-```ts
-// ❌ real timers — slow, flaky, non-deterministic
-setTimeout(() => {
-  expect(actor.state.name).toBe("timedOut");
-}, 5000);
-
-// ✅ VirtualClock — instant, deterministic
-clock.advance(5000);
-expect(actor.state.name).toBe("timedOut");
-```
+**Anti-pattern.** Global `setTimeout` or `new Date()` in effects or tests: slow, flaky, non-deterministic. Use the effect's `clock` and `clock.advance(ms)` in tests.
 
 #### Abort Signal Cleanup
 
-The effect's abort signal fires on state exit. Clear timers in an abort listener so they don't fire later.
+The effect's abort signal fires on state exit. Timers armed with `signal` are cleared then.
 
 ```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { expect } from "vitest";
+
+const clock = VirtualClock();
 const cancel = event("cancel")();
 const done = event("done")();
 const loading = state("loading")();
 const success = state("success")();
 
-const actor = new Actor({
+const actor = Actor({
   inputs: [cancel],
   internal: [done],
   states: [loading, success],
@@ -682,18 +652,17 @@ const actor = new Actor({
   setup: (m) => {
     m.effect(loading, {
       name: "scheduleWork",
-      fn: ({ signal, clock }) => {
-        const id = clock.setTimeout(5000, () => {
-          /* ... */
-        });
-        signal.addEventListener("abort", () => clock.clearTimeout(id));
+      sends: [done],
+      fn: ({ signal, clock, emit }) => {
+        clock.setTimeout(5000, { signal, cb: () => emit(done.create()) });
       },
     });
-    m.on(loading, cancel, () => ({ state: success }));
+    m.on(loading, { event: cancel, to: [success], handler: () => ({ state: success }) });
+    m.on(loading, { event: done, to: [success], handler: () => ({ state: success }) });
   },
 });
 
-// transition to success before the timer fires — abort signal clears it
+// leave loading before the timer fires: the abort signal clears it
 actor.send(cancel.create());
 clock.advance(10000);
 expect(clock.hasPending()).toBe(false);
@@ -704,12 +673,15 @@ expect(clock.hasPending()).toBe(false);
 `advance()` fires intervals at each elapsed tick. Multiple calls accumulate.
 
 ```ts
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { expect } from "vitest";
+
+const clock = VirtualClock();
 const tick = event("tick")();
+const active = state("active")();
 let count = 0;
 
-const active = state("active")();
-
-const actor = new Actor({
+Actor({
   inputs: [],
   internal: [tick],
   states: [active],
@@ -718,13 +690,17 @@ const actor = new Actor({
   setup: (m) => {
     m.effect(active, {
       name: "startTicker",
-      fn: ({ emit, clock }) => {
-        clock.setInterval(1000, () => emit(tick.create()));
+      sends: [tick],
+      fn: ({ emit, clock, signal }) => {
+        clock.setInterval(1000, { signal, cb: () => emit(tick.create()) });
       },
     });
-    m.on(active, tick, () => {
-      count++;
-      return {};
+    m.on(active, {
+      event: tick,
+      handler: () => {
+        count++;
+        return {};
+      },
     });
   },
 });
@@ -733,19 +709,11 @@ clock.advance(3500);
 expect(count).toBe(3); // fired at 1000, 2000, 3000
 ```
 
-**Anti-pattern. Expecting single `advance` to fire interval once:**
-
-```ts
-// ❌ advance(5000) fires interval at 1000, 2000, 3000, 4000, 5000
-clock.advance(5000);
-expect(count).toBe(1); // fails — count is 5
-
-// ✅ match exact ticks or use setTimeout for single fire
-clock.advance(1000);
-expect(count).toBe(1);
-```
+`advance(5000)` on a 1000ms interval fires five times, not once. Advance by exact ticks, or use `setTimeout` for a single fire.
 
 ## Development
+
+From the [repo](https://github.com/AndersCan/mantaq) (contributors):
 
 ```bash
 vp install
@@ -755,12 +723,12 @@ vp pack
 
 ## Testing
 
-The package ships with a full test suite you can run and audit:
+The package ships with a full test suite you can run and audit from the repo:
 
 ```bash
 vp test          # feature + error + property tests
 vp check         # format, lint, typecheck (includes type-level contract tests)
-vp run mutation:core   # mutation score must stay ≥ 90
+vp run mutation:core   # mutation score must stay ≥ the break threshold
 ```
 
 **Test contract.** Behavior is pinned by four kinds of tests, split by filename:
@@ -770,7 +738,7 @@ vp run mutation:core   # mutation score must stay ≥ 90
 - `*.property.test.ts`. Property-based invariants against a reference model (fast-check, replayable via `MANTAQ_SEED`).
 - `*.mutation.test.ts`. Directed tests that kill specific mutants. Regenerable and thrown away between stryker runs.
 
-Coverage is analyzed per test (stryker `perTest` coverage analysis) so every mutant is attributed to the test that pins it. The mutation break threshold is 90. A change that drops the score below 90 fails the build.
+Coverage is analyzed per test (stryker `perTest` coverage analysis) so every mutant is attributed to the test that pins it. A change that drops the mutation score below the break threshold (`stryker.config.json`) fails the build.
 
 ## License
 
