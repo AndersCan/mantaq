@@ -405,10 +405,12 @@ export async function inspectModule(
       },
       analysis,
     );
+    const withContext: VizMachine | null =
+      inspected.machine === null ? null : { ...inspected.machine, context: each.context };
     const instance =
       each.call === "instance" ? ["not fuzzed: exported as one actor, not a factory"] : [];
     return {
-      machine: inspected.machine,
+      machine: withContext,
       warnings: [...instance, ...replayed.warnings, ...inspected.warnings].map(
         (warning) => `${id}: ${warning}`,
       ),

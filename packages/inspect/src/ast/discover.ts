@@ -1,4 +1,6 @@
+import type { VizField } from "@mantaq/viz";
 import ts from "typescript";
+import { fieldsOf } from "./payloads.ts";
 import type { LoadedSource } from "./program.ts";
 
 /**
@@ -16,6 +18,8 @@ export interface MachineExport {
   name: string;
   call: "instance" | "call" | "clock" | "options";
   unwrap: "self" | "actor";
+  /** Fields of the actor's context type. null = no declared fields, or not an object type. */
+  context: VizField[] | null;
 }
 
 const ACTOR_KEYS = ["send", "snapshot", "inject", "settled"];
@@ -34,6 +38,23 @@ function unwrapOf(
   const actor = type.getProperty("actor");
   if (actor === undefined) return null;
   return hasAll(checker.getTypeOfSymbolAtLocation(actor, node), ACTOR_KEYS) ? "actor" : null;
+}
+
+/** Fields of the `context` property of the actor type reached by `unwrap`. */
+function contextOf(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
+): VizField[] | null {
+  const { type, unwrap, node } = context;
+  const actor = unwrap === "self" ? undefined : type.getProperty("actor");
+  const actorType = actor === undefined ? type : checker.getTypeOfSymbolAtLocation(actor, node);
+  const property = actorType?.getProperty("context");
+  if (property === undefined) return null;
+  const fields = fieldsOf(
+    checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(property, node)),
+    { checker, node, depth: 0 },
+  );
+  return fields === null || fields.length === 0 ? null : fields;
 }
 
 function isRequired(parameter: ts.Symbol): boolean {
@@ -76,11 +97,21 @@ function machineExport(
   const type = checker.getTypeOfSymbolAtLocation(target, node);
   const name = symbol.getName();
   const self = unwrapOf(checker, type, node);
-  if (self !== null) return { name, call: "instance", unwrap: self };
+  if (self !== null) {
+    return {
+      name,
+      call: "instance",
+      unwrap: self,
+      context: contextOf(checker, { type, unwrap: self, node }),
+    };
+  }
   for (const signature of checker.getSignaturesOfType(type, ts.SignatureKind.Call)) {
     const unwrap = unwrapOf(checker, signature.getReturnType(), node);
     const call = unwrap === null ? null : callOf(checker, signature, node);
-    if (unwrap !== null && call !== null) return { name, call, unwrap };
+    if (unwrap !== null && call !== null) {
+      const returned = signature.getReturnType();
+      return { name, call, unwrap, context: contextOf(checker, { type: returned, unwrap, node }) };
+    }
   }
   return null;
 }

@@ -4,8 +4,8 @@ import { describe, expect, test } from "vite-plus/test";
 
 function machine(id: string, outputs: string[], inputs: string[], internal: string[] = []) {
   const events = [
-    ...inputs.map((name) => ({ id: name, internal: false, doc: null, payloadType: null })),
-    ...internal.map((name) => ({ id: name, internal: true, doc: null, payloadType: null })),
+    ...inputs.map((name) => ({ id: name, internal: false, doc: null, payload: null })),
+    ...internal.map((name) => ({ id: name, internal: true, doc: null, payload: null })),
   ];
   const value = { id, outputs, events } as unknown as VizMachine;
   return { file: `/x/${id}.ts`, machine: value };

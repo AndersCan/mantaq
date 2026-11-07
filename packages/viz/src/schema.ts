@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 11;
+export const VIZ_SCHEMA_VERSION = 12;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -59,8 +59,26 @@ export interface VizEvent {
   internal: boolean;
   /** Leading JSDoc of the `event(...)` declaration. null = undocumented or AST not run. */
   doc: string | null;
-  /** Payload types are erased at runtime; always null. */
-  payloadType: null;
+  /** Payload fields from the event's payload type. null = no payload, not an object type, or source not analyzed. */
+  payload: VizField[] | null;
+}
+
+/** How the live page asks for a field. */
+export type VizFieldInput = "text" | "number" | "choice" | "json";
+
+/** One top-level field of a context or payload object type, read by the type checker. */
+export interface VizField {
+  name: string;
+  /** `checker.typeToString` of the non-nullable field type. */
+  type: string;
+  optional: boolean;
+  /** JSDoc of the property. null = undocumented. */
+  doc: string | null;
+  input: VizFieldInput;
+  /** Literal values for `choice`; empty otherwise. */
+  choices: VizJson[];
+  /** First sample of the type; the form starts with it. */
+  sample: VizJson;
 }
 
 /**
@@ -169,6 +187,8 @@ export interface VizMachine {
   events: VizEvent[];
   /** Declared output event ids, sorted. Empty = none declared. */
   outputs: string[];
+  /** Fields of the actor's context type. null = not an object type, or source not analyzed. */
+  context: VizField[] | null;
   edges: VizEdge[];
   /** null = not fuzzed. */
   fuzz: VizFuzz | null;

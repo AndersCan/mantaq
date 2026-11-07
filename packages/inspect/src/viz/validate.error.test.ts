@@ -24,11 +24,34 @@ describe("validateViz rejects", () => {
 
   test("version 9 documents and a missing outputs list", () => {
     expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
-      "$.schemaVersion: expected 11, got 9",
+      "$.schemaVersion: expected 12, got 9",
     ]);
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["outputs"];
     expect(issues(doc)).toEqual(["$.machines[0].outputs: expected string[]"]);
+  });
+
+  test("version 11 documents", () => {
+    expect(issues({ schemaVersion: 11, machines: [] })).toEqual([
+      "$.schemaVersion: expected 12, got 11",
+    ]);
+  });
+
+  test("a context field with a bad input kind", () => {
+    const doc = valid() as { machines: Array<Record<string, unknown>> };
+    const field = {
+      name: "a",
+      type: "string",
+      optional: false,
+      doc: null,
+      input: "dial",
+      choices: [],
+      sample: "x",
+    };
+    doc.machines[0] = { ...doc.machines[0], context: [field] };
+    expect(issues(doc)).toEqual([
+      "$.machines[0].context[0].input: expected one of text, number, choice, json",
+    ]);
   });
 
   test("invalid JSON text", () => {
