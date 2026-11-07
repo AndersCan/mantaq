@@ -104,6 +104,14 @@ describe("outlineChanges", () => {
     });
   });
 
+  test("a kind-only difference between two arrows is a change", () => {
+    const transition = go("a", "a");
+    const stay = { ...transition, kind: "stay" as const };
+    const changes = outlineChanges(outline(["a"], [transition]), outline(["a"], [stay]));
+    expect(changes.removedArrows).toEqual([transition]);
+    expect(changes.addedArrows).toEqual([stay]);
+  });
+
   test("a retargeted arrow is one removed and one added", () => {
     const changes = outlineChanges(outline(["a"], [go("a", "b")]), outline(["a"], [go("a", "c")]));
     expect(changes.removedArrows).toEqual([go("a", "b")]);
