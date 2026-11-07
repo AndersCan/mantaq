@@ -7,6 +7,7 @@ import {
   arrowsOf,
   cleanNoteText,
   isNoteTarget,
+  isVizSteps,
   notesFileOf,
   parseNotes,
   parseTarget,
@@ -44,6 +45,7 @@ function twice(): string {
 
 const shape: MachineShape = {
   states: [{ id: "s" }, { id: "t" }],
+  events: [{ id: "GO" }, { id: "STOP" }],
   edges: [
     { from: "s", event: "GO", kind: "transition" },
     { from: "s", event: "GO", kind: "transition" },
@@ -188,5 +190,61 @@ describe("notes file", () => {
     expect(isNoteTarget(state("a b"))).toBe(false);
     expect(isNoteTarget({ kind: "edge", state: "a" })).toBe(false);
     expect(isNoteTarget(undefined)).toBe(false);
+  });
+});
+
+describe("walk notes", () => {
+  const steps = [
+    { kind: "event", event: "GO", payload: { n: 1 } },
+    { kind: "advance", ms: 3600000 },
+  ] as const;
+
+  test("appendNote writes the walk lines and parseNotes reads them back", () => {
+    const added = appendNote(undefined, {
+      file: "m.ts",
+      machine: "m",
+      target: { kind: "walk" },
+      note: "Nils picks 1 hour",
+      walk: { end: "t", steps: [...steps] },
+    });
+    expect(added.text).toContain(
+      '- id: n1\n  machine: m\n  on: walk\n  status: open\n  note: Nils picks 1 hour\n  end: t\n  steps: [{"kind":"event","event":"GO","payload":{"n":1}},{"kind":"advance","ms":3600000}]\n',
+    );
+    const [note] = Either.getRight(parseNotes(added.text, "m.notes.md")) ?? [];
+    expect(note?.target).toEqual({ kind: "walk" });
+    expect(note?.end).toBe("t");
+    expect(note?.steps).toEqual(steps);
+    expect(note).toEqual(added.note);
+  });
+
+  test("other notes have no end or steps", () => {
+    const [note] = Either.getRight(parseNotes(twice(), "x")) ?? [];
+    expect(note?.end).toBeUndefined();
+    expect(note?.steps).toBeUndefined();
+  });
+
+  test("malformed steps give undefined and do not throw", () => {
+    for (const bad of [
+      "{oops",
+      "{}",
+      '[{"kind":"advance","ms":-1}]',
+      '[{"kind":"event","event":"","payload":1}]',
+      '[{"kind":"event","event":"GO"}]',
+      "",
+    ]) {
+      const text = `mantaq notes v1\n- id: n1\n  on: walk\n  end: t\n  steps: ${bad}\n`;
+      const [note] = Either.getRight(parseNotes(text, "x")) ?? [];
+      expect(note?.target).toEqual({ kind: "walk" });
+      expect(note?.steps).toBeUndefined();
+    }
+  });
+
+  test("walk target text, parse, guard", () => {
+    expect(targetText({ kind: "walk" })).toBe("walk");
+    expect(parseTarget("walk")).toEqual({ kind: "walk" });
+    expect(isNoteTarget({ kind: "walk" })).toBe(true);
+    expect(targetProblem(shape, { machine: "m", target: { kind: "walk" } })).toBeUndefined();
+    expect(isVizSteps([])).toBe(true);
+    expect(isVizSteps("x")).toBe(false);
   });
 });

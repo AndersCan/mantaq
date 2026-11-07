@@ -7,7 +7,14 @@
 import { isAnyState } from "@mantaq/viz";
 import type { VizMachine } from "@mantaq/viz";
 import type { ViewerSelection } from "@mantaq/viz/viewer";
-import { NOTES_VERSION, MAX_NOTE_LENGTH, arrowsOf, isNoteTarget, targetText } from "./notes.ts";
+import {
+  NOTES_VERSION,
+  MAX_NOTE_LENGTH,
+  arrowsOf,
+  isNoteTarget,
+  isVizSteps,
+  targetText,
+} from "./notes.ts";
 import type { Note, NoteTarget } from "./notes.ts";
 
 type Phase =
@@ -22,7 +29,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readNote(value: unknown): Note | undefined {
   if (!isRecord(value)) return undefined;
-  const { id, machine, on, target, status, note, result, question } = value;
+  const { id, machine, on, target, status, note, result, question, end, steps } = value;
   if (typeof id !== "string" || typeof note !== "string") return undefined;
   return {
     id,
@@ -33,6 +40,8 @@ function readNote(value: unknown): Note | undefined {
     note,
     result: typeof result === "string" ? result : undefined,
     question: typeof question === "string" ? question : undefined,
+    end: typeof end === "string" ? end : undefined,
+    steps: isVizSteps(steps) ? steps : undefined,
   };
 }
 
@@ -232,6 +241,7 @@ function targetOf(
 }
 
 function targetLabel(target: NoteTarget): string {
+  if (target.kind === "walk") return "this journey";
   if (target.kind === "state") return target.state;
   return `${target.event} from ${isAnyState(target.from) ? "any state" : target.from}`;
 }
