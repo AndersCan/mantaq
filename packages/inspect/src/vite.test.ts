@@ -1,6 +1,7 @@
 import { mantaqViz } from "./vite.ts";
 import { UPDATE_EVENT, parseViz } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createLogger, createServer } from "vite";
 import type { ViteDevServer } from "vite";
@@ -126,5 +127,71 @@ describe("mantaqViz fuzz budget", () => {
     expect(logged.find((line) => line.includes("fuzz never reached"))).toMatch(
       /^\[mantaq-viz\] checkout: fuzz never reached: .*\(ran 1 iterations, stopped: iteration cap\)/,
     );
+  });
+});
+
+describe("notes endpoint", () => {
+  const credit = join(import.meta.dirname, "fixtures", "credit.notes.md");
+  beforeAll(() => rmSync(credit, { force: true }));
+  afterAll(() => rmSync(credit, { force: true }));
+
+  function sentDuring(run: () => void): unknown[] {
+    const sent: unknown[] = [];
+    const send = server.ws.send.bind(server.ws);
+    server.ws.send = (payload: unknown) => sent.push(payload);
+    run();
+    server.ws.send = send;
+    return sent;
+  }
+
+  test("lists the notes of a machine", async () => {
+    const response = await fetch(`${origin}/__mantaq/notes?machine=retry`);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = (await response.json()) as { file: string; notes: Array<{ id: string }> };
+    expect(body.file).toBe("retry.notes.md");
+    expect(body.notes.map((note) => note.id)).toEqual(["n1", "n2"]);
+  });
+
+  test("saves a note next to the machine file, and its own write does not redraw", async () => {
+    const response = await fetch(`${origin}/__mantaq/notes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        version: 1,
+        machine: "credit",
+        target: { kind: "state", state: "idle" },
+        note: "first",
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(readFileSync(credit, "utf8")).toContain("  note: first\n");
+    expect(sentDuring(() => server.watcher.emit("all", "change", credit))).toEqual([]);
+  });
+
+  test("an outside edit redraws the page and keeps the cached document", async () => {
+    const before = await (await fetch(`${origin}/__mantaq/viz.json`)).text();
+    writeFileSync(credit, `${readFileSync(credit, "utf8")}\nedited by hand\n`);
+    expect(sentDuring(() => server.watcher.emit("all", "change", credit))).toEqual([
+      { type: "custom", event: UPDATE_EVENT },
+    ]);
+    expect(await (await fetch(`${origin}/__mantaq/viz.json`)).text()).toBe(before);
+  });
+
+  test("refuses a body that is not JSON content", async () => {
+    const response = await fetch(`${origin}/__mantaq/notes`, {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: "{}",
+    });
+    expect(response.status).toBe(415);
+  });
+
+  test("refuses a body over the limit", async () => {
+    const response = await fetch(`${origin}/__mantaq/notes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "x".repeat(20000),
+    });
+    expect(response.status).toBe(413);
   });
 });
