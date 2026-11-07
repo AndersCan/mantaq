@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 9;
+export const VIZ_SCHEMA_VERSION = 10;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -167,6 +167,8 @@ export interface VizMachine {
   regions: string[];
   states: VizState[];
   events: VizEvent[];
+  /** Declared output event ids, sorted. Empty = none declared. */
+  outputs: string[];
   edges: VizEdge[];
   /** null = not fuzzed. */
   fuzz: VizFuzz | null;

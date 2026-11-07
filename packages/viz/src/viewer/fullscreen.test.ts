@@ -22,6 +22,7 @@ const machine: VizMachine = {
     },
   ],
   events: [],
+  outputs: [],
   edges: [
     {
       id: "init",

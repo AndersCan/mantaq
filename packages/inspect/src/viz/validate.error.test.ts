@@ -22,6 +22,15 @@ describe("validateViz rejects", () => {
     ]);
   });
 
+  test("version 9 documents and a missing outputs list", () => {
+    expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
+      "$.schemaVersion: expected 10, got 9",
+    ]);
+    const doc = valid() as { machines: Array<Record<string, unknown>> };
+    delete doc.machines[0]?.["outputs"];
+    expect(issues(doc)).toEqual(["$.machines[0].outputs: expected string[]"]);
+  });
+
   test("invalid JSON text", () => {
     const result = parseViz("{nope");
     expect(Either.getLeft(result)?.[0]?.message).toMatch(/^invalid JSON/);
