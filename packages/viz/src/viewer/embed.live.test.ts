@@ -985,6 +985,25 @@ describe("live effect reports", () => {
     );
   });
 
+  test("a handled internal event no effect sends sits under Other internal events", () => {
+    const root = document.createElement("div");
+    const machine: VizMachine = {
+      ...fetcher,
+      events: [...fetcher.events, { id: "poke", internal: true, doc: null, payload: null }],
+      edges: [...fetcher.edges, edge("fetching", "poke", "waiting")],
+    };
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver: fetchDriver() },
+    );
+    click(root, '[data-send="start"]');
+    expect(events(root, "internal")).toEqual(["poke"]);
+    expect(root.querySelector('[data-group="internal"]')?.previousElementSibling?.textContent).toBe(
+      "Other internal events",
+    );
+  });
+
   test("the old single list is gone", () => {
     const root = mountFetcher();
     expect(root.querySelector('[data-group="live"]')).toBeNull();
