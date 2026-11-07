@@ -17,7 +17,7 @@ import {
   decodePath,
   encodeLiveStep,
   encodeStep,
-  payloadSamples,
+  asksForPayload,
 } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
@@ -360,7 +360,7 @@ function liveTake(
 ): void {
   const event = machine.edges.find((edge) => edge.id === step.edge)?.event;
   if (event === undefined) return;
-  if (payloadSamples(machine, event).length > 0) handlers.compose(event);
+  if (asksForPayload(machine, event)) handlers.compose(event);
   else handlers.send({ kind: "event", event, payload: null });
 }
 

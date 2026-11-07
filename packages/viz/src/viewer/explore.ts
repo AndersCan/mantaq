@@ -1,6 +1,7 @@
-import { movesFrom, payloadSamples, stateAfter, unhandledSends } from "../moves.ts";
+import { asksForPayload, movesFrom, stateAfter, unhandledSends } from "../moves.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
 import type {
+  VizField,
   VizJson,
   VizLiveState,
   VizLiveStep,
@@ -276,6 +277,115 @@ interface LiveMoves {
   compose: (event: string | null) => void;
 }
 
+/** One input per declared payload field, started at the field's sample. */
+function fieldInput(doc: Document, field: VizField): HTMLInputElement | HTMLSelectElement {
+  const attrs = { "data-field": field.name, "aria-label": field.name };
+  if (field.input === "choice") {
+    const select = html(doc, "select", attrs);
+    if (field.optional) select.append(html(doc, "option", { value: "" }, ["(not set)"]));
+    for (const choice of field.choices) {
+      const option = html(doc, "option", { value: JSON.stringify(choice) }, [
+        typeof choice === "string" ? choice : JSON.stringify(choice),
+      ]);
+      select.append(option);
+    }
+    select.value = field.optional ? "" : JSON.stringify(field.sample);
+    return select;
+  }
+  const input = html(doc, "input", {
+    ...attrs,
+    type: field.input === "number" ? "number" : "text",
+  });
+  if (!field.optional) {
+    input.value =
+      field.input === "json" || typeof field.sample !== "string"
+        ? (JSON.stringify(field.sample) ?? "")
+        : field.sample;
+  }
+  return input;
+}
+
+/** The value one field's input holds, or undefined to leave the field out; bad json is an error. */
+function readField(field: VizField, value: string): { value: VizJson | undefined } | { bad: true } {
+  if (field.input === "text") {
+    return { value: value !== "" || !field.optional ? value : undefined };
+  }
+  if (field.input === "number") {
+    const number = Number(value);
+    return { value: value.trim() !== "" && Number.isFinite(number) ? number : undefined };
+  }
+  if (value.trim() === "" || (field.input === "choice" && value === "")) {
+    return { value: undefined };
+  }
+  try {
+    return { value: JSON.parse(value) as VizJson };
+  } catch {
+    return { bad: true };
+  }
+}
+
+/** The payload typed into the field inputs, or the name of a json field that did not parse. */
+function readFields(
+  fields: ReadonlyArray<VizField>,
+  inputs: ReadonlyMap<string, HTMLInputElement | HTMLSelectElement>,
+): { payload: Record<string, VizJson> } | { bad: string } {
+  const payload: Record<string, VizJson> = {};
+  for (const field of fields) {
+    const read = readField(field, inputs.get(field.name)?.value ?? "");
+    if ("bad" in read) return { bad: field.name };
+    if (read.value !== undefined) payload[field.name] = read.value;
+  }
+  return { payload };
+}
+
+function fieldsForm(
+  doc: Document,
+  context: {
+    event: string;
+    fields: ReadonlyArray<VizField>;
+    send: (step: VizStep) => void;
+    close: () => void;
+  },
+): HTMLElement {
+  const { event, fields } = context;
+  const inputs = new Map(fields.map((field) => [field.name, fieldInput(doc, field)] as const));
+  const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" });
+  const submit = () => {
+    const read = readFields(fields, inputs);
+    if ("bad" in read) {
+      problem.textContent = `Not sent: ${read.bad} is not valid JSON.`;
+      problem.removeAttribute("hidden");
+      return;
+    }
+    context.send({ kind: "event", event, payload: read.payload });
+  };
+  return html(doc, "div", { class: "explore-payload", "data-payload-form": event }, [
+    html(doc, "p", {}, ["Payload for ", code(doc, event), ":"]),
+    ...fields.map((field) =>
+      html(doc, "label", { class: "explore-field" }, [
+        html(doc, "span", {}, [
+          html(doc, "strong", {}, [field.name]),
+          " ",
+          html(doc, "span", { class: "muted" }, [field.type]),
+        ]),
+        field.doc === null ? null : html(doc, "span", { class: "muted" }, [field.doc]),
+        inputs.get(field.name) ?? null,
+      ]),
+    ),
+    problem,
+    html(doc, "div", { class: "explore-samples" }, [
+      button(doc, ["Send ", code(doc, event)], {
+        onClick: submit,
+        attrs: { "data-payload-send": event },
+      }),
+      button(doc, ["Cancel"], {
+        onClick: context.close,
+        attrs: { "data-payload-cancel": event },
+      }),
+    ]),
+  ]);
+}
+
 /**
  * Asks for the payload before sending: filled with the first fuzz sample,
  * editable, with the other samples one click away. Nothing is sent until Send.
@@ -285,11 +395,16 @@ export function payloadForm(
   context: {
     event: string;
     samples: ReadonlyArray<VizJson>;
+    /** The event's declared payload fields; null when the type could not be read. */
+    fields: ReadonlyArray<VizField> | null;
     send: (step: VizStep) => void;
     close: () => void;
   },
 ): HTMLElement {
   const { event, samples } = context;
+  if (context.fields !== null && context.fields.length > 0) {
+    return fieldsForm(doc, { ...context, fields: context.fields });
+  }
   const first = samples[0];
   const box = html(doc, "textarea", {
     rows: "3",
@@ -358,22 +473,22 @@ function liveMovesSection(doc: Document, machine: VizMachine, moves: LiveMoves):
   const inputs = machine.events.filter((event) => !event.internal).map((event) => event.id);
   const events = [...new Set([...handled, ...inputs])].sort();
   return html(doc, "div", { class: "explore-moves" }, [
-    html(doc, "h3", {}, ["Send"]),
+    html(doc, "h3", {}, ["Send an event"]),
     html(
       doc,
       "ul",
       { "data-group": "live" },
       events.map((event) => {
-        const samples = payloadSamples(machine, event);
-        // An event fuzzing sent with a payload asks for one; the rest send at once.
-        const asks = samples.length > 0;
+        // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
+        const asks = asksForPayload(machine, event);
+        const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
         return html(doc, "li", { "data-send-item": event }, [
           button(doc, [code(doc, event), asks ? " …" : ""], {
             onClick: () =>
               asks ? moves.compose(event) : moves.send({ kind: "event", event, payload: null }),
             attrs: { "data-send": event },
           }),
-          asks
+          asks || declared !== null
             ? null
             : button(doc, ["with payload"], {
                 onClick: () => moves.compose(event),
@@ -418,21 +533,83 @@ function outcomeText(last: VizLiveStep): string {
   return ` ignored in ${last.from}: no handler`;
 }
 
-/** Pretty-printed context, lines the last step changed marked. */
-function contextSection(doc: Document, value: VizJson, previous: VizJson | undefined): HTMLElement {
-  return html(doc, "div", { class: "explore-context", "data-live-context": "" }, [
+function fieldValue(value: VizJson, name: string): string {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return "not set";
+  return Object.hasOwn(value, name) ? (JSON.stringify(value[name]) ?? "not set") : "not set";
+}
+
+/** One row per declared context field: meaning and value now, changed ones marked. */
+function fieldsTable(
+  doc: Document,
+  context: { fields: ReadonlyArray<VizField>; value: VizJson; previous: VizJson | undefined },
+): HTMLElement {
+  const { fields, value, previous } = context;
+  const head = ["Field", "Type", "Meaning", "Now"];
+  return html(doc, "table", { "data-context-fields": "" }, [
+    html(doc, "thead", {}, [
+      html(
+        doc,
+        "tr",
+        {},
+        head.map((name) => html(doc, "th", {}, [name])),
+      ),
+    ]),
     html(
       doc,
-      "pre",
+      "tbody",
       {},
-      contextLines(value, previous).flatMap((line, index) => [
-        index === 0 ? "" : "\n",
-        line.changed
-          ? html(doc, "mark", { class: "context-changed", "data-context-changed": "" }, [line.text])
-          : line.text,
-      ]),
+      fields.map((field) => {
+        const now = fieldValue(value, field.name);
+        const changed = previous !== undefined && now !== fieldValue(previous, field.name);
+        return html(
+          doc,
+          "tr",
+          { "data-context-field": field.name, "data-context-changed": changed ? "" : null },
+          [
+            html(doc, "td", {}, [code(doc, field.name)]),
+            html(doc, "td", {}, [code(doc, field.type)]),
+            html(doc, "td", {}, [field.doc ?? ""]),
+            html(doc, "td", {}, [
+              changed ? html(doc, "mark", { class: "context-changed" }, [now]) : now,
+            ]),
+          ],
+        );
+      }),
     ),
   ]);
+}
+
+/** The declared fields as a table, or the pretty-printed context with changed lines marked. */
+function contextSection(
+  doc: Document,
+  context: { machine: VizMachine; value: VizJson; previous: VizJson | undefined },
+): HTMLElement {
+  const { machine, value, previous } = context;
+  const note = html(doc, "p", { class: "muted", "data-context-note": "" }, [
+    "The machine starts with this context. You can't type it in: only its handlers change it, when you send events.",
+  ]);
+  const body =
+    machine.context !== null
+      ? fieldsTable(doc, { fields: machine.context, value, previous })
+      : prettyContext(doc, value, previous);
+  return html(doc, "div", { class: "explore-context" }, [
+    note,
+    html(doc, "div", { "data-live-context": "" }, [body]),
+  ]);
+}
+
+function prettyContext(doc: Document, value: VizJson, previous: VizJson | undefined): HTMLElement {
+  return html(
+    doc,
+    "pre",
+    {},
+    contextLines(value, previous).flatMap((line, index) => [
+      index === 0 ? "" : "\n",
+      line.changed
+        ? html(doc, "mark", { class: "context-changed", "data-context-changed": "" }, [line.text])
+        : line.text,
+    ]),
+  );
 }
 
 /** How many context lines the last live step changed. */
@@ -526,6 +703,11 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
     "section",
     { class: "explore", "data-current": current, "data-done": final ? "" : null },
     [
+      live
+        ? html(doc, "p", { class: "explore-note", "data-live-note": "" }, [
+            "The real machine runs here, in your browser. Effects run too, with the defaults the machine uses when it is built from a clock alone. Time stands still: timers fire only when you advance them.",
+          ])
+        : null,
       ...nowSection(doc, machine, { current, final }),
       ...(live
         ? [
@@ -558,7 +740,9 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
   );
   return {
     step,
-    context: live ? contextSection(doc, live.state.context, live.previous) : null,
+    context: live
+      ? contextSection(doc, { machine, value: live.state.context, previous: live.previous })
+      : null,
     path: historySection(doc, context),
   };
 }

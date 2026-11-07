@@ -145,6 +145,7 @@ describe("mountDriven heading and walk ownership", () => {
     for (const send of first.querySelectorAll<HTMLElement>("[data-send]")) {
       if (current(first) !== start) break;
       send.click();
+      first.querySelector<HTMLElement>("[data-payload-send]")?.click();
     }
     expect(current(first)).not.toBe(start);
     const walk = new URLSearchParams(location.search);
@@ -305,6 +306,7 @@ describe("compare", () => {
       for (const send of column.querySelectorAll<HTMLElement>("[data-send]")) {
         if (current(column) !== start) break;
         send.click();
+        column.querySelector<HTMLElement>("[data-payload-send]")?.click();
       }
     };
     const startA = current(section(root, "a"));
