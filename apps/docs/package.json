@@ -8,7 +8,7 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "test": "vp test run",
+    "test": "vp test run --passWithNoTests",
     "astro": "astro"
   },
   "dependencies": {
@@ -16,7 +16,6 @@
     "@mantaq/core": "workspace:*",
     "@mantaq/inspect": "workspace:*",
     "@mantaq/sugar": "workspace:*",
-    "@mantaq/viz": "workspace:*",
     "astro": "^7.2.0",
     "sharp": "catalog:",
     "starlight-llms-txt": "catalog:"

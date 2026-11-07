@@ -22,13 +22,13 @@ hero:
 ---
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
-import MachineViz from "../../components/MachineViz.astro";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
 
 State machine library for TypeScript. You declare states and events; Mantaq runs transitions, effects, timeouts, child actors, and cleanup. All types inferred from declarations.
 
 ## See it
 
-<MachineViz id="checkout" />
+<Machine src="src/content/docs/checkout.ts" />
 
 A built-in fuzzer sends random event sequences to every machine and reports states nothing reaches, handlers that throw, and events an effect sends that no state handles.
 

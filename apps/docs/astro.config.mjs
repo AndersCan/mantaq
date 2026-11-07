@@ -2,6 +2,7 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import starlightLlmsTxt from "starlight-llms-txt";
+import { mantaqViz } from "@mantaq/inspect/astro";
 import remarkGfm from "remark-gfm";
 
 // https://astro.build/config
@@ -16,6 +17,16 @@ export default defineConfig({
   },
   vite: {},
   integrations: [
+    mantaqViz({
+      machines: [
+        "src/content/docs/checkout.ts",
+        "src/content/docs/saga.ts",
+        "src/content/docs/login.ts",
+      ],
+      // Seeded, so every build draws the same coverage. 2000 runs miss the saga's
+      // five-step path to `completed` on this seed; 5000 take ~0.3s.
+      fuzz: { seed: 1, iterations: 5000 },
+    }),
     starlight({
       title: "Mantaq",
       logo: {
@@ -24,6 +35,7 @@ export default defineConfig({
         alt: "Mantaq",
         replacesTitle: true,
       },
+      customCss: ["./src/styles/machine.css"],
       plugins: [
         starlightLlmsTxt({
           projectName: "Mantaq",
