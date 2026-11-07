@@ -858,3 +858,138 @@ describe("what ran", () => {
     expect(text(root, "outcome")).toBe("No handler for submit in idle. Nothing ran.");
   });
 });
+
+describe("live effect reports", () => {
+  const withDoc = (from: string, event: string, to: string, doc: string | null): VizEdge => ({
+    ...edge(from, event, to),
+    doc,
+  });
+  const fetcher: VizMachine = {
+    ...checkout,
+    id: "fetcher",
+    initial: "waiting",
+    states: [
+      state("waiting", { initial: true }),
+      {
+        ...state("fetching"),
+        effects: [{ name: "fetchList", sends: ["listFetched", "fetchFailed", "fetchGone"] }],
+      },
+      state("couldNotFetch"),
+    ],
+    events: [
+      { id: "start", internal: false, doc: null, payload: null },
+      { id: "listFetched", internal: true, doc: null, payload: null },
+      { id: "fetchFailed", internal: true, doc: null, payload: null },
+      { id: "fetchGone", internal: true, doc: null, payload: null },
+    ],
+    edges: [
+      edge("waiting", "start", "fetching"),
+      withDoc("fetching", "listFetched", "waiting", "The list is shown."),
+      withDoc(
+        "fetching",
+        "fetchFailed",
+        "couldNotFetch",
+        "Fetching failed: the person can try again.",
+      ),
+    ],
+    fuzz: {
+      ...checkout.fuzz,
+      seed: 1,
+      iterations: 1,
+      errors: [],
+      failedExpectations: [],
+      corpus: [],
+    },
+  };
+  const next: Record<string, Record<string, string>> = {
+    waiting: { start: "fetching" },
+    fetching: { listFetched: "waiting", fetchFailed: "couldNotFetch" },
+  };
+  function fetchDriver(): VizDriver {
+    const run = (steps: VizStep[]): VizLiveState => {
+      let current = "waiting";
+      for (const step of steps) {
+        if (step.kind === "event") current = next[current]?.[step.event] ?? current;
+      }
+      return { state: current, steps, last: null, after: [], timers: [], context: null };
+    };
+    const done: VizStep[] = [];
+    return {
+      reset: () => {
+        done.length = 0;
+        return run([]);
+      },
+      step: (step) => {
+        done.push(step);
+        return run([...done]);
+      },
+    };
+  }
+  function mountFetcher() {
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [fetcher] },
+      { driver: fetchDriver() },
+    );
+    click(root, '[data-send="start"]');
+    return root;
+  }
+  const events = (root: HTMLElement, group: string) =>
+    [...root.querySelectorAll(`[data-group="${group}"] [data-send]`)].map((each) =>
+      each.getAttribute("data-send"),
+    );
+
+  test("lists what the running effect reports, with where each comes from", () => {
+    const root = mountFetcher();
+    expect(events(root, "effect")).toEqual(["fetchFailed", "listFetched"]);
+    const from = [...root.querySelectorAll('[data-group="effect"] [data-sent-by]')].map((each) =>
+      each.getAttribute("data-sent-by"),
+    );
+    expect(from).toEqual(["fetchList", "fetchList"]);
+  });
+
+  test("a report shows its handler's doc", () => {
+    const root = mountFetcher();
+    expect(root.querySelector('[data-send-item="fetchFailed"]')?.textContent).toContain(
+      "Fetching failed: the person can try again.",
+    );
+  });
+
+  test("picking the failure moves down the error path and Back undoes it", () => {
+    const root = mountFetcher();
+    click(root, '[data-send="fetchFailed"]');
+    expect(current(root)).toBe("couldNotFetch");
+    click(root, '[data-explore-action="back"]');
+    expect(current(root)).toBe("fetching");
+  });
+
+  test("a report no state handles is flagged", () => {
+    const root = mountFetcher();
+    expect(root.querySelector('.explore-warning[role="note"]')?.textContent).toContain(
+      "No handler in fetching for fetchGone",
+    );
+  });
+
+  test("inputs are grouped apart and marked ignored", () => {
+    const root = mountFetcher();
+    expect(
+      root.querySelector('[data-group="input"] [data-send-item="start"]')?.textContent,
+    ).toContain(" ignored in fetching");
+  });
+
+  test("the note says the person can answer for an effect", () => {
+    const root = mountFetcher();
+    expect(root.querySelector("[data-live-note]")?.textContent).toBe(
+      "The real machine runs here, in your browser. Effects run with the defaults the machine uses when it is built from a clock alone. While a state's effect runs, you can answer for it: pick what it reports under Effect reports back. Time stands still: timers fire only when you advance them.",
+    );
+  });
+
+  test("the old single list is gone", () => {
+    const root = mountFetcher();
+    expect(root.querySelector('[data-group="live"]')).toBeNull();
+    expect([...root.querySelectorAll("h3")].map((each) => each.textContent)).not.toContain(
+      "Send an event",
+    );
+  });
+});

@@ -19,6 +19,8 @@ The panel groups the next steps:
 - **Effect reports back**: internal events that an effect of the current state declares in `sends`.
 - **Other internal events**: internal events that no effect of the state declares.
 
+On the live page the same groups list what you can send; while `submitting` runs `chargeCard`, pick `paymentFail` under **Effect reports back** to see the failure path.
+
 A final state ends the walk. **Back** (or the left arrow), **Reset** and the path list undo steps. The standalone page keeps the walk in the URL (`?step=`), so a link opens the same path. `?machine=checkout&run=<name>` opens a recorded run by name; use it for links in docs and issues.
 
 A static walk follows declarations: guards are not evaluated, so a path may not happen at runtime. On the live page (the Vite plugin), each step runs the real actor, so guards are evaluated.
