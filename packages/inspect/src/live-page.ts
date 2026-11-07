@@ -8,10 +8,11 @@ import { mountViewer, showIssues } from "@mantaq/viz/viewer";
 import type { ViewerOptions } from "@mantaq/viz/viewer";
 import { linkOptions } from "@mantaq/viz/page";
 import { outlineOf, parseViz } from "@mantaq/viz";
-import type { MachineOutline, VizDocument, VizDriver, VizMachine } from "@mantaq/viz";
+import type { MachineOutline, VizDocument, VizDriver, VizLiveState, VizMachine } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
+import { journeyFooter, trackWalk } from "./journey-page.ts";
 import { notesFooter } from "./notes-page.ts";
 
 export type LiveTargets = Readonly<Record<string, FuzzTarget["create"]>>;
@@ -154,15 +155,36 @@ export function mountDriven(
   root.replaceChildren(...(picker ? [bar] : []), viewer);
   const machine = shown.machines[0];
   const changes = changesOption(context, machine, viz.machines);
+  const driver = trackedDriver(id, create);
+  const footer = panelFooter(doc, context.notes, machine, driver?.current);
   mountViewer(viewer, shown, {
     ...options,
     ...changes,
-    ...(context.notes === undefined || machine === undefined
-      ? {}
-      : { panelFooter: notesFooter(doc, { url: context.notes, machine }) }),
+    ...(footer === undefined ? {} : { panelFooter: footer }),
     ...(context.heading === undefined ? {} : { heading: context.heading }),
-    ...(create === undefined ? {} : { driver: createDriver({ id, create }) }),
+    ...(driver === undefined ? {} : { driver: driver.driver }),
   });
+}
+
+/** Notes, plus the journey box when the machine runs live; both persist across calls. */
+function panelFooter(
+  doc: Document,
+  url: string | undefined,
+  machine: VizMachine | undefined,
+  walk: (() => VizLiveState | undefined) | undefined,
+): ViewerOptions["panelFooter"] {
+  if (url === undefined || machine === undefined) return undefined;
+  const notes = notesFooter(doc, { url, machine });
+  if (walk === undefined) return notes;
+  const journey = journeyFooter(doc, { url, machine: machine.id, walk });
+  const wrapper = doc.createElement("div");
+  wrapper.className = "panel-extras";
+  return (selection) => {
+    const part = notes(selection);
+    if (wrapper.firstChild === null && part !== undefined) wrapper.append(part, journey.section);
+    journey.update();
+    return wrapper;
+  };
 }
 
 /** `?machine=<a>&compare=<b>` names two designs; undefined unless both are set and differ. */
@@ -277,4 +299,11 @@ export async function mountLiveDriven(
     return;
   }
   mountCompare(root, { viz: parsed[1], targets: context.targets, ids });
+}
+
+function trackedDriver(
+  id: string,
+  create: FuzzTarget["create"] | undefined,
+): ReturnType<typeof trackWalk> | undefined {
+  return create === undefined ? undefined : trackWalk(createDriver({ id, create }));
 }

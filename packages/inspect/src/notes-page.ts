@@ -49,14 +49,17 @@ function readNotes(value: unknown): Note[] {
   return Array.isArray(value) ? value.flatMap((each) => readNote(each) ?? []) : [];
 }
 
-async function errorText(response: Response): Promise<string> {
+export async function errorText(response: Response): Promise<string> {
   const body: unknown = await response.json().catch(() => undefined);
   const error = isRecord(body) ? body["error"] : undefined;
   return typeof error === "string" ? error : `the dev server answered ${response.status}`;
 }
 
 /** The saved note, or the reason it was not saved. */
-async function post(url: string, body: string): Promise<string | { file: string; note: Note }> {
+export async function post(
+  url: string,
+  body: string,
+): Promise<string | { file: string; note: Note }> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },

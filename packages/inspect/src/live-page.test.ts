@@ -369,9 +369,10 @@ describe("mountLiveDriven notes", () => {
     expect(urls.filter((each) => each.includes("notes"))).toEqual([]);
   });
 
-  test("with a notes url one machine asks for its notes", async () => {
+  test("with a notes url a live machine asks for its notes and for the journey box", async () => {
     const urls = await fetched("?machine=checkout", "/__mantaq/notes");
     expect(urls.filter((each) => each.includes("notes"))).toEqual([
+      "/__mantaq/notes?machine=checkout",
       "/__mantaq/notes?machine=checkout",
     ]);
   });
