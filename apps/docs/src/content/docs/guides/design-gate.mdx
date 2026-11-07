@@ -31,7 +31,8 @@ test("checkout has no design errors", () => {
 
 - a handler or effect that throws under fuzzing,
 - an effect that sends an event its state does not handle,
-- a declared state with no path from the initial state.
+- a declared state with no path from the initial state,
+- a state that is not final where nothing can happen (no handler, no effect).
 
 The message lists one line per error:
 
