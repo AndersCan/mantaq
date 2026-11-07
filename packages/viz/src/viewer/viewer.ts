@@ -7,6 +7,8 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { html } from "./dom.ts";
+import { changesSection } from "./changes.ts";
+import type { ChangesOption } from "./changes.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
 import { availableModes, modeLabel } from "./coverage-mode.ts";
@@ -126,6 +128,13 @@ export interface ViewerOptions {
    * Called on every panel refresh; may return the same node each time. The live page shows notes here.
    */
   panelFooter?: (selection: Selection | undefined) => Node | undefined;
+  /**
+   * Marks what changed in machine `machine` since `before`: added states and arrows are
+   * outlined, and a "What changed" list names them and what was removed.
+   * `onSeen` runs when the reader presses "Mark as seen"; the marks then clear.
+   * Unset, another machine shown, or nothing changed: no marks, no list.
+   */
+  changes?: ChangesOption;
 }
 
 /**
@@ -146,6 +155,7 @@ export function mountViewer(
   let back: () => void = () => undefined;
   listenOnRoot(root, () => back());
   let redraw: () => void = () => undefined;
+  const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
 
   function render(): void {
@@ -207,12 +217,7 @@ export function mountViewer(
       walked(run);
     };
     const rewind = (length: number) => {
-      if (driver !== undefined && view.live !== null) {
-        replayInto(view, driver, view.live.steps.slice(0, Math.max(0, length)));
-        walked();
-        return;
-      }
-      view.path = view.path.slice(0, Math.max(0, length));
+      rewindView(view, driver, length);
       walked();
     };
     const showDetails = (selection: Selection) => {
@@ -226,6 +231,8 @@ export function mountViewer(
       if (step !== null) view.selection = selection;
       return step === null ? showDetails(selection) : take(step);
     };
+    const graph = renderGraph(doc, machine, { select, showDetails, mode });
+    const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(
       ...noticeOf(doc, view),
@@ -240,10 +247,9 @@ export function mountViewer(
         onNavigate: options.onNavigate,
         live: driver !== undefined,
       }),
+      ...changes,
       html(doc, "div", { class: "viz-main" }, [
-        html(doc, "div", { class: "canvas" }, [
-          renderGraph(doc, machine, { select, showDetails, mode }),
-        ]),
+        html(doc, "div", { class: "canvas" }, [graph]),
         panel,
       ]),
     );
@@ -251,6 +257,13 @@ export function mountViewer(
   }
 
   render();
+}
+
+function rewindView(view: ViewState, driver: VizDriver | undefined, length: number): void {
+  const keep = Math.max(0, length);
+  if (driver !== undefined && view.live !== null)
+    replayInto(view, driver, view.live.steps.slice(0, keep));
+  else view.path = view.path.slice(0, keep);
 }
 
 function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {
