@@ -163,3 +163,59 @@ describe("mountDriven heading and walk ownership", () => {
     expect(current(third)).not.toBe(start);
   });
 });
+
+describe("mountDriven runs by name", () => {
+  const create = () => {
+    const clock = VirtualClock();
+    return { actor: createCheckoutActor(clock), clock };
+  };
+  const current = (root: HTMLElement) =>
+    root.querySelector<HTMLElement>(".explore")?.dataset["current"];
+  const basic = {
+    kind: "event",
+    event: "submitBasicInfo",
+    payload: { email: "a@b.c", name: "A" },
+  };
+
+  async function withRuns(): Promise<string> {
+    const doc = JSON.parse(await documentText());
+    doc.machines = [
+      { ...doc.machines[0], runs: [{ name: "gives basic info", steps: [basic] }] },
+      { ...doc.machines[0], id: "second" },
+    ];
+    return JSON.stringify(doc);
+  }
+
+  test("?machine=&run= opens at the run's end and leaves the address bar alone", async () => {
+    history.replaceState(null, "", "?machine=checkout&run=gives%20basic%20info");
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await withRuns(), targets: { checkout: create } });
+    expect(current(root)).toBe("shippingAddress");
+    expect(location.search).toBe("?machine=checkout&run=gives%20basic%20info");
+  });
+
+  test("clicking a run writes machine and run, no step", async () => {
+    history.replaceState(null, "", "?machine=checkout");
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await withRuns(), targets: { checkout: create } });
+    root.querySelector<HTMLElement>('[data-run="gives basic info"]')?.click();
+    expect(new URLSearchParams(location.search).get("run")).toBe("gives basic info");
+    expect(new URLSearchParams(location.search).has("step")).toBe(false);
+  });
+
+  test("switching machine drops run", async () => {
+    history.replaceState(null, "", "?machine=checkout&run=gives%20basic%20info");
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await withRuns(), targets: {} });
+    (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
+    expect(location.search).toBe("?machine=second");
+  });
+
+  test("run= without machine opens the start with no notice", async () => {
+    history.replaceState(null, "", "?run=gives%20basic%20info");
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await withRuns(), targets: { checkout: create } });
+    expect(current(root)).toBe("basicInfo");
+    expect(root.querySelector("[data-run-missing]")).toBeNull();
+  });
+});

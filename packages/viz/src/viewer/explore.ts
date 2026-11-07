@@ -24,7 +24,7 @@ export interface ExploreContext {
     send: (step: VizStep) => void;
     previous?: VizJson;
     /** Replace the walk with these steps from a fresh actor. */
-    play: (steps: ReadonlyArray<VizStep>) => void;
+    play: (steps: ReadonlyArray<VizStep>, run?: string) => void;
     /** Open the payload form for an event, or close it with null. */
     compose: (event: string | null) => void;
   };
@@ -391,7 +391,7 @@ function liveMovesSection(doc: Document, machine: VizMachine, moves: LiveMoves):
 function runsSection(
   doc: Document,
   machine: VizMachine,
-  live: { play: (steps: ReadonlyArray<VizStep>) => void },
+  live: { play: (steps: ReadonlyArray<VizStep>, run?: string) => void },
 ): HTMLElement | null {
   if (machine.runs.length === 0) return null;
   return html(doc, "div", { class: "explore-runs", "data-runs": "" }, [
@@ -403,7 +403,7 @@ function runsSection(
       machine.runs.map((run) =>
         html(doc, "li", {}, [
           button(doc, [run.name], {
-            onClick: () => live.play(run.steps),
+            onClick: () => live.play(run.steps, run.name),
             attrs: { "data-run": run.name },
           }),
         ]),

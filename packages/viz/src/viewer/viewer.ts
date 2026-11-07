@@ -43,6 +43,8 @@ interface ViewState {
   composing: string | null;
   /** The panel tab shown. */
   tab: PanelTab;
+  /** Why the requested run did not open; cleared by the next walk. */
+  notice: string | null;
 }
 
 type PanelTab = "step" | "context" | "path" | "details";
@@ -115,8 +117,10 @@ export interface ViewerOptions {
    * The driver runs one machine, so the machine picker is hidden.
    */
   driver?: VizDriver;
-  /** Called after every walk or machine change, e.g. to keep the URL shareable. */
-  onNavigate?: (where: { machine: string; steps: string[] }) => void;
+  /** Name of a run in the shown machine's `runs` to open on (from `?run=`). Wins over `steps`. Replays only with a `driver`. */
+  run?: string;
+  /** Called after every walk or machine change, e.g. to keep the URL shareable. `run` is set when the walk is a run just played from the Runs list. */
+  onNavigate?: (where: { machine: string; steps: string[]; run?: string }) => void;
 }
 
 /**
@@ -130,21 +134,9 @@ export function mountViewer(
 ): void {
   const doc = root.ownerDocument;
   const first = viz.machines.find((machine) => machine.id === options.machine) ?? viz.machines[0];
-  const view: ViewState = {
-    machineId: first?.id ?? "",
-    selection: null,
-    coverage: null,
-    path:
-      first === undefined || options.driver !== undefined
-        ? []
-        : decodePath(first, options.steps ?? []),
-    live: null,
-    previous: undefined,
-    composing: null,
-    tab: "step",
-  };
+  const view = initialView(first, options);
   const { driver } = options;
-  if (driver !== undefined) replayInto(view, driver, decodeLiveSteps(options.steps ?? []));
+  openInitial(view, { machine: first, driver, options });
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   listenOnRoot(root, () => back());
@@ -173,12 +165,14 @@ export function mountViewer(
       panel.replaceChildren(panelTabs(doc, { view, parts, details, refresh }));
       markDiagram(root, { machine, view, send, compose });
     };
-    const walked = () => {
+    const walked = (run?: string) => {
+      view.notice = null;
+      root.querySelector("[data-run-missing]")?.remove();
       const steps =
         view.live === null
           ? view.path.map((step) => encodeStep(machine, step))
           : view.live.steps.map(encodeLiveStep);
-      options.onNavigate?.({ machine: machine.id, steps });
+      options.onNavigate?.({ machine: machine.id, steps, ...(run === undefined ? {} : { run }) });
       refresh();
     };
     const send = (step: VizStep) => {
@@ -198,9 +192,9 @@ export function mountViewer(
       view.path = [...view.path, step];
       walked();
     };
-    const play = (steps: ReadonlyArray<VizStep>) => {
+    const play = (steps: ReadonlyArray<VizStep>, run?: string) => {
       if (driver !== undefined) replayInto(view, driver, steps);
-      walked();
+      walked(run);
     };
     const rewind = (length: number) => {
       if (driver !== undefined && view.live !== null) {
@@ -221,6 +215,7 @@ export function mountViewer(
     };
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(
+      ...noticeOf(doc, view),
       headerOf(doc, {
         root,
         viz,
@@ -241,6 +236,62 @@ export function mountViewer(
   }
 
   render();
+}
+
+function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {
+  return {
+    machineId: machine?.id ?? "",
+    selection: null,
+    coverage: null,
+    path:
+      machine === undefined || options.driver !== undefined
+        ? []
+        : decodePath(machine, options.steps ?? []),
+    live: null,
+    previous: undefined,
+    composing: null,
+    tab: "step",
+    notice: null,
+  };
+}
+
+function noticeOf(doc: Document, view: ViewState): HTMLElement[] {
+  if (view.notice === null) return [];
+  return [
+    html(doc, "p", { class: "run-notice", role: "status", "data-run-missing": "" }, [view.notice]),
+  ];
+}
+
+/** Opens on the named run when it can replay, else on the start with a notice; with no run, on `steps`. */
+function openInitial(
+  view: ViewState,
+  context: {
+    machine: VizMachine | undefined;
+    driver: VizDriver | undefined;
+    options: ViewerOptions;
+  },
+): void {
+  const { machine, driver, options } = context;
+  if (options.run === undefined || machine === undefined) {
+    if (driver !== undefined) replayInto(view, driver, decodeLiveSteps(options.steps ?? []));
+    return;
+  }
+  const found = machine.runs.find((candidate) => candidate.name === options.run);
+  if (found !== undefined && driver !== undefined) {
+    replayInto(view, driver, found.steps);
+    return;
+  }
+  if (driver !== undefined) replayInto(view, driver, []);
+  view.notice = runNotice(machine, { name: options.run, found: found !== undefined });
+}
+
+function runNotice(machine: VizMachine, run: { name: string; found: boolean }): string {
+  if (run.found) return `Run "${run.name}" replays only when ${machine.id} runs live.`;
+  if (machine.runs.length === 0) {
+    return `No run named "${run.name}" in ${machine.id}; it has no recorded runs.`;
+  }
+  const names = machine.runs.map((candidate) => candidate.name).join(", ");
+  return `No run named "${run.name}" in ${machine.id}. Runs: ${names}`;
 }
 
 type LiveContext = NonNullable<ExploreContext["live"]>;
@@ -393,6 +444,7 @@ function headerOf(
             view.machineId = id;
             view.selection = null;
             view.path = [];
+            view.notice = null;
             context.onNavigate?.({ machine: id, steps: [] });
             render();
           },
