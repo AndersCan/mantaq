@@ -32,11 +32,16 @@ export interface MantaqVizOptions {
   machines: string | string[];
   /** Where the page is served. Default `/__mantaq/`. */
   base?: string;
-  /** `false` = structure only. Default: 500 iterations, so a save redraws quickly. */
+  /**
+   * `false` = structure only. Default in dev: `{ timeLimitMs: 2000 }`, ending early on
+   * full coverage, so a save redraws fast. `vite build` defaults to `inspect`'s fixed
+   * 2000 iterations, so the written `viz.json` is reproducible.
+   */
   fuzz?: false | FuzzSettings;
 }
 
-const DEV_ITERATIONS = 500;
+/** Dev fuzz budget per machine: small machines stop at full coverage in milliseconds. */
+const DEV_FUZZ: FuzzSettings = { timeLimitMs: 2000 };
 
 export const TARGETS = "virtual:mantaq/targets";
 export const TARGETS_RESOLVED = `\0${TARGETS}`;
@@ -179,7 +184,7 @@ function siteBuild(context: {
 export function mantaqViz(options: MantaqVizOptions): Plugin[] {
   const base = (options.base ?? "/__mantaq/").replace(/\/?$/, "/");
   const patterns = Array.isArray(options.machines) ? options.machines : [options.machines];
-  const fuzz = options.fuzz ?? { iterations: DEV_ITERATIONS };
+  const fuzz = options.fuzz ?? DEV_FUZZ;
   const live = fileURLToPath(
     import.meta.resolve(import.meta.url.endsWith(".ts") ? "./live-entry.ts" : "./live-entry.mjs"),
   );
@@ -263,6 +268,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       });
     },
   };
-  const site = siteBuild({ base, patterns, fuzz, live, project, root: () => root });
+  const built = options.fuzz ?? {};
+  const site = siteBuild({ base, patterns, fuzz: built, live, project, root: () => root });
   return [inspectEntry(), targets, site, plugin];
 }

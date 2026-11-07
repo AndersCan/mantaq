@@ -2,6 +2,19 @@
   "name": "@mantaq/viz",
   "version": "0.8.0",
   "description": "Draw and walk a Mantaq machine in the browser, from a versioned, deterministic JSON document.",
+  "keywords": [
+    "actor",
+    "diagram",
+    "mantaq",
+    "state-machine",
+    "typescript",
+    "viewer",
+    "visualizer"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

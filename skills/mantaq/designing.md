@@ -1,12 +1,14 @@
 # Designing with the live page
 
-Design a machine by editing its real file while the live viz page shows the result. Written against `@mantaq/core` 0.6, `@mantaq/inspect` 0.6. Signatures: check the installed types.
+Design a machine by editing its real file while the live viz page shows the result. Signatures: check the installed types.
 
 ## 0. Set up (no mantaq or no live page yet)
 
 Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the vite config.
 
-1. Vite only. No `vite` in package.json: say the live viewer runs on Vite and ask before adding it.
+1. Vite only. No `vite` in package.json: say the live viewer runs on Vite and ask before adding it. A user who asked for a clickable diagram has consented.
+   - Empty folder: `npm create vite@latest . -- --template vanilla-ts`. Its tsconfig includes only `src`: add `vite.config.ts` to `include`.
+   - Bare `npm init` project (CommonJS, so Vite warns "ESM syntax in a file loaded as CommonJS"): `npm pkg set type=module`, `npm i -D vite typescript`, and a `tsconfig.json` with `"strict": true`, `"module": "ESNext"`, `"moduleResolution": "Bundler"`, `"include": ["src", "vite.config.ts"]`.
 2. Use the project's package manager.
 3. Install `@mantaq/core` and `-D @mantaq/inspect`, no versions. Check one core with `npm ls @mantaq/core`. Two versions: install core at the version `@mantaq/inspect` depends on.
 4. Vite config. None: create `vite.config.ts`:
@@ -65,6 +67,8 @@ States, then edges, then runs. Follow the user's order. Write each step into the
 ## 6. Runs
 
 Each test builds the actor through `recordRuns(factory)` (`@mantaq/inspect/record`). Name tests as user-visible journeys: the name is the run's label. Run the whole test file after each change so the Runs list updates. A journey linked from docs is a top-level test (no `describe`), so the run name is its title. Build it with only `{ clock }`, as the page does, so it replays the same there.
+
+The page fuzzes each machine on a budget and warns on states it never reached. A deep state at 0 hits is a budget miss, not proof it is unreachable: raise `fuzz: { timeLimitMs }` or `fuzz: { iterations }` in `mantaqViz` (or `expectNoDesignErrors`), or add a test journey that reaches it (a named run in `tests`).
 
 ## 7. Each turn
 

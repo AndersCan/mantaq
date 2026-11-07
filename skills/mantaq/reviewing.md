@@ -1,6 +1,6 @@
 # Reviewing Mantaq Actors
 
-Review actor code against the Rules in `SKILL.md`, then check what typechecking misses. Written against `@mantaq/core` 0.5; when behavior is in doubt, check the installed package.
+Review actor code against the Rules in `SKILL.md`, then check what typechecking misses. When behavior is in doubt, check the installed package.
 
 ## Structure
 

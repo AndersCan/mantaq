@@ -2,6 +2,19 @@
   "name": "@mantaq/pbt",
   "version": "0.0.4",
   "description": "Seeded fast-check property-based testing helpers and shared generators.",
+  "keywords": [
+    "actor",
+    "fast-check",
+    "mantaq",
+    "property-based-testing",
+    "state-machine",
+    "testing",
+    "typescript"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -4,6 +4,14 @@ Turns your Mantaq machine into a picture you can walk: add the Vite plugin, no o
 
 It finds every exported actor, or function that builds one, from the file's types. It reads handler explanations and sample payloads from the source, fuzzes each machine that runs on a `VirtualClock`, and shows them in a live page on your Vite dev server. The viewer is [`@mantaq/viz`](../viz/README.md).
 
+## Install
+
+```sh
+npm install -D @mantaq/inspect vite
+```
+
+`vite` is a peer dependency; `vitest` (for `@mantaq/inspect/record`) and `astro` are optional peers.
+
 ## Ways in
 
 **Gate in tests**: see the docs page "Design gate in vitest" for `expectNoDesignErrors`, `expectReached` and `expectAllStatesReached`.
@@ -12,19 +20,26 @@ It finds every exported actor, or function that builds one, from the file's type
 
 ```ts
 // vite.config.ts
+import { defineConfig } from "vite";
 import { mantaqViz } from "@mantaq/inspect/vite";
 
 export default defineConfig({
   plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })],
 });
-// open /__mantaq/ while `vp dev` runs
 ```
+
+Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the export name without `create` / `Actor` (`createCheckoutActor` → `checkout`).
 
 The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
 
 `vite build` with the plugin also writes the page as a static site: `index.html`, `viz.json` and a script under `base` (set `base: "/"` to put them at the output root). Machines load through your Vite config, and the fuzz runs at build time.
 
-Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations }`; default 500 iterations so a save redraws fast).
+Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations, timeLimitMs }`).
+
+- `timeLimitMs`: wall-time budget per machine. Fuzzing stops at the first of: every state and edge covered, `iterations` (no cap if only `timeLimitMs` is set), or the time limit. Runs stay seeded (same seed, same sequence); only how many ran depends on machine speed.
+- Dev default: `{ timeLimitMs: 2000 }`. A small machine stops at full coverage in milliseconds, so a save redraws fast; one fuzz cannot cover costs at most 2 s.
+- `vite build` default: 2000 iterations, no time limit, so `viz.json` is reproducible.
+- A state or edge fuzz never reached is a warning in the `[mantaq-viz]` log, with the iterations run and why it stopped. Raise `timeLimitMs` / `iterations`, or add a named run.
 
 **Astro**: publish a site where each page is prose plus the diagram. Add the integration, list the machine files, and put `<Machine>` on a page.
 
@@ -49,7 +64,7 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 
 - **Two lists.** A file is named twice: in `machines` (paths, not globs; relative to the Astro root or absolute) and in the page's `src`. The browser script is built before pages render, so it cannot learn the list from the pages.
 - **What fails the build.** An empty `machines`, a missing file, a file that cannot load, two files exporting the same machine id, a `src` that is not in `machines`, and a file with no exported actor. Design findings never fail the build; they show on the page.
-- **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations }`. Default: seeded, 2000 iterations, so builds are reproducible.
+- **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations, timeLimitMs }` (see the Vite options). Default: seeded, up to 2000 iterations (stops early at full coverage), no time limit, so builds are reproducible.
 - Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the static walk.
 
 **Overview of all machines.** `<Machines pages={...} />` draws every machine given to `mantaqViz` as a box, with an arrow from A to B labelled `e` when `e` is in A's declared `outputs` and B handles `e` as an input (same event id, internal events excluded).
@@ -68,6 +83,9 @@ import Machines from "@mantaq/inspect/astro/Machines.astro";
 ```ts
 import { inspect, vizDocument } from "@mantaq/inspect";
 import { serializeViz } from "@mantaq/viz";
+import type { AnyActor } from "@mantaq/core";
+
+declare function createCart(): AnyActor<unknown>;
 
 const { machine, warnings } = inspect({
   id: "cart",
@@ -111,7 +129,7 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 
 **AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { event, handler })` / `m.onAny({ event, handler })` and resolves names from the literal types of `state.name` / `event.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. A specific `on` wins over `onAny`, as at runtime.
 
-**Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See `docs/atlas/phase5-comparison.md`.
+**Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See [`docs/atlas/phase5-comparison.md`](https://github.com/AndersCan/mantaq/blob/main/docs/atlas/phase5-comparison.md).
 
 ## Record runs from your tests
 
@@ -119,6 +137,9 @@ In a vitest file, wrap the factory once and your tests become runs:
 
 ```ts
 import { recordRuns } from "@mantaq/inspect/record";
+import type { AnyActor, VirtualClock } from "@mantaq/core";
+
+declare function createInviteLinkActor(clock?: VirtualClock): AnyActor<unknown>;
 
 const make = recordRuns(createInviteLinkActor);
 ```
@@ -136,11 +157,15 @@ Every passing test that builds an actor with `make` writes its events and clock 
 - **History** cannot distinguish an ignored event from a self-loop. The fuzzer can (`stay` vs `transition`), but probe-only coverage cannot.
 - **Fuzzing is not proof.** An edge that is absent was not reached; it is not shown to be impossible.
 
-## Fixtures
+## Contributing (repo only)
+
+These sections apply to the [mantaq repo](https://github.com/AndersCan/mantaq), not to the npm package.
+
+### Fixtures
 
 `src/fixtures/{checkout,auth,saga}.ts` copy the handlers of `packages/examples/*.test.ts` verbatim, with effects stubbed. The examples live in test files and cannot be imported, so the copies can drift from them. `credit.ts` (conditional handlers, far literals), `retry.ts` (context counter, `attempts > 10`) and `switchy.ts` (unsupported control flow) exist for the AST, loop and guidance tests.
 
-## Repo scripts
+### Repo scripts
 
 ```sh
 vp run viz:export     # bundled examples -> packages/viz/public/examples/*.json (the viz dev page loads them)

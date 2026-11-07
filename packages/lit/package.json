@@ -2,6 +2,19 @@
   "name": "@mantaq/lit",
   "version": "0.1.0",
   "description": "Bind mantaq actors into lit-html templates with one directive.",
+  "keywords": [
+    "actor",
+    "lit",
+    "lit-html",
+    "mantaq",
+    "state-machine",
+    "typescript",
+    "ui"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

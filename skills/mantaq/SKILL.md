@@ -8,7 +8,7 @@ allowed-tools: Read Grep Glob Edit Write Bash Shell
 
 Actor-model state machine library for TypeScript. `npm install @mantaq/core`. Minimal primitives: states + events, context, effects, regions, one injectable clock.
 
-**Written against:** `@mantaq/core` 0.6, `@mantaq/sugar` 2.0, `@mantaq/test` 2.0, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.6, `@mantaq/viz` 0.6.
+**Written against:** `@mantaq/core` 0.6, `@mantaq/sugar` 2.0, `@mantaq/test` 2.0, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.8, `@mantaq/viz` 0.8. Sibling files share this stamp.
 
 ## Trust the installed package over this skill
 
@@ -18,7 +18,7 @@ signatures, defaults or option names, and what it does state can go stale.
 Before writing code:
 
 1. Read the installed versions from `node_modules/@mantaq/*/package.json`. If they differ from "Written against", treat this skill as a guide only.
-2. Take every signature from the installed type declarations (`node_modules/@mantaq/core/dist/*.d.ts`) and from the repo's `packages/examples/` tests when available. They are checked by the compiler. Prose is not.
+2. Take every signature from the installed type declarations (`node_modules/@mantaq/core/dist/*.d.ts`) and from the [example tests](https://github.com/AndersCan/mantaq/tree/main/packages/examples). They are checked by the compiler. Prose is not.
 3. If the types and this skill disagree, the types win. Say so to the user.
 
 If code fails to typecheck, fix it against the types. Never silence the
@@ -71,7 +71,7 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 - Handlers and effects should not throw for expected failures. A throw sends the actor to a terminal error state (`snapshot().error`, `on("error")`). Treat that as a bug signal, not control flow.
 - Read the current state from the handler's `state` argument, not `actor.state`.
 - **Names read without the notes.** Name a state for the situation: work in progress is a verb plus its object (`sendingRequest`, `addingMember`), waiting says what for (`waitingForAnswer`), and an outcome says how it ended (`joined`, `declined`, `expired`). Never `idle`, `done` or `approved` for a save that is still running. Name an event for what happened: a person's action names the control or decision (`askToJoin`, `dismissDecline`), and news from elsewhere is past tense (`answerArrived`, `requestSent`). Never a bare `ok`, `close`, `ask`, `create` or `answered`.
-- **Every journey ends in a named outcome**, success included. One state per way it can end. Never fall back to the start state to mean done. Mark the outcome final when the actor's work is over. An actor reused for the next attempt keeps it non-final and says so in its JSDoc.
+- **Every journey ends in a named outcome**, success included. One state per way it can end. Never fall back to the start state to mean done. Mark the outcome final when the actor's work is over. An actor reused for the next attempt keeps it non-final and says so in its JSDoc. Exception: a cyclic controller (traffic light) has no outcome or final state; every state must be on the cycle, reachable back to the start.
 - Test with `VirtualClock` and the `@mantaq/test` harness. See `testing.md`.
 
 ## Live design

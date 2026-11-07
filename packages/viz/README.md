@@ -6,7 +6,26 @@ Draws a Mantaq machine in the browser and lets you walk it. Input is a viz docum
 - `@mantaq/viz/viewer`: `mountViewer(root, document)` / `mountVizText(root, { source, text })` to embed it in a page, plus `@mantaq/viz/viewer.css`.
 - `@mantaq/viz/standalone`, `@mantaq/viz/live`: whole-page entries used by the Vite plugin (live page).
 
-Dev page with the bundled examples: `vp run viz:export`, then `cd packages/viz && vp dev`. It loads `examples/examples.json`, `?src=<url>`, or a picked file.
+Most apps never import this package directly: add the [`@mantaq/inspect`](https://www.npmjs.com/package/@mantaq/inspect) Vite plugin and open `/__mantaq/` on your dev server (`npx vite` or `npm run dev`).
+
+## Embed the viewer
+
+```sh
+npm install @mantaq/viz
+```
+
+```ts
+import { mountVizText } from "@mantaq/viz/viewer";
+import "@mantaq/viz/viewer.css";
+
+const root = document.getElementById("viz");
+if (root) {
+  const text = await (await fetch("/viz.json")).text(); // a document from @mantaq/inspect
+  mountVizText(root, { source: "/viz.json", text });
+}
+```
+
+`mountVizText` validates the JSON and lists every issue in place of the diagram when it is not a current viz document. `mountViewer(root, document)` takes an already-parsed document.
 
 ## Walking the graph
 
@@ -42,6 +61,26 @@ Take a step with a panel button, by clicking a pulsing edge, or by clicking a st
 
 Bump `VIZ_SCHEMA_VERSION` on any breaking change. The validator accepts only the current version.
 
+## Schema (v11)
+
+`VizDocument { schemaVersion: 11, machines: VizMachine[] }`, keys sorted, two-space indent. Types in `src/schema.ts`.
+
+| field              | meaning                                                                                                                                                                                                                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `machine.states[]` | `id` (region-prefixed `region.state`), `region`, `initial`, `final`, `effects` (`[{ name, sends }]` run on entry, registration order; `sends`: declared event ids, `null` = not declared), `coverage` (`null` = no run, else `{ hits }`), `doc` (leading JSDoc of the `state(...)` declaration, `null` = undocumented or AST not run) |
+| `edge.from`        | a state id, `__initial__`, or `*` (`region.*` in a region): an `onAny` registration, meaning any non-final state. `*` is never in `states`; a `stay` from `*` has `to: "*"`                                                                                                                                                           |
+| `machine.outputs`  | declared output event ids, sorted; empty = none                                                                                                                                                                                                                                                                                       |
+| `machine.events[]` | `id`, `internal`, `payloadType` (always `null`: erased at runtime), `doc` (leading JSDoc of the `event(...)` declaration, `null` = none)                                                                                                                                                                                              |
+| `edge.kind`        | `initial` · `transition` · `effect` (state runs effects on entry) · `stay` (handled, no state change: a registration without `to`, or observed while fuzzing)                                                                                                                                                                         |
+| `edge.to`          | `null` = **undetermined**: only for actors that carry no `to` declarations                                                                                                                                                                                                                                                            |
+| `edge.origin`      | `declared` (builder `to`, vouched for by the type checker) · `probe` (synthetic traversal, undeclared actors) · `fuzz` (observed only while fuzzing)                                                                                                                                                                                  |
+| `edge.explanation` | `null` (no handler: initial/effect, or AST not run) · `{ status: "analyzed", location, registration, branches, payloadReads, contextReads, contextWrites, readsActorState, comparisons, literals }` · `{ status: "not_analyzed", location, reason, snippet }`                                                                         |
+| `edge.doc`         | leading JSDoc of the `m.on` / `m.onAny` call behind the edge, or of the `m.effect` calls of the state for an `effect` edge (joined in order); `null` = undocumented, no handler, or AST not run                                                                                                                                       |
+| `machine.runs[]`   | named example runs, replayable on the live page: `{ name, steps }`, each step an event (`{ kind: "event", event, payload }`) or a clock advance (`{ kind: "advance", ms }`). Empty = none supplied                                                                                                                                    |
+| `machine.fuzz`     | `null` or `{ seed, iterations, corpus: [{ steps, discovered }], errors: [{ from, event, message, steps }] }`; every sequence is shrunk and replayable from a fresh actor                                                                                                                                                              |
+
+Bump `VIZ_SCHEMA_VERSION` on any breaking change. The validator accepts only the current version.
+
 ## Coverage: two sources, two questions
 
 The viewer's "Coverage from" picker dims elements with zero hits. What dimmed means depends on the source:
@@ -49,3 +88,7 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 - **examples + fuzz** (`reached`): neither an example nor fuzzing reached this. The default when both sources are present, and the same merge `expectReached` uses. Fix a miss by adding an example to `tests`.
 - **example tests** (`tested`): no test exercises this. It is the classic "what is untested" view. Supply the event sequences your tests send (`inspect({ tests })`).
 - **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
+
+## Contributing (repo only)
+
+Dev page with the bundled examples, from the [mantaq repo](https://github.com/AndersCan/mantaq): `vp run viz:export`, then `vp dev` in `packages/viz`. It loads `examples/examples.json`, `?src=<url>`, or a picked file.

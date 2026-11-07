@@ -8,7 +8,7 @@
     "guard": "node scripts/vision-guard.mjs",
     "bump:check": "node --test scripts/bump-check.test.mjs && node scripts/bump-check.mjs",
     "smoke:pack": "node scripts/pack-smoke.mjs",
-    "docs:check": "node scripts/docs-check.mjs",
+    "docs:check": "node scripts/docs-check.mjs && node scripts/skill-check.mjs",
     "knip": "knip",
     "coverage": "vp run -r coverage",
     "bench": "vp run @mantaq/bench#bench",

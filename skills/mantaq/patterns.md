@@ -1,6 +1,6 @@
 # Patterns
 
-Proven recipes. Code is a sketch written against `@mantaq/core` 0.5 and `@mantaq/sugar` 2.0. Copy the shape, not the exact signatures: check them against the installed types. Full working versions live in the mantaq repo under `packages/examples/` (e.g. `checkout.test.ts`, `saga-orchestrator.test.ts`, `request-response.test.ts`).
+Proven recipes. Code is a sketch. Copy the shape, not the exact signatures: check them against the installed types. Full working versions: [`packages/examples/`](https://github.com/AndersCan/mantaq/tree/main/packages/examples).
 
 ## Async Work → Effect + Internal Event
 
@@ -84,12 +84,12 @@ m.onAny({
 
 ## Other Recipes
 
-Worked, tested examples in `packages/examples/`. Read the one that matches:
+Worked, tested examples in [`packages/examples/`](https://github.com/AndersCan/mantaq/tree/main/packages/examples). Read the one that matches:
 
-- Event sourcing (context as log + fold): `event-sourcing.test.ts`
-- Saga / orchestration (emit chains, compensation via `onAny`): `saga-orchestrator.test.ts`
-- Undo/redo (context snapshots as history): `undo-redo-editor.test.ts`
-- Request/response with timeout: `request-response.test.ts`
-- Dynamic children: `actor-map.test.ts`
-- Retries and reconnects: `network-connection-manager.test.ts`, `websocket-connection.test.ts`
-- Caches, auth, game state, animation: `cache-with-ttl-and-lru.test.ts`, `authentication.test.ts`, `game-character.test.ts`, `animation-ui-state.test.ts`
+- Event sourcing (context as log + fold): [`event-sourcing.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/event-sourcing.test.ts)
+- Saga / orchestration (emit chains, compensation via `onAny`): [`saga-orchestrator.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/saga-orchestrator.test.ts)
+- Undo/redo (context snapshots as history): [`undo-redo-editor.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/undo-redo-editor.test.ts)
+- Request/response with timeout: [`request-response.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/request-response.test.ts)
+- Dynamic children: [`actor-map.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/actor-map.test.ts)
+- Retries and reconnects: [`network-connection-manager.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/network-connection-manager.test.ts), [`websocket-connection.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/websocket-connection.test.ts)
+- Caches, auth, game state, animation: [`cache-with-ttl-and-lru.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/cache-with-ttl-and-lru.test.ts), [`authentication.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/authentication.test.ts), [`game-character.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/game-character.test.ts), [`animation-ui-state.test.ts`](https://github.com/AndersCan/mantaq/blob/main/packages/examples/animation-ui-state.test.ts)

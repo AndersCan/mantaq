@@ -23,12 +23,15 @@ Use Mantaq for flows with known steps and clear transitions. It models where a p
 
 ## Packages
 
-| Package             | Exports                                                                                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@mantaq/core`      | `Actor`, `state`, `event`, `VirtualClock`, `RealClock`, `Context`                                                                                                 |
-| `@mantaq/sugar`     | `matches`, `states`, `events`, `tag`, `isIn`, `activeLeaves`, `ActorMap`, `onOutput`, `withPromise`, `withTimeout`, `actorSpec`, `definePart`, `use`, `withParts` |
-| `@mantaq/test`      | `createTestHarness`, state/transition/effect assertions                                                                                                           |
-| `@mantaq/traversal` | `buildGraph`, `instrument`, `History`                                                                                                                             |
+| Package             | Exports                                                                                                                                                                 |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@mantaq/core`      | `Actor`, `state`, `event`, `VirtualClock`, `RealClock`, `Context`                                                                                                       |
+| `@mantaq/sugar`     | `matches`, `states`, `events`, `tag`, `isIn`, `activeLeaves`, `createActorMap`, `onOutput`, `withPromise`, `withTimeout`, `actorSpec`, `definePart`, `use`, `withParts` |
+| `@mantaq/test`      | `createTestHarness`, state/transition/effect assertions                                                                                                                 |
+| `@mantaq/traversal` | `buildGraph`, `instrument`, `History`                                                                                                                                   |
+| `@mantaq/inspect`   | Vite plugin (`@mantaq/inspect/vite`) and Astro integration: draws, fuzzes and walks your machines at `/__mantaq/`                                                       |
+| `@mantaq/viz`       | Browser viewer for the viz document: `mountViewer`, `mountVizText`, `parseViz`                                                                                          |
+| `@mantaq/lit`       | `watch(actor, select)`: bind an actor into a lit-html template                                                                                                          |
 
 ## Quick example
 

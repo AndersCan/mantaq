@@ -8,7 +8,10 @@ test("the Design gate page shows the three planted bugs", async () => {
     load: (path) => import(path),
     fuzz: { seed: 1, iterations: 5000 },
   });
-  expect(result.warnings).toEqual([]);
+  // The planted bugs leave archived and the throwing back edge unreached.
+  expect(result.warnings).toEqual([
+    "checkoutWithBugs: fuzz never reached: archived, payment -back-> shippingAddress (ran 5000 iterations, stopped: iteration cap). Raise fuzz.timeLimitMs / iterations or add a named run to `tests`.",
+  ]);
   const machine = result.machines[0]!;
   expect(designErrors(machine)).toEqual([
     "back in payment throws: Error: the shipping address was lost",

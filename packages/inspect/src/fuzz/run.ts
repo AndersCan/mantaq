@@ -61,6 +61,8 @@ export interface Trace {
 }
 
 const ERROR_STATE = "__error";
+/** Event name of an error thrown while the clock advanced (a timer callback). */
+const ADVANCE = "advance";
 
 export function eventTypes(options: unknown, key: "inputs" | "internal" | "outputs"): string[] {
   if (typeof options !== "object" || options === null) return [];
@@ -192,7 +194,22 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
     statesBefore.push(actor.state.name);
-    applyStep(actor, { step, clock, internal });
+    // Core reports handler and effect-body throws via "error"; a throw from
+    // user code the step runs outside them (a timer callback under
+    // `clock.advance`) ends this run as an error, not the whole fuzz.
+    const applied = Either.from(() => {
+      applyStep(actor, { step, clock, internal });
+      return true;
+    });
+    if (Either.isLeft(applied)) {
+      errors.push({
+        from: actor.state.name,
+        event: step.kind === "advance" ? ADVANCE : step.event,
+        message: messageOf(applied[0]),
+        step: index,
+      });
+      break;
+    }
     if (contextText(actor) !== before) {
       contextSteps.push(index);
       // A state not seen before this step has no cycle: loop the step alone.

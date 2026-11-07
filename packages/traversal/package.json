@@ -2,6 +2,19 @@
   "name": "@mantaq/traversal",
   "version": "0.3.5",
   "description": "Graph extraction, traversal algorithms, and runtime tracking for mantaq actors.",
+  "keywords": [
+    "actor",
+    "coverage",
+    "graph",
+    "mantaq",
+    "state-machine",
+    "testing",
+    "typescript"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

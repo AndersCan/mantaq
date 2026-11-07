@@ -21,8 +21,7 @@ graph once and walk it however your check needs.
 npm install @mantaq/traversal
 ```
 
-> `@mantaq/traversal` depends on `@mantaq/core` and `@mantaq/utils`, which are
-> resolved as workspace packages in this repo.
+> Depends on `@mantaq/core` and `@mantaq/utils`; npm installs them with it.
 
 ## Building the graph
 
@@ -30,10 +29,22 @@ npm install @mantaq/traversal
 `ActorGraph`:
 
 ```ts
+import { Actor, state, event } from "@mantaq/core";
 import { buildGraph } from "@mantaq/traversal";
-import { createActor } from "@mantaq/core";
 
-const actor = createActor(myMachine);
+const idle = state("idle")();
+const running = state("running")();
+const start = event("START")();
+
+const actor = Actor({
+  inputs: [start],
+  states: [idle, running],
+  initial: idle,
+  setup: (m) => {
+    m.on(idle, { event: start, to: [running], handler: () => ({ state: running }) });
+  },
+});
+
 const graph = buildGraph(actor);
 // graph.nodes: GraphNode[]   — one per declared state (+ an `__initial__` node)
 // graph.edges: GraphEdge[]   — one per (state, event) handler
@@ -55,6 +66,11 @@ Handlers may branch on context. Pass one or more named sample contexts to see
 how the graph differs per context shape:
 
 ```ts
+import { buildGraph } from "@mantaq/traversal";
+import type { AnyActor } from "@mantaq/core";
+
+declare const actor: AnyActor;
+
 const graph = buildGraph(actor, {
   sampleContexts: {
     guest: { loggedIn: false },
@@ -81,20 +97,23 @@ needed:
 import { reachable, allPaths, findCycles, unreachableNodes, shortestPath } from "@mantaq/traversal";
 ```
 
-| Function                            | Returns            | Use                                                 |
-| ----------------------------------- | ------------------ | --------------------------------------------------- |
-| `reachable(graph, fromId, toId)`    | `boolean`          | Is `toId` reachable from `fromId`?                  |
-| `allPaths(graph, fromId, toId)`     | `string[][]`       | Every distinct path of node ids between two states. |
-| `findCycles(graph)`                 | `string[][]`       | Every cycle in the graph, as node-id loops.         |
-| `unreachableNodes(graph, fromId)`   | `string[]`         | Nodes no walk from `fromId` can ever reach.         |
-| `shortestPath(graph, fromId, toId)` | `string[] \| null` | The fewest-edge path, or `null` if unreachable.     |
+| Function                                | Returns                 | Use                                                  |
+| --------------------------------------- | ----------------------- | ---------------------------------------------------- |
+| `reachable(graph, { fromId, toId })`    | `boolean`               | Is `toId` reachable from `fromId`?                   |
+| `allPaths(graph, { fromId, toId })`     | `string[][]`            | Every distinct path of node ids between two states.  |
+| `findCycles(graph)`                     | `string[][]`            | Every cycle in the graph, as node-id loops.          |
+| `unreachableNodes(graph, { fromId })`   | `string[]`              | Nodes no walk from `fromId` can ever reach.          |
+| `shortestPath(graph, { fromId, toId })` | `string[] \| undefined` | The fewest-edge path, or `undefined` if unreachable. |
 
 A common check is "every declared state is reachable from the initial state":
 
 ```ts
 import { INITIAL_NODE_ID, unreachableNodes } from "@mantaq/traversal";
+import type { ActorGraph } from "@mantaq/traversal";
 
-const dead = unreachableNodes(graph, INITIAL_NODE_ID);
+declare const graph: ActorGraph;
+
+const dead = unreachableNodes(graph, { fromId: INITIAL_NODE_ID });
 if (dead.length > 0) {
   throw new Error(`Unreachable states: ${dead.join(", ")}`);
 }
@@ -109,6 +128,9 @@ plus a `history` property.
 
 ```ts
 import { instrument } from "@mantaq/traversal";
+import type { AnyActor } from "@mantaq/core";
+
+declare const actor: AnyActor;
 
 const wrapped = instrument(actor);
 wrapped.send({ type: "START" });
@@ -129,6 +151,12 @@ Combine static and runtime views to assert coverage. E.g. that every
 reachable state in the graph was actually visited by a scenario:
 
 ```ts
+import { buildGraph, instrument } from "@mantaq/traversal";
+import type { AnyActor } from "@mantaq/core";
+
+declare const actor: AnyActor;
+declare function runScenario(actor: { send(event: { type: string }): void }): void;
+
 const graph = buildGraph(actor);
 const wrapped = instrument(actor);
 runScenario(wrapped); // exercise the actor

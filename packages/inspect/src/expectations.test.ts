@@ -191,6 +191,9 @@ describe("expectations during a step", () => {
   });
 });
 
+const NO_SOURCE =
+  "no source, so payload types are unknown: fuzz sends begin, bump, finish, tag without a payload. Pass `source` (samples from the event types) or `payloads`.";
+
 describe("inspect with expectations", () => {
   test("the findings show up on the machine", () => {
     const { machine, warnings } = inspect({
@@ -199,7 +202,7 @@ describe("inspect with expectations", () => {
       expectations: expectedExpectations,
       fuzz: { iterations: 500 },
     });
-    expect(warnings).toEqual([]);
+    expect(warnings).toEqual([NO_SOURCE]);
     expect(machineFindings(machine).map((each) => each.kind)).toEqual(["neverSee", "mustSee"]);
   });
 
@@ -224,6 +227,7 @@ describe("inspect with expectations", () => {
     expect(warnings).toEqual([
       'expectations for unknown state "paymnt" ignored',
       'expectations for counting: unknown field "neverse" ignored (use neverSee or mustSee)',
+      NO_SOURCE,
     ]);
     expect(machineFindings(machine).map((each) => each.kind)).toEqual(["neverSee"]);
   });

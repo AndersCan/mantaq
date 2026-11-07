@@ -2,6 +2,21 @@
   "name": "@mantaq/inspect",
   "version": "0.8.0",
   "description": "Turn a Mantaq machine into a viz document: structure, handler explanations (AST), fuzz and test coverage. Vite plugin included.",
+  "keywords": [
+    "actor",
+    "astro-integration",
+    "diagram",
+    "fuzzing",
+    "mantaq",
+    "state-machine",
+    "typescript",
+    "visualizer",
+    "vite-plugin"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

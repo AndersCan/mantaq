@@ -2,6 +2,17 @@
   "name": "@mantaq/sugar",
   "version": "2.0.5",
   "description": "Userland sugar for mantaq actors — matches, effect helpers, transition utilities.",
+  "keywords": [
+    "actor",
+    "helpers",
+    "mantaq",
+    "state-machine",
+    "typescript"
+  ],
+  "homepage": "https://anderscan.github.io/mantaq/",
+  "bugs": {
+    "url": "https://github.com/AndersCan/mantaq/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

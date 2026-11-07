@@ -1,6 +1,8 @@
 import { EXAMPLE_ROOT } from "./examples.ts";
+import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createDoorActor } from "./fixtures/factories.ts";
 import { inspect, inspectModule, machineId } from "./inspect.ts";
+import type { VizStep } from "@mantaq/viz";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -11,7 +13,8 @@ describe("inspect", () => {
   test("payloads read from the event types let fuzzing reach a payload-guarded state", () => {
     const { machine, warnings } = inspect({ id: "door", create: () => createDoorActor(), source });
     expect(warnings).toEqual([]);
-    expect(machine.fuzz?.iterations).toBe(2000);
+    // Full coverage ends the run before the 2000 cap.
+    expect(machine.fuzz?.iterations).toBeLessThan(2000);
     expect(machine.states.find((state) => state.id === "opened")?.coverage?.hits).toBeGreaterThan(
       0,
     );
@@ -45,7 +48,7 @@ describe("inspect", () => {
   });
 
   test("example tests seed the fuzz corpus", () => {
-    const knock = [{ kind: "event" as const, event: "knock", payload: null }];
+    const knock: VizStep[] = [{ kind: "event", event: "knock", payload: null }];
     const { machine } = inspect({
       id: "door",
       create: () => createDoorActor(),
@@ -69,6 +72,72 @@ describe("inspect", () => {
     );
     expect(sent).toContainEqual(given);
     expect(JSON.stringify(sent)).not.toContain('"sample"');
+  });
+});
+
+describe("inspect: fuzz budget", () => {
+  const checkout = {
+    id: "checkout",
+    create: () => createCheckoutActor(),
+    source: {
+      file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/checkout.ts"),
+      root: EXAMPLE_ROOT,
+    },
+  };
+  const never = (warnings: string[]) =>
+    warnings.filter((warning) => warning.startsWith("fuzz never reached"));
+
+  test("timeLimitMs stops at full coverage, long before the limit, and is seeded", () => {
+    const run = () => inspect({ ...checkout, fuzz: { timeLimitMs: 60_000 } });
+    const { machine, warnings } = run();
+    expect(warnings).toEqual([]);
+    expect(machine.fuzz?.iterations).toBeGreaterThan(0);
+    expect(machine.fuzz?.iterations).toBeLessThan(2000);
+    expect(machine.states.every((state) => (state.coverage?.hits ?? 0) > 0)).toBe(true);
+    expect(run().machine).toEqual(machine);
+  });
+
+  test("without timeLimitMs, iterations is a cap: stops at full coverage, seeded", () => {
+    const run = () => inspect({ ...checkout, fuzz: { iterations: 50_000 } });
+    const { machine, warnings } = run();
+    expect(warnings).toEqual([]);
+    expect(machine.fuzz?.iterations).toBeLessThan(50_000);
+    expect(machine.states.every((state) => (state.coverage?.hits ?? 0) > 0)).toBe(true);
+    expect(run().machine).toEqual(machine);
+  });
+
+  test("states and edges fuzz missed are a warning with the iterations run and why it stopped", () => {
+    const { machine, warnings } = inspect({ ...checkout, fuzz: { iterations: 3 } });
+    expect(machine.fuzz?.iterations).toBe(3);
+    expect(never(warnings)).toHaveLength(1);
+    expect(never(warnings)[0]).toMatch(
+      /^fuzz never reached: .*success.* \(ran 3 iterations, stopped: iteration cap\)\. Raise fuzz\.timeLimitMs \/ iterations or add a named run to `tests`\.$/,
+    );
+  });
+
+  test("an iteration cap under a time limit stops first and says so", () => {
+    const { warnings } = inspect({ ...checkout, fuzz: { timeLimitMs: 60_000, iterations: 3 } });
+    expect(never(warnings)[0]).toContain("(ran 3 iterations, stopped: iteration cap)");
+  });
+
+  test("a named run that reaches the missed states clears the warning", () => {
+    const payload = { email: "a@b.c", name: "A" };
+    const steps: VizStep[] = [
+      { kind: "event", event: "submitBasicInfo", payload },
+      {
+        kind: "event",
+        event: "submitShipping",
+        payload: { street: "s", city: "c", zip: "z" },
+      },
+      { kind: "event", event: "submitPayment", payload: { cardNumber: "4" } },
+      { kind: "event", event: "paymentOk", payload: { orderId: "o" } },
+    ];
+    const { warnings } = inspect({
+      ...checkout,
+      fuzz: { iterations: 0 },
+      tests: [{ name: "happy path", steps }],
+    });
+    expect(never(warnings).join("\n")).not.toContain("success");
   });
 });
 
