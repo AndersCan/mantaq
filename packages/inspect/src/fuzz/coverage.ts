@@ -19,11 +19,47 @@ function matches(edge: VizEdge, seen: Observation): boolean {
 
 /** Times each edge was taken in `traces`; null for edges no handler drives (initial, effect). */
 export function edgeHits(edge: VizEdge, traces: ReadonlyArray<Trace>): number | null {
-  if (edge.kind === "initial" || edge.kind === "effect") return null;
+  if (!driven(edge)) return null;
   return traces.reduce(
     (sum, trace) => sum + trace.observations.filter((seen) => matches(edge, seen)).length,
     0,
   );
+}
+
+/** Edges a run can take: not the initial edge, not effect self-loops. */
+function driven(edge: VizEdge): boolean {
+  return edge.kind !== "initial" && edge.kind !== "effect";
+}
+
+/**
+ * Stateful `done` for `fuzz`: true once the runs seen so far reached every
+ * state and every handler edge of `machine`, counted as the viz counts hits.
+ */
+export function coverageGoal(machine: VizMachine): (trace: Trace) => boolean {
+  const states = new Set(machine.states.map((state) => state.id));
+  let edges = machine.edges.filter(driven);
+  return (trace) => {
+    for (const state of trace.visited) states.delete(state);
+    edges = edges.filter((edge) => !trace.observations.some((seen) => matches(edge, seen)));
+    return states.size === 0 && edges.length === 0;
+  };
+}
+
+function edgeName(edge: VizEdge): string {
+  return `${edge.from} -${edge.event}-> ${edge.kind === "stay" ? "(stay)" : (edge.to ?? "?")}`;
+}
+
+/**
+ * States and edges of a fuzzed machine with zero hits. An edge out of an
+ * unreached state is left out: reaching the state comes first.
+ */
+export function unreached(machine: VizMachine): string[] {
+  const states = machine.states.filter((state) => state.coverage?.hits === 0).map((s) => s.id);
+  const missing = new Set(states);
+  const edges = machine.edges
+    .filter((edge) => driven(edge) && edge.coverage?.hits === 0 && !missing.has(edge.from))
+    .map(edgeName);
+  return [...states, ...edges];
 }
 
 export function stateVisits(state: string, traces: ReadonlyArray<Trace>): number {

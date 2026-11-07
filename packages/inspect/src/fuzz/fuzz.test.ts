@@ -1,5 +1,7 @@
 import { exampleTargets, handWrittenBaselines } from "../examples.ts";
-import { withTestCoverage } from "./coverage.ts";
+import { coverageGoal, unreached, withTestCoverage } from "./coverage.ts";
+import { createCheckoutActor } from "../fixtures/checkout.ts";
+import { toVizMachine } from "../structure.ts";
 import { createConditionalActor } from "../fixtures/conditional.ts";
 import { createLockoutActor } from "../fixtures/lockout.ts";
 import { createStateRoutingActor } from "../fixtures/state-routing.ts";
@@ -269,5 +271,58 @@ describe("fuzz initial corpus", () => {
     const sequences = (result: typeof seeded) => result.corpus.map((entry) => entry.steps);
     expect(sequences(seeded)).not.toEqual(sequences(fuzz(target, options)));
     expect(seeded.corpus.some((entry) => entry.iteration === 0)).toBe(true);
+  });
+});
+
+describe("fuzz budget", () => {
+  const checkout: FuzzTarget = {
+    id: "checkout",
+    create: () => {
+      const clock = VirtualClock();
+      return { actor: createCheckoutActor(clock), clock };
+    },
+    payloads: { paymentOk: [{ orderId: "o1" }] },
+  };
+  /** A clock that ticks once per read: the deadline expires after `ms` checks. */
+  const ticking = (ms: number) => {
+    let now = 0;
+    return { ms, now: () => (now += 1) - 1 };
+  };
+
+  test("a deadline cuts the seeded sequence: same corpus as that many iterations", () => {
+    for (const seed of [1, 2, 3]) {
+      for (const ms of [1, 5, 40]) {
+        const timed = fuzz(checkout, { seed, iterations: 1000, deadline: ticking(ms) });
+        expect(timed.stopped).toBe("time");
+        expect(timed.iterations).toBe(ms - 1);
+        const counted = fuzz(checkout, { seed, iterations: timed.iterations });
+        expect(counted.stopped).toBe("iterations");
+        expect(timed.corpus).toEqual(counted.corpus);
+      }
+    }
+  });
+
+  test("the iteration cap wins when it comes before the deadline", () => {
+    const result = fuzz(checkout, { seed: 1, iterations: 3, deadline: ticking(1000) });
+    expect([result.iterations, result.stopped]).toEqual([3, "iterations"]);
+  });
+
+  test("done stops right after the first run that satisfies it", () => {
+    const done = (trace: { visited: string[] }) => trace.visited.includes("submitting");
+    const result = fuzz(checkout, { seed: 1, iterations: 100_000, done });
+    expect(result.stopped).toBe("covered");
+    expect(result.iterations).toBe(result.firstHit.get("state:submitting"));
+  });
+
+  test("coverageGoal stops once every state and edge is hit", () => {
+    const structure = toVizMachine({ id: "checkout", actor: createCheckoutActor() });
+    const result = fuzz(checkout, {
+      seed: DEFAULT_SEED,
+      iterations: 100_000,
+      done: coverageGoal(structure),
+    });
+    expect(result.stopped).toBe("covered");
+    expect(result.iterations).toBeLessThan(100_000);
+    expect(unreached(fuzzedMachine(checkout, result))).toEqual([]);
   });
 });

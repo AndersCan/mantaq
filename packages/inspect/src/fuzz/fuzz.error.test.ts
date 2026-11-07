@@ -1,6 +1,8 @@
 import { fuzz } from "./fuzz.ts";
 import { execute } from "./run.ts";
 import type { FuzzTarget } from "./run.ts";
+import { createTimerThrowActor } from "../fixtures/timer-throw.ts";
+import type { VizStep } from "@mantaq/viz";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -70,6 +72,36 @@ describe("fuzz failure paths", () => {
     expect(error?.message).toMatch(/TypeError/);
     expect(error?.steps).toHaveLength(1);
     expect(execute(target, error?.steps ?? []).errors).toHaveLength(1);
+  });
+
+  test("a timer callback that throws under advance ends that run as an error", () => {
+    const target: FuzzTarget = {
+      id: "pay",
+      create: () => {
+        const clock = VirtualClock();
+        return { actor: createTimerThrowActor(clock), clock };
+      },
+    };
+    const steps: VizStep[] = [
+      { kind: "event", event: "pay", payload: {} },
+      { kind: "advance", ms: 10 },
+      { kind: "advance", ms: 10 },
+    ];
+    const trace = execute(target, steps);
+    expect(trace.errors).toEqual([
+      {
+        from: "charging",
+        event: "advance",
+        message: "TypeError: Cannot read properties of undefined (reading 'startsWith')",
+        step: 1,
+      },
+    ]);
+    expect(trace.features).toContain("error:charging>advance");
+    const result = fuzz(target, { seed: 1, iterations: 300 });
+    expect(result.iterations).toBe(300);
+    expect(result.errors.map((error) => `${error.from}>${error.event}`)).toEqual([
+      "charging>advance",
+    ]);
   });
 
   test("zero iterations keeps only the empty run", () => {

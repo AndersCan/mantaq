@@ -20,7 +20,17 @@ export interface FuzzOptions {
   guide?: (trace: Trace) => boolean;
   /** Known-good sequences (e.g. example tests) the corpus starts from, before any mutation. */
   initial?: ReadonlyArray<ReadonlyArray<VizStep>>;
+  /** Stop early once this returns true. Sees every run, like `guide` (e.g. `coverageGoal`). */
+  done?: (trace: Trace) => boolean;
+  /**
+   * Wall-time budget. `now` is injected so the loop reads no clock itself:
+   * the run sequence stays seeded, only where it stops depends on time.
+   */
+  deadline?: { ms: number; now: () => number };
 }
+
+/** Why fuzzing stopped: `done` returned true, the iteration cap, or the deadline. */
+export type FuzzStop = "covered" | "iterations" | "time";
 
 export interface CorpusEntry {
   steps: VizStep[];
@@ -31,7 +41,9 @@ export interface CorpusEntry {
 
 export interface FuzzResult {
   seed: number;
+  /** Iterations that ran: at most `options.iterations`. */
   iterations: number;
+  stopped: FuzzStop;
   corpus: CorpusEntry[];
   /** Feature -> iteration that first reached it. */
   firstHit: Map<string, number>;
@@ -95,10 +107,23 @@ function collectErrors(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): 
   );
 }
 
+/** Why to stop before running `iteration`, or null to run it. */
+function stopper(options: FuzzOptions): (iteration: number, covered: boolean) => FuzzStop | null {
+  const { deadline } = options;
+  const started = deadline?.now() ?? 0;
+  return (iteration, covered) => {
+    if (covered) return "covered";
+    if (iteration > options.iterations) return "iterations";
+    if (deadline !== undefined && deadline.now() - started >= deadline.ms) return "time";
+    return null;
+  };
+}
+
 /**
  * Coverage-guided fuzzing. Each iteration mutates a corpus entry, runs it on a
  * fresh actor and keeps it if it reaches a feature (state, edge, stay, error)
- * no earlier run reached. Same target + options => identical result.
+ * no earlier run reached. Same target + options => identical result; with a
+ * `deadline`, the same runs in the same order, cut off where time ran out.
  */
 export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   const context = mutationContext(target, options);
@@ -108,8 +133,10 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   /** Parallel to `corpus`: which steps of each entry changed context, and their cycles. */
   const loops: Array<Pick<Parent, "contextSteps" | "loopStarts">> = [];
 
+  const progress = { covered: false };
   function consider(steps: VizStep[], iteration: number): void {
     const trace = execute(target, steps);
+    if (options.done?.(trace) === true) progress.covered = true;
     const discovered = trace.features.filter((feature) => !seen.has(feature));
     const guided = options.guide ? options.guide(trace) : false;
     for (const feature of discovered) {
@@ -124,7 +151,10 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
 
   consider([], 0);
   for (const steps of options.initial ?? []) consider([...steps], 0);
-  for (let iteration = 1; iteration <= options.iterations; iteration += 1) {
+  const stopAt = stopper(options);
+  let iteration = 1;
+  let stopped = stopAt(iteration, progress.covered);
+  while (stopped === null) {
     const at = context.rng.int(corpus.length);
     const parent = {
       steps: corpus[at]?.steps ?? [],
@@ -132,6 +162,8 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
       loopStarts: loops[at]?.loopStarts ?? [],
     };
     consider(mutate(parent, context), iteration);
+    iteration += 1;
+    stopped = stopAt(iteration, progress.covered);
   }
 
   const kept = corpus
@@ -139,7 +171,8 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
     .map((entry) => ({ ...entry, steps: shrink(target, entry.steps, entry.discovered) }));
   return {
     seed: options.seed,
-    iterations: options.iterations,
+    iterations: iteration - 1,
+    stopped,
     corpus: kept,
     firstHit,
     errors: collectErrors(target, kept),

@@ -4,8 +4,9 @@ import { analyzeModule, annotateWith } from "./ast/annotate.ts";
 import type { ModuleAnalysis } from "./ast/annotate.ts";
 import type { MachineExport } from "./ast/discover.ts";
 import type { AnalysisSource } from "./ast/program.ts";
-import { withTestCoverage } from "./fuzz/coverage.ts";
+import { coverageGoal, unreached, withTestCoverage } from "./fuzz/coverage.ts";
 import { fuzz } from "./fuzz/fuzz.ts";
+import type { FuzzOptions, FuzzStop } from "./fuzz/fuzz.ts";
 import { guidance } from "./fuzz/guided.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import { fuzzedMachine } from "./fuzz/to-viz.ts";
@@ -23,8 +24,60 @@ const DEFAULT_ITERATIONS = 2000;
 
 export interface FuzzSettings {
   seed?: number;
-  /** Default 2000. */
+  /** Most runs to try. Default 2000; no cap when `timeLimitMs` is set alone. */
   iterations?: number;
+  /**
+   * Wall-time budget for one machine. With it, fuzzing also stops as soon as
+   * every state and edge is covered. The runs stay seeded (same seed, same
+   * sequence); only how many ran depends on the machine's speed, so leave it
+   * out for a reproducible export.
+   */
+  timeLimitMs?: number;
+}
+
+/** The one wall-clock read in inspect: only a `timeLimitMs` budget uses it. */
+const wallClock = (): number => performance.now();
+
+const STOPPED: Record<FuzzStop, string> = {
+  covered: "full coverage",
+  iterations: "iteration cap",
+  time: "time limit",
+};
+
+/** Fuzz options for the settings: an iteration count, or a time budget that ends on full coverage. */
+function budget(
+  settings: FuzzSettings | undefined,
+  structure: VizMachine,
+): Pick<FuzzOptions, "iterations" | "done" | "deadline"> {
+  const limit = settings?.timeLimitMs;
+  if (limit === undefined) return { iterations: settings?.iterations ?? DEFAULT_ITERATIONS };
+  return {
+    iterations: settings?.iterations ?? Number.POSITIVE_INFINITY,
+    done: coverageGoal(structure),
+    deadline: { ms: limit, now: wallClock },
+  };
+}
+
+/** What fuzzing missed and how to get further, or nothing when it reached everything. */
+function fuzzWarnings(
+  machine: VizMachine,
+  run: { stopped: FuzzStop; unsampled: string[] },
+): string[] {
+  const missed = unreached(machine);
+  const iterations = machine.fuzz?.iterations ?? 0;
+  const never =
+    missed.length === 0
+      ? []
+      : [
+          `fuzz never reached: ${missed.join(", ")} (ran ${iterations} iterations, stopped: ${STOPPED[run.stopped]}). Raise fuzz.timeLimitMs / iterations or add a named run to \`tests\`.`,
+        ];
+  const unsampled =
+    run.unsampled.length === 0
+      ? []
+      : [
+          `no source, so payload types are unknown: fuzz sends ${run.unsampled.join(", ")} without a payload. Pass \`source\` (samples from the event types) or \`payloads\`.`,
+        ];
+  return [...never, ...unsampled];
 }
 
 export interface InspectTarget {
@@ -93,33 +146,41 @@ function annotator(
 function driven(
   target: InspectTarget,
   context: { structure: VizMachine; run: Either<string, FuzzTarget> },
-): { machine: VizMachine; skipped: string[] } {
+): { machine: VizMachine; notes: string[] } {
   const { structure, run } = context;
-  if (Either.isLeft(run)) return { machine: structure, skipped: [run[0]] };
+  if (Either.isLeft(run)) return { machine: structure, notes: [run[0]] };
   const settings = target.fuzz;
-  const fuzzed =
-    settings === false
-      ? structure
-      : fuzzedMachine(
-          run[1],
-          fuzz(run[1], {
-            seed: settings?.seed ?? DEFAULT_SEED,
-            iterations: settings?.iterations ?? DEFAULT_ITERATIONS,
-            ...(target.tests === undefined
-              ? {}
-              : { initial: target.tests.map((run) => run.steps) }),
-            ...guidance(structure),
-          }),
-        );
+  const fuzzed = settings === false ? null : fuzzRun(run[1], { target, settings, structure });
+  const base = fuzzed?.machine ?? structure;
   const machine =
     target.tests === undefined
-      ? fuzzed
+      ? base
       : withTestCoverage(
           run[1],
-          fuzzed,
+          base,
           target.tests.map((each) => each.steps),
         );
-  return { machine, skipped: [] };
+  return { machine, notes: fuzzed?.warnings ?? [] };
+}
+
+function fuzzRun(
+  runner: FuzzTarget,
+  context: { target: InspectTarget; settings: FuzzSettings | undefined; structure: VizMachine },
+): { machine: VizMachine; warnings: string[] } {
+  const { target, settings, structure } = context;
+  const result = fuzz(runner, {
+    seed: settings?.seed ?? DEFAULT_SEED,
+    ...budget(settings, structure),
+    ...(target.tests === undefined ? {} : { initial: target.tests.map((each) => each.steps) }),
+    ...guidance(structure),
+  });
+  const machine = fuzzedMachine(runner, result);
+  const sampled = runner.payloads ?? {};
+  const unsampled =
+    target.source === undefined
+      ? structure.events.map((event) => event.id).filter((id) => sampled[id] === undefined)
+      : [];
+  return { machine, warnings: fuzzWarnings(machine, { stopped: result.stopped, unsampled }) };
 }
 
 function inspectWith(
@@ -130,14 +191,14 @@ function inspectWith(
   const inferred = Either.getRight(analysis ?? Either.left("none"))?.payloads ?? {};
   const structure = annotate(toVizMachine({ id: target.id, actor: target.create() }));
   const run = runner(target, { ...inferred, ...target.payloads });
-  const { machine, skipped } = driven(target, { structure, run });
+  const { machine, notes } = driven(target, { structure, run });
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
     analysis === null ? [] : [Either.getLeft(analysis)].filter((each) => each !== undefined);
   const annotated = annotate({ ...machine, runs: [...(target.tests ?? [])] });
   return {
     machine: annotated,
-    warnings: [...unanalyzed, ...(quiet ? [] : skipped), ...warningsOf(annotated)],
+    warnings: [...unanalyzed, ...(quiet ? [] : notes), ...warningsOf(annotated)],
   };
 }
 

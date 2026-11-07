@@ -1,5 +1,7 @@
 import { EXAMPLE_ROOT } from "./examples.ts";
+import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createDoorActor } from "./fixtures/factories.ts";
+import { createTimerThrowActor } from "./fixtures/timer-throw.ts";
 import { inspect, inspectModule } from "./inspect.ts";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
@@ -45,5 +47,47 @@ describe("inspect: what cannot be done is a warning, never a guess", () => {
     });
     expect(result.machines.map((machine) => machine.id)).toEqual(["gate", "realDoor"]);
     expect(result.warnings[0]).toBe("door: createDoorActor did not return an actor");
+  });
+});
+
+describe("inspect: fuzz that cannot finish or crashes is reported, not fatal", () => {
+  test("a timer callback that throws under clock.advance is a fuzz error; fuzzing goes on", () => {
+    const { machine, warnings } = inspect({
+      id: "pay",
+      create: () => createTimerThrowActor(),
+      // `{}` is the payload the type forbids but fuzz may send: `card` is undefined.
+      payloads: { pay: [{ card: "4111" }, { card: "5500" }, {}], ok: [null], no: [null] },
+    });
+    const crash = machine.fuzz?.errors.find((error) => error.event === "advance");
+    expect(crash?.from).toBe("charging");
+    expect(crash?.message).toMatch(/^TypeError: .*startsWith/);
+    // The shrunk event path that reproduces it: pay with no card, then time passes.
+    expect(crash?.steps.map((step) => step.kind)).toEqual(["event", "advance"]);
+    expect(crash?.steps[0]).toMatchObject({ event: "pay", payload: {} });
+    // Runs with a card still reach both outcomes.
+    expect(warnings).toEqual([]);
+    const hits = (id: string) => machine.states.find((state) => state.id === id)?.coverage?.hits;
+    expect(hits("paid")).toBeGreaterThan(0);
+    expect(hits("declined")).toBeGreaterThan(0);
+  });
+
+  test("no source: events go out without payloads, and the warning says so", () => {
+    const { warnings } = inspect({ id: "pay", create: () => createTimerThrowActor() });
+    expect(warnings).toContain(
+      "no source, so payload types are unknown: fuzz sends no, ok, pay without a payload. Pass `source` (samples from the event types) or `payloads`.",
+    );
+  });
+
+  test("timeLimitMs 0 runs no iterations and names the time limit as the reason", () => {
+    const { machine, warnings } = inspect({
+      id: "checkout",
+      create: () => createCheckoutActor(),
+      source: { file: join(FIXTURES, "checkout.ts"), root: EXAMPLE_ROOT },
+      fuzz: { timeLimitMs: 0 },
+    });
+    expect(machine.fuzz?.iterations).toBe(0);
+    expect(warnings).toEqual([
+      "fuzz never reached: error, payment, shippingAddress, submitting, success, basicInfo -submitBasicInfo-> shippingAddress (ran 0 iterations, stopped: time limit). Raise fuzz.timeLimitMs / iterations or add a named run to `tests`.",
+    ]);
   });
 });
