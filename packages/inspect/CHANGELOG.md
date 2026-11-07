@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0
+
+<sub>2026-11-07</sub>
+
+- _(minor)_ The live page shows two machines side by side with `?machine=<a>&compare=<b>`, each with its own walk.
+
 ## 0.9.0
 
 <sub>2026-11-07</sub>
