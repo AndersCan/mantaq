@@ -54,10 +54,10 @@ No live page in the repo: add `mantaqViz({ machines })` per the `@mantaq/inspect
 
 ```ts
 /** The invite was sent and nobody has answered. */
-const pending = state("pending")();
+const waitingForAnswer = state("waitingForAnswer")();
 
 /** The invitee follows the link. */
-m.on(pending, { event: accept, to: [accepted], handler: () => ({ state: accepted }) });
+m.on(waitingForAnswer, { event: accept, to: [accepted], handler: () => ({ state: accepted }) });
 ```
 
 ## 5. Supported order, not a rule
