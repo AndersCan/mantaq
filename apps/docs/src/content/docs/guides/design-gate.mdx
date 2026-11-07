@@ -47,9 +47,31 @@ The reachability check is static. It reads the graph, so it needs no fuzzing: pa
 
 ## On the diagram
 
-The same findings show on the diagram. A state with a finding carries a "!" mark: click it to read what the bug is, then press Replay to run the events that found it. This checkout has two planted bugs: `archived` has no way in, and going `back` from `payment` throws.
+The same findings show on the diagram. A state with a finding carries a "!" mark: click it to read what the bug is, then press Replay to run the events that found it. This checkout has three planted bugs: `archived` has no way in, going `back` from `payment` throws, and the shipping step accepts an empty address (the last one is found by the next section).
 
 <Machine src="src/content/docs/checkout-with-bugs.ts" />
+
+## Tell the fuzzer what to expect
+
+Some bugs are not crashes: the machine runs fine and holds the wrong data. Say what must never happen in a block next to the factory, named `<machine id>Expectations`. It is a partial object per state: list only the context keys you care about.
+
+`neverSee` lists contexts that are a bug in that state, and fuzzing fails when a run reaches one. `mustSee` lists contexts some run has to reach, and fuzzing fails when none does.
+
+```ts
+import type { Expectations } from "@mantaq/inspect";
+
+/** What the fuzzer must never see. Delete the line to see the bug go unreported. */
+export const checkoutWithBugsExpectations: Expectations<typeof createCheckoutWithBugsActor> = {
+  payment: { neverSee: [{ address: "" }] },
+};
+```
+
+The diagram above is built from this block: `payment` carries a "!" for "Never-see context reached", and Replay runs the events that got there. Editor completion offers state names and context keys, and a typo fails to compile.
+
+- `undefined` means "not set": `{ note: undefined }` matches a context without `note`.
+- A must-see miss says no fuzz run reached the context. Add a recorded run to `tests` (see "Assert what gets reached") or raise `fuzz.iterations`.
+- In a test, pass the block as `expectations` on the target: `expectNoDesignErrors({ ...target, expectations: checkoutWithBugsExpectations })`. The message lists the hit with an `after:` line of events.
+- Payloads for events come from `source`. Without `source` or `payloads`, events that take a payload are sent without one.
 
 ## Assert what gets reached
 
