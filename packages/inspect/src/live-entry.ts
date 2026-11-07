@@ -21,6 +21,7 @@ if (root && source !== undefined) {
       source,
       targets: current.targets,
       ...(notes === undefined ? {} : { notes }),
+      ...(import.meta.hot === undefined ? {} : { seen: sessionStorage }),
     });
   draw();
   import.meta.hot?.on(UPDATE_EVENT, draw);

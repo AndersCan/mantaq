@@ -72,7 +72,7 @@ The page fuzzes each machine on a budget and warns on states it never reached. A
 
 ## 7. Each turn
 
-Edit, save, run the test file, then reply in at most 3 lines: changed states and edges, failing checks. No code unless asked.
+Edit, save, run the test file, then reply in at most 3 lines: changed states and edges, failing checks. No code unless asked. The live page outlines what you added and lists what you removed under "What changed", so the user can check your reply against it.
 
 ## 8. Done checks and report
 

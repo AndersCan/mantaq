@@ -1,0 +1,7 @@
+---
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+---
+<html><body>
+<Machine src="../fixtures/retry.ts" />
+<script is:inline>throw new Error("boom")</script>
+</body></html>

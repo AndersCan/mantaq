@@ -381,3 +381,102 @@ describe("mountLiveDriven notes", () => {
     expect(urls.filter((each) => each.includes("notes"))).toEqual([]);
   });
 });
+
+describe("mountDriven what changed", () => {
+  const source = "/viz.json";
+  const fakeStorage = () => {
+    const map = new Map<string, string>();
+    return {
+      map,
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+    };
+  };
+  const draw = (text: string, seen?: ReturnType<typeof fakeStorage>) => {
+    history.replaceState(null, "", "?machine=checkout");
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, { source, text, targets: {}, ...(seen === undefined ? {} : { seen }) });
+    return root;
+  };
+  const withState = async () => {
+    const doc = JSON.parse(await documentText());
+    doc.machines[0].states.push({ ...doc.machines[0].states[0], id: "brandNew" });
+    return JSON.stringify(doc);
+  };
+
+  test("the first mount stores one outline per machine and shows no list", async () => {
+    const seen = fakeStorage();
+    const root = draw(await documentText(), seen);
+    expect([...seen.map.keys()]).toEqual([`mantaq:seen:v1:${source}:checkout`]);
+    expect(root.querySelector("section.changes")).toBeNull();
+  });
+
+  test("a later mount marks the new state and keeps the baseline", async () => {
+    const seen = fakeStorage();
+    draw(await documentText(), seen);
+    const baseline = [...seen.map.values()];
+    const root = draw(await withState(), seen);
+    expect(
+      root.querySelector('g.state[data-node-id="brandNew"]')?.classList.contains("added"),
+    ).toBe(true);
+    expect(root.querySelector("section.changes")?.textContent).toContain("Added state brandNew");
+    expect([...seen.map.values()]).toEqual(baseline);
+  });
+
+  test("Mark as seen stores the current outline", async () => {
+    const seen = fakeStorage();
+    draw(await documentText(), seen);
+    const changed = await withState();
+    const root = draw(changed, seen);
+    root.querySelector<HTMLButtonElement>("section.changes button")?.click();
+    expect(draw(changed, seen).querySelector("section.changes")).toBeNull();
+  });
+
+  test.each(["{", '{"states":3}'])("a corrupt stored value %s is overwritten", async (bad) => {
+    const seen = fakeStorage();
+    seen.map.set(`mantaq:seen:v1:${source}:checkout`, bad);
+    const root = draw(await documentText(), seen);
+    expect(root.querySelector("section.changes")).toBeNull();
+    expect(JSON.parse(seen.map.get(`mantaq:seen:v1:${source}:checkout`) ?? "")).toHaveProperty(
+      "states",
+    );
+  });
+
+  test("storage that throws leaves the page working without a list", async () => {
+    const seen = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    const root = document.createElement("div");
+    mountDriven(root, { source, text: await documentText(), targets: {}, seen });
+    expect(root.querySelector(".explore")).not.toBeNull();
+    expect(root.querySelector("section.changes")).toBeNull();
+  });
+
+  test("without seen nothing is stored and nothing is listed", async () => {
+    const root = draw(await withState());
+    expect(root.querySelector("section.changes")).toBeNull();
+  });
+
+  test("the compare page shows no list", async () => {
+    const seen = fakeStorage();
+    draw(await documentText(), seen);
+    const doc = JSON.parse(await withState());
+    doc.machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
+    history.replaceState(null, "", "?machine=checkout&compare=second");
+    const root = document.createElement("div");
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify(doc))) as typeof fetch;
+    try {
+      await mountLiveDriven(root, { source, targets: {}, seen });
+    } finally {
+      globalThis.fetch = original;
+    }
+    expect(root.querySelector("section.changes")).toBeNull();
+  });
+});
