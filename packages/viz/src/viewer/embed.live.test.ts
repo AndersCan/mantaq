@@ -104,6 +104,7 @@ function driver(): VizDriver & { log: VizStep[][] } {
           ? [{ id: "t1", ms: 800, deadline, eventName: "paymentTimeout" }]
           : [],
       context,
+      payload: null,
     };
   };
   const done: VizStep[] = [];
@@ -749,7 +750,15 @@ describe("what ran", () => {
     const last: VizLiveStep = { ...base, ...entry };
     let onChange: (state: VizLiveState) => void = () => undefined;
     const live: VizDriver = {
-      reset: () => ({ state: "idle", steps: [], last: null, after: [], timers: [], context: {} }),
+      reset: () => ({
+        state: "idle",
+        steps: [],
+        last: null,
+        after: [],
+        timers: [],
+        context: {},
+        payload: null,
+      }),
       step: (step) => ({
         state: last.to,
         steps: [step],
@@ -757,6 +766,7 @@ describe("what ran", () => {
         after,
         timers: [],
         context: last.context,
+        payload: null,
       }),
       listen: (callback) => {
         onChange = callback;
@@ -845,6 +855,7 @@ describe("what ran", () => {
       ],
       timers: [],
       context: { amount: 9, failed: true },
+      payload: null,
     });
     const after = root.querySelector("[data-live-after]");
     expect(after?.textContent).toContain("Then paymentTimeout came back");
@@ -913,7 +924,15 @@ describe("live effect reports", () => {
       for (const step of steps) {
         if (step.kind === "event") current = next[current]?.[step.event] ?? current;
       }
-      return { state: current, steps, last: null, after: [], timers: [], context: null };
+      return {
+        state: current,
+        steps,
+        last: null,
+        after: [],
+        timers: [],
+        context: null,
+        payload: null,
+      };
     };
     const done: VizStep[] = [];
     return {
