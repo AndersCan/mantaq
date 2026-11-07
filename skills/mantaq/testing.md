@@ -71,7 +71,7 @@ import { recordRuns } from "@mantaq/inspect/record";
 const make = recordRuns(createInviteLinkActor);
 ```
 
-Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a stale file fails the test. Name tests as user-visible journeys: the test name is the run's label.
+Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a stale file fails the test. Name tests as user-visible journeys: the test name is the run's label. Link a run as `?machine=<id>&run=<name>`.
 
 ## Design Gate
 

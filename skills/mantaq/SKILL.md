@@ -70,6 +70,8 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 - Domain failures (declined card, timeout) are states and events: recoverable → non-final state with retry, terminal → final state. Never booleans in context.
 - Handlers and effects should not throw for expected failures. A throw sends the actor to a terminal error state (`snapshot().error`, `on("error")`). Treat that as a bug signal, not control flow.
 - Read the current state from the handler's `state` argument, not `actor.state`.
+- **Names read without the notes.** Name a state for the situation: work in progress is a verb plus its object (`sendingRequest`, `addingMember`), waiting says what for (`waitingForAnswer`), and an outcome says how it ended (`joined`, `declined`, `expired`). Never `idle`, `done` or `approved` for a save that is still running. Name an event for what happened: a person's action names the control or decision (`askToJoin`, `dismissDecline`), and news from elsewhere is past tense (`answerArrived`, `requestSent`). Never a bare `ok`, `close`, `ask`, `create` or `answered`.
+- **Every journey ends in a named outcome**, success included. One state per way it can end. Never fall back to the start state to mean done. Mark the outcome final when the actor's work is over. An actor reused for the next attempt keeps it non-final and says so in its JSDoc.
 - Test with `VirtualClock` and the `@mantaq/test` harness. See `testing.md`.
 
 ## Live design

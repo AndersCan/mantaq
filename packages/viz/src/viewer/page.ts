@@ -10,11 +10,13 @@ import "./page.css";
 
 import { DOCUMENT_ELEMENT_ID } from "../html.ts";
 
-function rememberWalk(where: { machine: string; steps: string[] }): void {
+function rememberWalk(where: { machine: string; steps: string[]; run?: string }): void {
   const next = new URLSearchParams(location.search);
   next.set("machine", where.machine);
   next.delete("step");
-  for (const step of where.steps) next.append("step", step);
+  next.delete("run");
+  if (where.run !== undefined) next.set("run", where.run);
+  else for (const step of where.steps) next.append("step", step);
   history.replaceState(null, "", `?${next.toString()}`);
 }
 
@@ -22,8 +24,10 @@ function rememberWalk(where: { machine: string; steps: string[] }): void {
 export function linkOptions(): ViewerOptions {
   const params = new URLSearchParams(location.search);
   const machine = params.get("machine");
+  const run = params.get("run");
   return {
     ...(machine === null ? {} : { machine }),
+    ...(machine !== null && run !== null ? { run } : {}),
     steps: params.getAll("step"),
     onNavigate: rememberWalk,
   };

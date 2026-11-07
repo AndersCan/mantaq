@@ -558,3 +558,11 @@
   flex-wrap: wrap;
   gap: 4px;
 }
+
+.viz .run-notice {
+  background: var(--banner-bg);
+  color: var(--banner-fg);
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin: 0 0 8px;
+}

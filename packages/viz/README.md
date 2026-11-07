@@ -16,7 +16,7 @@ The viewer keeps a cursor on one state, starting at the initial one. The panel l
 - **Effect reports back**: internal events that an effect of the current state declares in `sends` (`m.effect(state, { name, sends: [...], fn })`). Entering `submitting` runs `chargeCard`, which sends `paymentOk | paymentFail | paymentTimeout`.
 - **Other internal events**: internal events that no effect of the state declares.
 
-Take a step with a panel button, by clicking a pulsing edge, or by clicking a state that exactly one next step reaches. An undetermined edge (`to: null`) offers each target its AST explanation names. Without one, it cannot be taken. A final state ends the walk. **Back** (or ←), **Reset** and the path list undo steps. The standalone page keeps the walk in the URL: `?step=` holds one edge id per step, plus `~target` for an undetermined edge.
+Take a step with a panel button, by clicking a pulsing edge, or by clicking a state that exactly one next step reaches. An undetermined edge (`to: null`) offers each target its AST explanation names. Without one, it cannot be taken. A final state ends the walk. **Back** (or ←), **Reset** and the path list undo steps. The standalone page keeps the walk in the URL: `?step=` holds one edge id per step, plus `~target` for an undetermined edge. `?machine=<id>&run=<name>` opens a recorded run by name; use it for links in docs and issues.
 
 **Static walk** (standalone page): nothing runs. The walk follows declarations, so guards are not evaluated, and a path may not happen at runtime. The logic is in `src/moves.ts`: `movesFrom`, `unhandledSends`, `decodePath`.
 

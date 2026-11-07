@@ -58,6 +58,7 @@ export function mountDriven(
     const next = new URLSearchParams(location.search);
     next.set("machine", machine);
     next.delete("step");
+    next.delete("run");
     history.replaceState(null, "", `?${next.toString()}`);
     mountDriven(root, context);
   };

@@ -268,7 +268,7 @@ describe("runs", () => {
     ],
   };
 
-  function mountRuns(onNavigate: (w: { steps: string[] }) => void = () => undefined) {
+  function mountRuns(onNavigate: (w: { steps: string[]; run?: string }) => void = () => undefined) {
     const root = document.createElement("div");
     mountViewer(
       root,
@@ -308,6 +308,75 @@ describe("runs", () => {
     click(root, '[data-run="breaks"]');
     expect(current(root)).toBe("idle");
     expect(root.textContent).toContain("unknown event nope");
+  });
+
+  function mountRun(options: { run: string; steps?: string[]; driven?: boolean }) {
+    const root = document.createElement("div");
+    const seen: unknown[] = [];
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRuns] },
+      {
+        ...(options.driven === false ? {} : { driver: driver() }),
+        run: options.run,
+        ...(options.steps === undefined ? {} : { steps: options.steps }),
+        onNavigate: (where) => seen.push(where),
+      },
+    );
+    return { root, seen };
+  }
+
+  test("run= opens on a run's end state without navigating on mount", () => {
+    const { root, seen } = mountRun({ run: "pays and times out" });
+    expect(current(root)).toBe("error");
+    expect(seen).toEqual([]);
+  });
+
+  test("run= wins over steps", () => {
+    const { root } = mountRun({ run: "submits", steps: ["@800"] });
+    expect(current(root)).toBe("paying");
+  });
+
+  test("an unknown run opens the start with a notice that the next step clears", () => {
+    const { root } = mountRun({ run: "nope" });
+    expect(current(root)).toBe("idle");
+    const notice = root.querySelector("[data-run-missing]")?.textContent ?? "";
+    expect(notice).toContain('No run named "nope"');
+    expect(notice).toContain("submits");
+    sendSubmit(root);
+    expect(root.querySelector("[data-run-missing]")).toBeNull();
+  });
+
+  test("an unknown run in a machine without runs says so", () => {
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      { driver: driver(), run: "x" },
+    );
+    expect(root.querySelector("[data-run-missing]")?.textContent).toBe(
+      'No run named "x" in checkout; it has no recorded runs.',
+    );
+  });
+
+  test("a run without a driver says it replays only live", () => {
+    const { root } = mountRun({ run: "submits", driven: false });
+    expect(root.querySelector("[data-run-missing]")?.textContent).toContain(
+      "replays only when checkout runs live",
+    );
+  });
+
+  test("clicking a run reports its name to onNavigate", () => {
+    const seen: Array<{ run?: string }> = [];
+    const root = mountRuns((where) => seen.push(where));
+    click(root, '[data-run="submits"]');
+    expect(seen.at(-1)?.run).toBe("submits");
+  });
+
+  test("a run name from the URL is shown as text, not markup", () => {
+    const { root } = mountRun({ run: "<b>x</b>" });
+    expect(root.querySelector("[data-run-missing] b")).toBeNull();
+    expect(root.querySelector("[data-run-missing]")?.textContent).toContain("<b>x</b>");
   });
 
   test("a machine without runs shows no Runs section", () => {
