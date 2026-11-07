@@ -12,6 +12,8 @@ import type {
 } from "../schema.ts";
 import { changedKeys, contextLines } from "./context-diff.ts";
 import { html } from "./dom.ts";
+import { fillSources } from "./fill.ts";
+import type { FillSource } from "./fill.ts";
 import type { Selection } from "./graph.ts";
 
 export interface ExploreContext {
@@ -344,17 +346,71 @@ function readFields(
   return { payload };
 }
 
+function shown(value: VizJson): string {
+  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+  return text.length > 20 ? `${text.slice(0, 20)}…` : text;
+}
+
+function filledText(field: VizField, value: VizJson): string {
+  if (field.input === "text" && typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return JSON.stringify(value) ?? "";
+}
+
+/** "Values from": fills the inputs from one source, or back to the type's samples. */
+function fillPicker(
+  doc: Document,
+  context: {
+    fields: ReadonlyArray<VizField>;
+    inputs: ReadonlyMap<string, HTMLInputElement | HTMLSelectElement>;
+    sources: ReadonlyArray<FillSource>;
+  },
+): HTMLElement {
+  const { fields, inputs, sources } = context;
+  const select = html(doc, "select", { "data-fill-from": "", "aria-label": "Values from" });
+  sources.forEach((source, index) => {
+    const values = source.values.map((each) => `${each.field} ${shown(each.value)}`);
+    select.append(
+      html(doc, "option", { value: String(index) }, [`${source.path}: ${values.join(", ")}`]),
+    );
+  });
+  select.append(html(doc, "option", { value: "" }, ["The type's samples"]));
+  const apply = () => {
+    for (const field of fields) {
+      const input = inputs.get(field.name);
+      if (input !== undefined) input.value = fieldInput(doc, field).value;
+    }
+    const source = sources[Number(select.value)];
+    if (select.value === "" || source === undefined) return;
+    for (const { field: name, value } of source.values) {
+      const field = fields.find((each) => each.name === name);
+      const input = inputs.get(name);
+      if (field !== undefined && input !== undefined) input.value = filledText(field, value);
+    }
+  };
+  select.addEventListener("change", apply);
+  select.value = "0";
+  apply();
+  return html(doc, "label", { class: "explore-field", "data-fill": "" }, [
+    html(doc, "strong", {}, ["Values from"]),
+    select,
+  ]);
+}
+
 function fieldsForm(
   doc: Document,
   context: {
     event: string;
     fields: ReadonlyArray<VizField>;
+    live: Pick<VizLiveState, "state" | "payload" | "context"> | null;
     send: (step: VizStep) => void;
     close: () => void;
   },
 ): HTMLElement {
   const { event, fields } = context;
   const inputs = new Map(fields.map((field) => [field.name, fieldInput(doc, field)] as const));
+  const sources = context.live === null ? [] : fillSources(fields, context.live);
+  const fill = sources.length === 0 ? null : fillPicker(doc, { fields, inputs, sources });
   const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" });
   const submit = () => {
     const read = readFields(fields, inputs);
@@ -370,6 +426,7 @@ function fieldsForm(
   };
   return html(doc, "div", { class: "explore-payload", "data-payload-form": event }, [
     html(doc, "p", {}, ["Payload for ", code(doc, event), ":"]),
+    fill,
     ...fields.map((field) =>
       html(doc, "label", { class: "explore-field" }, [
         html(doc, "span", {}, [
@@ -406,13 +463,15 @@ export function payloadForm(
     samples: ReadonlyArray<VizJson>;
     /** The event's declared payload fields; null when the type could not be read. */
     fields: ReadonlyArray<VizField> | null;
+    /** What the machine holds now; null = nothing to fill from. */
+    live?: Pick<VizLiveState, "state" | "payload" | "context"> | null;
     send: (step: VizStep) => void;
     close: () => void;
   },
 ): HTMLElement {
   const { event, samples } = context;
   if (context.fields !== null && context.fields.length > 0) {
-    return fieldsForm(doc, { ...context, fields: context.fields });
+    return fieldsForm(doc, { ...context, fields: context.fields, live: context.live ?? null });
   }
   const first = samples[0];
   const box = html(doc, "textarea", {

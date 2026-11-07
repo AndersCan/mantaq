@@ -2,6 +2,7 @@
 import { RealClock, VirtualClock } from "@mantaq/core";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
+import { createAnswerActor } from "./fixtures/answer.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven, mountLiveDriven, readStorage } from "./live-page.ts";
@@ -59,6 +60,41 @@ describe("mountDriven targets", () => {
       targets: { checkout: create },
     });
     expect(root.querySelector("[data-send]")).toBeNull();
+  });
+});
+
+describe("mountDriven filled forms", () => {
+  test("the answer form starts with the code the machine is waiting on", async () => {
+    const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
+    const inspected = await inspectModule(answerFile, {
+      load: async () => ({ createAnswerActor }),
+      fuzz: false,
+    });
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: {
+        answer: () => {
+          const clock = VirtualClock();
+          return { actor: createAnswerActor(clock), clock };
+        },
+      },
+    });
+    const click = (selector: string) => root.querySelector<HTMLButtonElement>(selector)?.click();
+    click('[data-send="ask"]');
+    const code = root.querySelector<HTMLInputElement>('[data-field="code"]');
+    const album = root.querySelector<HTMLInputElement>('[data-field="album"]');
+    if (code) code.value = "c1";
+    if (album) album.value = "Trip";
+    click('[data-payload-send="ask"]');
+    click('[data-send="answered"]');
+    expect(root.querySelector<HTMLInputElement>('[data-field="code"]')?.value).toBe("c1");
+    const answer = root.querySelector<HTMLSelectElement>('[data-field="answer"]');
+    if (answer) answer.value = '"declined"';
+    click('[data-payload-send="answered"]');
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
   });
 });
 
