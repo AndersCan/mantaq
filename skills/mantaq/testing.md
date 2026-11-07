@@ -1,6 +1,6 @@
 # Testing Mantaq
 
-Deterministic tests with the VirtualClock + vitest. Harness and coverage from `@mantaq/test` (`npm install @mantaq/test`) and `@mantaq/traversal`. Written against `@mantaq/core` 0.5, `@mantaq/test` 2.0, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.5. Check exact signatures against the installed types.
+Deterministic tests with the VirtualClock + vitest. Harness and coverage from `@mantaq/test` (`npm install @mantaq/test`) and `@mantaq/traversal`. Check exact signatures against the installed types.
 
 ## Deterministic Tests (VirtualClock)
 
