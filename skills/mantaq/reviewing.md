@@ -16,6 +16,7 @@ Review actor code against the Rules in `SKILL.md`, then check what typechecking 
 
 - Every state, event and handler has a one-sentence doc comment in domain words. The live page shows it.
 - States and events read without their JSDoc, and every journey ends in a named outcome (`SKILL.md` Rules).
+- No bare `ok`/`ready`/`idle`/`error`; failures the person sees have their own state (`SKILL.md` Rules).
 - Links to journeys use `run=`, never `step=`.
 
 ## Typing

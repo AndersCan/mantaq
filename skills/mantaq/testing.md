@@ -15,7 +15,7 @@ const actor = Actor({ clock, ... });
 
 actor.send(submit.create({ ... }));
 clock.advance(800);                       // fires timers, drains queue — synchronous
-expect(matches(actor, "success")).toBe(true);
+expect(matches(actor, "submitted")).toBe(true);
 ```
 
 No awaits needed for timer work. For promise-based effects, `await actor.settled()`. Pending timers are not queued events, so `settled()` does not advance time.
@@ -81,7 +81,7 @@ import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@ma
 const target = { id: "inviteLink", create: () => createInviteLinkActor({ clock: VirtualClock() }) };
 expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, dead ends, unreachable states
 expectAllStatesReached(target);
-expectReached(target, { transitions: [{ from: "pending", event: "ACCEPT" }] });
+expectReached(target, { transitions: [{ from: "waitingForAnswer", event: "ACCEPT" }] });
 expectNoDesignErrors({ ...target, fuzz: false }); // structure only, no fuzzing
 ```
 
