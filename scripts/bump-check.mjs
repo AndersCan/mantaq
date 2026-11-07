@@ -4,9 +4,11 @@
  * package that does not exist (e.g. "@mantaq/testkit" for "@mantaq/test"), so
  * the fix ships with no version bump and CI stays green. Fail on it instead.
  *
+ * Also fails on a `major` bump: Mantaq takes no majors, breaking changes are minor.
+ *
  * Run with `vp run bump:check`. Wired into the root `ready` script.
  */
-import { findUnknownNames } from "./lib/bump-files.mjs";
+import { findMajorBumps, findUnknownNames } from "./lib/bump-files.mjs";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -54,6 +56,11 @@ for (const file of readdirSync(bumpDir)) {
   const source = readFileSync(join(bumpDir, file), "utf8");
   for (const name of findUnknownNames({ source, known })) {
     failures.push(`.bumpy/${file}: "${name}" is not a workspace package`);
+  }
+  for (const name of findMajorBumps(source)) {
+    failures.push(
+      `.bumpy/${file}: "${name}": major. Mantaq takes no majors; use minor for breaking changes`,
+    );
   }
 }
 

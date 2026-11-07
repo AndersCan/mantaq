@@ -22,6 +22,8 @@ export interface MutationContext {
 export interface Parent {
   steps: ReadonlyArray<VizStep>;
   contextSteps: ReadonlyArray<number>;
+  /** Parallel to `contextSteps`: where the cycle ending at that step starts. */
+  loopStarts: ReadonlyArray<number>;
 }
 
 const REPEAT_COUNTS = [2, 3, 5, 8, 13];
@@ -145,16 +147,20 @@ function repeatCounts(context: MutationContext): number[] {
 /**
  * Loop a step that changed the actor's context (a counter, an accumulating
  * list): `if (retries > 10)` needs the same event many times, and repeating
- * a step that changes nothing would only add noise. Inserts `count` copies.
+ * a step that changes nothing would only add noise. The loop body is the
+ * whole cycle ending at that step, back to the state it returns to: a
+ * counter bumped by `submit, rejected` needs the pair again, not `rejected`
+ * alone. Inserts `count` copies of the body after it.
  */
 function repeat(parent: Parent, context: MutationContext): VizStep[] {
   const at = context.rng.pick(parent.contextSteps);
-  const step = at === undefined ? undefined : parent.steps[at];
-  if (at === undefined || step === undefined) return [...parent.steps];
-  const room = context.maxLength * 4 - parent.steps.length;
+  if (at === undefined || parent.steps[at] === undefined) return [...parent.steps];
+  const start = parent.loopStarts[parent.contextSteps.indexOf(at)] ?? at;
+  const body = parent.steps.slice(Math.min(start, at), at + 1);
+  const room = Math.floor((context.maxLength * 4 - parent.steps.length) / body.length);
   const count = Math.min(context.rng.pick(repeatCounts(context)) ?? 2, room);
   if (count <= 0) return [...parent.steps];
-  const copies: VizStep[] = Array.from({ length: count }, () => step);
+  const copies = Array.from({ length: count }, () => body).flat();
   return [...parent.steps.slice(0, at + 1), ...copies, ...parent.steps.slice(at + 1)];
 }
 

@@ -15,6 +15,7 @@
     "bench:main": "bash scripts/bench-vs-main.sh",
     "bench:baseline": "vp run @mantaq/bench#bench:baseline",
     "dev": "vp run docs#dev",
+    "docs:dev": "vp run docs#dev",
     "prepare": "vp config",
     "mutation:core": "stryker run",
     "mutation:sugar": "cd packages/sugar && stryker run",

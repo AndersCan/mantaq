@@ -14,6 +14,25 @@
   color-scheme: light;
   background: var(--bg);
   color: var(--fg);
+  container-type: inline-size;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* Host pages (docs themes, markdown styles) size and space these; the viewer
+   sets its own. Zero specificity, so every rule below still wins. */
+.viz :where(h1, h2, h3, h4, p, ul, ol, dl, dt, dd, pre, figure, details) {
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.viz :where(p, dl, pre) {
+  margin-bottom: 6px;
+}
+
+.viz :where(button, select, textarea, input, code, pre) {
+  font-size: 0.75rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -42,35 +61,104 @@
 }
 
 .viz .viz-header :is(h1, h2, h3) {
-  font-size: 18px;
+  font-size: 1.125rem;
   margin: 0;
 }
 
 .viz .help-link {
   margin-left: auto;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
+/* Panel below the graph unless the viewer itself is wide: a docs column is
+   narrow even on a big screen, so this asks the container, not the viewport. */
 .viz .viz-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 16px;
-}
-
-@media (max-width: 760px) {
-  .viz .viz-main {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 
 .viz .canvas {
   overflow: auto;
+  position: relative;
+}
+
+/* The payload question, on the diagram next to the edge it will take. */
+.viz .payload-popover {
+  position: absolute;
+  z-index: 2;
+  width: min(22rem, calc(100% - 8px));
+  box-sizing: border-box;
+  background: var(--state-bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}
+
+.viz .payload-popover .explore-payload {
+  margin: 0;
+  border-left: none;
+}
+
+.viz .payload-popover textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, monospace;
 }
 
 .viz .panel {
-  border-left: 1px solid var(--region-bg);
-  padding-left: 16px;
+  border-top: 1px solid var(--region-bg);
+  padding-top: 8px;
+  min-width: 0;
+}
+
+@container (min-width: 1100px) {
+  .viz .viz-main {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  .viz .panel {
+    border-top: none;
+    border-left: 1px solid var(--region-bg);
+    padding: 0 0 0 16px;
+  }
+}
+
+.viz .panel h2 {
+  font-size: 0.875rem;
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+
+.viz .tab-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--region-bg);
+  margin-bottom: 8px;
+}
+
+.viz .tab-strip [role="tab"] {
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.viz .tab-strip [role="tab"][aria-selected="true"] {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.viz .tab-panel {
+  max-height: 60vh;
+  overflow: auto;
 }
 
 .viz .panel dl {
@@ -194,7 +282,7 @@
   margin: 0;
   padding-left: 20px;
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .viz .unknown-node circle {
@@ -280,7 +368,7 @@
 
 .viz .explanation pre {
   overflow-x: auto;
-  font-size: 12px;
+  font-size: 0.75rem;
   background: var(--region-bg);
   padding: 6px;
   border-radius: 4px;
@@ -360,11 +448,10 @@
   background: var(--region-bg);
   border-radius: 6px;
   padding: 6px 10px;
-  margin-bottom: 12px;
 }
 
 .viz .explore h3 {
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 10px 0 4px;
   color: var(--muted);
 }
@@ -419,16 +506,10 @@
   stroke-dasharray: 4 3;
 }
 
-.viz .explore-context summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-
 .viz .explore-context pre {
-  margin: 4px 0 0;
+  margin: 0;
   overflow: auto;
-  max-height: 40vh;
-  font-size: 12px;
+  font-size: 0.75rem;
   background: var(--region-bg);
 }
 
@@ -440,7 +521,7 @@
 
 .viz .fullscreen-toggle {
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--fg);
   background: var(--state-bg);
   border: 1px solid var(--state-border);
@@ -457,4 +538,23 @@
 
 .viz:fullscreen .viz-main {
   min-height: 0;
+}
+
+.viz .explore-payload {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--accent);
+}
+
+.viz .explore-payload p {
+  margin: 0;
+}
+
+.viz .explore-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }

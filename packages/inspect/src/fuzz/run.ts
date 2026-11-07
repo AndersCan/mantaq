@@ -44,6 +44,12 @@ export interface Trace {
   /** Indices of steps after which the actor context differed: loop candidates. */
   contextSteps: number[];
   /**
+   * Parallel to `contextSteps`: where the cycle ending at that step starts.
+   * The last step from which the actor was in the state the step ended in, so
+   * repeating `steps[start..step]` returns to the same state each time.
+   */
+  loopStarts: number[];
+  /**
    * Coverage features, sorted: `state:x`, `edge:a>e>b` (state changed or
    * re-entered), `stay:a>e` (handled, no change), `error:a>e` (handler threw).
    */
@@ -139,6 +145,9 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   const observations: Observation[] = [];
   const errors: RunError[] = [];
   const contextSteps: number[] = [];
+  const loopStarts: number[] = [];
+  /** The actor's state before each step. */
+  const statesBefore: string[] = [];
   let index = 0;
   actor.on("transition", {
     fn: ({ event, from, to, transitioned, effects }) => {
@@ -169,11 +178,17 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   for (const step of steps) {
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
+    statesBefore.push(actor.state.name);
     applyStep(actor, { step, clock, internal });
-    if (contextText(actor) !== before) contextSteps.push(index);
+    if (contextText(actor) !== before) {
+      contextSteps.push(index);
+      // A state not seen before this step has no cycle: loop the step alone.
+      const start = statesBefore.lastIndexOf(actor.state.name);
+      loopStarts.push(start === -1 ? index : start);
+    }
     index += 1;
   }
   actor.dispose();
   const features = featuresOf({ visited, observations, errors });
-  return { visited, observations, errors, contextSteps, features };
+  return { visited, observations, errors, contextSteps, loopStarts, features };
 }

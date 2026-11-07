@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractBumpNames, findUnknownNames } from "./lib/bump-files.mjs";
+import { extractBumpNames, findMajorBumps, findUnknownNames } from "./lib/bump-files.mjs";
 
 const known = new Set(["@mantaq/test", "@mantaq/core"]);
 
@@ -22,4 +22,11 @@ test("returns nothing for empty or missing frontmatter", () => {
 
 test("ignores a horizontal rule in the body after empty frontmatter", () => {
   assert.deepEqual(extractBumpNames("---\n---\n\nNote: x\n\n---\n"), []);
+});
+
+test("flags major bumps, quoted or not, and nothing else", () => {
+  const source =
+    '---\n"@mantaq/core": major\n\'@mantaq/test\': "major"\n"@mantaq/viz": minor\n---\n\nmajor rewrite\n';
+  assert.deepEqual(findMajorBumps(source), ["@mantaq/core", "@mantaq/test"]);
+  assert.deepEqual(findMajorBumps('---\n"@mantaq/core": patch\n---\n'), []);
 });

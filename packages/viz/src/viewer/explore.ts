@@ -25,6 +25,8 @@ export interface ExploreContext {
     previous?: VizJson;
     /** Replace the walk with these steps from a fresh actor. */
     play: (steps: ReadonlyArray<VizStep>) => void;
+    /** Open the payload form for an event, or close it with null. */
+    compose: (event: string | null) => void;
   };
 }
 
@@ -267,13 +269,86 @@ function timersSection(
   ]);
 }
 
-function liveMovesSection(
+interface LiveMoves {
+  state: VizLiveState;
+  send: (step: VizStep) => void;
+  final: boolean;
+  compose: (event: string | null) => void;
+}
+
+/**
+ * Asks for the payload before sending: filled with the first fuzz sample,
+ * editable, with the other samples one click away. Nothing is sent until Send.
+ */
+export function payloadForm(
   doc: Document,
-  machine: VizMachine,
-  context: { state: VizLiveState; send: (step: VizStep) => void; final: boolean },
+  context: {
+    event: string;
+    samples: ReadonlyArray<VizJson>;
+    send: (step: VizStep) => void;
+    close: () => void;
+  },
 ): HTMLElement {
-  const current = context.state.state;
-  if (context.final) {
+  const { event, samples } = context;
+  const first = samples[0];
+  const box = html(doc, "textarea", {
+    rows: "3",
+    "aria-label": `${event} payload JSON`,
+    "data-payload-json": event,
+  });
+  box.value = first === undefined ? "" : JSON.stringify(first);
+  const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" }, [
+    "Payload is not valid JSON. Nothing was sent.",
+  ]);
+  const submit = () => {
+    try {
+      const payload = box.value.trim() === "" ? null : (JSON.parse(box.value) as VizJson);
+      context.send({ kind: "event", event, payload });
+    } catch {
+      problem.removeAttribute("hidden");
+    }
+  };
+  return html(doc, "div", { class: "explore-payload", "data-payload-form": event }, [
+    html(doc, "p", {}, [
+      "Payload for ",
+      code(doc, event),
+      samples.length === 0
+        ? ". No fuzz samples: type the JSON the handler expects."
+        : ". Edit it, or pick a fuzz sample:",
+    ]),
+    samples.length === 0
+      ? null
+      : html(
+          doc,
+          "div",
+          { class: "explore-samples" },
+          samples.map((sample, index) =>
+            button(doc, [`sample ${index + 1}`], {
+              onClick: () => {
+                box.value = JSON.stringify(sample);
+              },
+              attrs: { "data-sample": String(index), title: JSON.stringify(sample) },
+            }),
+          ),
+        ),
+    box,
+    problem,
+    html(doc, "div", { class: "explore-samples" }, [
+      button(doc, ["Send ", code(doc, event)], {
+        onClick: submit,
+        attrs: { "data-payload-send": event },
+      }),
+      button(doc, ["Cancel"], {
+        onClick: context.close,
+        attrs: { "data-payload-cancel": event },
+      }),
+    ]),
+  ]);
+}
+
+function liveMovesSection(doc: Document, machine: VizMachine, moves: LiveMoves): HTMLElement {
+  const current = moves.state.state;
+  if (moves.final) {
     return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
       html(doc, "strong", {}, ["Done."]),
       ` ${current} is final: the actor has stopped.`,
@@ -282,57 +357,28 @@ function liveMovesSection(
   const handled = new Set(movesFrom(machine, current).map((move) => move.edge.event));
   const inputs = machine.events.filter((event) => !event.internal).map((event) => event.id);
   const events = [...new Set([...handled, ...inputs])].sort();
-  const json = html(doc, "textarea", {
-    rows: "2",
-    placeholder: "payload as JSON (empty: the sample, or none)",
-    "aria-label": "payload JSON",
-    "data-payload-json": "",
-  });
-  const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" }, [
-    "Payload is not valid JSON.",
-  ]);
-  const payloadFor = (sample: HTMLSelectElement | null): { value: VizJson } | null => {
-    try {
-      if (json.value.trim() !== "") return { value: JSON.parse(json.value) as VizJson };
-      return { value: sample === null || sample.value === "" ? null : JSON.parse(sample.value) };
-    } catch {
-      return null;
-    }
-  };
   return html(doc, "div", { class: "explore-moves" }, [
     html(doc, "h3", {}, ["Send"]),
-    json,
-    problem,
     html(
       doc,
       "ul",
       { "data-group": "live" },
       events.map((event) => {
         const samples = payloadSamples(machine, event);
-        const sample =
-          samples.length === 0
-            ? null
-            : html(
-                doc,
-                "select",
-                { "aria-label": `${event} payload sample`, "data-sample": event },
-                [
-                  html(doc, "option", { value: "" }, ["no payload"]),
-                  ...samples.map((each) =>
-                    html(doc, "option", { value: JSON.stringify(each) }, [JSON.stringify(each)]),
-                  ),
-                ],
-              );
+        // An event fuzzing sent with a payload asks for one; the rest send at once.
+        const asks = samples.length > 0;
         return html(doc, "li", { "data-send-item": event }, [
-          button(doc, [code(doc, event)], {
-            onClick: () => {
-              const payload = payloadFor(sample);
-              problem.toggleAttribute("hidden", payload !== null);
-              if (payload !== null) context.send({ kind: "event", event, payload: payload.value });
-            },
+          button(doc, [code(doc, event), asks ? " …" : ""], {
+            onClick: () =>
+              asks ? moves.compose(event) : moves.send({ kind: "event", event, payload: null }),
             attrs: { "data-send": event },
           }),
-          sample,
+          asks
+            ? null
+            : button(doc, ["with payload"], {
+                onClick: () => moves.compose(event),
+                attrs: { class: "link", "data-send-custom": event },
+              }),
           handled.has(event)
             ? null
             : html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`]),
@@ -372,17 +418,9 @@ function outcomeText(last: VizLiveStep): string {
   return ` ignored in ${last.from}: no handler`;
 }
 
-const collapsedContexts = new WeakSet<object>();
-
-/** Collapsible, pretty-printed context. The fold survives the panel redraw after each step. */
-function contextSection(
-  doc: Document,
-  value: VizJson,
-  context: { viewer: object; previous: VizJson | undefined },
-): HTMLElement {
-  const { viewer, previous } = context;
-  const section = html(doc, "details", { class: "explore-context", "data-live-context": "" }, [
-    html(doc, "summary", {}, ["Context"]),
+/** Pretty-printed context, lines the last step changed marked. */
+function contextSection(doc: Document, value: VizJson, previous: VizJson | undefined): HTMLElement {
+  return html(doc, "div", { class: "explore-context", "data-live-context": "" }, [
     html(
       doc,
       "pre",
@@ -395,18 +433,14 @@ function contextSection(
       ]),
     ),
   ]);
-  section.open = !collapsedContexts.has(viewer);
-  section.addEventListener("toggle", () => {
-    if (section.open) collapsedContexts.delete(viewer);
-    else collapsedContexts.add(viewer);
-  });
-  return section;
 }
 
-function liveResultSection(
-  doc: Document,
-  live: { state: VizLiveState; send: (step: VizStep) => void; previous?: VizJson },
-): HTMLElement {
+/** How many context lines the last live step changed. */
+export function changedLines(state: VizLiveState, previous: VizJson | undefined): number {
+  return contextLines(state.context, previous).filter((line) => line.changed).length;
+}
+
+function liveResultSection(doc: Document, live: { state: VizLiveState }): HTMLElement {
   const { last } = live.state;
   return html(doc, "div", { class: "explore-live" }, [
     last === null
@@ -428,7 +462,6 @@ function liveResultSection(
                 `Handler threw: ${last.error}`,
               ]),
         ]),
-    contextSection(doc, live.state.context, { viewer: live.send, previous: live.previous }),
   ]);
 }
 
@@ -473,23 +506,36 @@ function nowSection(
   ];
 }
 
-/** Side-panel section: where the walk is, what can happen next, and how it got here. */
-export function explorePanel(doc: Document, context: ExploreContext): HTMLElement {
+export interface ExploreParts {
+  /** Where the walk is and what can happen next. */
+  step: HTMLElement;
+  /** Live only: the actor's context. */
+  context: HTMLElement | null;
+  /** Runs and the steps taken so far. */
+  path: HTMLElement;
+}
+
+/** The walk, split for the panel's tabs. */
+export function explorePanel(doc: Document, context: ExploreContext): ExploreParts {
   const { machine, path, live } = context;
   const current = live?.state.state ?? stateAfter(machine, path) ?? "";
   const final = machine.states.find((state) => state.id === current)?.final === true;
   const length = live?.state.steps.length ?? path.length;
-  return html(
+  const step = html(
     doc,
     "section",
     { class: "explore", "data-current": current, "data-done": final ? "" : null },
     [
-      html(doc, "h2", {}, ["Explore"]),
       ...nowSection(doc, machine, { current, final }),
       ...(live
         ? [
             liveResultSection(doc, live),
-            liveMovesSection(doc, machine, { state: live.state, send: live.send, final }),
+            liveMovesSection(doc, machine, {
+              state: live.state,
+              send: live.send,
+              final,
+              compose: live.compose,
+            }),
             final ? null : timersSection(doc, { state: live.state, send: live.send }),
           ]
         : [
@@ -508,9 +554,24 @@ export function explorePanel(doc: Document, context: ExploreContext): HTMLElemen
           attrs: { "data-explore-action": "reset" },
         }),
       ]),
-      live ? runsSection(doc, machine, live) : null,
-      live ? livePathSection(doc, context, live.state) : pathSection(doc, context),
     ],
+  );
+  return {
+    step,
+    context: live ? contextSection(doc, live.state.context, live.previous) : null,
+    path: historySection(doc, context),
+  };
+}
+
+function historySection(doc: Document, context: ExploreContext): HTMLElement {
+  const { live } = context;
+  return html(
+    doc,
+    "div",
+    { class: "explore-history" },
+    live
+      ? [runsSection(doc, context.machine, live), livePathSection(doc, context, live.state)]
+      : [pathSection(doc, context)],
   );
 }
 

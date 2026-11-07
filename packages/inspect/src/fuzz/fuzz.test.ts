@@ -1,6 +1,7 @@
 import { exampleTargets, handWrittenBaselines } from "../examples.ts";
 import { withTestCoverage } from "./coverage.ts";
 import { createConditionalActor } from "../fixtures/conditional.ts";
+import { createLockoutActor } from "../fixtures/lockout.ts";
 import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import { serializeViz, VIZ_SCHEMA_VERSION, parseViz } from "@mantaq/viz";
 import type { VizStep } from "@mantaq/viz";
@@ -192,6 +193,28 @@ describe("loops over context-changing steps", () => {
     // connect: state change, no context change. failed: attempts += 1. reset: unhandled in connecting.
     const trace = execute(retry, [step("connect"), failed, step("reset"), failed]);
     expect(trace.contextSteps).toEqual([1, 3]);
+    // `failed` stays in `connecting`: each loop body is that step alone.
+    expect(trace.loopStarts).toEqual([1, 3]);
+  });
+
+  test("a counter bumped by a two-step cycle loops the whole cycle", () => {
+    const lockout: FuzzTarget = {
+      id: "lockout",
+      create: () => {
+        const clock = VirtualClock();
+        return { actor: createLockoutActor(clock), clock };
+      },
+    };
+    const step = (event: string) => ({ kind: "event" as const, event, payload: null });
+    // rejected returns to signedOut, last left at step 0: the body is submit, rejected.
+    const trace = execute(lockout, [step("submit"), step("rejected")]);
+    expect(trace.contextSteps).toEqual([1]);
+    expect(trace.loopStarts).toEqual([0]);
+    const entry = fuzz(lockout, { seed: DEFAULT_SEED, iterations: 300 }).corpus.find((each) =>
+      each.discovered.includes("state:lockedOut"),
+    );
+    const events = entry?.steps.map((each) => (each.kind === "event" ? each.event : "advance"));
+    expect(events).toEqual(["submit", "rejected", "submit", "rejected", "submit", "rejected"]);
   });
 
   test("`attempts > 10` is reached by looping; plain mutation misses it (same seed)", () => {
