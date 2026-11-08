@@ -263,6 +263,12 @@ exports[`determinism > auth snapshot 1`] = `
           "id": "SIGN_OUT",
           "internal": false,
           "payload": null
+        },
+        {
+          "doc": null,
+          "id": "USER_SIGNED_IN",
+          "internal": true,
+          "payload": null
         }
       ],
       "fuzz": null,

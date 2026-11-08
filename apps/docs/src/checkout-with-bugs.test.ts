@@ -14,9 +14,9 @@ test("the Design gate page shows the three planted bugs", async () => {
   ]);
   const machine = result.machines[0]!;
   expect(designErrors(machine)).toEqual([
-    "back in payment throws: Error: the shipping address was lost",
-    'state payment reached never-see context {"address":""}',
-    "state archived is declared but no path leads to it from the initial state",
+    'back in payment throws. Fuzzing sent back in payment and the handler threw "Error: the shipping address was lost", so the actor went to __error. Handle the failure in the handler and return a state for it.',
+    'payment was reached with {"address":""}. The expectations block says payment must never see {"address":""}, and a fuzz run got there. Reject that input in the handler that leads to payment, or change the expectation.',
+    "archived can never be reached. No transition leads into archived. From basicInfo, the machine can only reach basicInfo, payment and shippingAddress. Add a transition into archived, or remove it.",
   ]);
   const hit = machine.fuzz?.failedExpectations[0];
   expect(hit?.steps).toEqual([
