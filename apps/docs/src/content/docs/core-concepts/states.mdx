@@ -3,6 +3,8 @@ title: States
 description: Nodes in the state graph.
 ---
 
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+
 ## What
 
 A state is a named, typed node in the machine's graph. `state("basicInfo")()`
@@ -79,8 +81,6 @@ const checkout = new Actor({
 
 `matches(checkout, "basicInfo.fraud.cleared")` checks a child state.
 
-## Parallel states
-
 Multiple regions run simultaneously:
 
 ```ts
@@ -88,3 +88,11 @@ regions: { fraud: fraudMonitor, analytics: analyticsMonitor }
 ```
 
 Each is its own actor. Both run independently.
+
+## Regions: parts that run side by side
+
+Two things run at once in the photo upload: the upload and the network. The machine is in one state of each, and you send each region its own events.
+
+<Machine src="src/content/docs/photo-upload.ts" />
+
+Send a region its events on the region itself: `actor.regions.upload.send(...)`. The machine does not pass events down. The viewer lists them under each region.

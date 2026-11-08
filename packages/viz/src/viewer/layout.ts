@@ -60,8 +60,8 @@ export interface MachineLayout {
   nodes: Array<PlacedState | PlacedUnknown | PlacedAny>;
   edges: PlacedEdge[];
   regions: PlacedRegion[];
-  /** Entry arrow into the initial state, from the `initial` edge. */
-  entry: { from: Point; to: Point } | null;
+  /** Entry arrows: into the machine's start state, then into each region's, sorted by state id. */
+  entries: Array<{ from: Point; to: Point }>;
 }
 
 const CHAR_WIDTH = 7;
@@ -292,11 +292,17 @@ function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
     });
 }
 
-function placeEntry(graph: LayoutGraph, machine: VizMachine): MachineLayout["entry"] {
-  if (machine.initial === null) return null;
-  const node = box(graph.node(machine.initial));
-  const left = node.x - node.width / 2;
-  return { from: { x: left - 28, y: node.y }, to: { x: left, y: node.y } };
+function placeEntries(graph: LayoutGraph, machine: VizMachine): MachineLayout["entries"] {
+  const regionStarts = machine.states
+    .filter((state) => state.initial && state.region !== null)
+    .map((state) => state.id)
+    .sort();
+  const starts = machine.initial === null ? regionStarts : [machine.initial, ...regionStarts];
+  return starts.map((id) => {
+    const node = box(graph.node(id));
+    const left = node.x - node.width / 2;
+    return { from: { x: left - 28, y: node.y }, to: { x: left, y: node.y } };
+  });
 }
 
 /**
@@ -332,6 +338,6 @@ export function layoutMachine(machine: VizMachine): MachineLayout {
       region,
       ...box(graph.node(regionNodeId(region))),
     })),
-    entry: placeEntry(graph, machine),
+    entries: placeEntries(graph, machine),
   };
 }

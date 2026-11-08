@@ -71,6 +71,7 @@ Actor({ regions: { health: healthMonitor, movement: movementActor }, ... });
 
 - Child output events reach the parent automatically. The parent must declare the event in its `internal` (or `inputs`) to handle it.
 - For dynamic children (`createActorMap`), wire outputs with `onOutput`.
+- A region only gets events sent to it: `actor.regions.upload.send(…)`. The viz lists them under the region.
 - Forward events INTO a region manually. No declarative parent→child wiring:
 
 ```ts

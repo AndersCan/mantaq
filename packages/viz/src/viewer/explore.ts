@@ -1,7 +1,9 @@
 import { asksForPayload, movesFrom, stateAfter, unhandledSends } from "../moves.ts";
 import { coveredByAny } from "../schema.ts";
+import { actorOf, actorText, localName, offeredEvents, regionPaths } from "./compartments.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
 import type {
+  VizActorRef,
   VizField,
   VizJson,
   VizLiveState,
@@ -30,7 +32,7 @@ export interface ExploreContext {
     /** Replace the walk with these steps from a fresh actor. */
     play: (steps: ReadonlyArray<VizStep>, run?: string) => void;
     /** Open the payload form for an event, or close it with null. */
-    compose: (event: string | null) => void;
+    compose: (event: string | null, actor?: VizActorRef) => void;
   };
 }
 
@@ -292,7 +294,7 @@ interface LiveMoves {
   state: VizLiveState;
   send: (step: VizStep) => void;
   final: boolean;
-  compose: (event: string | null) => void;
+  compose: (event: string | null, actor?: VizActorRef) => void;
 }
 
 /** One input per declared payload field, started at the field's sample. */
@@ -562,9 +564,17 @@ export function payloadForm(
 function sendItem(
   doc: Document,
   machine: VizMachine,
-  context: { live: LiveMoves; moves: Move[]; event: string; tagged: boolean },
+  context: {
+    live: LiveMoves;
+    moves: Move[];
+    event: string;
+    tagged: boolean;
+    current: string;
+    compartment: string;
+  },
 ): HTMLElement {
-  const { live, moves, event, tagged } = context;
+  const { live, moves, event, tagged, current, compartment } = context;
+  const { actor } = actorOf(compartment);
   // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
   const asks = asksForPayload(machine, event);
   const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
@@ -572,18 +582,20 @@ function sendItem(
   return html(doc, "li", { "data-send-item": event }, [
     button(doc, [code(doc, event), asks ? " …" : ""], {
       onClick: () =>
-        asks ? live.compose(event) : live.send({ kind: "event", event, payload: null }),
+        asks
+          ? live.compose(event, actor)
+          : live.send({ kind: "event", event, payload: null, ...actorOf(compartment) }),
       attrs: { "data-send": event },
     }),
     asks || declared !== null
       ? null
       : button(doc, ["with payload"], {
-          onClick: () => live.compose(event),
+          onClick: () => live.compose(event, actor),
           attrs: { class: "link", "data-send-custom": event },
         }),
     move === undefined
       ? html(doc, "span", { class: "muted", "data-ignored": "" }, [
-          ` ignored in ${live.state.state}`,
+          ` ignored in ${current}`,
         ])
       : null,
     !tagged || move === undefined || move.sentBy.length === 0
@@ -598,6 +610,8 @@ function sendItem(
 type StateEffects = VizMachine["states"][number]["effects"];
 
 interface WaitingEffect {
+  /** "" for the machine itself, else the region's path. */
+  compartment: string;
   /** The state the effect belongs to: the top-level state or a region's current state. */
   from: string;
   effect: StateEffects[number];
@@ -606,10 +620,14 @@ interface WaitingEffect {
 /** The held effects of the current state and of each region's current state that still wait for an answer. */
 function waitingEffects(machine: VizMachine, state: VizLiveState): WaitingEffect[] {
   if (state.effectMode !== "held") return [];
-  return [state.state, ...Object.values(state.regions)].flatMap((from) => {
+  const owners = [
+    { compartment: "", from: state.state },
+    ...regionPaths(state).map((path) => ({ compartment: path, from: state.regions[path] ?? "" })),
+  ];
+  return owners.flatMap(({ compartment, from }) => {
     const effects = machine.states.find((each) => each.id === from)?.effects ?? [];
     return state.waiting.flatMap((name) =>
-      effects.filter((effect) => effect.name === name).map((effect) => ({ from, effect })),
+      effects.filter((effect) => effect.name === name).map((effect) => ({ compartment, from, effect })),
     );
   });
 }
@@ -619,7 +637,7 @@ function waitingReports(machine: VizMachine, state: VizLiveState): Set<string> {
   const handled = new Set(movesFrom(machine, state.state).map((move) => move.edge.event));
   return new Set(
     waitingEffects(machine, state)
-      .filter((each) => each.from === state.state)
+      .filter((each) => each.compartment === "")
       .flatMap((each) => (each.effect.sends ?? []).filter((event) => handled.has(event))),
   );
 }
@@ -633,7 +651,7 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
   const waiting = waitingEffects(machine, state);
   const blocks = waiting
     .filter(({ effect }) => effect.sends === null || effect.sends.length > 0)
-    .map(({ from, effect }, index) => {
+    .map(({ compartment, from, effect }, index) => {
       const sends = effect.sends;
       const moves = movesFrom(machine, from);
       const handled = new Set(moves.map((move) => move.edge.event));
@@ -650,7 +668,7 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
         },
         [
           html(doc, "h3", {}, ["Waiting for ", code(doc, effect.name)]),
-          index === 0 || from !== current
+          index === 0 || compartment !== ""
             ? docNote(doc, { text: effectDoc ?? null, scope: "edge" })
             : null,
           sends === null
@@ -673,6 +691,8 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
                         moves,
                         event,
                         tagged: false,
+                        current: from,
+                        compartment,
                       })
                     : html(doc, "li", { "data-send-item": event, "data-unhandled": "" }, [
                         code(doc, event),
@@ -705,37 +725,105 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
   return [...blocks, ...quiet, ...ranForReal];
 }
 
-function liveMovesSection(doc: Document, machine: VizMachine, live: LiveMoves): HTMLElement {
-  const current = live.state.state;
-  if (live.final) {
+/** The Send list of one actor: the machine itself ("") or a region (its path). */
+function liveMovesSection(
+  doc: Document,
+  machine: VizMachine,
+  live: LiveMoves & { current: string; compartment: string },
+): HTMLElement {
+  const { current, compartment } = live;
+  const actor = actorOf(compartment);
+  const title = compartment === "" ? "h3" : "h4";
+  if (live.final && compartment === "") {
     return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
       html(doc, "strong", {}, ["Done."]),
       ` ${current} is final: the actor has stopped.`,
     ]);
   }
+  const heading =
+    compartment === "" ? [] : [html(doc, "h3", {}, [code(doc, compartment), " handles"])];
+  const block = (children: Array<HTMLElement | null>) =>
+    html(
+      doc,
+      "div",
+      {
+        class: compartment === "" ? "explore-moves" : "explore-moves explore-region-moves",
+        "data-actor": actorText(actor.actor),
+      },
+      [...heading, ...children],
+    );
+  if (live.final) {
+    return block([
+      html(doc, "p", { class: "explore-end", "data-region-final": compartment }, [
+        code(doc, compartment),
+        " is final: it takes no more events.",
+      ]),
+    ]);
+  }
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
-  const inputs = machine.events.filter((event) => !event.internal).map((event) => event.id);
-  const shown = waitingReports(machine, live.state);
-  const events = [...new Set([...handled, ...inputs])].filter((event) => !shown.has(event)).sort();
+  const events = offeredEvents(machine, compartment, [...handled]);
+  const shown = compartment === "" ? waitingReports(machine, live.state) : new Set<string>();
+  const offered = events.filter((event) => !shown.has(event));
   const groups: MoveGroup[] = ["input", "effect", "internal"];
-  const item = (event: string) => sendItem(doc, machine, { live, moves, event, tagged: true });
+  const item = (event: string) =>
+    sendItem(doc, machine, { live, moves, event, tagged: true, current, compartment });
   const groupOf = (event: string): MoveGroup =>
     moves.find((each) => each.edge.event === event)?.group ?? "input";
-  return html(
-    doc,
-    "div",
-    { class: "explore-moves" },
+  return block(
     groups.flatMap((group) => {
-      const members = events.filter((event) => groupOf(event) === group);
+      const members = offered.filter((event) => groupOf(event) === group);
       return members.length === 0
         ? []
         : [
-            html(doc, "h3", {}, [GROUP_TITLES[group]]),
+            html(doc, title, {}, [GROUP_TITLES[group]]),
             html(doc, "ul", { "data-group": group }, members.map(item)),
           ];
     }),
   );
+}
+
+/** One line per region: where it is now. */
+function regionLines(doc: Document, machine: VizMachine, state: VizLiveState): HTMLElement[] {
+  return regionPaths(state).flatMap((path) => {
+    const id = state.regions[path] ?? "";
+    const info = machine.states.find((each) => each.id === id);
+    return [
+      html(
+        doc,
+        "p",
+        { class: "explore-now explore-region-now", "data-region": path, "data-region-state": id },
+        [
+          code(doc, path),
+          ": in ",
+          html(doc, "strong", {}, [localName(id)]),
+          info?.final ? " (final)" : "",
+        ],
+      ),
+      docNote(doc, { text: info?.doc ?? null, scope: "state" }),
+    ].filter((node): node is HTMLElement => node !== null);
+  });
+}
+
+/** The root's Send list, then one per region. The root's "Done." does not stop the regions. */
+function liveBlocks(
+  doc: Document,
+  machine: VizMachine,
+  live: LiveMoves,
+): Array<HTMLElement | null> {
+  const finalOf = (id: string) => machine.states.find((each) => each.id === id)?.final === true;
+  return [
+    liveMovesSection(doc, machine, { ...live, current: live.state.state, compartment: "" }),
+    ...regionPaths(live.state).map((path) => {
+      const current = live.state.regions[path] ?? "";
+      return liveMovesSection(doc, machine, {
+        ...live,
+        current,
+        compartment: path,
+        final: finalOf(current),
+      });
+    }),
+  ];
 }
 
 function runsSection(
@@ -886,6 +974,25 @@ function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
   return matching.map((branch) => branch.conditions);
 }
 
+function outcomeText(doc: Document, step: VizLiveStep): Array<Node | string> {
+  const region = step.actor?.region;
+  if (step.outcome === "missing") {
+    return ["No region ", code(doc, region ?? ""), " in this machine. Nothing ran."];
+  }
+  if (step.outcome === "ignored") {
+    return ["No handler for ", code(doc, step.event), ` in ${step.from}. Nothing ran.`];
+  }
+  const names = (id: string) => (region === undefined ? id : localName(id));
+  const where = region === undefined ? [": "] : [": ", code(doc, region), ": "];
+  return [
+    code(doc, step.event),
+    ...where,
+    step.outcome === "transition"
+      ? `${names(step.from)} → ${names(step.to)}`
+      : `handled in ${names(step.from)}, stays`,
+  ];
+}
+
 function stepLines(
   doc: Document,
   context: {
@@ -899,19 +1006,7 @@ function stepLines(
   const because = becauseOf(machine, step);
   const changed = changedKeys(before, step.context);
   return [
-    html(
-      doc,
-      "p",
-      { "data-live-outcome": "" },
-      step.outcome === "ignored"
-        ? ["No handler for ", code(doc, step.event), ` in ${step.from}. Nothing ran.`]
-        : [
-            code(doc, step.event),
-            step.outcome === "transition"
-              ? `: ${step.from} → ${step.to}`
-              : `: handled in ${step.from}, stays`,
-          ],
-    ),
+    html(doc, "p", { "data-live-outcome": "" }, outcomeText(doc, step)),
     because === null
       ? null
       : html(doc, "p", { "data-live-because": "" }, [
@@ -1055,27 +1150,21 @@ function liveNote(doc: Document, state: VizLiveState): HTMLElement {
   );
 }
 
-type LiveContext = NonNullable<ExploreContext["live"]>;
-
-/** Live walk, under "In <state>": held effects, the last result, then what can be sent. */
-function liveBody(
+/** Live Step tab, below the root's state: regions, held effects, outcome, Send lists, time. */
+function liveParts(
   doc: Document,
   machine: VizMachine,
-  context: { live: LiveContext; final: boolean },
+  context: { live: NonNullable<ExploreContext["live"]>; current: string; final: boolean },
 ): Array<HTMLElement | null> {
-  const { live, final } = context;
+  const { live, current, final } = context;
   const { state } = live;
-  const moves: LiveMoves = {
-    state,
-    send: live.send,
-    final,
-    compose: live.compose,
-  };
+  const moves: LiveMoves = { state, send: live.send, final, compose: live.compose };
   return [
+    ...regionLines(doc, machine, state),
     ...waitingSections(doc, machine, moves),
     liveResultSection(doc, { machine, state, previous: live.previous }),
-    state.effectMode === "held" ? null : effectsSection(doc, machine, state.state),
-    liveMovesSection(doc, machine, moves),
+    state.effectMode === "held" ? null : effectsSection(doc, machine, current),
+    ...liveBlocks(doc, machine, moves),
     final ? null : timersSection(doc, { state, send: live.send }),
   ];
 }
@@ -1098,7 +1187,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       live ? liveNote(doc, live.state) : null,
       ...nowSection(doc, machine, { current, final }),
       ...(live
-        ? liveBody(doc, machine, { live, final })
+        ? liveParts(doc, machine, { live, current, final })
         : [
             effectsSection(doc, machine, current),
             movesSection(doc, movesFrom(machine, current), {
@@ -1152,39 +1241,45 @@ function historySection(doc: Document, context: ExploreContext): HTMLElement {
  */
 export function clickStep(
   machine: VizMachine,
-  context: {
-    path: ReadonlyArray<ExploreStep>;
-    selection: Selection;
-    live?: string;
-  },
+  context: { path: ReadonlyArray<ExploreStep>; selection: Selection; currents?: string[] },
 ): ExploreStep | null {
-  const current = context.live ?? stateAfter(machine, context.path);
-  if (current === null) return null;
+  const currents = currentsIn(machine, context);
   const { selection } = context;
-  const steps = movesFrom(machine, current).flatMap((move) =>
-    move.targets.map((to) => ({ edge: move.edge.id, to })),
+  const steps = currents.flatMap((current) =>
+    movesFrom(machine, current).flatMap((move) =>
+      move.targets.map((to) => ({ edge: move.edge.id, to, current })),
+    ),
   );
   const matching =
     selection.kind === "edge"
       ? steps.filter((step) => step.edge === selection.id)
-      : steps.filter((step) => step.to === selection.id && step.to !== current);
-  return matching.length === 1 ? (matching[0] ?? null) : null;
+      : steps.filter((step) => step.to === selection.id && step.to !== step.current);
+  const only = matching[0];
+  return matching.length === 1 && only !== undefined ? { edge: only.edge, to: only.to } : null;
+}
+
+/** Every state the actor is in now: live, the machine's and each region's; walking, where the path ends. */
+function currentsIn(
+  machine: VizMachine,
+  context: { path: ReadonlyArray<ExploreStep>; currents?: string[] },
+): string[] {
+  if (context.currents !== undefined) return context.currents;
+  const walked = stateAfter(machine, context.path);
+  return walked === null ? [] : [walked];
 }
 
 /** Mark the walk on the drawn graph: current state, path taken, possible next steps. */
 export function markExplore(
   root: HTMLElement,
-  context: {
-    machine: VizMachine;
-    path: ReadonlyArray<ExploreStep>;
-    live?: string;
-  },
+  context: { machine: VizMachine; path: ReadonlyArray<ExploreStep>; currents?: string[] },
 ): void {
   const { machine, path } = context;
-  const current = context.live ?? stateAfter(machine, path);
-  const moves = current === null ? [] : movesFrom(machine, current);
+  const currents = currentsIn(machine, context);
+  const moves = currents.flatMap((current) => movesFrom(machine, current));
   const next = new Set(moves.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
-  const reachable = new Set(moves.flatMap((move) => move.targets).filter((to) => to !== current));
+  const reachable = new Set(
+    moves.flatMap((move) => move.targets).filter((to) => !currents.includes(to)),
+  );
   const taken = new Set(path.map((step) => step.edge));
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
@@ -1192,11 +1287,11 @@ export function markExplore(
     element.classList.toggle("next", next.has(id));
   }
   for (const element of root.querySelectorAll<SVGGElement>(".graph g.chip")) {
-    element.classList.toggle("running", element.dataset["state"] === current);
+    element.classList.toggle("running", currents.includes(element.dataset["state"] ?? ""));
   }
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
     const id = element.dataset["nodeId"];
-    element.classList.toggle("current", id === current);
+    element.classList.toggle("current", id !== undefined && currents.includes(id));
     element.classList.toggle("reachable", id !== undefined && reachable.has(id));
   }
 }

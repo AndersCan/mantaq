@@ -1,11 +1,14 @@
 import type {
   VizDocument,
+  VizActorRef,
   VizDriver,
   VizJson,
   VizLiveState,
   VizMachine,
   VizStep,
 } from "../schema.ts";
+import { scopeOf } from "../schema.ts";
+import { currentsOf } from "./compartments.ts";
 import { html } from "./dom.ts";
 import { changesSection } from "./changes.ts";
 import type { ChangesOption } from "./changes.ts";
@@ -43,6 +46,8 @@ interface ViewState {
   previous: VizJson | undefined;
   /** Live: the event whose payload form is open. */
   composing: string | null;
+  /** Live: the region the open payload form sends to; undefined = the machine itself. */
+  composingActor: VizActorRef | undefined;
   /** The panel tab shown. */
   tab: PanelTab;
   /** Why the requested run did not open; cleared by the next walk. */
@@ -199,8 +204,9 @@ export function mountViewer(
       stepInto(view, driver, step);
       walked();
     };
-    const compose = (event: string | null) => {
+    const compose = (event: string | null, actor?: VizActorRef) => {
       view.composing = event;
+      view.composingActor = event === null ? undefined : actor;
       refresh();
     };
     const take = (step: ExploreStep) => {
@@ -279,6 +285,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     live: null,
     previous: undefined,
     composing: null,
+    composingActor: undefined,
     tab: "step",
     notice: null,
   };
@@ -372,10 +379,13 @@ function liveTake(
   step: ExploreStep,
   handlers: Pick<LiveContext, "send" | "compose">,
 ): void {
-  const event = machine.edges.find((edge) => edge.id === step.edge)?.event;
-  if (event === undefined) return;
-  if (asksForPayload(machine, event)) handlers.compose(event);
-  else handlers.send({ kind: "event", event, payload: null });
+  const edge = machine.edges.find((each) => each.id === step.edge);
+  if (edge === undefined) return;
+  const { event } = edge;
+  const region = scopeOf(edge.from);
+  const actor = region === "" ? undefined : { region };
+  if (asksForPayload(machine, event)) handlers.compose(event, actor);
+  else handlers.send({ kind: "event", event, payload: null, ...(actor ? { actor } : {}) });
 }
 
 /** An effect result that arrives later replaces the live state. */
@@ -558,8 +568,8 @@ function markSelection(root: HTMLElement, selection: Selection | null): void {
   }
 }
 
-function liveState(view: ViewState): { live?: string } {
-  return view.live === null ? {} : { live: view.live.state };
+function liveState(view: ViewState): { currents?: string[] } {
+  return view.live === null ? {} : { currents: currentsOf(view.live) };
 }
 
 /** Back is reset plus replay: the driver keeps no history. Stops at the first step the driver throws on. */

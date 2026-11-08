@@ -383,7 +383,7 @@ describe("mountViewer with a driver", () => {
   test("a graph click is resolved from the live state", () => {
     const selection = { kind: "state", id: "done" } as const;
     expect(clickStep(withEvents, { path: [], selection })).not.toBeNull();
-    expect(clickStep(withEvents, { path: [], selection, live: "done" })).toBeNull();
+    expect(clickStep(withEvents, { path: [], selection, currents: ["done"] })).toBeNull();
   });
 });
 

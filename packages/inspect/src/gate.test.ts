@@ -158,7 +158,7 @@ describe("design error details", () => {
     expect(unreachableStates({ ...machine, edges })).toEqual(["orphan"]);
   });
 
-  test("states of a region are not reported", () => {
+  test("a region state with no way out is reported by its full id", () => {
     const first = state("first")();
     const second = state("second")();
     const child = Actor({
@@ -186,7 +186,9 @@ describe("design error details", () => {
         }),
     });
     expect(machine.states.map((each) => each.id)).toContain("child.first");
-    expect(designErrors(machine)).toEqual([]);
+    const errors = designErrors(machine);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/^child\.second is a dead end/);
   });
 
   test("lists thrown, unhandled-send and orphan errors in that order", () => {

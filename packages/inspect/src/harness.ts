@@ -8,7 +8,7 @@
  */
 import { Either } from "@mantaq/utils";
 import { machineFindings, parseViz } from "@mantaq/viz";
-import type { VizFinding, VizJson, VizLiveOutcome, VizMachine } from "@mantaq/viz";
+import type { VizActorRef, VizFinding, VizJson, VizLiveOutcome, VizMachine } from "@mantaq/viz";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -24,6 +24,14 @@ export interface VizHarness {
   waiting(): Promise<Array<{ effect: string; reports: string[] }>>;
   /** Click what one person would click; an ignored event is a result, not an error. */
   send(
+    event: string,
+    payload?: Record<string, VizJson>,
+  ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>>;
+  /** Where each region is now, by local state name: `{ network: "online", upload: "sendingPhoto" }`. */
+  regions(): Promise<Record<string, string>>;
+  /** Like `send`, for the Send button under a region. An unknown region is a result, not an error. */
+  sendTo(
+    actor: VizActorRef,
     event: string,
     payload?: Record<string, VizJson>,
   ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>>;
@@ -129,11 +137,11 @@ async function fillForm(
 /** Click through the payload form (or custom JSON box); returns a message when it cannot. */
 async function sendWithPayload(
   page: Page,
-  event: string,
-  payload: Record<string, VizJson> | undefined,
-  asks: boolean,
+  scope: string,
+  step: { event: string; payload: Record<string, VizJson> | undefined; asks: boolean },
 ): Promise<string | undefined> {
-  const trigger = page.locator(`${PANEL} [data-send=${quoted(event)}]`).first();
+  const { event, payload, asks } = step;
+  const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
   const sendButton = page.locator(`[data-payload-send=${quoted(event)}]`);
   if (payload === undefined) {
     await trigger.click();
@@ -160,26 +168,56 @@ async function sendWithPayload(
   return undefined;
 }
 
+/** Local state names of every region, read from the Step tab's region lines. */
+async function readRegions(page: Page): Promise<Record<string, string>> {
+  await page.click('[data-tab="step"]');
+  const lines = await page
+    .locator(`${PANEL} p[data-region][data-region-state]`)
+    .evaluateAll((nodes) =>
+      nodes.map((node) => [
+        node.getAttribute("data-region") ?? "",
+        node.getAttribute("data-region-state") ?? "",
+      ]),
+    );
+  return Object.fromEntries(
+    lines.map(([path = "", id = ""]) => [path, id.slice(id.lastIndexOf(".") + 1)]),
+  );
+}
+
 function makeSend(
   page: Page,
   id: string,
   state: () => Promise<string>,
   isClosed: () => boolean,
-): VizHarness["send"] {
-  return async (event, payload) => {
+): VizHarness["sendTo"] {
+  return async (actor, event, payload) => {
     if (isClosed()) {
       return Either.left("harness is closed");
     }
     await page.click('[data-tab="step"]');
-    const trigger = page.locator(`${PANEL} [data-send=${quoted(event)}]`).first();
+    const path = actor.region;
+    const scope =
+      path === "" ? `${PANEL} [data-actor=""]` : `${PANEL} [data-actor=${quoted(path)}]`;
+    if (
+      path !== "" &&
+      (await page.locator(`${PANEL} p[data-region=${quoted(path)}]`).count()) === 0
+    ) {
+      const names = Object.keys(await readRegions(page)).join(", ");
+      return Either.left(`no region ${quoted(path)} in ${id}. Regions: ${names}.`);
+    }
+    const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
     if ((await trigger.count()) === 0) {
-      const offered = await attributes(page, `${PANEL} [data-send]`, "data-send");
+      const offered = await attributes(page, `${scope} [data-send]`, "data-send");
+      const where =
+        path === ""
+          ? `${id} is in ${await state()}`
+          : `region ${path} is in ${(await readRegions(page))[path]}`;
       return Either.left(
-        `no button for ${event}: ${id} is in ${await state()}, which offers: ${[...new Set(offered)].join(", ")}.`,
+        `no button for ${event}: ${where}, which offers: ${[...new Set(offered)].join(", ")}.`,
       );
     }
     const asks = ((await trigger.textContent()) ?? "").trim().endsWith("…");
-    const problem = await sendWithPayload(page, event, payload, asks);
+    const problem = await sendWithPayload(page, scope, { event, payload, asks });
     if (problem !== undefined) {
       return Either.left(problem);
     }
@@ -254,6 +292,7 @@ function describe(
 ): VizHarness {
   const state = async () =>
     (await page.getAttribute(".explore[data-current]", "data-current")) ?? "";
+  const sendTo = makeSend(page, machine.id, state, lifecycle.isClosed);
   return {
     state,
     waiting: () =>
@@ -265,7 +304,9 @@ function describe(
           ),
         })),
       ),
-    send: makeSend(page, machine.id, state, lifecycle.isClosed),
+    send: (event, payload) => sendTo({ region: "" }, event, payload),
+    sendTo,
+    regions: () => readRegions(page),
     findings: () => machineFindings(machine),
     replay: async (finding) => {
       if (lifecycle.isClosed()) {

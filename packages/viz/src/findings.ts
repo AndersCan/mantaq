@@ -196,10 +196,18 @@ function namingFindings(machine: VizMachine): VizFinding[] {
   return [...vague, ...undocumented];
 }
 
+/** Regions whose start state the graph records. */
+function startedRegions(machine: VizMachine): Set<string | null> {
+  return new Set(
+    machine.states.filter((state) => state.initial && state.region !== null).map((s) => s.region),
+  );
+}
+
 function reachability(machine: VizMachine): { reached: Set<string>; undetermined: boolean } {
+  const started = startedRegions(machine);
   const reached = new Set(
     machine.states
-      .filter((state) => state.initial || state.region !== null)
+      .filter((state) => state.initial || (state.region !== null && !started.has(state.region)))
       .map((state) => state.id),
   );
   const queue = [...reached];
@@ -223,8 +231,8 @@ function reachability(machine: VizMachine): { reached: Set<string>; undetermined
 
 /**
  * States no edge path leads to from the initial state. Empty when an undetermined
- * edge hides the answer. Region states are never reported: the graph does not
- * record where a region starts.
+ * edge hides the answer. A region is walked from its own start state; a region
+ * whose start is not recorded counts as fully reached.
  */
 export function unreachableStates(machine: VizMachine): string[] {
   const { reached, undetermined } = reachability(machine);
@@ -346,11 +354,12 @@ export function machineFindings(machine: VizMachine): VizFinding[] {
     machine.initial === null
       ? ""
       : ` From ${machine.initial}, the machine can only reach ${names(reachedRoot)}.`;
+  const started = startedRegions(machine);
   const dead = machine.states
     .filter(
       (state) =>
         !state.final &&
-        state.region === null &&
+        (state.region === null || started.has(state.region)) &&
         state.effects.length === 0 &&
         !unreachable.includes(state.id) &&
         !machine.edges.some((edge) => edge.from === state.id || coveredByAny(edge.from, state.id)),
@@ -372,6 +381,7 @@ export function machineFindings(machine: VizMachine): VizFinding[] {
       });
     });
   const orphans = unreachable.map((id) => {
+    const inRegion = machine.states.some((state) => state.id === id && state.region !== null);
     const incoming = incomingInto(machine, id);
     const sources = [...new Set(incoming.map((edge) => edge.from))];
     const only =
@@ -389,7 +399,7 @@ export function machineFindings(machine: VizMachine): VizFinding[] {
       state: id,
       event: null,
       title: `${id} can never be reached`,
-      proof: `${only.proof}${reachSentence}`,
+      proof: `${only.proof}${inRegion ? "" : reachSentence}`,
       fix: only.fix,
       steps: null,
       noReplay: `Nothing reaches ${id}, so there is nothing to replay.`,
