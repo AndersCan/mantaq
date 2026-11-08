@@ -5,7 +5,7 @@ import { openViz } from "./harness.ts";
 
 const checkout = join(import.meta.dirname, "../../../apps/docs/src/content/docs/checkout.ts");
 
-for (const height of [768, 720]) {
+for (const height of [768, 720, 480]) {
   test(`Send stays on screen for every event of the checkout at 1280x${height}`, async () => {
     const opened = await openViz({ file: checkout, viewport: { width: 1280, height } });
     const viz = Either.getRight(opened);
