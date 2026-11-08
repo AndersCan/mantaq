@@ -298,7 +298,9 @@ function statePanel(
     list(doc, [
       ["id", state.id],
       ["doc", state.doc ?? "none"],
-      ["region", state.region ?? "(root)"],
+      state.region !== null && machine.maps.includes(state.region)
+        ? ["actor map", state.region]
+        : ["region", state.region ?? "(root)"],
       ["flags", joined(flags)],
       [
         "effects on entry",

@@ -24,4 +24,5 @@ This lists what exists and when to reach for it. Get exact signatures from
 - `regions` wire child outputs into the parent automatically. `createActorMap` children do not: connect them with `onOutput`.
 - Map children's context must be plain data. Capture parent actors in the factory closure, not in context.
 - Dispose an actor map when its owner is disposed.
+- Return actor maps from the factory next to the actor, `return { actor, photos }`, so the viz draws and drives the children.
 - Prefer sugar over raw core where it fits. Reach for the map, broadcast, tag and parts helpers when the need arises, not preemptively.

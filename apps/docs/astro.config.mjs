@@ -24,6 +24,7 @@ export default defineConfig({
         "src/content/docs/login.ts",
         "src/content/docs/checkout-with-bugs.ts",
         "src/content/docs/photo-upload.ts",
+        "src/content/docs/photo-queue.ts",
       ],
       // Seeded, so every build draws the same coverage. 2000 runs miss the saga's
       // five-step path to `completed` on this seed; 5000 take ~0.3s.

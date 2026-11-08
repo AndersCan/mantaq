@@ -55,19 +55,31 @@ function defs(doc: Document): SVGDefsElement {
   ]);
 }
 
-function regionGroup(doc: Document, placed: PlacedRegion): SVGGElement {
-  return svg(doc, "g", { class: "region", "data-region": placed.region }, [
-    svg(doc, "rect", {
-      x: placed.x - placed.width / 2,
-      y: placed.y - placed.height / 2,
-      width: placed.width,
-      height: placed.height,
-      rx: 10,
-    }),
-    svg(doc, "text", { x: placed.x - placed.width / 2 + 8, y: placed.y - placed.height / 2 + 14 }, [
-      placed.region,
-    ]),
-  ]);
+function regionGroup(doc: Document, placed: PlacedRegion, isMap: boolean): SVGGElement {
+  return svg(
+    doc,
+    "g",
+    {
+      class: "region",
+      "data-region": placed.region,
+      ...(isMap ? { "data-map": placed.region } : {}),
+    },
+    [
+      svg(doc, "rect", {
+        x: placed.x - placed.width / 2,
+        y: placed.y - placed.height / 2,
+        width: placed.width,
+        height: placed.height,
+        rx: 10,
+      }),
+      svg(
+        doc,
+        "text",
+        { x: placed.x - placed.width / 2 + 8, y: placed.y - placed.height / 2 + 14 },
+        [isMap ? `${placed.region}: one per key` : placed.region],
+      ),
+    ],
+  );
 }
 
 function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
@@ -389,7 +401,9 @@ export function renderGraph(
     },
     [
       defs(doc),
-      ...placed.regions.map((region) => regionGroup(doc, region)),
+      ...placed.regions.map((region) =>
+        regionGroup(doc, region, machine.maps.includes(region.region)),
+      ),
       ...placed.edges.map((edge) => edgeGroup(doc, edge, { machine, callbacks })),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
       ...placed.nodes.map((node) => nodeGroup(doc, node, { callbacks, findings })),

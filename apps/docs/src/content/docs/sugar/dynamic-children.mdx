@@ -3,6 +3,8 @@ title: Dynamic Children
 description: Dynamic child management with ActorMap and broadcast
 ---
 
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+
 ## What
 
 `ActorMap` is a keyed registry of one actor type: same actor shape, many
@@ -11,20 +13,20 @@ instances, keyed by id. `broadcast()` sends one event to every child.
 ## ActorMap
 
 ```ts
-const orders = new ActorMap(createOrderWorker);
+const orders = createActorMap(createOrderWorker);
 orders.spawn("ord_1"); // createOrderWorker("ord_1")
 ```
 
-Constructor: `new ActorMap(factory, options?)`. Factory receives the key and
+Constructor: `createActorMap(factory, options?)`. Factory receives the key and
 returns the actor. Every `spawn(key)` creates a fresh instance.
 
 **Not a map of things.** The constructor is a factory, the actor to
-replicate. `new ActorMap(shop)` means "spawn copies of `shop`-shaped actors."
+replicate. `createActorMap(shop)` means "spawn copies of `shop`-shaped actors."
 
 ### One actor, many instances
 
 ```ts
-const orders = new ActorMap(
+const orders = createActorMap(
   (orderId) =>
     new Actor({
       inputs: [ship, cancel],
@@ -45,7 +47,7 @@ A child that answers back holds its receiver in context. The map does no
 wiring:
 
 ```ts
-const orders = new ActorMap(
+const orders = createActorMap(
   (orderId) =>
     new Actor({
       context: { orderId, reportTo: shop },
@@ -65,6 +67,7 @@ orders.send("ord_1", ship.create());
 orders.kill("ord_1");
 orders.has("ord_1"); // boolean
 orders.keys(); // string[]
+orders.get("ord_1"); // the live child actor, or undefined
 orders.snapshot("ord_1"); // Snapshot | undefined
 ```
 
@@ -96,12 +99,18 @@ const shop = new Actor({
 `__error`. No manual cleanup.
 
 ```ts
-const orders = new ActorMap(createOrderWorker, { autoReap: true });
+const orders = createActorMap(createOrderWorker, { autoReap: true });
 
 orders.spawn("ord_1"); // size 1
 orders.send("ord_1", ship.create()); // worker ships, auto-removed
 orders.has("ord_1"); // false
 ```
+
+## See it
+
+Each photo you add starts its own child. The child's graph is drawn once; the list under Step shows every child and where it is. Fuzzing does not send to children, so their states show no coverage.
+
+<Machine src="src/content/docs/photo-queue.ts" />
 
 ## broadcast
 

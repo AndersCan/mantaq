@@ -1,6 +1,7 @@
 import type {
   VizDocument,
   VizActorRef,
+  VizLiveChild,
   VizDriver,
   VizJson,
   VizLiveState,
@@ -211,7 +212,7 @@ export function mountViewer(
     };
     const take = (step: ExploreStep) => {
       if (driver !== undefined) {
-        liveTake(machine, step, { send, compose });
+        liveTake(machine, step, { send, compose, children: view.live?.children ?? [] });
         return;
       }
       view.path = [...view.path, step];
@@ -377,13 +378,22 @@ function liveOf(
 function liveTake(
   machine: VizMachine,
   step: ExploreStep,
-  handlers: Pick<LiveContext, "send" | "compose">,
+  handlers: Pick<LiveContext, "send" | "compose"> & { children: ReadonlyArray<VizLiveChild> },
 ): void {
   const edge = machine.edges.find((each) => each.id === step.edge);
   if (edge === undefined) return;
   const { event } = edge;
   const region = scopeOf(edge.from);
-  const actor = region === "" ? undefined : { region };
+  // A map edge sends only when exactly one child is in its source state.
+  const inSource = handlers.children.filter((child) => child.state === edge.from);
+  const [only] = inSource;
+  if (machine.maps.includes(region) && (inSource.length !== 1 || only === undefined)) return;
+  const actor: VizActorRef | undefined =
+    only !== undefined && machine.maps.includes(region)
+      ? { map: only.map, key: only.key }
+      : region === ""
+        ? undefined
+        : { region };
   if (asksForPayload(machine, event)) handlers.compose(event, actor);
   else handlers.send({ kind: "event", event, payload: null, ...(actor ? { actor } : {}) });
 }

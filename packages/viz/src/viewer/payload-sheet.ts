@@ -19,6 +19,14 @@ function anchorOf(
   );
 }
 
+/** The state the actor a form sends to is in; the machine's own when it has no actor. */
+function actorState(live: VizLiveState, actor: VizActorRef | undefined): string {
+  if (actor === undefined) return live.state;
+  if ("region" in actor) return live.regions[actor.region] ?? live.state;
+  const child = live.children.find((each) => each.map === actor.map && each.key === actor.key);
+  return child?.state ?? live.state;
+}
+
 /**
  * The payload form as a sheet pinned to the bottom of the viewer, so Send is
  * always on screen; the event's edge on the diagram is marked. Escape closes
@@ -46,10 +54,7 @@ export function showPayloadSheet(
   const close = () => context.compose(null);
   anchorOf(root, {
     machine,
-    state:
-      actor === undefined
-        ? live.state
-        : (("region" in actor ? live.regions[actor.region] : undefined) ?? live.state),
+    state: actorState(live, actor),
     event,
   })?.setAttribute("data-composing", "");
   const sheet = html(doc, "section", {

@@ -699,10 +699,12 @@ function sendItem(
     tagged: boolean;
     current: string;
     compartment: string;
+    /** Set for an actor map's child; otherwise the region of `compartment`. */
+    child?: VizActorRef;
   },
 ): HTMLElement {
   const { live, moves, event, tagged, current, compartment } = context;
-  const { actor } = actorOf(compartment);
+  const actor = context.child ?? actorOf(compartment).actor;
   // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
   const asks = asksForPayload(machine, event);
   const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
@@ -712,7 +714,7 @@ function sendItem(
       onClick: () =>
         asks
           ? live.compose(event, actor)
-          : live.send({ kind: "event", event, payload: null, ...actorOf(compartment) }),
+          : live.send({ kind: "event", event, payload: null, ...(actor ? { actor } : {}) }),
       attrs: { "data-send": event },
     }),
     asks || declared !== null
@@ -853,14 +855,15 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
   return [...blocks, ...quiet, ...ranForReal];
 }
 
-/** The Send list of one actor: the machine itself ("") or a region (its path). */
+/** The Send list of one actor: the machine itself (""), a region (its path) or, with `child`, a map's child. */
 function liveMovesSection(
   doc: Document,
   machine: VizMachine,
-  live: LiveMoves & { current: string; compartment: string },
-): HTMLElement {
-  const { current, compartment } = live;
-  const actor = actorOf(compartment);
+  live: LiveMoves & { current: string; compartment: string; child?: VizActorRef },
+): HTMLElement | null {
+  const { current, compartment, child } = live;
+  const actor = child === undefined ? actorOf(compartment) : { actor: child };
+  if (child !== undefined && live.final) return null;
   const title = compartment === "" ? "h3" : "h4";
   if (live.final && compartment === "") {
     return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
@@ -869,7 +872,9 @@ function liveMovesSection(
     ]);
   }
   const heading =
-    compartment === "" ? [] : [html(doc, "h3", {}, [code(doc, compartment), " handles"])];
+    compartment === "" || child !== undefined
+      ? []
+      : [html(doc, "h3", {}, [code(doc, compartment), " handles"])];
   const block = (children: Array<HTMLElement | null>) =>
     html(
       doc,
@@ -895,7 +900,15 @@ function liveMovesSection(
   const offered = events.filter((event) => !shown.has(event));
   const groups: MoveGroup[] = ["input", "effect", "internal"];
   const item = (event: string) =>
-    sendItem(doc, machine, { live, moves, event, tagged: true, current, compartment });
+    sendItem(doc, machine, {
+      live,
+      moves,
+      event,
+      tagged: true,
+      current,
+      compartment,
+      ...(child === undefined ? {} : { child }),
+    });
   const groupOf = (event: string): MoveGroup =>
     moves.find((each) => each.edge.event === event)?.group ?? "input";
   return block(
@@ -930,6 +943,59 @@ function regionLines(doc: Document, machine: VizMachine, state: VizLiveState): H
       ),
       docNote(doc, { text: info?.doc ?? null, scope: "state" }),
     ].filter((node): node is HTMLElement => node !== null);
+  });
+}
+
+/** One section per actor map: its children, where each is now, and what each handles. */
+function childrenSections(
+  doc: Document,
+  machine: VizMachine,
+  live: LiveMoves,
+): Array<HTMLElement | null> {
+  const { state } = live;
+  return machine.maps.map((map) => {
+    const children = state.children.filter((child) => child.map === map);
+    const heading = html(doc, "h3", {}, [
+      code(doc, map),
+      children.length === 0
+        ? ": no children yet"
+        : `: ${children.length} ${children.length === 1 ? "child" : "children"}`,
+    ]);
+    const rows = children.map((child) => {
+      const info = machine.states.find((each) => each.id === child.state);
+      const final = info?.final === true;
+      const moves = liveMovesSection(doc, machine, {
+        ...live,
+        current: child.state,
+        compartment: map,
+        final,
+        child: { map, key: child.key },
+      });
+      return html(
+        doc,
+        "li",
+        {
+          class: "explore-child",
+          "data-child-map": map,
+          "data-child-key": child.key,
+          "data-child-state": child.state,
+        },
+        [
+          html(doc, "p", { class: "explore-now explore-child-now" }, [
+            code(doc, child.key),
+            ": in ",
+            html(doc, "strong", {}, [localName(child.state)]),
+            child.since === state.steps.length ? " (new)" : "",
+            final ? " (final)" : "",
+          ]),
+          moves,
+        ],
+      );
+    });
+    return html(doc, "section", { class: "explore-map", "data-map": map }, [
+      heading,
+      rows.length === 0 ? null : html(doc, "ul", { class: "explore-children" }, rows),
+    ]);
   });
 }
 
@@ -1104,14 +1170,27 @@ function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
 
 function outcomeText(doc: Document, step: VizLiveStep): Array<Node | string> {
   const region = step.actor === undefined ? undefined : actorText(step.actor);
+  const child = step.actor !== undefined && "map" in step.actor ? step.actor : undefined;
   if (step.outcome === "missing") {
-    return ["No region ", code(doc, region ?? ""), " in this machine. Nothing ran."];
+    return child === undefined
+      ? ["No region ", code(doc, region ?? ""), " in this machine. Nothing ran."]
+      : [
+          code(doc, child.key),
+          " is not in ",
+          code(doc, child.map),
+          " (it was removed or never added). Nothing ran.",
+        ];
   }
   if (step.outcome === "ignored") {
     return ["No handler for ", code(doc, step.event), ` in ${step.from}. Nothing ran.`];
   }
   const names = (id: string) => (region === undefined ? id : localName(id));
-  const where = region === undefined ? [": "] : [": ", code(doc, region), ": "];
+  const where =
+    child !== undefined
+      ? [": ", code(doc, child.map), " ", code(doc, child.key), ": "]
+      : region === undefined
+        ? [": "]
+        : [": ", code(doc, region), ": "];
   return [
     code(doc, step.event),
     ...where,
@@ -1289,6 +1368,7 @@ function liveParts(
   const moves: LiveMoves = { state, send: live.send, final, compose: live.compose };
   return [
     ...regionLines(doc, machine, state),
+    ...childrenSections(doc, machine, moves),
     ...waitingSections(doc, machine, moves),
     liveResultSection(doc, { machine, state, previous: live.previous }),
     state.effectMode === "held" ? null : effectsSection(doc, machine, current),
