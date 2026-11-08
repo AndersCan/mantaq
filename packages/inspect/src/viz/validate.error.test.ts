@@ -24,7 +24,7 @@ describe("validateViz rejects", () => {
 
   test("version 9 documents and a missing outputs list", () => {
     expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
-      "$.schemaVersion: expected 13, got 9",
+      "$.schemaVersion: expected 14, got 9",
     ]);
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["outputs"];
@@ -33,7 +33,7 @@ describe("validateViz rejects", () => {
 
   test("version 11 documents", () => {
     expect(issues({ schemaVersion: 11, machines: [] })).toEqual([
-      "$.schemaVersion: expected 13, got 11",
+      "$.schemaVersion: expected 14, got 11",
     ]);
   });
 
@@ -185,6 +185,26 @@ describe("validateViz rejects", () => {
       "$.machines[0].edges[1].explanation.reason: expected string",
       "$.machines[0].edges[1].explanation.snippet: expected string",
       "$.machines[0].edges[2].explanation.branches[0].target.kind: expected one of state, stay, unresolved",
+    ]);
+  });
+});
+
+describe("validateViz region steps", () => {
+  const withStep = (step: unknown): unknown => {
+    const doc = valid() as { machines: Array<{ runs: unknown }> };
+    doc.machines[0]!.runs = [{ name: "r", steps: [step] }];
+    return doc;
+  };
+
+  test("a region step is accepted", () => {
+    expect(
+      issues(withStep({ kind: "event", event: "go", payload: null, actor: { region: "a" } })),
+    ).toEqual([]);
+  });
+
+  test("a bad actor is an issue", () => {
+    expect(issues(withStep({ kind: "event", event: "go", payload: null, actor: 3 }))).toEqual([
+      "$.machines[0].runs[0].steps[0].actor: expected {region}",
     ]);
   });
 });

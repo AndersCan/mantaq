@@ -153,6 +153,7 @@ function fakeDriver(): VizDriver {
     timers: [],
     context: { n: steps.length },
     payload: null,
+    regions: {},
     effectMode: "real",
     waiting: [],
   });

@@ -24,11 +24,18 @@ function readStep(reader: Reader, record: JsonObject, path: string): VizStep {
     return { kind: "advance", ms: readInteger(reader, { record, key: "ms", path }) };
   if (record["kind"] !== "event")
     report(reader, { path: `${path}.kind`, message: "expected event or advance" });
-  return {
+  const step: VizStep = {
     kind: "event",
     event: readString(reader, { record, key: "event", path }),
     payload: readJson(reader, { record, key: "payload", path }),
   };
+  const actor = record["actor"];
+  if (actor === undefined) return step;
+  if (isRecord(actor) && typeof actor["region"] === "string") {
+    return { ...step, actor: { region: actor["region"] } };
+  }
+  report(reader, { path: `${path}.actor`, message: "expected {region}" });
+  return step;
 }
 
 function readSteps(reader: Reader, record: JsonObject, path: string): VizStep[] {

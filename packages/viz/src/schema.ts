@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 13;
+export const VIZ_SCHEMA_VERSION = 14;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -42,6 +42,7 @@ export interface VizState {
   label: string;
   /** Region path this state belongs to, or null for the root machine. */
   region: string | null;
+  /** True for the root's start state and each region's. */
   initial: boolean;
   final: boolean;
   /** Effects this state runs on entry, in registration order. */
@@ -198,19 +199,27 @@ export interface VizMachine {
 
 export type VizJson = null | boolean | number | string | VizJson[] | { [key: string]: VizJson };
 
+/** Which actor a step goes to, or which actor moved. Omitted = the machine itself. */
+export type VizActorRef = { region: string };
+
 /** One input to a machine: an event (`send` for inputs, `inject` for internal) or a clock advance. */
 export type VizStep =
-  | { kind: "event"; event: string; payload: VizJson }
+  | { kind: "event"; event: string; payload: VizJson; actor?: VizActorRef }
   | { kind: "advance"; ms: number };
 
-/** What one step did: the actor moved, handled it without moving, or had no handler. */
-export type VizLiveOutcome = "transition" | "stay" | "ignored";
+/**
+ * What one step did: the actor moved, handled it without moving, or had no handler.
+ * `missing`: the step's actor does not exist (no such region).
+ */
+export type VizLiveOutcome = "transition" | "stay" | "ignored" | "missing";
 
 export interface VizLiveStep {
   from: string;
   event: string;
   to: string;
   outcome: VizLiveOutcome;
+  /** The region that moved; omitted for the machine itself. `from` and `to` are then full ids ("upload.sendingPhoto"), "" when the outcome is `missing`. */
+  actor?: VizActorRef;
   /** Names of the effects the step ran. */
   effects: string[];
   context: VizJson;
@@ -228,6 +237,8 @@ export interface VizLiveTimer {
 /** Where a running actor is, after the steps in `steps`. */
 export interface VizLiveState {
   state: string;
+  /** Region path -> its current full state id ("upload" -> "upload.sendingPhoto"); {} without regions. */
+  regions: Record<string, string>;
   steps: VizStep[];
   last: VizLiveStep | null;
   /** Transitions an effect caused after the step's own one, sync or later, in order. */

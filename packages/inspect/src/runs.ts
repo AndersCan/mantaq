@@ -2,8 +2,9 @@ import type { VizJson, VizRun, VizStep } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { applyStep, eventCatalog } from "./fuzz/run.ts";
+import { applyStep, eventCatalog, targetOf } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
+import type { AnyActor } from "@mantaq/core";
 
 /** A run as a test recorded it: the steps it took and the state its actor ended in. */
 interface RecordedRun extends VizRun {
@@ -23,6 +24,19 @@ function dropOne(list: string[], item: string): boolean {
   return true;
 }
 
+/** Why a step cannot be replayed (unknown region or event), or null. */
+function stepProblem(root: AnyActor<unknown>, step: VizStep): string | null {
+  if (step.kind !== "event") return null;
+  const region = step.actor?.region;
+  const target = targetOf(root, step.actor);
+  if (target === undefined) return `unknown region "${region}"`;
+  const catalog = eventCatalog(target);
+  if (catalog.inputs.includes(step.event) || catalog.internal.includes(step.event)) return null;
+  return region === undefined
+    ? `unknown event "${step.event}"`
+    : `unknown event "${step.event}" in region ${region}`;
+}
+
 /**
  * Replay a raw recording on a fresh actor and keep only the steps that cannot
  * be reproduced: an internal event the replay already produced (a timer after
@@ -35,19 +49,20 @@ export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<strin
   const internal = new Set(eventCatalog(actor).internal);
   let produced: string[] = [];
   actor.on("transition", { fn: ({ event }) => void produced.push(event.type) });
-  const known = new Set([...eventCatalog(actor).inputs, ...internal]);
-  const unknown = run.steps.find((step) => step.kind === "event" && !known.has(step.event));
-  if (unknown?.kind === "event") {
-    actor.dispose();
-    return Either.left(`unknown event "${unknown.event}"`);
+  for (const step of run.steps) {
+    const problem = stepProblem(actor, step);
+    if (problem !== null) {
+      actor.dispose();
+      return Either.left(problem);
+    }
   }
   const kept: VizStep[] = [];
   for (const step of run.steps) {
-    if (step.kind === "event" && internal.has(step.event) && dropOne(produced, step.event))
-      continue;
+    const root = step.kind === "event" && step.actor === undefined;
+    if (root && internal.has(step.event) && dropOne(produced, step.event)) continue;
     produced = [];
     applyStep(actor, { step, clock, internal });
-    if (step.kind === "event" && internal.has(step.event)) dropOne(produced, step.event);
+    if (root && internal.has(step.event)) dropOne(produced, step.event);
     kept.push(step);
   }
   const ended = actor.state.name;
@@ -68,8 +83,13 @@ function isJson(value: unknown): value is VizJson {
 function isStep(value: unknown): value is VizStep {
   if (!isRecord(value)) return false;
   if (value["kind"] === "advance") return typeof value["ms"] === "number" && value["ms"] >= 0;
+  const actor = value["actor"];
+  const actorOk = actor === undefined || (isRecord(actor) && typeof actor["region"] === "string");
   return (
-    value["kind"] === "event" && typeof value["event"] === "string" && isJson(value["payload"])
+    value["kind"] === "event" &&
+    typeof value["event"] === "string" &&
+    isJson(value["payload"]) &&
+    actorOk
   );
 }
 

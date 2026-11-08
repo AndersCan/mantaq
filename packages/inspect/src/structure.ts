@@ -8,10 +8,11 @@ import type {
   VizState,
 } from "@mantaq/viz";
 import type { AnyActor } from "@mantaq/core";
-import { eventTypes } from "./fuzz/run.ts";
+import { eventTypes, regionActors } from "./fuzz/run.ts";
 import {
   INITIAL_NODE_ID,
   buildGraph,
+  parseInitialName,
   parseInternalEventIds,
   type GraphEdge,
   type GraphNode,
@@ -54,7 +55,7 @@ function toState(
   node: GraphNode,
   context: {
     visits: Map<string, number> | undefined;
-    initialId: string | null;
+    initialIds: ReadonlySet<string>;
     effects: ReadonlyArray<GraphEdge>;
   },
 ): VizState {
@@ -63,7 +64,7 @@ function toState(
     id: node.id,
     label: node.label,
     region: regionOf(node.id),
-    initial: node.id === context.initialId,
+    initial: context.initialIds.has(node.id),
     final: node.isFinal,
     effects: context.effects.find((edge) => edge.source === node.id)?.effects ?? [],
     coverage: visits ? hits(visits.get(node.id)) : null,
@@ -145,9 +146,20 @@ function toEdge(
 /** One machine; `toViz` is this plus sorting into a document. */
 export function toVizMachine(input: VizInput): VizMachine {
   const graph = buildGraph(input.actor, { sampleContexts: input.sampleContexts });
-  const internalIds = parseInternalEventIds(input.actor.options);
+  const regionActorList = regionActors(input.actor);
+  const internalIds = new Set([
+    ...parseInternalEventIds(input.actor.options),
+    ...regionActorList.flatMap((each) => [...parseInternalEventIds(each.actor.options)]),
+  ]);
   const initialEdge = graph.edges.find((edge) => edge.source === INITIAL_NODE_ID);
   const initial = initialEdge?.target ?? null;
+  const initialIds = new Set([
+    ...(initial === null ? [] : [initial]),
+    ...regionActorList.flatMap((each) => {
+      const name = parseInitialName(each.actor.options);
+      return name === undefined ? [] : [`${each.path}.${name}`];
+    }),
+  ]);
 
   const visits = input.history
     ? countBy(input.history.stateVisits().map((visit) => visit.stateName))
@@ -157,7 +169,7 @@ export function toVizMachine(input: VizInput): VizMachine {
   const effectEdges = graph.edges.filter((edge) => edgeKind(edge) === "effect");
   const states = graph.nodes
     .filter((node) => node.id !== INITIAL_NODE_ID && node.isAny !== true)
-    .map((node) => toState(node, { visits, initialId: initial, effects: effectEdges }))
+    .map((node) => toState(node, { visits, initialIds, effects: effectEdges }))
     .sort(byId);
   const edges = graph.edges.map((edge) => toEdge(edge, transitions)).sort(byId);
   const declaredInputs = eventTypes(input.actor.options, "inputs");
