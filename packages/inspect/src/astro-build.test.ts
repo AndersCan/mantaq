@@ -11,12 +11,15 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vite-plus/test"
 process.env["ASTRO_TELEMETRY_DISABLED"] = "1";
 
 let site = "";
+let wiredSite = "";
 const retry = "../fixtures/retry.ts";
 const clean = "../fixtures/clean.ts";
 const orphan = "../fixtures/orphan.ts";
 const retryAgain = "../fixtures/retry-again.ts";
 const empty = "../fixtures/no-machines.ts";
 const linked = "../fixtures/linked.ts";
+const wiredSender = "../fixtures/wired/sender.ts";
+const wiredReceiver = "../fixtures/wired/receiver.ts";
 const deadEnd = "../fixtures/dead-end.ts";
 const instance = "../fixtures/instance.ts";
 const badExpectations = "../fixtures/bad-expectations.ts";
@@ -63,10 +66,17 @@ beforeAll(async () => {
     overviewPage({ "": [linked], other: [retry, orphan] }),
   );
   await buildSite(site, [retry, orphan, linked]);
+  wiredSite = makeSite([wiredSender]);
+  writeFileSync(
+    join(wiredSite, "src", "pages", "machines.astro"),
+    overviewPage({ "": [wiredSender, wiredReceiver] }),
+  );
+  await buildSite(wiredSite, [wiredSender, wiredReceiver]);
 }, 120_000);
 
 afterAll(() => {
   rmSync(site, { recursive: true, force: true });
+  rmSync(wiredSite, { recursive: true, force: true });
 });
 
 describe("mantaqViz for Astro", () => {
@@ -150,6 +160,19 @@ describe("mantaqViz for Astro", () => {
     expect(document.querySelector("figcaption")?.textContent).toContain(
       "Click a machine to open its page.",
     );
+  });
+
+  test("Machines draws app-code connections and lists each with its line", () => {
+    const html = readFileSync(join(wiredSite, "dist", "machines", "index.html"), "utf8").replace(
+      /<link[^>]*>/g,
+      "",
+    );
+    document.documentElement.innerHTML = html;
+    const link = document.querySelector('.link[data-from="sender"][data-to="receiver"]');
+    expect(link?.textContent).toContain("handedOver → take");
+    const items = [...document.querySelectorAll("ul.wires li")].map((li) => li.textContent);
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatch(/^sender → receiver: handedOver → take, in .*wire\.ts:\d+$/);
   });
 
   test("a Machines page listing a file not in machines fails the build", async () => {

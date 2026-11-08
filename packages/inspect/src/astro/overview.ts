@@ -1,4 +1,5 @@
 import type { VizMachine } from "@mantaq/viz";
+import type { Wire } from "../ast/wires.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -13,6 +14,8 @@ export interface OverviewLink {
   to: string;
   /** Sorted. */
   events: string[];
+  /** App-code connections from `from` to `to`, in the order given. */
+  wires: Wire[];
 }
 
 interface PlacedBox {
@@ -37,15 +40,26 @@ export interface Overview {
   height: number;
   boxes: PlacedBox[];
   links: PlacedLink[];
+  /** Every link's wires, in link order. */
+  wires: Wire[];
 }
 
 const BOX_HEIGHT = 40;
 const CHAR_WIDTH = 8;
 const LABEL_HEIGHT = 16;
 
-/** A links B for each event A declares as an output and B handles as an input. */
+function labelOf(link: OverviewLink): string {
+  const wires = link.wires.map((wire) => `${wire.trigger} → ${wire.event}`);
+  return [...new Set([...link.events, ...wires])].join(", ");
+}
+
+/**
+ * A links B for each event A declares as an output and B handles as an input,
+ * and for each wire from A to B. Wires naming a machine not given are ignored.
+ */
 export function machineLinks(
   machines: ReadonlyArray<{ file: string; machine: VizMachine }>,
+  wires: ReadonlyArray<Wire> = [],
 ): OverviewLink[] {
   const links: OverviewLink[] = [];
   for (const a of machines) {
@@ -64,7 +78,10 @@ export function machineLinks(
           .map((event) => event.id),
       );
       const events = a.machine.outputs.filter((id) => inputs.has(id)).toSorted();
-      if (events.length > 0) links.push({ from: a.machine.id, to: b.machine.id, events });
+      const own = wires.filter((wire) => wire.from === a.machine.id && wire.to === b.machine.id);
+      if (events.length > 0 || own.length > 0) {
+        links.push({ from: a.machine.id, to: b.machine.id, events, wires: own });
+      }
     }
   }
   return links.toSorted((x, y) =>
@@ -85,7 +102,7 @@ export function layoutOverview(
     });
   }
   for (const link of links) {
-    const label = link.events.join(", ");
+    const label = labelOf(link);
     graph.setEdge(
       link.from,
       link.to,
@@ -116,10 +133,11 @@ export function layoutOverview(
       return {
         from: link.from,
         to: link.to,
-        label: link.events.join(", "),
+        label: labelOf(link),
         points: (edge.points ?? []).map((point: Point) => ({ x: point.x, y: point.y })),
         labelAt: { x: edge.x ?? 0, y: edge.y ?? 0 },
       };
     }),
+    wires: links.flatMap((link) => link.wires),
   };
 }

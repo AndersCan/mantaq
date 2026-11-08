@@ -71,7 +71,7 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 - **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations, timeLimitMs }` (see the Vite options). Default: seeded, up to 2000 iterations (stops early at full coverage), no time limit, so builds are reproducible.
 - Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the static walk.
 
-**Overview of all machines.** `<Machines pages={...} />` draws every machine given to `mantaqViz` as a box, with an arrow from A to B labelled `e` when `e` is in A's declared `outputs` and B handles `e` as an input (same event id, internal events excluded).
+**Overview of all machines.** `<Machines pages={...} />` draws every machine given to `mantaqViz` as a box. An arrow goes from A to B labelled `e` when `e` is in A's declared `outputs` and B handles `e` as an input. It is also drawn when app code that listens to A (`onOutput(a, ...)`, `a.on("output" | "change", ...)`) can send an event to B, labelled `trigger → event` and listed under the diagram with the line that sends. Calls are followed two levels deep. Test files are skipped.
 
 ```astro
 ---

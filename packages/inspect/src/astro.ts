@@ -20,6 +20,7 @@ import type { Plugin } from "vite";
 import { vizDocument } from "./inspect.ts";
 import type { FuzzSettings } from "./inspect.ts";
 import { layoutOverview, machineLinks } from "./astro/overview.ts";
+import { findWires } from "./ast/wires.ts";
 import { findingLines } from "./gate.ts";
 import { RUN_DROPPED } from "./runs.ts";
 import { inspectEntry, inspectFile } from "./load.ts";
@@ -149,7 +150,14 @@ async function documentsSource(
     `export const overview = ${JSON.stringify(
       layoutOverview(
         all.map(({ file, machine }) => ({ id: machine.id, file })),
-        machineLinks(all),
+        machineLinks(
+          all,
+          findWires({
+            root: context.root,
+            files: context.files,
+            machines: all.map(({ machine }) => machine),
+          }),
+        ),
       ),
     )};`,
   ].join("\n");

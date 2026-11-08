@@ -77,6 +77,17 @@ const line = (points) =>
     An arrow is an event one machine sends out and another takes in. Click a machine to open its
     page.
   </figcaption>
+  {
+    overview.wires.length > 0 && (
+      <ul class="wires">
+        {overview.wires.map((wire) => (
+          <li>
+            {wire.from} → {wire.to}: {wire.trigger} → {wire.event}, in {wire.at}
+          </li>
+        ))}
+      </ul>
+    )
+  }
 </figure>
 
 <style>
@@ -98,6 +109,11 @@ const line = (points) =>
   }
   .mantaq-machines .link text {
     font-size: 0.8em;
+  }
+  .mantaq-machines ul.wires {
+    font-size: 0.8em;
+    margin: 0.5em 0 0;
+    padding-left: 1.2em;
   }
   .mantaq-machines rect {
     fill: Canvas;
