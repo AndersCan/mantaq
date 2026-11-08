@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { VizField, VizJson } from "../schema.ts";
-import { fillSources } from "./fill.ts";
+import { fillSources, fuzzSources } from "./fill.ts";
 
 function field(name: string, input: VizField["input"], choices: VizJson[] = []): VizField {
   return { name, type: "x", optional: false, doc: null, input, choices, sample: "sample" };
@@ -118,5 +118,49 @@ describe("fillSources", () => {
   test("an inherited key does not fit", () => {
     const payload = Object.create({ code: "x" }) as VizJson;
     expect(fillSources([field("code", "text")], live("s", payload, null))).toEqual([]);
+  });
+});
+
+describe("fuzzSources", () => {
+  const fields = [field("email", "text"), field("age", "number")];
+  const numbered = (age: number) => ({ ...field("age", "number"), sample: age });
+
+  test("keeps object samples with fitting values, in field order", () => {
+    expect(fuzzSources(fields, [{ age: 2, email: "x" }])).toEqual([
+      {
+        path: "fuzz example 1",
+        values: [
+          { field: "email", value: "x" },
+          { field: "age", value: 2 },
+        ],
+      },
+    ]);
+  });
+
+  test("drops empty text, and samples left with no values", () => {
+    expect(fuzzSources(fields, [{ email: "" }, { email: "", age: 3 }, { other: 1 }])).toEqual([
+      { path: "fuzz example 1", values: [{ field: "age", value: 3 }] },
+    ]);
+  });
+
+  test("drops samples equal to the type's examples", () => {
+    expect(
+      fuzzSources([field("email", "text"), numbered(1)], [{ email: "sample", age: 1 }]),
+    ).toEqual([]);
+  });
+
+  test("collapses duplicates and skips non-objects", () => {
+    const result = fuzzSources(fields, [null, "x", [1], { email: "a" }, { email: "a" }]);
+    expect(result.map((each) => each.path)).toEqual(["fuzz example 1"]);
+  });
+
+  test("keeps five, numbered after drops", () => {
+    const samples: VizJson[] = [{ email: "" }];
+    for (let index = 0; index < 8; index += 1) samples.push({ email: `e${index}` });
+    const result = fuzzSources(fields, samples);
+    expect(result.map((each) => each.path)).toEqual(
+      [1, 2, 3, 4, 5].map((n) => `fuzz example ${n}`),
+    );
+    expect(result[0]?.values).toEqual([{ field: "email", value: "e0" }]);
   });
 });

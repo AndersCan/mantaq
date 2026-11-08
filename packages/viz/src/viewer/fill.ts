@@ -2,7 +2,7 @@ import type { VizField, VizJson, VizLiveState } from "../schema.ts";
 
 /** Values for an event's payload fields, copied from one thing the machine holds now. */
 export interface FillSource {
-  /** Where they come from: `waitingForAdminToAccept`, `context`, `context.requests[1]`. */
+  /** Where they come from: `waitingForAdminToAccept`, `context`, `context.requests[1]`, or `fuzz example 1` for a payload fuzzing sent. */
   path: string;
   /** Field name to value; only fields whose value fits, in the event's field order. */
   values: Array<{ field: string; value: VizJson }>;
@@ -77,4 +77,34 @@ export function fillSources(
   const ordered: FillSource[] = [];
   for (const each of sources) ordered.push(each.source);
   return ordered;
+}
+
+const fuzzLimit = 5;
+
+/** Payloads fuzzing sent, as choices for the form: only fields that fit, minus any that repeat the type's examples. */
+export function fuzzSources(
+  fields: ReadonlyArray<VizField>,
+  samples: ReadonlyArray<VizJson>,
+): FillSource[] {
+  const found: FillSource[] = [];
+  const seen = new Set<string>();
+  for (const sample of samples) {
+    if (found.length >= fuzzLimit) break;
+    if (!isObject(sample)) continue;
+    const values: FillSource["values"] = [];
+    let differs = false;
+    for (const field of fields) {
+      if (!Object.hasOwn(sample, field.name)) continue;
+      const value = sample[field.name];
+      if (value === undefined || !fits(field, value)) continue;
+      values.push({ field: field.name, value });
+      if (JSON.stringify(value) !== JSON.stringify(field.sample)) differs = true;
+    }
+    if (values.length === 0 || !differs) continue;
+    const key = JSON.stringify(values);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push({ path: `fuzz example ${found.length + 1}`, values });
+  }
+  return found;
 }
