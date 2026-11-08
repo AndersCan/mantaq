@@ -1,6 +1,8 @@
 import { EXAMPLE_ROOT } from "./examples.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createDoorActor } from "./fixtures/factories.ts";
+import { createExpectedActor } from "./fixtures/expected.ts";
+import { createLockoutActor } from "./fixtures/lockout.ts";
 import { createTimerThrowActor } from "./fixtures/timer-throw.ts";
 import { inspect, inspectModule } from "./inspect.ts";
 import { join } from "node:path";
@@ -75,11 +77,23 @@ describe("inspect: fuzz that cannot finish or crashes is reported, not fatal", (
     expect(hits("declined")).toBeGreaterThan(0);
   });
 
-  test("no source: events go out without payloads, and the warning says so", () => {
-    const { warnings } = inspect({ id: "pay", create: () => createTimerThrowActor() });
+  test("no source: an event whose fields the machine reads is named", () => {
+    const { warnings } = inspect({ id: "expected", create: () => createExpectedActor() });
     expect(warnings).toContain(
-      "no source, so payload types are unknown: fuzz sends no, ok, pay without a payload. Pass `source` (samples from the event types) or `payloads`.",
+      "fuzz sent tag without a payload and the machine read note. Pass `source` (samples from the event types) or `payloads` with a sample for tag.",
     );
+  });
+
+  test("no source: a field read later by a timer callback is named", () => {
+    const { warnings } = inspect({ id: "pay", create: () => createTimerThrowActor() });
+    expect(warnings.filter((each) => each.startsWith("fuzz sent "))).toEqual([
+      "fuzz sent pay without a payload and the machine read card. Pass `source` (samples from the event types) or `payloads` with a sample for pay.",
+    ]);
+  });
+
+  test("no source: events nobody reads from get no warning", () => {
+    const { warnings } = inspect({ id: "lockout", create: () => createLockoutActor() });
+    expect(warnings.filter((each) => each.startsWith("fuzz sent "))).toEqual([]);
   });
 
   test("timeLimitMs 0 runs no iterations and names the time limit as the reason", () => {
