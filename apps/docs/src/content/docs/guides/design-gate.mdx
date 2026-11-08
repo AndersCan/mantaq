@@ -32,13 +32,14 @@ test("checkout has no design errors", () => {
 - a handler or effect that throws under fuzzing,
 - an effect that sends an event its state does not handle,
 - a declared state with no path from the initial state,
-- a state that is not final where nothing can happen (no handler, no effect).
+- a state that is not final where nothing can happen (no handler, no effect),
+- an input or internal event that no state handles.
 
 The message lists one line per error:
 
 ```
 checkout has 1 design error:
-  - state archived is declared but no path leads to it from the initial state
+  - archived can never be reached. No transition leads into archived. From basicInfo, the machine can only reach basicInfo, error, payment, shippingAddress, submitting and success. Add a transition into archived, or remove it.
 ```
 
 Unreached edges and `onAny` routing warnings are not errors. They show in the visualizer and the Vite plugin's output, and do not fail the test.
@@ -47,7 +48,7 @@ The reachability check is static. It reads the graph, so it needs no fuzzing: pa
 
 ## On the diagram
 
-The same findings show on the diagram. A state with a finding carries a "!" mark: click it to read what the bug is, then press Replay to run the events that found it. This checkout has three planted bugs: `archived` has no way in, going `back` from `payment` throws, and the shipping step accepts an empty address (the last one is found by the next section).
+The same findings show on the diagram. A state with a finding carries a "!" mark: click it to read what the bug is, then press Replay to run the events that found it. This checkout has six planted bugs, listed by their headlines: "back in payment throws", `payment was reached with {"address":""}` (the shipping step accepts an empty address, found by the next section), "paymentDeclined is a dead end", "refunded can never be reached", "refunding can never be reached", and "cancelOrder is declared but no state handles it". Replay is on the findings a run reached; the two unreachable states have nothing to replay, and `cancelOrder` belongs to no state, so it has no mark and is listed at the top of the Details tab.
 
 <Machine src="src/content/docs/checkout-with-bugs.ts" />
 
@@ -74,7 +75,7 @@ export const checkoutWithBugsExpectations: Expectations<typeof createCheckoutWit
 };
 ```
 
-The diagram above is built from this block: `payment` carries a "!" for "Never-see context reached", and Replay runs the events that got there. Editor completion offers state names and context keys, and a typo fails to compile.
+The diagram above is built from this block: `payment` carries a "!" for `payment was reached with {"address":""}`, and Replay runs the events that got there. Editor completion offers state names and context keys, and a typo fails to compile.
 
 - `undefined` means "not set": `{ note: undefined }` matches a context without `note`.
 - A must-see miss says no fuzz run reached the context. Add a recorded run to `tests` (see "Assert what gets reached") or raise `fuzz.iterations`.

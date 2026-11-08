@@ -64,7 +64,7 @@ test("names the machines when the id is wrong", async () => {
 test("reads findings from the built document", async () => {
   await withViz(docs("checkout-with-bugs.ts"), async (viz) => {
     expect(viz.findings()).toContainEqual(
-      expect.objectContaining({ kind: "unreachableState", state: "archived" }),
+      expect.objectContaining({ kind: "unreachableState", state: "refunding" }),
     );
   });
 }, 60_000);
@@ -181,6 +181,41 @@ test("submitPayment waits in submitting with its three reports", async () => {
     expect(await state("back")).toBe("payment");
     expect(await state("submitPayment")).toBe("submitting");
     expect(await state("paymentOk")).toBe("success");
+    expect(viz.problems()).toEqual([]);
+  });
+}, 60_000);
+
+test("the planted-bug machine shows six findings and replays the dead end", async () => {
+  await withViz(docs("checkout-with-bugs.ts"), async (viz) => {
+    const findings = viz.findings();
+    expect(findings).toHaveLength(6);
+    expect(findings.map((each) => each.title)).toEqual([
+      "back in payment throws",
+      'payment was reached with {"address":""}',
+      "paymentDeclined is a dead end",
+      "refunded can never be reached",
+      "refunding can never be reached",
+      "cancelOrder is declared but no state handles it",
+    ]);
+    const deadEnd = findings.find((each) => each.kind === "deadEnd")!;
+    expect(Either.getRight(await viz.replay(deadEnd))).toEqual({ state: "paymentDeclined" });
+    expect(await viz.state()).toBe("paymentDeclined");
+    const refunded = findings.find((each) => each.state === "refunded")!;
+    expect(refunded.steps ?? []).toEqual([]);
+    expect(Either.getLeft(await viz.replay(refunded))).toBe(
+      "refunded can never be reached has nothing to replay.",
+    );
+    const text = await viz.text();
+    for (const old of [
+      "Handler throws",
+      "Never-see context reached",
+      "Must-see context missed",
+      "Event nobody handles",
+      "Dead end",
+      "Unreachable state",
+    ]) {
+      expect(text).not.toContain(old);
+    }
     expect(viz.problems()).toEqual([]);
   });
 }, 60_000);
