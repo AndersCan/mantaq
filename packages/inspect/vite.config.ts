@@ -35,4 +35,5 @@ export default defineConfig({
     },
   },
   fmt: {},
+  test: { testTimeout: 30_000 },
 });

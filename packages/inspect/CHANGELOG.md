@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.26.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  The machines overview draws a dashed arrow to no machine for declared outputs no app code listens to. Listener checks against an event constant (`e.type === x.type`) now name the trigger.
+
 ## 0.25.0
 
 <sub>2026-11-08</sub>
