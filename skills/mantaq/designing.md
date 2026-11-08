@@ -7,6 +7,7 @@ Design a machine by editing its real file while the live viz page shows the resu
 Someone asks you to design, plan or rethink a feature or a rule ("design this with me", "who can delete photos?"). Your first reply is the drawn design, never a written design and never only questions.
 
 - Write the machine (section 1, or section 2 for a change) and one recorded walk per story the ask names (section 6). Do it before you ask anything.
+- The ask changes something the app already does (section 2 found its machines): start the reply with `Today:` and one link per story the ask names to its recorded walk on the machines the app runs (section 3), then the drawn change. A story with no walk of today: record one on the real machine first (section 6). This is the default, not a gate: do not wait for an answer before drawing the change.
 - Reply with one preview link per walk (section 3). If the repo's flow docs say a design ask gets a preview, push and open the draft pull request without asking.
 - Open questions go after the links, as questions about the drawn machine. This is the default, not a gate: when the ask names no feature at all, one question first is fine.
 
@@ -44,7 +45,7 @@ Edit the real machine file and fix every caller the typechecker flags. Never mak
 
 ## 2. Find the machine from plain words
 
-List machine files: `rg -l "Actor\(" -g '*.ts' -g '!*.test.ts'`, plus any flows manifest. Read each candidate's top JSDoc and its state and event names. Match them to the user's words and the repo glossary (`CONTEXT.md` if present). One match: name it. Several: list them, one line each, and ask one question. None: design a new one, starting with states.
+List machine files: `rg -l "Actor\(" -g '*.ts' -g '!*.test.ts'`, plus any flows manifest. Read each candidate's top JSDoc and its state and event names. Match them to the user's words and the repo glossary (`CONTEXT.md` if present). One match: name it. Several: list them, one line each, and ask one question. None: design a new one, starting with states. A machine whose factory no app code calls (`rg -l "<factory name>\(" -g '!*.test.ts'` lists only its own file) is a design, not how the app works today: never link its walks as today, and say so when it is the only machine for a story.
 
 ## 3. Open the live page
 
