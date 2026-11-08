@@ -92,6 +92,19 @@ describe("machineLinks with wires", () => {
     expect(overview.wires).toEqual([w]);
   });
 
+  test("each link carries only the wires to its own receiver", () => {
+    const toB = wire("b", "change", "poke");
+    const toC = wire("c", "output", "ping");
+    const links = machineLinks(
+      [machine("a", [], []), machine("b", [], ["poke"]), machine("c", [], ["ping"])],
+      [toB, toC],
+    );
+    expect(links).toEqual([
+      { from: "a", to: "b", events: [], wires: [toB] },
+      { from: "a", to: "c", events: [], wires: [toC] },
+    ]);
+  });
+
   test("a wire to an unlisted machine is ignored", () => {
     const links = machineLinks([machine("a", [], [])], [wire("ghost", "change", "poke")]);
     expect(links).toEqual([]);
