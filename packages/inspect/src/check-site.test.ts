@@ -138,6 +138,10 @@ describe("checkSite cannot run", () => {
         `[gone](${site}/gone/?machine=timed&run=waits)`,
         `[held](${site}/other/?machine=timed&run=waits)`,
         `[plain](${site}/?machine=timed)`,
+        `[bare root](${site}?machine=timed&run=nope)`,
+        `[titled](${site}/?machine=timed&run=nope "a title")`,
+        `[waits again](${site}/?machine=timed&run=waits)`,
+        `[sibling](https://example.test/docsx/?machine=timed&run=nope)`,
       ].join("\n"),
     );
     expect(await checkSite(walks, "/", { links: [file], site })).toEqual(
@@ -148,6 +152,8 @@ describe("checkSite cannot run", () => {
           `${file}:4: walk link "no machine" has no machine=, so no viewer opens it`,
           `${file}:5: walk link "gone" goes to /gone/, which is not built`,
           `${file}:6: walk link "held" opens /other/, but no viewer there holds timed`,
+          `${file}:8: walk link "bare root": No run named "nope" in timed. Runs: times out, waits`,
+          `${file}:9: walk link "titled": No run named "nope" in timed. Runs: times out, waits`,
         ],
       }),
     );
@@ -219,6 +225,23 @@ describe("mantaq-check-site", () => {
   test("an unknown flag is a usage error", () => {
     expect(spawnSync("node", [cli, good, "--wat"], { encoding: "utf8" }).status).toBe(2);
   });
+
+  test("--links and --site reach the check: a bad walk link exits 1, --links alone exits 2", () => {
+    const dir = mkdtempSync(join(tmpdir(), "check-site-cli-links-"));
+    roots.push(dir);
+    const file = join(dir, "walks.md");
+    writeFileSync(file, "[nope](https://example.test/docs/?machine=timed&run=nope)\n");
+    const bad = spawnSync(
+      "node",
+      [cli, walks, "--links", file, "--site", "https://example.test/docs"],
+      { encoding: "utf8" },
+    );
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toContain(`${file}:1: walk link "nope": No run named "nope"`);
+    const alone = spawnSync("node", [cli, walks, "--links", file], { encoding: "utf8" });
+    expect(alone.status).toBe(2);
+    expect(alone.stderr).toContain("--links needs --site");
+  }, 120_000);
 
   test("a good site exits 0", () => {
     const run = spawnSync("node", [cli, good], { encoding: "utf8" });

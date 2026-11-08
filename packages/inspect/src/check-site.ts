@@ -250,6 +250,18 @@ function checkBoxes(site: Site, url: string, boxes: Box[], opened: Map<string, S
   return failures;
 }
 
+/** The link as a URL when it goes to a run under the site address; the site root may lack its slash. */
+function runLink(href: string, site: URL): URL | undefined {
+  const url = URL.parse(href);
+  if (url === null || !url.searchParams.has("run") || url.origin !== site.origin) {
+    return undefined;
+  }
+  if (`${url.pathname}/` === site.pathname) {
+    url.pathname = site.pathname;
+  }
+  return url.pathname.startsWith(site.pathname) ? url : undefined;
+}
+
 /** The markdown links in the files that go to a run under the site address. */
 function walkLinks(files: string[], site: URL): Either<string, WalkLink[]> {
   const found: WalkLink[] = [];
@@ -261,14 +273,9 @@ function walkLinks(files: string[], site: URL): Either<string, WalkLink[]> {
       return Either.left(`cannot read ${file}`);
     }
     for (const [index, line] of text.split("\n").entries()) {
-      for (const match of line.matchAll(/\[([^\]]*)\]\(([^)\s]+)\)/g)) {
-        const url = URL.parse(match[2] ?? "");
-        if (
-          url !== null &&
-          url.searchParams.has("run") &&
-          url.origin === site.origin &&
-          url.pathname.startsWith(site.pathname)
-        ) {
+      for (const match of line.matchAll(/\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+        const url = runLink(match[2] ?? "", site);
+        if (url !== undefined) {
           found.push({ where: `${file}:${index + 1}`, text: match[1] ?? "", target: url });
         }
       }
