@@ -1,6 +1,7 @@
 ---
 import { resolve } from "node:path";
 import { documents, root } from "virtual:mantaq/documents";
+import { bannerParts } from "./banner.ts";
 
 const { src } = Astro.props;
 const abs = resolve(root, src);
@@ -13,17 +14,7 @@ if (doc === undefined) {
 if (doc.machines.length === 0) {
   throw new Error(`<Machine src="${src}">: no exported actor or actor factory found in ${abs}`);
 }
-const bugs = doc.findings.filter((f) => !f.note);
-const count = bugs.length;
-const unique = (items: string[]) => [...new Set(items)];
-const names = (items: string[]) =>
-  items.length < 2
-    ? (items[0] ?? "")
-    : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-const shown = bugs.slice(0, 6).map((f) => f.title);
-const more = bugs.length > 6 ? `; and ${bugs.length - 6} more` : "";
-const marked = bugs.some((f) => f.state !== null);
-const wide = unique(bugs.filter((f) => f.state === null).map((f) => f.event ?? ""));
+const { count, machines, shown, more, marked, wideText } = bannerParts(doc.findings);
 ---
 
 <section class="mantaq-findings" data-count={count}>
@@ -31,12 +22,12 @@ const wide = unique(bugs.filter((f) => f.state === null).map((f) => f.event ?? "
     count > 0 ? (
       <p>
         <strong>
-          {count} design finding{count === 1 ? "" : "s"} in {names(unique(bugs.map((f) => f.machine)))}
+          {count} design finding{count === 1 ? "" : "s"} in {machines}
         </strong>
         : {shown.join("; ")}
         {more}.{marked ? " Click a ! on the diagram to see why." : ""}
-        {wide.length > 0
-          ? ` ${names(wide)} ${wide.length === 1 ? "is" : "are"} listed at the top of the Details tab.`
+        {wideText !== ""
+          ? ` ${wideText} listed at the top of the Details tab.`
           : ""}
       </p>
     ) : (
