@@ -53,6 +53,7 @@ export default defineConfig({
             { label: "Introduction", slug: "getting-started/introduction" },
             { label: "State Machines & Statecharts", slug: "getting-started/state-machines" },
             { label: "Installation", slug: "getting-started/installation" },
+            { label: "Your first machine", slug: "getting-started/first-machine" },
           ],
         },
         {

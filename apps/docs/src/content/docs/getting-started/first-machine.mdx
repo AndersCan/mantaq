@@ -1,0 +1,34 @@
+---
+title: Your first machine
+description: Write, run and test a traffic light with @mantaq/core.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import lightSource from "../../../first-machine/traffic-light.ts?raw";
+import testSource from "../../../first-machine/traffic-light.test.ts?raw";
+
+A traffic light that cycles red, green and yellow on timers, and that you can switch off. Copy both files into your project.
+
+## The machine
+
+<Code code={lightSource} lang="ts" title="traffic-light.ts" />
+
+- **States:** each colour is a `state(...)()`. `off` is final, so the light never leaves it.
+- **Events:** `switchOff` is an input you send. `timeUp` is internal; only effects emit it.
+- **Timers:** each colour's effect calls `clock.setTimeout` on the injected clock and passes `signal`, so the timer stops when the light leaves that colour.
+- **Transitions:** `m.on` moves each colour to the next on `timeUp`; `m.onAny` switches off from any colour.
+
+## Test it
+
+A `VirtualClock` only moves when you call `advance`, so the test runs instantly.
+
+<Code
+  code={testSource.replace('"vite-plus/test"', '"vitest"')}
+  lang="ts"
+  title="traffic-light.test.ts"
+/>
+
+```bash
+npm install -D vitest
+npx vitest run
+```
