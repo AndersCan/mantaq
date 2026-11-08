@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  Breaking: region dead ends and unreachable region states are now design findings. The live viewer shows each region's state, groups the Send buttons per region and sends them to that region, and draws a start arrow for each region.
+- _(minor)_ The payload form offers fuzzed payloads under Values from, and Edit as JSON.
+- _(minor)_
+  The payload form is a sheet pinned to the bottom of the viewer: Send is always on screen. The popover on the diagram is gone, along with its `.payload-popover` CSS class and its placement; the sheet uses `.payload-sheet`, and the event's edge gets `data-composing`. Styles that targeted `.payload-popover` need to move to `.payload-sheet`.
+
 ## 0.17.0
 
 <sub>2026-11-08</sub>
