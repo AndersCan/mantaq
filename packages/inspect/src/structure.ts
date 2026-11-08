@@ -160,7 +160,14 @@ export function toVizMachine(input: VizInput): VizMachine {
     .map((node) => toState(node, { visits, initialId: initial, effects: effectEdges }))
     .sort(byId);
   const edges = graph.edges.map((edge) => toEdge(edge, transitions)).sort(byId);
-  const events: VizEvent[] = [...new Set(edges.map((edge) => edge.event).filter(Boolean))]
+  const declaredInputs = eventTypes(input.actor.options, "inputs");
+  const events: VizEvent[] = [
+    ...new Set([
+      ...edges.map((edge) => edge.event).filter(Boolean),
+      ...declaredInputs,
+      ...internalIds,
+    ]),
+  ]
     .filter((eventId) => !eventId.startsWith("effect:"))
     .sort()
     .map((eventId) => ({

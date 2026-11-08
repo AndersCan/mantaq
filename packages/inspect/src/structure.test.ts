@@ -147,3 +147,20 @@ describe("toViz outputs", () => {
     expect(toViz([{ id: "m", actor }]).machines[0]?.outputs).toEqual([]);
   });
 });
+
+describe("toViz declared events", () => {
+  test("an input no state handles is still in events", () => {
+    const idle = state("idle")();
+    const go = event("go")();
+    const actor = Actor({
+      inputs: [go],
+      states: [idle],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: () => {},
+    });
+    const machine = toViz([{ id: "m", actor }]).machines[0];
+    expect(machine?.events.map((e) => [e.id, e.internal])).toEqual([["go", false]]);
+    expect(machine?.edges.some((edge) => edge.event === "go")).toBe(false);
+  });
+});

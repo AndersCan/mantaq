@@ -115,7 +115,9 @@ describe("finding marks", () => {
     const finding = root.querySelector('.state-findings .finding[data-kind="handlerError"]');
     expect(finding?.textContent).toContain("Handler throws");
     expect(finding?.textContent).toContain("Fuzzing sent this event");
-    expect(finding?.textContent).toContain("pick in idle throws: boom");
+    expect(finding?.textContent).toContain(
+      "pick in idle throws. Fuzzing sent pick in idle and the handler threw",
+    );
     expect(finding?.textContent).toContain('pick {"side":"b"}');
   });
 

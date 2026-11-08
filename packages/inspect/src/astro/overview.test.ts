@@ -7,7 +7,14 @@ function machine(id: string, outputs: string[], inputs: string[], internal: stri
     ...inputs.map((name) => ({ id: name, internal: false, doc: null, payload: null })),
     ...internal.map((name) => ({ id: name, internal: true, doc: null, payload: null })),
   ];
-  const value = { id, outputs, events } as unknown as VizMachine;
+  const edges = inputs.map((name) => ({
+    id: name,
+    from: "idle",
+    to: "idle",
+    event: name,
+    kind: "transition",
+  }));
+  const value = { id, outputs, events, edges } as unknown as VizMachine;
   return { file: `/x/${id}.ts`, machine: value };
 }
 
@@ -40,6 +47,12 @@ describe("machineLinks", () => {
 
   test("an event the receiver does not handle is no link", () => {
     expect(machineLinks([machine("a", ["x"], []), machine("b", [], [])])).toEqual([]);
+  });
+
+  test("an input the receiver declares but no state handles is no link", () => {
+    const b = machine("b", [], ["x"]);
+    const unhandled = { ...b.machine, edges: [] } as unknown as VizMachine;
+    expect(machineLinks([machine("a", ["x"], []), { ...b, machine: unhandled }])).toEqual([]);
   });
 
   test("an internal event of the receiver is no link", () => {

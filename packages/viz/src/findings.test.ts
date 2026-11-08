@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
-import { FINDING_KINDS, machineFindings, unreachableStates } from "./findings.ts";
+import { FINDING_KINDS, machineFindings, names, unreachableStates } from "./findings.ts";
 import type { VizMachine, VizStep } from "./schema.ts";
 
 function vizState(id: string, extra: Record<string, unknown> = {}) {
@@ -43,12 +43,26 @@ describe("machineFindings", () => {
       },
     });
     expect(machineFindings(machine)).toEqual([
-      { kind: "handlerError", state: "idle", message: "pick in idle throws: boom", steps: [stepA] },
+      {
+        kind: "handlerError",
+        state: "idle",
+        event: "pick",
+        note: false,
+        title: "pick in idle throws",
+        proof:
+          'Fuzzing sent pick in idle and the handler threw "boom", so the actor went to __error.',
+        fix: "Handle the failure in the handler and return a state for it.",
+        message:
+          'pick in idle throws. Fuzzing sent pick in idle and the handler threw "boom", so the actor went to __error. Handle the failure in the handler and return a state for it.',
+        steps: [stepA],
+        noReplay: null,
+      },
     ]);
   });
 
   test("unreachable state has no path", () => {
     const machine = build({
+      initial: "idle",
       states: [vizState("idle", { initial: true }), vizState("orphan")],
       edges: [vizEdge("idle", "idle", "stay")],
     });
@@ -56,8 +70,15 @@ describe("machineFindings", () => {
       {
         kind: "unreachableState",
         state: "orphan",
-        message: "state orphan is declared but no path leads to it from the initial state",
+        event: null,
+        note: false,
+        title: "orphan can never be reached",
+        proof: "No transition leads into orphan. From idle, the machine can only reach idle.",
+        fix: "Add a transition into orphan, or remove it.",
+        message:
+          "orphan can never be reached. No transition leads into orphan. From idle, the machine can only reach idle. Add a transition into orphan, or remove it.",
         steps: null,
+        noReplay: "Nothing reaches orphan, so there is nothing to replay.",
       },
     ]);
     expect(unreachableStates(machine)).toEqual(["orphan"]);
@@ -75,8 +96,16 @@ describe("machineFindings", () => {
         {
           kind: "deadEnd",
           state: "waiting",
-          message: "state waiting has no way out and is not final",
+          event: null,
+          note: false,
+          title: "waiting is a dead end",
+          proof:
+            "The machine gets to waiting by go in idle, but nothing can happen there: no event is handled, no effect runs, and it is not final.",
+          fix: "Handle an event in waiting, or make it final.",
+          message:
+            "waiting is a dead end. The machine gets to waiting by go in idle, but nothing can happen there: no event is handled, no effect runs, and it is not final. Handle an event in waiting, or make it final.",
           steps: null,
+          noReplay: "No fuzz run reached waiting, so there is no path to replay.",
         },
       ]);
     });
@@ -135,8 +164,15 @@ describe("machineFindings", () => {
       {
         kind: "unhandledSend",
         state: "sender",
-        message: "effect notify in sender sends ping, but sender has no handler for it",
+        event: "ping",
+        note: false,
+        title: "notify sends ping, but sender has no handler for it",
+        proof: "When notify sends ping in sender, nothing handles it.",
+        fix: "Handle ping in sender, or remove ping from the sends of notify.",
+        message:
+          "notify sends ping, but sender has no handler for it. When notify sends ping in sender, nothing handles it. Handle ping in sender, or remove ping from the sends of notify.",
         steps: [],
+        noReplay: "sender is the start state, so there is nothing to replay.",
       },
     ]);
   });
@@ -188,8 +224,16 @@ describe("machineFindings", () => {
       {
         kind: "neverSee",
         state: "payment",
-        message: 'state payment reached never-see context {"address":""}',
+        event: null,
+        note: false,
+        title: 'payment was reached with {"address":""}',
+        proof:
+          'The expectations block says payment must never see {"address":""}, and a fuzz run got there.',
+        fix: "Reject that input in the handler that leads to payment, or change the expectation.",
+        message:
+          'payment was reached with {"address":""}. The expectations block says payment must never see {"address":""}, and a fuzz run got there. Reject that input in the handler that leads to payment, or change the expectation.',
         steps: [stepA, stepB],
+        noReplay: null,
       },
     ]);
   });
@@ -210,8 +254,16 @@ describe("machineFindings", () => {
       {
         kind: "mustSee",
         state: "payment",
-        message: 'state payment never reached must-see context {"address":""} in 2000 fuzz runs',
+        event: null,
+        note: false,
+        title: 'payment was never reached with {"address":""}',
+        proof:
+          'The expectations block says some run must reach payment with {"address":""}, and none of 2000 fuzz runs did.',
+        fix: "Add a recorded run to tests that gets there, or check what blocks the path.",
+        message:
+          'payment was never reached with {"address":""}. The expectations block says some run must reach payment with {"address":""}, and none of 2000 fuzz runs did. Add a recorded run to tests that gets there, or check what blocks the path.',
         steps: null,
+        noReplay: "No run got there, so there is nothing to replay.",
       },
     ]);
   });
@@ -328,28 +380,28 @@ describe("naming findings", () => {
       edges: [analyzedEdge("ready", "showingCart", "DONE")],
       events: [eventNamed("DONE", "Paid.")],
     });
-    expect(namingKinds(machine)).toEqual([
-      {
-        kind: "vagueName",
-        state: "ready",
-        message:
-          "state ready has a vague name (only generic words: ready); name what the person sees, like showingPhotos",
-        steps: null,
-      },
-      {
-        kind: "vagueName",
-        state: "ready",
-        message:
-          "event DONE has a vague name (only generic words: done); name what happened, like photosLoaded",
-        steps: null,
-      },
-      {
-        kind: "undocumented",
-        state: "showingCart",
-        message:
-          'state showingCart has no doc comment: add /** what the person sees here */ above state("showingCart")',
-        steps: null,
-      },
+    expect(namingKinds(machine).map((f) => [f.kind, f.state, f.event, f.note, f.message])).toEqual([
+      [
+        "vagueName",
+        "ready",
+        null,
+        true,
+        "ready is a vague name. Every word in ready (ready) is a generic status word, so the diagram does not say what happens there. Name what the person sees, like showingPhotos.",
+      ],
+      [
+        "vagueName",
+        null,
+        "DONE",
+        true,
+        "DONE is a vague name. Every word in DONE (done) is a generic status word, so the diagram does not say what happened. Name what happened, like photosLoaded.",
+      ],
+      [
+        "undocumented",
+        "showingCart",
+        null,
+        true,
+        'showingCart has no description. There is no /** */ comment above state("showingCart"), so the page shows nothing under its name. Add /** what the person sees here */ above state("showingCart").',
+      ],
     ]);
   });
 
@@ -362,14 +414,14 @@ describe("naming findings", () => {
     expect(namingKinds(machine)).toEqual([]);
   });
 
-  test("an onAny event is placed on the first state it covers", () => {
+  test("an event-level naming note has no state", () => {
     const machine = named({
       initial: "alpha",
       states: [stateNamed("alpha"), stateNamed("beta")],
       edges: [analyzedEdge("*", "beta", "DONE")],
       events: [eventNamed("DONE")],
     });
-    expect(namingKinds(machine).map((finding) => finding.state)).toEqual(["alpha"]);
+    expect(namingKinds(machine).map((finding) => finding.state)).toEqual([null]);
   });
 
   test("a comment of only whitespace counts as missing", () => {
@@ -391,9 +443,153 @@ describe("FINDING_KINDS", () => {
       "mustSee",
       "neverSee",
       "undocumented",
+      "unhandledEvent",
       "unhandledSend",
       "unreachableState",
       "vagueName",
     ]);
+  });
+});
+
+describe("names", () => {
+  test.each([
+    [[], ""],
+    [["a"], "a"],
+    [["a", "b"], "a and b"],
+    [["a", "b", "c"], "a, b and c"],
+    [["a", "b", "c", "d", "e", "f"], "a, b, c, d, e and f"],
+    [["a", "b", "c", "d", "e", "f", "g", "h"], "a, b, c, d, e, f and 2 more"],
+  ])("%j", (ids, text) => {
+    expect(names(ids)).toBe(text);
+  });
+});
+
+describe("unreachable proof", () => {
+  test("names the arrow from a state that is unreachable too", () => {
+    const machine = build({
+      initial: "a",
+      states: [
+        vizState("a", { initial: true }),
+        vizState("b"),
+        vizState("orphanA"),
+        vizState("orphanB"),
+      ],
+      edges: [
+        vizEdge("a", "b", "x"),
+        vizEdge("b", "a", "back"),
+        vizEdge("orphanA", "orphanB", "y"),
+      ],
+    });
+    const found = machineFindings(machine).find((f) => f.state === "orphanB");
+    expect(found?.proof).toBe(
+      "Only y in orphanA leads into orphanB, and orphanA can never be reached either. From a, the machine can only reach a and b.",
+    );
+    expect(found?.fix).toBe("Make orphanA reachable, or remove orphanB.");
+  });
+
+  test("a dead end at the start state replays nothing", () => {
+    const machine = build({ initial: "a", states: [vizState("a", { initial: true })] });
+    const [dead] = machineFindings(machine);
+    expect(dead?.proof).toContain("The machine starts in a,");
+    expect(dead?.steps).toEqual([]);
+    expect(dead?.noReplay).toBe("a is the start state, so there is nothing to replay.");
+  });
+});
+
+describe("unhandledEvent", () => {
+  const declared = (id: string, internal: boolean) => ({ id, internal, doc: null, payload: null });
+
+  test("an input and an internal event no state handles", () => {
+    const machine = build({
+      states: [vizState("idle", { initial: true })],
+      edges: [vizEdge("idle", "idle", "stay")],
+      events: [declared("cancel", false), declared("paid", true)],
+    });
+    const found = machineFindings(machine).filter((f) => f.kind === "unhandledEvent");
+    expect(found.map((f) => f.message)).toEqual([
+      "cancel is declared but no state handles it. cancel is an input of m, but no state has a handler for it, so sending it does nothing. Handle cancel in a state, or remove it from inputs.",
+      "paid is declared but no state handles it. paid is an internal event of m, but no state has a handler for it: if an effect sends it, the actor goes to __error. Handle paid in a state, or remove it from internal.",
+    ]);
+    expect(found[0]).toMatchObject({
+      state: null,
+      event: "cancel",
+      note: false,
+      steps: null,
+      noReplay: "No state handles cancel, so there is nothing to replay.",
+    });
+  });
+
+  test("not raised when an unhandledSend names the same event", () => {
+    const machine = build({
+      states: [vizState("idle", { initial: true, effects: [{ name: "notify", sends: ["ping"] }] })],
+      edges: [vizEdge("idle", "idle", "stay")],
+      events: [declared("ping", false)],
+    });
+    expect(machineFindings(machine).map((f) => f.kind)).toEqual(["unhandledSend"]);
+  });
+
+  test("not raised when an onAny edge handles it", () => {
+    const machine = build({
+      states: [vizState("idle", { initial: true })],
+      edges: [vizEdge("*", "idle", "reset")],
+      events: [declared("reset", false)],
+    });
+    expect(machineFindings(machine)).toEqual([]);
+  });
+});
+
+describe("unhandledSend text", () => {
+  const withEvents = (events: unknown[]) =>
+    build({
+      states: [vizState("idle", { initial: true, effects: [{ name: "notify", sends: ["ping"] }] })],
+      edges: [vizEdge("idle", "idle", "stay")],
+      events,
+    });
+
+  test("internal events go to __error, inputs are dropped", () => {
+    const internal = withEvents([{ id: "ping", internal: true, doc: null, payload: null }]);
+    const input = withEvents([{ id: "ping", internal: false, doc: null, payload: null }]);
+    expect(machineFindings(internal)[0]?.proof).toBe(
+      "When notify sends ping in idle, the actor goes to __error.",
+    );
+    expect(machineFindings(input)[0]?.proof).toBe(
+      "When notify sends ping in idle, it is dropped and the machine stays in idle.",
+    );
+  });
+});
+
+describe("finding invariants", () => {
+  test("every finding is consistent", () => {
+    const machines = [
+      build({
+        initial: "a",
+        states: [
+          vizState("a", { initial: true, effects: [{ name: "go", sends: ["ping"] }] }),
+          vizState("orphan"),
+          vizState("stuck"),
+        ],
+        edges: [vizEdge("a", "stuck", "next"), vizEdge("*", "a", "reset")],
+        events: [{ id: "extra", internal: false, doc: null, payload: null }],
+        fuzz: {
+          iterations: 3,
+          errors: [{ from: "a", event: "pick", message: "boom", steps: [stepA] }],
+          corpus: [],
+          failedExpectations: [
+            { kind: "mustSee", state: "a", match: "{}", steps: null },
+            { kind: "neverSee", state: "a", match: "{}", steps: [stepA] },
+          ],
+          expectations: [],
+        },
+      }),
+    ];
+    for (const machine of machines) {
+      const all = machineFindings(machine);
+      expect(all.length).toBeGreaterThan(4);
+      for (const f of all) {
+        expect(f.steps !== null && f.steps.length > 0).toBe(f.noReplay === null);
+        expect(f.message).toBe(`${f.title}. ${f.proof} ${f.fix}`);
+        expect(f.title).toContain(f.state ?? f.event ?? "");
+      }
+    }
   });
 });

@@ -194,7 +194,7 @@ describe("mantaqViz for Astro", () => {
     test("lists a structural finding", async () => {
       await withSite([orphan], async (root) => {
         await expect(buildSite(root, [orphan], { failOnFindings: true })).rejects.toThrow(
-          /failOnFindings: 2 problems stop the build\n.*orphan in .*orphan\.ts:\n  - state orphan is declared but no path leads to it/,
+          /failOnFindings: 2 problems stop the build\n.*orphan in .*orphan\.ts:\n  - orphan can never be reached\./,
         );
       });
     }, 120_000);
@@ -203,9 +203,7 @@ describe("mantaqViz for Astro", () => {
       await withSite([deadEnd], async (root) => {
         await expect(
           buildSite(root, [deadEnd], { fuzz: { iterations: 200 }, failOnFindings: true }),
-        ).rejects.toThrow(
-          /  - state waitingForReply has no way out and is not final\n {4}after: replyRequested/,
-        );
+        ).rejects.toThrow(/  - waitingForReply is a dead end\..*\n {4}after: replyRequested/);
       });
     }, 120_000);
 

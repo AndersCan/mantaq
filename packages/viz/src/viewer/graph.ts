@@ -370,6 +370,7 @@ export function renderGraph(
   const placed = layoutMachine(machine);
   const findings = new Map<string, VizFinding[]>();
   for (const finding of machineFindings(machine)) {
+    if (finding.state === null) continue;
     findings.set(finding.state, [...(findings.get(finding.state) ?? []), finding]);
   }
   const root = svg(

@@ -52,7 +52,16 @@ export function machineLinks(
     for (const b of machines) {
       if (a.machine.id === b.machine.id) continue;
       const inputs = new Set(
-        b.machine.events.filter((event) => !event.internal).map((event) => event.id),
+        b.machine.events
+          .filter(
+            (event) =>
+              !event.internal &&
+              b.machine.edges.some(
+                (edge) =>
+                  edge.event === event.id && (edge.kind === "transition" || edge.kind === "stay"),
+              ),
+          )
+          .map((event) => event.id),
       );
       const events = a.machine.outputs.filter((id) => inputs.has(id)).toSorted();
       if (events.length > 0) links.push({ from: a.machine.id, to: b.machine.id, events });

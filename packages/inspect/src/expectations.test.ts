@@ -285,7 +285,7 @@ describe("expectNoDesignErrors with expectations", () => {
         fuzz: { iterations: 500 },
       }),
     ).toThrow(
-      'expected has 1 design error:\n  - state counting reached never-see context {"count":3}\n    after: begin → bump → bump → bump',
+      'expected has 1 design error:\n  - counting was reached with {"count":3}. The expectations block says counting must never see {"count":3}, and a fuzz run got there. Reject that input in the handler that leads to the state, or change the expectation.\n    after: begin → bump → bump → bump',
     );
   });
 
@@ -297,7 +297,9 @@ describe("expectNoDesignErrors with expectations", () => {
         expectations: { counting: { mustSee: [{ count: -1 }] } },
         fuzz: { iterations: 200 },
       }),
-    ).toThrow('state counting never reached must-see context {"count":-1} in 200 fuzz runs');
+    ).toThrow(
+      'counting was never reached with {"count":-1}. The expectations block says some run must reach counting with {"count":-1}, and none of 200 fuzz runs did.',
+    );
   });
 
   test("a handler error gets its after: line too", () => {

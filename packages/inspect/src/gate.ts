@@ -25,8 +25,8 @@ export function findingLines(machine: VizMachine): string[] {
 
 /**
  * Call from a test: throws when fuzzing finds a handler or effect that throws,
- * an effect sends an event its state does not handle, or a declared state has
- * no path from the initial state. With `source`, it also throws on a state or
+ * an effect sends an event its state does not handle, a declared state has
+ * no path from the initial state, or a declared event has no state that handles it. With `source`, it also throws on a state or
  * event whose name is only generic words (ok, loading, done...) or that has no
  * doc comment. Runs are seeded, so the result is stable.
  */

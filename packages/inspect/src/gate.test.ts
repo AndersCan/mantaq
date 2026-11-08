@@ -46,7 +46,7 @@ describe("expectNoDesignErrors", () => {
   test("fails on a declared state no path leads to", () => {
     expect(() =>
       expectNoDesignErrors({ id: "orphan", create: () => createOrphanActor(), fuzz: false }),
-    ).toThrow(/state orphan is declared but no path leads to it/);
+    ).toThrow(/orphan can never be reached\. No transition leads into orphan\./);
   });
 
   test("lists only states with no path from the initial state", () => {
@@ -75,9 +75,9 @@ describe("names", () => {
     ).toThrow(
       [
         "vague has 3 design errors:",
-        "  - state ready has a vague name (only generic words: ready); name what the person sees, like showingPhotos",
-        "  - event DONE has a vague name (only generic words: done); name what happened, like photosLoaded",
-        '  - state showingCart has no doc comment: add /** what the person sees here */ above state("showingCart")',
+        "  - ready is a vague name. Every word in ready (ready) is a generic status word, so the diagram does not say what happens there. Name what the person sees, like showingPhotos.",
+        "  - DONE is a vague name. Every word in DONE (done) is a generic status word, so the diagram does not say what happened. Name what happened, like photosLoaded.",
+        '  - showingCart has no description. There is no /** */ comment above state("showingCart"), so the page shows nothing under its name. Add /** what the person sees here */ above state("showingCart").',
       ].join("\n"),
     );
   });
@@ -129,7 +129,7 @@ describe("design error details", () => {
       fuzz: false,
     });
     expect(designErrors(machine)).toEqual([
-      "effect notify in sender sends ping, but sender has no handler for it",
+      "notify sends ping, but sender has no handler for it. When notify sends ping in sender, the actor goes to __error. Handle ping in sender, or remove ping from the sends of notify.",
     ]);
   });
 
@@ -201,12 +201,12 @@ describe("design error details", () => {
         ...machine.states,
         { ...machine.states[0]!, id: "lost", initial: false, effects: [] },
       ],
-      fuzz: { errors: [{ event: "go", from: "sender", message: "boom" }] },
+      fuzz: { errors: [{ event: "go", from: "sender", message: "boom", steps: [] }] },
     } as unknown as typeof machine;
     expect(designErrors(withThrow)).toEqual([
-      "go in sender throws: boom",
-      "effect notify in sender sends ping, but sender has no handler for it",
-      "state lost is declared but no path leads to it from the initial state",
+      'go in sender throws. Fuzzing sent go in sender and the handler threw "boom", so the actor went to __error. Handle the failure in the handler and return a state for it.',
+      "notify sends ping, but sender has no handler for it. When notify sends ping in sender, the actor goes to __error. Handle ping in sender, or remove ping from the sends of notify.",
+      "lost can never be reached. No transition leads into lost. From sender, the machine can only reach sender. Add a transition into lost, or remove it.",
     ]);
   });
 });
