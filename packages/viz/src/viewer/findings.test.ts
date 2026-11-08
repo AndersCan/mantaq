@@ -107,6 +107,17 @@ describe("finding marks", () => {
     expect(mark(root, "picked")).toBeNull();
   });
 
+  test("a naming note on a state draws no mark", () => {
+    // `idle` is a vague name (a note) and also has the handler error: only the error counts
+    expect(mark(mount(), "idle")?.getAttribute("aria-label")).not.toContain("vague");
+    const clean: VizMachine = {
+      ...machine,
+      states: machine.states.filter((candidate) => candidate.id !== "orphan"),
+      fuzz: { ...machine.fuzz!, errors: [] },
+    };
+    expect(mark(mount(undefined, clean), "idle")).toBeNull();
+  });
+
   test("clicking a mark opens the details without taking the step", () => {
     const root = mount();
     // idle is the current state and `picked` its next step; marks sit on `idle`, so click via picked's neighbour
