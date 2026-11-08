@@ -29,6 +29,7 @@
   "files": [
     "dist",
     "src/astro/Machine.astro",
+    "src/astro/banner.ts",
     "src/astro/Machines.astro"
   ],
   "type": "module",
