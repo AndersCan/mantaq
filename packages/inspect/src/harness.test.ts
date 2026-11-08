@@ -1,5 +1,5 @@
 import { Either } from "@mantaq/utils";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
@@ -10,8 +10,14 @@ const docs = (file: string) =>
 const checkout = docs("checkout.ts");
 
 // one harness per test, closed in finally
-async function withViz<T>(file: string, run: (viz: VizHarness) => Promise<T>): Promise<T> {
-  const opened = await openViz({ file });
+async function withViz<T>(
+  file: string,
+  machineOrRun: string | ((viz: VizHarness) => Promise<T>),
+  maybeRun?: (viz: VizHarness) => Promise<T>,
+): Promise<T> {
+  const machine = typeof machineOrRun === "string" ? machineOrRun : undefined;
+  const run = typeof machineOrRun === "string" ? maybeRun! : machineOrRun;
+  const opened = await openViz({ file, machine });
   const viz = Either.getRight(opened);
   if (viz === undefined) {
     throw new Error(String(Either.getLeft(opened)));
@@ -81,5 +87,61 @@ test("takes a screenshot", async () => {
 test("waiting is empty where no effect waits", async () => {
   await withViz(checkout, async (viz) => {
     expect(await viz.waiting()).toEqual([]);
+  });
+}, 60_000);
+
+const fixture = (file: string) => join(import.meta.dirname, "fixtures", file);
+
+test("an event the state ignores is a result, not an error", async () => {
+  await withViz(checkout, async (viz) => {
+    const result = await viz.send("submitShipping");
+    expect(Either.getRight(result)).toEqual({ state: "basicInfo", outcome: "ignored" });
+  });
+}, 60_000);
+
+test("says why the form refused a payload", async () => {
+  await withViz(fixture("factories.ts"), "door", async (viz) => {
+    const result = await viz.send("open", { by: "key", tags: "[oops" });
+    expect(Either.getLeft(result)).toBe("open was not sent: Not sent: tags is not valid JSON.");
+  });
+}, 60_000);
+
+test("fills a choice field and sends a payload with the custom box", async () => {
+  await withViz(fixture("fields.ts"), async (viz) => {
+    const choice = await viz.send("choose", { validFor: "1h" });
+    expect(Either.getRight(choice)).toEqual({ state: "idle", outcome: "stay" });
+    const custom = await viz.send("touch", { anything: 1 });
+    expect(Either.getRight(custom)).toEqual({ state: "idle", outcome: "stay" });
+  });
+}, 60_000);
+
+test("close is idempotent and send after close is a Left", async () => {
+  const opened = await openViz({ file: checkout });
+  const viz = Either.getRight(opened);
+  if (viz === undefined) {
+    throw new Error(String(Either.getLeft(opened)));
+  }
+  await viz.close();
+  await viz.close();
+  expect(Either.getLeft(await viz.send("back"))).toBe("harness is closed");
+}, 60_000);
+
+test("a failed open leaves no temp directory behind", async () => {
+  const count = () => readdirSync(tmpdir()).filter((n) => n.startsWith("mantaq-harness-")).length;
+  const before = count();
+  const result = await openViz({ file: join(tmpdir(), "does-not-exist.ts") });
+  expect(Either.getLeft(result)).toBe("does-not-exist.ts has no machine the inspector can read.");
+  expect(count()).toBe(before);
+}, 60_000);
+
+test("says when an export is not live", async () => {
+  const result = await openViz({ file: fixture("factories.ts"), machine: "realDoor" });
+  expect(Either.getLeft(result)).toMatch(/^realDoor is not live: /);
+}, 60_000);
+
+test("collects console errors", async () => {
+  await withViz(fixture("harness-odd.ts"), async (viz) => {
+    await viz.send("noisy");
+    expect(viz.problems()).toEqual(["harness-noise"]);
   });
 }, 60_000);

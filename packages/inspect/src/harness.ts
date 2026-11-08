@@ -158,8 +158,16 @@ async function sendWithPayload(
   return undefined;
 }
 
-function makeSend(page: Page, id: string, state: () => Promise<string>): VizHarness["send"] {
+function makeSend(
+  page: Page,
+  id: string,
+  state: () => Promise<string>,
+  isClosed: () => boolean,
+): VizHarness["send"] {
   return async (event, payload) => {
+    if (isClosed()) {
+      return Either.left("harness is closed");
+    }
     await page.click('[data-tab="step"]');
     const trigger = page.locator(`${PANEL} [data-send=${quoted(event)}]`).first();
     if ((await trigger.count()) === 0) {
@@ -240,7 +248,7 @@ function describe(
   page: Page,
   machine: VizMachine,
   problems: string[],
-  close: () => Promise<void>,
+  lifecycle: { close: () => Promise<void>; isClosed: () => boolean },
 ): VizHarness {
   const state = async () =>
     (await page.getAttribute(".explore[data-current]", "data-current")) ?? "";
@@ -255,7 +263,7 @@ function describe(
           ),
         })),
       ),
-    send: makeSend(page, machine.id, state),
+    send: makeSend(page, machine.id, state, lifecycle.isClosed),
     findings: () => machineFindings(machine),
     text: async () => {
       await page.click('[data-tab="step"]');
@@ -269,7 +277,7 @@ function describe(
       return bytes;
     },
     problems: () => [...problems],
-    close,
+    close: lifecycle.close,
   };
 }
 
@@ -327,7 +335,7 @@ export async function openViz(options: OpenVizOptions): Promise<Either<string, V
     if (unready !== undefined) {
       return fail(unready);
     }
-    return Either.right(describe(page, machine, problems, close));
+    return Either.right(describe(page, machine, problems, { close, isClosed: () => closed }));
   } catch (error) {
     return fail(`could not open ${machine.id}: ${firstLine(error)}`);
   }
