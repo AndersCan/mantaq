@@ -33,10 +33,13 @@ the machine directly.
 
 `signal` fires when the actor leaves the state. Check it before emitting.
 
+The examples below are `m.effect` calls from the `setup` of the docs [checkout machine](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts), where `chargeCard`, `submitting` and the payment events are declared.
+
 ```ts
 m.effect(submitting, {
   name: "chargeCard",
-  fn: ({ signal, emit }) => {
+  fn: ({ signal, emit, context }) => {
+    const cardNumber = context.get().paymentInfo?.cardNumber ?? "";
     chargeCard(cardNumber).then((orderId) => {
       if (!signal.aborted) emit(paymentOk.create({ orderId }));
     });
@@ -55,7 +58,8 @@ only those events. Emitting anything else is a type error.
 m.effect(submitting, {
   name: "chargeCard",
   sends: [paymentOk, paymentFail, paymentTimeout],
-  fn: ({ signal, emit }) => {
+  fn: ({ signal, emit, context }) => {
+    const cardNumber = context.get().paymentInfo?.cardNumber ?? "";
     chargeCard(cardNumber).then((orderId) => {
       if (!signal.aborted) emit(paymentOk.create({ orderId }));
     });
@@ -78,7 +82,9 @@ Call `m.effect` multiple times for one state. They run in order.
 ```ts
 m.effect(submitting, {
   name: "chargeCard",
-  fn: ({ signal, emit }) => {
+  sends: [paymentOk, paymentFail],
+  fn: ({ signal, emit, context }) => {
+    const cardNumber = context.get().paymentInfo?.cardNumber ?? "";
     chargeCard(cardNumber).then(
       (id) => {
         if (!signal.aborted) emit(paymentOk.create({ orderId: id }));
@@ -91,11 +97,11 @@ m.effect(submitting, {
 });
 m.effect(submitting, {
   name: "startSubmitTimeout",
+  sends: [paymentTimeout],
   fn: ({ signal, emit, clock }) => {
-    clock.setTimeout(800, () => {
-      if (!signal.aborted) emit(paymentTimeout.create());
-    });
+    clock.setTimeout(800, { signal, cb: () => emit(paymentTimeout.create()) });
   },
+});
 ```
 
 ## Error handling

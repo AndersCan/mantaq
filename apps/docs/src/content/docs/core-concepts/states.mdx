@@ -15,6 +15,8 @@ State answers "where am I?". Context answers "what do I know?".
 
 ## Basic states
 
+The examples on this page build on each other: paste them into one file, in order.
+
 ```ts
 import { state } from "@mantaq/core";
 
@@ -39,19 +41,31 @@ Entering a final state fires `"done"` subscribers, sets `snapshot().done` to
 States carry an optional payload, passed on entry, read by effects.
 
 ```ts
-m.on(submitting, paymentFail, () => ({
-  state: error,
-  payload: { reason: "card declined" },
-}));
-```
+import { Actor, event } from "@mantaq/core";
 
-```ts
-m.effect(error, {
-  name: "logFailure",
-  fn: ({ state }) => {
-    console.log(state.payload.reason);
+const error = state("error")<{ reason: string }>();
+const paymentFail = event("paymentFail")<{ reason: string }>();
+
+const payments = Actor({
+  inputs: [paymentFail],
+  states: [submitting, error],
+  initial: submitting,
+  setup: (m) => {
+    m.on(submitting, {
+      event: paymentFail,
+      to: [error],
+      handler: (event) => ({ state: error, payload: { reason: event.payload.reason } }),
+    });
+    m.effect(error, {
+      name: "logFailure",
+      fn: ({ state }) => {
+        console.log(state.payload.reason);
+      },
+    });
   },
 });
+
+payments.send(paymentFail.create({ reason: "card declined" })); // logs "card declined"
 ```
 
 ## Regions (hierarchical states)
@@ -60,32 +74,41 @@ Sub-actors passed as `regions` to the Actor constructor. Child runs alongside
 parent. Snapshot nests.
 
 ```ts
-import { checkout } from "../checkout.ts";
+import { matches } from "@mantaq/sugar";
 
-const fraudMonitor = new Actor({
+const scanning = state("scanning")();
+const cleared = state("cleared")();
+const flagged = state("flagged")();
+const scanDone = event("scanDone")<{ risky: boolean }>();
+
+const fraudMonitor = Actor({
   inputs: [scanDone],
   states: [scanning, cleared, flagged],
   initial: scanning,
   setup: (m) => {
-    m.on(scanning, scanDone, (event) => ({
-      state: event.payload.risky ? flagged : cleared,
-    }));
+    m.on(scanning, {
+      event: scanDone,
+      to: [cleared, flagged],
+      handler: (event) => ({ state: event.payload.risky ? flagged : cleared }),
+    });
   },
 });
 
-const checkout = new Actor({
-  // ...
+const checkout = Actor({
+  inputs: [],
+  states: [basicInfo],
+  initial: basicInfo,
+  setup: () => {},
   regions: { fraud: fraudMonitor },
 });
+
+fraudMonitor.send(scanDone.create({ risky: false }));
+matches(checkout, "basicInfo.fraud.cleared"); // true
 ```
 
 `matches(checkout, "basicInfo.fraud.cleared")` checks a child state.
 
-Multiple regions run simultaneously:
-
-```ts
-regions: { fraud: fraudMonitor, analytics: analyticsMonitor }
-```
+Multiple regions run simultaneously: `regions: { fraud: fraudMonitor, analytics: analyticsMonitor }`.
 
 Each is its own actor. Both run independently.
 
