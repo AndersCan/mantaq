@@ -6,7 +6,7 @@ export * from "./schema.ts";
 export { serializeViz } from "./serialize.ts";
 export { parseViz, validateViz } from "./validate.ts";
 export type { VizIssue } from "./validate.ts";
-export { FINDING_KINDS, machineFindings, unreachableStates } from "./findings.ts";
+export { machineFindings, unreachableStates } from "./findings.ts";
 export type { VizFinding, VizFindingKind } from "./findings.ts";
 export { decodePath, encodeStep, movesFrom, stateAfter, unhandledSends } from "./moves.ts";
 export type { ExploreStep, Move, MoveGroup } from "./moves.ts";

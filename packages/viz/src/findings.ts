@@ -35,64 +35,6 @@ export interface VizFinding {
   noReplay: string | null;
 }
 
-export const FINDING_KINDS: Readonly<
-  Record<VizFindingKind, { title: string; sentence: string; noSteps: string }>
-> = {
-  handlerError: {
-    title: "Handler throws",
-    sentence:
-      "Fuzzing sent this event in this state and the handler threw, so the actor ends up in its error state instead of where you meant it to go.",
-    noSteps: "No fuzz run reached it.",
-  },
-  neverSee: {
-    title: "Never-see context reached",
-    sentence:
-      "A fuzz run reached this state with a context the machine file marks as a bug here (neverSee).",
-    noSteps: "No fuzz run reached it.",
-  },
-  mustSee: {
-    title: "Must-see context missed",
-    sentence:
-      "No fuzz run reached this state with a context the machine file says some run must reach (mustSee). A path to it is missing or blocked, or the fuzzer needs a recorded test run that gets there.",
-    noSteps: "No fuzz run reached this context.",
-  },
-  unhandledSend: {
-    title: "Event nobody handles",
-    sentence:
-      "An effect here sends an event this state has no handler for: an input is dropped without a trace, and an internal event puts the actor in its error state.",
-    noSteps: "No fuzz run reached this state.",
-  },
-  deadEnd: {
-    title: "Dead end",
-    sentence:
-      "The actor can get here, but nothing can happen next: no event is handled, no effect runs, and the state is not final. A way out is missing, or the state should be final.",
-    noSteps: "No fuzz run reached this state.",
-  },
-  unreachableState: {
-    title: "Unreachable state",
-    sentence:
-      "No sequence of events leads here from the initial state: a transition into it is missing, or the state is not needed.",
-    noSteps: "No event path reaches this state.",
-  },
-  unhandledEvent: {
-    title: "Event nobody handles",
-    sentence: "This event is declared, but no state has a handler for it.",
-    noSteps: "No state handles this event.",
-  },
-  vagueName: {
-    title: "Vague name",
-    sentence:
-      "Every word in this name is a generic status word, so it says how something went but not what. Someone reading only the diagram cannot tell what happens here. Name the thing: what the person sees, or what happened.",
-    noSteps: "Found by reading the machine file, not by a run.",
-  },
-  undocumented: {
-    title: "No description",
-    sentence:
-      "This state or event has no /** */ comment above its declaration, so the page has nothing to show under its name. Say in one line what the person sees, or what happened.",
-    noSteps: "Found by reading the machine file, not by a run.",
-  },
-};
-
 // Status words that say how, not what. A name made only of these is vague.
 const VAGUE_WORDS: ReadonlySet<string> = new Set(
   "ok ready idle loading loaded error failed failure success succeeded done finished complete completed pending busy active waiting start started init status result data update updated change changed act acted".split(

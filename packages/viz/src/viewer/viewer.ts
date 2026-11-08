@@ -220,10 +220,11 @@ export function mountViewer(
       rewindView(view, driver, length);
       walked();
     };
-    const showDetails = (selection: Selection) => {
+    const showDetails = (selection: Selection, shown?: { findings: boolean }) => {
       view.selection = selection;
       view.tab = "details";
       refresh();
+      if (shown?.findings === true) panel.querySelector<HTMLElement>(".state-findings h4")?.focus();
     };
     // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {

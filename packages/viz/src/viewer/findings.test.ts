@@ -102,8 +102,10 @@ describe("finding marks", () => {
     const root = mount();
     expect(root.querySelectorAll(".finding-mark")).toHaveLength(2);
     expect(mark(root, "idle")?.getAttribute("data-finding-count")).toBe("1");
-    expect(mark(root, "idle")?.getAttribute("aria-label")).toContain("Handler throws");
-    expect(mark(root, "orphan")?.getAttribute("aria-label")).toContain("Unreachable state");
+    expect(mark(root, "idle")?.getAttribute("aria-label")).toContain("pick in idle throws");
+    expect(mark(root, "orphan")?.getAttribute("aria-label")).toContain(
+      "orphan can never be reached",
+    );
     expect(mark(root, "picked")).toBeNull();
   });
 
@@ -124,11 +126,9 @@ describe("finding marks", () => {
     mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("idle");
     const finding = root.querySelector('.state-findings .finding[data-kind="handlerError"]');
-    expect(finding?.textContent).toContain("Handler throws");
-    expect(finding?.textContent).toContain("Fuzzing sent this event");
-    expect(finding?.textContent).toContain(
-      "pick in idle throws. Fuzzing sent pick in idle and the handler threw",
-    );
+    expect(finding?.querySelector("h4")?.textContent).toBe("pick in idle throws");
+    expect(finding?.textContent).toContain("Fuzzing sent pick in idle and the handler threw");
+    expect(finding?.querySelector(".finding-fix")?.textContent).toContain("Fix: ");
     expect(finding?.textContent).toContain('pick {"side":"b"}');
   });
 
@@ -159,8 +159,8 @@ describe("finding marks", () => {
     const root = mount(undefined, mustSee);
     mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
     const finding = root.querySelector('.finding[data-kind="mustSee"]');
-    expect(finding?.textContent).toContain("Must-see context missed");
-    expect(finding?.textContent).toContain("No fuzz run reached this context.");
+    expect(finding?.textContent).toContain("idle was never reached with");
+    expect(finding?.textContent).toContain("No run got there, so there is nothing to replay.");
     expect(finding?.querySelector("[data-replay]")).toBeNull();
   });
 
@@ -201,8 +201,8 @@ describe("finding marks", () => {
   test("an unreachable state has no path and nothing to replay", () => {
     const root = mount(driver());
     mark(root, "orphan")?.dispatchEvent(new Event("click", { bubbles: true }));
-    expect(root.querySelector(".finding")?.textContent).toContain(
-      "No event path reaches this state.",
+    expect(root.querySelector(".finding-no-replay")?.textContent).toBe(
+      "Nothing reaches orphan, so there is nothing to replay.",
     );
     expect(root.querySelector("[data-replay]")).toBeNull();
   });
@@ -223,5 +223,81 @@ describe("finding marks", () => {
     root.querySelector<HTMLButtonElement>("[data-replay]")?.click();
     expect(activeTab()).toBe("step");
     expect(root.querySelector("[data-live-error]")?.textContent).toContain("boom");
+  });
+
+  test("a replay button is labelled for what it shows", () => {
+    const root = mount(driver());
+    mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(root.querySelector("[data-replay]")?.textContent).toBe("Replay the throw");
+  });
+
+  test("a finding mark brings the card into focus; the state chip does not", () => {
+    const root = mount();
+    document.body.append(root);
+    mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
+    const heading = root.querySelector(".state-findings h4");
+    expect(heading).not.toBeNull();
+    expect(document.activeElement).toBe(heading);
+    expect(root.querySelector(".finding-mark")?.getAttribute("data-state")).toBe("idle");
+    const other = mount();
+    document.body.append(other);
+    other
+      .querySelector("[data-node-id=orphan]")
+      ?.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(document.activeElement).not.toBe(other.querySelector(".state-findings h4"));
+  });
+});
+
+const wide: VizMachine = {
+  ...machine,
+  states: [state("idle", { initial: true }), state("picked")],
+  fuzz: null,
+  events: [
+    { id: "pick", internal: false, doc: null, payload: null },
+    { id: "ghost", internal: false, doc: "x", payload: null },
+  ],
+};
+
+describe("machine-wide findings and notes", () => {
+  test("an event nobody handles shows under About the whole machine, with and without selection", () => {
+    const root = mount(undefined, wide);
+    const section = () => root.querySelector(".machine-findings");
+    expect(section()?.getAttribute("data-findings")).toBe("1");
+    expect(section()?.textContent).toContain("ghost is declared but no state handles it");
+    expect(section()?.querySelector("[data-replay]")).toBeNull();
+    expect(section()?.querySelector(".finding-no-replay")?.textContent).toBe(
+      "No state handles ghost, so there is nothing to replay.",
+    );
+    mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
+    root
+      .querySelector("[data-node-id=picked]")
+      ?.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(section()).not.toBeNull();
+  });
+
+  test("a naming note on a state has no mark and sits under Naming notes", () => {
+    const root = mount(undefined, wide);
+    expect(root.querySelector(".finding-mark")).toBeNull();
+    root.querySelector("[data-node-id=idle]")?.dispatchEvent(new Event("click", { bubbles: true }));
+    const notes = root.querySelector(".state-notes");
+    expect(notes?.getAttribute("data-notes")).not.toBeNull();
+    expect(notes?.querySelector("article[data-note]")).not.toBeNull();
+    expect(root.querySelector(".state-findings")).toBeNull();
+  });
+
+  test("no card uses a generic title", () => {
+    const root = mount(driver());
+    for (const id of ["idle", "orphan"]) {
+      mark(root, id)?.dispatchEvent(new Event("click", { bubbles: true }));
+    }
+    for (const old of [
+      "Handler throws",
+      "Dead end",
+      "Unreachable state",
+      "Vague name",
+      "No description",
+    ]) {
+      expect(root.textContent).not.toContain(old);
+    }
   });
 });
