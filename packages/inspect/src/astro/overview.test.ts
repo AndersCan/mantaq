@@ -1,5 +1,6 @@
 import { layoutOverview, machineLinks } from "./overview.ts";
 import type { VizMachine } from "@mantaq/viz";
+import type { Wire } from "../ast/wires.ts";
 import { describe, expect, test } from "vite-plus/test";
 
 function machine(id: string, outputs: string[], inputs: string[], internal: string[] = []) {
@@ -24,12 +25,12 @@ describe("machineLinks", () => {
       machine("a", ["requestQueued"], []),
       machine("b", [], ["requestQueued"]),
     ]);
-    expect(links).toEqual([{ from: "a", to: "b", events: ["requestQueued"] }]);
+    expect(links).toEqual([{ from: "a", to: "b", events: ["requestQueued"], wires: [] }]);
   });
 
   test("several shared events make one link, sorted", () => {
     const links = machineLinks([machine("a", ["y", "x"], []), machine("b", [], ["x", "y"])]);
-    expect(links).toEqual([{ from: "a", to: "b", events: ["x", "y"] }]);
+    expect(links).toEqual([{ from: "a", to: "b", events: ["x", "y"], wires: [] }]);
   });
 
   test("two receivers make two links", () => {
@@ -60,6 +61,43 @@ describe("machineLinks", () => {
   });
 });
 
+describe("machineLinks with wires", () => {
+  const wire = (to: string, trigger: string, event: string): Wire => ({
+    from: "a",
+    to,
+    trigger,
+    event,
+    at: "app.ts:3",
+  });
+
+  test("a wire alone makes a link", () => {
+    const w = wire("b", "change", "poke");
+    const links = machineLinks([machine("a", [], []), machine("b", [], ["poke"])], [w]);
+    expect(links).toEqual([{ from: "a", to: "b", events: [], wires: [w] }]);
+  });
+
+  test("an id match and a wire make one link with both, labelled together", () => {
+    const w = wire("b", "change", "poke");
+    const machines = [machine("a", ["handedOver"], []), machine("b", [], ["handedOver", "poke"])];
+    const links = machineLinks(machines, [w]);
+    expect(links).toEqual([{ from: "a", to: "b", events: ["handedOver"], wires: [w] }]);
+    const overview = layoutOverview(
+      [
+        { id: "a", file: "/x/a.ts" },
+        { id: "b", file: "/x/b.ts" },
+      ],
+      links,
+    );
+    expect(overview.links[0]?.label).toBe("handedOver, change → poke");
+    expect(overview.wires).toEqual([w]);
+  });
+
+  test("a wire to an unlisted machine is ignored", () => {
+    const links = machineLinks([machine("a", [], [])], [wire("ghost", "change", "poke")]);
+    expect(links).toEqual([]);
+  });
+});
+
 describe("layoutOverview", () => {
   const machines = [
     { id: "a", file: "/x/a.ts" },
@@ -68,8 +106,8 @@ describe("layoutOverview", () => {
     { id: "lonely", file: "/x/lonely.ts" },
   ];
   const links = [
-    { from: "a", to: "b", events: ["x", "y"] },
-    { from: "b", to: "c", events: ["z"] },
+    { from: "a", to: "b", events: ["x", "y"], wires: [] },
+    { from: "b", to: "c", events: ["z"], wires: [] },
   ];
 
   test("same input gives the same layout", () => {
