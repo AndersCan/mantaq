@@ -41,6 +41,7 @@ const photoUpload: VizMachine = {
   id: "photoUpload",
   initial: "showingUploadScreen",
   regions: ["upload", "network"],
+  maps: [],
   states: [
     state("showingUploadScreen", { initial: true }),
     state("showingUploadedPhoto", { final: true }),
@@ -74,7 +75,7 @@ function snapshot(steps: VizStep[]): VizLiveState {
   const regions = { upload: "upload.waitingForPhoto", network: "network.online" };
   let root = "showingUploadScreen";
   for (const step of steps) {
-    if (step.kind !== "event" || step.actor === undefined) continue;
+    if (step.kind !== "event" || step.actor === undefined || !("region" in step.actor)) continue;
     const at = step.actor.region === "upload" ? "upload" : "network";
     if (step.event === "photoPicked") regions.upload = "upload.sendingPhoto";
     if (step.event === "uploadConfirmed") {
@@ -94,7 +95,10 @@ function snapshot(steps: VizStep[]): VizLiveState {
             from: "upload.waitingForPhoto",
             event: last.event,
             to: "upload.sendingPhoto",
-            outcome: last.actor?.region === "nope" ? "missing" : "transition",
+            outcome:
+              last.actor !== undefined && "region" in last.actor && last.actor.region === "nope"
+                ? "missing"
+                : "transition",
             effects: [],
             context: null,
             error: null,
@@ -105,6 +109,7 @@ function snapshot(steps: VizStep[]): VizLiveState {
     context: null,
     payload: null,
     regions,
+    children: [],
     effectMode: "real",
     waiting: [],
   };

@@ -46,7 +46,10 @@ export function showPayloadSheet(
   const close = () => context.compose(null);
   anchorOf(root, {
     machine,
-    state: actor === undefined ? live.state : (live.regions[actor.region] ?? live.state),
+    state:
+      actor === undefined
+        ? live.state
+        : (("region" in actor ? live.regions[actor.region] : undefined) ?? live.state),
     event,
   })?.setAttribute("data-composing", "");
   const sheet = html(doc, "section", {
