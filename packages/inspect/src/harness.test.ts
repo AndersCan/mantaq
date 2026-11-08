@@ -106,6 +106,13 @@ test("says why the form refused a payload", async () => {
   });
 }, 60_000);
 
+test("says when an event takes no payload", async () => {
+  await withViz(fixture("harness-empty.ts"), async (viz) => {
+    const result = await viz.send("ping", { some: 1 });
+    expect(Either.getLeft(result)).toBe("ping takes no payload.");
+  });
+}, 60_000);
+
 test("fills a choice field and sends a payload with the custom box", async () => {
   await withViz(fixture("fields.ts"), async (viz) => {
     const choice = await viz.send("choose", { validFor: "1h" });
