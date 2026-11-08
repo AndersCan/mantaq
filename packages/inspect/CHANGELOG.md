@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_ Hosted `<Machine>` diagrams collect notes and journeys in the tab and copy them for your coding agent.
+
 ## 0.27.0
 
 <sub>2026-11-08</sub>
