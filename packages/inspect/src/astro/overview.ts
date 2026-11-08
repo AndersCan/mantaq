@@ -15,7 +15,7 @@ export interface OverviewLink {
   /** Sorted. */
   events: string[];
   /** App-code connections from `from` to `to`, in the order given. */
-  wires: Wire[];
+  wires: OverviewWire[];
 }
 
 interface PlacedBox {
@@ -45,13 +45,18 @@ interface PlacedUnheard {
   labelAt: { x: number; y: number };
 }
 
+interface OverviewWire extends Wire {
+  /** Top-level, non-final states of the receiver with no handler for `event`, in states order. */
+  ignoredIn: string[];
+}
+
 export interface Overview {
   width: number;
   height: number;
   boxes: PlacedBox[];
   links: PlacedLink[];
   /** Every link's wires, in link order. */
-  wires: Wire[];
+  wires: OverviewWire[];
   /** Machines no app code runs, in the order given. */
   notRun: NotRun[];
   /** Outputs no app code listens to, one arrow per machine. */
@@ -116,7 +121,9 @@ export function machineLinks(
           .map((event) => event.id),
       );
       const events = a.machine.outputs.filter((id) => inputs.has(id)).toSorted();
-      const own = wires.filter((wire) => wire.from === a.machine.id && wire.to === b.machine.id);
+      const own = wires
+        .filter((wire) => wire.from === a.machine.id && wire.to === b.machine.id)
+        .map((wire) => ({ ...wire, ignoredIn: ignoredIn(b.machine, wire.event) }));
       if (events.length > 0 || own.length > 0) {
         links.push({ from: a.machine.id, to: b.machine.id, events, wires: own });
       }
@@ -125,6 +132,26 @@ export function machineLinks(
   return links.toSorted((x, y) =>
     x.from === y.from ? (x.to < y.to ? -1 : x.to > y.to ? 1 : 0) : x.from < y.from ? -1 : 1,
   );
+}
+
+/**
+ * The top-level, non-final states of `receiver` that have no handler for `event`:
+ * a send of it does nothing there. An `onAny` handler (from "*") covers every state.
+ * An unknown machine gives [].
+ */
+export function ignoredIn(receiver: VizMachine | undefined, event: string): string[] {
+  if (receiver === undefined) return [];
+  const handles = (from: string) =>
+    receiver.edges.some(
+      (edge) =>
+        edge.event === event &&
+        edge.from === from &&
+        (edge.kind === "transition" || edge.kind === "stay"),
+    );
+  if (handles("*")) return [];
+  return receiver.states
+    .filter((each) => each.region === null && !each.final && !handles(each.id))
+    .map((each) => each.id);
 }
 
 export function layoutOverview(
