@@ -27,7 +27,7 @@ import {
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
-import { showPayloadPopover } from "./payload-popover.ts";
+import { showPayloadSheet } from "./payload-sheet.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
@@ -546,7 +546,7 @@ function headerOf(
   ]);
 }
 
-/** Everything drawn over the graph: walk marks, selection, and the open payload popover. */
+/** Everything drawn over the graph: walk marks, selection, and the edge of the open payload sheet. */
 function markDiagram(
   root: HTMLElement,
   context: { machine: VizMachine; view: ViewState } & Pick<LiveContext, "send" | "compose">,
@@ -554,8 +554,7 @@ function markDiagram(
   const { machine, view } = context;
   markExplore(root, { machine, path: view.path, ...liveState(view) });
   markSelection(root, view.selection);
-  const canvas = root.querySelector<HTMLElement>(".canvas");
-  if (canvas) showPayloadPopover(canvas, { ...context, ...view });
+  showPayloadSheet(root, { ...context, ...view });
 }
 
 function markSelection(root: HTMLElement, selection: Selection | null): void {
