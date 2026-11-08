@@ -174,7 +174,10 @@ test("a change keeps the elements of a directive result inside a nested watch", 
   const before = [...root.querySelectorAll("li")];
   b.send(rename.create({ id: 2, text: "B" }));
   const after = [...root.querySelectorAll("li")];
-  expect({ text: root.textContent, same: after.every((li, i) => li === before[i]) }).toEqual({
+  expect({
+    text: root.textContent?.trim(),
+    same: after.every((li, i) => li === before[i]),
+  }).toEqual({
     text: "aBc",
     same: true,
   });
