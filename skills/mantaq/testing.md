@@ -80,7 +80,11 @@ A journey through an effect's answer injects that answer right after the send th
 ```ts
 import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
 
-const target = { id: "inviteLink", create: () => createInviteLinkActor({ clock: VirtualClock() }) };
+const target = {
+  id: "inviteLink",
+  create: () => createInviteLinkActor({ clock: VirtualClock() }),
+  source: { file: join(import.meta.dirname, "invite-link.ts"), root: import.meta.dirname },
+};
 expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, dead ends, unreachable states, events no state handles; with `source`: vague or undocumented names, handlers and effects
 expectAllStatesReached(target);
 expectReached(target, { transitions: [{ from: "waitingForAnswer", event: "ACCEPT" }] });
@@ -91,7 +95,7 @@ Fuzz throws in app code are real findings: fix them, never suppress.
 
 Bad data without a crash: export `<machine id>Expectations` beside the factory, `payment: { neverSee: [{ address: "" }] }` typed `Expectations<typeof createXActor>`.
 `mustSee` lists contexts some run must reach. Tests can pass the block as `expectations` on the target.
-Payloads come from `source`; without it, payload events are sent without one.
+Payloads come from `source` or `payloads: { event: [...] }`. If fuzzing sent an event with no payload and the machine read a field of it, all three checks stop and name the event and the fields: add `source` or real payloads, never reshape the design to get past it.
 
 With `@mantaq/test` 2.0 the `*` any-node (`m.onAny`) counts in coverage: it is one node, covered once its event fires from any state.
 

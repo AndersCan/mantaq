@@ -22,9 +22,87 @@ function createActor() {
   });
 }
 
+const evA = event("a")<{ x: number; z: number }>();
+const evB = event("b")<{ y: number }>();
+
+function createTwoActor() {
+  return Actor({
+    clock: VirtualClock(),
+    inputs: [evA, evB],
+    states: [idle],
+    initial: idle,
+    setup: (m) => {
+      m.on(idle, {
+        event: evA,
+        to: [idle],
+        handler: (e) => (e.payload.x + e.payload.z > 0 ? {} : {}),
+      });
+      m.on(idle, { event: evB, to: [idle], handler: (e) => (e.payload.y > 0 ? {} : {}) });
+    },
+  });
+}
+
 const target = { id: "flow", create: () => createActor(), fuzz: { iterations: 300 } };
 const structureOnly = { id: "flow", create: () => createActor(), fuzz: false as const };
 const goOnly = [{ name: "go", steps: [{ kind: "event" as const, event: "go", payload: null }] }];
+
+const lockOn = event("lockSet")<{ lockOn: boolean }>();
+const off = state("off")();
+const on = state("on")();
+
+function createLockActor(handler: (lockOn: boolean | undefined) => boolean) {
+  return Actor({
+    clock: VirtualClock(),
+    inputs: [lockOn],
+    states: [off, on],
+    initial: off,
+    setup: (m) => {
+      m.on(off, {
+        event: lockOn,
+        to: [on, off],
+        handler: (e) => ({ state: handler(e.payload.lockOn) ? on : off }),
+      });
+      m.on(on, { event: lockOn, to: [off], handler: () => ({ state: off }) });
+    },
+  });
+}
+
+const refusal =
+  "lock: fuzzing had no payload for 1 event the machine reads, so this check proves nothing yet:\n  - lockSet: read lockOn\nPass `source` (payloads from the event types) or `payloads: { lockSet: [...] }` with a real payload for each case.";
+const lockPayloads = { lockSet: [{ lockOn: true }, { lockOn: false }] };
+
+describe("a check whose events were fuzzed without a payload", () => {
+  test("a state only an empty payload reaches is the refusal, not a pass", () => {
+    const create = () => createLockActor((flag) => flag === false);
+    expect(() => expectAllStatesReached({ id: "lock", create })).toThrow(refusal);
+    expect(() =>
+      expectAllStatesReached({ id: "lock", create, payloads: lockPayloads }),
+    ).not.toThrow();
+  });
+
+  test("a miss follows the refusal after a blank line", () => {
+    const create = () => createLockActor((flag) => flag === true);
+    expect(() => expectAllStatesReached({ id: "lock", create })).toThrow(
+      new RegExp(
+        `^${refusal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\n\nlock missed 1 expected reach:`,
+      ),
+    );
+    expect(() =>
+      expectAllStatesReached({ id: "lock", create, payloads: lockPayloads }),
+    ).not.toThrow();
+  });
+
+  test("expectReached stops the same way", () => {
+    const create = () => createLockActor((flag) => flag === false);
+    expect(() => expectReached({ id: "lock", create }, { states: ["on"] })).toThrow(refusal);
+  });
+
+  test("names every event, in event order, when there are several", () => {
+    expect(() => expectAllStatesReached({ id: "two", create: createTwoActor })).toThrow(
+      "two: fuzzing had no payload for 2 events the machine reads, so this check proves nothing yet:\n  - a: read x, z\n  - b: read y\nPass `source` (payloads from the event types) or `payloads: { a: [...], b: [...] }` with a real payload for each case.",
+    );
+  });
+});
 
 describe("expectReached", () => {
   test("passes when fuzzing visits the states and transitions", () => {

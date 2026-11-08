@@ -1,6 +1,6 @@
 import type { VizEdge, VizMachine } from "@mantaq/viz";
-import { inspect } from "./inspect.ts";
-import type { InspectTarget } from "./inspect.ts";
+import { inspect, missingPayloadBlock } from "./inspect.ts";
+import type { Inspected, InspectTarget } from "./inspect.ts";
 
 export interface ReachTransition {
   from: string;
@@ -55,11 +55,13 @@ export function missedReach(machine: VizMachine, expected: ReachExpectation): st
   return [...states, ...transitions].filter((line) => line !== null);
 }
 
-function failOnMiss(machine: VizMachine, misses: string[]): void {
-  if (misses.length === 0) return;
-  throw new Error(
-    `${machine.id} missed ${misses.length} expected ${misses.length === 1 ? "reach" : "reaches"}:\n${misses.map((each) => `  - ${each}`).join("\n")}\nAdd a named run to \`tests\`, or raise \`fuzz.iterations\`, to cover it.`,
-  );
+function failOnMiss(inspected: Inspected, misses: string[]): void {
+  const { machine } = inspected;
+  const block = missingPayloadBlock(machine.id, inspected.missingPayloads);
+  if (misses.length === 0 && block === "") return;
+  if (misses.length === 0) throw new Error(block);
+  const miss = `${machine.id} missed ${misses.length} expected ${misses.length === 1 ? "reach" : "reaches"}:\n${misses.map((each) => `  - ${each}`).join("\n")}\nAdd a named run to \`tests\`, or raise \`fuzz.iterations\`, to cover it.`;
+  throw new Error(block === "" ? miss : `${block}\n\n${miss}`);
 }
 
 /**
@@ -68,12 +70,13 @@ function failOnMiss(machine: VizMachine, misses: string[]): void {
  * says nothing got there yet.
  */
 export function expectReached(target: InspectTarget, expected: ReachExpectation): void {
-  const { machine } = inspect(target);
-  failOnMiss(machine, missedReach(machine, expected));
+  const inspected = inspect(target);
+  failOnMiss(inspected, missedReach(inspected.machine, expected));
 }
 
 /** Call from a test: throws unless fuzzing or the target's `tests` visited every declared state. */
 export function expectAllStatesReached(target: InspectTarget): void {
-  const { machine } = inspect(target);
-  failOnMiss(machine, missedReach(machine, { states: machine.states.map((state) => state.id) }));
+  const inspected = inspect(target);
+  const { machine } = inspected;
+  failOnMiss(inspected, missedReach(machine, { states: machine.states.map((state) => state.id) }));
 }

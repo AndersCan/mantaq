@@ -8,6 +8,7 @@ import { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts
 import { inspect } from "./inspect.ts";
 import { join } from "node:path";
 
+const picks = { pick: [{ side: "a" as const }, { side: "b" as const }] };
 const FIXTURES = join(import.meta.dirname, "fixtures");
 
 const idle = state("idle")();
@@ -33,15 +34,40 @@ describe("expectNoDesignErrors", () => {
       expectNoDesignErrors({
         id: "door",
         create: () => createDoorActor(),
+        payloads: { open: [{ by: "key" }, { by: "code" }] },
         fuzz: { iterations: 100 },
       }),
     ).not.toThrow();
   });
 
+  test("stops on an event fuzzing sent without the payload the handler reads", () => {
+    expect(() =>
+      expectNoDesignErrors({
+        id: "door",
+        create: () => createDoorActor(),
+        fuzz: { iterations: 100 },
+      }),
+    ).toThrow(
+      "door: fuzzing had no payload for 1 event the machine reads, so this check proves nothing yet:\n  - open: read by\nPass `source` (payloads from the event types) or `payloads: { open: [...] }` with a real payload for each case.",
+    );
+  });
+
   test("fails on a handler that throws under fuzzing", () => {
     expect(() =>
+      expectNoDesignErrors({
+        id: "throwing",
+        create: () => createThrowingActor(),
+        payloads: picks,
+      }),
+    ).toThrow(/^throwing has 1 design error:\n {2}- pick in idle throws/);
+  });
+
+  test("an empty payload that breaks the handler is the refusal first, then the error", () => {
+    expect(() =>
       expectNoDesignErrors({ id: "throwing", create: () => createThrowingActor() }),
-    ).toThrow(/throwing has 1 design error:\n {2}- pick in idle throws/);
+    ).toThrow(
+      /^throwing: fuzzing had no payload for 1 event the machine reads[^]*- pick: read side\n[^\n]*payloads: \{ pick: \[\.\.\.\] \}[^\n]*\n\nthrowing has 1 design error:\n {2}- pick in idle throws/,
+    );
   });
 
   test("fails on a declared state no path leads to", () => {
