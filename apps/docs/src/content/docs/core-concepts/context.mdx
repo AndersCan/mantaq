@@ -12,10 +12,12 @@ State decides where the machine is. Context decides what it knows.
 
 ## Define
 
-```ts
-import { checkout, type CheckoutContext } from "../checkout.ts";
+The examples on this page build on each other. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
 
-const c: CheckoutContext = checkout.context;
+```ts
+import type { CheckoutContext } from "./checkout";
+
+const initialContext: CheckoutContext = {};
 ```
 
 Typed at compile time. No runtime cost.
@@ -29,12 +31,29 @@ Handlers get a `context` handle:
 - Mutate what `get()` returned, then `set()` it
 
 ```ts
-m.on(basicInfo, submitBasicInfo, (event, { context }) => {
-  const s = context.get();
-  s.basicInfo = event.payload;
-  context.set(s);
-  return { state: shippingAddress };
+import { Actor } from "@mantaq/core";
+import { basicInfo, shippingAddress, submitBasicInfo } from "./checkout";
+
+const checkout = Actor({
+  inputs: [submitBasicInfo],
+  states: [basicInfo, shippingAddress],
+  initial: basicInfo,
+  context: initialContext,
+  setup: (m) => {
+    m.on(basicInfo, {
+      event: submitBasicInfo,
+      to: [shippingAddress],
+      handler: (event, { context }) => {
+        const s = context.get();
+        s.basicInfo = event.payload;
+        context.set(s);
+        return { state: shippingAddress };
+      },
+    });
+  },
 });
+
+checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 ```
 
 Nested mutations work the same way (`s.items.push(item); context.set(s)`).
@@ -42,7 +61,7 @@ Nested mutations work the same way (`s.items.push(item); context.set(s)`).
 ## Read outside transitions
 
 ```ts
-checkout.context.basicInfo?.email;
+checkout.context.basicInfo?.email; // "a@b.com"
 ```
 
 ## Effects
