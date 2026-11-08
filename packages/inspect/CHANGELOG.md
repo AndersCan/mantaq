@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  A walk link may name several machines (`?machine=a&machine=b&run=<name>`): each viewer on the page opens that run, and `mantaq-check-site --links` checks every machine named.
+
 ## 0.22.0
 
 <sub>2026-11-08</sub>
