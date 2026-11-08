@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  The live viewer shows an actor map's children: one row per child with its state, its own Send list, and the child's graph drawn once in a box labelled "one per key". The browser harness gains `children()` and `sendTo({ map, key }, …)`.
+
 ## 0.19.0
 
 <sub>2026-11-08</sub>
