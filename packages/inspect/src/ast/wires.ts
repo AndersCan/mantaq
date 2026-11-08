@@ -416,7 +416,7 @@ export function scanAppCode(context: {
   for (const { program, names, checker } of programs) {
     for (const name of names) {
       const sourceFile = program.getSourceFile(name);
-      if (sourceFile === undefined || !keep(sourceFile.fileName)) continue;
+      if (sourceFile === undefined) continue;
       for (const used of usedTargets(checker, sourceFile, candidates)) runs.add(used);
     }
   }
