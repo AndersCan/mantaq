@@ -1,10 +1,14 @@
+import { VirtualClock } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import type { VizJson, VizStep } from "@mantaq/viz";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { afterEach, expect } from "vite-plus/test";
+import { isActor, messageOf } from "./fuzz/run.ts";
+import type { FuzzTarget } from "./fuzz/run.ts";
 import { machineId } from "./inspect.ts";
+import { RUN_DROPPED, normalizeRun } from "./runs.ts";
 
 interface Recorded {
   name: string;
@@ -22,6 +26,10 @@ interface Pending {
   steps: VizStep[];
   problem: string;
   seen: number;
+  /** Keys the test passed besides `clock`; empty when the run needs no replay. */
+  extra: string[];
+  /** The factory called the way the page calls it. */
+  replay: (clock: VirtualClock) => Made;
 }
 
 /** Actors built during the running test attempt, flushed when it ends. */
@@ -86,9 +94,40 @@ function flush(testPath: string, id: string, run: Recorded, runs: Map<string, Re
   writeFileSync(file, textOf(runs));
 }
 
+function extraKeys(args: readonly unknown[]): string[] {
+  const [only] = args;
+  if (args.length !== 1 || typeof only !== "object" || only === null) return [];
+  const proto = Object.getPrototypeOf(only);
+  if (proto !== Object.prototype && proto !== null) return [];
+  if ("now" in only && "advance" in only) return []; // a bare clock, not options
+  return Object.keys(only).filter((key) => key !== "clock");
+}
+
+/** Empty when the run replays to the same end on `{ clock }` alone, else the reason. */
+function replayProblem(each: Pending, run: Recorded): string {
+  if (each.extra.length === 0) return "";
+  const target: FuzzTarget = {
+    id: each.id,
+    create: () => {
+      const clock = VirtualClock();
+      const made = each.replay(clock);
+      return isActor(made) ? { actor: made, clock } : { actor: made.actor, clock, made };
+    },
+  };
+  const replayed = Either.from(() => normalizeRun(target, run));
+  const reason = Either.isLeft(replayed)
+    ? `the factory threw with only { clock }: ${messageOf(replayed[0])}.`
+    : Either.isLeft(replayed[1])
+      ? replayed[1][0]
+      : "";
+  if (reason === "") return "";
+  return `recordRuns: run "${run.name}"${RUN_DROPPED}${reason} This test passed: ${each.extra.join(", ")}.`;
+}
+
 function finish(attempt: Pending[], passed: boolean): void {
   if (!passed) return;
   const counts = new Map<string, number>();
+  const dropped: string[] = [];
   for (const each of attempt) {
     if (each.problem !== "") {
       console.warn(`recordRuns: "${each.name}" not recorded, ${each.problem}`);
@@ -97,16 +136,22 @@ function finish(attempt: Pending[], passed: boolean): void {
     const now = each.actor.clock.now();
     if (now > each.seen) each.steps.push({ kind: "advance", ms: now - each.seen });
     const count = (counts.get(each.name) ?? 0) + 1;
-    counts.set(each.name, count);
     const name = count === 1 ? each.name : `${each.name} #${count}`;
+    const run = { name, end: each.actor.state.name, steps: each.steps };
+    const unreplayed = replayProblem(each, run);
+    if (unreplayed !== "") {
+      dropped.push(unreplayed);
+      continue;
+    }
+    counts.set(each.name, count);
     const runs = files.get(each.testPath) ?? new Map<string, Recorded[]>();
     files.set(each.testPath, runs);
     const list = runs.get(each.id) ?? [];
     runs.set(each.id, list);
-    const run = { name, end: each.actor.state.name, steps: each.steps };
     list.push(run);
     flush(each.testPath, each.id, run, runs);
   }
+  if (dropped.length > 0) throw new Error(dropped.join("\n"));
 }
 
 // One hook for the file, so a factory may be called in a test or in beforeEach.
@@ -122,7 +167,9 @@ afterEach(({ task }) => {
  * the test: the events it handled and how far its clock moved. Run the whole
  * file to refresh it; with `CI` set a stale file fails the test instead.
  * The factory may be called in the test or in `beforeEach`. A retried test is
- * recorded once, from the attempt that passed.
+ * recorded once, from the attempt that passed. A test that passes options
+ * besides `clock` is replayed on the factory with only `{ clock }`, as the
+ * page does; if it ends elsewhere, the run is not recorded and the test fails.
  */
 export function recordRuns<F extends (...args: never[]) => Made>(factory: F): F {
   const id = machineId(factory.name);
@@ -138,6 +185,8 @@ export function recordRuns<F extends (...args: never[]) => Made>(factory: F): F 
       steps: [],
       problem: "",
       seen: actor.clock.now(),
+      extra: extraKeys(args),
+      replay: (clock) => Reflect.apply(factory, undefined, [{ clock }]),
     };
     pending.push(entry);
     actor.on("transition", {

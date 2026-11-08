@@ -212,3 +212,42 @@ test("empty", () => { make().send({ type: "start", payload: {} } as never); });`
     expect(machines[0]?.runs.map((each) => each.name)).toEqual(["times out", "waits"]);
   });
 });
+
+describe("recordRuns replays a test that passes options", () => {
+  const door = {
+    fixture: join(HERE, "fixtures/locked-door.ts"),
+    factory: "createLockedDoorActor",
+  };
+  const unlocked = `test("unlocked", () => { const actor = make({ clock: VirtualClock() }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("openedDoor"); });`;
+
+  test("ends elsewhere on the defaults: the test fails and the run is not recorded", () => {
+    const dir = join(SCRATCH, "replay-differs");
+    const file = testFile(
+      dir,
+      `test("locked", () => { const actor = make({ clock: VirtualClock(), locked: true }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("lockedOut"); });
+${unlocked}`,
+      door,
+    );
+    const result = run(dir, {});
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(
+      'recordRuns: run "locked" dropped: replays to openedDoor, the test ended in lockedOut.',
+    );
+    expect(result.output).toContain("This test passed: locked.");
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as {
+      lockedDoor: { name: string }[];
+    };
+    expect(recorded.lockedDoor.map((each) => each.name)).toEqual(["unlocked"]);
+  });
+
+  test("same end on the defaults: recorded as today", () => {
+    const dir = join(SCRATCH, "replay-same");
+    const file = testFile(
+      dir,
+      `test("open", () => { const actor = make({ clock: VirtualClock(), locked: false }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("openedDoor"); });`,
+      door,
+    );
+    expect(run(dir, {}).ok).toBe(true);
+    expect(readFileSync(file, "utf8")).toContain('"open"');
+  });
+});

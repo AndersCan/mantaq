@@ -68,7 +68,7 @@ States, then edges, then runs. Follow the user's order. Write each step into the
 
 ## 6. Runs
 
-Each test builds the actor through `recordRuns(factory)` (`@mantaq/inspect/record`). Name tests as user-visible journeys: the name is the run's label. Run the whole test file after each change so the Runs list updates. A journey linked from docs is a top-level test (no `describe`), so the run name is its title. Build it with only `{ clock }`, as the page does, so it replays the same there. The user can also save a journey from the live page; see section 11.
+Each test builds the actor through `recordRuns(factory)` (`@mantaq/inspect/record`). Name tests as user-visible journeys: the name is the run's label. Run the whole test file after each change so the Runs list updates. A journey linked from docs is a top-level test (no `describe`), so the run name is its title. Build it with only `{ clock }`, as the page does. If the journey needs a port to answer differently, give the factory's default that behaviour (the page runs the defaults); a recorded test that passes other options is replayed on the defaults and fails with `recordRuns: run "..." dropped:` when it ends elsewhere. A test that is not a journey builds its actor with the factory itself, not through `recordRuns`. The user can also save a journey from the live page; see section 11.
 
 The page fuzzes each machine on a budget and warns on states it never reached. A deep state at 0 hits is a budget miss, not proof it is unreachable: raise `fuzz: { timeLimitMs }` or `fuzz: { iterations }` in `mantaqViz` (or `expectNoDesignErrors`), or add a test journey that reaches it (a named run in `tests`).
 
