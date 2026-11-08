@@ -36,6 +36,41 @@
   font-size: 0.75rem;
 }
 
+/* One button look: a bordered button in the text colour. Send is the one
+   filled button. Component rules below (tabs, fullscreen) still win. */
+.viz button {
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--fg);
+  background: var(--state-bg);
+  border: 1px solid var(--state-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.viz button:hover:not(:disabled) {
+  background: var(--region-bg);
+}
+
+.viz button:disabled {
+  color: var(--muted);
+  border-color: var(--muted);
+  cursor: default;
+}
+
+.viz button.primary {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.viz button.primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.1);
+}
+
 @media (prefers-color-scheme: dark) {
   .viz {
     --bg: #141416;

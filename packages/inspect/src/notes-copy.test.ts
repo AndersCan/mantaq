@@ -95,38 +95,6 @@ describe("notes on a page without a dev server", () => {
     expect(barLine(root)).toBe("1 note to send from this page.");
   });
 
-  test("a walk added as a journey counts, and Copy writes both notes", async () => {
-    const root = await draw();
-    click(root, "payment");
-    addNote(root, "needs a cancel");
-    expect(root.querySelector("section.journey h3")?.textContent).toBe(
-      "Add this walk as a journey",
-    );
-    root.querySelector<HTMLElement>("[data-send]")?.click();
-    const input = root.querySelector<HTMLInputElement>("section.journey input")!;
-    input.value = "Pays once";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    const add = root.querySelector<HTMLButtonElement>("section.journey button")!;
-    expect(add.textContent).toBe("Add journey");
-    root
-      .querySelector("section.journey form")!
-      .dispatchEvent(new Event("submit", { cancelable: true }));
-    expect(root.querySelector("section.journey p[role=status]")?.textContent).toBe(
-      "Journey added. Copy it for your agent below.",
-    );
-    expect(barLine(root)).toBe("2 notes to send from this page.");
-
-    const writeText = vi.fn(async (_text: string) => {});
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    bar(root)!.querySelector<HTMLButtonElement>("[data-copy-notes]")!.click();
-    await tick();
-    const text = writeText.mock.calls[0]?.[0] ?? "";
-    expect(text).toContain("mantaq notes v1 for src/checkout.ts\n- id: p1\n  machine: checkout");
-    expect(text).toContain("  on: state payment\n  status: open\n  note: needs a cancel\n");
-    expect(text).toContain("  on: walk\n  status: open\n  note: Pays once\n  end: ");
-    expect(barLine(root)).toBe("2 notes copied");
-  });
-
   test("a rejected clipboard shows one line and keeps the notes", async () => {
     const root = await draw();
     click(root, "payment");

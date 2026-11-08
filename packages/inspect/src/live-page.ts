@@ -12,14 +12,12 @@ import type {
   MachineOutline,
   VizDocument,
   VizDriver,
-  VizLiveState,
   VizMachine,
   VizOutputRoutes,
 } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
-import { journeyFooter, trackWalk } from "./journey-page.ts";
 import { copyNotesFooter, pageNotes, sendBar } from "./notes-copy.ts";
 import { notesFooter } from "./notes-page.ts";
 
@@ -181,85 +179,44 @@ export function mountDriven(
   root.replaceChildren(...(picker ? [bar] : []), viewer);
   const machine = shown.machines[0];
   const changes = changesOption(context, machine, viz.machines);
-  const driver = trackedDriver(id, create, context.effectMode);
-  const footer = panelFooter(doc, context, machine, driver?.current);
+  const driver = liveDriver(id, create, context.effectMode);
+  const footer = panelFooter(doc, context, machine);
   mountViewer(viewer, shown, {
     ...options,
     ...changes,
     ...(footer === undefined ? {} : { panelFooter: footer }),
     ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...routesOf(context),
-    ...(driver === undefined ? {} : { driver: driver.driver }),
+    ...(driver === undefined ? {} : { driver }),
   });
 }
 
-/** Notes, plus the journey box when the machine runs live; both persist across calls. */
+/** The notes box for the selected state or edge, when the page can take notes. */
 function panelFooter(
   doc: Document,
   context: { notes?: string; copyNotes?: { file: string } },
   machine: VizMachine | undefined,
-  walk: (() => VizLiveState | undefined) | undefined,
 ): ViewerOptions["panelFooter"] {
   if (machine === undefined) return undefined;
-  if (context.notes !== undefined) return serverFooter(doc, context.notes, machine, walk);
-  if (context.copyNotes !== undefined)
-    return copyFooter(doc, context.copyNotes.file, machine, walk);
+  if (context.notes !== undefined) return notesFooter(doc, { url: context.notes, machine });
+  if (context.copyNotes !== undefined) return copyFooter(doc, context.copyNotes.file, machine);
   return undefined;
 }
 
-function serverFooter(
-  doc: Document,
-  url: string,
-  machine: VizMachine,
-  walk: (() => VizLiveState | undefined) | undefined,
-): NonNullable<ViewerOptions["panelFooter"]> {
-  const notes = notesFooter(doc, { url, machine });
-  if (walk === undefined) return notes;
-  const journey = journeyFooter(doc, { url, machine: machine.id, walk });
-  const wrapper = doc.createElement("div");
-  wrapper.className = "panel-extras";
-  return (selection) => {
-    const part = notes(selection);
-    if (wrapper.firstChild === null && part !== undefined) wrapper.append(part, journey.section);
-    journey.update();
-    return wrapper;
-  };
-}
-
-/** A page without a dev server: notes and journeys stay in the tab, the bar copies them. */
+/** A page without a dev server: notes stay in the tab, the bar copies them. */
 function copyFooter(
   doc: Document,
   file: string,
   machine: VizMachine,
-  walk: (() => VizLiveState | undefined) | undefined,
 ): NonNullable<ViewerOptions["panelFooter"]> {
   const store = pageNotes(doc);
   const notes = copyNotesFooter(doc, { file, machine, store });
-  const journey =
-    walk === undefined
-      ? undefined
-      : journeyFooter(doc, {
-          url: "",
-          machine: machine.id,
-          walk,
-          add: (state, name) =>
-            store.add({
-              file,
-              machine: machine.id,
-              target: { kind: "walk" },
-              note: name,
-              walk: { end: state.state, steps: state.steps },
-            }),
-        });
   const wrapper = doc.createElement("div");
   wrapper.className = "panel-extras";
   const bar = sendBar(doc, store);
   return (selection) => {
     const part = notes(selection);
-    if (wrapper.firstChild === null && part !== undefined) {
-      wrapper.append(part, ...(journey === undefined ? [] : [journey.section]), bar);
-    }
-    journey?.update();
+    if (wrapper.firstChild === null && part !== undefined) wrapper.append(part, bar);
     return wrapper;
   };
 }
@@ -378,12 +335,12 @@ export async function mountLiveDriven(
   mountCompare(root, { viz: parsed[1], targets: context.targets, ids });
 }
 
-function trackedDriver(
+function liveDriver(
   id: string,
   create: FuzzTarget["create"] | undefined,
   effectMode: "held" | "real" | undefined,
-): ReturnType<typeof trackWalk> | undefined {
+): VizDriver | undefined {
   return create === undefined
     ? undefined
-    : trackWalk(createDriver({ id, create }, { effectMode: effectMode ?? "held" }));
+    : createDriver({ id, create }, { effectMode: effectMode ?? "held" });
 }
