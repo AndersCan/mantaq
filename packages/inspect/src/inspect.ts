@@ -111,6 +111,18 @@ export interface Inspected {
   missingPayloads: MissingPayload[];
 }
 
+/**
+ * What a design check throws when fuzzing sent events without a payload that the
+ * machine then read, or "" when there is none. Callers add their own text after a blank line.
+ */
+export function missingPayloadBlock(id: string, missing: ReadonlyArray<MissingPayload>): string {
+  if (missing.length === 0) return "";
+  const count = `${missing.length} event${missing.length === 1 ? "" : "s"}`;
+  const lines = missing.map((each) => `  - ${each.event}: read ${each.fields.join(", ")}`);
+  const keys = missing.map((each) => `${each.event}: [...]`).join(", ");
+  return `${id}: fuzzing had no payload for ${count} the machine reads, so this check proves nothing yet:\n${lines.join("\n")}\nPass \`source\` (payloads from the event types) or \`payloads: { ${keys} }\` with a real payload for each case.`;
+}
+
 /** The actor of a factory result, and the whole result when it is `{ actor, ... }`. */
 function createdOf(result: AnyActor<unknown> | { actor: AnyActor<unknown> }): {
   actor: AnyActor<unknown>;

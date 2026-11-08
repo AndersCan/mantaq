@@ -14,7 +14,19 @@ import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@ma
 Each helper takes an inspect target: an `id` and a `create` function that returns a fresh actor on a `VirtualClock`.
 
 ```ts
-const target = { id: "checkout", create: () => createCheckoutActor() };
+const target = {
+  id: "checkout",
+  create: () => createCheckoutActor(),
+  source: { file: join(import.meta.dirname, "checkout.ts"), root: import.meta.dirname },
+};
+```
+
+`source` is how fuzzing learns what each event's payload looks like. Without it (or a `payloads` block), an event whose handler reads its payload cannot be tested with a real one. The three checks then stop instead of passing or failing on an empty event:
+
+```
+checkout: fuzzing had no payload for 1 event the machine reads, so this check proves nothing yet:
+  - submitPayment: read cardNumber
+Pass `source` (payloads from the event types) or `payloads: { submitPayment: [...] }` with a real payload for each case.
 ```
 
 ## Fail on design errors
@@ -82,7 +94,7 @@ The diagram above is built from this block: `payment` carries a "!" for `payment
 - `undefined` means "not set": `{ note: undefined }` matches a context without `note`.
 - A must-see miss says no fuzz run reached the context. Add a recorded run to `tests` (see "Assert what gets reached") or raise `fuzz.iterations`.
 - In a test, pass the block as `expectations` on the target: `expectNoDesignErrors({ ...target, expectations: checkoutWithBugsExpectations })`. The message lists the hit with an `after:` line of events.
-- Payloads for events come from `source`. Without `source` or `payloads`, events that take a payload are sent without one.
+- Payloads for events come from `source` or `payloads`. Without them, an event whose handler reads its payload stops `expectNoDesignErrors`, `expectReached` and `expectAllStatesReached` with a message naming the event and the fields it read.
 
 ## Assert what gets reached
 

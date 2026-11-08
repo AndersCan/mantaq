@@ -304,8 +304,12 @@ describe("expectNoDesignErrors with expectations", () => {
 
   test("a handler error gets its after: line too", () => {
     expect(() =>
-      expectNoDesignErrors({ id: "throwing", create: () => createThrowingActor() }),
-    ).toThrow(/- pick in idle throws[^\n]*\n {4}after: pick/);
+      expectNoDesignErrors({
+        id: "throwing",
+        create: () => createThrowingActor(),
+        payloads: { pick: [{ side: "a" }, { side: "b" }] },
+      }),
+    ).toThrow(/- pick in idle throws[^\n]*\n {4}after: pick \{"side":"b"\}/);
   });
 });
 
