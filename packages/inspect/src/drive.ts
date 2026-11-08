@@ -33,11 +33,58 @@ function markTimerStarts(clock: VirtualClock, onStart: () => void): void {
   clock.setInterval = (ms, options) => setRepeat(ms, { ...options, cb: wrap(options.cb) });
 }
 
+interface HeldEffect {
+  name: string;
+  signal: AbortSignal;
+}
+
+function isEffectEntry(value: unknown): value is { name: string; fn: unknown } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "name" in value &&
+    typeof value.name === "string" &&
+    "fn" in value &&
+    typeof value.fn === "function"
+  );
+}
+
+function hasSignal(value: unknown): value is { signal: AbortSignal } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "signal" in value &&
+    value.signal instanceof AbortSignal
+  );
+}
+
+/** Swap each effect body for a stub that only records its signal; recurse into regions. */
+function holdEffects(actor: AnyActor<unknown>, held: HeldEffect[]): void {
+  for (const list of Object.values(actor.options?.effects ?? {})) {
+    for (const [index, entry] of list.entries()) {
+      if (!isEffectEntry(entry)) continue;
+      list[index] = {
+        ...entry,
+        fn: (input: unknown) => {
+          if (hasSignal(input)) held.push({ name: entry.name, signal: input.signal });
+        },
+      };
+    }
+  }
+  for (const region of Object.values(actor.regions)) holdEffects(region, held);
+}
+
+export interface DriverOptions {
+  /** `held` (default): effect bodies do not run and the viewer asks what they report; first-state effects still run, because core runs them while the actor is built. `real`: they run. */
+  effectMode?: "held" | "real";
+}
+
 /**
  * A running actor for the viewer. Steps go through the same function the
  * fuzzer replays with, so live and fuzzed behaviour cannot drift. No node APIs.
  */
-export function createDriver(target: FuzzTarget): VizDriver {
+export function createDriver(target: FuzzTarget, options: DriverOptions = {}): VizDriver {
+  const effectMode = options.effectMode ?? "held";
   let session = start(target);
   let onChange: ((state: VizLiveState) => void) | null = null;
 
@@ -47,6 +94,8 @@ export function createDriver(target: FuzzTarget): VizDriver {
     const log: VizLiveStep[] = [];
     const steps: VizStep[] = [];
     const flags = { inside: true, disposed: false, segment: 0 };
+    const held: HeldEffect[] = [];
+    if (effectMode === "held") holdEffects(actor, held);
 
     markTimerStarts(clock, () => {
       flags.segment = log.length;
@@ -90,11 +139,13 @@ export function createDriver(target: FuzzTarget): VizDriver {
       },
     });
     flags.inside = false;
-    return { actor, clock, internal, log, steps, flags };
+    return { actor, clock, internal, log, steps, flags, held };
   }
 
   function view(): VizLiveState {
-    const { actor, clock, steps, log } = session;
+    const { actor, clock, steps, log, held } = session;
+    const waiting = held.filter((each) => !each.signal.aborted);
+    held.splice(0, held.length, ...waiting);
     return {
       state: actor.state.name,
       steps: [...steps],
@@ -108,6 +159,8 @@ export function createDriver(target: FuzzTarget): VizDriver {
       })),
       context: json(contextText(actor)),
       payload: payloadOf(actor),
+      effectMode,
+      waiting: waiting.map((each) => each.name),
     };
   }
 

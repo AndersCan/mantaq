@@ -106,6 +106,8 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
           : [],
       context,
       payload: held,
+      effectMode: "real",
+      waiting: [],
     };
   };
   const done: VizStep[] = [];
@@ -821,6 +823,8 @@ describe("what ran", () => {
         timers: [],
         context: {},
         payload: null,
+        effectMode: "real",
+        waiting: [],
       }),
       step: (step) => ({
         state: last.to,
@@ -830,6 +834,8 @@ describe("what ran", () => {
         timers: [],
         context: last.context,
         payload: null,
+        effectMode: "real",
+        waiting: [],
       }),
       listen: (callback) => {
         onChange = callback;
@@ -919,6 +925,8 @@ describe("what ran", () => {
       timers: [],
       context: { amount: 9, failed: true },
       payload: null,
+      effectMode: "real",
+      waiting: [],
     });
     const after = root.querySelector("[data-live-after]");
     expect(after?.textContent).toContain("Then paymentTimeout came back");
@@ -995,6 +1003,8 @@ describe("live effect reports", () => {
         timers: [],
         context: null,
         payload: null,
+        effectMode: "real",
+        waiting: [],
       };
     };
     const done: VizStep[] = [];
