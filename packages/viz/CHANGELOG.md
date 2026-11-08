@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.17.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  The live driver holds effects: they do not run, and `VizLiveState.waiting` names the ones waiting for an answer. `createDriver(target, { effectMode: "real" })` runs them.
+
+  Breaking: createDriver holds effects by default — affects code calling @mantaq/inspect/drive directly (none found in mantaq apps or justus); pass { effectMode: "real" } to keep running them.
+
+  Breaking: VizLiveState has required effectMode and waiting — affects custom VizDriver implementations (none known).
+
+- _(minor)_
+  Design findings say what is wrong in the machine's own names: a headline, a proof (for an unreachable state, the arrows into it and the states the machine can reach) and a fix. A declared input or internal event that no state handles is now a finding. Naming notes (vague or undocumented names) are flagged as notes.
+
+  Breaking: `VizFinding.state` is nullable, and `title`, `proof`, `fix`, `event`, `note` and `noReplay` are new required fields — affects code reading `@mantaq/viz` findings. A declared input or internal event that no state handles is now a design finding — affects `expectNoDesignErrors` and `failOnFindings` on such machines.
+
+- _(minor)_
+  The diagram panel shows each finding as a card: the headline first, then the proof, the fix, and Replay (labelled for what it shows) or the reason there is nothing to replay. Clicking the ! on a state brings its first finding into view. Naming notes sit under "Naming notes" and no longer put a ! on the diagram; findings about the whole machine show at the top of the Details tab.
+
+  Breaking: `FINDING_KINDS` is removed from `@mantaq/viz` — read `title`, `proof` and `fix` from each finding instead.
+
+- _(minor)_
+  A step can name the region it goes to (`actor: { region }`), in the live driver, the fuzzer, saved journeys and shared links (`upload>photoPicked`). Each region's start state is marked `initial`, and `VizLiveState.regions` lists where every region is.
+
+  Breaking: document format v14 — affects anyone serving a prebuilt viz.json; rebuild it.
+
+  Breaking: VizLiveState has a required regions and VizLiveOutcome gains "missing" — affects custom VizDriver implementations and exhaustive switches on the outcome (none known).
+
+- _(minor)_
+  The live panel shows each held effect first, as **Waiting for**, with the events it reports. The panel text says what runs.
+
+  Breaking: the live page and Astro embeds no longer run effects — affects people who relied on effects answering by themselves in the viz (e.g. justus flows pages); they now pick the answer. Recorded runs replay unchanged.
+
 ## 0.16.0
 
 <sub>2026-11-08</sub>
