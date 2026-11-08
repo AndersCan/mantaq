@@ -107,6 +107,39 @@ function inputOf(type: ts.Type, checker: ts.TypeChecker): Pick<VizField, "input"
   return { input: "json", choices: [] };
 }
 
+function parseJson(text: string): VizJson | undefined {
+  try {
+    return JSON.parse(text) as VizJson;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The first line of the property's first `@example` tag, when it fits the input kind. */
+function exampleOf(
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker,
+  field: Pick<VizField, "input" | "choices">,
+): VizJson | undefined {
+  const tag = symbol.getJsDocTags(checker).find((found) => found.name === "example");
+  const text = ts
+    .displayPartsToString(tag?.text)
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line !== "");
+  if (text === undefined) return undefined;
+  const parsed = parseJson(text);
+  if (field.input === "number") {
+    const value = Number(text);
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (field.input === "choice") {
+    return field.choices.find((choice) => choice === parsed || String(choice) === text);
+  }
+  if (field.input === "text") return typeof parsed === "string" ? parsed : text;
+  return parsed;
+}
+
 /**
  * Top-level fields of an object type, in declaration order, with their doc
  * comment and how a form should ask for them. Null when the type is not a
@@ -125,14 +158,18 @@ export function fieldsOf(type: ts.Type, walk: Walk): VizField[] | null {
     if (checker.getSignaturesOfType(fieldType, ts.SignatureKind.Call).length > 0) return [];
     const plainType = checker.getNonNullableType(fieldType);
     const doc = ts.displayPartsToString(symbol.getDocumentationComment(checker));
+    const input = inputOf(plainType, checker);
     return [
       {
         name: symbol.getName(),
         type: checker.typeToString(plainType),
         optional: (symbol.getFlags() & ts.SymbolFlags.Optional) !== 0,
         doc: doc === "" ? null : doc,
-        ...inputOf(plainType, checker),
-        sample: samplesOf(plainType, { ...walk, depth: walk.depth + 1 })[0] ?? null,
+        ...input,
+        sample:
+          exampleOf(symbol, checker, input) ??
+          samplesOf(plainType, { ...walk, depth: walk.depth + 1 })[0] ??
+          null,
       },
     ];
   });

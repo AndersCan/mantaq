@@ -93,6 +93,18 @@ describe("analyzeModule: context and payload fields from types", () => {
     expect(fields?.eventPayloads.has("touch")).toBe(false);
   });
 
+  test("an @example tag becomes the field's sample when it fits", () => {
+    const found = analysis("examples")?.eventPayloads.get("save");
+    expect(found?.map((field) => [field.name, field.sample])).toEqual([
+      ["email", "ana@example.com"],
+      ["name", "Ana Lima"],
+      ["amount", 1],
+      ["tier", "b"],
+      ["note", "sample"],
+    ]);
+    expect(found?.[0]?.doc).toBe("Where to reach them.");
+  });
+
   test("a machine without a declared context has none", () => {
     expect(analysis("documented")?.machines[0]?.context).toBeNull();
   });

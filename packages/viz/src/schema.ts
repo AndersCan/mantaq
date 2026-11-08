@@ -77,7 +77,7 @@ export interface VizField {
   input: VizFieldInput;
   /** Literal values for `choice`; empty otherwise. */
   choices: VizJson[];
-  /** First sample of the type; the form starts with it. */
+  /** Value the form starts with: the property's `@example` when it fits, else the type's first sample. */
   sample: VizJson;
 }
 
