@@ -265,3 +265,41 @@ export function appendNote(
     },
   };
 }
+
+/** A note collected on a page that cannot save it: copied for the user to paste into chat. */
+export interface CopiedNote {
+  file: string;
+  machine: string;
+  target: NoteTarget;
+  note: string;
+  walk?: { end: string; steps: VizStep[] };
+}
+
+function copiedItem(id: string, each: CopiedNote): string {
+  return [
+    `- id: ${id}`,
+    `  machine: ${each.machine}`,
+    `  on: ${targetText(each.target)}`,
+    "  status: open",
+    `  note: ${cleanNoteText(each.note)}`,
+    ...(each.walk === undefined
+      ? []
+      : [`  end: ${each.walk.end}`, `  steps: ${JSON.stringify(each.walk.steps)}`]),
+  ].join("\n");
+}
+
+/**
+ * The notes as blocks to paste into chat: one `mantaq notes v1 for <file>` block per
+ * machine file, in the order the files first appear, ids p1..pk across all blocks.
+ */
+export function copyText(notes: readonly CopiedNote[]): string {
+  const files = [...new Set(notes.map((each) => each.file))];
+  let next = 0;
+  const blocks = files.map((file) => {
+    const items = notes
+      .filter((each) => each.file === file)
+      .map((each) => copiedItem(`p${++next}`, each));
+    return [`mantaq notes v${NOTES_VERSION} for ${file}`, ...items].join("\n");
+  });
+  return blocks.length === 0 ? "" : `${blocks.join("\n\n")}\n`;
+}

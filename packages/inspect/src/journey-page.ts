@@ -42,18 +42,25 @@ async function probe(options: { url: string; machine: string }): Promise<Phase> 
 
 export function journeyFooter(
   doc: Document,
-  context: { url: string; machine: string; walk: () => VizLiveState | undefined },
+  context: {
+    url: string;
+    machine: string;
+    walk: () => VizLiveState | undefined;
+    /** Set on a page without a dev server: the walk is added here instead of posted. */
+    add?: (walk: VizLiveState, name: string) => void;
+  },
 ): { section: HTMLElement; update(): void } {
   const section = doc.createElement("section");
   section.className = "journey";
   section.hidden = true;
-  let phase: Phase = "loading";
+  const copying = context.add !== undefined;
+  let phase: Phase = copying ? "ready" : "loading";
   let draft = "";
   let saving = false;
   let status = "";
 
   const heading = doc.createElement("h3");
-  heading.textContent = "Save this walk as a journey";
+  heading.textContent = copying ? "Add this walk as a journey" : "Save this walk as a journey";
   const hint = doc.createElement("p");
   hint.className = "hint";
   hint.dataset["walk"] = "";
@@ -87,7 +94,7 @@ export function journeyFooter(
         ? "Walk the machine first: send an event or advance the clock."
         : `${count} ${count === 1 ? "step" : "steps"}, ends in ${walk.state}.`;
     field.readOnly = saving;
-    button.textContent = saving ? "Saving..." : "Save journey";
+    button.textContent = saving ? "Saving..." : copying ? "Add journey" : "Save journey";
     button.disabled = saving || count === 0 || draft.trim() === "";
     line.textContent = status;
   };
@@ -100,8 +107,17 @@ export function journeyFooter(
     event.preventDefault();
     const walk = context.walk();
     if (saving || walk === undefined || walk.steps.length === 0 || draft.trim() === "") return;
-    void save(walk);
+    if (context.add === undefined) void save(walk);
+    else addHere(context.add, walk);
   });
+
+  const addHere = (add: (walk: VizLiveState, name: string) => void, walk: VizLiveState) => {
+    add(walk, draft);
+    draft = "";
+    field.value = "";
+    status = "Journey added. Copy it for your agent below.";
+    update();
+  };
 
   const save = async (walk: VizLiveState) => {
     saving = true;
@@ -129,10 +145,12 @@ export function journeyFooter(
     update();
   };
 
-  void probe(context).then((next) => {
-    phase = next;
-    update();
-  });
+  if (!copying) {
+    void probe(context).then((next) => {
+      phase = next;
+      update();
+    });
+  }
   update();
   return { section, update };
 }

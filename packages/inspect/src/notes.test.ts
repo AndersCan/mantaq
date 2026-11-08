@@ -1,3 +1,4 @@
+import type { VizStep } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -6,6 +7,7 @@ import {
   appendNote,
   arrowsOf,
   cleanNoteText,
+  copyText,
   isNoteTarget,
   isVizSteps,
   notesFileOf,
@@ -14,7 +16,7 @@ import {
   targetProblem,
   targetText,
 } from "./notes.ts";
-import type { MachineShape } from "./notes.ts";
+import type { CopiedNote, MachineShape } from "./notes.ts";
 
 const golden = readFileSync(join(import.meta.dirname, "fixtures", "retry.notes.md"), "utf8");
 
@@ -270,5 +272,49 @@ describe("walk notes", () => {
     expect(targetProblem(shape, { machine: "m", target: { kind: "walk" } })).toBeUndefined();
     expect(isVizSteps([])).toBe(true);
     expect(isVizSteps("x")).toBe(false);
+  });
+});
+
+describe("copyText", () => {
+  const walk: { end: string; steps: VizStep[] } = {
+    end: "payment",
+    steps: [{ kind: "event", event: "PAY", payload: 1 }],
+  };
+
+  test("state, edge and walk notes across two files give two groups that parse back", () => {
+    const notes: CopiedNote[] = [
+      { file: "a.ts", machine: "a", target: state("one"), note: "first" },
+      { file: "b.ts", machine: "b", target: { kind: "walk" }, note: "walk it", walk },
+      { file: "a.ts", machine: "a", target: { kind: "edge", from: "one", event: "GO" }, note: "x" },
+    ];
+    const text = copyText(notes);
+    expect(text.endsWith("\n")).toBe(true);
+    const [first, second] = text.trimEnd().split("\n\n");
+    expect(first?.split("\n")[0]).toBe("mantaq notes v1 for a.ts");
+    expect(second?.split("\n")[0]).toBe("mantaq notes v1 for b.ts");
+    const a = parseNotes(first ?? "", "a.ts");
+    const b = parseNotes(second ?? "", "b.ts");
+    expect(Either.isRight(a) && a[1].map((each) => each.id)).toEqual(["p1", "p2"]);
+    expect(Either.isRight(b) && b[1].map((each) => each.id)).toEqual(["p3"]);
+    expect(Either.isRight(a) && a[1].map((each) => each.target)).toEqual([
+      state("one"),
+      { kind: "edge", from: "one", event: "GO" },
+    ]);
+    expect(Either.isRight(b) && b[1][0]?.end).toBe("payment");
+    expect(Either.isRight(b) && b[1][0]?.steps).toEqual([
+      { kind: "event", event: "PAY", payload: 1 },
+    ]);
+  });
+
+  test("a note with a newline and a tab stays on one line", () => {
+    const text = copyText([
+      { file: "a.ts", machine: "a", target: state("one"), note: "a\n- id: fake\tb" },
+    ]);
+    expect(text.split("\n")).toHaveLength(7);
+    expect(text).toContain("  note: a - id: fake b\n");
+  });
+
+  test("no notes give an empty string", () => {
+    expect(copyText([])).toBe("");
   });
 });

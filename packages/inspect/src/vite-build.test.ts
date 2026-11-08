@@ -51,7 +51,7 @@ describe("mantaqViz build", () => {
     const files = readdirSync(out, { recursive: true }).map(String);
     expect(files.some((file) => file.endsWith(".notes.md"))).toBe(false);
     for (const file of files.filter((each) => each.endsWith(".js"))) {
-      expect(readFileSync(join(out, file), "utf8")).not.toContain("mantaq notes v1");
+      expect(readFileSync(join(out, file), "utf8")).not.toContain("Written by the live viz page");
     }
     const urls: string[] = [];
     const text = readFileSync(join(out, "viz.json"), "utf8");

@@ -6,12 +6,14 @@ for (const root of document.querySelectorAll<HTMLElement>(".mantaq-machine")) {
   const text = root.dataset["mantaqViz"];
   if (text !== undefined) {
     const raw = root.dataset["mantaqRoutes"];
+    const src = root.dataset["mantaqSrc"];
     mountDriven(root, {
-      source: root.dataset["mantaqSrc"] ?? "machine",
+      source: src ?? "machine",
       text,
       targets,
       heading: "h2",
       ...(raw === undefined ? {} : { routes: JSON.parse(raw) }),
+      ...(src === undefined ? {} : { copyNotes: { file: src } }),
     });
   }
 }

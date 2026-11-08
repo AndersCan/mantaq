@@ -35,4 +35,18 @@ describe("astro client", () => {
     expect(mountDriven).toHaveBeenCalledTimes(1);
     expect(mountDriven.mock.calls[0]?.[1]).not.toHaveProperty("routes");
   });
+
+  test("data-mantaq-src turns on copying notes for that file", async () => {
+    machineRoot({ mantaqViz: "{}", mantaqSrc: "apps/web/src/m.ts" });
+    await import("./client.ts");
+    expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({
+      copyNotes: { file: "apps/web/src/m.ts" },
+    });
+  });
+
+  test("without data-mantaq-src there is no copyNotes", async () => {
+    machineRoot({ mantaqViz: "{}" });
+    await import("./client.ts");
+    expect(mountDriven.mock.calls[0]?.[1]).not.toHaveProperty("copyNotes");
+  });
 });
