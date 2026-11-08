@@ -2,7 +2,7 @@ import { scopeOf } from "../schema.ts";
 import type { VizActorRef, VizLiveState, VizMachine } from "../schema.ts";
 
 /** Sorted unique events of the handlers that live in one compartment ("" = the machine itself, else a region path). */
-export function eventsOf(machine: VizMachine, compartment: string): string[] {
+function eventsOf(machine: VizMachine, compartment: string): string[] {
   const events = machine.edges
     .filter(
       (edge) =>
