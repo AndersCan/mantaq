@@ -19,7 +19,7 @@ import { existsSync } from "node:fs";
 import { fuzz } from "./fuzz/fuzz.ts";
 import { fuzzedMachine } from "./fuzz/to-viz.ts";
 import { guidance } from "./fuzz/guided.ts";
-import { normalizeRun, readRuns } from "./runs.ts";
+import { normalizeRun, readRuns, RUN_DROPPED } from "./runs.ts";
 import { routingWarnings, unhandledSends, VIZ_SCHEMA_VERSION } from "@mantaq/viz";
 import { mapWarnings, toVizMachine } from "./structure.ts";
 
@@ -345,7 +345,7 @@ function replayedRuns(
       Either.isRight(result) ? [{ name: each.name, steps: result[1] }] : [],
     ),
     warnings: results.flatMap(({ each, result }) =>
-      Either.isLeft(result) ? [`run "${each.name}" dropped: ${result[0]}`] : [],
+      Either.isLeft(result) ? [`run "${each.name}"${RUN_DROPPED}${result[0]}`] : [],
     ),
   };
 }

@@ -41,7 +41,9 @@ describe("normalizeRun", () => {
 
   test("a replay that ends elsewhere is left with the reason", () => {
     const result = normalizeRun(timed, { name: "t", end: "error", steps: [start] });
-    expect(result).toEqual(Either.left("replays to waiting, the test ended in error"));
+    expect(result[0]).toMatch(
+      /^replays to waiting, the test ended in error\. The page builds the actor with only a VirtualClock/,
+    );
   });
 });
 
@@ -135,7 +137,7 @@ describe("recorded runs that cannot be trusted", () => {
     writeFileSync(join(dir, "timed.ts"), `export * from ${JSON.stringify(file)};\n`);
     const result = await inspectModule(join(dir, "timed.ts"), { load, fuzz: { iterations: 0 } });
     expect(result.warnings).toContain(
-      'timed: run "wrong" dropped: replays to waiting, the test ended in error',
+      `timed: run "wrong" dropped: replays to waiting, the test ended in error. The page builds the actor with only a VirtualClock; a test that passes other options can end elsewhere. Build this test's actor with only the clock, or give the factory defaults that act like those options.`,
     );
   });
 
