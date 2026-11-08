@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.22.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  The machines overview also draws connections made in app code (a listener on one machine's output or change that sends to another), labelled `trigger → event` and listed under the diagram with the line that sends.
+
 ## 0.21.0
 
 <sub>2026-11-08</sub>
