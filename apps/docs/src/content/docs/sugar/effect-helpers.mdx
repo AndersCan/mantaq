@@ -88,32 +88,40 @@ Annotating both handlers with the event union lets `Either.match` infer one resu
 ## withTimeout
 
 ```ts
-withTimeout(ms, input, () => paymentTimeout.create());
+withTimeout(800, { input, event: () => paymentTimeout.create() });
 ```
 
 - Schedules timeout on the actor's clock
-- On fire: checks `signal.aborted`, calls `eventFn`, emits resulting event
+- On fire: checks `signal.aborted`, calls `event`, emits resulting event
 - State exit aborts the effect signal, no emit after exit
 - Warns on invalid `ms`
 
 Equivalent without sugar:
 
 ```ts
-m.effect(submitting, ({ clock, signal, emit }) => {
-  clock.setTimeout(800, () => {
-    if (!signal.aborted) emit(paymentTimeout.create());
-  });
+m.effect(submitting, {
+  name: "startSubmitTimeout",
+  fn: ({ clock, signal, emit }) => {
+    clock.setTimeout(800, { signal, cb: () => emit(paymentTimeout.create()) });
+  },
 });
 ```
 
 ## VirtualClock testing
 
 ```ts
-import { checkout } from "../checkout.ts";
 import { VirtualClock } from "@mantaq/core";
+import { matches } from "@mantaq/sugar";
+import { createCheckoutActor, submitBasicInfo, submitPayment, submitShipping } from "./checkout";
 
 const clock = VirtualClock();
-checkout.send(submitPayment.create());
+const { actor: checkout } = createCheckoutActor({
+  clock,
+  chargeCard: () => new Promise<string>(() => {}), // never answers
+});
+checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
+checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
+checkout.send(submitPayment.create({ cardNumber: "4242 4242 4242 4242" }));
 clock.advance(800); // triggers timeout synchronously
 matches(checkout, "error"); // true: no answer in 800ms
 ```

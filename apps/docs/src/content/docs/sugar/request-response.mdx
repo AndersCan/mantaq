@@ -25,7 +25,7 @@ const answered = state("answered")().final();
 const timedOut = state("timedOut")().final();
 
 function createRequestHandler(orderId: string, clock: Clock) {
-  return new Actor({
+  return Actor({
     inputs: [request, answer],
     internal: [timeout],
     outputs: [requestSettled],
@@ -34,28 +34,40 @@ function createRequestHandler(orderId: string, clock: Clock) {
     clock,
     context: { orderId, timeoutMs: 0 },
     setup: (m) => {
-      m.on(idle, request, (event, opts) => {
-        const s = opts.context.get();
-        s.timeoutMs = event.payload.timeoutMs;
-        opts.context.set(s);
-        return { state: pending };
+      m.on(idle, {
+        event: request,
+        to: [pending],
+        handler: (event, opts) => {
+          const s = opts.context.get();
+          s.timeoutMs = event.payload.timeoutMs;
+          opts.context.set(s);
+          return { state: pending };
+        },
       });
       m.effect(pending, {
         name: "startResponseTimeout",
         fn: (input) => {
-          withTimeout(input.context.get().timeoutMs, input, () => timeout.create());
+          withTimeout(input.context.get().timeoutMs, { input, event: () => timeout.create() });
         },
       });
-      m.on(pending, answer, (event) => ({
-        state: answered,
-        emit: [
-          requestSettled.create({ orderId, status: "answered", result: event.payload.result }),
-        ],
-      }));
-      m.on(pending, timeout, () => ({
-        state: timedOut,
-        emit: [requestSettled.create({ orderId, status: "timedOut" })],
-      }));
+      m.on(pending, {
+        event: answer,
+        to: [answered],
+        handler: (event) => ({
+          state: answered,
+          emit: [
+            requestSettled.create({ orderId, status: "answered", result: event.payload.result }),
+          ],
+        }),
+      });
+      m.on(pending, {
+        event: timeout,
+        to: [timedOut],
+        handler: () => ({
+          state: timedOut,
+          emit: [requestSettled.create({ orderId, status: "timedOut" })],
+        }),
+      });
     },
   });
 }
@@ -71,7 +83,7 @@ One parent owns an `ActorMap` of handlers keyed by order id. Routes answers
 to the right handler, collects settlements.
 
 ```ts
-const requests = new ActorMap(
+const requests = createActorMap(
   (orderId) => {
     const child = createRequestHandler(orderId, clock);
     onOutput(child, (e) => {
@@ -124,7 +136,7 @@ await requester.waitFor("ord_1"); // same, already settled
 Deterministic on one `VirtualClock`:
 
 ```ts
-const clock = new VirtualClock();
+const clock = VirtualClock();
 const requester = createRequester(clock, 1000);
 
 const promise = requester.waitFor("ord_2");
@@ -132,5 +144,5 @@ requester.request("ord_2", 1000);
 clock.advance(1001);
 
 await expect(promise).resolves.toEqual({ orderId: "ord_2", status: "timedOut" });
-expect(requester.requests.size).toBe(0);
+expect(requester.requests.keys()).toEqual([]);
 ```

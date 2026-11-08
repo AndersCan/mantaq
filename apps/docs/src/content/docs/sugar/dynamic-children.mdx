@@ -26,18 +26,17 @@ replicate. `createActorMap(shop)` means "spawn copies of `shop`-shaped actors."
 ### One actor, many instances
 
 ```ts
-const orders = createActorMap(
-  (orderId) =>
-    new Actor({
-      inputs: [ship, cancel],
-      states: [picking, shipped],
-      initial: picking,
-      context: { orderId },
-      setup: (m) => {
-        m.on(picking, ship, () => ({ state: shipped }));
-        m.on(picking, cancel, () => ({ state: picking }));
-      },
-    }),
+const orders = createActorMap((orderId) =>
+  Actor({
+    inputs: [ship, cancel],
+    states: [picking, shipped],
+    initial: picking,
+    context: { orderId },
+    setup: (m) => {
+      m.on(picking, { event: ship, to: [shipped], handler: () => ({ state: shipped }) });
+      m.on(picking, { event: cancel, to: [picking], handler: () => ({ state: picking }) });
+    },
+  }),
 );
 ```
 
@@ -47,12 +46,14 @@ A child that answers back holds its receiver in context. The map does no
 wiring:
 
 ```ts
-const orders = createActorMap(
-  (orderId) =>
-    new Actor({
-      context: { orderId, reportTo: shop },
-      // ...
-    }),
+const orders = createActorMap((orderId) =>
+  Actor({
+    inputs: [ship],
+    states: [picking, shipped],
+    initial: picking,
+    context: { orderId, reportTo: shop },
+    setup: () => {},
+  }),
 );
 ```
 
@@ -74,18 +75,24 @@ orders.snapshot("ord_1"); // Snapshot | undefined
 ### The shop parent
 
 ```ts
-const shop = new Actor({
+const shop = Actor({
   inputs: [checkoutDone, cancelAll],
   states: [open],
   initial: open,
   setup: (m) => {
-    m.on(open, checkoutDone, (event) => {
-      orders.ensure(event.payload.orderId);
-      return {};
+    m.on(open, {
+      event: checkoutDone,
+      handler: (event) => {
+        orders.ensure(event.payload.orderId);
+        return {};
+      },
     });
-    m.onAny(cancelAll, () => {
-      broadcast(orders, cancel.create());
-      return {};
+    m.onAny({
+      event: cancelAll,
+      handler: () => {
+        broadcast(orders, cancel.create());
+        return {};
+      },
     });
   },
 });
