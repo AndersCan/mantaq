@@ -993,7 +993,7 @@ describe("live effect reports", () => {
     waiting: { start: "fetching" },
     fetching: { listFetched: "waiting", fetchFailed: "couldNotFetch" },
   };
-  function fetchDriver(): VizDriver {
+  function fetchDriver(mode: "held" | "real" = "real", held = ["fetchList"]): VizDriver {
     const run = (steps: VizStep[]): VizLiveState => {
       let current = "waiting";
       for (const step of steps) {
@@ -1008,8 +1008,8 @@ describe("live effect reports", () => {
         context: null,
         payload: null,
         regions: {},
-        effectMode: "real",
-        waiting: [],
+        effectMode: mode,
+        waiting: mode === "held" && current === "fetching" ? held : [],
       };
     };
     const done: VizStep[] = [];
@@ -1024,12 +1024,14 @@ describe("live effect reports", () => {
       },
     };
   }
-  function mountFetcher() {
+  function mountFetcher(
+    options: { mode?: "held" | "real"; machine?: VizMachine; held?: string[] } = {},
+  ) {
     const root = document.createElement("div");
     mountViewer(
       root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [fetcher] },
-      { driver: fetchDriver() },
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [options.machine ?? fetcher] },
+      { driver: fetchDriver(options.mode, options.held) },
     );
     click(root, '[data-send="start"]');
     return root;
@@ -1077,10 +1079,10 @@ describe("live effect reports", () => {
     ).toContain(" ignored in fetching");
   });
 
-  test("the note says the person can answer for an effect", () => {
+  test("the note says effects run", () => {
     const root = mountFetcher();
     expect(root.querySelector("[data-live-note]")?.textContent).toBe(
-      "The real machine runs here, in your browser. Effects run with the defaults the machine uses when it is built from a clock alone. While a state's effect runs, you can answer for it: pick what it reports under Effect reports back. Time stands still: timers fire only when you advance them.",
+      "This machine runs here, in your browser, with its effects. Timers wait until you advance them.",
     );
   });
 
@@ -1109,5 +1111,92 @@ describe("live effect reports", () => {
     expect([...root.querySelectorAll("h3")].map((each) => each.textContent)).not.toContain(
       "Send an event",
     );
+  });
+
+  describe("held", () => {
+    const waitingBlock = (root: HTMLElement) =>
+      root.querySelector('section[data-waiting-on="fetchList"]');
+    const withEffect = (sends: string[] | null): VizMachine => ({
+      ...fetcher,
+      states: fetcher.states.map((each) =>
+        each.id === "fetching" ? { ...each, effects: [{ name: "fetchList", sends }] } : each,
+      ),
+    });
+
+    test("the note says effects do not run", () => {
+      const root = mountFetcher({ mode: "held" });
+      const note = root.querySelector("[data-live-note]");
+      expect(note?.getAttribute("data-effect-mode")).toBe("held");
+      expect(note?.textContent).toBe(
+        "This machine runs here, in your browser, but its effects do not: when a state starts one, the viz waits and you pick what it reports. Timers wait until you advance them.",
+      );
+    });
+
+    test("the waiting block comes right after the now section", () => {
+      const root = mountFetcher({ mode: "held" });
+      const now = root.querySelector(".explore-now");
+      expect(now?.nextElementSibling).toBe(waitingBlock(root));
+      expect(waitingBlock(root)?.querySelector("h3")?.textContent).toBe("Waiting for fetchList");
+    });
+
+    test("its reports are in declared order and are not repeated in the groups", () => {
+      const root = mountFetcher({ mode: "held" });
+      const inBlock = [...(waitingBlock(root)?.querySelectorAll("[data-send]") ?? [])].map((each) =>
+        each.getAttribute("data-send"),
+      );
+      expect(inBlock).toEqual(["listFetched", "fetchFailed"]);
+      expect(root.querySelector('.explore-moves [data-group="effect"]')).toBeNull();
+      expect(root.querySelector('.explore-moves [data-send="fetchFailed"]')).toBeNull();
+    });
+
+    test("a declared report the state does not handle has text and no button", () => {
+      const root = mountFetcher({ mode: "held" });
+      const item = waitingBlock(root)?.querySelector('[data-send-item="fetchGone"]');
+      expect(item?.hasAttribute("data-unhandled")).toBe(true);
+      expect(item?.querySelector("button")).toBeNull();
+      expect(item?.textContent).toBe(
+        "fetchGone is not handled in fetching. In your app, fetchList sending it puts the machine in its error state.",
+      );
+    });
+
+    test("the outcome does not repeat the effects line", () => {
+      const root = mountFetcher({ mode: "held" });
+      expect(root.querySelector("[data-live-effects]")).toBeNull();
+      expect(root.querySelector(".explore-effects")).toBeNull();
+    });
+
+    test("an effect that reports nothing says so and has no block", () => {
+      const root = mountFetcher({ mode: "held", machine: withEffect([]) });
+      expect(waitingBlock(root)).toBeNull();
+      expect(root.querySelector('[data-held-quiet="fetchList"]')?.textContent).toBe(
+        "fetchList did not run. It reports nothing, so there is nothing to answer.",
+      );
+    });
+
+    test("an effect that does not declare its reports points to the internal events", () => {
+      const root = mountFetcher({ mode: "held", machine: withEffect(null) });
+      expect(waitingBlock(root)?.querySelector("p")?.textContent).toBe(
+        "It did not run, and it does not declare what it reports (sends). Pick its answer under Other internal events.",
+      );
+      expect(waitingBlock(root)?.querySelector("[data-send]")).toBeNull();
+    });
+
+    test("an effect of the state that is not waiting ran for real", () => {
+      const root = mountFetcher({ mode: "held", held: [] });
+      expect(waitingBlock(root)).toBeNull();
+      expect(root.querySelector('[data-ran-for-real="fetchList"]')?.textContent).toContain(
+        "fetchList ran for real: a machine runs its first state's effects while it is built",
+      );
+      expect(root.querySelectorAll('[data-group="effect"] [data-send]')).toHaveLength(2);
+    });
+
+    test("picking a report moves on and Back returns to waiting", () => {
+      const root = mountFetcher({ mode: "held" });
+      click(root, '[data-waiting-on="fetchList"] [data-send="fetchFailed"]');
+      expect(current(root)).toBe("couldNotFetch");
+      expect(waitingBlock(root)).toBeNull();
+      click(root, '[data-explore-action="back"]');
+      expect(waitingBlock(root)).not.toBeNull();
+    });
   });
 });

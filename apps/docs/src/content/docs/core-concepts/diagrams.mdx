@@ -32,7 +32,7 @@ and what it reads and writes in context.
 
 ## Walking it
 
-The panel runs the real machine in your browser, on a virtual clock. It starts
+The panel runs the real machine in your browser, on a virtual clock, without running its effects. It starts
 in the initial state, and the pulsing edges are the steps you can take next.
 Click one, or use the **Step** tab:
 
@@ -48,9 +48,9 @@ really goes. The **Context** tab shows the machine's data after each step, with
 the lines the step changed marked. **Path** lists the steps so far; **Back**,
 **Reset** and the path list undo them by replaying from a fresh actor.
 
-Effects in the docs machines are stubs. Entering `submitting` runs
-`chargeCard`, which reports back with `paymentOk`, `paymentFail` or
-`paymentTimeout`: send one to say how the charge went.
+Effects do not run in the panel. Entering `submitting` starts `chargeCard`;
+the panel waits instead and offers what it reports: `paymentOk`, `paymentFail`
+or `paymentTimeout`. Pick one to say how the charge went.
 
 ## A bigger machine
 
