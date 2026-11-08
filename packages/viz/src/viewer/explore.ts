@@ -10,6 +10,7 @@ import type {
   VizLiveStep,
   VizLiveTimer,
   VizMachine,
+  VizOutputRoutes,
   VizStep,
 } from "../schema.ts";
 import { changedKeys, contextLines } from "./context-diff.ts";
@@ -27,6 +28,8 @@ export interface ExploreContext {
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
   live?: {
     state: VizLiveState;
+    /** Where each output of the shown machine goes; unset: only the output names show. */
+    routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
     previous?: VizJson;
     /** Replace the walk with these steps from a fresh actor. */
@@ -1206,6 +1209,31 @@ function outcomeText(doc: Document, step: VizLiveStep): Array<Node | string> {
   ];
 }
 
+function sentLine(
+  doc: Document,
+  context: { machine: VizMachine; step: VizLiveStep; routes: VizOutputRoutes | undefined },
+): HTMLElement | null {
+  const { machine, step, routes } = context;
+  if (step.sent.length === 0) return null;
+  return html(doc, "p", { "data-live-sent": "" }, [
+    "Sent out: ",
+    ...step.sent.flatMap((output, index) => {
+      const found = routes?.[machine.id]?.[output] ?? [];
+      return [
+        index === 0 ? "" : "; ",
+        code(doc, output),
+        ...found.flatMap((route, at) => [
+          at === 0 ? " → " : ", ",
+          code(doc, route.to),
+          " takes ",
+          code(doc, route.event),
+          ` (${route.at})`,
+        ]),
+      ];
+    }),
+  ]);
+}
+
 function stepLines(
   doc: Document,
   context: {
@@ -1213,6 +1241,7 @@ function stepLines(
     step: VizLiveStep;
     before: VizJson | undefined;
     held: boolean;
+    routes: VizOutputRoutes | undefined;
   },
 ): Array<HTMLElement | null> {
   const { machine, step, before } = context;
@@ -1232,6 +1261,7 @@ function stepLines(
     changed.length === 0
       ? null
       : html(doc, "p", { "data-live-changed": "" }, [`Changed: ${changed.join(", ")}`]),
+    sentLine(doc, { machine, step, routes: context.routes }),
     step.effects.length === 0 || context.held
       ? null
       : html(doc, "p", { "data-live-effects": "" }, [
@@ -1247,16 +1277,17 @@ function liveResultSection(
     machine: VizMachine;
     state: VizLiveState;
     previous: VizJson | undefined;
+    routes: VizOutputRoutes | undefined;
   },
 ): HTMLElement {
-  const { machine, state, previous } = live;
+  const { machine, state, previous, routes } = live;
   const { last, after } = state;
   const held = state.effectMode === "held";
   return html(doc, "div", { class: "explore-live" }, [
     last === null
       ? html(doc, "p", { class: "muted" }, ["Nothing has run yet."])
       : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
-          ...stepLines(doc, { machine, step: last, before: previous, held }),
+          ...stepLines(doc, { machine, step: last, before: previous, held, routes }),
           last.error === null
             ? null
             : html(
@@ -1277,6 +1308,7 @@ function liveResultSection(
                 step,
                 before: (index === 0 ? last : after[index - 1])?.context,
                 held,
+                routes,
               }),
               step.error === null
                 ? null
@@ -1376,7 +1408,12 @@ function liveParts(
     ...regionLines(doc, machine, state),
     ...childrenSections(doc, machine, moves),
     ...waitingSections(doc, machine, moves),
-    liveResultSection(doc, { machine, state, previous: live.previous }),
+    liveResultSection(doc, {
+      machine,
+      state,
+      previous: live.previous,
+      routes: live.routes,
+    }),
     state.effectMode === "held" ? null : effectsSection(doc, machine, current),
     ...liveBlocks(doc, machine, moves),
     final ? null : timersSection(doc, { state, send: live.send }),

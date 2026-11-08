@@ -7,6 +7,7 @@ import type {
   VizLiveState,
   VizLiveStep,
   VizMachine,
+  VizOutputRoutes,
   VizState,
   VizStep,
 } from "../schema.ts";
@@ -1031,9 +1032,13 @@ describe("what ran", () => {
       },
     ],
   };
-  const mountWith = (machine: VizMachine, live: VizDriver) => {
+  const mountWith = (machine: VizMachine, live: VizDriver, routes?: VizOutputRoutes) => {
     const root = document.createElement("div");
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver: live });
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver: live, ...(routes === undefined ? {} : { routes }) },
+    );
     return root;
   };
   const text = (root: HTMLElement, hook: string) =>
@@ -1054,6 +1059,7 @@ describe("what ran", () => {
       to: "paying",
       outcome: "transition",
       effects: [],
+      sent: [],
       context: { amount: 9 },
       error: null,
     };
@@ -1105,6 +1111,37 @@ describe("what ran", () => {
     click(stay, '[data-payload-send="submit"]');
     expect(text(stay, "outcome")).toBe("submit: handled in idle, stays");
     expect(text(stay, "because")).toBe("Because: !(payload.amount > 5)");
+  });
+
+  test("Sent out names each output, with where the app takes it when the page knows", () => {
+    const routes: VizOutputRoutes = {
+      [branching.id]: { openAlbum: [{ to: "router", event: "NAVIGATED", at: "a.ts:72" }] },
+    };
+    const send = (root: HTMLElement) => {
+      click(root, '[data-send="submit"]');
+      click(root, '[data-payload-send="submit"]');
+    };
+    const routed = mountWith(branching, stepped({ sent: ["openAlbum"] }).live, routes);
+    send(routed);
+    expect(text(routed, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED (a.ts:72)");
+
+    const bare = mountWith(branching, stepped({ sent: ["openAlbum"] }).live);
+    send(bare);
+    expect(text(bare, "sent")).toBe("Sent out: openAlbum");
+
+    const several = mountWith(
+      branching,
+      stepped({ sent: ["openAlbum", "ANSWER_SENT"] }).live,
+      routes,
+    );
+    send(several);
+    expect(text(several, "sent")).toBe(
+      "Sent out: openAlbum → router takes NAVIGATED (a.ts:72); ANSWER_SENT",
+    );
+
+    const quiet = mountWith(branching, stepped({}).live, routes);
+    send(quiet);
+    expect(quiet.querySelector("[data-live-sent]")).toBeNull();
   });
 
   test("Because is absent when every branch shares a target", () => {
@@ -1163,6 +1200,7 @@ describe("what ran", () => {
         to: "paying",
         outcome: "transition",
         effects: [],
+        sent: [],
         context: { amount: 9 },
         error: null,
       },
@@ -1173,6 +1211,7 @@ describe("what ran", () => {
           to: "error",
           outcome: "transition",
           effects: [],
+          sent: [],
           context: { amount: 9, failed: true },
           error: null,
         },

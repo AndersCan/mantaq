@@ -112,6 +112,7 @@ function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => v
           effects,
           context: json(contextText(root)),
           error: null,
+          sent: [],
         });
       },
     });
@@ -126,6 +127,7 @@ function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => v
           effects: [],
           context: json(contextText(root)),
           error: messageOf(info.error),
+          sent: [],
         });
       },
     });
@@ -135,6 +137,28 @@ function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => v
 interface MapChild {
   child: AnyActor<unknown>;
   since: number;
+}
+
+/** Core reports a transition after its effects ran, so a follow-up a sync effect sent is recorded before the transition that started it: put the starter first. */
+function startedFollowUp(
+  entry: VizLiveStep,
+  recorded: { log: VizLiveStep[]; flags: { inside: boolean; segment: number } },
+): boolean {
+  const { log, flags } = recorded;
+  return flags.inside && entry.effects.length > 0 && entry.to === log[flags.segment]?.from;
+}
+
+/** Core emits an output right after the transition that caused it: file it on the latest entry. */
+function watchOutputs(
+  actor: AnyActor<unknown>,
+  context: { log: VizLiveStep[]; changed: () => void },
+): void {
+  actor.on("output", {
+    fn: (event) => {
+      context.log.at(-1)?.sent.push(event.type);
+      context.changed();
+    },
+  });
 }
 
 /** Record the root actor's own transitions and errors. */
@@ -149,6 +173,7 @@ function watchRoot(actor: AnyActor<unknown>, record: (entry: VizLiveStep) => voi
         effects,
         context: json(contextText(actor)),
         error: null,
+        sent: [],
       });
     },
   });
@@ -162,6 +187,7 @@ function watchRoot(actor: AnyActor<unknown>, record: (entry: VizLiveStep) => voi
         effects: [],
         context: json(contextText(actor)),
         error: messageOf(info.error),
+        sent: [],
       });
     },
   });
@@ -209,6 +235,7 @@ function watchChild(
         effects,
         context: json(contextText(root)),
         error: null,
+        sent: [],
       });
     },
   });
@@ -223,6 +250,7 @@ function watchChild(
         effects: [],
         context: json(contextText(root)),
         error: messageOf(info.error),
+        sent: [],
       });
     },
   });
@@ -247,6 +275,7 @@ function unhandled(
     effects: [],
     context: json(contextText(at.actor)),
     error: null,
+    sent: [],
   };
 }
 
@@ -281,18 +310,18 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       flags.segment = log.length;
     });
 
-    /** Core reports a transition after its effects ran, so a follow-up a sync effect sent is recorded before the transition that started it: put the starter first. */
-    function startedFollowUp(entry: VizLiveStep): boolean {
-      return flags.inside && entry.effects.length > 0 && entry.to === log[flags.segment]?.from;
+    function record(entry: VizLiveStep): void {
+      if (startedFollowUp(entry, { log, flags })) log.splice(flags.segment, 0, entry);
+      else log.push(entry);
+      changed();
     }
 
-    function record(entry: VizLiveStep): void {
-      if (startedFollowUp(entry)) log.splice(flags.segment, 0, entry);
-      else log.push(entry);
+    function changed(): void {
       if (!flags.inside && !flags.disposed) onChange?.(view());
     }
 
     watchRoot(actor, record);
+    watchOutputs(actor, { log, changed });
     watchRegions(actor, record);
 
     const children = new Map<string, MapChild>();

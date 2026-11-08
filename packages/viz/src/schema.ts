@@ -224,10 +224,22 @@ export interface VizLiveStep {
   actor?: VizActorRef;
   /** Names of the effects the step ran. */
   effects: string[];
+  /** Output event ids the machine sent out during this step, in order. [] when none. */
+  sent: string[];
   context: VizJson;
   /** Message of a handler that threw; null when none did. */
   error: string | null;
 }
+
+/** Where the app takes one output: the machine it sends to, the event, and the line that does it. */
+export interface VizOutputRoute {
+  to: string;
+  event: string;
+  at: string;
+}
+
+/** Per machine id, per output id: its routes. A missing output id: nothing known. */
+export type VizOutputRoutes = Record<string, Record<string, VizOutputRoute[]>>;
 
 export interface VizLiveTimer {
   id: string;
