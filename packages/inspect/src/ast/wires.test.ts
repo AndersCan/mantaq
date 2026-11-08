@@ -1,7 +1,8 @@
 import { createReceiverActor } from "../fixtures/wired/receiver.ts";
 import { createSenderActor } from "../fixtures/wired/sender.ts";
 import { inspectModule } from "../inspect.ts";
-import { findWires } from "./wires.ts";
+import { createSketchActor } from "../fixtures/wired/sketch.ts";
+import { findWires, scanAppCode } from "./wires.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
@@ -10,6 +11,7 @@ import { describe, expect, test } from "vite-plus/test";
 const DIR = join(import.meta.dirname, "..", "fixtures", "wired");
 const ROOT = join(import.meta.dirname, "..", "fixtures");
 const files = ["sender.ts", "receiver.ts"].map((name) => join(DIR, name));
+const sketch = join(DIR, "sketch.ts");
 
 async function machines() {
   const sender = await inspectModule(files[0] ?? "", {
@@ -31,6 +33,51 @@ function lineOf(text: string): number {
 function readLines(): string[] {
   return ts.sys.readFile(join(DIR, "wire.ts"))?.split("\n") ?? [];
 }
+
+describe("scanAppCode", () => {
+  test("lists the machine only a test and a type use mention, and keeps the wires", async () => {
+    const sketched = await inspectModule(sketch, {
+      load: async () => ({ createSketchActor }),
+      fuzz: false,
+    });
+    const all = [...(await machines()), ...sketched.machines];
+    const scanned = scanAppCode({ root: ROOT, files: [...files, sketch], machines: all });
+    expect(scanned.notRun).toEqual([
+      { id: "sketch", factory: "createSketchActor", file: "wired/sketch.ts" },
+    ]);
+    expect(scanned.wires).toEqual(findWires({ root: ROOT, files, machines: all }));
+    expect(scanned.wires).toHaveLength(3);
+  });
+
+  test("a machine exported only as an instance is never listed", async () => {
+    const edges = join(ROOT, "wired-edges", "edges.ts");
+    const scanned = scanAppCode({ root: ROOT, files: [edges], machines: await machines() });
+    expect(scanned.notRun).toEqual([]);
+  });
+
+  test("a factory passed as a value counts as run", async () => {
+    const dir = mkdtempSync(join(ROOT, "wired", "tmp-"));
+    try {
+      writeFileSync(
+        join(dir, "use.ts"),
+        'import { createSketchActor as make } from "../sketch.ts";\nexport const list = [1].map(() => make());\n',
+      );
+      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
+      const sketched = await inspectModule(sketch, {
+        load: async () => ({ createSketchActor }),
+        fuzz: false,
+      });
+      const scanned = scanAppCode({
+        root: ROOT,
+        files: [sketch, join(dir, "use.ts")],
+        machines: sketched.machines,
+      });
+      expect(scanned.notRun).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("findWires", () => {
   test("finds the guarded, two-hop change and typed-parameter connections between two machines", async () => {

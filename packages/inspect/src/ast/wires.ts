@@ -2,6 +2,7 @@ import type { VizMachine } from "@mantaq/viz";
 import { dirname } from "node:path";
 import ts from "typescript";
 import { locationOf } from "./program.ts";
+import { machineId } from "../inspect.ts";
 
 /** App code that can send an event to one machine when another machine's output or change fires. */
 export interface Wire {
@@ -282,6 +283,150 @@ function wiresOf(scan: Scan, root: string, sourceFile: ts.SourceFile): Wire[] {
   });
 }
 
+/** A listed machine whose factory no app code uses. */
+export interface NotRun {
+  /** Machine id. */
+  id: string;
+  /** Factory export name, e.g. "createMembershipActor". */
+  factory: string;
+  /** Machine file relative to root, "/" separators. */
+  file: string;
+}
+
+interface Target extends NotRun {
+  symbol: ts.Symbol;
+}
+
+function pathOf(symbol: ts.Symbol): string | undefined {
+  return symbol.valueDeclaration?.getSourceFile().fileName.replaceAll("\\", "/");
+}
+
+function samePlace(a: ts.Symbol, b: ts.Symbol): boolean {
+  if (a === b) return true;
+  const path = pathOf(a);
+  return path !== undefined && a.getName() === b.getName() && path === pathOf(b);
+}
+
+function factoriesIn(
+  checker: ts.TypeChecker,
+  root: string,
+  sourceFile: ts.SourceFile,
+  machines: ReadonlyArray<VizMachine>,
+): Target[] {
+  const module = checker.getSymbolAtLocation(sourceFile);
+  if (module === undefined) return [];
+  const ids = new Set(machines.map((machine) => machine.id));
+  return checker.getExportsOfModule(module).flatMap((each) => {
+    const id = machineId(each.getName());
+    const symbol = resolved(checker, each);
+    const declaration = symbol?.valueDeclaration;
+    if (symbol === undefined || declaration === undefined || !ids.has(id)) return [];
+    if (checker.getTypeOfSymbolAtLocation(symbol, declaration).getCallSignatures().length === 0)
+      return [];
+    return [{ id, factory: each.getName(), file: locationOf(sourceFile, root).file, symbol }];
+  });
+}
+
+function isNonValue(node: ts.Node): boolean {
+  for (let each: ts.Node | undefined = node; each !== undefined; each = each.parent) {
+    if (
+      ts.isTypeNode(each) ||
+      ts.isImportDeclaration(each) ||
+      ts.isExportDeclaration(each) ||
+      ts.isExportAssignment(each)
+    )
+      return true;
+  }
+  return false;
+}
+
+function usedTargets(
+  checker: ts.TypeChecker,
+  sourceFile: ts.SourceFile,
+  targets: ReadonlyArray<Target>,
+): Target[] {
+  const wanted = new Set(targets.map((target) => target.factory));
+  const aliases = (node: ts.Node): void => {
+    if (ts.isImportSpecifier(node) && node.propertyName !== undefined) {
+      if (wanted.has(node.propertyName.text)) wanted.add(node.name.text);
+    }
+    ts.forEachChild(node, aliases);
+  };
+  aliases(sourceFile);
+  const used: Target[] = [];
+  const walk = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && wanted.has(node.text) && !isNonValue(node)) {
+      const symbol = resolved(checker, checker.getSymbolAtLocation(node));
+      for (const target of symbol === undefined ? [] : targets) {
+        const declaration = target.symbol.valueDeclaration;
+        const isName = declaration !== undefined && node.parent === declaration;
+        if (symbol !== undefined && !isName && samePlace(symbol, target.symbol)) used.push(target);
+      }
+    }
+    ts.forEachChild(node, walk);
+  };
+  walk(sourceFile);
+  return used;
+}
+
+/**
+ * App-code wires and the listed machines no app code runs, from one set of
+ * programs. A machine is run when app code (the machine's tsconfig minus test
+ * files) uses its factory export as a value. Read with the TypeScript
+ * checker; nothing is run.
+ */
+export function scanAppCode(context: {
+  root: string;
+  /** Absolute machine files given to mantaqViz. */
+  files: ReadonlyArray<string>;
+  machines: ReadonlyArray<VizMachine>;
+}): { wires: Wire[]; notRun: NotRun[] } {
+  const { root, files, machines } = context;
+  if (machines.length === 0) return { wires: [], notRun: [] };
+  const programs = groups(files).map(({ config, names }) => {
+    const program = ts.createProgram(names, optionsOf(config));
+    return { program, names, checker: program.getTypeChecker() };
+  });
+  const all = programs.flatMap(({ program, names, checker }) => {
+    const scan = { checker, machines };
+    return names.flatMap((name) => {
+      const sourceFile = program.getSourceFile(name);
+      return sourceFile === undefined ? [] : wiresOf(scan, root, sourceFile);
+    });
+  });
+  const keyOf = (wire: Wire) =>
+    JSON.stringify([wire.from, wire.to, wire.at, wire.event, wire.trigger]);
+  const wires = [...new Map(all.map((wire) => [keyOf(wire), wire])).values()]
+    .filter((wire) => wire.from !== wire.to)
+    .sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+
+  const found = new Map<string, Target>();
+  for (const { program, checker } of programs) {
+    for (const file of files) {
+      const sourceFile = program.getSourceFile(file);
+      if (sourceFile === undefined) continue;
+      for (const target of factoriesIn(checker, root, sourceFile, machines)) {
+        const key = JSON.stringify([target.id, target.file, target.factory]);
+        if (!found.has(key)) found.set(key, target);
+      }
+    }
+  }
+  const candidates = [...found.values()];
+  const runs = new Set<Target>();
+  for (const { program, names, checker } of programs) {
+    for (const name of names) {
+      const sourceFile = program.getSourceFile(name);
+      if (sourceFile === undefined || !keep(sourceFile.fileName)) continue;
+      for (const used of usedTargets(checker, sourceFile, candidates)) runs.add(used);
+    }
+  }
+  const notRun = candidates
+    .filter((target) => !runs.has(target))
+    .map(({ id, factory, file }) => ({ id, factory, file }))
+    .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return { wires, notRun };
+}
+
 /**
  * Connections between machines made in app code: a listener on one machine's
  * output or change that can send an event to another machine, at most two
@@ -293,19 +438,5 @@ export function findWires(context: {
   files: ReadonlyArray<string>;
   machines: ReadonlyArray<VizMachine>;
 }): Wire[] {
-  const { root, files, machines } = context;
-  if (machines.length === 0) return [];
-  const all = groups(files).flatMap(({ config, names }) => {
-    const program = ts.createProgram(names, optionsOf(config));
-    const scan = { checker: program.getTypeChecker(), machines };
-    return names.flatMap((name) => {
-      const sourceFile = program.getSourceFile(name);
-      return sourceFile === undefined ? [] : wiresOf(scan, root, sourceFile);
-    });
-  });
-  const keyOf = (wire: Wire) =>
-    JSON.stringify([wire.from, wire.to, wire.at, wire.event, wire.trigger]);
-  return [...new Map(all.map((wire) => [keyOf(wire), wire])).values()]
-    .filter((wire) => wire.from !== wire.to)
-    .sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+  return scanAppCode(context).wires;
 }
