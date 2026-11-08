@@ -149,11 +149,7 @@ interface Scan {
   machines: ReadonlyArray<VizMachine>;
 }
 
-function sendsFrom(
-  scan: Scan,
-  call: ts.CallExpression,
-  state: { depth: number; visited: Set<ts.Node> },
-): Found[] {
+function sendsFrom(scan: Scan, call: ts.CallExpression, depth: number): Found[] {
   const { checker, machines } = scan;
   const found: Found[] = [];
   const callee = call.expression;
@@ -165,12 +161,10 @@ function sendsFrom(
       property === undefined ? undefined : checker.getTypeOfSymbolAtLocation(property, arg);
     if (to !== null && literal?.isStringLiteral()) found.push({ to, event: literal.value });
   }
-  if (state.depth >= MAX_DEPTH) return found;
+  if (depth >= MAX_DEPTH) return found;
   const body = bodyOf(checker, call);
-  if (body === null || state.visited.has(body)) return found;
-  state.visited.add(body);
-  for (const inner of callsIn(body))
-    found.push(...sendsFrom(scan, inner, { depth: state.depth + 1, visited: state.visited }));
+  if (body === null) return found;
+  for (const inner of callsIn(body)) found.push(...sendsFrom(scan, inner, depth + 1));
   return found;
 }
 
@@ -276,7 +270,7 @@ function wiresOf(scan: Scan, root: string, sourceFile: ts.SourceFile): Wire[] {
       callsIn(body).flatMap((entry) => {
         const at = locationOf(entry, root);
         const trigger = listener.kind === "change" ? "change" : triggerOf(entry, body, outputs);
-        return sendsFrom(scan, entry, { depth: 0, visited: new Set() }).map((found) => ({
+        return sendsFrom(scan, entry, 0).map((found) => ({
           from,
           to: found.to,
           trigger,
