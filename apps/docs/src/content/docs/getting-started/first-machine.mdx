@@ -4,6 +4,7 @@ description: Write, run and test a traffic light with @mantaq/core.
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
 import lightSource from "../../../first-machine/traffic-light.ts?raw";
 import testSource from "../../../first-machine/traffic-light.test.ts?raw";
 
@@ -17,6 +18,12 @@ A traffic light that cycles red, green and yellow on timers, and that you can sw
 - **Events:** `switchOff` is an input you send. `timeUp` is internal; only effects emit it.
 - **Timers:** each colour's effect calls `clock.setTimeout` on the injected clock and passes `signal`, so the timer stops when the light leaves that colour.
 - **Transitions:** `m.on` moves each colour to the next on `timeUp`; `m.onAny` switches off from any colour.
+
+## Walk it
+
+<Machine src="src/first-machine/traffic-light.ts" runEffects />
+
+This is the machine above, running in your browser on a virtual clock. Press the first time button and the light turns green, as `clock.advance` does in the test below; keep advancing to see yellow and red, or send `switchOff`. [How the visualizer works](/mantaq/guides/visualizer/) explains the rest of the panel.
 
 ## Test it
 
