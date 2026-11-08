@@ -74,13 +74,13 @@ const { basicInfo, payment, success } = states("basicInfo", "payment", {
 });
 const { submitBasicInfo, submitPayment } = events("submitBasicInfo", "submitPayment");
 
-const checkout = new Actor({
+const checkout = Actor({
   inputs: [submitBasicInfo, submitPayment],
   states: [basicInfo, payment, success],
   initial: basicInfo,
   setup: (m) => {
-    m.on(basicInfo, submitBasicInfo, () => ({ state: payment }));
-    m.on(payment, submitPayment, () => ({ state: success }));
+    m.on(basicInfo, { event: submitBasicInfo, to: [payment], handler: () => ({ state: payment }) });
+    m.on(payment, { event: submitPayment, to: [success], handler: () => ({ state: success }) });
   },
 });
 ```

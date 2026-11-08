@@ -15,12 +15,14 @@ not behavior.
 
 ## 1. Declare the actor spec
 
-Options move out of `new Actor` into an `actorSpec` value. This becomes the
+Options move out of `Actor({ ... })` into an `actorSpec` value. This becomes the
 type anchor every part references.
 
 ```ts
+// checkout-spec.ts
 import { state, event } from "@mantaq/core";
 import { actorSpec } from "@mantaq/sugar";
+import type { CheckoutContext } from "./checkout";
 
 export const basicInfo = state("basicInfo")();
 export const payment = state("payment")();
@@ -54,16 +56,21 @@ needed. Context stays mutable, part handlers read and write with no casts.
 the spec `type`-only as anchor, refs as values.
 
 ```ts
+// parts/basic-info.ts
 import { definePart } from "@mantaq/sugar";
-import type { checkout } from "../checkout.ts";
-import { basicInfo, shippingAddress, submitBasicInfo, chargeCard } from "../checkout.ts";
+import type { checkout } from "../checkout-spec";
+import { basicInfo, payment, submitBasicInfo } from "../checkout-spec";
 
 export const basicInfoPart = definePart<typeof checkout>((m) => {
-  m.on(basicInfo, submitBasicInfo, (event, opts) => {
-    const cur = opts.context.get();
-    cur.basicInfo = event.payload;
-    opts.context.set(cur);
-    return { state: shippingAddress };
+  m.on(basicInfo, {
+    event: submitBasicInfo,
+    to: [payment],
+    handler: (event, opts) => {
+      const cur = opts.context.get();
+      cur.basicInfo = event.payload;
+      opts.context.set(cur);
+      return { state: payment };
+    },
   });
 });
 ```
@@ -71,23 +78,39 @@ export const basicInfoPart = definePart<typeof checkout>((m) => {
 Effects stay with their state:
 
 ```ts
+// parts/submitting.ts
+import { definePart, withPromise, withTimeout } from "@mantaq/sugar";
+import { chargeCard } from "../checkout";
+import type { checkout } from "../checkout-spec";
+import {
+  error,
+  paymentFail,
+  paymentOk,
+  paymentTimeout,
+  submitting,
+  success,
+} from "../checkout-spec";
+
 export const submittingPart = definePart<typeof checkout>((m) => {
   m.effect(submitting, {
     name: "chargeCard",
     fn: (input) => {
       const s = input.context.get();
-      withPromise(chargeCard(s.paymentInfo!.cardNumber), input.signal, input.emit, {
-        success: (orderId) => paymentOk.create({ orderId }),
-        error: (reason) => paymentFail.create({ reason: String(reason) }),
+      withPromise({
+        promise: chargeCard(s.paymentInfo!.cardNumber),
+        signal: input.signal,
+        emit: input.emit,
+        events: {
+          success: (orderId) => paymentOk.create({ orderId }),
+          error: (reason) => paymentFail.create({ reason: String(reason) }),
+        },
       });
-      withTimeout(800, input, () => paymentTimeout.create());
+      withTimeout(800, { input, event: () => paymentTimeout.create() });
     },
   });
-  m.on(submitting, paymentOk, (event, opts) => {
-    /* ... */
-  });
-  m.on(submitting, paymentFail, () => ({ state: error }));
-  m.on(submitting, paymentTimeout, () => ({ state: error }));
+  m.on(submitting, { event: paymentOk, to: [success], handler: () => ({ state: success }) });
+  m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
+  m.on(submitting, { event: paymentTimeout, to: [error], handler: () => ({ state: error }) });
 });
 ```
 
@@ -97,25 +120,33 @@ Cross-state handlers go in their own part too. Reach the actor through
 ## 3. Compose
 
 ```ts
+// checkout-actor.ts
 import { withParts } from "@mantaq/sugar";
-import { checkout } from "../checkout.ts";
-import { basicInfoPart } from "./parts/basic-info.ts";
-import { submittingPart } from "./parts/submitting.ts";
+import { checkout } from "./checkout-spec";
+import { basicInfoPart } from "./parts/basic-info";
+import { submittingPart } from "./parts/submitting";
 
-export const checkoutActor = withParts(checkout, [basicInfoPart, submittingPart]);
+export const checkoutActor = withParts(checkout, basicInfoPart, submittingPart);
 ```
 
 Pass `clock`, `regions`, or `internalBudget` through the spec the same way
-as `new Actor`.
+as `Actor({ ... })`.
 
 ## 4. Mix with inline code
 
 `use` registers a part inside a hand-written setup:
 
 ```ts
-const actor = new Actor({
+// checkout-inline.ts
+import { Actor, VirtualClock } from "@mantaq/core";
+import { use } from "@mantaq/sugar";
+import { basicInfo, checkout } from "./checkout-spec";
+import { basicInfoPart } from "./parts/basic-info";
+import { submittingPart } from "./parts/submitting";
+
+const actor = Actor({
   ...checkout,
-  clock: new VirtualClock(),
+  clock: VirtualClock(),
   setup: (m) => {
     use(m, basicInfoPart);
     use(m, submittingPart);
