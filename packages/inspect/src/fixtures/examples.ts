@@ -17,7 +17,7 @@ const save = event("save")<{
   /** @example b */
   tier: "a" | "b";
   note: string;
-  /** @example {"a":1} */
+  /** @example {"a":42} */
   tags: { a: number };
   /** @example nope{ */
   broken: string[];
