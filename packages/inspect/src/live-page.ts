@@ -23,12 +23,20 @@ function only(viz: VizDocument, machine: string | null): VizDocument {
   return { ...viz, machines: chosen === undefined ? [] : [chosen] };
 }
 
-/** The walk in the address bar, only when it names a machine of this document. */
+/**
+ * The walk in the address bar, only when it names a machine of this document.
+ * A link naming several machines opens the first one this document holds.
+ */
 function ownWalk(viz: VizDocument): ReturnType<typeof linkOptions> {
   const linked = linkOptions();
-  const own =
-    linked.machine === undefined || viz.machines.some((each) => each.id === linked.machine);
-  return own ? linked : { onNavigate: linked.onNavigate };
+  const named = [...new Set(new URLSearchParams(location.search).getAll("machine"))];
+  if (named.length < 2) {
+    const own =
+      linked.machine === undefined || viz.machines.some((each) => each.id === linked.machine);
+    return own ? linked : { onNavigate: linked.onNavigate };
+  }
+  const held = named.find((id) => viz.machines.some((each) => each.id === id));
+  return held === undefined ? { onNavigate: linked.onNavigate } : { ...linked, machine: held };
 }
 
 /** The target for `id` when it runs on a clock the page can advance. */

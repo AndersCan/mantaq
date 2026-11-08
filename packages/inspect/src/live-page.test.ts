@@ -257,6 +257,58 @@ describe("mountDriven runs by name", () => {
   });
 });
 
+describe("a link naming several machines", () => {
+  const create = () => {
+    const clock = VirtualClock();
+    return { actor: createCheckoutActor(clock), clock };
+  };
+  const current = (root: HTMLElement) =>
+    root.querySelector<HTMLElement>(".explore")?.dataset["current"];
+  const basic = {
+    kind: "event",
+    event: "submitBasicInfo",
+    payload: { email: "a@b.c", name: "A" },
+  };
+
+  async function twoDocuments(): Promise<[string, string]> {
+    const doc = JSON.parse(await documentText());
+    const run = { name: "gives basic info", steps: [basic] };
+    const first = { ...doc, machines: [{ ...doc.machines[0], runs: [run] }] };
+    const second = { ...doc, machines: [{ ...doc.machines[0], id: "second", runs: [run] }] };
+    return [JSON.stringify(first), JSON.stringify(second)];
+  }
+
+  test("each viewer opens the run on the machine it holds", async () => {
+    const search = "?machine=checkout&machine=second&run=gives%20basic%20info";
+    history.replaceState(null, "", search);
+    const [first, second] = await twoDocuments();
+    const targets = { checkout: create, second: create };
+    const one = document.createElement("div");
+    const two = document.createElement("div");
+    mountDriven(one, { source: "test", text: first, targets });
+    mountDriven(two, { source: "test", text: second, targets });
+    expect(current(one)).toBe("shippingAddress");
+    expect(current(two)).toBe("shippingAddress");
+    expect(location.search).toBe(search);
+  });
+
+  test("a viewer holding none of them opens at its start", async () => {
+    history.replaceState(null, "", "?machine=x&machine=y&run=gives%20basic%20info");
+    const [first] = await twoDocuments();
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: first, targets: { checkout: create } });
+    expect(current(root)).toBe("basicInfo");
+  });
+
+  test("a viewer holding only a later name opens that one", async () => {
+    history.replaceState(null, "", "?machine=x&machine=second&machine=x&run=gives%20basic%20info");
+    const [, second] = await twoDocuments();
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: second, targets: { second: create } });
+    expect(current(root)).toBe("shippingAddress");
+  });
+});
+
 describe("compare", () => {
   const create = () => {
     const clock = VirtualClock();
