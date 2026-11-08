@@ -1,23 +1,14 @@
 /**
- * The notes section of the live page: under the panel, for the selected
- * state or arrow, the notes already left on it and a box to add one. It talks to the
- * dev-server endpoint and stays hidden when that does not answer (static
- * hosts, older servers, visitors from another computer).
+ * What the note box of the live page shares: reading the dev-server notes
+ * endpoint, posting a note, and the note list for a state or arrow.
  */
 import { isAnyState } from "@mantaq/viz";
 import type { VizMachine } from "@mantaq/viz";
 import type { ViewerSelection } from "@mantaq/viz/viewer";
-import {
-  NOTES_VERSION,
-  MAX_NOTE_LENGTH,
-  arrowsOf,
-  isNoteTarget,
-  isVizSteps,
-  targetText,
-} from "./notes.ts";
+import { NOTES_VERSION, isNoteTarget, targetText } from "./notes.ts";
 import type { Note, NoteTarget } from "./notes.ts";
 
-type Phase =
+export type Phase =
   | { kind: "loading" }
   | { kind: "unavailable" }
   | { kind: "refused"; message: string }
@@ -29,7 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readNote(value: unknown): Note | undefined {
   if (!isRecord(value)) return undefined;
-  const { id, machine, on, target, status, note, result, question, end, steps } = value;
+  const { id, machine, on, target, status, note, result, question } = value;
   if (typeof id !== "string" || typeof note !== "string") return undefined;
   return {
     id,
@@ -40,8 +31,6 @@ function readNote(value: unknown): Note | undefined {
     note,
     result: typeof result === "string" ? result : undefined,
     question: typeof question === "string" ? question : undefined,
-    end: typeof end === "string" ? end : undefined,
-    steps: isVizSteps(steps) ? steps : undefined,
   };
 }
 
@@ -56,7 +45,10 @@ async function errorText(response: Response): Promise<string> {
 }
 
 /** The saved note, or the reason it was not saved. */
-async function post(url: string, body: string): Promise<string | { file: string; note: Note }> {
+export async function post(
+  url: string,
+  body: string,
+): Promise<string | { file: string; note: Note }> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -72,7 +64,7 @@ async function post(url: string, body: string): Promise<string | { file: string;
     : { file, note };
 }
 
-async function fetchPhase(url: string, machine: string): Promise<Phase> {
+export async function fetchPhase(url: string, machine: string): Promise<Phase> {
   const response = await fetch(`${url}?machine=${encodeURIComponent(machine)}`).catch(
     () => undefined,
   );
@@ -92,129 +84,7 @@ async function fetchPhase(url: string, machine: string): Promise<Phase> {
   };
 }
 
-/** The footer for the viewer's `panelFooter`: one persistent section, rebuilt only when it must change. */
-export function notesFooter(
-  doc: Document,
-  context: { url: string; machine: VizMachine },
-): (selection: ViewerSelection | undefined) => Node | undefined {
-  const section = doc.createElement("section");
-  section.className = "notes";
-  section.hidden = true;
-  let phase: Phase = { kind: "loading" };
-  let target: NoteTarget | undefined;
-  let status = "";
-  let saving = false;
-  let draft = "";
-  let justSaved = false;
-
-  const render = () => {
-    section.hidden = true;
-    section.replaceChildren();
-    if (phase.kind === "loading" || phase.kind === "unavailable") return;
-    section.hidden = false;
-    const statusLine = doc.createElement("p");
-    statusLine.className = "notes-status";
-    statusLine.setAttribute("role", "status");
-    statusLine.textContent = phase.kind === "refused" ? phase.message : status;
-    if (phase.kind === "refused" || target === undefined) {
-      if (phase.kind === "refused") section.append(statusLine);
-      else section.hidden = true;
-      return;
-    }
-    const label = targetLabel(target);
-    const heading = doc.createElement("h3");
-    heading.textContent = `Notes on ${label}`;
-    section.append(heading);
-    if (target.kind === "edge") {
-      const shared = arrowsOf(context.machine, target);
-      if (shared > 1) {
-        const hint = doc.createElement("p");
-        hint.className = "hint";
-        hint.textContent = `The ${shared} arrows for ${label} share these notes.`;
-        section.append(hint);
-      }
-    }
-    section.append(noteList(doc, target, phase.notes));
-    section.append(form(target), statusLine);
-    if (phase.exists || justSaved) {
-      const where = doc.createElement("p");
-      where.className = "notes-file";
-      where.textContent = `Saved in ${phase.file}`;
-      section.append(where);
-    }
-  };
-
-  const form = (forTarget: NoteTarget): HTMLFormElement => {
-    const element = doc.createElement("form");
-    const label = doc.createElement("label");
-    label.textContent = "Add a note";
-    const field = doc.createElement("textarea");
-    field.rows = 3;
-    field.maxLength = MAX_NOTE_LENGTH;
-    field.style.cssText = "width:100%;box-sizing:border-box";
-    field.value = draft;
-    field.readOnly = saving;
-    label.append(field);
-    const button = doc.createElement("button");
-    button.type = "submit";
-    button.textContent = saving ? "Saving..." : "Save note";
-    button.disabled = saving || field.value.trim() === "";
-    field.addEventListener("input", () => {
-      draft = field.value;
-      button.disabled = saving || draft.trim() === "";
-    });
-    element.addEventListener("submit", (event) => {
-      event.preventDefault();
-      if (!saving && draft.trim() !== "") void save(forTarget, draft);
-    });
-    element.append(label, button);
-    return element;
-  };
-
-  const save = async (forTarget: NoteTarget, text: string) => {
-    saving = true;
-    justSaved = false;
-    status = "";
-    render();
-    const body = JSON.stringify({
-      version: NOTES_VERSION,
-      machine: context.machine.id,
-      target: forTarget,
-      note: text,
-    });
-    const reason = await post(context.url, body);
-    saving = false;
-    if (typeof reason === "string") {
-      status = `Could not save this note: ${reason}. Your text is still here.`;
-    } else if (phase.kind === "showing") {
-      phase = { ...phase, exists: true, file: reason.file, notes: [...phase.notes, reason.note] };
-      draft = "";
-      justSaved = true;
-      status = "Note saved";
-    }
-    render();
-  };
-
-  const load = async () => {
-    phase = await fetchPhase(context.url, context.machine.id);
-    render();
-  };
-  void load();
-
-  return (selection) => {
-    const next = targetOf(selection, context.machine);
-    if (key(next) !== key(target)) {
-      target = next;
-      draft = "";
-      status = "";
-      justSaved = false;
-      render();
-    }
-    return section;
-  };
-}
-
-export function key(target: NoteTarget | undefined): string {
+function key(target: NoteTarget | undefined): string {
   return target === undefined ? "" : targetText(target);
 }
 
@@ -241,7 +111,6 @@ export function targetOf(
 }
 
 export function targetLabel(target: NoteTarget): string {
-  if (target.kind === "walk") return "this journey";
   if (target.kind === "state") return target.state;
   return `${target.event} from ${isAnyState(target.from) ? "any state" : target.from}`;
 }
@@ -262,14 +131,13 @@ function noteItem(doc: Document, each: Note): HTMLLIElement {
   return item;
 }
 
-function noteList(doc: Document, target: NoteTarget, notes: Note[]): HTMLElement {
+export function noteList(
+  doc: Document,
+  target: NoteTarget,
+  notes: Note[],
+): HTMLElement | undefined {
   const mine = notes.filter((each) => key(each.target) === key(target));
-  if (mine.length === 0) {
-    const hint = doc.createElement("p");
-    hint.className = "hint";
-    hint.textContent = `No notes on ${targetLabel(target)} yet.`;
-    return hint;
-  }
+  if (mine.length === 0) return undefined;
   const list = doc.createElement("ul");
   list.className = "notes-list";
   for (const each of mine) list.append(noteItem(doc, each));

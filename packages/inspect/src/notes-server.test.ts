@@ -62,18 +62,6 @@ function post(body: unknown, extra: Partial<NotesRequest> = {}): NotesRequest {
 
 const valid = { version: 1, machine: "m", target: { kind: "state", state: "s" }, note: "hi" };
 
-const walk = {
-  version: 1,
-  machine: "m",
-  target: { kind: "walk" },
-  note: "Nils picks go",
-  end: "t",
-  steps: [
-    { kind: "event", event: "GO", payload: {} },
-    { kind: "advance", ms: 5 },
-  ],
-};
-
 describe("answerNotes errors", () => {
   const table: Array<[string, (c: NotesContext) => Promise<unknown>, number, string]> = [];
   const add = (
@@ -92,25 +80,12 @@ describe("answerNotes errors", () => {
       status,
       error,
     ]);
-  const walkAdd = (name: string, over: Record<string, unknown>, status: number, error: string) =>
-    add(name, post({ ...walk, ...over }), status, error);
-  walkAdd("walk without steps", { steps: "x" }, 400, "the journey needs its steps");
-  walkAdd(
-    "walk with a bad step",
-    { steps: [{ kind: "nope" }] },
+  add(
+    "a walk target",
+    post({ ...valid, target: { kind: "walk" } }),
     400,
-    "the journey needs its steps",
+    "the note needs a state or an arrow",
   );
-  walkAdd("walk with empty steps", { steps: [] }, 400, "walk the machine before saving a journey");
-  walkAdd(
-    "walk with an unknown event",
-    { steps: [{ kind: "event", event: "NOPE", payload: null }] },
-    404,
-    "no event NOPE in m",
-  );
-  walkAdd("walk ending in an unknown state", { end: "nope" }, 404, "no state nope in m");
-  walkAdd("walk with no end", { end: undefined }, 404, "no state undefined in m");
-  walkAdd("walk with a blank name", { note: " \n " }, 400, "the journey needs a name");
   add(
     "remote",
     get("machine=m", { remote: "10.0.0.2" }),
@@ -259,26 +234,6 @@ describe("answerNotes errors", () => {
     const text = store.get("/proj/src/m.notes.md") ?? "";
     expect(text).toContain("  on: edge * STOP\n");
     expect(text).toContain("  on: edge t PING\n");
-  });
-
-  test("a walk is saved with its end and steps, and listed back", async () => {
-    const { context, store } = setup();
-    const answer = await answerNotes(post(walk), context);
-    expect(answer.status).toBe(200);
-    expect((answer.body as { note: unknown }).note).toMatchObject({
-      id: "n1",
-      target: { kind: "walk" },
-      end: "t",
-      steps: walk.steps,
-    });
-    expect(store.get("/proj/src/m.notes.md")).toContain(
-      '  on: walk\n  status: open\n  note: Nils picks go\n  end: t\n  steps: [{"kind":"event","event":"GO","payload":{}},{"kind":"advance","ms":5}]\n',
-    );
-    const listed = await answerNotes(get("machine=m"), context);
-    expect((listed.body as { notes: unknown[] }).notes[0]).toMatchObject({
-      end: "t",
-      steps: walk.steps,
-    });
   });
 
   test("a v2 file is not written", async () => {
