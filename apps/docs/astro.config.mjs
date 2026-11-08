@@ -43,7 +43,6 @@ export default defineConfig({
       plugins: [
         starlightLlmsTxt({
           projectName: "Mantaq",
-          customSelectors: { all: ['.mantaq-findings[data-count="0"]'] },
         }),
       ],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/anderscan/mantaq" }],
