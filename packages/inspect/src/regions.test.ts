@@ -4,6 +4,7 @@ import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
 import { createUploadRegionsActor } from "./fixtures/upload-regions.ts";
+import { createNestedRegionsActor } from "./fixtures/nested-regions.ts";
 import { fuzz } from "./fuzz/fuzz.ts";
 import { execute } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -143,5 +144,96 @@ describe("journeys", () => {
     expect(run([{ ...picked, event: "nope" }], "showingUploadScreen")).toEqual(
       Either.left('unknown event "nope" in region upload'),
     );
+  });
+});
+
+describe("nested regions", () => {
+  const ran: string[] = [];
+  const nested: FuzzTarget = {
+    id: "nested",
+    create: () => {
+      const clock = VirtualClock();
+      return { actor: createNestedRegionsActor({ clock, ran }), clock };
+    },
+  };
+  const toWorker = {
+    kind: "event",
+    event: "go",
+    payload: null,
+    actor: { region: "worker" },
+  } as const;
+
+  const pingStep = {
+    kind: "event",
+    event: "ping",
+    payload: null,
+    actor: { region: "worker.sub" },
+  } as const;
+
+  test("machine marks a region's internal event as internal", () => {
+    const machine = toVizMachine({ id: "n", actor: nested.create().actor });
+    expect(machine.events.find((each) => each.id === "tick")?.internal).toBe(true);
+    expect(machine.events.find((each) => each.id === "go")?.internal).toBeFalsy();
+  });
+
+  test("a region's internal event is a no-op where its state cannot handle it", () => {
+    const live = createDriver(nested).step({ ...toWorker, event: "tick" });
+    expect(live.regions["worker"]).toBe("worker.ready");
+    expect(live.last?.outcome).not.toBe("transition");
+  });
+
+  test("a region's internal event is handled where its state can", () => {
+    const driver = createDriver(nested);
+    driver.step(toWorker);
+    const live = driver.step({ ...toWorker, event: "tick" });
+    expect(live.regions["worker"]).toBe("worker.ready");
+  });
+
+  test("a throwing region handler is recorded with its region", () => {
+    const live = createDriver(nested).step({ ...toWorker, event: "boom" });
+    expect(live.last?.error).toContain("worker exploded");
+    expect(live.last?.actor).toEqual({ region: "worker" });
+  });
+
+  test("the same event name on root and region goes to the region addressed", () => {
+    const live = createDriver(nested).step(toWorker);
+    expect(live.state).toBe("idle");
+    expect(live.last).toMatchObject({
+      from: "worker.ready",
+      to: "worker.running",
+      actor: { region: "worker" },
+    });
+    const root = createDriver(nested).step({ kind: "event", event: "go", payload: null });
+    expect(root.state).toBe("done");
+    expect(root.last?.actor).toBeUndefined();
+    expect(root.regions["worker"]).toBe("worker.ready");
+  });
+
+  test("the step's own entry comes first when the root reacts to the same event name", () => {
+    const live = createDriver(nested).step(pingStep);
+    expect(live.last).toMatchObject({ actor: { region: "worker.sub" }, event: "ping" });
+    expect(live.after.some((each) => each.actor === undefined && each.event === "ping")).toBe(true);
+    expect(live.state).toBe("done");
+  });
+
+  test("a nested region takes steps by dotted path", () => {
+    const live = createDriver(nested).step(pingStep);
+    expect(live.regions["worker.sub"]).toBe("worker.sub.b");
+    expect(live.last).toMatchObject({
+      from: "worker.sub.a",
+      to: "worker.sub.b",
+      actor: { region: "worker.sub" },
+    });
+    expect(normalizeRun(nested, { name: "n", steps: [pingStep], end: "done" })).toEqual(
+      Either.right([pingStep]),
+    );
+  });
+
+  test("held effects do not run in regions, real ones do", () => {
+    ran.length = 0;
+    createDriver(nested, { effectMode: "held" }).step(toWorker);
+    expect(ran).toEqual([]);
+    createDriver(nested, { effectMode: "real" }).step(toWorker);
+    expect(ran).toEqual(["work"]);
   });
 });
