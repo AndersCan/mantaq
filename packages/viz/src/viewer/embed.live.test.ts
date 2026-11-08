@@ -126,7 +126,12 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
   };
 }
 
-function mount(options: { steps?: string[]; onNavigate?: (w: { steps: string[] }) => void } = {}) {
+function mount(
+  options: {
+    steps?: string[];
+    onNavigate?: (w: { steps: string[] }) => void;
+  } = {},
+) {
   const root = document.createElement("div");
   const live = driver();
   mountViewer(
@@ -275,14 +280,24 @@ describe("live controls", () => {
 });
 
 describe("runs", () => {
-  const submit: VizStep = { kind: "event", event: "submit", payload: { amount: 5 } };
+  const submit: VizStep = {
+    kind: "event",
+    event: "submit",
+    payload: { amount: 5 },
+  };
   const withRuns: VizMachine = {
     ...checkout,
     runs: [
-      { name: "pays and times out", steps: [submit, { kind: "advance", ms: 800 }] },
+      {
+        name: "pays and times out",
+        steps: [submit, { kind: "advance", ms: 800 }],
+      },
       { name: "submits", steps: [submit] },
       { name: "empty", steps: [] },
-      { name: "breaks", steps: [{ kind: "event", event: "nope", payload: null }, submit] },
+      {
+        name: "breaks",
+        steps: [{ kind: "event", event: "nope", payload: null }, submit],
+      },
     ],
   };
 
@@ -531,7 +546,10 @@ describe("field forms and the context table", () => {
   test("the note is present when live and absent without a driver", () => {
     expect(mountFields().root.querySelector("[data-live-note]")).not.toBeNull();
     const root = document.createElement("div");
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [fieldsMachine] });
+    mountViewer(root, {
+      schemaVersion: VIZ_SCHEMA_VERSION,
+      machines: [fieldsMachine],
+    });
     expect(root.querySelector("[data-live-note]")).toBeNull();
   });
 
@@ -554,7 +572,11 @@ describe("field forms and the context table", () => {
     if (flags) flags.value = '{"a":false}';
     click(root, '[data-payload-send="submit"]');
     expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { validFor: "10m", flags: { a: false } } },
+      {
+        kind: "event",
+        event: "submit",
+        payload: { validFor: "10m", flags: { a: false } },
+      },
     ]);
   });
 
@@ -617,7 +639,11 @@ describe("field forms and the context table", () => {
     expect(field(root, "code")?.value).toBe("c1");
     click(root, '[data-payload-send="submit"]');
     expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { code: "c1", validFor: "10m" } },
+      {
+        kind: "event",
+        event: "submit",
+        payload: { code: "c1", validFor: "10m" },
+      },
     ]);
   });
 
@@ -778,7 +804,10 @@ describe("what ran", () => {
           location: { file: "m.ts", line: 1, column: 1 },
           registration: "on",
           branches: [
-            { conditions: ["payload.amount > 5"], target: { kind: "state", state: "paying" } },
+            {
+              conditions: ["payload.amount > 5"],
+              target: { kind: "state", state: "paying" },
+            },
             { conditions: ["!(payload.amount > 5)"], target: { kind: "stay" } },
           ],
           payloadReads: [],
@@ -798,7 +827,11 @@ describe("what ran", () => {
   };
   const text = (root: HTMLElement, hook: string) =>
     root.querySelector(`[data-live-${hook}]`)?.textContent;
-  const submit = { kind: "event", event: "submit", payload: { amount: 9 } } as const;
+  const submit = {
+    kind: "event",
+    event: "submit",
+    payload: { amount: 9 },
+  } as const;
 
   function stepped(
     entry: Partial<VizLiveState["last"] & object>,
@@ -871,8 +904,14 @@ describe("what ran", () => {
               explanation: {
                 ...candidate.explanation,
                 branches: [
-                  { conditions: ["a"], target: { kind: "state", state: "paying" } },
-                  { conditions: ["!a"], target: { kind: "state", state: "paying" } },
+                  {
+                    conditions: ["a"],
+                    target: { kind: "state", state: "paying" },
+                  },
+                  {
+                    conditions: ["!a"],
+                    target: { kind: "state", state: "paying" },
+                  },
                 ],
               },
             }
@@ -959,7 +998,12 @@ describe("live effect reports", () => {
       state("waiting", { initial: true }),
       {
         ...state("fetching"),
-        effects: [{ name: "fetchList", sends: ["listFetched", "fetchFailed", "fetchGone"] }],
+        effects: [
+          {
+            name: "fetchList",
+            sends: ["listFetched", "fetchFailed", "fetchGone"],
+          },
+        ],
       },
       state("couldNotFetch"),
     ],
@@ -1025,12 +1069,19 @@ describe("live effect reports", () => {
     };
   }
   function mountFetcher(
-    options: { mode?: "held" | "real"; machine?: VizMachine; held?: string[] } = {},
+    options: {
+      mode?: "held" | "real";
+      machine?: VizMachine;
+      held?: string[];
+    } = {},
   ) {
     const root = document.createElement("div");
     mountViewer(
       root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [options.machine ?? fetcher] },
+      {
+        schemaVersion: VIZ_SCHEMA_VERSION,
+        machines: [options.machine ?? fetcher],
+      },
       { driver: fetchDriver(options.mode, options.held) },
     );
     click(root, '[data-send="start"]');
@@ -1181,13 +1232,70 @@ describe("live effect reports", () => {
       expect(waitingBlock(root)?.querySelector("[data-send]")).toBeNull();
     });
 
-    test("an effect of the state that is not waiting ran for real", () => {
+    test("an effect of a later state that is not waiting does not claim it ran for real", () => {
       const root = mountFetcher({ mode: "held", held: [] });
       expect(waitingBlock(root)).toBeNull();
-      expect(root.querySelector('[data-ran-for-real="fetchList"]')?.textContent).toContain(
-        "fetchList ran for real: a machine runs its first state's effects while it is built",
+      expect(root.querySelector("[data-ran-for-real]")).toBeNull();
+    });
+
+    test("an effect of the initial state that is not waiting ran for real", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        states: fetcher.states.map((each) =>
+          each.id === "waiting" ? { ...each, effects: [{ name: "warmUp", sends: [] }] } : each,
+        ),
+      };
+      const root = document.createElement("div");
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+        {
+          driver: fetchDriver("held", []),
+        },
       );
-      expect(root.querySelectorAll('[data-group="effect"] [data-send]')).toHaveLength(2);
+      expect(root.querySelector('[data-ran-for-real="warmUp"]')?.textContent).toContain(
+        "warmUp ran for real",
+      );
+    });
+
+    test("a held effect in a region shows a waiting block with its reports", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        regions: ["upload"],
+        states: [
+          state("waiting", { initial: true }),
+          {
+            ...state("upload.sending"),
+            effects: [{ name: "sendPhoto", sends: ["photoSent"] }],
+          },
+        ],
+        events: [{ id: "photoSent", internal: true, doc: null, payload: null }],
+        edges: [edge("upload.sending", "photoSent", "upload.sending")],
+      };
+      const live: VizLiveState = {
+        state: "waiting",
+        steps: [],
+        last: null,
+        after: [],
+        timers: [],
+        context: null,
+        payload: null,
+        regions: { upload: "upload.sending" },
+        effectMode: "held",
+        waiting: ["sendPhoto"],
+      };
+      const root = document.createElement("div");
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+        {
+          driver: { reset: () => live, step: () => live },
+        },
+      );
+      expect(root.querySelector('section[data-waiting-on="sendPhoto"]')).not.toBeNull();
+      expect(
+        root.querySelector('[data-waiting-on="sendPhoto"] [data-send="photoSent"]'),
+      ).not.toBeNull();
     });
 
     test("picking a report moves on and Back returns to waiting", () => {
