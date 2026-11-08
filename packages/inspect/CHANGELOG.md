@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  A live step lists the outputs the machine sent out, as "Sent out: …", and names where the app takes each one when the page passes `routes` to the viewer. Breaking: `VizLiveStep.sent` is now required, so a hand-written `VizDriver` must fill it (`[]` when nothing was sent).
+- _(minor)_
+  Astro `<Machine>` pages tell the viewer where the app takes each output, so a live step reads "Sent out: openAlbum → router takes NAVIGATED (file:line)".
+
 ## 0.26.1
 
 <sub>2026-11-08</sub>
