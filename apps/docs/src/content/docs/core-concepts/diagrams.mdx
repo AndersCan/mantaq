@@ -37,9 +37,9 @@ in the initial state, and the pulsing edges are the steps you can take next.
 Click one, or use the **Step** tab:
 
 - **Send**: every event the current state handles, plus the inputs it ignores.
-  An event that carries a payload asks for one first, in a popover on the
-  diagram next to its edge, filled in with a sample from fuzzing. Edit the
-  JSON or pick another sample, then send.
+  An event that carries a payload asks for one first, in a form at the
+  bottom of the viewer, already filled. Change a field, pick other values, or
+  edit it as JSON, then Send.
 - **Time**: pending timers. Advance the clock to fire one, or by any number of
   milliseconds.
 
@@ -98,8 +98,7 @@ user ride on state payloads, so context holds only the counters.
 
 <Machine src="src/content/docs/login.ts" />
 
-Try it: send `SUBMIT` with a wrong password (the popover starts with a fuzz
-sample; `ada` / `lovelace` is the account that works). `checking` starts a
+Try it: send `SUBMIT` with a wrong password (the form starts filled; `ada` / `lovelace` is the account that works). `checking` starts a
 300 ms timer: advance it in the **Time** section, and you are back at the form.
 Open the **Context** tab: `failedAttempts` went up by one. Do it twice more and
 the third rejection goes to `lockedOut`, with a 30 s unlock timer. The diagram

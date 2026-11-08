@@ -236,22 +236,25 @@ describe("live controls", () => {
       .querySelector('[data-edge-id="idle-submit-paying"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(live.log).toEqual([]);
-    expect(
-      root.querySelector('.canvas .payload-popover [data-payload-form="submit"]'),
-    ).not.toBeNull();
-    expect(root.querySelector(".payload-popover")?.getAttribute("aria-label")).toBe(
+    expect(root.querySelector('.payload-sheet [data-payload-form="submit"]')).not.toBeNull();
+    expect(root.querySelector(".canvas .payload-sheet")).toBeNull();
+    expect(root.querySelector(".payload-sheet")?.parentElement).toBe(root);
+    expect(root.querySelector(".payload-sheet")?.getAttribute("aria-label")).toBe(
       "Payload for submit",
     );
+    const marked = [...root.querySelectorAll("[data-composing]")];
+    expect(marked.map((each) => each.getAttribute("data-edge-id"))).toEqual(["idle-submit-paying"]);
   });
 
-  test("the Send list opens the same popover on the diagram, and Escape closes it", () => {
+  test("the Send list opens the same sheet, and Escape closes it", () => {
     const { root, live } = mount();
     click(root, '[data-send="submit"]');
-    const popover = root.querySelector(".canvas .payload-popover");
-    expect(popover).not.toBeNull();
+    const sheet = root.querySelector(".payload-sheet");
+    expect(sheet).not.toBeNull();
     expect(root.querySelector(".panel [data-payload-form]")).toBeNull();
-    popover?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(root.querySelector(".payload-popover")).toBeNull();
+    sheet?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    expect(root.querySelector("[data-composing]")).toBeNull();
     expect(live.log).toEqual([]);
   });
 

@@ -86,27 +86,50 @@
   position: relative;
 }
 
-/* The payload question, on the diagram next to the edge it will take. */
-.viz .payload-popover {
-  position: absolute;
+/* The payload question, pinned to the bottom so Send stays on screen. */
+.viz .payload-sheet {
+  position: sticky;
+  bottom: 0;
   z-index: 2;
-  width: min(22rem, calc(100% - 8px));
+  display: flex;
+  flex-direction: column;
+  max-height: min(60vh, 26rem);
   box-sizing: border-box;
   background: var(--state-bg);
   border: 1px solid var(--accent);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+  border-top-width: 2px;
+  border-radius: 6px 6px 0 0;
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 25%);
 }
 
-.viz .payload-popover .explore-payload {
+.viz .payload-sheet .explore-payload {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   margin: 0;
   border-left: none;
 }
 
-.viz .payload-popover textarea {
+.viz .payload-sheet .payload-head,
+.viz .payload-sheet .payload-actions {
+  flex: none;
+}
+
+.viz .payload-sheet .payload-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.viz .payload-sheet textarea {
   width: 100%;
   box-sizing: border-box;
   font-family: ui-monospace, monospace;
+}
+
+.viz .edge[data-composing] path {
+  stroke: var(--accent);
+  stroke-width: 2.5;
 }
 
 .viz .panel {

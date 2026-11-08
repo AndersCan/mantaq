@@ -35,6 +35,8 @@ export interface VizHarness {
     event: string,
     payload?: Record<string, VizJson>,
   ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>>;
+  /** Open the form for `event` if it is not open, and say whether its Send button is inside the window. */
+  sendFits(event: string): Promise<Either<string, { inViewport: boolean }>>;
   findings(): VizFinding[];
   /** Click the finding's "!" mark, then its Replay button; left when the finding has no replay. */
   replay(finding: VizFinding): Promise<Either<string, { state: string }>>;
@@ -309,6 +311,34 @@ function describe(
     send: (event, payload) => sendTo({ region: "" }, event, payload),
     sendTo,
     regions: () => readRegions(page),
+    sendFits: async (event) => {
+      if (lifecycle.isClosed()) {
+        return Either.left("harness is closed");
+      }
+      const send = page.locator(`[data-payload-send=${quoted(event)}]`);
+      if ((await send.count()) === 0) {
+        await page.click('[data-tab="step"]');
+        const trigger = page.locator(`${PANEL} [data-send=${quoted(event)}]`).first();
+        if ((await trigger.count()) === 0) {
+          return Either.left(`no button for ${event}.`);
+        }
+        await trigger.click();
+      }
+      if ((await send.count()) === 0) {
+        return Either.left(`no open form for ${event}`);
+      }
+      return Either.right({
+        inViewport: await send.evaluate((node) => {
+          const rect = node.getBoundingClientRect();
+          return (
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.bottom <= innerHeight &&
+            rect.right <= innerWidth
+          );
+        }),
+      });
+    },
     findings: () => machineFindings(machine),
     replay: async (finding) => {
       if (lifecycle.isClosed()) {
