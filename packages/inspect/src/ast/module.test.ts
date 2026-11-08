@@ -101,6 +101,10 @@ describe("analyzeModule: context and payload fields from types", () => {
       ["amount", 1],
       ["tier", "b"],
       ["note", "sample"],
+      ["tags", { a: 1 }],
+      ["broken", ["sample"]],
+      ["level", 2],
+      ["size", "s"],
     ]);
     expect(found?.[0]?.doc).toBe("Where to reach them.");
   });

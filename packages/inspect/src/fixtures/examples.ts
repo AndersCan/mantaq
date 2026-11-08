@@ -17,6 +17,14 @@ const save = event("save")<{
   /** @example b */
   tier: "a" | "b";
   note: string;
+  /** @example {"a":1} */
+  tags: { a: number };
+  /** @example nope{ */
+  broken: string[];
+  /** @example 2 */
+  level: 1 | 2;
+  /** @example c */
+  size: "s" | "m";
 }>();
 
 export function createExamplesActor(clock: VirtualClock = VirtualClock()) {
