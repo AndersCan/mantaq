@@ -21,6 +21,7 @@ import { vizDocument } from "./inspect.ts";
 import type { FuzzSettings } from "./inspect.ts";
 import { layoutOverview, machineLinks } from "./astro/overview.ts";
 import { findingLines } from "./gate.ts";
+import { RUN_DROPPED } from "./runs.ts";
 import { inspectEntry, inspectFile } from "./load.ts";
 import { TARGETS, TARGETS_RESOLVED, targetsSource } from "./vite.ts";
 import { existsSync } from "node:fs";
@@ -34,7 +35,7 @@ export interface MantaqAstroOptions {
   fuzz?: false | FuzzSettings;
   /**
    * `astro build` fails when any machine has a design finding, could not be
-   * fuzzed (unless `fuzz: false`), or has an expectation that is not checked.
+   * fuzzed (unless `fuzz: false`), has an expectation that is not checked, or a recorded run that does not replay.
    * The error lists each with the events that lead there. `astro dev` only
    * shows them on the page. Default false.
    */
@@ -46,6 +47,15 @@ const DOCUMENTS_RESOLVED = `\0${DOCUMENTS}`;
 const CLIENT = "virtual:mantaq/astro-client";
 
 const NOT_FUZZED = /^[^:]*: not fuzzed: /;
+
+function droppedRuns(id: string, warnings: string[]): string[] {
+  const prefix = `${id}: `;
+  return warnings
+    .filter((warning) => warning.startsWith(prefix))
+    .map((warning) => warning.slice(prefix.length))
+    .filter((rest) => rest.startsWith('run "') && rest.includes(RUN_DROPPED))
+    .map((rest) => `  - ${rest}`);
+}
 
 function failureReport(
   fuzzed: boolean,
@@ -62,6 +72,7 @@ function failureReport(
           `  - not fuzzed: ${reason ?? "no fuzz run"}; handler throws, never-see and must-see cannot be found. Export a factory on a VirtualClock, or pass fuzz: false to mantaqViz`,
         );
       }
+      items.push(...droppedRuns(machine.id, warnings));
       if (items.length === 0) continue;
       count += items.filter((line) => line.startsWith("  - ")).length;
       blocks.push(`${machine.id} in ${rel}:`, ...items);

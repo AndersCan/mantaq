@@ -8,6 +8,9 @@ import { applyStep, eventCatalog, targetOf } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import type { AnyActor } from "@mantaq/core";
 
+/** Between the run name and the reason in a drop warning. */
+export const RUN_DROPPED = " dropped: ";
+
 /** A run as a test recorded it: the steps it took and the state its actor ended in. */
 interface RecordedRun extends VizRun {
   end: string;
@@ -86,7 +89,9 @@ export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<strin
   release(actor, maps);
   return ended === run.end
     ? Either.right(kept)
-    : Either.left(`replays to ${ended}, the test ended in ${run.end}`);
+    : Either.left(
+        `replays to ${ended}, the test ended in ${run.end}. The page builds the actor with only a VirtualClock; a test that passes other options can end elsewhere. Build this test's actor with only the clock, or give the factory defaults that act like those options.`,
+      );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

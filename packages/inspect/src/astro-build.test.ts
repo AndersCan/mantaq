@@ -263,6 +263,31 @@ describe("mantaqViz for Astro", () => {
       });
     }, 120_000);
 
+    test("a recorded run that does not replay fails", async () => {
+      const source = join(import.meta.dirname, "fixtures", "clean.ts");
+      await withSite([clean], async (root) => {
+        mkdirSync(join(root, "m", "__runs__"), { recursive: true });
+        writeFileSync(join(root, "m", "clean.ts"), `export * from ${JSON.stringify(source)};\n`);
+        writeFileSync(
+          join(root, "m", "__runs__", "clean.test.json"),
+          JSON.stringify({
+            clean: [
+              {
+                name: "Nils declines",
+                end: "waitingForRequest",
+                steps: [{ kind: "event", event: "requestArrived", payload: {} }],
+              },
+            ],
+          }),
+        );
+        await expect(
+          buildSite(root, ["m/clean.ts"], { fuzz: { iterations: 200 }, failOnFindings: true }),
+        ).rejects.toThrow(
+          /failOnFindings: 1 problem stops the build\n.*clean in .*clean\.ts:\n {2}- run "Nils declines" dropped: replays to handlingRequest, the test ended in waitingForRequest\. The page builds the actor with only a VirtualClock/,
+        );
+      });
+    }, 120_000);
+
     test("astro dev does not fail", async () => {
       const hook = mantaqViz({ machines: [orphan], fuzz: false, failOnFindings: true }).hooks[
         "astro:config:setup"
