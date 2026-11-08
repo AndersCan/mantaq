@@ -8,7 +8,7 @@ A machine in an app talks to the outside world: a payment provider, a timer. Don
 ## A factory with ports and a clock
 
 ```ts
-import { createCheckoutActor, chargeCard } from "../checkout.ts";
+import { createCheckoutActor, chargeCard } from "./checkout";
 
 // app: one singleton, real port, real clock
 export const checkout = createCheckoutActor({ chargeCard }).actor;
@@ -21,12 +21,7 @@ export const checkout = createCheckoutActor({ chargeCard }).actor;
 ```ts
 import { VirtualClock } from "@mantaq/core";
 import { createTestHarness } from "@mantaq/test";
-import {
-  createCheckoutActor,
-  submitBasicInfo,
-  submitShipping,
-  submitPayment,
-} from "../checkout.ts";
+import { createCheckoutActor, submitBasicInfo, submitShipping, submitPayment } from "./checkout";
 
 const clock = VirtualClock();
 const { actor } = createCheckoutActor({

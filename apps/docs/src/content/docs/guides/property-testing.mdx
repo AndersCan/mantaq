@@ -19,23 +19,35 @@ Machine in `submitting` schedules `paymentTimeout` after `timeoutMs`. `VirtualCl
 ```ts
 import { Actor, VirtualClock } from "@mantaq/core";
 import { fc, runProperty } from "@mantaq/pbt";
+import {
+  back,
+  basicInfo,
+  error,
+  payment,
+  paymentTimeout,
+  shippingAddress,
+  submitBasicInfo,
+  submitShipping,
+  submitting,
+  success,
+} from "./checkout";
 
 runProperty(
   fc.tuple(fc.integer({ min: 0, max: 1000 }), fc.integer({ min: 0, max: 1000 })),
   ([timeoutMs, advanceMs]) => {
-    const clock = new VirtualClock();
-    const actor = new Actor({
+    const clock = VirtualClock();
+    const actor = Actor({
       clock,
       inputs: [],
       internal: [paymentTimeout],
       states: [basicInfo, shippingAddress, payment, submitting, success, error],
       initial: submitting,
       setup: (m) => {
-        m.on(submitting, paymentTimeout, () => ({ state: error }));
+        m.on(submitting, { event: paymentTimeout, to: [error], handler: () => ({ state: error }) });
         m.effect(submitting, {
           name: "startSubmitTimeout",
           fn: ({ signal, clock: c, emit }) => {
-            c.setTimeout(timeoutMs, () => emit(paymentTimeout.create()), { signal });
+            c.setTimeout(timeoutMs, { signal, cb: () => emit(paymentTimeout.create()) });
           },
         });
       },
@@ -55,16 +67,31 @@ From any pre-payment step, mashing `back` never reaches a final state.
 
 ```ts
 runProperty(fc.integer({ min: 0, max: 10 }), (presses) => {
-  const clock = new VirtualClock();
-  const actor = new Actor({
+  const actor = Actor({
     inputs: [back, submitBasicInfo, submitShipping],
     states: [basicInfo, shippingAddress, payment, success, error],
     initial: basicInfo,
     setup: (m) => {
-      m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
-      m.on(shippingAddress, back, () => ({ state: basicInfo }));
-      m.on(shippingAddress, submitShipping, () => ({ state: payment }));
-      m.on(payment, back, () => ({ state: shippingAddress }));
+      m.on(basicInfo, {
+        event: submitBasicInfo,
+        to: [shippingAddress],
+        handler: () => ({ state: shippingAddress }),
+      });
+      m.on(shippingAddress, {
+        event: back,
+        to: [basicInfo],
+        handler: () => ({ state: basicInfo }),
+      });
+      m.on(shippingAddress, {
+        event: submitShipping,
+        to: [payment],
+        handler: () => ({ state: payment }),
+      });
+      m.on(payment, {
+        event: back,
+        to: [shippingAddress],
+        handler: () => ({ state: shippingAddress }),
+      });
     },
   });
 
