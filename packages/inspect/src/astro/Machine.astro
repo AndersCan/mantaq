@@ -1,6 +1,7 @@
 ---
 import { resolve } from "node:path";
 import { documents, root } from "virtual:mantaq/documents";
+import { bannerParts } from "./banner.ts";
 
 const { src } = Astro.props;
 const abs = resolve(root, src);
@@ -13,20 +14,22 @@ if (doc === undefined) {
 if (doc.machines.length === 0) {
   throw new Error(`<Machine src="${src}">: no exported actor or actor factory found in ${abs}`);
 }
-const count = doc.findings.length;
+const { count, machines, shown, more, marked, wideText } = bannerParts(doc.findings);
 ---
 
 <section class="mantaq-findings" data-count={count}>
   {
     count > 0 ? (
-      <>
-        <p>
-          <strong>
-            {count} design finding{count === 1 ? "" : "s"}
-          </strong>
-          , marked with ! on the diagram. Click a mark to see the bug and replay it.
-        </p>
-      </>
+      <p>
+        <strong>
+          {count} design finding{count === 1 ? "" : "s"} in {machines}
+        </strong>
+        : {shown.join("; ")}
+        {more}.{marked ? " Click a ! on the diagram to see why." : ""}
+        {wideText !== ""
+          ? ` ${wideText} listed at the top of the Details tab.`
+          : ""}
+      </p>
     ) : (
       <p>No design findings.{doc.fuzzed ? "" : " Fuzzing is off."}</p>
     )
