@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  The live driver reports the current state's payload as `VizLiveState.payload`. Breaking: a custom `VizDriver` must return `payload`.
+
 ## 0.16.0
 
 <sub>2026-11-07</sub>
