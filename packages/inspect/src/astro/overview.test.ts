@@ -1,4 +1,4 @@
-import { layoutOverview, machineLinks } from "./overview.ts";
+import { layoutOverview, machineLinks, outputRoutes } from "./overview.ts";
 import type { VizMachine } from "@mantaq/viz";
 import type { Wire } from "../ast/wires.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -185,5 +185,38 @@ describe("layoutOverview", () => {
         expect(apart).toBe(true);
       }
     }
+  });
+});
+
+describe("outputRoutes", () => {
+  const wire = (trigger: string, event: string, from = "a", at = "app.ts:3"): Wire => ({
+    from,
+    to: "b",
+    trigger,
+    event,
+    at,
+  });
+  const a = machine("a", ["x", "y"], []).machine;
+
+  test("a guarded wire is a route for its output only", () => {
+    expect(outputRoutes([a], [wire("x", "GO")])).toEqual({
+      a: { x: [{ to: "b", event: "GO", at: "app.ts:3" }] },
+    });
+  });
+
+  test("an unguarded wire is a route for every output, in wire order", () => {
+    expect(outputRoutes([a], [wire("x", "ONE"), wire("output", "TWO")])).toEqual({
+      a: {
+        x: [
+          { to: "b", event: "ONE", at: "app.ts:3" },
+          { to: "b", event: "TWO", at: "app.ts:3" },
+        ],
+        y: [{ to: "b", event: "TWO", at: "app.ts:3" }],
+      },
+    });
+  });
+
+  test("change wires, other machines' wires and unwired outputs give nothing", () => {
+    expect(outputRoutes([a], [wire("change", "GO"), wire("x", "GO", "z")])).toEqual({});
   });
 });

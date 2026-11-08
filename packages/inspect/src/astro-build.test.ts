@@ -191,6 +191,15 @@ describe("mantaqViz for Astro", () => {
     );
   });
 
+  test("Machine pages carry where each output goes", () => {
+    const html = readFileSync(join(wiredSite, "dist", "index.html"), "utf8");
+    document.documentElement.innerHTML = html.replace(/<link[^>]*>/g, "");
+    const raw = document.querySelector(".mantaq-machine")?.getAttribute("data-mantaq-routes");
+    const routes = JSON.parse(raw ?? "{}");
+    expect(routes["sender"]["handedOver"][0]).toMatchObject({ to: "receiver", event: "take" });
+    expect(routes["sender"]["handedOver"][0].at).toMatch(/wire\.ts:\d+$/);
+  });
+
   test("Machines draws a dashed arrow to no machine for an output nothing listens to", () => {
     const html = readFileSync(join(wiredSite, "dist", "machines", "index.html"), "utf8").replace(
       /<link[^>]*>/g,

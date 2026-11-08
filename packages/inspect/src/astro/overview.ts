@@ -1,4 +1,4 @@
-import type { VizMachine } from "@mantaq/viz";
+import type { VizMachine, VizOutputRoutes } from "@mantaq/viz";
 import type { NotRun, Unheard, Wire } from "../ast/wires.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
@@ -65,6 +65,30 @@ const LABEL_HEIGHT = 16;
 function labelOf(link: OverviewLink): string {
   const wires = link.wires.map((wire) => `${wire.trigger} → ${wire.event}`);
   return [...new Set([...link.events, ...wires])].join(", ");
+}
+
+/**
+ * Per machine, per output id: the app-code wires that take it, in wire order.
+ * An unguarded wire ("output") takes every output; "change" wires are never routes.
+ */
+export function outputRoutes(
+  machines: ReadonlyArray<VizMachine>,
+  wires: ReadonlyArray<Wire>,
+): VizOutputRoutes {
+  const result: VizOutputRoutes = {};
+  for (const machine of machines) {
+    const byOutput: Record<string, Array<{ to: string; event: string; at: string }>> = {};
+    for (const id of machine.outputs) {
+      const routes = wires
+        .filter(
+          (wire) => wire.from === machine.id && (wire.trigger === id || wire.trigger === "output"),
+        )
+        .map(({ to, event, at }) => ({ to, event, at }));
+      if (routes.length > 0) byOutput[id] = routes;
+    }
+    if (Object.keys(byOutput).length > 0) result[machine.id] = byOutput;
+  }
+  return result;
 }
 
 /**

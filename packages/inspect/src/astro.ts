@@ -19,7 +19,7 @@ import type { AstroIntegration } from "astro";
 import type { Plugin } from "vite";
 import { vizDocument } from "./inspect.ts";
 import type { FuzzSettings } from "./inspect.ts";
-import { layoutOverview, machineLinks } from "./astro/overview.ts";
+import { layoutOverview, machineLinks, outputRoutes } from "./astro/overview.ts";
 import { scanAppCode } from "./ast/wires.ts";
 import { findingLines } from "./gate.ts";
 import { RUN_DROPPED } from "./runs.ts";
@@ -152,6 +152,12 @@ async function documentsSource(
   return [
     `export const root = ${JSON.stringify(context.root)};`,
     `export const documents = ${JSON.stringify(documents)};`,
+    `export const routes = ${JSON.stringify(
+      outputRoutes(
+        all.map(({ machine }) => machine),
+        scanned.wires,
+      ),
+    )};`,
     `export const overview = ${JSON.stringify(
       layoutOverview(
         all.map(({ file, machine }) => ({ id: machine.id, file })),

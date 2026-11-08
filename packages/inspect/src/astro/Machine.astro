@@ -1,6 +1,6 @@
 ---
 import { resolve } from "node:path";
-import { documents, root } from "virtual:mantaq/documents";
+import { documents, root, routes } from "virtual:mantaq/documents";
 import { bannerParts } from "./banner.ts";
 
 const { src } = Astro.props;
@@ -14,6 +14,9 @@ if (doc === undefined) {
 if (doc.machines.length === 0) {
   throw new Error(`<Machine src="${src}">: no exported actor or actor factory found in ${abs}`);
 }
+const docRoutes = Object.fromEntries(
+  doc.machines.flatMap((id) => (routes[id] === undefined ? [] : [[id, routes[id]]])),
+);
 const { count, machines, shown, more, marked, wideText } = bannerParts(doc.findings);
 ---
 
@@ -35,7 +38,12 @@ const { count, machines, shown, more, marked, wideText } = bannerParts(doc.findi
     )
   }
 </section>
-<div class="mantaq-machine" data-mantaq-viz={doc.text} data-mantaq-src={src}>
+<div
+  class="mantaq-machine"
+  data-mantaq-viz={doc.text}
+  data-mantaq-src={src}
+  data-mantaq-routes={JSON.stringify(docRoutes)}
+>
   <noscript>The interactive diagram needs JavaScript.</noscript>
 </div>
 <script>
