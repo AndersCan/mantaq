@@ -111,12 +111,13 @@ npm i -D playwright && npx playwright install chromium
 astro build && mantaq-check-site dist --base /docs
 ```
 
-`mantaq-check-site <dir> [--base <path>]` serves the built Astro site, opens every page that holds a machine in headless Chromium and prints one line per problem, naming the page and the machine:
+`mantaq-check-site <dir> [--base <path>] [--links <file> ... --site <url>]` serves the built Astro site, opens every page that holds a machine in headless Chromium and prints one line per problem, naming the page and the machine:
 
 - a machine draws no diagram;
 - a live machine handles none of the events it offers;
 - an overview box (`<Machines>`) links to a page that was not built, or to a page that shows no viewer for that machine (the overview is what makes "this page shows its machine" checkable);
 - a page throws or logs an error in the browser.
+- with `--links <file>` (repeatable) and `--site <url>` (the address the site is published at), a markdown link `[text](url)` in the file that points under `--site` and carries `run=` opens no walk: its page is not built, no viewer there holds the machine, or the viewer says "No run named ...". One line per link: `<file>:<line>: walk link "<text>": <reason>`.
 
 `--base` is the Astro `base` (default `/`). Exit codes: 0 ok, 1 problems found, 2 could not run (usage, no `playwright`, no Chromium). `playwright` is an optional peer dependency; set `CHROMIUM_PATH` to use a Chromium you already have.
 

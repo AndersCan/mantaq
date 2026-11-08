@@ -10,7 +10,9 @@ import type { AddressInfo } from "node:net";
 import { extname, join, resolve, sep } from "node:path";
 
 export type SiteCheck = { pages: number; failures: string[] };
+export type SiteCheckOptions = { links?: string[]; site?: string };
 
+type WalkLink = { where: string; text: string; target: URL };
 type Viewer = { src: string; ids: string[]; label: string };
 type Box = { id: string; href: string };
 type Scan = { viewers: Viewer[]; boxes: Box[] };
@@ -248,14 +250,133 @@ function checkBoxes(site: Site, url: string, boxes: Box[], opened: Map<string, S
   return failures;
 }
 
+/** The markdown links in the files that go to a run under the site address. */
+function walkLinks(files: string[], site: URL): Either<string, WalkLink[]> {
+  const found: WalkLink[] = [];
+  for (const file of files) {
+    let text: string;
+    try {
+      text = readFileSync(file, "utf8");
+    } catch {
+      return Either.left(`cannot read ${file}`);
+    }
+    for (const [index, line] of text.split("\n").entries()) {
+      for (const match of line.matchAll(/\[([^\]]*)\]\(([^)\s]+)\)/g)) {
+        const url = URL.parse(match[2] ?? "");
+        if (
+          url !== null &&
+          url.searchParams.has("run") &&
+          url.origin === site.origin &&
+          url.pathname.startsWith(site.pathname)
+        ) {
+          found.push({ where: `${file}:${index + 1}`, text: match[1] ?? "", target: url });
+        }
+      }
+    }
+  }
+  return Either.right(found);
+}
+
+/** The failure for one walk link: what the viewer at its target says, or why none opens. */
+async function checkWalkLink(
+  browser: import("playwright").Browser,
+  site: Site,
+  siteUrl: URL,
+  link: WalkLink,
+): Promise<string | undefined> {
+  const { dir, base, origin } = site;
+  const shown = link.text.replace(/\s+/g, " ").trim() || link.target.href;
+  const name = `${link.where}: walk link "${shown}"`;
+  const id = link.target.searchParams.get("machine") ?? "";
+  if (id === "") {
+    return `${name} has no machine=, so no viewer opens it`;
+  }
+  const path = base + link.target.pathname.slice(siteUrl.pathname.length);
+  if (fileFor(dir, base, path) === undefined) {
+    return `${name} goes to ${path}, which is not built`;
+  }
+  const page = await browser.newPage();
+  try {
+    await page.goto(origin + path + link.target.search);
+    const found = await scan(page);
+    const roots = page.locator(".mantaq-machine");
+    const held = found.viewers.flatMap((viewer, index) =>
+      viewer.ids.includes(id) ? [roots.nth(index)] : [],
+    );
+    if (held.length === 0) {
+      return `${name} opens ${path}, but no viewer there holds ${id}`;
+    }
+    for (const root of held) {
+      await root.locator("svg").first().waitFor({ timeout: 10_000 });
+      const notice = root.locator("[data-run-missing]");
+      if ((await notice.count()) > 0) {
+        return `${name}: ${((await notice.first().textContent()) ?? "").trim()}`;
+      }
+    }
+    return undefined;
+  } catch (error) {
+    return `${name}: could not check: ${firstLine(error)}`;
+  } finally {
+    await page.close();
+  }
+}
+
+async function checkWalkLinks(
+  browser: import("playwright").Browser,
+  site: Site,
+  siteUrl: URL,
+  links: WalkLink[],
+): Promise<string[]> {
+  const failures: string[] = [];
+  for (const link of links) {
+    const failure = await checkWalkLink(browser, site, siteUrl, link);
+    if (failure !== undefined) {
+      failures.push(failure);
+    }
+  }
+  return failures;
+}
+
+/** The site address and the walk links the options ask to check, or why they cannot. */
+function linksToCheck(
+  options: SiteCheckOptions,
+): Either<string, { siteUrl: URL; links: WalkLink[] }> {
+  const files = options.links ?? [];
+  const none = new URL("http://unused.invalid/");
+  if (files.length === 0) {
+    return Either.right({ siteUrl: none, links: [] });
+  }
+  if (options.site === undefined) {
+    return Either.left(
+      "--links needs --site, the address the site is published at (e.g. https://you.github.io/repo/)",
+    );
+  }
+  const parsed = URL.parse(options.site);
+  if (parsed === null || !/^https?:$/.test(parsed.protocol)) {
+    return Either.left(`--site must be an absolute http(s) address, got "${options.site}"`);
+  }
+  parsed.pathname = parsed.pathname.replace(/\/*$/, "/");
+  const read = walkLinks(files, parsed);
+  if (Either.isLeft(read)) {
+    return read;
+  }
+  return Either.right({ siteUrl: parsed, links: read[1] });
+}
+
 export async function checkSite(
   dirArg: string,
   baseArg: string,
+  options: SiteCheckOptions = {},
 ): Promise<Either<string, SiteCheck>> {
   const dir = resolve(dirArg);
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
     return Either.left(`${dir} is not a directory`);
   }
+  const wanted = linksToCheck(options);
+  if (Either.isLeft(wanted)) {
+    return wanted;
+  }
+  const { siteUrl, links } = wanted[1];
   const base = normaliseBase(baseArg);
   const pages = htmlFiles(dir)
     .filter((file) => readFileSync(file, "utf8").includes("mantaq-machine"))
@@ -297,6 +418,7 @@ export async function checkSite(
     for (const [url, found] of opened) {
       failures.push(...checkBoxes(site, url, found.boxes, opened));
     }
+    failures.push(...(await checkWalkLinks(browser, site, siteUrl, links)));
   } finally {
     await browser.close();
     await new Promise((done) => server.close(done));
