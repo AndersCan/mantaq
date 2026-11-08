@@ -81,6 +81,16 @@ describe("notes on a page without a dev server", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  test("selecting a state or edge does not scroll the page", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const root = await draw();
+    click(root, "payment");
+    addNote(root, "x");
+    click(root, "payment");
+    expect(scroll).not.toHaveBeenCalled();
+  });
+
   test("adding a note lists it as To send and shows the bar", async () => {
     const root = await draw();
     click(root, "payment");

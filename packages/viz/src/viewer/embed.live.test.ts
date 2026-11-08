@@ -225,6 +225,13 @@ describe("live controls", () => {
     expect(root.querySelector("[data-payload-form]")).toBeNull();
   });
 
+  test("Send is the only primary button in the payload form", () => {
+    const { root } = mount();
+    click(root, '[data-send="submit"]');
+    const primary = [...root.querySelectorAll('[data-payload-form="submit"] button.primary')];
+    expect(primary.map((each) => each.getAttribute("data-payload-send"))).toEqual(["submit"]);
+  });
+
   test("cancel closes the form without sending", () => {
     const { root, live } = mount();
     click(root, '[data-send="submit"]');
