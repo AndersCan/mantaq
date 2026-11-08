@@ -60,6 +60,15 @@ export interface Trace {
    * re-entered), `stay:a>e` (handled, no change), `error:a>e` (handler threw).
    */
   features: string[];
+  /** Events sent without a payload whose fields the machine then read, sorted by event. */
+  missingPayloads: MissingPayload[];
+}
+
+/** An event fuzzing sent without a payload, and the payload fields the machine read from it. */
+export interface MissingPayload {
+  event: string;
+  /** Sorted. */
+  fields: string[];
 }
 
 export function isActor(value: unknown): value is AnyActor<unknown> {
@@ -104,8 +113,71 @@ function handles(actor: AnyActor<unknown>, event: string): boolean {
   );
 }
 
-function toEvent(step: { event: string; payload: VizJson }): InternalEvent {
-  return step.payload === null ? { type: step.event } : { type: step.event, payload: step.payload };
+function toEvent(
+  step: { event: string; payload: VizJson },
+  empty?: (event: string) => object,
+): InternalEvent {
+  if (step.payload !== null) return { type: step.event, payload: step.payload };
+  return empty === undefined
+    ? { type: step.event }
+    : { type: step.event, payload: empty(step.event) };
+}
+
+/** Keys a serializer probes on any value; not a read of a payload field. */
+const NOT_A_FIELD = new Set(["toJSON"]);
+
+/** Same event merged, fields and events sorted. */
+export function mergeMissing(lists: ReadonlyArray<MissingPayload>): MissingPayload[] {
+  const merged = new Map<string, Set<string>>();
+  for (const { event, fields } of lists) {
+    const set = merged.get(event) ?? new Set<string>();
+    for (const field of fields) set.add(field);
+    merged.set(event, set);
+  }
+  return [...merged]
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([event, fields]) => ({ event, fields: [...fields].sort() }));
+}
+
+/**
+ * An empty payload that notes the field names read from it, until `missing()` is read: later reads are not part of the trace.
+ * It answers like `{}`: a read gives undefined, `in` gives false.
+ */
+function recordingPayloads(): {
+  make: (event: string) => object;
+  isMade: (value: unknown) => boolean;
+  missing: () => MissingPayload[];
+} {
+  const read = new Map<string, Set<string>>();
+  const made = new WeakSet<object>();
+  const note = (event: string, key: string | symbol): void => {
+    if (typeof key !== "string" || NOT_A_FIELD.has(key)) return;
+    const fields = read.get(event) ?? new Set<string>();
+    fields.add(key);
+    read.set(event, fields);
+  };
+  return {
+    make: (event) => {
+      const proxy = new Proxy(
+        {},
+        {
+          get: (target, key, receiver) => {
+            note(event, key);
+            return Reflect.get(target, key, receiver);
+          },
+          has: (target, key) => {
+            note(event, key);
+            return Reflect.has(target, key);
+          },
+        },
+      );
+      made.add(proxy);
+      return proxy;
+    },
+    isMade: (value) => typeof value === "object" && value !== null && made.has(value),
+    missing: () =>
+      mergeMissing([...read].map(([event, fields]) => ({ event, fields: [...fields] }))),
+  };
 }
 
 export function messageOf(error: unknown): string {
@@ -180,6 +252,8 @@ export function applyStep(
     clock: VirtualClock;
     internal: ReadonlySet<string>;
     maps?: Readonly<Record<string, ActorMapLike>>;
+    /** The payload for an event step that has none. Default: none. */
+    emptyPayload?: (event: string) => object;
   },
 ): void {
   const { step } = context;
@@ -190,8 +264,8 @@ export function applyStep(
   // A live effect only emits while its state is active, and core rejects an
   // internal event the current state cannot handle. Such a step is a no-op.
   if (internal.has(step.event)) {
-    if (handles(actor, step.event)) actor.inject(toEvent(step));
-  } else actor.send(toEvent(step));
+    if (handles(actor, step.event)) actor.inject(toEvent(step, context.emptyPayload));
+  } else actor.send(toEvent(step, context.emptyPayload));
 }
 
 /**
@@ -205,6 +279,9 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   const visited = [actor.state.name];
   const regions = regionActors(actor);
   for (const region of regions) visited.push(`${region.path}.${region.actor.state.name}`);
+  const recording = recordingPayloads();
+  /** What the handler got, as plain data: a recording payload is `{}`. */
+  const plain = (payload: unknown): unknown => (recording.isMade(payload) ? {} : payload);
   const observations: Observation[] = [];
   const errors: RunError[] = [];
   const contextSteps: number[] = [];
@@ -230,7 +307,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
         transitioned,
         effects,
         step: index,
-        payload: event.payload,
+        payload: plain(event.payload),
         context,
       });
       if (transitioned) visited.push(to);
@@ -257,7 +334,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
           transitioned,
           effects,
           step: index,
-          payload: event.payload,
+          payload: plain(event.payload),
           context: parsed(contextText(actor)),
         });
         if (transitioned) visited.push(`${path}.${to}`);
@@ -282,7 +359,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     // user code the step runs outside them (a timer callback under
     // `clock.advance`) ends this run as an error, not the whole fuzz.
     const applied = Either.from(() => {
-      applyStep(actor, { step, clock, internal, maps });
+      applyStep(actor, { step, clock, internal, maps, emptyPayload: recording.make });
       return true;
     });
     if (Either.isLeft(applied)) {
@@ -305,5 +382,6 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   for (const map of Object.values(maps)) map.dispose();
   actor.dispose();
   const features = [...new Set([...featuresOf({ visited, observations, errors }), ...hits])].sort();
-  return { visited, observations, errors, contextSteps, loopStarts, features };
+  const missingPayloads = recording.missing();
+  return { visited, observations, errors, contextSteps, loopStarts, features, missingPayloads };
 }

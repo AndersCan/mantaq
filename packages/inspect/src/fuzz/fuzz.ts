@@ -2,8 +2,8 @@ import type { VizExpectation, VizFailedExpectation, VizFuzzError, VizStep } from
 import { mutate } from "./mutate.ts";
 import type { LiteralPool, MutationContext, Parent } from "./mutate.ts";
 import { createRng } from "./rng.ts";
-import { eventCatalog, execute, regionActors } from "./run.ts";
-import type { FuzzTarget, Trace } from "./run.ts";
+import { eventCatalog, execute, mergeMissing, regionActors } from "./run.ts";
+import type { FuzzTarget, MissingPayload, Trace } from "./run.ts";
 
 export interface FuzzOptions {
   seed: number;
@@ -52,6 +52,8 @@ export interface FuzzResult {
   failedExpectations: VizFailedExpectation[];
   /** Every rule written, held or not, in `FuzzTarget.expectations` order. */
   expectations: VizExpectation[];
+  /** Events sent without a payload whose fields the machine read, over every run. Sorted. */
+  missingPayloads: MissingPayload[];
 }
 
 function covers(target: FuzzTarget, steps: ReadonlyArray<VizStep>, wanted: ReadonlyArray<string>) {
@@ -172,9 +174,11 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   /** Parallel to `corpus`: which steps of each entry changed context, and their cycles. */
   const loops: Array<Pick<Parent, "contextSteps" | "loopStarts">> = [];
 
+  const missing: MissingPayload[] = [];
   const progress = { covered: false };
   function consider(steps: VizStep[], iteration: number): void {
     const trace = execute(target, steps);
+    missing.push(...trace.missingPayloads);
     if (options.done?.(trace) === true) progress.covered = true;
     const discovered = trace.features.filter((feature) => !seen.has(feature));
     const guided = options.guide ? options.guide(trace) : false;
@@ -218,5 +222,6 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
     errors: collectErrors(target, kept),
     failedExpectations: checked.flatMap((each) => (each.failed === null ? [] : [each.failed])),
     expectations: checked.map((each) => each.rule),
+    missingPayloads: mergeMissing(missing),
   };
 }

@@ -210,7 +210,7 @@ describe("expectations during a step", () => {
 });
 
 const NO_SOURCE =
-  "no source, so payload types are unknown: fuzz sends begin, bump, finish, tag without a payload. Pass `source` (samples from the event types) or `payloads`.";
+  "fuzz sent tag without a payload and the machine read note. Pass `source` (samples from the event types) or `payloads` with a sample for tag.";
 
 describe("inspect with expectations", () => {
   test("the findings show up on the machine", () => {

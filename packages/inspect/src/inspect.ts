@@ -2,7 +2,7 @@ import type { AnalysisSource } from "./ast/program.ts";
 import type { AnyActor, Clock } from "@mantaq/core";
 import type { AnyExpectations, CheckedExpectation } from "./expectations.ts";
 import type { FuzzOptions, FuzzStop } from "./fuzz/fuzz.ts";
-import type { FuzzTarget } from "./fuzz/run.ts";
+import type { FuzzTarget, MissingPayload } from "./fuzz/run.ts";
 import type { MachineExport } from "./ast/discover.ts";
 import type { ModuleAnalysis } from "./ast/annotate.ts";
 import type { RecordedRuns } from "./runs.ts";
@@ -67,7 +67,7 @@ function budget(
 /** What fuzzing missed and how to get further, or nothing when it reached everything. */
 function fuzzWarnings(
   machine: VizMachine,
-  run: { stopped: FuzzStop; unsampled: string[] },
+  run: { stopped: FuzzStop; missing: ReadonlyArray<MissingPayload> },
 ): string[] {
   const missed = unreached(machine);
   const iterations = machine.fuzz?.iterations ?? 0;
@@ -77,12 +77,10 @@ function fuzzWarnings(
       : [
           `fuzz never reached: ${missed.join(", ")} (ran ${iterations} iterations, stopped: ${STOPPED[run.stopped]}). Raise fuzz.timeLimitMs / iterations or add a named run to \`tests\`.`,
         ];
-  const unsampled =
-    run.unsampled.length === 0
-      ? []
-      : [
-          `no source, so payload types are unknown: fuzz sends ${run.unsampled.join(", ")} without a payload. Pass \`source\` (samples from the event types) or \`payloads\`.`,
-        ];
+  const unsampled = run.missing.map(
+    ({ event, fields }) =>
+      `fuzz sent ${event} without a payload and the machine read ${fields.join(", ")}. Pass \`source\` (samples from the event types) or \`payloads\` with a sample for ${event}.`,
+  );
   return [...never, ...unsampled];
 }
 
@@ -109,6 +107,8 @@ export interface Inspected {
   machine: VizMachine;
   /** Things worth fixing or knowing: unreachable routing, unhandled sends, why fuzzing was skipped. */
   warnings: string[];
+  /** Events fuzzing sent without a payload whose fields the machine read; empty when fuzzing is off. */
+  missingPayloads: MissingPayload[];
 }
 
 /** The actor of a factory result, and the whole result when it is `{ actor, ... }`. */
@@ -171,9 +171,9 @@ function annotator(
 function driven(
   target: InspectTarget,
   context: { structure: VizMachine; run: Either<string, FuzzTarget> },
-): { machine: VizMachine; notes: string[] } {
+): { machine: VizMachine; notes: string[]; missing: MissingPayload[] } {
   const { structure, run } = context;
-  if (Either.isLeft(run)) return { machine: structure, notes: [run[0]] };
+  if (Either.isLeft(run)) return { machine: structure, notes: [run[0]], missing: [] };
   const settings = target.fuzz;
   const fuzzed = settings === false ? null : fuzzRun(run[1], { target, settings, structure });
   const base = fuzzed?.machine ?? structure;
@@ -185,7 +185,7 @@ function driven(
           base,
           target.tests.map((each) => each.steps),
         );
-  return { machine, notes: fuzzed?.warnings ?? [] };
+  return { machine, notes: fuzzed?.warnings ?? [], missing: fuzzed?.missing ?? [] };
 }
 
 /** Why written expectations are not checked, if they are not. */
@@ -207,7 +207,7 @@ function uncheckedExpectations(
 function fuzzRun(
   runner: FuzzTarget,
   context: { target: InspectTarget; settings: FuzzSettings | undefined; structure: VizMachine },
-): { machine: VizMachine; warnings: string[] } {
+): { machine: VizMachine; warnings: string[]; missing: MissingPayload[] } {
   const { target, settings, structure } = context;
   const result = fuzz(runner, {
     seed: settings?.seed ?? DEFAULT_SEED,
@@ -216,12 +216,12 @@ function fuzzRun(
     ...guidance(structure),
   });
   const machine = fuzzedMachine(runner, result);
-  const sampled = runner.payloads ?? {};
-  const unsampled =
-    target.source === undefined
-      ? structure.events.map((event) => event.id).filter((id) => sampled[id] === undefined)
-      : [];
-  return { machine, warnings: fuzzWarnings(machine, { stopped: result.stopped, unsampled }) };
+  const { missingPayloads: missing } = result;
+  return {
+    machine,
+    warnings: fuzzWarnings(machine, { stopped: result.stopped, missing }),
+    missing,
+  };
 }
 
 function inspectWith(
@@ -237,7 +237,7 @@ function inspectWith(
     structure.states.filter((each) => each.region === null).map((each) => each.id),
   );
   const run = runner(target, { ...inferred, ...target.payloads }, expected.checked);
-  const { machine, notes } = driven(target, { structure, run });
+  const { machine, notes, missing } = driven(target, { structure, run });
   const unchecked = uncheckedExpectations(target, { expected, run, structure });
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
@@ -245,6 +245,7 @@ function inspectWith(
   const annotated = annotate({ ...machine, runs: [...(target.tests ?? [])] });
   return {
     machine: annotated,
+    missingPayloads: missing,
     warnings: [
       ...unanalyzed,
       ...mapWarnings(created.made),
