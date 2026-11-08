@@ -67,6 +67,7 @@ export function showPayloadPopover(
       event,
       samples: payloadSamples(machine, event),
       fields: machine.events.find((each) => each.id === event)?.payload ?? null,
+      live,
       send: context.send,
       close,
     }),

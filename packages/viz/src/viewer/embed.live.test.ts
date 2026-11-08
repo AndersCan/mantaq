@@ -3,6 +3,7 @@ import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type {
   VizDriver,
   VizEdge,
+  VizJson,
   VizLiveState,
   VizLiveStep,
   VizMachine,
@@ -77,7 +78,7 @@ const checkout: VizMachine = {
 };
 
 /** A pure function of the step log, like the real driver after reset + replay. */
-function driver(): VizDriver & { log: VizStep[][] } {
+function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
   const log: VizStep[][] = [];
   const run = (steps: VizStep[]): VizLiveState => {
     let now = 0;
@@ -104,7 +105,7 @@ function driver(): VizDriver & { log: VizStep[][] } {
           ? [{ id: "t1", ms: 800, deadline, eventName: "paymentTimeout" }]
           : [],
       context,
-      payload: null,
+      payload: held,
     };
   };
   const done: VizStep[] = [];
@@ -515,9 +516,9 @@ describe("field forms and the context table", () => {
     fuzz: null,
   };
 
-  function mountFields(machine: VizMachine = fieldsMachine) {
+  function mountFields(machine: VizMachine = fieldsMachine, held: VizJson = null) {
     const root = document.createElement("div");
-    const live = driver();
+    const live = driver(held);
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver: live });
     return { root, live };
   }
@@ -571,6 +572,68 @@ describe("field forms and the context table", () => {
     click(root, '[data-send="ping"]');
     expect(live.log[0]).toEqual([{ kind: "event", event: "ping", payload: null }]);
     expect(root.querySelector('[data-send-custom="ping"]')).not.toBeNull();
+  });
+
+  const fillMachine: VizMachine = {
+    ...fieldsMachine,
+    events: [
+      {
+        id: "submit",
+        internal: false,
+        doc: null,
+        payload: [
+          {
+            name: "code",
+            type: "string",
+            optional: false,
+            doc: null,
+            input: "text",
+            choices: [],
+            sample: "sample",
+          },
+          {
+            name: "validFor",
+            type: '"10m" | "1h"',
+            optional: false,
+            doc: null,
+            input: "choice",
+            choices: ["10m", "1h"],
+            sample: "10m",
+          },
+        ],
+      },
+    ],
+  };
+  const fillFrom = (root: HTMLElement) =>
+    root.querySelector<HTMLSelectElement>("select[data-fill-from]");
+
+  test("the form starts filled from the state's payload and says where from", () => {
+    const { root, live } = mountFields(fillMachine, { code: "c1" });
+    click(root, '[data-send="submit"]');
+    expect(fillFrom(root)?.options[0]?.textContent).toBe("idle: code c1");
+    expect(field(root, "code")?.value).toBe("c1");
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { code: "c1", validFor: "10m" } },
+    ]);
+  });
+
+  test("choosing the type's samples resets the fields", () => {
+    const { root } = mountFields(fillMachine, { code: "c1" });
+    click(root, '[data-send="submit"]');
+    const picker = fillFrom(root);
+    if (picker) {
+      picker.value = "";
+      picker.dispatchEvent(new Event("change"));
+    }
+    expect(field(root, "code")?.value).toBe("sample");
+  });
+
+  test("no matches means no Values from", () => {
+    const { root } = mountFields(fillMachine, null);
+    click(root, '[data-send="submit"]');
+    expect(fillFrom(root)).toBeNull();
+    expect(field(root, "code")?.value).toBe("sample");
   });
 
   test("the Context tab lists each declared field with its meaning and value", () => {
