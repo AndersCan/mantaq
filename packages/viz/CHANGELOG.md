@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.1
+
+<sub>2026-11-08</sub>
+
+- _(patch)_
+  The payload form starts from values sent earlier in the walk, and the Values from picker appears only when there is a real choice.
+
 ## 0.20.0
 
 <sub>2026-11-08</sub>

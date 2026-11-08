@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/core",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "State machine runtime with actor model, event system, state hierarchy, effects, and virtual clock.",
   "keywords": [
     "actor",
