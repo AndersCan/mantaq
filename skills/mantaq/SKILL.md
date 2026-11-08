@@ -81,6 +81,8 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 
 To set mantaq up, design or explain a machine with the live viz page, read `designing.md`.
 
+A design ask that changes what the app does today: your FINAL answer to the person (after any helper or subagent reports) opens with the `Today:` block of real flows-site `run=` links, before any finding or link to your change. Delegating to a helper does not move this duty; see `designing.md` "First reply".
+
 ## Sibling Files
 
 - `designing.md`. Design a machine in the code, with the live page open
