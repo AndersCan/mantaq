@@ -304,13 +304,30 @@ export interface Unheard {
   outputs: string[];
 }
 
-/** Output ids a listener body checks with `x.type === id`; empty when it checks none. */
+/** True when `node` is in the condition of an `if` that has an `else`. */
+function hasElse(node: ts.Node): boolean {
+  for (let each: ts.Node | undefined = node.parent; each !== undefined; each = each.parent) {
+    if (ts.isIfStatement(each)) {
+      const inCondition = node.pos >= each.expression.pos && node.end <= each.expression.end;
+      if (inCondition && each.elseStatement !== undefined) return true;
+    }
+    if (ts.isFunctionLike(each) || ts.isBlock(each)) return false;
+  }
+  return false;
+}
+
+/**
+ * Output ids a listener body checks with `x.type === id`; empty when it checks
+ * none, or when a checked `if` has an `else`, since that branch handles the
+ * other outputs.
+ */
 function namedIn(
   checker: ts.TypeChecker,
   bodies: ReadonlyArray<ts.Node>,
   outputs: ReadonlyArray<string>,
 ): string[] {
   const named: string[] = [];
+  let fallsThrough = false;
   const visit = (node: ts.Node): void => {
     if (
       ts.isBinaryExpression(node) &&
@@ -322,13 +339,16 @@ function namedIn(
       );
       for (const side of sides) {
         const literal = typed ? literalOf(checker, side) : null;
-        if (literal !== null && outputs.includes(literal)) named.push(literal);
+        if (literal !== null && outputs.includes(literal)) {
+          named.push(literal);
+          if (hasElse(node)) fallsThrough = true;
+        }
       }
     }
     ts.forEachChild(node, visit);
   };
   for (const body of bodies) visit(body);
-  return named;
+  return fallsThrough ? [] : named;
 }
 
 /** The outputs each output listener in `sourceFile` hears, by machine id. */

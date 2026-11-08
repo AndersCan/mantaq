@@ -106,6 +106,16 @@ describe("machineLinks with wires", () => {
     expect(overview.unheard[0]?.points.length).toBeGreaterThanOrEqual(2);
   });
 
+  test("an unheard entry for a machine not in the overview is dropped", () => {
+    const overview = layoutOverview(
+      [{ id: "a", file: "/x/a.ts" }],
+      [],
+      [],
+      [{ id: "ghost", outputs: ["one"] }],
+    );
+    expect(overview.unheard).toEqual([]);
+  });
+
   test("each link carries only the wires to its own receiver", () => {
     const toB = wire("b", "change", "poke");
     const toC = wire("c", "output", "ping");
