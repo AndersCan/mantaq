@@ -2,6 +2,14 @@
 
 Design a machine by editing its real file while the live viz page shows the result. Signatures: check the installed types.
 
+## First reply to a design ask
+
+Someone asks you to design, plan or rethink a feature or a rule ("design this with me", "who can delete photos?"). Your first reply is the drawn design, never a written design and never only questions.
+
+- Write the machine (section 1, or section 2 for a change) and one recorded walk per story the ask names (section 6). Do it before you ask anything.
+- Reply with one preview link per walk (section 3). If the repo's flow docs say a design ask gets a preview, push and open the draft pull request without asking.
+- Open questions go after the links, as questions about the drawn machine. This is the default, not a gate: when the ask names no feature at all, one question first is fine.
+
 ## 0. Set up (no mantaq or no live page yet)
 
 Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the vite config.
