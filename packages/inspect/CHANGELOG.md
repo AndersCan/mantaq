@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.21.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  `mantaq-check-site` takes `--links <file>` (repeatable) and `--site <url>`: every markdown link in the file to a run under the site address is opened in Chromium, and the check fails when the page is not built, no viewer there holds the machine, or the viewer says "No run named ...".
+- _(minor)_
+  `mantaqViz({ failOnFindings: true })` fails `astro build` when a recorded run does not replay on the page. The drop warning now says how to fix it: build the test's actor with only a clock, or give the factory defaults that act like the test's options. Breaking: sites using `failOnFindings` with such a run now fail to build; fix the run as the message says.
+
 ## 0.20.0
 
 <sub>2026-11-08</sub>
