@@ -1,4 +1,5 @@
-import { VirtualClock } from "@mantaq/core";
+import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { createActorMap } from "@mantaq/sugar";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
 import { createPhotoQueue } from "./fixtures/photo-queue.ts";
@@ -7,6 +8,8 @@ import { actorMapsOf } from "./maps.ts";
 import { inspect } from "./inspect.ts";
 import { toViz, toVizMachine } from "./structure.ts";
 import { validateViz } from "@mantaq/viz";
+import { withTestCoverage } from "./fuzz/coverage.ts";
+import { normalizeRun } from "./runs.ts";
 import { Either } from "@mantaq/utils";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
@@ -236,5 +239,134 @@ describe("driver", () => {
       actor: { map: "nope", key: "x" },
     });
     expect(live.last?.outcome).toBe("missing");
+  });
+});
+
+describe("driver effects and reset", () => {
+  const go = event("go")();
+  const added = event("added")();
+  const waitingS = state("waitingS")();
+  const busyS = state("busyS")();
+  const ran: string[] = [];
+  const effectTarget: FuzzTarget = {
+    id: "effectful",
+    create: () => {
+      const clock = VirtualClock();
+      const jobs = createActorMap(() =>
+        Actor({
+          clock,
+          inputs: [go],
+          states: [waitingS, busyS],
+          initial: waitingS,
+          setup: (m) => {
+            m.on(waitingS, { event: go, to: [busyS], handler: () => ({ state: busyS }) });
+            m.effect(busyS, {
+              name: "work",
+              fn: () => {
+                ran.push("work");
+              },
+            });
+          },
+        }),
+      );
+      const open = state("open")();
+      const actor = Actor({
+        clock,
+        inputs: [added],
+        states: [open],
+        initial: open,
+        setup: (m) => {
+          m.on(open, {
+            event: added,
+            handler: () => {
+              jobs.ensure("j1");
+              return {};
+            },
+          });
+        },
+      });
+      return { actor, clock, made: { actor, jobs } };
+    },
+  };
+  const addStep = { kind: "event", event: "added", payload: null } as const;
+  const goStep = {
+    kind: "event",
+    event: "go",
+    payload: null,
+    actor: { map: "jobs", key: "j1" },
+  } as const;
+
+  test("held: a map child's effect is held and listed in waiting", () => {
+    ran.length = 0;
+    const driver = createDriver(effectTarget);
+    driver.step(addStep);
+    const live = driver.step(goStep);
+    expect(live.waiting).toEqual(["work"]);
+    expect(ran).toEqual([]);
+  });
+
+  test("real: a map child's effect runs", () => {
+    ran.length = 0;
+    const driver = createDriver(effectTarget, { effectMode: "real" });
+    driver.step(addStep);
+    expect(driver.step(goStep).waiting).toEqual([]);
+    expect(ran).toEqual(["work"]);
+  });
+});
+
+function capturedQueue(seen: Array<ReturnType<typeof createPhotoQueue>>): FuzzTarget {
+  return {
+    id: "photoQueue",
+    create: () => {
+      const clock = VirtualClock();
+      const made = createPhotoQueue({ clock });
+      seen.push(made);
+      return { actor: made.actor, clock, made };
+    },
+  };
+}
+
+describe("child disposal", () => {
+  test("reset disposes the old session's children", () => {
+    const seen: Array<ReturnType<typeof createPhotoQueue>> = [];
+    const driver = createDriver(capturedQueue(seen));
+    driver.step(add("p1"));
+    const old = seen[seen.length - 1];
+    expect(old?.photos.keys()).toEqual(["p1"]);
+    driver.reset();
+    expect(old?.photos.keys()).toEqual([]);
+  });
+
+  test("a replay disposes its children", () => {
+    const seen: Array<ReturnType<typeof createPhotoQueue>> = [];
+    const steps = [add("p1"), confirm("p1")];
+    const result = normalizeRun(capturedQueue(seen), { name: "t", end: "open", steps });
+    expect(result).toEqual(Either.right(steps));
+    expect(seen[0]?.photos.keys()).toEqual([]);
+  });
+});
+
+describe("test coverage", () => {
+  test("map states and edges get no tested field", () => {
+    const { machine } = inspect({ id: "photoQueue", create: () => createPhotoQueue() });
+    const covered = withTestCoverage(target, machine, [[add("p1"), confirm("p1")]]);
+    const inChild = covered.states.filter((each) => each.id.startsWith("photos."));
+    expect(inChild.length).toBeGreaterThan(0);
+    for (const each of inChild) expect(each.tested).toBeNull();
+    for (const each of covered.edges.filter((edge) => edge.from.startsWith("photos."))) {
+      expect(each.tested).toBeNull();
+    }
+    expect(covered.states.find((each) => each.id === "open")?.tested).not.toBeNull();
+  });
+});
+
+describe("normalizeRun with maps", () => {
+  test("a ref to an unknown map is refused", () => {
+    const result = normalizeRun(target, {
+      name: "t",
+      end: "open",
+      steps: [{ ...confirm("x"), actor: { map: "nope", key: "x" } }],
+    });
+    expect(result).toEqual(Either.left('unknown actor map "nope"'));
   });
 });
