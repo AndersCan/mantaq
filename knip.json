@@ -22,7 +22,7 @@
       "ignoreDependencies": ["@mantaq/core"]
     },
     "packages/inspect": {
-      "entry": ["src/fixtures/*.ts"],
+      "entry": ["src/fixtures/**/*.ts"],
       "ignoreDependencies": ["vitest"]
     }
   }
