@@ -17,17 +17,23 @@ import { Actor, VirtualClock, state, event } from "@mantaq/core";
 import { withTimeout, withPromise } from "@mantaq/sugar";
 
 export type BasicInfo = {
+  /** @example ana@example.com */
   email: string;
+  /** @example Ana Lima */
   name: string;
 };
 
 export type ShippingAddress = {
+  /** @example 1 Main Street */
   street: string;
+  /** @example Lisbon */
   city: string;
+  /** @example 1000-001 */
   zip: string;
 };
 
 export type PaymentInfo = {
+  /** @example 4242 4242 4242 4242 */
   cardNumber: string;
 };
 
@@ -60,9 +66,15 @@ export const submitPayment = event("submitPayment")<PaymentInfo>();
 /** The visitor went back a step. */
 export const back = event("back")();
 /** The card was charged. */
-export const paymentOk = event("paymentOk")<{ orderId: string }>();
+export const paymentOk = event("paymentOk")<{
+  /** @example ord_4242 */
+  orderId: string;
+}>();
 /** The card was declined. */
-export const paymentFail = event("paymentFail")<{ reason: string }>();
+export const paymentFail = event("paymentFail")<{
+  /** @example Card declined */
+  reason: string;
+}>();
 /** The card charge took too long. */
 export const paymentTimeout = event("paymentTimeout")();
 
