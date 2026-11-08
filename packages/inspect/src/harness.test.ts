@@ -187,15 +187,22 @@ test("the planted-bug machine shows six findings and replays the dead end", asyn
   await withViz(docs("checkout-with-bugs.ts"), async (viz) => {
     const findings = viz.findings();
     expect(findings).toHaveLength(6);
-    for (const finding of findings) {
-      expect(finding.title).toMatch(/back|payment|paymentDeclined|refunded|refunding|cancelOrder/);
-    }
+    expect(findings.map((each) => each.title)).toEqual([
+      "back in payment throws",
+      'payment was reached with {"address":""}',
+      "paymentDeclined is a dead end",
+      "refunded can never be reached",
+      "refunding can never be reached",
+      "cancelOrder is declared but no state handles it",
+    ]);
     const deadEnd = findings.find((each) => each.kind === "deadEnd")!;
     expect(Either.getRight(await viz.replay(deadEnd))).toEqual({ state: "paymentDeclined" });
     expect(await viz.state()).toBe("paymentDeclined");
     const refunded = findings.find((each) => each.state === "refunded")!;
     expect(refunded.steps ?? []).toEqual([]);
-    expect(Either.isLeft(await viz.replay(refunded))).toBe(true);
+    expect(Either.getLeft(await viz.replay(refunded))).toBe(
+      "refunded can never be reached has nothing to replay.",
+    );
     const text = await viz.text();
     for (const old of [
       "Handler throws",
