@@ -79,7 +79,7 @@ Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a 
 import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
 
 const target = { id: "inviteLink", create: () => createInviteLinkActor({ clock: VirtualClock() }) };
-expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, dead ends, unreachable states, events no state handles; with `source`: vague or undocumented names
+expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, dead ends, unreachable states, events no state handles; with `source`: vague or undocumented names, handlers and effects
 expectAllStatesReached(target);
 expectReached(target, { transitions: [{ from: "waitingForAnswer", event: "ACCEPT" }] });
 expectNoDesignErrors({ ...target, fuzz: false }); // structure only, no fuzzing

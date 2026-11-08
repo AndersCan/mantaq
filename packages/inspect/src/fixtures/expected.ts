@@ -31,7 +31,9 @@ export function createExpectedActor(clock: VirtualClock = VirtualClock()) {
     clock,
     context: initialContext,
     setup: (m) => {
+      /** Counting begins. */
       m.on(idle, { event: begin, to: [counting], handler: () => ({ state: counting }) });
+      /** The count goes up. */
       m.on(counting, {
         event: bump,
         to: [counting],
@@ -40,6 +42,7 @@ export function createExpectedActor(clock: VirtualClock = VirtualClock()) {
           return { state: counting };
         },
       });
+      /** A tag is added. */
       m.on(counting, {
         event: tag,
         to: [counting],
@@ -48,6 +51,7 @@ export function createExpectedActor(clock: VirtualClock = VirtualClock()) {
           return { state: counting };
         },
       });
+      /** The count is finished. */
       m.on(counting, { event: finish, to: [done], handler: () => ({ state: done }) });
     },
   });

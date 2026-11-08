@@ -1,6 +1,7 @@
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { createDoorActor } from "./fixtures/factories.ts";
+import { createDocumentedActor } from "./fixtures/documented.ts";
 import { createVagueNamesActor } from "./fixtures/vague-names.ts";
 import { createThrowingActor } from "./fixtures/throwing.ts";
 import { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts";
@@ -210,5 +211,36 @@ describe("design error details", () => {
       "notify sends ping, but sender has no handler for it. When notify sends ping in sender, the actor goes to __error. Handle ping in sender, or remove ping from the sends of notify.",
       "lost can never be reached. No transition leads into lost. From sender, the machine can only reach sender. Add a transition into lost, or remove it.",
     ]);
+  });
+});
+
+describe("handlers and effects with no description", () => {
+  const expected = [
+    "finish from any state has no description. The m.onAny handler for finish (documented.ts:41) has no /** */ comment, so the Step list shows nothing under finish. Add /** what happened and what the machine does next */ right before that m.onAny.",
+    "last in done has no description. The handler for last in done (documented.ts:43) has no /** */ comment, so the Step list shows nothing under last. Add /** what happened and what the machine does next */ right before that m.on, or before its .on in a chain.",
+    'tidy in done has no description. No m.effect(done, …) call has a /** */ comment, so the Step list shows nothing under "Entering done runs:". Add /** what happens while done runs tidy */ right before m.effect(done, …).',
+  ];
+  const sorted = [expected[0], expected[2], expected[1]];
+  const arrowLines = (fuzz: false | { iterations: number }) =>
+    designErrors(
+      inspect({
+        id: "documented",
+        create: () => createDocumentedActor(),
+        source: { file: join(FIXTURES, "documented.ts"), root: FIXTURES },
+        fuzz,
+      }).machine,
+    ).filter(
+      (line) =>
+        line.includes("has no description") &&
+        !line.includes("above state(") &&
+        !line.includes("above event("),
+    );
+
+  test("without fuzz", () => {
+    expect(arrowLines(false)).toEqual(sorted);
+  });
+
+  test("fuzz stay edges collapse into the same notes", () => {
+    expect(arrowLines({ iterations: 200 })).toEqual(sorted);
   });
 });

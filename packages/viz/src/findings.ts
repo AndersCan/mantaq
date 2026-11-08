@@ -193,7 +193,84 @@ function namingFindings(machine: VizMachine): VizFinding[] {
       }),
     );
   }
-  return [...vague, ...undocumented];
+  return [...vague, ...undocumented, ...arrowFindings(machine)];
+}
+
+type VizEdgeT = VizMachine["edges"][number];
+
+function isHandlerEdge(edge: VizEdgeT): boolean {
+  return edge.kind === "transition" || edge.kind === "stay";
+}
+
+function groupKey(edge: VizEdgeT): string | null {
+  const location = edge.explanation?.location;
+  if (!location) return null;
+  return `${location.file}:${location.line}:${location.column}\u0000${edge.event}`;
+}
+
+function handlerFinding(edge: VizEdgeT, anyInGroup: boolean): VizFinding {
+  const location = edge.explanation?.location;
+  const where = `${location?.file}:${location?.line}`;
+  if (anyInGroup) {
+    return finding({
+      kind: "undocumented",
+      state: null,
+      event: edge.event,
+      title: `${edge.event} from any state has no description`,
+      proof: `The m.onAny handler for ${edge.event} (${where}) has no /** */ comment, so the Step list shows nothing under ${edge.event}.`,
+      fix: "Add /** what happened and what the machine does next */ right before that m.onAny.",
+      steps: null,
+    });
+  }
+  return finding({
+    kind: "undocumented",
+    state: edge.from,
+    event: edge.event,
+    title: `${edge.event} in ${edge.from} has no description`,
+    proof: `The handler for ${edge.event} in ${edge.from} (${where}) has no /** */ comment, so the Step list shows nothing under ${edge.event}.`,
+    fix: "Add /** what happened and what the machine does next */ right before that m.on, or before its .on in a chain.",
+    steps: null,
+  });
+}
+
+function effectsFinding(state: VizMachine["states"][number]): VizFinding {
+  const list = names(state.effects.map((effect) => effect.name));
+  const local = state.id.split(".").at(-1) ?? state.id;
+  return finding({
+    kind: "undocumented",
+    state: state.id,
+    event: null,
+    title: `${list} in ${state.id} ${state.effects.length === 1 ? "has" : "have"} no description`,
+    proof: `No m.effect(${local}, …) call has a /** */ comment, so the Step list shows nothing under "Entering ${state.id} runs:".`,
+    fix: `Add /** what happens while ${state.id} runs ${list} */ right before m.effect(${local}, …).`,
+    steps: null,
+  });
+}
+
+function arrowFindings(machine: VizMachine): VizFinding[] {
+  const undescribed = machine.edges.filter((edge) => missingDoc(edge.doc));
+  const anyGroups = new Set(
+    undescribed.filter((edge) => isHandlerEdge(edge) && isAnyState(edge.from)).map(groupKey),
+  );
+  const out: VizFinding[] = [];
+  const seen = new Set<string>();
+  for (const edge of undescribed) {
+    if (edge.kind === "effect") {
+      const state = machine.states.find((candidate) => candidate.id === edge.from);
+      if (!state || state.effects.length === 0 || seen.has(`effect\u0000${edge.from}`)) continue;
+      seen.add(`effect\u0000${edge.from}`);
+      out.push(effectsFinding(state));
+      continue;
+    }
+    const group = groupKey(edge);
+    if (!isHandlerEdge(edge) || group === null) continue;
+    const anyInGroup = anyGroups.has(group);
+    const key = anyInGroup ? group : `${group}\u0000${edge.from}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(handlerFinding(edge, anyInGroup));
+  }
+  return out;
 }
 
 /** Regions whose start state the graph records. */
