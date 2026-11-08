@@ -640,7 +640,7 @@ describe("field forms and the context table", () => {
   test("the form starts filled from the state's payload and says where from", () => {
     const { root, live } = mountFields(fillMachine, { code: "c1" });
     click(root, '[data-send="submit"]');
-    expect(fillFrom(root)?.options[0]?.textContent).toBe("idle: code c1");
+    expect(fillFrom(root)).toBeNull();
     expect(field(root, "code")?.value).toBe("c1");
     click(root, '[data-payload-send="submit"]');
     expect(live.log[0]).toEqual([
@@ -653,7 +653,7 @@ describe("field forms and the context table", () => {
   });
 
   test("choosing the type's samples resets the fields", () => {
-    const { root } = mountFields(fillMachine, { code: "c1" });
+    const { root } = mountFields(fuzzedMachine, { code: "c1" });
     click(root, '[data-send="submit"]');
     const picker = fillFrom(root);
     if (picker) {

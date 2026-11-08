@@ -1,4 +1,4 @@
-import type { VizField, VizJson, VizLiveState } from "../schema.ts";
+import type { VizField, VizJson, VizLiveState, VizStep } from "../schema.ts";
 
 /** Values for an event's payload fields, copied from one thing the machine holds now. */
 export interface FillSource {
@@ -55,10 +55,29 @@ function fits(field: VizField, value: VizJson): boolean {
   }
 }
 
-/** Everything the payload could be filled from, best first. [] = nothing fits; the form stays as today. */
+/** The latest value this walk sent for each field of the same name; null when none fits. */
+function typedSource(
+  fields: ReadonlyArray<VizField>,
+  steps: ReadonlyArray<VizStep>,
+): FillSource | null {
+  const values: FillSource["values"] = [];
+  for (const field of fields) {
+    for (const step of steps.toReversed()) {
+      if (step.kind !== "event" || !isObject(step.payload)) continue;
+      if (!Object.hasOwn(step.payload, field.name)) continue;
+      const value = step.payload[field.name];
+      if (value === undefined || !fits(field, value)) continue;
+      values.push({ field: field.name, value });
+      break;
+    }
+  }
+  return values.length === 0 ? null : { path: "you typed", values };
+}
+
+/** Everything the payload could be filled from, best first: what this walk sent, then what the machine holds. [] = nothing fits; the form stays as today. */
 export function fillSources(
   fields: ReadonlyArray<VizField>,
-  live: Pick<VizLiveState, "state" | "payload" | "context">,
+  live: Pick<VizLiveState, "state" | "payload" | "context"> & { steps?: ReadonlyArray<VizStep> },
 ): FillSource[] {
   const sources: Array<{ source: FillSource; filled: number }> = [];
   for (const { path, value } of candidates(live)) {
@@ -74,7 +93,8 @@ export function fillSources(
     if (filled > 0) sources.push({ source: { path, values }, filled });
   }
   sources.sort((a, b) => b.filled - a.filled);
-  const ordered: FillSource[] = [];
+  const typed = typedSource(fields, live.steps ?? []);
+  const ordered: FillSource[] = typed === null ? [] : [typed];
   for (const each of sources) ordered.push(each.source);
   return ordered;
 }

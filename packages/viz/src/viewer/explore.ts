@@ -383,7 +383,7 @@ function fillPicker(
     held: ReadonlyArray<FillSource>;
     fuzz: ReadonlyArray<FillSource>;
   },
-): HTMLElement {
+): HTMLElement | null {
   const { fields, inputs, held, fuzz } = context;
   const sources = [...held, ...fuzz];
   const select = html(doc, "select", {
@@ -417,6 +417,7 @@ function fillPicker(
   select.addEventListener("change", apply);
   select.value = held.length > 0 ? "0" : "";
   apply();
+  if (held.length === 1 && fuzz.length === 0) return null;
   return html(doc, "label", { class: "explore-field", "data-fill": "" }, [
     html(doc, "strong", {}, ["Values from"]),
     select,
@@ -476,13 +477,18 @@ function fieldRow(doc: Document, field: VizField, input: HTMLElement | null): HT
   ]);
 }
 
+/** What a payload form fills from: the machine now, and the steps of the walk. */
+type FillLive = Pick<VizLiveState, "state" | "payload" | "context"> & {
+  steps?: ReadonlyArray<VizStep>;
+};
+
 function fieldsForm(
   doc: Document,
   context: {
     event: string;
     fields: ReadonlyArray<VizField>;
     samples: ReadonlyArray<VizJson>;
-    live: Pick<VizLiveState, "state" | "payload" | "context"> | null;
+    live: FillLive | null;
     send: (step: VizStep) => void;
     close: () => void;
   },
@@ -609,7 +615,7 @@ export function payloadForm(
     /** The event's declared payload fields; null when the type could not be read. */
     fields: ReadonlyArray<VizField> | null;
     /** What the machine holds now; null = nothing to fill from. */
-    live?: Pick<VizLiveState, "state" | "payload" | "context"> | null;
+    live?: FillLive | null;
     send: (step: VizStep) => void;
     close: () => void;
   },
