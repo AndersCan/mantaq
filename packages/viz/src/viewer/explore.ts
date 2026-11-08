@@ -526,7 +526,7 @@ function fieldsForm(
   });
   const toggle = button(doc, ["Edit as JSON"], {
     onClick: () => (form.getAttribute("data-payload-view") === "json" ? asFields() : asJson()),
-    attrs: { class: "link", "data-payload-as-json": event },
+    attrs: { "data-payload-as-json": event },
   });
   const show = (view: "fields" | "json") => {
     const json = view === "json";
@@ -593,7 +593,7 @@ function fieldsForm(
       html(doc, "div", { class: "explore-samples" }, [
         button(doc, ["Send ", code(doc, event)], {
           onClick: submit,
-          attrs: { "data-payload-send": event },
+          attrs: { class: "primary", "data-payload-send": event },
         }),
         button(doc, ["Cancel"], {
           onClick: context.close,
@@ -686,7 +686,7 @@ export function payloadForm(
       html(doc, "div", { class: "explore-samples" }, [
         button(doc, ["Send ", code(doc, event)], {
           onClick: submit,
-          attrs: { "data-payload-send": event },
+          attrs: { class: "primary", "data-payload-send": event },
         }),
         button(doc, ["Cancel"], {
           onClick: context.close,
@@ -730,7 +730,7 @@ function sendItem(
       ? null
       : button(doc, ["with payload"], {
           onClick: () => live.compose(event, actor),
-          attrs: { class: "link", "data-send-custom": event },
+          attrs: { "data-send-custom": event },
         }),
     move === undefined
       ? html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`])

@@ -1,6 +1,6 @@
 /**
  * The notes box on a page that has no dev server (a pull request preview, the published
- * site): notes and journeys stay in the tab and are copied as one block for the user
+ * site): notes stay in the tab and are copied as one block for the user
  * to paste to their coding agent.
  */
 import type { VizMachine } from "@mantaq/viz";
@@ -149,7 +149,6 @@ export function copyNotesFooter(
       draft = "";
       status = "";
       render();
-      if (next !== undefined) section.scrollIntoView?.({ block: "nearest" });
     }
     return section;
   };
