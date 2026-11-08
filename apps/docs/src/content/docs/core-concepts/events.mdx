@@ -10,7 +10,11 @@ declares one.
 
 ## Declare
 
+The examples on this page build on each other. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
+
 ```ts
+import { event } from "@mantaq/core";
+
 const back = event("back")();
 const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
 back.type; // "back"
@@ -28,17 +32,35 @@ submitBasicInfo.create({ email: "a@b.com", name: "A" });
 ## Check identity
 
 ```ts
-back.is(someEvent); // boolean (type guard)
+const someEvent: unknown = back.create();
+back.is(someEvent); // true (type guard)
 ```
 
 ## Use in transitions
 
 ```ts
-m.on(shippingAddress, submitShipping, (event, { context }) => {
-  const s = context.get();
-  s.shippingAddress = event.payload;
-  context.set(s);
-  return { state: payment };
+import { Actor, state } from "@mantaq/core";
+import { basicInfo, error, payment, shippingAddress, submitShipping } from "./checkout";
+import type { CheckoutContext } from "./checkout";
+
+const initialContext: CheckoutContext = {};
+const checkout = Actor({
+  inputs: [submitShipping],
+  states: [shippingAddress, payment],
+  initial: shippingAddress,
+  context: initialContext,
+  setup: (m) => {
+    m.on(shippingAddress, {
+      event: submitShipping,
+      to: [payment],
+      handler: (event, { context }) => {
+        const s = context.get();
+        s.shippingAddress = event.payload;
+        context.set(s);
+        return { state: payment };
+      },
+    });
+  },
 });
 ```
 
@@ -47,13 +69,25 @@ m.on(shippingAddress, submitShipping, (event, { context }) => {
 The handler's second argument also carries the current state as `state: { name, payload }`, typed from the state ref. Carry a payload forward without a guard:
 
 ```ts
-m.on(shipping, {
-  event: confirm,
-  to: [shipped],
-  handler: (_e, { state }) => ({
-    state: shipped.create(state.payload),
-  }),
+const picking = state("picking")<{ orderId: string }>();
+const shipped = state("shipped")<{ orderId: string }>();
+const ship = event("ship")();
+
+const order = Actor({
+  inputs: [ship],
+  states: [picking, shipped],
+  initial: picking.create({ orderId: "ord_1" }),
+  setup: (m) => {
+    m.on(picking, {
+      event: ship,
+      to: [shipped],
+      handler: (_e, { state }) => ({ state: shipped.create(state.payload) }),
+    });
+  },
 });
+
+order.send(ship.create());
+order.snapshot().payload; // { orderId: "ord_1" }
 ```
 
 ## Guards (conditional transitions)
@@ -62,9 +96,23 @@ No guard syntax. Plain `if` in the handler picks which `{ state }` to return.
 Return `{}` to stay put.
 
 ```ts
-m.on(scanning, scanDone, (event) => ({
-  state: event.payload.risky ? flagged : cleared,
-}));
+const scanning = state("scanning")();
+const cleared = state("cleared")();
+const flagged = state("flagged")();
+const scanDone = event("scanDone")<{ risky: boolean }>();
+
+const fraudMonitor = Actor({
+  inputs: [scanDone],
+  states: [scanning, cleared, flagged],
+  initial: scanning,
+  setup: (m) => {
+    m.on(scanning, {
+      event: scanDone,
+      to: [cleared, flagged],
+      handler: (event) => ({ state: event.payload.risky ? flagged : cleared }),
+    });
+  },
+});
 ```
 
 ## Internal events
@@ -85,7 +133,16 @@ event runs first; `onAny` still runs and may transition only if the state
 handler did not.
 
 ```ts
-m.onAny({ event: cancel, to: [basicInfo], handler: () => ({ state: basicInfo }) });
+const cancel = event("cancel")();
+
+const form = Actor({
+  inputs: [cancel],
+  states: [basicInfo, shippingAddress, payment],
+  initial: payment,
+  setup: (m) => {
+    m.onAny({ event: cancel, to: [basicInfo], handler: () => ({ state: basicInfo }) });
+  },
+});
 ```
 
 When the target depends on the current state, as with `back`, register one
@@ -94,8 +151,19 @@ registration declares its exact target, so diagrams show which state leads
 where.
 
 ```ts
-m.on(payment, { event: back, to: [shippingAddress], handler: () => ({ state: shippingAddress }) });
-m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
+const steps = Actor({
+  inputs: [back],
+  states: [shippingAddress, payment, error],
+  initial: error,
+  setup: (m) => {
+    m.on(payment, {
+      event: back,
+      to: [shippingAddress],
+      handler: () => ({ state: shippingAddress }),
+    });
+    m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
+  },
+});
 ```
 
 See the checkout's `back` edges drawn in [Diagrams](/mantaq/core-concepts/diagrams/).

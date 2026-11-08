@@ -47,17 +47,33 @@ Synthesized by the actor, not in your `states` list. Terminal.
 transition handle it. The `error` state can leave via a `back` handler or
 similar.
 
+The examples on this page use the docs checkout machine. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
+
 ```ts
-m.effect(submitting, {
-  name: "chargeCard",
-  fn: ({ signal, emit }) => {
-    chargeCard(cardNumber)
-      .then((id) => {
-        if (!signal.aborted) emit(paymentOk.create({ orderId: id }));
-      })
-      .catch((r) => {
-        if (!signal.aborted) emit(paymentFail.create({ reason: String(r) }));
-      });
+import { Actor } from "@mantaq/core";
+import { chargeCard, error, paymentFail, paymentOk, submitting, success } from "./checkout";
+
+const payments = Actor({
+  inputs: [],
+  internal: [paymentOk, paymentFail],
+  states: [submitting, success, error],
+  initial: submitting,
+  setup: (m) => {
+    m.effect(submitting, {
+      name: "chargeCard",
+      sends: [paymentOk, paymentFail],
+      fn: ({ signal, emit }) => {
+        chargeCard("4242 4242 4242 4242")
+          .then((id) => {
+            if (!signal.aborted) emit(paymentOk.create({ orderId: id }));
+          })
+          .catch((r) => {
+            if (!signal.aborted) emit(paymentFail.create({ reason: String(r) }));
+          });
+      },
+    });
+    m.on(submitting, { event: paymentOk, to: [success], handler: () => ({ state: success }) });
+    m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
   },
 });
 ```
@@ -68,8 +84,14 @@ Subscribe to death. Fired with the full `ErrorInfo`. Seeded: if the machine
 died before you subscribed, the last `ErrorInfo` replays immediately.
 
 ```ts
-checkout.on("error", (info) => {
-  console.error(`${info.reason} on ${info.event.type}:`, info.error);
+import { createCheckoutActor, payment } from "./checkout";
+
+const { actor: checkout } = createCheckoutActor();
+
+checkout.on("error", {
+  fn: (info) => {
+    console.error(`${info.reason} on ${info.event.type}:`, info.error);
+  },
 });
 ```
 
@@ -96,7 +118,7 @@ Read `checkout.state.name`, the typed state name, not `snapshot().path[0]`.
 ```ts
 checkout.on("change", {
   fn: () => {
-    show(checkout.state.name);
+    console.log(checkout.state.name); // "basicInfo"
   },
 });
 ```
