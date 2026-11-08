@@ -20,6 +20,7 @@ import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import { journeyFooter, trackWalk } from "./journey-page.ts";
+import { copyNotesFooter, pageNotes, sendBar } from "./notes-copy.ts";
 import { notesFooter } from "./notes-page.ts";
 
 export type LiveTargets = Readonly<Record<string, FuzzTarget["create"]>>;
@@ -134,6 +135,8 @@ export function mountDriven(
     heading?: "h1" | "h2" | "h3";
     /** URL of the dev server's notes endpoint; unset = no notes section. */
     notes?: string;
+    /** Page without a dev server: collect notes in the tab and copy them for the agent. `file` names the machine file in the block. `notes` wins when both are set. */
+    copyNotes?: { file: string };
     /** Where the dev page keeps each machine's outline for "what changed"; unset = no marks. */
     seen?: SeenStorage;
     /** Where each machine's outputs go, shown on live steps. */
@@ -177,7 +180,7 @@ export function mountDriven(
   const machine = shown.machines[0];
   const changes = changesOption(context, machine, viz.machines);
   const driver = trackedDriver(id, create);
-  const footer = panelFooter(doc, context.notes, machine, driver?.current);
+  const footer = panelFooter(doc, context, machine, driver?.current);
   mountViewer(viewer, shown, {
     ...options,
     ...changes,
@@ -191,11 +194,23 @@ export function mountDriven(
 /** Notes, plus the journey box when the machine runs live; both persist across calls. */
 function panelFooter(
   doc: Document,
-  url: string | undefined,
+  context: { notes?: string; copyNotes?: { file: string } },
   machine: VizMachine | undefined,
   walk: (() => VizLiveState | undefined) | undefined,
 ): ViewerOptions["panelFooter"] {
-  if (url === undefined || machine === undefined) return undefined;
+  if (machine === undefined) return undefined;
+  if (context.notes !== undefined) return serverFooter(doc, context.notes, machine, walk);
+  if (context.copyNotes !== undefined)
+    return copyFooter(doc, context.copyNotes.file, machine, walk);
+  return undefined;
+}
+
+function serverFooter(
+  doc: Document,
+  url: string,
+  machine: VizMachine,
+  walk: (() => VizLiveState | undefined) | undefined,
+): NonNullable<ViewerOptions["panelFooter"]> {
   const notes = notesFooter(doc, { url, machine });
   if (walk === undefined) return notes;
   const journey = journeyFooter(doc, { url, machine: machine.id, walk });
@@ -205,6 +220,44 @@ function panelFooter(
     const part = notes(selection);
     if (wrapper.firstChild === null && part !== undefined) wrapper.append(part, journey.section);
     journey.update();
+    return wrapper;
+  };
+}
+
+/** A page without a dev server: notes and journeys stay in the tab, the bar copies them. */
+function copyFooter(
+  doc: Document,
+  file: string,
+  machine: VizMachine,
+  walk: (() => VizLiveState | undefined) | undefined,
+): NonNullable<ViewerOptions["panelFooter"]> {
+  const store = pageNotes(doc);
+  const notes = copyNotesFooter(doc, { file, machine, store });
+  const journey =
+    walk === undefined
+      ? undefined
+      : journeyFooter(doc, {
+          url: "",
+          machine: machine.id,
+          walk,
+          add: (state, name) =>
+            store.add({
+              file,
+              machine: machine.id,
+              target: { kind: "walk" },
+              note: name,
+              walk: { end: state.state, steps: state.steps },
+            }),
+        });
+  const wrapper = doc.createElement("div");
+  wrapper.className = "panel-extras";
+  const bar = sendBar(doc, store);
+  return (selection) => {
+    const part = notes(selection);
+    if (wrapper.firstChild === null && part !== undefined) {
+      wrapper.append(part, ...(journey === undefined ? [] : [journey.section]), bar);
+    }
+    journey?.update();
     return wrapper;
   };
 }

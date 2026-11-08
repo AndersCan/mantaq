@@ -217,7 +217,7 @@ export function notesFooter(
   };
 }
 
-function key(target: NoteTarget | undefined): string {
+export function key(target: NoteTarget | undefined): string {
   return target === undefined ? "" : targetText(target);
 }
 
@@ -226,7 +226,7 @@ function word(value: string): boolean {
 }
 
 /** What a click can carry a note: a state, or an arrow a handler draws. */
-function targetOf(
+export function targetOf(
   selection: ViewerSelection | undefined,
   machine: VizMachine,
 ): NoteTarget | undefined {
@@ -243,7 +243,7 @@ function targetOf(
     : undefined;
 }
 
-function targetLabel(target: NoteTarget): string {
+export function targetLabel(target: NoteTarget): string {
   if (target.kind === "walk") return "this journey";
   if (target.kind === "state") return target.state;
   return `${target.event} from ${isAnyState(target.from) ? "any state" : target.from}`;
