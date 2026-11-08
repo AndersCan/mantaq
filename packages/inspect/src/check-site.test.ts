@@ -15,11 +15,13 @@ const linked = "../fixtures/linked.ts";
 const deaf = "../fixtures/deaf.ts";
 const orphan = "../fixtures/orphan.ts";
 const stay = "../fixtures/stay.ts";
+const timed = "../fixtures/timed.ts";
 
 let good = "";
 let broken = "";
 let quiet = "";
 let empty = "";
+let walks = "";
 const roots: string[] = [];
 
 function viewerPage(src: string, extra = ""): string {
@@ -64,6 +66,10 @@ beforeAll(async () => {
     "deaf.astro": viewerPage(deaf),
     "blank.astro": `<html><body><div class="mantaq-machine" data-mantaq-src="blank.ts"></div></body></html>\n`,
     "machines.astro": overviewPage({ "": [retry, orphan], deaf: [deaf], gone: [linked] }),
+  });
+  walks = await makeSite([timed, retry], {
+    "index.astro": viewerPage(timed),
+    "other.astro": viewerPage(retry),
   });
 }, 240_000);
 
@@ -117,6 +123,56 @@ describe("checkSite cannot run", () => {
     expect(Either.isLeft(result) ? result[0] : "").toContain("is not a directory");
   });
 
+  test("opens the walk links in a doc and fails on one that opens no walk", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "check-site-links-"));
+    roots.push(dir);
+    const site = "https://example.test/docs";
+    const file = join(dir, "walks.md");
+    writeFileSync(
+      file,
+      [
+        `[waits](${site}/?machine=timed&run=waits)`,
+        `[nope](${site}/?machine=timed&run=nope)`,
+        "[elsewhere](https://other.test/?machine=timed&run=nope)",
+        `[no machine](${site}/?run=waits)`,
+        `[gone](${site}/gone/?machine=timed&run=waits)`,
+        `[held](${site}/other/?machine=timed&run=waits)`,
+        `[plain](${site}/?machine=timed)`,
+        `[bare root](${site}?machine=timed&run=nope)`,
+        `[titled](${site}/?machine=timed&run=nope "a title")`,
+        `[waits again](${site}/?machine=timed&run=waits)`,
+        `[sibling](https://example.test/docsx/?machine=timed&run=nope)`,
+      ].join("\n"),
+    );
+    expect(await checkSite(walks, "/", { links: [file], site })).toEqual(
+      Either.right({
+        pages: 2,
+        failures: [
+          `${file}:2: walk link "nope": No run named "nope" in timed. Runs: times out, waits`,
+          `${file}:4: walk link "no machine" has no machine=, so no viewer opens it`,
+          `${file}:5: walk link "gone" goes to /gone/, which is not built`,
+          `${file}:6: walk link "held" opens /other/, but no viewer there holds timed`,
+          `${file}:8: walk link "bare root": No run named "nope" in timed. Runs: times out, waits`,
+          `${file}:9: walk link "titled": No run named "nope" in timed. Runs: times out, waits`,
+        ],
+      }),
+    );
+  }, 120_000);
+
+  test("cannot run without a site, with a bad site or with a missing file", async () => {
+    expect(await checkSite(walks, "/", { links: ["x.md"] })).toEqual(
+      Either.left(
+        "--links needs --site, the address the site is published at (e.g. https://you.github.io/repo/)",
+      ),
+    );
+    expect(await checkSite(walks, "/", { links: ["x.md"], site: "nope" })).toEqual(
+      Either.left('--site must be an absolute http(s) address, got "nope"'),
+    );
+    expect(await checkSite(walks, "/", { links: ["missing.md"], site: "https://a.test/" })).toEqual(
+      Either.left("cannot read missing.md"),
+    );
+  });
+
   test("a folder without machines", async () => {
     const result = await checkSite(empty, "/");
     expect(result).toEqual(
@@ -161,12 +217,31 @@ describe("mantaq-check-site", () => {
   test("no arguments is a usage error", () => {
     const run = spawnSync("node", [cli], { encoding: "utf8" });
     expect(run.status).toBe(2);
-    expect(run.stderr.trim()).toBe("usage: mantaq-check-site <dir> [--base <path>]");
+    expect(run.stderr.trim()).toBe(
+      "usage: mantaq-check-site <dir> [--base <path>] [--links <file> ... --site <url>]",
+    );
   });
 
   test("an unknown flag is a usage error", () => {
     expect(spawnSync("node", [cli, good, "--wat"], { encoding: "utf8" }).status).toBe(2);
   });
+
+  test("--links and --site reach the check: a bad walk link exits 1, --links alone exits 2", () => {
+    const dir = mkdtempSync(join(tmpdir(), "check-site-cli-links-"));
+    roots.push(dir);
+    const file = join(dir, "walks.md");
+    writeFileSync(file, "[nope](https://example.test/docs/?machine=timed&run=nope)\n");
+    const bad = spawnSync(
+      "node",
+      [cli, walks, "--links", file, "--site", "https://example.test/docs"],
+      { encoding: "utf8" },
+    );
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toContain(`${file}:1: walk link "nope": No run named "nope"`);
+    const alone = spawnSync("node", [cli, walks, "--links", file], { encoding: "utf8" });
+    expect(alone.status).toBe(2);
+    expect(alone.stderr).toContain("--links needs --site");
+  }, 120_000);
 
   test("a good site exits 0", () => {
     const run = spawnSync("node", [cli, good], { encoding: "utf8" });

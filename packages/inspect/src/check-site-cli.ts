@@ -1,25 +1,30 @@
 #!/usr/bin/env node
 /**
- *   mantaq-check-site <dir> [--base <path>]
+ *   mantaq-check-site <dir> [--base <path>] [--links <file> ... --site <url>]
  *
  * Serves a built Astro site and checks, in headless Chromium, that every
  * machine draws, every live machine handles an event and every overview box
- * opens a built page that shows its machine. Exit 0 ok, 1 problems, 2 cannot run.
+ * opens a built page that shows its machine. With --links, every markdown
+ * link to a run under --site must open a viewer that has that run. Exit 0 ok, 1 problems, 2 cannot run.
  */
 import { Either } from "@mantaq/utils";
 import { parseArgs } from "node:util";
 import { checkSite } from "./check-site.ts";
 
-const USAGE = "usage: mantaq-check-site <dir> [--base <path>]";
+const USAGE = "usage: mantaq-check-site <dir> [--base <path>] [--links <file> ... --site <url>]";
+
+const OPTIONS = {
+  base: { type: "string" },
+  links: { type: "string", multiple: true },
+  site: { type: "string" },
+} as const;
 
 async function main(): Promise<number> {
-  let parsed: ReturnType<
-    typeof parseArgs<{ options: { base: { type: "string" } }; allowPositionals: true }>
-  >;
+  let parsed: ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
   try {
     parsed = parseArgs({
       args: process.argv.slice(2),
-      options: { base: { type: "string" } },
+      options: OPTIONS,
       allowPositionals: true,
       strict: true,
     });
@@ -32,7 +37,10 @@ async function main(): Promise<number> {
     console.error(USAGE);
     return 2;
   }
-  const result = await checkSite(dir, parsed.values.base ?? "/");
+  const result = await checkSite(dir, parsed.values.base ?? "/", {
+    links: parsed.values.links ?? [],
+    site: parsed.values.site,
+  });
   if (Either.isLeft(result)) {
     console.error(`mantaq-check-site: ${result[0]}`);
     return 2;
