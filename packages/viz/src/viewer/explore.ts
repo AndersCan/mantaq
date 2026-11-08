@@ -569,12 +569,10 @@ function sendItem(
     moves: Move[];
     event: string;
     tagged: boolean;
-    current: string;
-    compartment: string;
+    actor: { actor?: VizActorRef };
   },
 ): HTMLElement {
-  const { live, moves, event, tagged, current, compartment } = context;
-  const { actor } = actorOf(compartment);
+  const { live, moves, event, tagged, actor } = context;
   // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
   const asks = asksForPayload(machine, event);
   const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
@@ -583,19 +581,19 @@ function sendItem(
     button(doc, [code(doc, event), asks ? " …" : ""], {
       onClick: () =>
         asks
-          ? live.compose(event, actor)
-          : live.send({ kind: "event", event, payload: null, ...actorOf(compartment) }),
+          ? live.compose(event, actor.actor)
+          : live.send({ kind: "event", event, payload: null, ...actor }),
       attrs: { "data-send": event },
     }),
     asks || declared !== null
       ? null
       : button(doc, ["with payload"], {
-          onClick: () => live.compose(event, actor),
+          onClick: () => live.compose(event, actor.actor),
           attrs: { class: "link", "data-send-custom": event },
         }),
     move === undefined
       ? html(doc, "span", { class: "muted", "data-ignored": "" }, [
-          ` ignored in ${current}`,
+          ` ignored in ${live.state.state}`,
         ])
       : null,
     !tagged || move === undefined || move.sentBy.length === 0
@@ -610,34 +608,41 @@ function sendItem(
 type StateEffects = VizMachine["states"][number]["effects"];
 
 interface WaitingEffect {
-  /** "" for the machine itself, else the region's path. */
-  compartment: string;
   /** The state the effect belongs to: the top-level state or a region's current state. */
   from: string;
+  /** The region path it runs in, "" for the machine itself. */
+  compartment: string;
   effect: StateEffects[number];
 }
 
 /** The held effects of the current state and of each region's current state that still wait for an answer. */
 function waitingEffects(machine: VizMachine, state: VizLiveState): WaitingEffect[] {
   if (state.effectMode !== "held") return [];
-  const owners = [
-    { compartment: "", from: state.state },
-    ...regionPaths(state).map((path) => ({ compartment: path, from: state.regions[path] ?? "" })),
+  const holders = [
+    { from: state.state, compartment: "" },
+    ...regionPaths(state).map((path) => ({ from: state.regions[path] ?? "", compartment: path })),
   ];
-  return owners.flatMap(({ compartment, from }) => {
+  return holders.flatMap(({ from, compartment }) => {
     const effects = machine.states.find((each) => each.id === from)?.effects ?? [];
     return state.waiting.flatMap((name) =>
-      effects.filter((effect) => effect.name === name).map((effect) => ({ compartment, from, effect })),
+      effects
+        .filter((effect) => effect.name === name)
+        .map((effect) => ({ from, compartment, effect })),
     );
   });
 }
 
-/** Events offered inside a waiting block of the top-level state; the groups leave them out. */
-function waitingReports(machine: VizMachine, state: VizLiveState): Set<string> {
-  const handled = new Set(movesFrom(machine, state.state).map((move) => move.edge.event));
+/** Events offered inside a waiting block of one actor; its groups leave them out. */
+function waitingReports(
+  machine: VizMachine,
+  state: VizLiveState,
+  compartment: string,
+): Set<string> {
+  const from = compartment === "" ? state.state : (state.regions[compartment] ?? "");
+  const handled = new Set(movesFrom(machine, from).map((move) => move.edge.event));
   return new Set(
     waitingEffects(machine, state)
-      .filter((each) => each.compartment === "")
+      .filter((each) => each.compartment === compartment)
       .flatMap((each) => (each.effect.sends ?? []).filter((event) => handled.has(event))),
   );
 }
@@ -651,7 +656,7 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
   const waiting = waitingEffects(machine, state);
   const blocks = waiting
     .filter(({ effect }) => effect.sends === null || effect.sends.length > 0)
-    .map(({ compartment, from, effect }, index) => {
+    .map(({ from, compartment, effect }, index) => {
       const sends = effect.sends;
       const moves = movesFrom(machine, from);
       const handled = new Set(moves.map((move) => move.edge.event));
@@ -668,7 +673,7 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
         },
         [
           html(doc, "h3", {}, ["Waiting for ", code(doc, effect.name)]),
-          index === 0 || compartment !== ""
+          index === 0 || from !== current
             ? docNote(doc, { text: effectDoc ?? null, scope: "edge" })
             : null,
           sends === null
@@ -691,8 +696,7 @@ function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): H
                         moves,
                         event,
                         tagged: false,
-                        current: from,
-                        compartment,
+                        actor: actorOf(compartment),
                       })
                     : html(doc, "li", { "data-send-item": event, "data-unhandled": "" }, [
                         code(doc, event),
@@ -762,17 +766,18 @@ function liveMovesSection(
   }
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
-  const events = offeredEvents(machine, compartment, [...handled]);
-  const shown = compartment === "" ? waitingReports(machine, live.state) : new Set<string>();
-  const offered = events.filter((event) => !shown.has(event));
+  const shown = waitingReports(machine, live.state, compartment);
+  const events = offeredEvents(machine, compartment, [...handled]).filter(
+    (event) => !shown.has(event),
+  );
   const groups: MoveGroup[] = ["input", "effect", "internal"];
   const item = (event: string) =>
-    sendItem(doc, machine, { live, moves, event, tagged: true, current, compartment });
+    sendItem(doc, machine, { live, moves, event, tagged: true, actor });
   const groupOf = (event: string): MoveGroup =>
     moves.find((each) => each.edge.event === event)?.group ?? "input";
   return block(
     groups.flatMap((group) => {
-      const members = offered.filter((event) => groupOf(event) === group);
+      const members = events.filter((event) => groupOf(event) === group);
       return members.length === 0
         ? []
         : [
@@ -1150,22 +1155,28 @@ function liveNote(doc: Document, state: VizLiveState): HTMLElement {
   );
 }
 
-/** Live Step tab, below the root's state: regions, held effects, outcome, Send lists, time. */
-function liveParts(
+type LiveContext = NonNullable<ExploreContext["live"]>;
+
+/** Live Step tab, below the root's state: regions, held effects, outcome, effects, Send lists, time. */
+function liveBody(
   doc: Document,
   machine: VizMachine,
-  context: { live: NonNullable<ExploreContext["live"]>; current: string; final: boolean },
+  context: { live: LiveContext; current: string; final: boolean },
 ): Array<HTMLElement | null> {
   const { live, current, final } = context;
-  const { state } = live;
-  const moves: LiveMoves = { state, send: live.send, final, compose: live.compose };
+  const moves: LiveMoves = {
+    state: live.state,
+    send: live.send,
+    final,
+    compose: live.compose,
+  };
   return [
-    ...regionLines(doc, machine, state),
+    ...regionLines(doc, machine, live.state),
     ...waitingSections(doc, machine, moves),
-    liveResultSection(doc, { machine, state, previous: live.previous }),
-    state.effectMode === "held" ? null : effectsSection(doc, machine, current),
+    liveResultSection(doc, { machine, state: live.state, previous: live.previous }),
+    live.state.effectMode === "held" ? null : effectsSection(doc, machine, current),
     ...liveBlocks(doc, machine, moves),
-    final ? null : timersSection(doc, { state, send: live.send }),
+    final ? null : timersSection(doc, { state: live.state, send: live.send }),
   ];
 }
 
@@ -1187,7 +1198,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       live ? liveNote(doc, live.state) : null,
       ...nowSection(doc, machine, { current, final }),
       ...(live
-        ? liveParts(doc, machine, { live, current, final })
+        ? liveBody(doc, machine, { live, current, final })
         : [
             effectsSection(doc, machine, current),
             movesSection(doc, movesFrom(machine, current), {
