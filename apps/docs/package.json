@@ -8,7 +8,7 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "test": "vp test run --passWithNoTests",
+    "test": "tsc -p tsconfig.examples.json && vp test run --passWithNoTests",
     "astro": "astro"
   },
   "dependencies": {
