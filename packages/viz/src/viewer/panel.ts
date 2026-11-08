@@ -1,7 +1,7 @@
 import { routingWarnings } from "../routing.ts";
 import { coveredByAny, isAnyState } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState, VizStep } from "../schema.ts";
-import { FINDING_KINDS, machineFindings } from "../findings.ts";
+import { machineFindings } from "../findings.ts";
 import type { VizFinding } from "../findings.ts";
 import { activatable, html } from "./dom.ts";
 import { renderExplanation } from "./explanation.ts";
@@ -136,10 +136,16 @@ function edgeList(
   );
 }
 
-function edgePanel(doc: Document, edge: VizEdge, machine: VizMachine): HTMLElement {
+function edgePanel(
+  doc: Document,
+  edge: VizEdge,
+  context: { machine: VizMachine; replay: Replay },
+): HTMLElement {
+  const { machine, replay } = context;
   const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [`Edge ${edge.id}`]),
+    machineWide(doc, machine, replay),
     routingNote(doc, edge, machine),
     predictionNote(doc, edge, machine),
     list(doc, [
@@ -162,55 +168,103 @@ function edgePanel(doc: Document, edge: VizEdge, machine: VizMachine): HTMLEleme
   ]);
 }
 
-function findingArticle(
-  doc: Document,
-  finding: VizFinding,
-  replay: ((steps: ReadonlyArray<VizStep>) => void) | undefined,
-): HTMLElement {
-  const { title, sentence, noSteps } = FINDING_KINDS[finding.kind];
+const REPLAY_LABELS: Partial<Record<VizFinding["kind"], string>> = {
+  deadEnd: "Replay how it gets stuck",
+  handlerError: "Replay the throw",
+};
+
+type Replay = ((steps: ReadonlyArray<VizStep>) => void) | undefined;
+
+function findingArticle(doc: Document, finding: VizFinding, replay: Replay): HTMLElement {
   const { steps } = finding;
   const path =
-    steps === null
-      ? [html(doc, "p", {}, [noSteps])]
-      : steps.length === 0
-        ? []
-        : [
-            html(doc, "p", {}, ["Found by:"]),
-            html(
-              doc,
-              "ol",
-              { class: "steps" },
-              steps.map((step) => html(doc, "li", {}, [stepText(step)])),
-            ),
-          ];
+    steps === null || steps.length === 0
+      ? [html(doc, "p", { class: "finding-no-replay" }, [finding.noReplay ?? ""])]
+      : [
+          html(doc, "p", {}, ["Found by:"]),
+          html(
+            doc,
+            "ol",
+            { class: "steps" },
+            steps.map((step) => html(doc, "li", {}, [stepText(step)])),
+          ),
+        ];
   const button =
     replay === undefined || steps === null || steps.length === 0
       ? null
-      : html(doc, "button", { type: "button", "data-replay": "" }, ["Replay"]);
+      : html(doc, "button", { type: "button", "data-replay": "" }, [
+          REPLAY_LABELS[finding.kind] ?? "Replay how it gets here",
+        ]);
   button?.addEventListener("click", () => replay?.(steps ?? []));
-  return html(doc, "article", { class: "finding", "data-kind": finding.kind }, [
-    html(doc, "h4", {}, [title]),
-    html(doc, "p", {}, [sentence]),
-    html(doc, "p", {}, [html(doc, "code", {}, [finding.message])]),
-    ...path,
-    button,
-  ]);
+  return html(
+    doc,
+    "article",
+    {
+      class: "finding",
+      "data-kind": finding.kind,
+      "data-state": finding.state ?? "",
+      "data-event": finding.event ?? "",
+      ...(finding.note ? { "data-note": "" } : {}),
+    },
+    [
+      html(doc, "h4", { tabindex: "-1" }, [finding.title]),
+      html(doc, "p", {}, [finding.proof]),
+      html(doc, "p", { class: "finding-fix" }, [`Fix: ${finding.fix}`]),
+      ...path,
+      button,
+    ],
+  );
 }
 
 function findingsSection(
   doc: Document,
   findings: ReadonlyArray<VizFinding>,
-  replay: ((steps: ReadonlyArray<VizStep>) => void) | undefined,
+  context: { className: string; heading: string; count: string; replay: Replay },
 ): HTMLElement | null {
   if (findings.length === 0) return null;
   return html(
     doc,
     "section",
-    { class: "state-findings", "data-findings": String(findings.length) },
+    { class: context.className, [context.count]: String(findings.length) },
     [
-      html(doc, "h3", {}, ["Findings"]),
-      ...findings.map((finding) => findingArticle(doc, finding, replay)),
+      html(doc, "h3", {}, [context.heading]),
+      ...findings.map((finding) => findingArticle(doc, finding, context.replay)),
     ],
+  );
+}
+
+function bugs(findings: ReadonlyArray<VizFinding>): VizFinding[] {
+  return findings.filter((finding) => !finding.note);
+}
+
+function notes(findings: ReadonlyArray<VizFinding>): VizFinding[] {
+  return findings.filter((finding) => finding.note);
+}
+
+function notesSection(
+  doc: Document,
+  findings: ReadonlyArray<VizFinding>,
+  replay: Replay,
+): HTMLElement | null {
+  return findingsSection(doc, notes(findings), {
+    className: "state-notes",
+    heading: "Naming notes",
+    count: "data-notes",
+    replay,
+  });
+}
+
+/** Bugs about no single state (an event nobody handles); shown at the top of every Details view. */
+function machineWide(doc: Document, machine: VizMachine, replay: Replay): HTMLElement | null {
+  return findingsSection(
+    doc,
+    bugs(machineFindings(machine).filter((finding) => finding.state === null)),
+    {
+      className: "machine-findings",
+      heading: "About the whole machine",
+      count: "data-findings",
+      replay,
+    },
   );
 }
 
@@ -232,7 +286,14 @@ function statePanel(
   const incoming = machine.edges.filter((edge) => edge.to === state.id && edge.kind !== "initial");
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
     html(doc, "h2", {}, [`State ${state.id}`]),
-    findingsSection(doc, findings, replay),
+    machineWide(doc, machine, replay),
+    findingsSection(doc, bugs(findings), {
+      className: "state-findings",
+      heading: "Findings",
+      count: "data-findings",
+      replay,
+    }),
+    notesSection(doc, findings, replay),
     rulesSection(doc, machine, state.id),
     list(doc, [
       ["id", state.id],
@@ -298,14 +359,17 @@ export function renderPanel(
   const { selection } = context;
   if (selection?.kind === "edge") {
     const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-    if (edge) return edgePanel(doc, edge, machine);
+    if (edge) return edgePanel(doc, edge, { machine, replay: context.replay });
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);
     if (state)
       return statePanel(doc, state, { machine, select: context.select, replay: context.replay });
   }
+  const wide = machineFindings(machine).filter((finding) => finding.state === null);
   return html(doc, "div", {}, [
+    machineWide(doc, machine, context.replay),
+    notesSection(doc, wide, context.replay),
     html(doc, "p", { class: "hint" }, ["Select a state or edge."]),
     fuzzSummary(doc, machine),
   ]);

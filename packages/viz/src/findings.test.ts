@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
-import { FINDING_KINDS, machineFindings, names, unreachableStates } from "./findings.ts";
+import { machineFindings, names, unreachableStates } from "./findings.ts";
 import type { VizMachine, VizStep } from "./schema.ts";
 
 function vizState(id: string, extra: Record<string, unknown> = {}) {
@@ -307,11 +307,6 @@ describe("machineFindings", () => {
       "unreachableState",
     ]);
   });
-
-  test("names the two naming findings", () => {
-    expect(FINDING_KINDS.vagueName.title).toBe("Vague name");
-    expect(FINDING_KINDS.undocumented.title).toBe("No description");
-  });
 });
 
 function analyzedEdge(from: string, to: string, event: string) {
@@ -432,22 +427,6 @@ describe("naming findings", () => {
       events: [eventNamed("stay")],
     });
     expect(namingKinds(machine).map((finding) => finding.kind)).toEqual(["undocumented"]);
-  });
-});
-
-describe("FINDING_KINDS", () => {
-  test("titles every kind", () => {
-    expect(Object.keys(FINDING_KINDS).sort()).toEqual([
-      "deadEnd",
-      "handlerError",
-      "mustSee",
-      "neverSee",
-      "undocumented",
-      "unhandledEvent",
-      "unhandledSend",
-      "unreachableState",
-      "vagueName",
-    ]);
   });
 });
 

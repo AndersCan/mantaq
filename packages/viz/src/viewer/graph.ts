@@ -1,4 +1,4 @@
-import { FINDING_KINDS, machineFindings } from "../findings.ts";
+import { machineFindings } from "../findings.ts";
 import type { VizFinding } from "../findings.ts";
 import { isAnyState } from "../schema.ts";
 import { movesFrom } from "../moves.ts";
@@ -16,7 +16,7 @@ export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: stri
 export interface GraphCallbacks {
   select(selection: Selection): void;
   /** Show the details of a selection without taking a step. */
-  showDetails(selection: Selection): void;
+  showDetails(selection: Selection, options?: { findings: boolean }): void;
   /** Coverage source the overlay dims by. */
   mode: CoverageMode;
 }
@@ -113,7 +113,7 @@ function findingMark(
   const id = placed.state.id;
   const cx = placed.x + placed.width / 2 - 2;
   const cy = placed.y - placed.height / 2 + 2;
-  const titles = findings.map((finding) => FINDING_KINDS[finding.kind].title).join(", ");
+  const titles = findings.map((finding) => finding.title).join("; ");
   const noun = findings.length === 1 ? "finding" : "findings";
   const mark = svg(
     doc,
@@ -121,6 +121,7 @@ function findingMark(
     {
       class: "finding-mark",
       "data-finding-count": findings.length,
+      "data-state": id,
       tabindex: 0,
       role: "button",
       "aria-label": `${findings.length} ${noun} on ${id}: ${titles}`,
@@ -130,7 +131,7 @@ function findingMark(
       svg(doc, "text", { x: cx, y: cy + 4, "text-anchor": "middle" }, ["!"]),
     ],
   );
-  const open = () => callbacks.showDetails({ kind: "state", id });
+  const open = () => callbacks.showDetails({ kind: "state", id }, { findings: true });
   mark.addEventListener("click", (event) => {
     event.stopPropagation();
     open();
