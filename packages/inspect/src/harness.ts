@@ -100,7 +100,7 @@ async function fillForm(
   payload: Record<string, VizJson>,
 ): Promise<string | undefined> {
   const form = page.locator(`[data-payload-form=${quoted(event)}]`);
-  const jsonBox = page.locator(`[data-payload-json=${quoted(event)}]`);
+  const jsonBox = page.locator(`[data-payload-json=${quoted(event)}]:visible`);
   if ((await jsonBox.count()) > 0) {
     await jsonBox.fill(JSON.stringify(payload));
     return undefined;
