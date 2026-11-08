@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { documents, root, routes } from "virtual:mantaq/documents";
 import { bannerParts } from "./banner.ts";
 
-const { src } = Astro.props;
+const { src, runEffects } = Astro.props;
 const abs = resolve(root, src);
 const doc = documents[abs];
 if (doc === undefined) {
@@ -43,6 +43,7 @@ const { count, machines, shown, more, marked, wideText } = bannerParts(doc.findi
   data-mantaq-viz={doc.text}
   data-mantaq-src={src}
   data-mantaq-routes={JSON.stringify(docRoutes)}
+  data-mantaq-effects={runEffects === true ? "run" : undefined}
 >
   <noscript>The interactive diagram needs JavaScript.</noscript>
 </div>
