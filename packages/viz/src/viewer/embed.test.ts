@@ -173,6 +173,7 @@ function fakeDriver(): VizDriver {
           to: "done",
           outcome: "transition",
           effects: ["closeUp"],
+          sent: [],
           context: { n: done.length },
           error: null,
         });
@@ -183,6 +184,7 @@ function fakeDriver(): VizDriver {
           to: from,
           outcome: "stay",
           effects: [],
+          sent: [],
           context: { n: done.length },
           error: null,
         });
@@ -193,6 +195,7 @@ function fakeDriver(): VizDriver {
           to: "open",
           outcome: "stay",
           effects: [],
+          sent: [],
           context: { n: done.length },
           error: "handler failed",
         });
@@ -203,6 +206,7 @@ function fakeDriver(): VizDriver {
           to: from,
           outcome: "ignored",
           effects: [],
+          sent: [],
           context: { n: done.length },
           error: null,
         });

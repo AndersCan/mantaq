@@ -8,7 +8,14 @@ import { mountViewer, showIssues } from "@mantaq/viz/viewer";
 import type { ViewerOptions } from "@mantaq/viz/viewer";
 import { linkOptions } from "@mantaq/viz/page";
 import { outlineOf, parseViz } from "@mantaq/viz";
-import type { MachineOutline, VizDocument, VizDriver, VizLiveState, VizMachine } from "@mantaq/viz";
+import type {
+  MachineOutline,
+  VizDocument,
+  VizDriver,
+  VizLiveState,
+  VizMachine,
+  VizOutputRoutes,
+} from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -113,6 +120,10 @@ function changesOption(
   };
 }
 
+function routesOf(context: { routes?: VizOutputRoutes }): { routes?: VizOutputRoutes } {
+  return context.routes === undefined ? {} : { routes: context.routes };
+}
+
 /** Mount the document at `text`; machines with a target run live, the rest stay static walks. */
 export function mountDriven(
   root: HTMLElement,
@@ -125,6 +136,8 @@ export function mountDriven(
     notes?: string;
     /** Where the dev page keeps each machine's outline for "what changed"; unset = no marks. */
     seen?: SeenStorage;
+    /** Where each machine's outputs go, shown on live steps. */
+    routes?: VizOutputRoutes;
   },
 ): void {
   const parsed = parseViz(context.text);
@@ -170,6 +183,7 @@ export function mountDriven(
     ...changes,
     ...(footer === undefined ? {} : { panelFooter: footer }),
     ...(context.heading === undefined ? {} : { heading: context.heading }),
+    ...routesOf(context),
     ...(driver === undefined ? {} : { driver: driver.driver }),
   });
 }

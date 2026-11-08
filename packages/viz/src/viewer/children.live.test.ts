@@ -205,6 +205,7 @@ describe("live actor map children", () => {
       outcome: "transition",
       actor: { map: "photos", key: "p1" },
       effects: [],
+      sent: [],
       context: null,
       error: null,
     }));
@@ -224,6 +225,7 @@ describe("live actor map children", () => {
       outcome: "missing",
       actor: { map: "photos", key: "p2" },
       effects: [],
+      sent: [],
       context: null,
       error: null,
     }));

@@ -6,6 +6,7 @@ import type {
   VizJson,
   VizLiveState,
   VizMachine,
+  VizOutputRoutes,
   VizStep,
 } from "../schema.ts";
 import { scopeOf } from "../schema.ts";
@@ -141,6 +142,8 @@ export interface ViewerOptions {
    * Unset, another machine shown, or nothing changed: no marks, no list.
    */
   changes?: ChangesOption;
+  /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
+  routes?: VizOutputRoutes;
 }
 
 /**
@@ -182,7 +185,7 @@ export function mountViewer(
         path: view.path,
         take,
         rewind,
-        ...liveOf(view, { send, play, compose }),
+        ...liveOf(view, { send, play, compose, routes: options.routes }),
       });
       const details = renderPanel(doc, machine, {
         selection: view.selection,
@@ -366,7 +369,7 @@ function panelTabs(
 
 function liveOf(
   view: ViewState,
-  handlers: Pick<LiveContext, "send" | "play" | "compose">,
+  handlers: Pick<LiveContext, "send" | "play" | "compose" | "routes">,
 ): { live?: LiveContext } {
   if (view.live === null) return {};
   return {
@@ -448,6 +451,7 @@ function stepSafely(
         outcome: "stay",
         effects: [],
         context: before.context,
+        sent: [],
         error: error instanceof Error ? error.message : String(error),
       },
       after: before.after,

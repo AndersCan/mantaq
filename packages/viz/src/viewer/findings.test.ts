@@ -72,6 +72,7 @@ function driver(): VizDriver {
             to: "__error",
             outcome: "ignored",
             effects: [],
+            sent: [],
             context: null,
             error: "boom",
           },

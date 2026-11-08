@@ -100,6 +100,7 @@ function snapshot(steps: VizStep[]): VizLiveState {
                 ? "missing"
                 : "transition",
             effects: [],
+            sent: [],
             context: null,
             error: null,
             ...(last.actor === undefined ? {} : { actor: last.actor }),

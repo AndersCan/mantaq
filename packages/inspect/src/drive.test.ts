@@ -3,6 +3,7 @@ import { withTimeout } from "@mantaq/sugar";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { createSenderActor } from "./fixtures/wired/sender.ts";
 import { createThrowingActor } from "./fixtures/throwing.ts";
 import type { VizJson } from "@mantaq/viz";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -66,6 +67,27 @@ describe("createDriver", () => {
       error: null,
     });
     expect(live.context).toMatchObject({ basicInfo: { email: "a@b.c" } });
+  });
+
+  test("a step records the outputs the machine sent, in order", () => {
+    const sender: FuzzTarget = {
+      id: "sender",
+      create: () => {
+        const clock = VirtualClock();
+        return { actor: createSenderActor(clock), clock };
+      },
+    };
+    const driver = createDriver(sender);
+    driver.reset();
+    const live = driver.step({ kind: "event", event: "go", payload: null });
+    expect(live.last?.sent).toEqual(["handedOver"]);
+    expect(driver.step({ kind: "event", event: "go", payload: null }).last?.sent).toEqual([]);
+  });
+
+  test("a step that sends nothing records no outputs", () => {
+    const driver = createDriver(checkout);
+    driver.reset();
+    expect(driver.step(basic).last?.sent).toEqual([]);
   });
 
   test("an event the state does not handle is ignored", () => {
