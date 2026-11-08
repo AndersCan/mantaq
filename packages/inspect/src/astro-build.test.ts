@@ -20,6 +20,8 @@ const linked = "../fixtures/linked.ts";
 const deadEnd = "../fixtures/dead-end.ts";
 const instance = "../fixtures/instance.ts";
 const badExpectations = "../fixtures/bad-expectations.ts";
+const unhandled = "../fixtures/unhandled.ts";
+const vagueNames = "../fixtures/vague-names.ts";
 
 function page(sources: string[]): string {
   const tags = sources.map((src) => `<Machine src="${src}" />`).join("\n");
@@ -77,11 +79,42 @@ describe("mantaqViz for Astro", () => {
     }
     const findings = [...document.querySelectorAll<HTMLElement>(".mantaq-findings")];
     expect(findings).toHaveLength(2);
-    expect(findings[0]?.dataset["count"]).toBe("2");
-    expect(findings[1]?.dataset["count"]).toBe("2");
-    expect(findings[1]?.textContent).toContain("2 design findings, marked with ! on the diagram");
+    expect(findings[0]?.dataset["count"]).toBe("0");
+    expect(findings[1]?.dataset["count"]).toBe("1");
+    expect(findings[0]?.textContent?.trim()).toBe("No design findings. Fuzzing is off.");
+    expect(findings[1]?.textContent?.replace(/\s+/g, " ").trim()).toBe(
+      "1 design finding in orphan: orphan can never be reached. Click a ! on the diagram to see why.",
+    );
     expect(findings[1]?.querySelector("ul")).toBeNull();
   });
+
+  test("the banner for a machine with only a naming note says no findings", async () => {
+    const root = makeSite([vagueNames]);
+    try {
+      await buildSite(root, [vagueNames]);
+      document.documentElement.innerHTML = readFileSync(join(root, "dist", "index.html"), "utf8");
+      const banner = document.querySelector<HTMLElement>(".mantaq-findings");
+      expect(banner?.dataset["count"]).toBe("0");
+      expect(banner?.textContent?.trim()).toBe("No design findings. Fuzzing is off.");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  test("the banner points at the Details tab for an input no state handles", async () => {
+    const root = makeSite([unhandled]);
+    try {
+      await buildSite(root, [unhandled]);
+      document.documentElement.innerHTML = readFileSync(join(root, "dist", "index.html"), "utf8");
+      const banner = document.querySelector<HTMLElement>(".mantaq-findings");
+      expect(banner?.dataset["count"]).toBe("1");
+      expect(banner?.textContent?.replace(/\s+/g, " ").trim()).toBe(
+        "1 design finding in unhandled: callOff is declared but no state handles it. callOff is listed at the top of the Details tab.",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   test("the built script drives the machine live", async () => {
     document.documentElement.innerHTML = built();
