@@ -176,6 +176,33 @@ function sendsFrom(scan: Scan, call: ts.CallExpression, depth: number): Found[] 
   return found;
 }
 
+function exits(statement: ts.Statement): boolean {
+  if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) return true;
+  return ts.isBlock(statement) && statement.statements.length > 0 && exits(statement.statements[0]);
+}
+
+/** The output id of an early-return guard `if (x.type !== id) return;`, else null. */
+function earlyReturnLiteral(
+  checker: ts.TypeChecker,
+  statement: ts.Statement,
+  outputs: ReadonlyArray<string>,
+): string | null {
+  if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return null;
+  if (!exits(statement.thenStatement)) return null;
+  const test = statement.expression;
+  if (
+    !ts.isBinaryExpression(test) ||
+    test.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken
+  )
+    return null;
+  const sides = [test.left, test.right];
+  const typed = sides.some(
+    (side) => ts.isPropertyAccessExpression(side) && side.name.text === "type",
+  );
+  const literal = sides.map((side) => literalOf(checker, side)).find((text) => text !== null);
+  return typed && literal != null && outputs.includes(literal) ? literal : null;
+}
+
 function guardLiteral(
   checker: ts.TypeChecker,
   condition: ts.Expression,
@@ -208,10 +235,18 @@ function triggerOf(
 ): string {
   for (
     let node: ts.Node | undefined = call.parent;
-    node !== undefined && node !== listener;
+    node !== undefined && node !== listener.parent;
     node = node.parent
   ) {
+    if (ts.isBlock(node)) {
+      for (const statement of node.statements) {
+        if (statement.pos >= call.pos) break;
+        const literal = earlyReturnLiteral(checker, statement, outputs);
+        if (literal !== null) return literal;
+      }
+    }
     if (
+      node !== listener &&
       ts.isIfStatement(node) &&
       call.pos >= node.thenStatement.pos &&
       call.end <= node.thenStatement.end
@@ -329,6 +364,10 @@ function namedIn(
   const named: string[] = [];
   let fallsThrough = false;
   const visit = (node: ts.Node): void => {
+    if (ts.isIfStatement(node)) {
+      const literal = earlyReturnLiteral(checker, node, outputs);
+      if (literal !== null) named.push(literal);
+    }
     if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken

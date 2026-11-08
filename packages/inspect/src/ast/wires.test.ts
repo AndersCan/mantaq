@@ -160,6 +160,13 @@ describe("scanAppCode unheard outputs", () => {
     expect(scanned.unheard).toEqual([]);
   });
 
+  test("an early-return type guard hears only the output it lets through", async () => {
+    const scanned = await unheardWith(
+      'actor.on("output", { fn: (e) => { if (e.type !== "a") return; note(); } });\n',
+    );
+    expect(scanned.unheard).toEqual([{ id: "duo", outputs: ["b"] }]);
+  });
+
   test("a checked if with an else hears every output", async () => {
     const scanned = await unheardWith(
       'actor.on("output", { fn: (e) => { if (e.type === "a") note(); else note(); } });\n',
@@ -241,6 +248,22 @@ describe("findWires", () => {
         { from: "sender", to: "receiver", trigger: "output", event: "take", at: at(send, 4) },
       ].sort((a, b) => a.at.localeCompare(b.at)),
     );
+  });
+
+  test("an early-return type guard names the output the listener hears", async () => {
+    const dir = mkdtempSync(join(ROOT, "wired-edges", "tmp-"));
+    try {
+      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../../../../tsconfig.json"}');
+      const file = join(dir, "listen.ts");
+      writeFileSync(
+        file,
+        'import { receiverActor, take } from "../../wired/receiver.ts";\nimport { senderActor } from "../../wired/sender.ts";\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    if (e.type !== "handedOver") return;\n    receiverActor.send(take.create());\n  },\n});\n',
+      );
+      const found = findWires({ root: ROOT, files: [file], machines: await machines() });
+      expect(found.map((wire) => wire.trigger)).toEqual(["handedOver"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("ignores listeners in test files", async () => {
