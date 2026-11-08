@@ -95,7 +95,10 @@ const line = (points) =>
       <ul class="wires">
         {overview.wires.map((wire) => (
           <li>
-            {wire.from} → {wire.to}: {wire.trigger} → {wire.event}, in {wire.at}
+            {wire.from} → {wire.to}: {wire.trigger} → {wire.event}, in {wire.at}{
+              wire.ignoredIn.length > 0 &&
+                `. ${wire.to} ignores ${wire.event} while ${wire.ignoredIn.join(", ")}.`
+            }
           </li>
         ))}
       </ul>

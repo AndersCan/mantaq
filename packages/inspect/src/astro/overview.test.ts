@@ -1,4 +1,4 @@
-import { layoutOverview, machineLinks, outputRoutes } from "./overview.ts";
+import { ignoredIn, layoutOverview, machineLinks, outputRoutes } from "./overview.ts";
 import type { VizMachine } from "@mantaq/viz";
 import type { Wire } from "../ast/wires.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -15,9 +15,58 @@ function machine(id: string, outputs: string[], inputs: string[], internal: stri
     event: name,
     kind: "transition",
   }));
-  const value = { id, outputs, events, edges } as unknown as VizMachine;
+  const value = { id, outputs, events, edges, states: [] } as unknown as VizMachine;
   return { file: `/x/${id}.ts`, machine: value };
 }
+
+function receiver(
+  states: Array<{ id: string; final?: boolean; region?: string }>,
+  edges: Array<{ from: string; event: string; kind?: string }>,
+) {
+  return {
+    id: "r",
+    events: [{ id: "x", internal: false }],
+    outputs: [],
+    states: states.map((each) => ({
+      id: each.id,
+      final: each.final ?? false,
+      region: each.region ?? null,
+    })),
+    edges: edges.map((each) => ({ kind: "transition", ...each })),
+  } as unknown as VizMachine;
+}
+
+describe("ignoredIn", () => {
+  const states = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "done", final: true }];
+
+  test("lists the non-final states without a handler, in states order", () => {
+    const r = receiver(states, [{ from: "b", event: "x" }]);
+    expect(ignoredIn(r, "x")).toEqual(["a", "c"]);
+  });
+
+  test("an onAny handler covers every state", () => {
+    expect(ignoredIn(receiver(states, [{ from: "*", event: "x" }]), "x")).toEqual([]);
+  });
+
+  test("region states are not listed", () => {
+    const r = receiver([{ id: "a" }, { id: "r1.p", region: "r1" }], []);
+    expect(ignoredIn(r, "x")).toEqual(["a"]);
+  });
+
+  test("effect edges do not count as handlers", () => {
+    const r = receiver(states, [{ from: "a", event: "x", kind: "effect" }]);
+    expect(ignoredIn(r, "x")).toEqual(["a", "b", "c"]);
+  });
+
+  test("a stay handler counts", () => {
+    const r = receiver(states, [{ from: "a", event: "x", kind: "stay" }]);
+    expect(ignoredIn(r, "x")).toEqual(["b", "c"]);
+  });
+
+  test("no receiver gives nothing", () => {
+    expect(ignoredIn(undefined, "x")).toEqual([]);
+  });
+});
 
 describe("machineLinks", () => {
   test("an output another machine handles is a link", () => {
@@ -62,6 +111,13 @@ describe("machineLinks", () => {
 });
 
 describe("machineLinks with wires", () => {
+  test("each wire carries the receiver's ignoring states", () => {
+    const w = wire("r", "change", "x");
+    const r = receiver([{ id: "s1" }, { id: "s2" }], [{ from: "s1", event: "x" }]);
+    const links = machineLinks([machine("a", [], []), { file: "/x/r.ts", machine: r }], [w]);
+    expect(links[0]?.wires[0]?.ignoredIn).toEqual(["s2"]);
+  });
+
   const wire = (to: string, trigger: string, event: string): Wire => ({
     from: "a",
     to,
@@ -73,14 +129,16 @@ describe("machineLinks with wires", () => {
   test("a wire alone makes a link", () => {
     const w = wire("b", "change", "poke");
     const links = machineLinks([machine("a", [], []), machine("b", [], ["poke"])], [w]);
-    expect(links).toEqual([{ from: "a", to: "b", events: [], wires: [w] }]);
+    expect(links).toEqual([{ from: "a", to: "b", events: [], wires: [{ ...w, ignoredIn: [] }] }]);
   });
 
   test("an id match and a wire make one link with both, labelled together", () => {
     const w = wire("b", "change", "poke");
     const machines = [machine("a", ["handedOver"], []), machine("b", [], ["handedOver", "poke"])];
     const links = machineLinks(machines, [w]);
-    expect(links).toEqual([{ from: "a", to: "b", events: ["handedOver"], wires: [w] }]);
+    expect(links).toEqual([
+      { from: "a", to: "b", events: ["handedOver"], wires: [{ ...w, ignoredIn: [] }] },
+    ]);
     const overview = layoutOverview(
       [
         { id: "a", file: "/x/a.ts" },
@@ -89,7 +147,7 @@ describe("machineLinks with wires", () => {
       links,
     );
     expect(overview.links[0]?.label).toBe("handedOver, change → poke");
-    expect(overview.wires).toEqual([w]);
+    expect(overview.wires).toEqual([{ ...w, ignoredIn: [] }]);
   });
 
   test("an unheard entry is drawn as one arrow to no box", () => {
@@ -124,8 +182,8 @@ describe("machineLinks with wires", () => {
       [toB, toC],
     );
     expect(links).toEqual([
-      { from: "a", to: "b", events: [], wires: [toB] },
-      { from: "a", to: "c", events: [], wires: [toC] },
+      { from: "a", to: "b", events: [], wires: [{ ...toB, ignoredIn: [] }] },
+      { from: "a", to: "c", events: [], wires: [{ ...toC, ignoredIn: [] }] },
     ]);
   });
 

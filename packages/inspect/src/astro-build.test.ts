@@ -174,7 +174,10 @@ describe("mantaqViz for Astro", () => {
     expect(link?.textContent).toContain("handedOver → take");
     const items = [...document.querySelectorAll("ul.wires li")].map((li) => li.textContent);
     expect(items).toHaveLength(3);
-    expect(items[0]).toMatch(/^sender → receiver: handedOver → take, in .*wire\.ts:\d+$/);
+    expect(items[0]).toMatch(
+      /^sender → receiver: handedOver → take, in .*wire\.ts:\d+\. receiver ignores take while checking\.$/,
+    );
+    expect(items.filter((item) => item?.includes("ignores"))).toHaveLength(3);
     expect(
       document.querySelector('a.box[data-machine="sketch"]')?.hasAttribute("data-not-run"),
     ).toBe(true);
