@@ -12,14 +12,12 @@ States, events, and effects are declarations until an Actor runs them.
 
 ## Create
 
-```ts
-import { checkout } from "../checkout.ts";
+The examples on this page drive the docs checkout machine and build on each other. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
 
-// `checkout` is the canonical multi-step checkout machine (see ./checkout.ts):
-//
-//   basicInfo -> shippingAddress -> payment -> submitting -> success (final)
-//                                      ^ (back) v                  v (back)
-//                                                               error
+```ts
+import { createCheckoutActor } from "./checkout";
+
+const { actor: checkout } = createCheckoutActor();
 ```
 
 ```
@@ -31,23 +29,27 @@ basicInfo -> shippingAddress -> payment -> submitting -> success
 ## Send events
 
 ```ts
+import { submitBasicInfo } from "./checkout";
+
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 ```
 
 ## Check state
 
 ```ts
-checkout.snapshot().path[0]; // "payment"
-matches(checkout, "payment"); // from @mantaq/sugar
+import { matches } from "@mantaq/sugar";
+
+checkout.snapshot().path[0]; // "shippingAddress"
+matches(checkout, "shippingAddress"); // true
 ```
 
 ## Listen for changes
 
 ```ts
-const unsub = checkout.on("change", (snap) => {
-  /* ... */
+const unsub = checkout.on("change", {
+  fn: (snap) => console.log(snap.path),
 });
-// unsub() to stop
+unsub(); // stop listening
 ```
 
 Fires immediately with current snapshot, then on every state or context change.
@@ -64,7 +66,7 @@ Waits for internal events to drain and pending effects to finish.
 
 ```ts
 checkout.snapshot();
-// { path: ["payment"], context: {...}, regions: {} }
+// { path: ["shippingAddress"], context: { basicInfo: {...} }, regions: {} }
 ```
 
 ## Constructor options
@@ -84,11 +86,11 @@ checkout.snapshot();
 
 ## Setup builder
 
-| Method                          | What                                        |
-| ------------------------------- | ------------------------------------------- |
-| `m.on(state, event, fn)`        | Transition handler for one state/event pair |
-| `m.onAny(event, fn)`            | Handler for an event in every state         |
-| `m.effect(state, { name, fn })` | Run `fn` on state entry; `name` is required |
+| Method                                 | What                                        |
+| -------------------------------------- | ------------------------------------------- |
+| `m.on(state, { event, to, handler })`  | Transition handler for one state/event pair |
+| `m.onAny({ event, to, handler })`      | Handler for an event in every state         |
+| `m.effect(state, { name, sends, fn })` | Run `fn` on state entry; `name` is required |
 
 Handlers return `{ state }` (with optional `payload` or `emit`) to transition,
 or `{}` to stay put.
