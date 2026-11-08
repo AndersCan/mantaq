@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.30.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  Fuzzing records each event it sent without a payload whose fields the machine then read: `Trace.missingPayloads`, `FuzzResult.missingPayloads` and `Inspected.missingPayloads` (type `MissingPayload`). The vague "no source" warning is replaced by one exact line per such event, and no longer appears for events the machine reads nothing from.
+
+  Breaking: none
+
+- _(minor)_
+  `expectReached`, `expectAllStatesReached` and `expectNoDesignErrors` stop when fuzzing sent an event without a payload and the machine read a field of it. The error names each event and the fields read, and says to pass `source` or `payloads`. Before, such a check passed on an event the app cannot send, blamed the handler for a payload the types forbid, or told you to raise `fuzz.iterations`.
+
+  Breaking: expectReached, expectAllStatesReached and expectNoDesignErrors now fail when fuzzing sent an event without a payload and the machine read one — affects tests without source or payloads for such events: add them.
+
 ## 0.29.0
 
 <sub>2026-11-08</sub>
