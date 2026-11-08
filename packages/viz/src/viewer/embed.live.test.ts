@@ -106,6 +106,7 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
           : [],
       context,
       payload: held,
+      regions: {},
       effectMode: "real",
       waiting: [],
     };
@@ -823,6 +824,7 @@ describe("what ran", () => {
         timers: [],
         context: {},
         payload: null,
+        regions: {},
         effectMode: "real",
         waiting: [],
       }),
@@ -834,6 +836,7 @@ describe("what ran", () => {
         timers: [],
         context: last.context,
         payload: null,
+        regions: {},
         effectMode: "real",
         waiting: [],
       }),
@@ -925,6 +928,7 @@ describe("what ran", () => {
       timers: [],
       context: { amount: 9, failed: true },
       payload: null,
+      regions: {},
       effectMode: "real",
       waiting: [],
     });
@@ -1003,6 +1007,7 @@ describe("live effect reports", () => {
         timers: [],
         context: null,
         payload: null,
+        regions: {},
         effectMode: "real",
         waiting: [],
       };

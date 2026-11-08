@@ -78,6 +78,7 @@ function driver(): VizDriver {
     timers: [],
     context: null,
     payload: null,
+    regions: {},
     effectMode: "real",
     waiting: [],
   });

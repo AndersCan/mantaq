@@ -1,5 +1,20 @@
-import type { VizDriver, VizJson, VizLiveState, VizLiveStep, VizStep } from "@mantaq/viz";
-import { applyStep, contextText, eventCatalog, messageOf, parsed } from "./fuzz/run.ts";
+import type {
+  VizActorRef,
+  VizDriver,
+  VizJson,
+  VizLiveState,
+  VizLiveStep,
+  VizStep,
+} from "@mantaq/viz";
+import {
+  applyStep,
+  contextText,
+  eventCatalog,
+  messageOf,
+  parsed,
+  regionActors,
+  targetOf,
+} from "./fuzz/run.ts";
 import type { AnyActor, VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -79,6 +94,66 @@ export interface DriverOptions {
   effectMode?: "held" | "real";
 }
 
+/** Record every transition and error of the regions, tagged with the region and prefixed ids. */
+function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => void): void {
+  for (const { path, actor: region } of regionActors(root)) {
+    const ref: VizActorRef = { region: path };
+    region.on("transition", {
+      fn: ({ event, from: before, to, transitioned, effects }) => {
+        record({
+          from: `${path}.${before}`,
+          event: event.type,
+          to: `${path}.${to}`,
+          outcome: transitioned ? "transition" : "stay",
+          actor: ref,
+          effects,
+          context: json(contextText(root)),
+          error: null,
+        });
+      },
+    });
+    region.on("error", {
+      fn: (info) => {
+        record({
+          from: `${path}.${info.state.name}`,
+          event: info.event.type,
+          to: `${path}.${region.state.name}`,
+          outcome: "stay",
+          actor: ref,
+          effects: [],
+          context: json(contextText(root)),
+          error: messageOf(info.error),
+        });
+      },
+    });
+  }
+}
+
+/** The log entry for an event nobody handled: ignored, or missing when its region does not exist. */
+function unhandled(
+  step: Extract<VizStep, { kind: "event" }>,
+  at: { actor: AnyActor<unknown>; target: AnyActor<unknown> | undefined; root: string },
+): VizLiveStep {
+  const ref = step.actor;
+  const gone = ref !== undefined && at.target === undefined;
+  const here = ref === undefined ? at.root : `${ref.region}.${at.target?.state.name ?? ""}`;
+  const state = gone ? "" : here;
+  return {
+    from: state,
+    event: step.event,
+    to: state,
+    outcome: gone ? "missing" : "ignored",
+    ...(ref === undefined ? {} : { actor: ref }),
+    effects: [],
+    context: json(contextText(at.actor)),
+    error: null,
+  };
+}
+
+function sameActor(left: VizActorRef | undefined, right: VizActorRef | undefined): boolean {
+  return left?.region === right?.region;
+}
+
 /**
  * A running actor for the viewer. Steps go through the same function the
  * fuzzer replays with, so live and fuzzed behaviour cannot drift. No node APIs.
@@ -138,6 +213,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
         });
       },
     });
+    watchRegions(actor, record);
     flags.inside = false;
     return { actor, clock, internal, log, steps, flags, held };
   }
@@ -148,6 +224,9 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     held.splice(0, held.length, ...waiting);
     return {
       state: actor.state.name,
+      regions: Object.fromEntries(
+        regionActors(actor).map((each) => [each.path, `${each.path}.${each.actor.state.name}`]),
+      ),
       steps: [...steps],
       last: log[0] ?? null,
       after: log.slice(1),
@@ -180,22 +259,20 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       flags.segment = 0;
       flags.inside = true;
       const before = actor.state.name;
+      const target = step.kind === "event" ? targetOf(actor, step.actor) : undefined;
       try {
         applyStep(actor, { step, clock, internal });
       } finally {
         flags.inside = false;
       }
       steps.push(step);
-      if (log.length === 0 && step.kind === "event") {
-        log.push({
-          from: before,
-          event: step.event,
-          to: before,
-          outcome: "ignored",
-          effects: [],
-          context: json(contextText(actor)),
-          error: null,
-        });
+      if (step.kind === "event") {
+        const own = log.findIndex(
+          (entry) => entry.event === step.event && sameActor(entry.actor, step.actor),
+        );
+        const [entry] = own === -1 ? [] : log.splice(own, 1);
+        if (entry !== undefined) log.unshift(entry);
+        else log.unshift(unhandled(step, { actor, target, root: before }));
       }
       return view();
     },

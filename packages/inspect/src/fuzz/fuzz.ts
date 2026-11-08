@@ -2,7 +2,7 @@ import type { VizExpectation, VizFailedExpectation, VizFuzzError, VizStep } from
 import { mutate } from "./mutate.ts";
 import type { LiteralPool, MutationContext, Parent } from "./mutate.ts";
 import { createRng } from "./rng.ts";
-import { eventCatalog, execute } from "./run.ts";
+import { eventCatalog, execute, regionActors } from "./run.ts";
 import type { FuzzTarget, Trace } from "./run.ts";
 
 export interface FuzzOptions {
@@ -85,10 +85,20 @@ export function shrink(
 }
 
 function mutationContext(target: FuzzTarget, options: FuzzOptions): MutationContext {
-  const catalog = eventCatalog(target.create().actor);
+  const root = target.create().actor;
+  const catalog = eventCatalog(root);
+  const regionEvents = regionActors(root).flatMap(({ path, actor }) => {
+    const each = eventCatalog(actor);
+    return [...each.inputs, ...each.internal]
+      .sort()
+      .map((event) => ({ event, actor: { region: path } }));
+  });
   return {
     rng: createRng(options.seed),
-    events: [...catalog.inputs, ...catalog.internal].sort(),
+    events: [
+      ...[...catalog.inputs, ...catalog.internal].sort().map((event) => ({ event })),
+      ...regionEvents,
+    ],
     payloads: target.payloads ?? {},
     literals: options.literals ?? { numbers: [], strings: [] },
     maxLength: options.maxLength ?? 24,

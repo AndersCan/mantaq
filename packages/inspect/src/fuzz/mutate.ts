@@ -1,4 +1,4 @@
-import type { VizJson, VizStep } from "@mantaq/viz";
+import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
 import type { Rng } from "./rng.ts";
 
 /** Extra values to try at payload leaves (Phase 5 literal seeding). Empty = blind mutation. */
@@ -9,8 +9,8 @@ export interface LiteralPool {
 
 export interface MutationContext {
   rng: Rng;
-  /** Every event type the machine declares, sorted. */
-  events: ReadonlyArray<string>;
+  /** Every event the machine declares, root events first, then each region's; `actor` is omitted for the root. */
+  events: ReadonlyArray<{ event: string; actor?: VizActorRef }>;
   payloads: Readonly<Record<string, ReadonlyArray<VizJson>>>;
   literals: LiteralPool;
   maxLength: number;
@@ -36,10 +36,13 @@ function isObject(value: VizJson): value is { [key: string]: VizJson } {
 }
 
 function freshEvent(context: MutationContext): VizStep {
-  const event = context.rng.pick(context.events) ?? "";
+  const picked = context.rng.pick(context.events);
+  const event = picked?.event ?? "";
   const samples = context.payloads[event] ?? [];
   const payload = context.rng.pick(samples) ?? null;
-  return { kind: "event", event, payload };
+  return picked?.actor === undefined
+    ? { kind: "event", event, payload }
+    : { kind: "event", event, payload, actor: picked.actor };
 }
 
 function freshStep(context: MutationContext): VizStep {

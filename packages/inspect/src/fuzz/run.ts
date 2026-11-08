@@ -1,4 +1,4 @@
-import type { VizJson, VizStep } from "@mantaq/viz";
+import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
 import type { AnyActor, InternalEvent, VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import { matches } from "../expectations.ts";
@@ -126,16 +126,52 @@ export function parsed(text: string | null): unknown {
   return text === null ? null : JSON.parse(text);
 }
 
+/** Every region actor under `actor`, nested ones included, with its dotted path, sorted by path. */
+export function regionActors(
+  actor: AnyActor<unknown>,
+  prefix = "",
+): Array<{ path: string; actor: AnyActor<unknown> }> {
+  const found = Object.entries(actor.regions).flatMap(([name, region]) => {
+    const path = `${prefix}${name}`;
+    return [{ path, actor: region }, ...regionActors(region, `${path}.`)];
+  });
+  return found.sort((left, right) =>
+    left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
+  );
+}
+
+/** The actor a step goes to; undefined when the step names a region that does not exist. */
+export function targetOf(
+  root: AnyActor<unknown>,
+  ref: VizActorRef | undefined,
+): AnyActor<unknown> | undefined {
+  if (ref === undefined) return root;
+  return regionActors(root).find((each) => each.path === ref.region)?.actor;
+}
+
+const catalogs = new WeakMap<object, ReadonlySet<string>>();
+
+function internalOf(actor: AnyActor<unknown>): ReadonlySet<string> {
+  const cached = catalogs.get(actor);
+  if (cached !== undefined) return cached;
+  const found = new Set(eventCatalog(actor).internal);
+  catalogs.set(actor, found);
+  return found;
+}
+
 /** The one step function: the fuzzer and the live driver both apply steps through it. */
 export function applyStep(
-  actor: AnyActor<unknown>,
+  root: AnyActor<unknown>,
   context: { step: VizStep; clock: VirtualClock; internal: ReadonlySet<string> },
 ): void {
   const { step } = context;
-  if (step.kind === "advance") context.clock.advance(step.ms);
+  if (step.kind === "advance") return context.clock.advance(step.ms);
+  const actor = targetOf(root, step.actor);
+  if (actor === undefined) return;
+  const internal = actor === root ? context.internal : internalOf(actor);
   // A live effect only emits while its state is active, and core rejects an
   // internal event the current state cannot handle. Such a step is a no-op.
-  else if (context.internal.has(step.event)) {
+  if (internal.has(step.event)) {
     if (handles(actor, step.event)) actor.inject(toEvent(step));
   } else actor.send(toEvent(step));
 }
@@ -148,6 +184,8 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   const { actor, clock } = target.create();
   const internal = new Set(eventCatalog(actor).internal);
   const visited = [actor.state.name];
+  const regions = regionActors(actor);
+  for (const region of regions) visited.push(`${region.path}.${region.actor.state.name}`);
   const observations: Observation[] = [];
   const errors: RunError[] = [];
   const contextSteps: number[] = [];
@@ -190,6 +228,33 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
       });
     },
   });
+  for (const { path, actor: region } of regions) {
+    region.on("transition", {
+      fn: ({ event, from, to, transitioned, effects }) => {
+        observations.push({
+          from: `${path}.${from}`,
+          event: event.type,
+          to: `${path}.${to}`,
+          transitioned,
+          effects,
+          step: index,
+          payload: event.payload,
+          context: parsed(contextText(actor)),
+        });
+        if (transitioned) visited.push(`${path}.${to}`);
+      },
+    });
+    region.on("error", {
+      fn: (info) => {
+        errors.push({
+          from: `${path}.${info.state.name}`,
+          event: info.event.type,
+          message: messageOf(info.error),
+          step: index,
+        });
+      },
+    });
+  }
   for (const step of steps) {
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);

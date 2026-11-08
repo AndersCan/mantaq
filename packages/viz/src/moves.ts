@@ -1,5 +1,5 @@
 import { coveredByAny } from "./schema.ts";
-import type { VizEdge, VizJson, VizMachine, VizStep } from "./schema.ts";
+import type { VizActorRef, VizEdge, VizJson, VizMachine, VizStep } from "./schema.ts";
 
 /**
  * Walking the drawn graph by hand: no actor runs. A path is the edges taken
@@ -136,7 +136,13 @@ export function decodePath(machine: VizMachine, encoded: ReadonlyArray<string>):
  */
 export function encodeLiveStep(step: VizStep): string {
   if (step.kind === "advance") return `@${step.ms}`;
-  return step.payload === null ? step.event : `${step.event}=${JSON.stringify(step.payload)}`;
+  const event = step.actor === undefined ? step.event : `${actorText(step.actor)}>${step.event}`;
+  return step.payload === null ? event : `${event}=${JSON.stringify(step.payload)}`;
+}
+
+/** The URL prefix of an actor ref: the region path. */
+function actorText(actor: VizActorRef): string {
+  return actor.region;
 }
 
 function parseJson(text: string): { value: VizJson } | null {
@@ -154,11 +160,14 @@ function decodeLiveStep(text: string): VizStep | null {
     return text.length > 1 && Number.isFinite(ms) && ms >= 0 ? { kind: "advance", ms } : null;
   }
   const cut = text.indexOf("=");
-  const event = cut === -1 ? text : text.slice(0, cut);
-  if (event === "") return null;
-  if (cut === -1) return { kind: "event", event, payload: null };
+  const head = cut === -1 ? text : text.slice(0, cut);
+  const arrow = head.indexOf(">");
+  const event = arrow === -1 ? head : head.slice(arrow + 1);
+  const actor = arrow === -1 ? {} : { actor: { region: head.slice(0, arrow) } };
+  if (event === "" || arrow === 0) return null;
+  if (cut === -1) return { kind: "event", event, payload: null, ...actor };
   const payload = parseJson(text.slice(cut + 1));
-  return payload === null ? null : { kind: "event", event, payload: payload.value };
+  return payload === null ? null : { kind: "event", event, payload: payload.value, ...actor };
 }
 
 /** Steps from a shared link, up to the first one that does not parse. */
