@@ -6,7 +6,7 @@ description: Convenience helpers.
 ## `matches(actor, pattern)`
 
 ```ts
-import { checkout } from "../checkout.ts";
+import { checkout } from "./checkout";
 
 function matches(actor: { snapshot(): Snapshot }, pattern: string): boolean;
 ```
@@ -76,13 +76,13 @@ busy.has(checkout.snapshot()); // true if paying or submitting
 Keyed registry of one actor type.
 
 ```ts
-const map = new ActorMap(createOrderWorker);
+const map = createActorMap(createOrderWorker);
 map.spawn("ord_1");
 map.send("ord_1", ship.create());
 map.kill("ord_1");
 ```
 
-`new ActorMap(factory, options?)`. Factory builds actor, receiving key: `(id: string) => Actor`. `spawn(key)` creates fresh instance keyed by id. `options: { autoReap? }`: `true` removes child once it reaches final state or dies into `__error`. Off by default.
+`createActorMap(factory, options?)`. Factory builds actor, receiving key: `(id: string) => Actor`. `spawn(key)` creates fresh instance keyed by id. `options: { autoReap? }`: `true` removes child once it reaches final state or dies into `__error`. Off by default.
 
 | Method             | What                                  |
 | ------------------ | ------------------------------------- |
@@ -94,7 +94,7 @@ map.kill("ord_1");
 | `get(key)`         | Live child. `undefined` if absent     |
 | `keys()`           | List keys                             |
 | `snapshot(key)`    | Child snapshot. `undefined` if absent |
-| `size`             | Count                                 |
+| `dispose()`        | Kill every child                      |
 
 ---
 
@@ -188,11 +188,15 @@ Wrap a slice of setup (`m.on`, `m.onAny`, `m.effect`) for its own file. Generic 
 
 ```ts
 const basicInfoPart = definePart<typeof checkout>((m) => {
-  m.on(basicInfo, submitBasicInfo, (event, opts) => {
-    const cur = opts.context.get();
-    cur.basicInfo = event.payload;
-    opts.context.set(cur);
-    return { state: shippingAddress };
+  m.on(basicInfo, {
+    event: submitBasicInfo,
+    to: [shippingAddress],
+    handler: (event, opts) => {
+      const cur = opts.context.get();
+      cur.basicInfo = event.payload;
+      opts.context.set(cur);
+      return { state: shippingAddress };
+    },
   });
 });
 ```
@@ -220,7 +224,7 @@ Not a React hook. Takes `Fragment`s from `definePart`. Never annotate `Part` typ
 
 ---
 
-## `withParts(base, parts)`
+## `withParts(base, ...parts)`
 
 ```ts
 function withParts<
@@ -231,18 +235,16 @@ function withParts<
   ActorContext = Record<string, unknown>,
 >(
   base: Omit<ActorOptions<States, Inputs, Internal, Outputs, ActorContext>, "setup">,
-  parts:
-    | Part<States, Inputs, Internal, Outputs, ActorContext>
-    | readonly Part<States, Inputs, Internal, Outputs, ActorContext>[],
+  ...parts: Part<States, Inputs, Internal, Outputs, ActorContext>[]
 ): Actor<States, Inputs, Internal, Outputs, ActorContext>;
 ```
 
-Build actor from spec plus parts. Setup generated. Parts run against builder in order. `base` takes every option `new Actor` takes.
+Build actor from spec plus parts. Setup generated. Parts run against builder in order. `base` takes every option `Actor` takes.
 
-Parts array shares actor generics: `Part<States, ...>`. A part built against one spec cannot wire into another. For same (state, event), last registered handler wins, across parts and inline code. Effects append: every effect on a state runs on entry.
+Every part shares the actor generics: `Part<States, ...>`. A part built against one spec cannot wire into another. For same (state, event), last registered handler wins, across parts and inline code. Effects append: every effect on a state runs on entry.
 
 ```ts
-const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
+const actor = withParts(checkout, basicInfoPart, submittingPart, backPart);
 ```
 
 ---
@@ -253,7 +255,7 @@ const actor = withParts(checkout, [basicInfoPart, submittingPart, backPart]);
 type ActorSpec;       // shape of the static actor spec (states/inputs/.../initial)
 type BuilderOf<S>;    // ActorBuilder for that spec
 type Fragment<S>;     // (m: BuilderOf<S>) => void
-type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — withParts array element type
+type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — one withParts part
 ```
 
 `ActorSpec` is a constraint, not a value annotation: annotating with `ActorSpec` (or `ActorOptions`) erases literal types. Build with `actorSpec`, pass `typeof <that value>`. Never annotate the object itself.
@@ -276,31 +278,30 @@ onOutput(childActor, (event) => {
 
 ---
 
-## `withPromise(promise, signal, emit, events)`
+## `withPromise(options)`
 
 ```ts
-function withPromise<T>(
-  promise: Promise<T>,
-  signal: AbortSignal,
-  emit: EmitFn,
+function withPromise<T, Emit = { type: string; payload?: unknown }>(options: {
+  promise: Promise<T>;
+  signal: AbortSignal;
+  emit: (event: Emit) => void;
   events: {
-    success: (data: T) => InternalEvent;
-    error: (err: unknown) => InternalEvent;
-  },
-): void;
+    success: (data: T) => Emit;
+    error: (err: unknown) => Emit;
+  };
+}): Promise<void>;
 ```
 
 Promise to actor events. Checks `signal.aborted`.
 
 ---
 
-## `withTimeout(ms, input, eventFn)`
+## `withTimeout(ms, { input, event })`
 
 ```ts
 function withTimeout<ActorContext>(
   ms: number,
-  input: EffectInput<ActorContext>,
-  event: () => InternalEvent,
+  options: { input: EffectInput<ActorContext>; event: () => InternalEvent },
 ): void;
 ```
 
