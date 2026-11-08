@@ -1,6 +1,6 @@
 {
   "name": "@mantaq/test",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Test harness and assertion utilities for verifying mantaq actor behavior.",
   "keywords": [
     "actor",
