@@ -1,5 +1,5 @@
 import { movesFrom, payloadSamples } from "../moves.ts";
-import type { VizLiveState, VizMachine, VizStep } from "../schema.ts";
+import type { VizActorRef, VizLiveState, VizMachine, VizStep } from "../schema.ts";
 import { html } from "./dom.ts";
 import { payloadForm } from "./explore.ts";
 
@@ -48,12 +48,14 @@ export function showPayloadPopover(
     machine: VizMachine;
     live: VizLiveState | null;
     composing: string | null;
+    /** The region the open form sends to; none = the machine itself. */
+    composingActor?: VizActorRef;
     send: (step: VizStep) => void;
     compose: (event: string | null) => void;
   },
 ): void {
   for (const old of canvas.querySelectorAll(".payload-popover")) old.remove();
-  const { machine, live, composing: event } = context;
+  const { machine, live, composing: event, composingActor: actor } = context;
   if (live === null || event === null) return;
   const doc = canvas.ownerDocument;
   const close = () => context.compose(null);
@@ -68,7 +70,8 @@ export function showPayloadPopover(
       samples: payloadSamples(machine, event),
       fields: machine.events.find((each) => each.id === event)?.payload ?? null,
       live,
-      send: context.send,
+      send: (step) =>
+        context.send(actor === undefined || step.kind !== "event" ? step : { ...step, actor }),
       close,
     }),
   );
@@ -76,6 +79,14 @@ export function showPayloadPopover(
     if (key.key === "Escape") close();
   });
   canvas.append(popover);
-  place(popover, canvas, anchorOf(canvas, { machine, state: live.state, event }));
+  place(
+    popover,
+    canvas,
+    anchorOf(canvas, {
+      machine,
+      state: actor === undefined ? live.state : (live.regions[actor.region] ?? live.state),
+      event,
+    }),
+  );
   popover.querySelector<HTMLElement>("textarea, input, select")?.focus({ preventScroll: true });
 }

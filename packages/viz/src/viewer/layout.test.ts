@@ -210,3 +210,23 @@ describe("separateLabels", () => {
     expect(new Set(rows).size).toBe(3);
   });
 });
+
+describe("entry arrows", () => {
+  test("the machine and each region with a start state get one", () => {
+    const machine = machineOf(
+      ["first", "up.a", "up.b", "net.on"],
+      [edge({ from: "up.a", event: "go", target: "up.b" })],
+    );
+    const states = machine.states.map((each) =>
+      each.id.includes(".")
+        ? { ...each, region: each.id.slice(0, each.id.indexOf(".")), initial: each.id !== "up.b" }
+        : each,
+    );
+    const layout = layoutMachine({ ...machine, states, regions: ["up", "net"] });
+    expect(layout.entries).toHaveLength(3);
+  });
+
+  test("a machine without regions has one", () => {
+    expect(layoutMachine(tight).entries).toHaveLength(1);
+  });
+});

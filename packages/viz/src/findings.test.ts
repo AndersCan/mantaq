@@ -572,3 +572,32 @@ describe("finding invariants", () => {
     }
   });
 });
+
+describe("regions", () => {
+  const region = (extra: Record<string, unknown> = {}) =>
+    build({
+      initial: "idle",
+      states: [
+        vizState("idle", { initial: true }),
+        vizState("upload.a", { region: "upload", ...extra }),
+        vizState("upload.b", { region: "upload" }),
+        vizState("upload.orphan", { region: "upload" }),
+      ],
+      edges: [vizEdge("idle", "idle", "stay"), vizEdge("upload.a", "upload.b")],
+    });
+
+  test("a region is walked from its own start state", () => {
+    const machine = region({ initial: true });
+    expect(unreachableStates(machine)).toEqual(["upload.orphan"]);
+    const kinds = machineFindings(machine).map((each) => `${each.kind} ${each.state}`);
+    expect(kinds).toContain("deadEnd upload.b");
+    expect(kinds).toContain("unreachableState upload.orphan");
+  });
+
+  test("a region with no recorded start is not reported", () => {
+    expect(unreachableStates(region())).toEqual([]);
+    expect(machineFindings(region()).filter((each) => each.state?.startsWith("upload"))).toEqual(
+      [],
+    );
+  });
+});

@@ -391,7 +391,7 @@ export function renderGraph(
       defs(doc),
       ...placed.regions.map((region) => regionGroup(doc, region)),
       ...placed.edges.map((edge) => edgeGroup(doc, edge, { machine, callbacks })),
-      placed.entry ? entryArrow(doc, placed.entry) : null,
+      ...placed.entries.map((entry) => entryArrow(doc, entry)),
       ...placed.nodes.map((node) => nodeGroup(doc, node, { callbacks, findings })),
     ],
   );
