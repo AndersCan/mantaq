@@ -10,10 +10,14 @@
  * A `bumpy version` PR that bumps a minor fails here until the stamp is
  * updated, so review the skill in the same PR.
  *
+ * Also parses the frontmatter of every skill's SKILL.md as strict YAML, so
+ * `npx skills add` never meets a parse error.
+ *
  * Run with `vp run docs:check`.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { checkFrontmatter } from "./lib/skill-frontmatter.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 const SKILL_DIR = join(ROOT, "skills", "mantaq");
@@ -27,6 +31,13 @@ for (const entry of readdirSync(join(ROOT, "packages"))) {
 }
 
 const failures = [];
+for (const dir of readdirSync(join(ROOT, "skills"))) {
+  const file = join(ROOT, "skills", dir, "SKILL.md");
+  if (!existsSync(file)) continue;
+  for (const problem of checkFrontmatter(readFileSync(file, "utf8"))) {
+    failures.push(`skills/${dir}/SKILL.md: ${problem}`);
+  }
+}
 let skillStamped = false;
 for (const name of readdirSync(SKILL_DIR)) {
   if (!name.endsWith(".md")) continue;
