@@ -35,6 +35,8 @@ export interface VizHarness {
     event: string,
     payload?: Record<string, VizJson>,
   ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>>;
+  /** Every child of every actor map, by local state name: `[{ map: "photos", key: "p1", state: "sendingPhoto" }]`. */
+  children(): Promise<Array<{ map: string; key: string; state: string }>>;
   /** Open the form for `event` if it is not open, and say whether its Send button is inside the window. */
   sendFits(event: string): Promise<Either<string, { inViewport: boolean }>>;
   findings(): VizFinding[];
@@ -186,6 +188,44 @@ async function readRegions(page: Page): Promise<Record<string, string>> {
   );
 }
 
+/** Every child row of the Step tab: map, key and local state name. */
+async function readChildren(
+  page: Page,
+): Promise<Array<{ map: string; key: string; state: string }>> {
+  await page.click('[data-tab="step"]');
+  return page.locator(`${PANEL} [data-child-key]`).evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const id = node.getAttribute("data-child-state") ?? "";
+      return {
+        map: node.getAttribute("data-child-map") ?? "",
+        key: node.getAttribute("data-child-key") ?? "",
+        state: id.slice(id.lastIndexOf(".") + 1),
+      };
+    }),
+  );
+}
+
+/** Why the region or map child `actor` is not on the Step tab; undefined when it is (or for the machine itself). */
+async function missingActor(
+  page: Page,
+  context: { id: string; actor: VizActorRef; path: string },
+): Promise<string | undefined> {
+  const { id, actor, path } = context;
+  if ("map" in actor) {
+    const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
+    if ((await page.locator(row).count()) > 0) return undefined;
+    const keys = (await readChildren(page))
+      .filter((child) => child.map === actor.map)
+      .map((child) => child.key);
+    return `no child ${quoted(actor.key)} in ${quoted(actor.map)} of ${id}. Children: ${keys.join(", ")}.`;
+  }
+  if (path === "" || (await page.locator(`${PANEL} p[data-region=${quoted(path)}]`).count()) > 0) {
+    return undefined;
+  }
+  const names = Object.keys(await readRegions(page)).join(", ");
+  return `no region ${quoted(path)} in ${id}. Regions: ${names}.`;
+}
+
 function makeSend(
   page: Page,
   id: string,
@@ -202,13 +242,8 @@ function makeSend(
       path === ""
         ? `${PANEL} :is([data-actor=""], .explore-waiting)`
         : `${PANEL} [data-actor=${quoted(path)}]`;
-    if (
-      path !== "" &&
-      (await page.locator(`${PANEL} p[data-region=${quoted(path)}]`).count()) === 0
-    ) {
-      const names = Object.keys(await readRegions(page)).join(", ");
-      return Either.left(`no region ${quoted(path)} in ${id}. Regions: ${names}.`);
-    }
+    const missing = await missingActor(page, { id, actor, path });
+    if (missing !== undefined) return Either.left(missing);
     const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
     if ((await trigger.count()) === 0) {
       const offered = await attributes(page, `${scope} [data-send]`, "data-send");
@@ -311,6 +346,7 @@ function describe(
     send: (event, payload) => sendTo({ region: "" }, event, payload),
     sendTo,
     regions: () => readRegions(page),
+    children: () => readChildren(page),
     sendFits: async (event) => {
       if (lifecycle.isClosed()) {
         return Either.left("harness is closed");

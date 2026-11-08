@@ -48,9 +48,13 @@ export function regionPaths(state: VizLiveState): string[] {
   return Object.keys(state.regions).sort();
 }
 
-/** Every state the actor is in: the machine's own, then each region's. */
+/** Every state the actor is in: the machine's own, each region's, then each map child's. */
 export function currentsOf(state: VizLiveState): string[] {
-  return [state.state, ...regionPaths(state).map((path) => state.regions[path] ?? "")];
+  return [
+    state.state,
+    ...regionPaths(state).map((path) => state.regions[path] ?? ""),
+    ...state.children.map((child) => child.state),
+  ];
 }
 
 /** Name of a state inside its region. */
