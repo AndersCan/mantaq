@@ -164,3 +164,37 @@ describe("fuzzSources", () => {
     expect(result[0]?.values).toEqual([{ field: "email", value: "e0" }]);
   });
 });
+
+describe("fillSources: what the walk sent", () => {
+  const step = (event: string, payload: VizJson) => ({ kind: "event" as const, event, payload });
+
+  test("a field takes the latest value a same-named field was sent with, ranked first", () => {
+    const result = fillSources([field("name", "text")], {
+      ...live("s", { name: "held" }, null),
+      steps: [step("EDIT_NAME", { name: "Al" }), step("EDIT_NAME", { name: "Ada" })],
+    });
+    expect(result.map((each) => each.path)).toEqual(["you typed", "s"]);
+    expect(result[0]?.values).toEqual([{ field: "name", value: "Ada" }]);
+  });
+
+  test("ignores advances, non-object payloads, empty text and unrelated fields", () => {
+    const result = fillSources([field("name", "text")], {
+      ...live("s", null, null),
+      steps: [
+        step("A", { name: "kept" }),
+        { kind: "advance", ms: 5 },
+        step("B", "name"),
+        step("C", null),
+        step("D", { name: "" }),
+        step("E", { other: "x" }),
+      ],
+    });
+    expect(result).toEqual([{ path: "you typed", values: [{ field: "name", value: "kept" }] }]);
+  });
+
+  test("nothing sent means no typed source", () => {
+    expect(fillSources([field("name", "text")], { ...live("s", null, null), steps: [] })).toEqual(
+      [],
+    );
+  });
+});
