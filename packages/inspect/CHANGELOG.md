@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_ The machines overview draws a machine dashed, and lists it under the diagram, when no app code uses its factory.
+
 ## 0.23.0
 
 <sub>2026-11-08</sub>
