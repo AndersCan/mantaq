@@ -294,8 +294,8 @@ async function checkWalkLink(
   const { dir, base, origin } = site;
   const shown = link.text.replace(/\s+/g, " ").trim() || link.target.href;
   const name = `${link.where}: walk link "${shown}"`;
-  const id = link.target.searchParams.get("machine") ?? "";
-  if (id === "") {
+  const ids = [...new Set(link.target.searchParams.getAll("machine"))].filter((id) => id !== "");
+  if (ids.length === 0) {
     return `${name} has no machine=, so no viewer opens it`;
   }
   const path = base + link.target.pathname.slice(siteUrl.pathname.length);
@@ -307,17 +307,19 @@ async function checkWalkLink(
     await page.goto(origin + path + link.target.search);
     const found = await scan(page);
     const roots = page.locator(".mantaq-machine");
-    const held = found.viewers.flatMap((viewer, index) =>
-      viewer.ids.includes(id) ? [roots.nth(index)] : [],
-    );
-    if (held.length === 0) {
-      return `${name} opens ${path}, but no viewer there holds ${id}`;
-    }
-    for (const root of held) {
-      await root.locator("svg").first().waitFor({ timeout: 10_000 });
-      const notice = root.locator("[data-run-missing]");
-      if ((await notice.count()) > 0) {
-        return `${name}: ${((await notice.first().textContent()) ?? "").trim()}`;
+    for (const id of ids) {
+      const held = found.viewers.flatMap((viewer, index) =>
+        viewer.ids.includes(id) ? [roots.nth(index)] : [],
+      );
+      if (held.length === 0) {
+        return `${name} opens ${path}, but no viewer there holds ${id}`;
+      }
+      for (const root of held) {
+        await root.locator("svg").first().waitFor({ timeout: 10_000 });
+        const notice = root.locator("[data-run-missing]");
+        if ((await notice.count()) > 0) {
+          return `${name}: ${((await notice.first().textContent()) ?? "").trim()}`;
+        }
       }
     }
     return undefined;

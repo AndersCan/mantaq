@@ -1,9 +1,9 @@
 import { Either } from "@mantaq/utils";
 import { build } from "astro";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mantaqViz } from "./astro.ts";
 import { checkSite, fileFor, serve } from "./check-site.ts";
@@ -22,6 +22,7 @@ let broken = "";
 let quiet = "";
 let empty = "";
 let walks = "";
+let story = "";
 const roots: string[] = [];
 
 function viewerPage(src: string, extra = ""): string {
@@ -32,10 +33,18 @@ function overviewPage(pages: Record<string, string[]>): string {
   return `---\nimport Machines from "@mantaq/inspect/astro/Machines.astro";\n---\n<html><body>\n<Machines pages={${JSON.stringify(pages)}} />\n</body></html>\n`;
 }
 
-async function makeSite(machines: string[], pages: Record<string, string>): Promise<string> {
+async function makeSite(
+  machines: string[],
+  pages: Record<string, string>,
+  files: Record<string, string> = {},
+): Promise<string> {
   const root = mkdtempSync(join(import.meta.dirname, "check-site-"));
   roots.push(root);
   mkdirSync(join(root, "src", "pages"), { recursive: true });
+  for (const [name, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, name)), { recursive: true });
+    writeFileSync(join(root, name), text);
+  }
   for (const [name, text] of Object.entries(pages)) {
     writeFileSync(join(root, "src", "pages", name), text);
   }
@@ -71,6 +80,23 @@ beforeAll(async () => {
     "index.astro": viewerPage(timed),
     "other.astro": viewerPage(retry),
   });
+  const fixture = (name: string) =>
+    readFileSync(join(import.meta.dirname, "fixtures", name), "utf8");
+  const step = (event: string) => [{ kind: "event", event, payload: {} }];
+  story = await makeSite(
+    ["m/timed.ts", "m/retry.ts"],
+    {
+      "index.astro": `---\nimport Machine from "@mantaq/inspect/astro/Machine.astro";\n---\n<html><body>\n<Machine src="m/timed.ts" />\n<Machine src="m/retry.ts" />\n</body></html>\n`,
+    },
+    {
+      "m/timed.ts": fixture("timed.ts"),
+      "m/retry.ts": fixture("retry.ts"),
+      "m/__runs__/story.test.json": JSON.stringify({
+        timed: [{ name: "both start", end: "waiting", steps: step("start") }],
+        retry: [{ name: "both start", end: "connecting", steps: step("connect") }],
+      }),
+    },
+  );
 }, 240_000);
 
 afterAll(() => {
@@ -154,6 +180,30 @@ describe("checkSite cannot run", () => {
           `${file}:6: walk link "held" opens /other/, but no viewer there holds timed`,
           `${file}:8: walk link "bare root": No run named "nope" in timed. Runs: times out, waits`,
           `${file}:9: walk link "titled": No run named "nope" in timed. Runs: times out, waits`,
+        ],
+      }),
+    );
+  }, 120_000);
+
+  test("a link naming two machines opens both, and fails on the side that cannot", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "check-site-story-"));
+    roots.push(dir);
+    const site = "https://example.test/docs";
+    const file = join(dir, "story.md");
+    writeFileSync(
+      file,
+      [
+        `[both](${site}/?machine=timed&machine=retry&run=both%20start)`,
+        `[one side](${site}/?machine=retry&machine=timed&run=waits)`,
+        `[missing](${site}/?machine=timed&machine=nope&run=both%20start)`,
+      ].join("\n"),
+    );
+    expect(await checkSite(story, "/", { links: [file], site })).toEqual(
+      Either.right({
+        pages: 1,
+        failures: [
+          `${file}:2: walk link "one side": No run named "waits" in retry. Runs: both start`,
+          `${file}:3: walk link "missing" opens /, but no viewer there holds nope`,
         ],
       }),
     );
