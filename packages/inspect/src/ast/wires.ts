@@ -68,6 +68,13 @@ function stringLiteralOf(node: ts.Node): string | null {
   return ts.isStringLiteralLike(node) ? node.text : null;
 }
 
+/** The string a guard side stands for: a string literal, or an expression typed as one string literal ("x.type" of an event constant). */
+function literalOf(checker: ts.TypeChecker, node: ts.Expression): string | null {
+  if (ts.isStringLiteralLike(node)) return node.text;
+  const type = checker.getTypeAtLocation(node);
+  return type.isStringLiteral() ? type.value : null;
+}
+
 /** Event ids `send` accepts, or null when `expr` is not an actor with literal event types. */
 function inputIds(checker: ts.TypeChecker, expr: ts.Expression): Set<string> | null {
   const type = checker.getNonNullableType(checker.getTypeAtLocation(expr));
@@ -169,7 +176,11 @@ function sendsFrom(scan: Scan, call: ts.CallExpression, depth: number): Found[] 
   return found;
 }
 
-function guardLiteral(condition: ts.Expression, outputs: ReadonlyArray<string>): string | null {
+function guardLiteral(
+  checker: ts.TypeChecker,
+  condition: ts.Expression,
+  outputs: ReadonlyArray<string>,
+): string | null {
   const literals: string[] = [];
   const visit = (node: ts.Node): void => {
     if (
@@ -180,7 +191,7 @@ function guardLiteral(condition: ts.Expression, outputs: ReadonlyArray<string>):
       const typed = sides.some(
         (side) => ts.isPropertyAccessExpression(side) && side.name.text === "type",
       );
-      const literal = sides.map(stringLiteralOf).find((text) => text !== null);
+      const literal = sides.map((side) => literalOf(checker, side)).find((text) => text !== null);
       if (typed && literal != null && outputs.includes(literal)) literals.push(literal);
     }
     ts.forEachChild(node, visit);
@@ -190,6 +201,7 @@ function guardLiteral(condition: ts.Expression, outputs: ReadonlyArray<string>):
 }
 
 function triggerOf(
+  checker: ts.TypeChecker,
   call: ts.CallExpression,
   listener: ts.Node,
   outputs: ReadonlyArray<string>,
@@ -204,7 +216,7 @@ function triggerOf(
       call.pos >= node.thenStatement.pos &&
       call.end <= node.thenStatement.end
     ) {
-      const literal = guardLiteral(node.expression, outputs);
+      const literal = guardLiteral(checker, node.expression, outputs);
       if (literal !== null) return literal;
     }
   }
@@ -270,7 +282,8 @@ function wiresOf(scan: Scan, root: string, sourceFile: ts.SourceFile): Wire[] {
     return listener.bodies.flatMap((body) =>
       callsIn(body).flatMap((entry) => {
         const at = locationOf(entry, root);
-        const trigger = listener.kind === "change" ? "change" : triggerOf(entry, body, outputs);
+        const trigger =
+          listener.kind === "change" ? "change" : triggerOf(checker, entry, body, outputs);
         return sendsFrom(scan, entry, 0).map((found) => ({
           from,
           to: found.to,
@@ -280,6 +293,55 @@ function wiresOf(scan: Scan, root: string, sourceFile: ts.SourceFile): Wire[] {
         }));
       }),
     );
+  });
+}
+
+/** Declared outputs of a run machine that no app-code listener hears. */
+export interface Unheard {
+  /** Machine id. */
+  id: string;
+  /** Output event ids, sorted. Never empty. */
+  outputs: string[];
+}
+
+/** Output ids a listener body checks with `x.type === id`; empty when it checks none. */
+function namedIn(
+  checker: ts.TypeChecker,
+  bodies: ReadonlyArray<ts.Node>,
+  outputs: ReadonlyArray<string>,
+): string[] {
+  const named: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+    ) {
+      const sides = [node.left, node.right];
+      const typed = sides.some(
+        (side) => ts.isPropertyAccessExpression(side) && side.name.text === "type",
+      );
+      for (const side of sides) {
+        const literal = typed ? literalOf(checker, side) : null;
+        if (literal !== null && outputs.includes(literal)) named.push(literal);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  for (const body of bodies) visit(body);
+  return named;
+}
+
+/** The outputs each output listener in `sourceFile` hears, by machine id. */
+function heardIn(scan: Scan, sourceFile: ts.SourceFile): Array<[string, string[]]> {
+  const { checker, machines } = scan;
+  return callsIn(sourceFile).flatMap((call) => {
+    const listener = listenerOf(checker, call);
+    if (listener === null || listener.kind !== "output") return [];
+    const id = machineIn(checker, listener.source, machines);
+    if (id === null) return [];
+    const outputs = machines.find((machine) => machine.id === id)?.outputs ?? [];
+    const named = namedIn(checker, listener.bodies, outputs);
+    return [[id, listener.bodies.length === 0 || named.length === 0 ? [...outputs] : named]];
   });
 }
 
@@ -369,8 +431,38 @@ function usedTargets(
   return used;
 }
 
+type Programs = ReadonlyArray<{ program: ts.Program; names: string[]; checker: ts.TypeChecker }>;
+
+function unheardOf(
+  programs: Programs,
+  machines: ReadonlyArray<VizMachine>,
+  notRun: ReadonlyArray<NotRun>,
+): Unheard[] {
+  const heard = new Map<string, Set<string>>();
+  for (const { program, names, checker } of programs) {
+    for (const name of names) {
+      const sourceFile = program.getSourceFile(name);
+      if (sourceFile === undefined) continue;
+      for (const [id, outputs] of heardIn({ checker, machines }, sourceFile)) {
+        heard.set(id, new Set([...(heard.get(id) ?? []), ...outputs]));
+      }
+    }
+  }
+  const unheard = machines
+    .filter((machine) => !notRun.some((each) => each.id === machine.id))
+    .flatMap((machine) => {
+      const outputs = machine.outputs
+        .filter((id) => !heard.get(machine.id)?.has(id))
+        .toSorted((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+      return outputs.length === 0 ? [] : [{ id: machine.id, outputs }];
+    })
+    .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return unheard;
+}
+
 /**
- * App-code wires and the listed machines no app code runs, from one set of
+ * App-code wires, the listed machines no app code runs, and the outputs no
+ * app-code listener hears, from one set of
  * programs. A machine is run when app code (the machine's tsconfig minus test
  * files) uses its factory export as a value. Read with the TypeScript
  * checker; nothing is run.
@@ -380,9 +472,9 @@ export function scanAppCode(context: {
   /** Absolute machine files given to mantaqViz. */
   files: ReadonlyArray<string>;
   machines: ReadonlyArray<VizMachine>;
-}): { wires: Wire[]; notRun: NotRun[] } {
+}): { wires: Wire[]; notRun: NotRun[]; unheard: Unheard[] } {
   const { root, files, machines } = context;
-  if (machines.length === 0) return { wires: [], notRun: [] };
+  if (machines.length === 0) return { wires: [], notRun: [], unheard: [] };
   const programs = groups(files).map(({ config, names }) => {
     const program = ts.createProgram(names, optionsOf(config));
     return { program, names, checker: program.getTypeChecker() };
@@ -424,7 +516,8 @@ export function scanAppCode(context: {
     .filter((target) => !runs.has(target))
     .map(({ id, factory, file }) => ({ id, factory, file }))
     .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return { wires, notRun };
+  const unheard = unheardOf(programs, machines, notRun);
+  return { wires, notRun, unheard };
 }
 
 /**

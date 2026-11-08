@@ -21,6 +21,7 @@ const linked = "../fixtures/linked.ts";
 const wiredSender = "../fixtures/wired/sender.ts";
 const wiredReceiver = "../fixtures/wired/receiver.ts";
 const wiredSketch = "../fixtures/wired/sketch.ts";
+const wiredQuiet = "../fixtures/wired/quiet.ts";
 const deadEnd = "../fixtures/dead-end.ts";
 const instance = "../fixtures/instance.ts";
 const badExpectations = "../fixtures/bad-expectations.ts";
@@ -70,9 +71,9 @@ beforeAll(async () => {
   wiredSite = makeSite([wiredSender]);
   writeFileSync(
     join(wiredSite, "src", "pages", "machines.astro"),
-    overviewPage({ "": [wiredSender, wiredReceiver, wiredSketch] }),
+    overviewPage({ "": [wiredSender, wiredReceiver, wiredSketch, wiredQuiet] }),
   );
-  await buildSite(wiredSite, [wiredSender, wiredReceiver, wiredSketch]);
+  await buildSite(wiredSite, [wiredSender, wiredReceiver, wiredSketch, wiredQuiet]);
 }, 120_000);
 
 afterAll(() => {
@@ -188,6 +189,24 @@ describe("mantaqViz for Astro", () => {
     expect(document.querySelector("figcaption")?.textContent).toContain(
       "A dashed machine is not run by the app.",
     );
+  });
+
+  test("Machines draws a dashed arrow to no machine for an output nothing listens to", () => {
+    const html = readFileSync(join(wiredSite, "dist", "machines", "index.html"), "utf8").replace(
+      /<link[^>]*>/g,
+      "",
+    );
+    document.documentElement.innerHTML = html;
+    const arrows = [...document.querySelectorAll("g.unheard")];
+    expect(arrows).toHaveLength(1);
+    expect(arrows[0]?.getAttribute("data-from")).toBe("quiet");
+    expect(arrows[0]?.getAttribute("data-outputs")).toBe("unheard");
+    expect(arrows[0]?.textContent?.trim()).toBe("unheard → nobody");
+    expect(document.querySelector("figcaption")?.textContent).toContain(
+      "A dashed arrow to no machine is an output no app code listens to.",
+    );
+    expect(document.querySelectorAll("ul.wires li")).toHaveLength(3);
+    expect(document.querySelectorAll("ul.not-run li")).toHaveLength(1);
   });
 
   test("a Machines page listing a file not in machines fails the build", async () => {

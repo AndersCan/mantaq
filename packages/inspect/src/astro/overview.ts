@@ -1,5 +1,5 @@
 import type { VizMachine } from "@mantaq/viz";
-import type { NotRun, Wire } from "../ast/wires.ts";
+import type { NotRun, Unheard, Wire } from "../ast/wires.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -37,6 +37,14 @@ interface PlacedLink {
   labelAt: { x: number; y: number };
 }
 
+interface PlacedUnheard {
+  from: string;
+  outputs: string[];
+  label: string;
+  points: Array<{ x: number; y: number }>;
+  labelAt: { x: number; y: number };
+}
+
 export interface Overview {
   width: number;
   height: number;
@@ -46,6 +54,8 @@ export interface Overview {
   wires: Wire[];
   /** Machines no app code runs, in the order given. */
   notRun: NotRun[];
+  /** Outputs no app code listens to, one arrow per machine. */
+  unheard: PlacedUnheard[];
 }
 
 const BOX_HEIGHT = 40;
@@ -97,7 +107,10 @@ export function layoutOverview(
   machines: ReadonlyArray<OverviewMachine>,
   links: ReadonlyArray<OverviewLink>,
   notRun: ReadonlyArray<NotRun> = [],
+  unheard: ReadonlyArray<Unheard> = [],
 ): Overview {
+  const shown = unheard.filter((each) => machines.some((machine) => machine.id === each.id));
+  const unheardLabel = (each: Unheard) => `${each.outputs.join(", ")} → nobody`;
   const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({ multigraph: true });
   graph.setGraph({ rankdir: "LR", nodesep: 36, ranksep: 72, marginx: 16, marginy: 16 });
   for (const machine of machines) {
@@ -113,6 +126,16 @@ export function layoutOverview(
       link.to,
       { width: CHAR_WIDTH * label.length, height: LABEL_HEIGHT, label },
       `${link.from}>${link.to}`,
+    );
+  }
+  for (const each of shown) {
+    const label = unheardLabel(each);
+    graph.setNode(`nobody>${each.id}`, { width: 1, height: 1 });
+    graph.setEdge(
+      each.id,
+      `nobody>${each.id}`,
+      { width: CHAR_WIDTH * label.length, height: LABEL_HEIGHT, label },
+      `${each.id}>nobody`,
     );
   }
   layout(graph);
@@ -146,5 +169,15 @@ export function layoutOverview(
     }),
     wires: links.flatMap((link) => link.wires),
     notRun: notRun.filter((each) => machines.some((machine) => machine.id === each.id)),
+    unheard: shown.map((each) => {
+      const edge = graph.edge(each.id, `nobody>${each.id}`, `${each.id}>nobody`);
+      return {
+        from: each.id,
+        outputs: each.outputs,
+        label: unheardLabel(each),
+        points: (edge.points ?? []).map((point: Point) => ({ x: point.x, y: point.y })),
+        labelAt: { x: edge.x ?? 0, y: edge.y ?? 0 },
+      };
+    }),
   };
 }

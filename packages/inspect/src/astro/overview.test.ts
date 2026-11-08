@@ -92,6 +92,20 @@ describe("machineLinks with wires", () => {
     expect(overview.wires).toEqual([w]);
   });
 
+  test("an unheard entry is drawn as one arrow to no box", () => {
+    const overview = layoutOverview(
+      [{ id: "a", file: "/x/a.ts" }],
+      [],
+      [],
+      [{ id: "a", outputs: ["one", "two"] }],
+    );
+    expect(overview.boxes).toHaveLength(1);
+    expect(overview.unheard).toHaveLength(1);
+    expect(overview.unheard[0]?.label).toBe("one, two → nobody");
+    expect(overview.unheard[0]?.from).toBe("a");
+    expect(overview.unheard[0]?.points.length).toBeGreaterThanOrEqual(2);
+  });
+
   test("each link carries only the wires to its own receiver", () => {
     const toB = wire("b", "change", "poke");
     const toC = wire("c", "output", "ping");

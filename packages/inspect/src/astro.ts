@@ -157,6 +157,7 @@ async function documentsSource(
         all.map(({ file, machine }) => ({ id: machine.id, file })),
         machineLinks(all, scanned.wires),
         scanned.notRun,
+        scanned.unheard,
       ),
     )};`,
   ].join("\n");

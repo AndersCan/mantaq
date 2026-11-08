@@ -1,6 +1,7 @@
 import { createReceiverActor } from "../fixtures/wired/receiver.ts";
 import { createSenderActor } from "../fixtures/wired/sender.ts";
 import { inspectModule } from "../inspect.ts";
+import { createQuietActor } from "../fixtures/wired/quiet.ts";
 import { createSketchActor } from "../fixtures/wired/sketch.ts";
 import { findWires, scanAppCode } from "./wires.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -12,6 +13,7 @@ const DIR = join(import.meta.dirname, "..", "fixtures", "wired");
 const ROOT = join(import.meta.dirname, "..", "fixtures");
 const files = ["sender.ts", "receiver.ts"].map((name) => join(DIR, name));
 const sketch = join(DIR, "sketch.ts");
+const quiet = join(DIR, "quiet.ts");
 
 async function machines() {
   const sender = await inspectModule(files[0] ?? "", {
@@ -46,6 +48,24 @@ describe("scanAppCode", () => {
       { id: "sketch", factory: "createSketchActor", file: "wired/sketch.ts" },
     ]);
     expect(scanned.wires).toEqual(findWires({ root: ROOT, files, machines: all }));
+    expect(scanned.wires).toHaveLength(3);
+  });
+
+  test("lists the output no listener hears, hearing every output of an unguarded listener", async () => {
+    const sketched = await inspectModule(sketch, {
+      load: async () => ({ createSketchActor }),
+      fuzz: false,
+    });
+    const quieted = await inspectModule(quiet, {
+      load: async () => ({ createQuietActor }),
+      fuzz: false,
+    });
+    const all = [...(await machines()), ...sketched.machines, ...quieted.machines];
+    const scanned = scanAppCode({ root: ROOT, files: [...files, sketch, quiet], machines: all });
+    expect(scanned.unheard).toEqual([{ id: "quiet", outputs: ["unheard"] }]);
+    expect(scanned.notRun).toEqual([
+      { id: "sketch", factory: "createSketchActor", file: "wired/sketch.ts" },
+    ]);
     expect(scanned.wires).toHaveLength(3);
   });
 
