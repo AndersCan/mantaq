@@ -98,7 +98,7 @@ describe("createDriver", () => {
   });
 
   test("advance fires the labelled timer", () => {
-    const driver = createDriver(timed);
+    const driver = createDriver(timed, { effectMode: "real" });
     const waitingLive = driver.step({ kind: "event", event: "start", payload: null });
     expect(waitingLive.timers).toEqual([
       expect.objectContaining({ ms: 800, deadline: 800, eventName: "expired" }),
@@ -126,7 +126,7 @@ describe("createDriver", () => {
   });
 
   test("reset starts over with an empty log and a fresh clock", () => {
-    const driver = createDriver(timed);
+    const driver = createDriver(timed, { effectMode: "real" });
     driver.step({ kind: "event", event: "start", payload: null });
     driver.step({ kind: "advance", ms: 800 });
     const live = driver.reset();
@@ -168,14 +168,14 @@ const pingStep = { kind: "event", event: "ping", payload: null } as const;
 
 describe("createDriver effect results", () => {
   test("a sync effect follow-up is in after, not overwriting last", () => {
-    const driver = createDriver(asyncTarget("sync"));
+    const driver = createDriver(asyncTarget("sync"), { effectMode: "real" });
     const live = driver.step(pingStep);
     expect(live.last).toMatchObject({ event: "ping", to: "waiting", effects: ["reply"] });
     expect(live.after).toEqual([expect.objectContaining({ event: "pong", to: "timedOut" })]);
   });
 
   test("an async effect result calls listen with one after entry", async () => {
-    const driver = createDriver(asyncTarget("async"));
+    const driver = createDriver(asyncTarget("async"), { effectMode: "real" });
     const seen: Array<{ state: string; after: number }> = [];
     driver.listen?.((live) => seen.push({ state: live.state, after: live.after.length }));
     const first = driver.step(pingStep);
@@ -187,7 +187,7 @@ describe("createDriver effect results", () => {
   });
 
   test("reset during a pending async effect never calls back", async () => {
-    const driver = createDriver(asyncTarget("async"));
+    const driver = createDriver(asyncTarget("async"), { effectMode: "real" });
     const seen: string[] = [];
     driver.listen?.((live) => seen.push(live.state));
     driver.step(pingStep);
@@ -232,7 +232,7 @@ describe("createDriver ordering inside one step", () => {
   };
 
   test("timers that cycle between states stay in chronological order", () => {
-    const live = createDriver(cycle).step({ kind: "advance", ms: 250 });
+    const live = createDriver(cycle, { effectMode: "real" }).step({ kind: "advance", ms: 250 });
     expect(live.last).toMatchObject({ event: "toB", from: "a", to: "b" });
     expect(live.after).toEqual([expect.objectContaining({ event: "toA", from: "b", to: "a" })]);
   });
@@ -247,35 +247,38 @@ describe("createDriver sync effect sending two events", () => {
   const s2 = state("s2")();
   const s3 = state("s3")();
   test("both follow-ups come after the starter, in order", () => {
-    const driver = createDriver({
-      id: "two",
-      create: () => {
-        const clock = VirtualClock();
-        const actor = Actor({
-          inputs: [go],
-          internal: [one, two],
-          states: [s0, s1, s2, s3],
-          initial: s0,
-          clock,
-          setup: (m) => {
-            m.on(s0, { event: go, to: [s1], handler: () => ({ state: s1 }) });
-            m.effect(s1, {
-              name: "fan",
-              sends: [one],
-              fn: ({ emit }) => emit(one.create()),
-            });
-            m.on(s1, { event: one, to: [s2], handler: () => ({ state: s2 }) });
-            m.effect(s2, {
-              name: "fan2",
-              sends: [two],
-              fn: ({ emit }) => emit(two.create()),
-            });
-            m.on(s2, { event: two, to: [s3], handler: () => ({ state: s3 }) });
-          },
-        });
-        return { actor, clock };
+    const driver = createDriver(
+      {
+        id: "two",
+        create: () => {
+          const clock = VirtualClock();
+          const actor = Actor({
+            inputs: [go],
+            internal: [one, two],
+            states: [s0, s1, s2, s3],
+            initial: s0,
+            clock,
+            setup: (m) => {
+              m.on(s0, { event: go, to: [s1], handler: () => ({ state: s1 }) });
+              m.effect(s1, {
+                name: "fan",
+                sends: [one],
+                fn: ({ emit }) => emit(one.create()),
+              });
+              m.on(s1, { event: one, to: [s2], handler: () => ({ state: s2 }) });
+              m.effect(s2, {
+                name: "fan2",
+                sends: [two],
+                fn: ({ emit }) => emit(two.create()),
+              });
+              m.on(s2, { event: two, to: [s3], handler: () => ({ state: s3 }) });
+            },
+          });
+          return { actor, clock };
+        },
       },
-    });
+      { effectMode: "real" },
+    );
     const live = driver.step({ kind: "event", event: "go", payload: null });
     expect(live.last).toMatchObject({ event: "go", from: "s0", to: "s1" });
     expect(live.after.map((entry) => entry.event)).toEqual(["one", "two"]);
@@ -326,5 +329,179 @@ describe("createDriver payload", () => {
     const driver = createDriver(payloads);
     driver.reset();
     expect(driver.step({ kind: "event", event: "hold", payload: null }).payload).toBeNull();
+  });
+});
+
+describe("createDriver held effects", () => {
+  const paid = event("paid")();
+  const declined = event("declined")();
+  const loaded = event("loaded")();
+  const idleS = state("idle")();
+  const charging = state("charging")();
+  const paidS = state("paid")();
+  const declinedS = state("declined")();
+  const loading = state("loading")();
+  const ready = state("ready")();
+  const startEv = event("start")();
+  const called: string[] = [];
+
+  const chargeTarget: FuzzTarget = {
+    id: "charging",
+    create: () => {
+      const clock = VirtualClock();
+      const actor = Actor({
+        inputs: [startEv],
+        internal: [paid, declined],
+        states: [idleS, charging, paidS, declinedS],
+        initial: idleS,
+        clock,
+        setup: (m) => {
+          m.on(idleS, { event: startEv, to: [charging], handler: () => ({ state: charging }) });
+          m.effect(charging, {
+            name: "charge",
+            sends: [paid, declined],
+            fn: (input) => {
+              called.push("charge");
+              withTimeout(800, { input, event: () => declined.create() });
+              return Promise.resolve().then(() => input.emit(paid.create()));
+            },
+          });
+          m.on(charging, { event: paid, to: [paidS], handler: () => ({ state: paidS }) });
+          m.on(charging, {
+            event: declined,
+            to: [declinedS],
+            handler: () => ({ state: declinedS }),
+          });
+        },
+      });
+      return { actor, clock };
+    },
+  };
+  const loadTarget: FuzzTarget = {
+    id: "loading",
+    create: () => {
+      const clock = VirtualClock();
+      const actor = Actor({
+        inputs: [startEv],
+        internal: [loaded],
+        states: [loading, ready],
+        initial: loading,
+        clock,
+        setup: (m) => {
+          m.effect(loading, {
+            name: "load",
+            sends: [loaded],
+            fn: ({ emit }) => emit(loaded.create()),
+          });
+          m.on(loading, { event: loaded, to: [ready], handler: () => ({ state: ready }) });
+          m.on(ready, { event: startEv, to: [loading], handler: () => ({ state: loading }) });
+        },
+      });
+      return { actor, clock };
+    },
+  };
+  const startStep = { kind: "event", event: "start", payload: null } as const;
+  const paidStep = { kind: "event", event: "paid", payload: null } as const;
+
+  test("held: entering a state with an effect waits there", async () => {
+    called.length = 0;
+    const driver = createDriver(chargeTarget);
+    const seen: string[] = [];
+    driver.listen?.((live) => seen.push(live.state));
+    const live = driver.step(startStep);
+    expect(live).toMatchObject({
+      state: "charging",
+      waiting: ["charge"],
+      timers: [],
+      effectMode: "held",
+    });
+    expect(live.last?.effects).toEqual(["charge"]);
+    await macrotask();
+    expect(seen).toEqual([]);
+    expect(called).toEqual([]);
+  });
+
+  test("held: an injected report leaves the state and clears waiting", () => {
+    const driver = createDriver(chargeTarget);
+    driver.step(startStep);
+    const live = driver.step(paidStep);
+    expect(live).toMatchObject({ state: "paid", waiting: [] });
+  });
+
+  test("held: reset while waiting drops the held effect", async () => {
+    const driver = createDriver(chargeTarget);
+    const seen: string[] = [];
+    driver.listen?.((live) => seen.push(live.state));
+    driver.step(startStep);
+    expect(driver.reset().waiting).toEqual([]);
+    await macrotask();
+    expect(seen).toEqual([]);
+  });
+
+  test("held: the first state's effects run for real", () => {
+    const driver = createDriver(loadTarget);
+    expect(driver.reset()).toMatchObject({ state: "ready", waiting: [] });
+    expect(driver.step(startStep)).toMatchObject({ state: "loading", waiting: ["load"] });
+  });
+
+  test("held: an effect inside a region is held and listed in waiting", () => {
+    const regionCalled: string[] = [];
+    const poke = event("poke")();
+    const childIdle = state("childIdle")();
+    const childBusy = state("childBusy")();
+    const parentIdle = state("parentIdle")();
+    let startChild = () => {};
+    const target: FuzzTarget = {
+      id: "region",
+      create: () => {
+        const clock = VirtualClock();
+        const child = Actor({
+          inputs: [startEv],
+          states: [childIdle, childBusy],
+          initial: childIdle,
+          clock,
+          setup: (m) => {
+            m.on(childIdle, {
+              event: startEv,
+              to: [childBusy],
+              handler: () => ({ state: childBusy }),
+            });
+            m.effect(childBusy, {
+              name: "childWork",
+              fn: () => {
+                regionCalled.push("childWork");
+              },
+            });
+          },
+        });
+        const actor = Actor({
+          inputs: [poke],
+          states: [parentIdle],
+          initial: parentIdle,
+          clock,
+          regions: { child },
+          setup: () => {},
+        });
+        startChild = () => {
+          child.send(startEv.create());
+        };
+        return { actor, clock };
+      },
+    };
+    const driver = createDriver(target);
+    startChild();
+    const live = driver.step({ kind: "event", event: "poke", payload: null });
+    expect(regionCalled).toEqual([]);
+    expect(live.waiting).toEqual(["childWork"]);
+  });
+
+  test("real: effects run as before", async () => {
+    const driver = createDriver(chargeTarget, { effectMode: "real" });
+    const seen: string[] = [];
+    driver.listen?.((live) => seen.push(live.state));
+    const live = driver.step(startStep);
+    expect(live).toMatchObject({ effectMode: "real", waiting: [] });
+    await macrotask();
+    expect(seen).toEqual(["paid"]);
   });
 });

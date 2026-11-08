@@ -236,6 +236,10 @@ export interface VizLiveState {
   context: VizJson;
   /** The current state's payload; null when it has none or is not serializable. */
   payload: VizJson;
+  /** "held": effect bodies do not run; the viewer offers what they report. "real": they run. */
+  effectMode: "held" | "real";
+  /** Held effects of the active state still waiting for an answer (their state not left), in the order they started. [] in real mode. */
+  waiting: string[];
 }
 
 /**

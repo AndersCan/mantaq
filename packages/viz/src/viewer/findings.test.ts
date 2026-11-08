@@ -78,6 +78,8 @@ function driver(): VizDriver {
     timers: [],
     context: null,
     payload: null,
+    effectMode: "real",
+    waiting: [],
   });
   return { reset: () => run([]), step: (step) => run([step]) };
 }
