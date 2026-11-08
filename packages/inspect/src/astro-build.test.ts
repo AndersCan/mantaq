@@ -283,6 +283,24 @@ describe("mantaqViz for Astro", () => {
     }
   }, 120_000);
 
+  test("runEffects marks the diagram to run its effects, and is absent by default", async () => {
+    for (const run of [true, false]) {
+      const root = makeSite([clean]);
+      try {
+        const tag = run ? `<Machine src="${clean}" runEffects />` : `<Machine src="${clean}" />`;
+        const source = page([]).replace("\n\n</body>", `\n${tag}\n</body>`);
+        writeFileSync(join(root, "src", "pages", "index.astro"), source);
+        await buildSite(root, [clean]);
+        const html = readFileSync(join(root, "dist", "index.html"), "utf8");
+        document.documentElement.innerHTML = html.replace(/<link[^>]*>/g, "");
+        const machine = document.querySelector<HTMLElement>(".mantaq-machine");
+        expect(machine?.dataset["mantaqEffects"]).toBe(run ? "run" : undefined);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  }, 120_000);
+
   describe("failOnFindings", () => {
     async function withSite(sources: string[], run: (root: string) => Promise<void>) {
       const root = makeSite(sources);

@@ -12,6 +12,7 @@ for (const root of document.querySelectorAll<HTMLElement>(".mantaq-machine")) {
       text,
       targets,
       heading: "h2",
+      effectMode: root.dataset["mantaqEffects"] === "run" ? "real" : "held",
       ...(raw === undefined ? {} : { routes: JSON.parse(raw) }),
       ...(src === undefined ? {} : { copyNotes: { file: src } }),
     });

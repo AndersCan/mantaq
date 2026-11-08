@@ -49,4 +49,16 @@ describe("astro client", () => {
     await import("./client.ts");
     expect(mountDriven.mock.calls[0]?.[1]).not.toHaveProperty("copyNotes");
   });
+
+  test("data-mantaq-effects=run runs the diagram's effects", async () => {
+    machineRoot({ mantaqViz: "{}", mantaqEffects: "run" });
+    await import("./client.ts");
+    expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({ effectMode: "real" });
+  });
+
+  test("without data-mantaq-effects effects stay held", async () => {
+    machineRoot({ mantaqViz: "{}" });
+    await import("./client.ts");
+    expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({ effectMode: "held" });
+  });
 });

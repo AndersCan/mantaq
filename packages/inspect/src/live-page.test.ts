@@ -34,6 +34,27 @@ describe("mountDriven", () => {
     expect(root.querySelector("[data-send]")).not.toBeNull();
   });
 
+  test("effectMode real runs the machine's effects; default holds them", async () => {
+    const text = await documentText();
+    const create = () => {
+      const clock = VirtualClock();
+      return { actor: createCheckoutActor(clock), clock };
+    };
+    const modeOf = (effectMode?: "real") => {
+      const root = document.createElement("div");
+      document.body.append(root);
+      mountDriven(root, {
+        source: "test",
+        text,
+        targets: { checkout: create },
+        ...(effectMode === undefined ? {} : { effectMode }),
+      });
+      return root.querySelector("[data-live-note]")?.getAttribute("data-effect-mode");
+    };
+    expect(modeOf("real")).toBe("real");
+    expect(modeOf()).toBe("held");
+  });
+
   test("without a target the viewer is the static walk", async () => {
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: await documentText(), targets: {} });

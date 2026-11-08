@@ -141,6 +141,8 @@ export function mountDriven(
     seen?: SeenStorage;
     /** Where each machine's outputs go, shown on live steps. */
     routes?: VizOutputRoutes;
+    /** "real": effects run, timers wait for the time buttons. Default "held": the viewer asks what each effect reports. */
+    effectMode?: "held" | "real";
   },
 ): void {
   const parsed = parseViz(context.text);
@@ -179,7 +181,7 @@ export function mountDriven(
   root.replaceChildren(...(picker ? [bar] : []), viewer);
   const machine = shown.machines[0];
   const changes = changesOption(context, machine, viz.machines);
-  const driver = trackedDriver(id, create);
+  const driver = trackedDriver(id, create, context.effectMode);
   const footer = panelFooter(doc, context, machine, driver?.current);
   mountViewer(viewer, shown, {
     ...options,
@@ -379,6 +381,9 @@ export async function mountLiveDriven(
 function trackedDriver(
   id: string,
   create: FuzzTarget["create"] | undefined,
+  effectMode: "held" | "real" | undefined,
 ): ReturnType<typeof trackWalk> | undefined {
-  return create === undefined ? undefined : trackWalk(createDriver({ id, create }));
+  return create === undefined
+    ? undefined
+    : trackWalk(createDriver({ id, create }, { effectMode: effectMode ?? "held" }));
 }
