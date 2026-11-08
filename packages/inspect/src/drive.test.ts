@@ -444,6 +444,57 @@ describe("createDriver held effects", () => {
     expect(driver.step(startStep)).toMatchObject({ state: "loading", waiting: ["load"] });
   });
 
+  test("held: an effect inside a region is held and listed in waiting", () => {
+    const regionCalled: string[] = [];
+    const poke = event("poke")();
+    const childIdle = state("childIdle")();
+    const childBusy = state("childBusy")();
+    const parentIdle = state("parentIdle")();
+    let startChild = () => {};
+    const target: FuzzTarget = {
+      id: "region",
+      create: () => {
+        const clock = VirtualClock();
+        const child = Actor({
+          inputs: [startEv],
+          states: [childIdle, childBusy],
+          initial: childIdle,
+          clock,
+          setup: (m) => {
+            m.on(childIdle, {
+              event: startEv,
+              to: [childBusy],
+              handler: () => ({ state: childBusy }),
+            });
+            m.effect(childBusy, {
+              name: "childWork",
+              fn: () => {
+                regionCalled.push("childWork");
+              },
+            });
+          },
+        });
+        const actor = Actor({
+          inputs: [poke],
+          states: [parentIdle],
+          initial: parentIdle,
+          clock,
+          regions: { child },
+          setup: () => {},
+        });
+        startChild = () => {
+          child.send(startEv.create());
+        };
+        return { actor, clock };
+      },
+    };
+    const driver = createDriver(target);
+    startChild();
+    const live = driver.step({ kind: "event", event: "poke", payload: null });
+    expect(regionCalled).toEqual([]);
+    expect(live.waiting).toEqual(["childWork"]);
+  });
+
   test("real: effects run as before", async () => {
     const driver = createDriver(chargeTarget, { effectMode: "real" });
     const seen: string[] = [];
