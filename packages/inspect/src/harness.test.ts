@@ -161,7 +161,6 @@ test("an uncaught error in the page lands in problems", async () => {
   });
 }, 60_000);
 
-<<<<<<< HEAD
 test("submitPayment waits in submitting with its three reports", async () => {
   await withViz(checkout, async (viz) => {
     const state = async (event: string) =>
@@ -182,7 +181,10 @@ test("submitPayment waits in submitting with its three reports", async () => {
     expect(await state("back")).toBe("payment");
     expect(await state("submitPayment")).toBe("submitting");
     expect(await state("paymentOk")).toBe("success");
-=======
+    expect(viz.problems()).toEqual([]);
+  });
+}, 60_000);
+
 test("the planted-bug machine shows six findings and replays the dead end", async () => {
   await withViz(docs("checkout-with-bugs.ts"), async (viz) => {
     const findings = viz.findings();
@@ -214,7 +216,6 @@ test("the planted-bug machine shows six findings and replays the dead end", asyn
     ]) {
       expect(text).not.toContain(old);
     }
->>>>>>> 4553597 (docs: the planted-bug checkout shows a dead end, an unreachable pair and an unhandled input)
     expect(viz.problems()).toEqual([]);
   });
 }, 60_000);
