@@ -176,6 +176,7 @@ if (snap && isIn(snap, "active")) {
   // child is active
 }
 
+map.get("child1"); // the live child, or undefined
 map.keys(); // ["child1"]
 map.kill("child1");
 ```

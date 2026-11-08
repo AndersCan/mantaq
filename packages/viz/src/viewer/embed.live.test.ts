@@ -49,6 +49,7 @@ const checkout: VizMachine = {
   id: "checkout",
   initial: "idle",
   regions: [],
+  maps: [],
   states: [state("idle", { initial: true }), state("paying"), state("error", { final: true })],
   events: [
     { id: "submit", internal: false, doc: null, payload: null },
@@ -107,6 +108,7 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
       context,
       payload: held,
       regions: {},
+      children: [],
       effectMode: "real",
       waiting: [],
     };
@@ -1067,6 +1069,7 @@ describe("what ran", () => {
         context: {},
         payload: null,
         regions: {},
+        children: [],
         effectMode: "real",
         waiting: [],
       }),
@@ -1079,6 +1082,7 @@ describe("what ran", () => {
         context: last.context,
         payload: null,
         regions: {},
+        children: [],
         effectMode: "real",
         waiting: [],
       }),
@@ -1177,6 +1181,7 @@ describe("what ran", () => {
       context: { amount: 9, failed: true },
       payload: null,
       regions: {},
+      children: [],
       effectMode: "real",
       waiting: [],
     });
@@ -1263,6 +1268,7 @@ describe("live effect reports", () => {
         regions: {},
         effectMode: mode,
         waiting: mode === "held" && current === "fetching" ? held : [],
+        children: [],
       };
     };
     const done: VizStep[] = [];
@@ -1489,6 +1495,7 @@ describe("live effect reports", () => {
         timers: [],
         context: null,
         payload: null,
+        children: [],
         regions: { upload: "upload.sending" },
         effectMode: "held",
         waiting: ["sendPhoto"],

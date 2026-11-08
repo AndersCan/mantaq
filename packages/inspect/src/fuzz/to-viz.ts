@@ -81,9 +81,11 @@ function byId<T extends { id: string }>(left: T, right: T): number {
  */
 export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): VizMachine {
   const traces = result.corpus.map((entry) => execute(target, entry.steps));
-  const fresh = target.create().actor;
+  const created = target.create();
+  const fresh = created.actor;
   const internal = new Set(eventCatalog(fresh).internal);
-  const base = toVizMachine({ id: target.id, actor: fresh });
+  const base = toVizMachine({ id: target.id, actor: fresh, made: created.made });
+  const inMap = (id: string): boolean => base.maps.some((name) => id.startsWith(`${name}.`));
   const added = discoveredEdges(base, traces);
   const known = new Set(base.events.map((event) => event.id));
   const events: VizEvent[] = [
@@ -97,10 +99,10 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): VizMachin
     events,
     states: base.states.map((state) => ({
       ...state,
-      coverage: { hits: stateVisits(state.id, traces) },
+      coverage: inMap(state.id) ? null : { hits: stateVisits(state.id, traces) },
     })),
     edges: [...base.edges, ...added].sort(byId).map((edge) => {
-      const hits = edgeHits(edge, traces);
+      const hits = inMap(edge.from) ? null : edgeHits(edge, traces);
       return { ...edge, coverage: hits === null ? null : { hits } };
     }),
     fuzz: {

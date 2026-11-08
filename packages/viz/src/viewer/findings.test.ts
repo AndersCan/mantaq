@@ -42,6 +42,7 @@ const machine: VizMachine = {
   id: "flow",
   initial: "idle",
   regions: [],
+  maps: [],
   states: [state("idle", { initial: true }), state("picked"), state("orphan")],
   events: [{ id: "pick", internal: false, doc: null, payload: null }],
   outputs: [],
@@ -79,6 +80,7 @@ function driver(): VizDriver {
     context: null,
     payload: null,
     regions: {},
+    children: [],
     effectMode: "real",
     waiting: [],
   });

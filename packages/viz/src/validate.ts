@@ -107,6 +107,14 @@ function readEdge(reader: Reader, record: JsonObject, path: string): VizEdge {
 function checkReferences(reader: Reader, machine: VizMachine, path: string): void {
   const stateIds = new Set(machine.states.map((state) => state.id));
   const known = (id: string) => stateIds.has(id) || id === "__initial__" || isAnyState(id);
+  machine.maps.forEach((name, index) => {
+    if (!machine.regions.includes(name)) {
+      report(reader, {
+        path: `${path}.maps[${index}]`,
+        message: `${JSON.stringify(name)} is not in regions`,
+      });
+    }
+  });
   machine.edges.forEach((edge, index) => {
     if (!known(edge.from)) {
       report(reader, {
@@ -129,6 +137,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
     id: readString(reader, { record, key: "id", path }),
     initial: readNullableString(reader, { record, key: "initial", path }),
     regions: readStrings(reader, { record, key: "regions", path }),
+    maps: readStrings(reader, { record, key: "maps", path }),
     states: readList(reader, { record, key: "states", path }, (item, at) =>
       readState(reader, item, at),
     ),

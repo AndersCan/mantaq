@@ -8,6 +8,7 @@ const machine: VizMachine = {
   id: "door",
   initial: "open",
   regions: [],
+  maps: [],
   states: [
     {
       id: "open",

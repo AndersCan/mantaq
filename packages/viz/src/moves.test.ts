@@ -27,6 +27,32 @@ describe("live step text", () => {
     expect(decodeLiveSteps(["a.b>connectionLost"])).toEqual([step]);
   });
 
+  test("a map child step round-trips with its key encoded", () => {
+    const step: VizStep = {
+      kind: "event",
+      event: "retryPressed",
+      payload: null,
+      actor: { map: "photos", key: "p 1]" },
+    };
+    expect(encodeLiveStep(step)).toBe("photos[p%201%5D]>retryPressed");
+    expect(decodeLiveSteps(["photos[p%201%5D]>retryPressed"])).toEqual([step]);
+  });
+
+  test("a map step with a payload and an empty key", () => {
+    const step: VizStep = {
+      kind: "event",
+      event: "go",
+      payload: { a: 1 },
+      actor: { map: "m", key: "" },
+    };
+    expect(encodeLiveStep(step)).toBe('m[]>go={"a":1}');
+    expect(decodeLiveSteps(['m[]>go={"a":1}'])).toEqual([step]);
+  });
+
+  test("a bad key encoding ends the list", () => {
+    expect(decodeLiveSteps(["photos[%E0%A4%A]>go", "go"])).toEqual([]);
+  });
+
   test("root steps and advances are unchanged", () => {
     expect(decodeLiveSteps(["go", "@800"])).toEqual([
       { kind: "event", event: "go", payload: null },

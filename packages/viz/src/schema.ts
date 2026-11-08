@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 14;
+export const VIZ_SCHEMA_VERSION = 15;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -184,6 +184,8 @@ export interface VizMachine {
   initial: string | null;
   /** Region paths, sorted. Empty for flat machines. */
   regions: string[];
+  /** Actor map names, sorted. Each one is also in `regions`; its states are those of one child. Empty = none. */
+  maps: string[];
   states: VizState[];
   events: VizEvent[];
   /** Declared output event ids, sorted. Empty = none declared. */
@@ -200,7 +202,7 @@ export interface VizMachine {
 export type VizJson = null | boolean | number | string | VizJson[] | { [key: string]: VizJson };
 
 /** Which actor a step goes to, or which actor moved. Omitted = the machine itself. */
-export type VizActorRef = { region: string };
+export type VizActorRef = { region: string } | { map: string; key: string };
 
 /** One input to a machine: an event (`send` for inputs, `inject` for internal) or a clock advance. */
 export type VizStep =
@@ -209,7 +211,7 @@ export type VizStep =
 
 /**
  * What one step did: the actor moved, handled it without moving, or had no handler.
- * `missing`: the step's actor does not exist (no such region).
+ * `missing`: the step's actor does not exist (no such region, or a child that was removed).
  */
 export type VizLiveOutcome = "transition" | "stay" | "ignored" | "missing";
 
@@ -218,7 +220,7 @@ export interface VizLiveStep {
   event: string;
   to: string;
   outcome: VizLiveOutcome;
-  /** The region that moved; omitted for the machine itself. `from` and `to` are then full ids ("upload.sendingPhoto"), "" when the outcome is `missing`. */
+  /** The region or map child that moved; omitted for the machine itself. `from` and `to` are then full ids ("upload.sendingPhoto"), "" when the outcome is `missing`. */
   actor?: VizActorRef;
   /** Names of the effects the step ran. */
   effects: string[];
@@ -234,11 +236,23 @@ export interface VizLiveTimer {
   eventName: string | null;
 }
 
+/** One live child of an actor map. */
+export interface VizLiveChild {
+  map: string;
+  key: string;
+  /** Full state id, e.g. "photos.sendingPhoto". */
+  state: string;
+  /** `steps.length` when the driver first saw this child. */
+  since: number;
+}
+
 /** Where a running actor is, after the steps in `steps`. */
 export interface VizLiveState {
   state: string;
-  /** Region path -> its current full state id ("upload" -> "upload.sendingPhoto"); {} without regions. */
+  /** Region path -> its current full state id ("upload" -> "upload.sendingPhoto"); {} without regions. Actor maps are not listed here; see `children`. */
   regions: Record<string, string>;
+  /** Live actor map children: maps sorted by name, then in the map's key order. [] without maps. */
+  children: VizLiveChild[];
   steps: VizStep[];
   last: VizLiveStep | null;
   /** Transitions an effect caused after the step's own one, sync or later, in order. */

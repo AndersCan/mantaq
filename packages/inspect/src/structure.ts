@@ -8,7 +8,10 @@ import type {
   VizState,
 } from "@mantaq/viz";
 import type { AnyActor } from "@mantaq/core";
-import { eventTypes, regionActors } from "./fuzz/run.ts";
+import { actorMapsOf } from "./maps.ts";
+import type { ActorMapLike } from "./maps.ts";
+import { Either } from "@mantaq/utils";
+import { eventTypes, isActor, regionActors } from "./fuzz/run.ts";
 import {
   INITIAL_NODE_ID,
   buildGraph,
@@ -26,6 +29,8 @@ export interface VizInput {
    * see this actor's current state, so pass one that has not been driven.
    */
   actor: AnyActor<unknown>;
+  /** What the factory returned when it was `{ actor, ...maps }`; its actor maps are drawn as one child each. */
+  made?: unknown;
   /** History from `instrument(actor)`; omit for a structure-only document. */
   history?: History;
   sampleContexts?: Record<string, Record<string, unknown>>;
@@ -143,13 +148,96 @@ function toEdge(
   };
 }
 
+interface MapChild {
+  name: string;
+  graph: ReturnType<typeof buildGraph>;
+  initial: string | undefined;
+  internal: Set<string>;
+  inputs: string[];
+}
+
+/** What one map's probe child looks like, or why it cannot be drawn. */
+function probeChild(name: string, map: ActorMapLike): Either<string, MapChild> {
+  const probed = Either.from(() => {
+    map.spawn("example");
+    return map.get("example");
+  });
+  const cleanup = () => Either.from(() => map.kill("example"));
+  if (Either.isLeft(probed)) {
+    cleanup();
+    return Either.left(
+      `actor map ${name}: could not start a child to draw it: ${probed[0] instanceof Error ? probed[0].message : String(probed[0])}`,
+    );
+  }
+  const child = probed[1];
+  if (!isActor(child)) {
+    cleanup();
+    return Either.left(
+      `actor map ${name}: its children are not mantaq actors, so they are not drawn`,
+    );
+  }
+  const graph = buildGraph(child);
+  const found: MapChild = {
+    name,
+    graph,
+    initial: parseInitialName(child.options),
+    internal: parseInternalEventIds(child.options),
+    inputs: eventTypes(child.options, "inputs"),
+  };
+  cleanup();
+  return Either.right(found);
+}
+
+/** Why an actor map in `made` is not drawn, or what to update. */
+export function mapWarnings(made: unknown): string[] {
+  const found = actorMapsOf(made);
+  return [
+    ...Object.entries(found.maps).flatMap(([name, map]) => {
+      const probed = probeChild(name, map);
+      return Either.isLeft(probed) ? [probed[0]] : [];
+    }),
+    ...found.old.map(
+      (name) =>
+        `${name} looks like an actor map from an older @mantaq/sugar (no get): update @mantaq/sugar to draw its children`,
+    ),
+  ];
+}
+
+/** The child's graph under `<name>.`: ids prefixed, no initial edge. */
+function prefixedGraph(child: MapChild): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const at = (id: string): string => `${child.name}.${id}`;
+  return {
+    nodes: child.graph.nodes
+      .filter((node) => node.id !== INITIAL_NODE_ID)
+      .map((node) => ({ ...node, id: at(node.id) })),
+    edges: child.graph.edges
+      .filter((edge) => edge.source !== INITIAL_NODE_ID)
+      .map((edge) => ({
+        ...edge,
+        id: at(edge.id),
+        source: at(edge.source),
+        target: at(edge.target),
+      })),
+  };
+}
+
 /** One machine; `toViz` is this plus sorting into a document. */
 export function toVizMachine(input: VizInput): VizMachine {
-  const graph = buildGraph(input.actor, { sampleContexts: input.sampleContexts });
+  const own = buildGraph(input.actor, { sampleContexts: input.sampleContexts });
+  const children = Object.entries(actorMapsOf(input.made).maps).flatMap(([name, map]) => {
+    const probed = probeChild(name, map);
+    return Either.isRight(probed) ? [probed[1]] : [];
+  });
+  const drawn = children.map(prefixedGraph);
+  const graph = {
+    nodes: [...own.nodes, ...drawn.flatMap((each) => each.nodes)],
+    edges: [...own.edges, ...drawn.flatMap((each) => each.edges)],
+  };
   const regionActorList = regionActors(input.actor);
   const internalIds = new Set([
     ...parseInternalEventIds(input.actor.options),
     ...regionActorList.flatMap((each) => [...parseInternalEventIds(each.actor.options)]),
+    ...children.flatMap((each) => [...each.internal]),
   ]);
   const initialEdge = graph.edges.find((edge) => edge.source === INITIAL_NODE_ID);
   const initial = initialEdge?.target ?? null;
@@ -159,7 +247,12 @@ export function toVizMachine(input: VizInput): VizMachine {
       const name = parseInitialName(each.actor.options);
       return name === undefined ? [] : [`${each.path}.${name}`];
     }),
+    ...children.flatMap((each) =>
+      each.initial === undefined ? [] : [`${each.name}.${each.initial}`],
+    ),
   ]);
+  const mapNames = new Set(children.map((each) => each.name));
+  const inMap = (id: string): boolean => mapNames.has(regionOf(id) ?? "");
 
   const visits = input.history
     ? countBy(input.history.stateVisits().map((visit) => visit.stateName))
@@ -170,9 +263,16 @@ export function toVizMachine(input: VizInput): VizMachine {
   const states = graph.nodes
     .filter((node) => node.id !== INITIAL_NODE_ID && node.isAny !== true)
     .map((node) => toState(node, { visits, initialIds, effects: effectEdges }))
+    .map((state) => (inMap(state.id) ? { ...state, coverage: null, tested: null } : state))
     .sort(byId);
-  const edges = graph.edges.map((edge) => toEdge(edge, transitions)).sort(byId);
-  const declaredInputs = eventTypes(input.actor.options, "inputs");
+  const edges = graph.edges
+    .map((edge) => toEdge(edge, transitions))
+    .map((edge) => (inMap(edge.from) ? { ...edge, coverage: null, tested: null } : edge))
+    .sort(byId);
+  const declaredInputs = [
+    ...eventTypes(input.actor.options, "inputs"),
+    ...children.flatMap((each) => each.inputs),
+  ];
   const events: VizEvent[] = [
     ...new Set([
       ...edges.map((edge) => edge.event).filter(Boolean),
@@ -189,7 +289,7 @@ export function toVizMachine(input: VizInput): VizMachine {
       payload: null,
     }));
   const regions = [
-    ...new Set(states.flatMap((state) => (state.region ? [state.region] : []))),
+    ...new Set([...states.flatMap((state) => (state.region ? [state.region] : [])), ...mapNames]),
   ].sort();
 
   const outputs = eventTypes(input.actor.options, "outputs").sort();
@@ -197,6 +297,7 @@ export function toVizMachine(input: VizInput): VizMachine {
     id: input.id,
     initial,
     regions,
+    maps: [...mapNames].sort(),
     states,
     events,
     outputs,

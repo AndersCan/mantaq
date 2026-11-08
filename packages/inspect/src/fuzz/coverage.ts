@@ -26,6 +26,10 @@ export function edgeHits(edge: VizEdge, traces: ReadonlyArray<Trace>): number | 
   );
 }
 
+function inMap(machine: VizMachine, id: string): boolean {
+  return machine.maps.some((name) => id.startsWith(`${name}.`));
+}
+
 /** Edges a run can take: not the initial edge, not effect self-loops. */
 function driven(edge: VizEdge): boolean {
   return edge.kind !== "initial" && edge.kind !== "effect";
@@ -40,9 +44,11 @@ export function coverageGoal(
   machine: VizMachine,
   must: ReadonlyArray<string> = [],
 ): (trace: Trace) => boolean {
-  const states = new Set(machine.states.map((state) => state.id));
+  const states = new Set(
+    machine.states.filter((state) => !inMap(machine, state.id)).map((state) => state.id),
+  );
   const unmet = new Set(must);
-  let edges = machine.edges.filter(driven);
+  let edges = machine.edges.filter((edge) => driven(edge) && !inMap(machine, edge.from));
   return (trace) => {
     for (const state of trace.visited) states.delete(state);
     for (const feature of trace.features) unmet.delete(feature);
@@ -89,10 +95,10 @@ export function withTestCoverage(
     ...machine,
     states: machine.states.map((state) => ({
       ...state,
-      tested: { hits: stateVisits(state.id, traces) },
+      tested: inMap(machine, state.id) ? null : { hits: stateVisits(state.id, traces) },
     })),
     edges: machine.edges.map((edge) => {
-      const hits = edgeHits(edge, traces);
+      const hits = inMap(machine, edge.from) ? null : edgeHits(edge, traces);
       return { ...edge, tested: hits === null ? null : { hits } };
     }),
   };

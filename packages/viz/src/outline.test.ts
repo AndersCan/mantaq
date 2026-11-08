@@ -45,6 +45,7 @@ function machine(states: string[], edges: VizEdge[]): VizMachine {
     id: "m",
     initial: states[0] ?? "",
     regions: [],
+    maps: [],
     states: states.map(state),
     events: [],
     outputs: [],

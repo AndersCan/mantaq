@@ -58,7 +58,7 @@ function createExpression(found: MachineExport, index: number): string {
       : found.call === "options"
         ? `${callee}({ clock: VirtualClock() })`
         : `${callee}()`;
-  return found.unwrap === "actor" ? `${call}.actor` : call;
+  return call;
 }
 
 /**
@@ -79,7 +79,7 @@ export function targetsSource(files: ReadonlyArray<string>): string {
     imports.push(`import * as m${index} from ${JSON.stringify(file)};`);
     for (const found of factories) {
       entries.push(
-        `  ${JSON.stringify(machineId(found.name))}: () => { const actor = ${createExpression(found, index)}; return { actor, clock: actor.clock }; },`,
+        `  ${JSON.stringify(machineId(found.name))}: () => { const made = ${createExpression(found, index)}; const actor = ${found.unwrap === "actor" ? "made.actor" : "made"}; return { actor, clock: actor.clock, made }; },`,
       );
     }
   });

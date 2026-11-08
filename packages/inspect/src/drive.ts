@@ -6,8 +6,11 @@ import type {
   VizLiveStep,
   VizStep,
 } from "@mantaq/viz";
+import { actorMapsOf } from "./maps.ts";
+import type { ActorMapLike } from "./maps.ts";
 import {
   applyStep,
+  isActor,
   contextText,
   eventCatalog,
   messageOf,
@@ -129,14 +132,111 @@ function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => v
   }
 }
 
-/** The log entry for an event nobody handled: ignored, or missing when its region does not exist. */
+interface MapChild {
+  child: AnyActor<unknown>;
+  since: number;
+}
+
+/** Record the root actor's own transitions and errors. */
+function watchRoot(actor: AnyActor<unknown>, record: (entry: VizLiveStep) => void): void {
+  actor.on("transition", {
+    fn: ({ event, from: before, to, transitioned, effects }) => {
+      record({
+        from: before,
+        event: event.type,
+        to,
+        outcome: transitioned ? "transition" : "stay",
+        effects,
+        context: json(contextText(actor)),
+        error: null,
+      });
+    },
+  });
+  actor.on("error", {
+    fn: (info) => {
+      record({
+        from: info.state.name,
+        event: info.event.type,
+        to: actor.state.name,
+        outcome: "stay",
+        effects: [],
+        context: json(contextText(actor)),
+        error: messageOf(info.error),
+      });
+    },
+  });
+}
+
+/** Wrap spawn and ensure so every new child is watched, and watch the ones already there. */
+function watchMaps(
+  maps: Readonly<Record<string, ActorMapLike>>,
+  watch: (name: string, key: string) => void,
+): void {
+  for (const [name, map] of Object.entries(maps)) {
+    const spawn = map.spawn.bind(map);
+    const ensure = map.ensure.bind(map);
+    map.spawn = (key) => {
+      spawn(key);
+      watch(name, key);
+    };
+    map.ensure = (key) => {
+      ensure(key);
+      watch(name, key);
+    };
+    for (const key of map.keys()) watch(name, key);
+  }
+}
+
+/** Record every transition and error of one actor, tagged with its ref and prefixed ids. */
+function watchChild(
+  child: AnyActor<unknown>,
+  at: {
+    root: AnyActor<unknown>;
+    ref: VizActorRef;
+    prefix: string;
+    record: (e: VizLiveStep) => void;
+  },
+): void {
+  const { root, ref, prefix, record } = at;
+  child.on("transition", {
+    fn: ({ event, from: before, to, transitioned, effects }) => {
+      record({
+        from: `${prefix}.${before}`,
+        event: event.type,
+        to: `${prefix}.${to}`,
+        outcome: transitioned ? "transition" : "stay",
+        actor: ref,
+        effects,
+        context: json(contextText(root)),
+        error: null,
+      });
+    },
+  });
+  child.on("error", {
+    fn: (info) => {
+      record({
+        from: `${prefix}.${info.state.name}`,
+        event: info.event.type,
+        to: `${prefix}.${child.state.name}`,
+        outcome: "stay",
+        actor: ref,
+        effects: [],
+        context: json(contextText(root)),
+        error: messageOf(info.error),
+      });
+    },
+  });
+}
+
+/** The log entry for an event nobody handled: ignored, or missing when its actor does not exist. */
 function unhandled(
   step: Extract<VizStep, { kind: "event" }>,
   at: { actor: AnyActor<unknown>; target: AnyActor<unknown> | undefined; root: string },
 ): VizLiveStep {
   const ref = step.actor;
   const gone = ref !== undefined && at.target === undefined;
-  const here = ref === undefined ? at.root : `${ref.region}.${at.target?.state.name ?? ""}`;
+  const scope = ref === undefined ? "" : "region" in ref ? ref.region : ref.map;
+  const here = ref === undefined ? at.root : `${scope}.${at.target?.state.name ?? ""}`;
   const state = gone ? "" : here;
   return {
     from: state,
@@ -151,7 +251,11 @@ function unhandled(
 }
 
 function sameActor(left: VizActorRef | undefined, right: VizActorRef | undefined): boolean {
-  return left?.region === right?.region;
+  if (left === undefined || right === undefined) return left === right;
+  if ("region" in left || "region" in right) {
+    return "region" in left && "region" in right && left.region === right.region;
+  }
+  return left.map === right.map && left.key === right.key;
 }
 
 /**
@@ -164,11 +268,12 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
   let onChange: ((state: VizLiveState) => void) | null = null;
 
   function start(from: FuzzTarget) {
-    const { actor, clock } = from.create();
+    const { actor, clock, made } = from.create();
+    const maps: Record<string, ActorMapLike> = actorMapsOf(made).maps;
     const internal = new Set(eventCatalog(actor).internal);
     const log: VizLiveStep[] = [];
     const steps: VizStep[] = [];
-    const flags = { inside: true, disposed: false, segment: 0 };
+    const flags = { inside: true, disposed: false, segment: 0, pending: 0 };
     const held: HeldEffect[] = [];
     if (effectMode === "held") holdEffects(actor, held);
 
@@ -187,45 +292,40 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       if (!flags.inside && !flags.disposed) onChange?.(view());
     }
 
-    actor.on("transition", {
-      fn: ({ event, from: before, to, transitioned, effects }) => {
-        record({
-          from: before,
-          event: event.type,
-          to,
-          outcome: transitioned ? "transition" : "stay",
-          effects,
-          context: json(contextText(actor)),
-          error: null,
-        });
-      },
-    });
-    actor.on("error", {
-      fn: (info) => {
-        record({
-          from: info.state.name,
-          event: info.event.type,
-          to: actor.state.name,
-          outcome: "stay",
-          effects: [],
-          context: json(contextText(actor)),
-          error: messageOf(info.error),
-        });
-      },
-    });
+    watchRoot(actor, record);
     watchRegions(actor, record);
+
+    const children = new Map<string, MapChild>();
+    const watch = (name: string, key: string): void => {
+      const child = maps[name]?.get(key);
+      const id = `${name}\u0000${key}`;
+      if (!isActor(child) || children.get(id)?.child === child) return;
+      children.set(id, { child, since: steps.length + flags.pending });
+      if (effectMode === "held") holdEffects(child, held);
+      watchChild(child, { root: actor, ref: { map: name, key }, prefix: name, record });
+    };
+    watchMaps(maps, watch);
     flags.inside = false;
-    return { actor, clock, internal, log, steps, flags, held };
+    return { actor, clock, internal, log, steps, flags, held, maps, children, watch };
   }
 
   function view(): VizLiveState {
-    const { actor, clock, steps, log, held } = session;
+    const { actor, clock, steps, log, held, maps, children, watch } = session;
     const waiting = held.filter((each) => !each.signal.aborted);
     held.splice(0, held.length, ...waiting);
     return {
       state: actor.state.name,
       regions: Object.fromEntries(
         regionActors(actor).map((each) => [each.path, `${each.path}.${each.actor.state.name}`]),
+      ),
+      children: Object.entries(maps).flatMap(([name, map]) =>
+        map.keys().flatMap((key) => {
+          watch(name, key);
+          const entry = children.get(`${name}\u0000${key}`);
+          return entry === undefined
+            ? []
+            : [{ map: name, key, state: `${name}.${entry.child.state.name}`, since: entry.since }];
+        }),
       ),
       steps: [...steps],
       last: log[0] ?? null,
@@ -249,21 +349,24 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     },
     reset() {
       session.flags.disposed = true;
+      for (const map of Object.values(session.maps)) map.dispose();
       session.actor.dispose();
       session = start(target);
       return view();
     },
     step(step) {
-      const { actor, clock, internal, log, steps, flags } = session;
+      const { actor, clock, internal, log, steps, flags, maps } = session;
       log.length = 0;
       flags.segment = 0;
       flags.inside = true;
+      flags.pending = 1;
       const before = actor.state.name;
-      const target = step.kind === "event" ? targetOf(actor, step.actor) : undefined;
+      const target = step.kind === "event" ? targetOf(actor, step.actor, maps) : undefined;
       try {
-        applyStep(actor, { step, clock, internal });
+        applyStep(actor, { step, clock, internal, maps });
       } finally {
         flags.inside = false;
+        flags.pending = 0;
       }
       steps.push(step);
       if (step.kind === "event") {

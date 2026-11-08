@@ -22,6 +22,7 @@ const machine: VizMachine = {
   id: "flow",
   initial: "a",
   regions: [],
+  maps: [],
   states: [state("a", true), state("b")],
   events: [],
   outputs: [],

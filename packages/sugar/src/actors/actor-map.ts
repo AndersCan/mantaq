@@ -26,6 +26,8 @@ export interface ActorMap extends SendableMap<SendableEvent> {
   dispose(): void;
   ensure(key: string): void;
   has(key: string): boolean;
+  /** The live child for `key`, or undefined. Read it; send through `send(key, …)`. */
+  get(key: string): ActorMapChild | undefined;
   keys(): string[];
   snapshot(key: string): Snapshot | undefined;
   readonly size: number;
@@ -95,6 +97,10 @@ export function createActorMap(
     return actors.has(key);
   }
 
+  function get(key: string): ActorMapChild | undefined {
+    return actors.get(key);
+  }
+
   function keys(): string[] {
     return [...actors.keys()];
   }
@@ -109,6 +115,7 @@ export function createActorMap(
     dispose,
     ensure,
     has,
+    get,
     keys,
     snapshot: snapshotOf,
     send(key, ...events) {
