@@ -15,6 +15,7 @@ export function createVagueNamesActor(clock: VirtualClock = VirtualClock()) {
     initial: ready,
     clock,
     setup: (m) => {
+      /** The visitor finished, so the cart shows. */
       m.on(ready, { event: DONE, to: [showingCart], handler: () => ({ state: showingCart }) });
     },
   });

@@ -601,3 +601,132 @@ describe("regions", () => {
     );
   });
 });
+
+describe("arrow descriptions", () => {
+  const at = (line: number, column = 7) => ({
+    status: "analyzed",
+    location: { file: "m.ts", line, column },
+  });
+  const edge = (from: string, to: string, event: string, extra: Record<string, unknown> = {}) => ({
+    ...vizEdge(from, to, event),
+    doc: null,
+    explanation: at(3),
+    ...extra,
+  });
+  const arrowNotes = (machine: VizMachine) =>
+    machineFindings(machine).filter(
+      (f) => f.title.endsWith("has no description") || f.title.endsWith("have no description"),
+    );
+  const base = {
+    states: [vizState("a", { initial: true, doc: "A." }), vizState("b", { doc: "B." })],
+  };
+
+  test("an undocumented handler gives the exact message", () => {
+    const [note] = arrowNotes(build({ ...base, edges: [edge("a", "b", "go")] }));
+    expect(note?.message).toBe(
+      "go in a has no description. The handler for go in a (m.ts:3) has no /** */ comment, so the Step list shows nothing under go. Add /** what happened and what the machine does next */ right before that m.on, or before its .on in a chain.",
+    );
+    expect(note?.note).toBe(true);
+    expect(note?.state).toBe("a");
+  });
+
+  test("one handler with two targets and a stay edge gives one note", () => {
+    const machine = build({
+      ...base,
+      edges: [
+        edge("a", "b", "go"),
+        edge("a", "a", "go", { kind: "stay", id: "s" }),
+        edge("a", "a", "go", { id: "t" }),
+      ],
+    });
+    expect(arrowNotes(machine)).toHaveLength(1);
+  });
+
+  test("an any edge plus a concrete edge gives one onAny note", () => {
+    const machine = build({
+      ...base,
+      edges: [
+        edge("a", "b", "end"),
+        edge("*", "b", "end", { id: "any" }),
+        edge("b", "b", "end", { id: "bb", kind: "stay" }),
+      ],
+    });
+    const notes = arrowNotes(machine);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.state).toBeNull();
+    expect(notes[0]?.message).toBe(
+      "end from any state has no description. The m.onAny handler for end (m.ts:3) has no /** */ comment, so the Step list shows nothing under end. Add /** what happened and what the machine does next */ right before that m.onAny.",
+    );
+  });
+
+  test("a chain gives one note per event", () => {
+    const machine = build({ ...base, edges: [edge("a", "b", "one"), edge("a", "b", "two")] });
+    expect(arrowNotes(machine).map((f) => f.event)).toEqual(["one", "two"]);
+  });
+
+  test("an edge without a location gives no note", () => {
+    const machine = build({
+      ...base,
+      edges: [
+        edge("a", "b", "go", { explanation: { status: "not_analyzed", location: null } }),
+        edge("a", "b", "x", { explanation: { status: "analyzed" } }),
+      ],
+    });
+    expect(arrowNotes(machine)).toEqual([]);
+  });
+
+  test("a doc of only spaces counts as missing, a real doc does not", () => {
+    const blank = build({ ...base, edges: [edge("a", "b", "go", { doc: "  " })] });
+    expect(arrowNotes(blank)).toHaveLength(1);
+    const documented = build({ ...base, edges: [edge("a", "b", "go", { doc: "Moves on." })] });
+    expect(arrowNotes(documented)).toEqual([]);
+  });
+
+  test("effects without a description say has or have", () => {
+    const effectEdge = { ...vizEdge("a", "a", "effect:a"), kind: "effect", doc: null };
+    const one = build({
+      states: [vizState("a", { initial: true, doc: "A.", effects: [{ name: "tidy" }] })],
+      edges: [effectEdge],
+    });
+    const [note] = arrowNotes(one);
+    expect(note?.message).toBe(
+      'tidy in a has no description. No m.effect(a, …) call has a /** */ comment, so the Step list shows nothing under "Entering a runs:". Add /** what happens while a runs tidy */ right before m.effect(a, …).',
+    );
+    const two = build({
+      states: [
+        vizState("a", { initial: true, doc: "A.", effects: [{ name: "tidy" }, { name: "sweep" }] }),
+      ],
+      edges: [effectEdge],
+    });
+    expect(arrowNotes(two)[0]?.title).toBe("tidy and sweep in a have no description");
+  });
+
+  test("a machine whose source was not read gives no arrow notes", () => {
+    const machine = build({
+      states: [vizState("a", { initial: true }), vizState("b")],
+      edges: [
+        {
+          ...vizEdge("a", "b", "go"),
+          doc: null,
+          explanation: { status: "not_analyzed", location: { file: "m.ts", line: 1, column: 1 } },
+        },
+      ],
+    });
+    expect(arrowNotes(machine)).toEqual([]);
+  });
+
+  test("arrow notes come after undocumented event notes", () => {
+    const machine = build({
+      states: [
+        vizState("a", { initial: true, doc: "A." }),
+        vizState("b", { doc: "B.", final: true }),
+      ],
+      events: [{ id: "go", doc: null }],
+      edges: [edge("a", "b", "go")],
+    });
+    expect(machineFindings(machine).map((f) => f.title)).toEqual([
+      "go has no description",
+      "go in a has no description",
+    ]);
+  });
+});

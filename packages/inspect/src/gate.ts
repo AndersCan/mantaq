@@ -28,7 +28,7 @@ export function findingLines(machine: VizMachine): string[] {
  * an effect sends an event its state does not handle, a declared state has
  * no path from the initial state, or a declared event has no state that handles it. With `source`, it also throws on a state or
  * event whose name is only generic words (ok, loading, done...) or that has no
- * doc comment. Runs are seeded, so the result is stable.
+ * doc comment, and on a handler or a state's effects with no doc comment. Runs are seeded, so the result is stable.
  */
 export function expectNoDesignErrors(target: InspectTarget): void {
   const { machine } = inspect(target);

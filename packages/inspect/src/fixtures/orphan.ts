@@ -16,7 +16,9 @@ export function createOrphanActor(clock: VirtualClock = VirtualClock()) {
     states: [idle, running, orphan],
     initial: idle,
     setup: (m) => {
+      /** The runner starts running. */
       m.on(idle, { event: go, to: [running], handler: () => ({ state: running }) });
+      /** The runner goes idle again. */
       m.on(running, { event: go, to: [idle], handler: () => ({ state: idle }) });
     },
   });

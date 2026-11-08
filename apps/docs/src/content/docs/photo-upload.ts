@@ -45,11 +45,13 @@ export function createPhotoUploadActor(options: { clock?: VirtualClock } = {}) {
     states: [waitingForPhoto, sendingPhoto, photoSent],
     initial: waitingForPhoto,
     setup: (m) => {
+      /** A photo was picked, so the visitor confirms the upload. */
       m.on(waitingForPhoto, {
         event: photoPicked,
         to: [sendingPhoto],
         handler: () => ({ state: sendingPhoto }),
       });
+      /** The upload was confirmed, so the photo is sent. */
       m.on(sendingPhoto, {
         event: uploadConfirmed,
         to: [photoSent],
@@ -63,11 +65,13 @@ export function createPhotoUploadActor(options: { clock?: VirtualClock } = {}) {
     states: [online, offline],
     initial: online,
     setup: (m) => {
+      /** The connection was lost. */
       m.on(online, {
         event: connectionLost,
         to: [offline],
         handler: () => ({ state: offline }),
       });
+      /** The connection is back. */
       m.on(offline, {
         event: connectionRestored,
         to: [online],
@@ -83,6 +87,7 @@ export function createPhotoUploadActor(options: { clock?: VirtualClock } = {}) {
     initial: showingUploadScreen,
     regions: { upload, network },
     setup: (m) => {
+      /** The photo was uploaded, so the upload screen shows. */
       m.on(showingUploadScreen, {
         event: photoUploaded,
         to: [showingUploadedPhoto],

@@ -97,6 +97,7 @@ export function createCheckoutActor(
     clock: c,
     context: initialContext,
     setup: (m) => {
+      /** Charges the card; the answer comes back as paymentOk, paymentFail or paymentTimeout. */
       m.effect(submitting, {
         name: "chargeCard",
         sends: [paymentOk, paymentFail, paymentTimeout],
@@ -117,6 +118,7 @@ export function createCheckoutActor(
           });
         },
       });
+      /** The visitor went back from payment, so the card details are cleared. */
       m.on(payment, {
         event: back,
         to: [shippingAddress],
@@ -127,6 +129,7 @@ export function createCheckoutActor(
           return { state: shippingAddress };
         },
       });
+      /** The visitor went back from shipping, so the address is cleared. */
       m.on(shippingAddress, {
         event: back,
         to: [basicInfo],
@@ -137,7 +140,9 @@ export function createCheckoutActor(
           return { state: basicInfo };
         },
       });
+      /** The visitor went back from the error to try another card. */
       m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
+      /** The name and email are saved, and the shipping form opens. */
       m.on(basicInfo, {
         event: submitBasicInfo,
         to: [shippingAddress],
@@ -148,6 +153,7 @@ export function createCheckoutActor(
           return { state: shippingAddress };
         },
       });
+      /** The address is saved, and the card form opens. */
       m.on(shippingAddress, {
         event: submitShipping,
         to: [payment],
@@ -158,6 +164,7 @@ export function createCheckoutActor(
           return { state: payment };
         },
       });
+      /** The card details are saved, and the charge starts. */
       m.on(payment, {
         event: submitPayment,
         to: [submitting],
@@ -168,6 +175,7 @@ export function createCheckoutActor(
           return { state: submitting };
         },
       });
+      /** The order id is saved, and the order is done. */
       m.on(submitting, {
         event: paymentOk,
         to: [success],
@@ -178,7 +186,9 @@ export function createCheckoutActor(
           return { state: success };
         },
       });
+      /** The card was declined, so the visitor sees why. */
       m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
+      /** The charge took too long, so the visitor sees an error. */
       m.on(submitting, {
         event: paymentTimeout,
         to: [error],

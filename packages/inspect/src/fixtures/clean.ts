@@ -16,11 +16,13 @@ export function createCleanActor(clock: VirtualClock = VirtualClock()) {
     states: [waitingForRequest, handlingRequest],
     initial: waitingForRequest,
     setup: (m) => {
+      /** The request is handled now. */
       m.on(waitingForRequest, {
         event: requestArrived,
         to: [handlingRequest],
         handler: () => ({ state: handlingRequest }),
       });
+      /** The actor waits for the next request. */
       m.on(handlingRequest, {
         event: requestHandled,
         to: [waitingForRequest],
