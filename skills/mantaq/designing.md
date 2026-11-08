@@ -44,6 +44,8 @@ Find the repo's live-page command: `rg -l mantaqViz` across scripts, vite config
 
 A published flow page is an Astro page with `<Machine src="…" />` (`mantaqViz` from `@mantaq/inspect/astro` in `astro.config`); link it with `?machine=<id>`. The live dev page stays the edit loop. After `astro build`, run `mantaq-check-site <outDir> --base <base>`; it fails naming the page and machine. To show a journey, link its recorded run: `?machine=<id>&run=<run name>`, URL-encoded (`encodeURIComponent`), with the name exactly as in `__runs__/*.json`. Never put a `step=` trace in docs, issues or PRs. It is unreadable, breaks on any rename, and cannot carry the result of an async effect. Needs `@mantaq/viz` 0.6 or later; older pages ignore `run=`.
 
+A localhost link opens only on the machine running the server. If the user is elsewhere, or asked for a link to judge or share, look for hosted previews in the repo's flow or contributing docs. If there is one, ask before pushing (unless they asked for a shareable link), push a branch, open a draft pull request, and wait until the preview names your commit. Then reply with one preview link per journey (`?machine=<id>&run=<run name>`). With no preview, say the link only opens here, and give the published URL it will have after merge.
+
 No live page in the repo: add `mantaqViz({ machines })` per the `@mantaq/inspect` README and say so. The page only drives an exported factory that takes `{ clock }` or a clock. Ports (I/O) stay optional options with a working default, so the page can build the actor. See the mantaq guide "Machines in an application".
 
 ## 4. Make the page readable without code
@@ -79,7 +81,7 @@ Edit, save, run the test file, then reply in at most 3 lines: changed states and
 - The repo's typecheck passes.
 - A test next to the machine's tests calls `expectNoDesignErrors({ id, create: () => factory({ clock: VirtualClock() }) })`.
 - The test file passes with `CI=1` and the server output has no `dropped:` warning.
-- Report: the machine file, states and edges in one line each, runs, and one `?machine=&run=` link per journey.
+- Report: the machine file, states and edges in one line each, runs, and one `?machine=&run=` link per journey, on the preview when there is one.
 
 ## 9. Changing a singleton
 
