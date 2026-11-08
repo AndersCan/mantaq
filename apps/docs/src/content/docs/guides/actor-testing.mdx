@@ -40,28 +40,45 @@ const paymentTimeout = event("paymentTimeout")();
 
 function createCheckoutActor() {
   const initialContext: CheckoutContext = {};
-  return new Actor({
+  return Actor({
     inputs: [submitBasicInfo, submitShipping, submitPayment, back],
     internal: [paymentOk, paymentFail, paymentTimeout],
     states: [basicInfo, shippingAddress, payment, submitting, success, error],
     initial: basicInfo,
     context: initialContext,
     setup: (m) => {
-      m.on(basicInfo, submitBasicInfo, (e, { context }) => {
-        context.set({ ...context.get(), basicInfo: e.payload });
-        return { state: shippingAddress };
+      m.on(basicInfo, {
+        event: submitBasicInfo,
+        to: [shippingAddress],
+        handler: (e, { context }) => {
+          context.set({ ...context.get(), basicInfo: e.payload });
+          return { state: shippingAddress };
+        },
       });
-      m.on(shippingAddress, submitShipping, (e, { context }) => {
-        context.set({ ...context.get(), shippingAddress: e.payload });
-        return { state: payment };
+      m.on(shippingAddress, {
+        event: submitShipping,
+        to: [payment],
+        handler: (e, { context }) => {
+          context.set({ ...context.get(), shippingAddress: e.payload });
+          return { state: payment };
+        },
       });
-      m.on(payment, submitPayment, (e, { context }) => {
-        context.set({ ...context.get(), paymentInfo: e.payload });
-        return { state: submitting };
+      m.on(payment, {
+        event: submitPayment,
+        to: [submitting],
+        handler: (e, { context }) => {
+          context.set({ ...context.get(), paymentInfo: e.payload });
+          return { state: submitting };
+        },
       });
-      m.on(submitting, paymentOk, () => ({ state: success }));
-      m.on(submitting, paymentFail, () => ({ state: error }));
-      m.on(submitting, paymentTimeout, () => ({ state: error }));
+      m.on(payment, {
+        event: back,
+        to: [shippingAddress],
+        handler: () => ({ state: shippingAddress }),
+      });
+      m.on(submitting, { event: paymentOk, to: [success], handler: () => ({ state: success }) });
+      m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
+      m.on(submitting, { event: paymentTimeout, to: [error], handler: () => ({ state: error }) });
     },
   });
 }
@@ -85,7 +102,7 @@ expect(checkout.snapshot().path[0]).toBe("shippingAddress");
 
 checkout.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
 checkout.send(submitPayment.create({ cardNumber: "1111222233334444" }));
-checkout.send(paymentOk.create({ orderId: "ord_1" }));
+checkout.inject(paymentOk.create({ orderId: "ord_1" })); // internal events are injected, not sent
 expect(checkout.snapshot().path[0]).toBe("success");
 expect(checkout.snapshot().done).toBe(true);
 ```
@@ -95,24 +112,34 @@ expect(checkout.snapshot().done).toBe(true);
 `VirtualClock.advance(ms)` is synchronous, fires timers, drains queue. No fake timers, no sleeps.
 
 ```ts
-const clock = new VirtualClock();
-const checkout = new Actor({
+const clock = VirtualClock();
+const checkout = Actor({
   inputs: [submitBasicInfo, submitShipping, submitPayment, back],
   internal: [paymentTimeout],
   states: [basicInfo, shippingAddress, payment, submitting, success, error],
   initial: basicInfo,
   clock,
   setup: (m) => {
-    m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
-    m.on(shippingAddress, submitShipping, () => ({ state: payment }));
-    m.on(payment, submitPayment, () => ({ state: submitting }));
-    m.on(submitting, paymentTimeout, () => ({ state: error }));
+    m.on(basicInfo, {
+      event: submitBasicInfo,
+      to: [shippingAddress],
+      handler: () => ({ state: shippingAddress }),
+    });
+    m.on(shippingAddress, {
+      event: submitShipping,
+      to: [payment],
+      handler: () => ({ state: payment }),
+    });
+    m.on(payment, {
+      event: submitPayment,
+      to: [submitting],
+      handler: () => ({ state: submitting }),
+    });
+    m.on(submitting, { event: paymentTimeout, to: [error], handler: () => ({ state: error }) });
     m.effect(submitting, {
       name: "startSubmitTimeout",
       fn: ({ signal, emit, clock }) => {
-        clock.setTimeout(800, () => {
-          if (!signal.aborted) emit(paymentTimeout.create());
-        });
+        clock.setTimeout(800, { signal, cb: () => emit(paymentTimeout.create()) });
       },
     });
   },
@@ -133,17 +160,29 @@ Promise effects emit in a microtask. `settled()` waits for them.
 
 ```ts
 const initialContext: CheckoutContext = {};
-const checkout = new Actor({
+const checkout = Actor({
   inputs: [submitBasicInfo, submitShipping, submitPayment, back],
   internal: [paymentOk, paymentFail],
   states: [basicInfo, shippingAddress, payment, submitting, success, error],
   initial: basicInfo,
   context: initialContext,
   setup: (m) => {
-    m.on(basicInfo, submitBasicInfo, () => ({ state: shippingAddress }));
-    m.on(shippingAddress, submitShipping, () => ({ state: payment }));
-    m.on(payment, submitPayment, () => ({ state: submitting }));
-    m.on(submitting, paymentOk, () => ({ state: success }));
+    m.on(basicInfo, {
+      event: submitBasicInfo,
+      to: [shippingAddress],
+      handler: () => ({ state: shippingAddress }),
+    });
+    m.on(shippingAddress, {
+      event: submitShipping,
+      to: [payment],
+      handler: () => ({ state: payment }),
+    });
+    m.on(payment, {
+      event: submitPayment,
+      to: [submitting],
+      handler: () => ({ state: submitting }),
+    });
+    m.on(submitting, { event: paymentOk, to: [success], handler: () => ({ state: success }) });
     m.effect(submitting, {
       name: "chargeCard",
       fn: ({ signal, emit }) => {
