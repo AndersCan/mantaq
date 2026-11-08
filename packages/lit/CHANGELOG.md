@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+<sub>2026-11-08</sub>
+
+- _(patch)_
+  A `watch` inside another `watch` now stops listening when its part is cleared, also after the chain got shorter. Before, it could keep listening and draw an old page over the new one.
+
 ## 0.2.0
 
 <sub>2026-11-07</sub>
