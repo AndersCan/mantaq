@@ -64,7 +64,7 @@ test("names the machines when the id is wrong", async () => {
 test("reads findings from the built document", async () => {
   await withViz(docs("checkout-with-bugs.ts"), async (viz) => {
     expect(viz.findings()).toContainEqual(
-      expect.objectContaining({ kind: "unreachableState", state: "archived" }),
+      expect.objectContaining({ kind: "unreachableState", state: "refunding" }),
     );
   });
 }, 60_000);
@@ -161,6 +161,7 @@ test("an uncaught error in the page lands in problems", async () => {
   });
 }, 60_000);
 
+<<<<<<< HEAD
 test("submitPayment waits in submitting with its three reports", async () => {
   await withViz(checkout, async (viz) => {
     const state = async (event: string) =>
@@ -181,6 +182,32 @@ test("submitPayment waits in submitting with its three reports", async () => {
     expect(await state("back")).toBe("payment");
     expect(await state("submitPayment")).toBe("submitting");
     expect(await state("paymentOk")).toBe("success");
+=======
+test("the planted-bug machine shows six findings and replays the dead end", async () => {
+  await withViz(docs("checkout-with-bugs.ts"), async (viz) => {
+    const findings = viz.findings();
+    expect(findings).toHaveLength(6);
+    for (const finding of findings) {
+      expect(finding.title).toMatch(/back|payment|paymentDeclined|refunded|refunding|cancelOrder/);
+    }
+    const deadEnd = findings.find((each) => each.kind === "deadEnd")!;
+    expect(Either.getRight(await viz.replay(deadEnd))).toEqual({ state: "paymentDeclined" });
+    expect(await viz.state()).toBe("paymentDeclined");
+    const refunded = findings.find((each) => each.state === "refunded")!;
+    expect(refunded.steps ?? []).toEqual([]);
+    expect(Either.isLeft(await viz.replay(refunded))).toBe(true);
+    const text = await viz.text();
+    for (const old of [
+      "Handler throws",
+      "Never-see context reached",
+      "Must-see context missed",
+      "Event nobody handles",
+      "Dead end",
+      "Unreachable state",
+    ]) {
+      expect(text).not.toContain(old);
+    }
+>>>>>>> 4553597 (docs: the planted-bug checkout shows a dead end, an unreachable pair and an unhandled input)
     expect(viz.problems()).toEqual([]);
   });
 }, 60_000);
