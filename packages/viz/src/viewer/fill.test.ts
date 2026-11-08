@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { VizField, VizJson } from "../schema.ts";
-import { fillSources, fuzzSources } from "./fill.ts";
+import { fillSources, fuzzSources, knownPayload } from "./fill.ts";
 
 function field(name: string, input: VizField["input"], choices: VizJson[] = []): VizField {
   return { name, type: "x", optional: false, doc: null, input, choices, sample: "sample" };
@@ -196,5 +196,53 @@ describe("fillSources: what the walk sent", () => {
     expect(fillSources([field("name", "text")], { ...live("s", null, null), steps: [] })).toEqual(
       [],
     );
+  });
+});
+
+describe("knownPayload", () => {
+  const step = (event: string, payload: VizJson) => ({ kind: "event" as const, event, payload });
+  const card: VizField = { ...field("cardNumber", "text"), sample: "4242 4242 4242 4242" };
+  const base = { event: "pay", samples: [], steps: [] };
+
+  test("with nothing sent or fuzzed, the field's example", () => {
+    expect(knownPayload([card], base)).toEqual({ payload: { cardNumber: "4242 4242 4242 4242" } });
+  });
+
+  test("the fuzzer's first payload beats the example", () => {
+    const samples = [{ cardNumber: "1111" }, { cardNumber: "2222" }];
+    expect(knownPayload([card], { ...base, samples })).toEqual({ payload: { cardNumber: "1111" } });
+  });
+
+  test("what this walk sent under that name, on any event, beats the fuzzer", () => {
+    const result = knownPayload([card], {
+      ...base,
+      samples: [{ cardNumber: "1111" }],
+      steps: [step("other", { cardNumber: "8" }), step("other", { cardNumber: "9" })],
+    });
+    expect(result).toEqual({ payload: { cardNumber: "9" } });
+  });
+
+  test("an optional field with nothing known is left out", () => {
+    const optional: VizField = { ...card, optional: true };
+    expect(knownPayload([optional], base)).toEqual({ payload: {} });
+  });
+
+  test("a fuzz value that does not fit falls back to the example", () => {
+    const amount: VizField = { ...field("amount", "number"), sample: 1 };
+    expect(knownPayload([amount], { ...base, samples: [{ amount: "lots" }] })).toEqual({
+      payload: { amount: 1 },
+    });
+  });
+
+  test("without fields: the last payload sent with this event, else the fuzzer's first", () => {
+    const steps = [step("pay", { a: 1 }), step("pay", { a: 3 }), step("other", { a: 5 })];
+    const samples = [{ a: 1 }, { a: 2 }];
+    expect(knownPayload(null, { event: "pay", samples, steps })).toEqual({ payload: { a: 3 } });
+    expect(knownPayload([], { event: "pay", samples, steps: [] })).toEqual({ payload: { a: 1 } });
+  });
+
+  test("without fields and nothing known: undefined", () => {
+    expect(knownPayload(null, base)).toBeUndefined();
+    expect(knownPayload(null, { ...base, steps: [step("pay", null)] })).toBeUndefined();
   });
 });

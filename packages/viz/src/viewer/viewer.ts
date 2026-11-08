@@ -3,6 +3,7 @@ import type {
   VizActorRef,
   VizLiveChild,
   VizDriver,
+  VizEdge,
   VizJson,
   VizLiveState,
   VizMachine,
@@ -25,10 +26,12 @@ import {
   encodeLiveStep,
   encodeStep,
   asksForPayload,
+  payloadSamples,
 } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
+import { knownPayload } from "./fill.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
@@ -50,6 +53,8 @@ interface ViewState {
   composing: string | null;
   /** Live: the region the open payload form sends to; undefined = the machine itself. */
   composingActor: VizActorRef | undefined;
+  /** Live: an edge click opens the payload form instead of sending a known value. */
+  alwaysAsk: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
   /** Why the requested run did not open; cleared by the next walk. */
@@ -215,7 +220,7 @@ export function mountViewer(
     };
     const take = (step: ExploreStep) => {
       if (driver !== undefined) {
-        liveTake(machine, step, { send, compose, children: view.live?.children ?? [] });
+        liveTake(machine, step, { send, compose, view });
         return;
       }
       view.path = [...view.path, step];
@@ -234,7 +239,8 @@ export function mountViewer(
       view.selection = selection;
       view.tab = "details";
       refresh();
-      if (shown?.findings === true) panel.querySelector<HTMLElement>(".state-findings h4")?.focus();
+      if (shown?.findings === true)
+        panel.querySelector<HTMLElement>(".state-findings h4")?.focus({ preventScroll: true });
     };
     // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {
@@ -290,6 +296,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     previous: undefined,
     composing: null,
     composingActor: undefined,
+    alwaysAsk: false,
     tab: "step",
     notice: null,
   };
@@ -377,28 +384,48 @@ function liveOf(
   };
 }
 
-/** A live click on an edge: an event that carries a payload opens its form, as in the Send list. */
+function knownFor(machine: VizMachine, event: string, view: ViewState) {
+  return knownPayload(machine.events.find((each) => each.id === event)?.payload ?? null, {
+    event,
+    samples: payloadSamples(machine, event),
+    steps: view.live?.steps ?? [],
+  });
+}
+
+/** Who an edge click sends to; "none" = a map edge without exactly one child in its source state. */
+function actorOf(
+  machine: VizMachine,
+  edge: VizEdge,
+  children: ReadonlyArray<VizLiveChild>,
+): VizActorRef | undefined | "none" {
+  const region = scopeOf(edge.from);
+  if (machine.maps.includes(region)) {
+    const inSource = children.filter((child) => child.state === edge.from);
+    const [only] = inSource;
+    return inSource.length === 1 && only !== undefined ? { map: only.map, key: only.key } : "none";
+  }
+  return region === "" ? undefined : { region };
+}
+
+/** A live click on an edge sends at once with a payload the page already knows; Always ask (or nothing known) opens the form. */
 function liveTake(
   machine: VizMachine,
   step: ExploreStep,
-  handlers: Pick<LiveContext, "send" | "compose"> & { children: ReadonlyArray<VizLiveChild> },
+  handlers: Pick<LiveContext, "send" | "compose"> & { view: ViewState },
 ): void {
   const edge = machine.edges.find((each) => each.id === step.edge);
   if (edge === undefined) return;
   const { event } = edge;
-  const region = scopeOf(edge.from);
-  // A map edge sends only when exactly one child is in its source state.
-  const inSource = handlers.children.filter((child) => child.state === edge.from);
-  const [only] = inSource;
-  if (machine.maps.includes(region) && (inSource.length !== 1 || only === undefined)) return;
-  const actor: VizActorRef | undefined =
-    only !== undefined && machine.maps.includes(region)
-      ? { map: only.map, key: only.key }
-      : region === ""
-        ? undefined
-        : { region };
-  if (asksForPayload(machine, event)) handlers.compose(event, actor);
-  else handlers.send({ kind: "event", event, payload: null, ...(actor ? { actor } : {}) });
+  const actor = actorOf(machine, edge, handlers.view.live?.children ?? []);
+  if (actor === "none") return;
+  const withActor = actor ? { actor } : {};
+  if (!asksForPayload(machine, event)) {
+    handlers.send({ kind: "event", event, payload: null, ...withActor });
+    return;
+  }
+  const known = handlers.view.alwaysAsk ? undefined : knownFor(machine, event, handlers.view);
+  if (known === undefined) handlers.compose(event, actor);
+  else handlers.send({ kind: "event", event, payload: known.payload, ...withActor });
 }
 
 /** An effect result that arrives later replaces the live state. */
@@ -512,6 +539,25 @@ function fullscreenButton(doc: Document, root: HTMLElement): HTMLButtonElement |
   return button;
 }
 
+function alwaysAskButton(doc: Document, view: ViewState): HTMLElement {
+  const button = html(
+    doc,
+    "button",
+    {
+      type: "button",
+      class: "always-ask",
+      "data-always-ask": "",
+      "aria-pressed": String(view.alwaysAsk),
+    },
+    ["Always ask"],
+  );
+  button.addEventListener("click", () => {
+    view.alwaysAsk = !view.alwaysAsk;
+    button.setAttribute("aria-pressed", String(view.alwaysAsk));
+  });
+  return button;
+}
+
 function headerOf(
   doc: Document,
   context: {
@@ -556,6 +602,9 @@ function headerOf(
       { class: "help-link", href: DOCS_URL, target: "_blank", rel: "noopener noreferrer" },
       ["How this works"],
     ),
+    context.live && machine.events.some((each) => asksForPayload(machine, each.id))
+      ? alwaysAskButton(doc, view)
+      : null,
     fullscreenButton(doc, context.root),
   ]);
 }

@@ -13,7 +13,7 @@ import type {
 } from "../schema.ts";
 import { decodeLiveSteps, encodeLiveStep, payloadSamples } from "../moves.ts";
 import { mountViewer } from "./embed.ts";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
   return {
@@ -159,6 +159,11 @@ function sendSubmit(root: HTMLElement, json?: string) {
 }
 const current = (root: HTMLElement) => root.querySelector(".explore")?.getAttribute("data-current");
 
+const clickEdge = (root: HTMLElement, id: string) =>
+  root
+    .querySelector(`[data-edge-id="${id}"]`)
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
 describe("live controls", () => {
   test("a timer button advances the clock to its deadline", () => {
     const { root } = mount();
@@ -240,20 +245,109 @@ describe("live controls", () => {
     expect(root.querySelector("[data-payload-form]")).toBeNull();
   });
 
-  test("clicking an edge that carries a payload opens its form", () => {
+  test("an edge click sends the first fuzz payload at once", () => {
     const { root, live } = mount();
-    root
-      .querySelector('[data-edge-id="idle-submit-paying"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log).toEqual([[{ kind: "event", event: "submit", payload: { amount: 5 } }]]);
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+  });
+
+  test("a second click on the same event sends what this walk sent last", () => {
+    const toggle: VizMachine = {
+      ...checkout,
+      states: [state("off", { initial: true }), state("on")],
+      initial: "off",
+      events: [{ id: "flip", internal: false, doc: null, payload: null }],
+      edges: [edge("off", "flip", "on"), edge("on", "flip", "off")],
+      fuzz: {
+        ...checkout.fuzz!,
+        corpus: [{ steps: [{ kind: "event", event: "flip", payload: { n: 1 } }], discovered: [] }],
+      },
+    };
+    const log: VizStep[] = [];
+    const flip: VizDriver = {
+      reset: () => flipState([]),
+      step: (step) => {
+        log.push(step);
+        return flipState([...log]);
+      },
+    };
+    function flipState(steps: VizStep[]): VizLiveState {
+      return {
+        state: steps.length % 2 === 0 ? "off" : "on",
+        steps,
+        last: null,
+        after: [],
+        timers: [],
+        context: null,
+        payload: null,
+        regions: {},
+        children: [],
+        effectMode: "real",
+        waiting: [],
+      };
+    }
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [toggle] }, { driver: flip });
+    click(root, "[data-always-ask]");
+    click(root, '[data-send="flip"]');
+    const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]');
+    if (box) box.value = '{"n": 42}';
+    click(root, '[data-payload-send="flip"]');
+    click(root, "[data-always-ask]");
+    clickEdge(root, "on-flip-off");
+    expect(log.at(-1)).toEqual({ kind: "event", event: "flip", payload: { n: 42 } });
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+  });
+
+  test("Always ask opens the form on an edge click", () => {
+    const { root, live } = mount();
+    click(root, "[data-always-ask]");
+    expect(root.querySelector("[data-always-ask]")?.getAttribute("aria-pressed")).toBe("true");
+    clickEdge(root, "idle-submit-paying");
     expect(live.log).toEqual([]);
     expect(root.querySelector('.payload-sheet [data-payload-form="submit"]')).not.toBeNull();
-    expect(root.querySelector(".canvas .payload-sheet")).toBeNull();
-    expect(root.querySelector(".payload-sheet")?.parentElement).toBe(root);
     expect(root.querySelector(".payload-sheet")?.getAttribute("aria-label")).toBe(
       "Payload for submit",
     );
     const marked = [...root.querySelectorAll("[data-composing]")];
     expect(marked.map((each) => each.getAttribute("data-edge-id"))).toEqual(["idle-submit-paying"]);
+  });
+
+  test("Always ask survives a re-render and toggles off", () => {
+    const { root, live } = mount();
+    click(root, "[data-always-ask]");
+    click(root, "[data-always-ask]");
+    expect(root.querySelector("[data-always-ask]")?.getAttribute("aria-pressed")).toBe("false");
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log).toHaveLength(1);
+  });
+
+  test("Always ask is hidden when no event takes a payload, and without a driver", () => {
+    const plain: VizMachine = { ...checkout, fuzz: null };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [plain] },
+      { driver: driver() },
+    );
+    expect(root.querySelector("[data-always-ask]")).toBeNull();
+    const staticRoot = document.createElement("div");
+    mountViewer(staticRoot, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] });
+    expect(staticRoot.querySelector("[data-always-ask]")).toBeNull();
+  });
+
+  test("an edge click does not scroll or move focus", () => {
+    const { root } = mount();
+    const scroll = vi
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => undefined);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(() => undefined);
+    clickEdge(root, "idle-submit-paying");
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect(scroll).not.toHaveBeenCalled();
+    for (const call of focus.mock.calls) expect(call[0]).toEqual({ preventScroll: true });
+    vi.restoreAllMocks();
   });
 
   test("the Send list opens the same sheet, and Escape closes it", () => {
