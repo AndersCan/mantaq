@@ -20,6 +20,7 @@ const empty = "../fixtures/no-machines.ts";
 const linked = "../fixtures/linked.ts";
 const wiredSender = "../fixtures/wired/sender.ts";
 const wiredReceiver = "../fixtures/wired/receiver.ts";
+const wiredSketch = "../fixtures/wired/sketch.ts";
 const deadEnd = "../fixtures/dead-end.ts";
 const instance = "../fixtures/instance.ts";
 const badExpectations = "../fixtures/bad-expectations.ts";
@@ -69,9 +70,9 @@ beforeAll(async () => {
   wiredSite = makeSite([wiredSender]);
   writeFileSync(
     join(wiredSite, "src", "pages", "machines.astro"),
-    overviewPage({ "": [wiredSender, wiredReceiver] }),
+    overviewPage({ "": [wiredSender, wiredReceiver, wiredSketch] }),
   );
-  await buildSite(wiredSite, [wiredSender, wiredReceiver]);
+  await buildSite(wiredSite, [wiredSender, wiredReceiver, wiredSketch]);
 }, 120_000);
 
 afterAll(() => {
@@ -173,6 +174,20 @@ describe("mantaqViz for Astro", () => {
     const items = [...document.querySelectorAll("ul.wires li")].map((li) => li.textContent);
     expect(items).toHaveLength(3);
     expect(items[0]).toMatch(/^sender → receiver: handedOver → take, in .*wire\.ts:\d+$/);
+    expect(
+      document.querySelector('a.box[data-machine="sketch"]')?.hasAttribute("data-not-run"),
+    ).toBe(true);
+    expect(
+      document.querySelector('a.box[data-machine="sender"]')?.hasAttribute("data-not-run"),
+    ).toBe(false);
+    const notRun = [...document.querySelectorAll("ul.not-run li")].map((li) => li.textContent);
+    expect(notRun).toHaveLength(1);
+    expect(notRun[0]).toMatch(
+      /^sketch is not run by the app: no app code calls createSketchActor \(.*wired\/sketch\.ts\)$/,
+    );
+    expect(document.querySelector("figcaption")?.textContent).toContain(
+      "A dashed machine is not run by the app.",
+    );
   });
 
   test("a Machines page listing a file not in machines fails the build", async () => {

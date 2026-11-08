@@ -1,5 +1,5 @@
 import type { VizMachine } from "@mantaq/viz";
-import type { Wire } from "../ast/wires.ts";
+import type { NotRun, Wire } from "../ast/wires.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -25,6 +25,8 @@ interface PlacedBox {
   y: number;
   width: number;
   height: number;
+  /** False when no app code uses the machine's factory. */
+  runs: boolean;
 }
 
 interface PlacedLink {
@@ -42,6 +44,8 @@ export interface Overview {
   links: PlacedLink[];
   /** Every link's wires, in link order. */
   wires: Wire[];
+  /** Machines no app code runs, in the order given. */
+  notRun: NotRun[];
 }
 
 const BOX_HEIGHT = 40;
@@ -92,6 +96,7 @@ export function machineLinks(
 export function layoutOverview(
   machines: ReadonlyArray<OverviewMachine>,
   links: ReadonlyArray<OverviewLink>,
+  notRun: ReadonlyArray<NotRun> = [],
 ): Overview {
   const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({ multigraph: true });
   graph.setGraph({ rankdir: "LR", nodesep: 36, ranksep: 72, marginx: 16, marginy: 16 });
@@ -126,6 +131,7 @@ export function layoutOverview(
         y: (node.y ?? 0) - height / 2,
         width,
         height,
+        runs: !notRun.some((each) => each.id === machine.id),
       };
     }),
     links: links.map((link) => {
@@ -139,5 +145,6 @@ export function layoutOverview(
       };
     }),
     wires: links.flatMap((link) => link.wires),
+    notRun: notRun.filter((each) => machines.some((machine) => machine.id === each.id)),
   };
 }

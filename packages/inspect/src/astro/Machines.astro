@@ -64,7 +64,7 @@ const line = (points) =>
     }
     {
       boxes.map((box) => (
-        <a class="box" href={box.href} data-machine={box.id}>
+        <a class="box" href={box.href} data-machine={box.id} data-not-run={box.runs ? undefined : ""}>
           <rect x={box.x} y={box.y} width={box.width} height={box.height} rx="6"></rect>
           <text x={box.x + box.width / 2} y={box.y + box.height / 2} text-anchor="middle">
             {box.id}
@@ -75,7 +75,7 @@ const line = (points) =>
   </svg>
   <figcaption>
     An arrow is an event one machine sends out and another takes in. Click a machine to open its
-    page.
+    page.{overview.notRun.length > 0 && " A dashed machine is not run by the app."}
   </figcaption>
   {
     overview.wires.length > 0 && (
@@ -83,6 +83,17 @@ const line = (points) =>
         {overview.wires.map((wire) => (
           <li>
             {wire.from} → {wire.to}: {wire.trigger} → {wire.event}, in {wire.at}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  {
+    overview.notRun.length > 0 && (
+      <ul class="not-run">
+        {overview.notRun.map((each) => (
+          <li data-machine={each.id}>
+            {each.id} is not run by the app: no app code calls {each.factory} ({each.file})
           </li>
         ))}
       </ul>
@@ -110,10 +121,14 @@ const line = (points) =>
   .mantaq-machines .link text {
     font-size: 0.8em;
   }
-  .mantaq-machines ul.wires {
+  .mantaq-machines ul.wires,
+  .mantaq-machines ul.not-run {
     font-size: 0.8em;
     margin: 0.5em 0 0;
     padding-left: 1.2em;
+  }
+  .mantaq-machines a.box[data-not-run] rect {
+    stroke-dasharray: 4 3;
   }
   .mantaq-machines rect {
     fill: Canvas;

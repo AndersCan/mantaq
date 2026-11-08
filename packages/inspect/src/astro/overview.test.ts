@@ -135,6 +135,20 @@ describe("layoutOverview", () => {
     expect(overview.links[0]?.label).toBe("x, y");
   });
 
+  test("a not-run machine gives runs false on its box only, and unknown ids are dropped", () => {
+    const sketch = { id: "b", factory: "createBActor", file: "x/b.ts" };
+    const ghost = { id: "ghost", factory: "createGhostActor", file: "x/g.ts" };
+    const overview = layoutOverview(machines, links, [sketch, ghost]);
+    expect(overview.boxes.map((box) => [box.id, box.runs])).toEqual([
+      ["a", true],
+      ["b", false],
+      ["c", true],
+      ["lonely", true],
+    ]);
+    expect(overview.notRun).toEqual([sketch]);
+    expect(layoutOverview(machines, links).notRun).toEqual([]);
+  });
+
   test("boxes do not overlap", () => {
     const { boxes } = layoutOverview(machines, links);
     for (const [i, p] of boxes.entries()) {

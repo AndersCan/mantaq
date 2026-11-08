@@ -20,7 +20,7 @@ import type { Plugin } from "vite";
 import { vizDocument } from "./inspect.ts";
 import type { FuzzSettings } from "./inspect.ts";
 import { layoutOverview, machineLinks } from "./astro/overview.ts";
-import { findWires } from "./ast/wires.ts";
+import { scanAppCode } from "./ast/wires.ts";
 import { findingLines } from "./gate.ts";
 import { RUN_DROPPED } from "./runs.ts";
 import { inspectEntry, inspectFile } from "./load.ts";
@@ -144,20 +144,19 @@ async function documentsSource(
     const report = failureReport(context.fuzz !== false, reported);
     if (report !== "") plugin.error(report);
   }
+  const scanned = scanAppCode({
+    root: context.root,
+    files: context.files,
+    machines: all.map(({ machine }) => machine),
+  });
   return [
     `export const root = ${JSON.stringify(context.root)};`,
     `export const documents = ${JSON.stringify(documents)};`,
     `export const overview = ${JSON.stringify(
       layoutOverview(
         all.map(({ file, machine }) => ({ id: machine.id, file })),
-        machineLinks(
-          all,
-          findWires({
-            root: context.root,
-            files: context.files,
-            machines: all.map(({ machine }) => machine),
-          }),
-        ),
+        machineLinks(all, scanned.wires),
+        scanned.notRun,
       ),
     )};`,
   ].join("\n");
