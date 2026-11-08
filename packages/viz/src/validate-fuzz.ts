@@ -34,7 +34,10 @@ function readStep(reader: Reader, record: JsonObject, path: string): VizStep {
   if (isRecord(actor) && typeof actor["region"] === "string") {
     return { ...step, actor: { region: actor["region"] } };
   }
-  report(reader, { path: `${path}.actor`, message: "expected {region}" });
+  if (isRecord(actor) && typeof actor["map"] === "string" && typeof actor["key"] === "string") {
+    return { ...step, actor: { map: actor["map"], key: actor["key"] } };
+  }
+  report(reader, { path: `${path}.actor`, message: "expected {region} or {map, key}" });
   return step;
 }
 

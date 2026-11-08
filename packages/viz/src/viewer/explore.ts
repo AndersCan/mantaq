@@ -1103,7 +1103,7 @@ function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
 }
 
 function outcomeText(doc: Document, step: VizLiveStep): Array<Node | string> {
-  const region = step.actor?.region;
+  const region = step.actor === undefined ? undefined : actorText(step.actor);
   if (step.outcome === "missing") {
     return ["No region ", code(doc, region ?? ""), " in this machine. Nothing ran."];
   }

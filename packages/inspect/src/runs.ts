@@ -2,6 +2,8 @@ import type { VizJson, VizRun, VizStep } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
+import { actorMapsOf } from "./maps.ts";
+import type { ActorMapLike } from "./maps.ts";
 import { applyStep, eventCatalog, targetOf } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import type { AnyActor } from "@mantaq/core";
@@ -25,16 +27,30 @@ function dropOne(list: string[], item: string): boolean {
 }
 
 /** Why a step cannot be replayed (unknown region or event), or null. */
-function stepProblem(root: AnyActor<unknown>, step: VizStep): string | null {
+function stepProblem(
+  root: AnyActor<unknown>,
+  step: VizStep,
+  maps: Readonly<Record<string, ActorMapLike>>,
+): string | null {
   if (step.kind !== "event") return null;
-  const region = step.actor?.region;
-  const target = targetOf(root, step.actor);
-  if (target === undefined) return `unknown region "${region}"`;
+  const ref = step.actor;
+  if (ref !== undefined && "map" in ref && maps[ref.map] === undefined) {
+    return `unknown actor map "${ref.map}"`;
+  }
+  // A map child may not exist yet while the steps are only being checked.
+  if (ref !== undefined && "map" in ref) return null;
+  const target = targetOf(root, ref);
+  if (target === undefined) return `unknown region "${ref?.region}"`;
   const catalog = eventCatalog(target);
   if (catalog.inputs.includes(step.event) || catalog.internal.includes(step.event)) return null;
-  return region === undefined
+  return ref === undefined
     ? `unknown event "${step.event}"`
-    : `unknown event "${step.event}" in region ${region}`;
+    : `unknown event "${step.event}" in region ${ref.region}`;
+}
+
+function release(actor: AnyActor<unknown>, maps: Readonly<Record<string, ActorMapLike>>): void {
+  for (const map of Object.values(maps)) map.dispose();
+  actor.dispose();
 }
 
 /**
@@ -45,14 +61,15 @@ function stepProblem(root: AnyActor<unknown>, step: VizStep): string | null {
  * test did.
  */
 export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<string, VizStep[]> {
-  const { actor, clock } = target.create();
+  const { actor, clock, made } = target.create();
+  const maps = actorMapsOf(made).maps;
   const internal = new Set(eventCatalog(actor).internal);
   let produced: string[] = [];
   actor.on("transition", { fn: ({ event }) => void produced.push(event.type) });
   for (const step of run.steps) {
-    const problem = stepProblem(actor, step);
+    const problem = stepProblem(actor, step, maps);
     if (problem !== null) {
-      actor.dispose();
+      release(actor, maps);
       return Either.left(problem);
     }
   }
@@ -61,12 +78,12 @@ export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<strin
     const root = step.kind === "event" && step.actor === undefined;
     if (root && internal.has(step.event) && dropOne(produced, step.event)) continue;
     produced = [];
-    applyStep(actor, { step, clock, internal });
+    applyStep(actor, { step, clock, internal, maps });
     if (root && internal.has(step.event)) dropOne(produced, step.event);
     kept.push(step);
   }
   const ended = actor.state.name;
-  actor.dispose();
+  release(actor, maps);
   return ended === run.end
     ? Either.right(kept)
     : Either.left(`replays to ${ended}, the test ended in ${run.end}`);
@@ -84,7 +101,11 @@ function isStep(value: unknown): value is VizStep {
   if (!isRecord(value)) return false;
   if (value["kind"] === "advance") return typeof value["ms"] === "number" && value["ms"] >= 0;
   const actor = value["actor"];
-  const actorOk = actor === undefined || (isRecord(actor) && typeof actor["region"] === "string");
+  const actorOk =
+    actor === undefined ||
+    (isRecord(actor) &&
+      (typeof actor["region"] === "string" ||
+        (typeof actor["map"] === "string" && typeof actor["key"] === "string")));
   return (
     value["kind"] === "event" &&
     typeof value["event"] === "string" &&

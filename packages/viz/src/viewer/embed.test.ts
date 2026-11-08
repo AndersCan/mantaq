@@ -43,6 +43,7 @@ const door: VizMachine = {
   id: "door",
   initial: "open",
   regions: [],
+  maps: [],
   states: [
     { ...state("open", { initial: true }), doc: "The door stands open." },
     state("done", { final: true }),
@@ -154,6 +155,7 @@ function fakeDriver(): VizDriver {
     context: { n: steps.length },
     payload: null,
     regions: {},
+    children: [],
     effectMode: "real",
     waiting: [],
   });

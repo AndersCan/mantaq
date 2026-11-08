@@ -71,6 +71,14 @@ describe("ActorMap", () => {
     return createActorMap((id) => makeActor(id).actor);
   }
 
+  test("get returns the child that send reaches", () => {
+    const map = actorMap();
+    map.spawn("a");
+    const { toggle } = makeActor("a");
+    map.send("a", toggle.create());
+    expect(map.get("a")?.snapshot().path[0]).toBe("on");
+  });
+
   test("adds a child to the map under its key", () => {
     const map = actorMap();
     map.spawn("a");

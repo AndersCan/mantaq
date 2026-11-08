@@ -40,7 +40,7 @@ export function actorOf(compartment: string): { actor?: VizActorRef } {
 
 /** The URL/DOM text of an actor ref: "" for the machine itself. */
 export function actorText(actor: VizActorRef | undefined): string {
-  return actor === undefined ? "" : actor.region;
+  return actor === undefined ? "" : "region" in actor ? actor.region : `${actor.map}[${actor.key}]`;
 }
 
 /** Region paths of a live state, sorted. */

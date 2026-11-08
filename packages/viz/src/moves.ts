@@ -1,3 +1,4 @@
+import { Either } from "@mantaq/utils";
 import { coveredByAny } from "./schema.ts";
 import type { VizActorRef, VizEdge, VizJson, VizMachine, VizStep } from "./schema.ts";
 
@@ -140,9 +141,18 @@ export function encodeLiveStep(step: VizStep): string {
   return step.payload === null ? event : `${event}=${JSON.stringify(step.payload)}`;
 }
 
-/** The URL prefix of an actor ref: the region path. */
+/** The URL prefix of an actor ref: the region path, or `map[key]` with the key encoded. */
 function actorText(actor: VizActorRef): string {
-  return actor.region;
+  return "region" in actor ? actor.region : `${actor.map}[${encodeURIComponent(actor.key)}]`;
+}
+
+const CHILD = /^([^[\]>]+)\[([^\]]*)\]$/;
+
+function decodeActor(text: string): VizActorRef | null {
+  const child = CHILD.exec(text);
+  if (child === null) return { region: text };
+  const key = Either.from(() => decodeURIComponent(child[2] ?? ""));
+  return Either.isLeft(key) ? null : { map: child[1] ?? "", key: key[1] };
 }
 
 function parseJson(text: string): { value: VizJson } | null {
@@ -153,6 +163,16 @@ function parseJson(text: string): { value: VizJson } | null {
   }
 }
 
+/** The `[actor>]event` part of a step's text. */
+function decodeHead(head: string): { event: string; actor: { actor?: VizActorRef } } | null {
+  const arrow = head.indexOf(">");
+  const event = arrow === -1 ? head : head.slice(arrow + 1);
+  if (event === "" || arrow === 0) return null;
+  if (arrow === -1) return { event, actor: {} };
+  const ref = decodeActor(head.slice(0, arrow));
+  return ref === null ? null : { event, actor: { actor: ref } };
+}
+
 /** Inverse of `encodeLiveStep`; null when the text is not a step. */
 function decodeLiveStep(text: string): VizStep | null {
   if (text.startsWith("@")) {
@@ -160,11 +180,9 @@ function decodeLiveStep(text: string): VizStep | null {
     return text.length > 1 && Number.isFinite(ms) && ms >= 0 ? { kind: "advance", ms } : null;
   }
   const cut = text.indexOf("=");
-  const head = cut === -1 ? text : text.slice(0, cut);
-  const arrow = head.indexOf(">");
-  const event = arrow === -1 ? head : head.slice(arrow + 1);
-  const actor = arrow === -1 ? {} : { actor: { region: head.slice(0, arrow) } };
-  if (event === "" || arrow === 0) return null;
+  const head = decodeHead(cut === -1 ? text : text.slice(0, cut));
+  if (head === null) return null;
+  const { event, actor } = head;
   if (cut === -1) return { kind: "event", event, payload: null, ...actor };
   const payload = parseJson(text.slice(cut + 1));
   return payload === null ? null : { kind: "event", event, payload: payload.value, ...actor };

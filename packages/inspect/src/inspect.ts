@@ -12,7 +12,7 @@ import { Either } from "@mantaq/utils";
 import { VirtualClock } from "@mantaq/core";
 import { analyzeModule, annotateWith } from "./ast/annotate.ts";
 import { checkExpectations } from "./expectations.ts";
-import { contextText } from "./fuzz/run.ts";
+import { contextText, isActor } from "./fuzz/run.ts";
 import { coverageGoal, unreached, withTestCoverage } from "./fuzz/coverage.ts";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
@@ -21,7 +21,7 @@ import { fuzzedMachine } from "./fuzz/to-viz.ts";
 import { guidance } from "./fuzz/guided.ts";
 import { normalizeRun, readRuns } from "./runs.ts";
 import { routingWarnings, unhandledSends, VIZ_SCHEMA_VERSION } from "@mantaq/viz";
-import { toVizMachine } from "./structure.ts";
+import { mapWarnings, toVizMachine } from "./structure.ts";
 
 const DEFAULT_ITERATIONS = 2000;
 
@@ -88,8 +88,11 @@ function fuzzWarnings(
 
 export interface InspectTarget {
   id: string;
-  /** A fresh actor on every call. Fuzzing needs it to run on a VirtualClock. */
-  create: () => AnyActor<unknown>;
+  /**
+   * A fresh actor on every call, or `{ actor, ... }` with the actor maps next to it
+   * (`return { actor, photos }`). Fuzzing needs the actor to run on a VirtualClock.
+   */
+  create: () => AnyActor<unknown> | { actor: AnyActor<unknown> };
   /** File with the `m.on` calls: edge explanations, and payload samples from the event types. */
   source?: AnalysisSource;
   /** Sample payloads per event; replace the ones read from types. */
@@ -106,6 +109,14 @@ export interface Inspected {
   machine: VizMachine;
   /** Things worth fixing or knowing: unreachable routing, unhandled sends, why fuzzing was skipped. */
   warnings: string[];
+}
+
+/** The actor of a factory result, and the whole result when it is `{ actor, ... }`. */
+function createdOf(result: AnyActor<unknown> | { actor: AnyActor<unknown> }): {
+  actor: AnyActor<unknown>;
+  made?: unknown;
+} {
+  return isActor(result) ? { actor: result } : { actor: result.actor, made: result };
 }
 
 function isVirtualClock(clock: Clock): clock is VirtualClock {
@@ -129,14 +140,18 @@ function runner(
   payloads: Readonly<Record<string, ReadonlyArray<VizJson>>>,
   expectations: ReadonlyArray<CheckedExpectation>,
 ): Either<string, FuzzTarget> {
-  if (!isVirtualClock(target.create().clock)) {
+  if (!isVirtualClock(createdOf(target.create()).actor.clock)) {
     return Either.left("not fuzzed: the actor does not run on a VirtualClock");
   }
   return Either.right({
     id: target.id,
     create: () => {
-      const actor = target.create();
-      return { actor, clock: isVirtualClock(actor.clock) ? actor.clock : VirtualClock() };
+      const { actor, made } = createdOf(target.create());
+      return {
+        actor,
+        clock: isVirtualClock(actor.clock) ? actor.clock : VirtualClock(),
+        ...(made === undefined ? {} : { made }),
+      };
     },
     payloads,
     ...(expectations.length === 0 ? {} : { expectations }),
@@ -215,7 +230,8 @@ function inspectWith(
 ): Inspected {
   const annotate = annotator(target, analysis);
   const inferred = Either.getRight(analysis ?? Either.left("none"))?.payloads ?? {};
-  const structure = annotate(toVizMachine({ id: target.id, actor: target.create() }));
+  const created = createdOf(target.create());
+  const structure = annotate(toVizMachine({ id: target.id, ...created }));
   const expected = checkExpectations(
     target.expectations,
     structure.states.filter((each) => each.region === null).map((each) => each.id),
@@ -231,6 +247,7 @@ function inspectWith(
     machine: annotated,
     warnings: [
       ...unanalyzed,
+      ...mapWarnings(created.made),
       ...expected.warnings,
       ...unchecked,
       ...(quiet ? [] : notes),
@@ -279,14 +296,6 @@ export function machineId(exportName: string): string {
   return core === "" ? exportName : core.charAt(0).toLowerCase() + core.slice(1);
 }
 
-function isActor(value: unknown): value is AnyActor<unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    ["send", "snapshot", "inject"].every((key) => typeof Reflect.get(value, key) === "function")
-  );
-}
-
 /** Call an export the way its type says, and take the actor out of what it returns. */
 function factoryOf(found: MachineExport, value: unknown): (() => unknown) | null {
   if (found.call === "instance") return () => value;
@@ -300,25 +309,30 @@ function factoryOf(found: MachineExport, value: unknown): (() => unknown) | null
   return () => Reflect.apply(value, undefined, argument());
 }
 
-function actorFactory(found: MachineExport, value: unknown): (() => AnyActor<unknown>) | null {
+function actorFactory(found: MachineExport, value: unknown): InspectTarget["create"] | null {
   const factory = factoryOf(found, value);
   if (factory === null) return null;
   const unwrap = (result: unknown): unknown =>
     found.unwrap === "actor" && typeof result === "object" && result !== null
       ? Reflect.get(result, "actor")
       : result;
-  const sample = unwrap(factory());
-  if (!isActor(sample)) return null;
-  return () => {
-    const actor = unwrap(factory());
-    return isActor(actor) ? actor : sample;
+  /** The factory's result as the target takes it: the whole `{ actor, ... }` when it has one. */
+  const made = (result: unknown): AnyActor<unknown> | { actor: AnyActor<unknown> } | null => {
+    const actor = unwrap(result);
+    if (!isActor(actor)) return null;
+    return found.unwrap === "actor" && typeof result === "object" && result !== null
+      ? { ...result, actor }
+      : actor;
   };
+  const sample = made(factory());
+  if (sample === null) return null;
+  return () => made(factory()) ?? sample;
 }
 
 /** The recorded runs of one machine that replay faithfully, and a warning for each that does not. */
 function replayedRuns(
   id: string,
-  create: () => AnyActor<unknown>,
+  create: InspectTarget["create"],
   recorded: RecordedRuns,
 ): { runs: VizRun[]; warnings: string[] } {
   const found = recorded[id] ?? [];

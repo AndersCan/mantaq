@@ -249,6 +249,17 @@ describe("ActorMap directed mutation tests", () => {
     expect([map.snapshot("missing"), map.snapshot("a")?.path[0]]).toEqual([undefined, "off"]);
   });
 
+  test("get returns the spawned child, undefined once killed, and the new child after a respawn", () => {
+    const map = childMap();
+    map.spawn("a");
+    const first = map.get("a");
+    expect([first?.snapshot().path[0], map.get("missing")]).toEqual(["off", undefined]);
+    map.spawn("a");
+    expect(map.get("a")).not.toBe(first);
+    map.kill("a");
+    expect(map.get("a")).toBeUndefined();
+  });
+
   test("throws when the factory raises inside spawn", () => {
     // malformed JSON raises inside the factory, mirroring any constructor crash
     const map = createActorMap(() => JSON.parse("{"));
@@ -307,6 +318,15 @@ describe("ActorMap autoReap directed mutation tests", () => {
     expect(map.size).toBe(1);
     map.send("a", toggle.create());
     expect({ has: map.has("a"), size: map.size }).toEqual({ has: false, size: 0 });
+  });
+
+  test("get is undefined for a child that was reaped", () => {
+    const map = reapingMap();
+    const { toggle } = finalChild();
+    map.spawn("a");
+    expect(map.get("a")).toBeDefined();
+    map.send("a", toggle.create());
+    expect(map.get("a")).toBeUndefined();
   });
 
   test("removes a child that dies into __error under autoReap", () => {

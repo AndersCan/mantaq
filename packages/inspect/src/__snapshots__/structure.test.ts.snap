@@ -274,6 +274,7 @@ exports[`determinism > auth snapshot 1`] = `
       "fuzz": null,
       "id": "auth",
       "initial": "checkingAuth",
+      "maps": [],
       "outputs": [],
       "regions": [],
       "runs": [],
@@ -376,7 +377,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 14
+  "schemaVersion": 15
 }
 "
 `;
@@ -607,6 +608,7 @@ exports[`determinism > checkout snapshot 1`] = `
       "fuzz": null,
       "id": "checkout",
       "initial": "basicInfo",
+      "maps": [],
       "outputs": [],
       "regions": [],
       "runs": [],
@@ -689,7 +691,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 14
+  "schemaVersion": 15
 }
 "
 `;
@@ -1134,6 +1136,7 @@ exports[`determinism > saga snapshot 1`] = `
       "fuzz": null,
       "id": "saga",
       "initial": "idle",
+      "maps": [],
       "outputs": [],
       "regions": [],
       "runs": [],
@@ -1288,7 +1291,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 14
+  "schemaVersion": 15
 }
 "
 `;

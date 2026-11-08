@@ -24,7 +24,7 @@ describe("validateViz rejects", () => {
 
   test("version 9 documents and a missing outputs list", () => {
     expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
-      "$.schemaVersion: expected 14, got 9",
+      "$.schemaVersion: expected 15, got 9",
     ]);
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["outputs"];
@@ -33,7 +33,7 @@ describe("validateViz rejects", () => {
 
   test("version 11 documents", () => {
     expect(issues({ schemaVersion: 11, machines: [] })).toEqual([
-      "$.schemaVersion: expected 14, got 11",
+      "$.schemaVersion: expected 15, got 11",
     ]);
   });
 
@@ -202,9 +202,36 @@ describe("validateViz region steps", () => {
     ).toEqual([]);
   });
 
+  test("a map child step is accepted", () => {
+    expect(
+      issues(
+        withStep({
+          kind: "event",
+          event: "go",
+          payload: null,
+          actor: { map: "photos", key: "p1" },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  test("a map step without a key is an issue", () => {
+    expect(
+      issues(withStep({ kind: "event", event: "go", payload: null, actor: { map: "photos" } })),
+    ).toEqual(["$.machines[0].runs[0].steps[0].actor: expected {region} or {map, key}"]);
+  });
+
+  test("a map that is not a region is an issue, and maps are required", () => {
+    const doc = valid() as { machines: Array<Record<string, unknown>> };
+    doc.machines[0]!["maps"] = ["photos"];
+    expect(issues(doc)).toEqual(['$.machines[0].maps[0]: "photos" is not in regions']);
+    delete doc.machines[0]!["maps"];
+    expect(issues(doc)).toEqual(["$.machines[0].maps: expected string[]"]);
+  });
+
   test("a bad actor is an issue", () => {
     expect(issues(withStep({ kind: "event", event: "go", payload: null, actor: 3 }))).toEqual([
-      "$.machines[0].runs[0].steps[0].actor: expected {region}",
+      "$.machines[0].runs[0].steps[0].actor: expected {region} or {map, key}",
     ]);
   });
 });

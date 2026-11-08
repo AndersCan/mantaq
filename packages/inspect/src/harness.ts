@@ -197,7 +197,7 @@ function makeSend(
       return Either.left("harness is closed");
     }
     await page.click('[data-tab="step"]');
-    const path = actor.region;
+    const path = actorPath(actor);
     const scope =
       path === ""
         ? `${PANEL} :is([data-actor=""], .explore-waiting)`
@@ -431,4 +431,8 @@ export async function openViz(options: OpenVizOptions): Promise<Either<string, V
   } catch (error) {
     return fail(`could not open ${machine.id}: ${firstLine(error)}`);
   }
+}
+
+function actorPath(actor: VizActorRef): string {
+  return "region" in actor ? actor.region : `${actor.map}[${actor.key}]`;
 }

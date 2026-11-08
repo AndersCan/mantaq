@@ -1,13 +1,15 @@
 import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
 import type { AnyActor, InternalEvent, VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
+import { actorMapsOf } from "../maps.ts";
+import type { ActorMapLike } from "../maps.ts";
 import { matches } from "../expectations.ts";
 import type { CheckedExpectation } from "../expectations.ts";
 
 /** A machine the fuzzer can drive: a fresh actor plus the virtual clock it runs on. */
 export interface FuzzTarget {
   id: string;
-  create(): { actor: AnyActor<unknown>; clock: VirtualClock };
+  create(): { actor: AnyActor<unknown>; clock: VirtualClock; made?: unknown };
   /**
    * Sample payloads per event type. Payload types are erased at runtime, so
    * the fuzzer only mutates shapes it was given. Events without samples are
@@ -58,6 +60,14 @@ export interface Trace {
    * re-entered), `stay:a>e` (handled, no change), `error:a>e` (handler threw).
    */
   features: string[];
+}
+
+export function isActor(value: unknown): value is AnyActor<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    ["send", "snapshot", "inject"].every((key) => typeof Reflect.get(value, key) === "function")
+  );
 }
 
 const ERROR_STATE = "__error";
@@ -140,13 +150,16 @@ export function regionActors(
   );
 }
 
-/** The actor a step goes to; undefined when the step names a region that does not exist. */
+/** The actor a step goes to; undefined when the step names a region or child that does not exist. */
 export function targetOf(
   root: AnyActor<unknown>,
   ref: VizActorRef | undefined,
+  maps: Readonly<Record<string, ActorMapLike>> = {},
 ): AnyActor<unknown> | undefined {
   if (ref === undefined) return root;
-  return regionActors(root).find((each) => each.path === ref.region)?.actor;
+  if ("region" in ref) return regionActors(root).find((each) => each.path === ref.region)?.actor;
+  const child = maps[ref.map]?.get(ref.key);
+  return isActor(child) ? child : undefined;
 }
 
 const catalogs = new WeakMap<object, ReadonlySet<string>>();
@@ -162,11 +175,16 @@ function internalOf(actor: AnyActor<unknown>): ReadonlySet<string> {
 /** The one step function: the fuzzer and the live driver both apply steps through it. */
 export function applyStep(
   root: AnyActor<unknown>,
-  context: { step: VizStep; clock: VirtualClock; internal: ReadonlySet<string> },
+  context: {
+    step: VizStep;
+    clock: VirtualClock;
+    internal: ReadonlySet<string>;
+    maps?: Readonly<Record<string, ActorMapLike>>;
+  },
 ): void {
   const { step } = context;
   if (step.kind === "advance") return context.clock.advance(step.ms);
-  const actor = targetOf(root, step.actor);
+  const actor = targetOf(root, step.actor, context.maps);
   if (actor === undefined) return;
   const internal = actor === root ? context.internal : internalOf(actor);
   // A live effect only emits while its state is active, and core rejects an
@@ -181,7 +199,8 @@ export function applyStep(
  * only run via the virtual clock, and nothing here reads wall time.
  */
 export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trace {
-  const { actor, clock } = target.create();
+  const { actor, clock, made } = target.create();
+  const maps = actorMapsOf(made).maps;
   const internal = new Set(eventCatalog(actor).internal);
   const visited = [actor.state.name];
   const regions = regionActors(actor);
@@ -263,7 +282,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     // user code the step runs outside them (a timer callback under
     // `clock.advance`) ends this run as an error, not the whole fuzz.
     const applied = Either.from(() => {
-      applyStep(actor, { step, clock, internal });
+      applyStep(actor, { step, clock, internal, maps });
       return true;
     });
     if (Either.isLeft(applied)) {
@@ -283,6 +302,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     }
     index += 1;
   }
+  for (const map of Object.values(maps)) map.dispose();
   actor.dispose();
   const features = [...new Set([...featuresOf({ visited, observations, errors }), ...hits])].sort();
   return { visited, observations, errors, contextSteps, loopStarts, features };
