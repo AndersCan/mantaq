@@ -369,6 +369,51 @@ describe("runEffects directed mutation tests", () => {
     };
   }
 
+  async function isSettled(promise: Promise<unknown>): Promise<boolean> {
+    let settled = false;
+    void promise.then(() => {
+      settled = true;
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    return settled;
+  }
+
+  function neverAnswering(abort: AbortController) {
+    return runEffects({
+      ...baseOptions(),
+      abort,
+      effects: { idle: [{ name: "never", fn: () => new Promise<void>(() => {}) }] },
+    });
+  }
+
+  test("a pending effect stays pending until its abort fires, then settles", async () => {
+    const abort = new AbortController();
+    const [pending] = neverAnswering(abort).pending;
+    expect(await isSettled(pending)).toBe(false);
+    abort.abort();
+    expect(await isSettled(pending)).toBe(true);
+  });
+
+  test("an effect that aborts its own signal before returning settles", async () => {
+    const abort = new AbortController();
+    const result = runEffects({
+      ...baseOptions(),
+      abort,
+      effects: {
+        idle: [
+          {
+            name: "selfAbort",
+            fn: () => {
+              abort.abort();
+              return new Promise<void>(() => {});
+            },
+          },
+        ],
+      },
+    });
+    expect(await isSettled(result.pending[0])).toBe(true);
+  });
+
   test("a synchronous effect throw is routed to onError and stops the rest", () => {
     const seen: string[] = [];
     const result = runEffects({
