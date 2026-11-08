@@ -281,7 +281,7 @@ onOutput(childActor, (event) => {
 ## `withPromise(options)`
 
 ```ts
-function withPromise<T, Emit = InternalEvent>(options: {
+function withPromise<T, Emit = { type: string; payload?: unknown }>(options: {
   promise: Promise<T>;
   signal: AbortSignal;
   emit: (event: Emit) => void;
