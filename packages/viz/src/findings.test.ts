@@ -701,6 +701,38 @@ describe("arrow descriptions", () => {
     expect(arrowNotes(two)[0]?.title).toBe("tidy and sweep in a have no description");
   });
 
+  test("a stay-only handler gives one note", () => {
+    const machine = build({ ...base, edges: [edge("a", "a", "tick", { kind: "stay" })] });
+    expect(arrowNotes(machine).map((f) => f.title)).toEqual(["tick in a has no description"]);
+  });
+
+  test("a handler registered for two from states gives a note per state", () => {
+    const machine = build({
+      ...base,
+      edges: [edge("a", "b", "go"), edge("b", "a", "go", { id: "ba" })],
+    });
+    expect(arrowNotes(machine).map((f) => f.state)).toEqual(["a", "b"]);
+  });
+
+  test("an effect edge for a state with no effects gives no note", () => {
+    const effectEdge = { ...vizEdge("a", "a", "effect:a"), kind: "effect", doc: null };
+    const machine = build({
+      states: [vizState("a", { initial: true, doc: "A.", effects: [] })],
+      edges: [effectEdge],
+    });
+    expect(arrowNotes(machine)).toEqual([]);
+  });
+
+  test("an effect edge for an unknown state gives no note", () => {
+    const effectEdge = { ...vizEdge("ghost", "ghost", "effect:ghost"), kind: "effect", doc: null };
+    expect(arrowNotes(build({ ...base, edges: [effectEdge] }))).toEqual([]);
+  });
+
+  test("a located edge that is not a handler gives no handler note", () => {
+    const machine = build({ ...base, edges: [edge("a", "b", "go", { kind: "initial" })] });
+    expect(arrowNotes(machine)).toEqual([]);
+  });
+
   test("a machine whose source was not read gives no arrow notes", () => {
     const machine = build({
       states: [vizState("a", { initial: true }), vizState("b")],
