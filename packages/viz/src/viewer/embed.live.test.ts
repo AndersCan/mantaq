@@ -768,6 +768,89 @@ describe("field forms and the context table", () => {
     expect(alertText(root)).toBe("Not sent: this is not valid JSON.");
   });
 
+  test("an empty JSON box sends a null payload", () => {
+    const { root, live } = mountFields();
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-as-json="submit"]');
+    const box = jsonBox(root);
+    if (box) box.value = "  ";
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: null }]);
+  });
+
+  test("a field left empty stays out of the JSON view", () => {
+    const { root } = mountFields();
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-as-json="submit"]');
+    expect(Object.keys(JSON.parse(jsonBox(root)?.value ?? ""))).toEqual(["validFor"]);
+  });
+
+  test("text that is not valid JSON survives fields to JSON and back", () => {
+    const { root } = mountFields();
+    click(root, '[data-send="submit"]');
+    const flags = field(root, "flags");
+    if (flags) flags.value = "{oops";
+    click(root, '[data-payload-as-json="submit"]');
+    expect(JSON.parse(jsonBox(root)?.value ?? "")).toEqual({ validFor: "10m", flags: "{oops" });
+  });
+
+  test("Edit as fields clears inputs whose key is missing and hides an old alert", () => {
+    const { root } = mountFields();
+    click(root, '[data-send="submit"]');
+    const note = field(root, "note");
+    if (note) note.value = "old";
+    click(root, '[data-payload-as-json="submit"]');
+    const box = jsonBox(root);
+    if (box) box.value = "{nope";
+    click(root, '[data-payload-as-fields="submit"]');
+    expect(alertText(root)).not.toBe("");
+    if (box) box.value = '{"validFor":"1h"}';
+    click(root, '[data-payload-as-fields="submit"]');
+    expect(note?.value).toBe("");
+    expect(root.querySelector("[role=alert]")?.hasAttribute("hidden")).toBe(true);
+    click(root, '[data-payload-as-json="submit"]');
+    expect(root.querySelector("[role=alert]")?.hasAttribute("hidden")).toBe(true);
+  });
+
+  test("a bad field value focuses that field", () => {
+    const { root, live } = mountFields();
+    document.body.append(root);
+    click(root, '[data-send="submit"]');
+    const flags = field(root, "flags");
+    if (flags) flags.value = "{oops";
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log).toEqual([]);
+    expect(document.activeElement).toBe(flags);
+    root.remove();
+  });
+
+  test("invalid JSON focuses the box in either direction", () => {
+    const { root } = mountFields();
+    document.body.append(root);
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-as-json="submit"]');
+    const box = jsonBox(root);
+    if (box) box.value = "{nope";
+    click(root, '[data-payload-send="submit"]');
+    expect(document.activeElement).toBe(box);
+    (document.activeElement as HTMLElement | null)?.blur();
+    click(root, '[data-payload-as-fields="submit"]');
+    expect(document.activeElement).toBe(box);
+    root.remove();
+  });
+
+  test.each(["[1]", "5", '"x"'])("Edit as fields refuses %s as not an object", (text) => {
+    const { root } = mountFields();
+    click(root, '[data-send="submit"]');
+    click(root, '[data-payload-as-json="submit"]');
+    const box = jsonBox(root);
+    if (box) box.value = text;
+    click(root, '[data-payload-as-fields="submit"]');
+    expect(alertText(root)).toBe(
+      "Not fields of submit: not an object. Remove them to edit as fields.",
+    );
+  });
+
   test("a missing required field puts the alert in the actions row and focuses the field", () => {
     const { root, live } = mountFields(requiredMachine, null);
     document.body.append(root);
