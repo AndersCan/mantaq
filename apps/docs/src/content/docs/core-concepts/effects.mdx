@@ -11,17 +11,13 @@ the machine directly.
 
 ## EffectInput
 
-`fn` receives one object, typed `EffectInput` in `@mantaq/core`:
-
 ```ts
-import type { Clock, Context, InternalEvent } from "@mantaq/core";
-
-interface EffectInput<ActorContext, Payload, Emit> {
+{
   signal: AbortSignal;
-  state: { name: string; payload: Payload };
+  state: { name: string; payload: unknown };
   event: InternalEvent;
   context: Context<ActorContext>;
-  emit: (event: Emit) => void;
+  emit: (event) => void;
   clock: Clock;
 }
 ```
@@ -107,8 +103,6 @@ m.effect(submitting, {
   },
 });
 ```
-
-Passing `signal` cancels the timer when the actor leaves `submitting`.
 
 ## Error handling
 
