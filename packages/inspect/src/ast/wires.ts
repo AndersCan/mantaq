@@ -364,10 +364,6 @@ function namedIn(
   const named: string[] = [];
   let fallsThrough = false;
   const visit = (node: ts.Node): void => {
-    if (ts.isIfStatement(node)) {
-      const literal = earlyReturnLiteral(checker, node, outputs);
-      if (literal !== null) named.push(literal);
-    }
     if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
@@ -386,7 +382,14 @@ function namedIn(
     }
     ts.forEachChild(node, visit);
   };
-  for (const body of bodies) visit(body);
+  for (const body of bodies) {
+    visit(body);
+    if (!ts.isBlock(body)) continue;
+    for (const statement of body.statements) {
+      const literal = earlyReturnLiteral(checker, statement, outputs);
+      if (literal !== null) named.push(literal);
+    }
+  }
   return fallsThrough ? [] : named;
 }
 
