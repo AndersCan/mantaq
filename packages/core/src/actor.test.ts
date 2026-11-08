@@ -39,6 +39,39 @@ describe("Actor.settled", () => {
     expect(bEffectRan).toBe(true);
     expect(actor.state.name).toBe("b");
   });
+
+  test("settled resolves when the state is left while its effect never answers", async () => {
+    const idle = state("idle")();
+    const loading = state("loading")();
+    const loaded = state("loaded")();
+    const go = event("GO")();
+    const done = event("DONE")();
+
+    const actor = Actor({
+      clock: VirtualClock(),
+      inputs: [go],
+      internal: [done],
+      states: [idle, loading, loaded],
+      initial: idle,
+      setup: (m) => {
+        m.on(idle, { event: go, to: [loading], handler: () => ({ state: loading }) });
+        m.effect(loading, {
+          name: "neverAnswers",
+          sends: [done],
+          fn: () => new Promise<void>(() => {}),
+        });
+        m.on(loading, { event: done, to: [loaded], handler: () => ({ state: loaded }) });
+      },
+    });
+
+    actor.send(go.create());
+    actor.inject(done.create());
+    const result = await Promise.race([
+      actor.settled().then(() => "settled"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("hung"), 200)),
+    ]);
+    expect({ result, state: actor.state.name }).toEqual({ result: "settled", state: "loaded" });
+  });
 });
 
 describe("Actor dispatch resolution", () => {

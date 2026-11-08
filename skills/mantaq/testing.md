@@ -18,7 +18,7 @@ clock.advance(800);                       // fires timers, drains queue — sync
 expect(matches(actor, "submitted")).toBe(true);
 ```
 
-No awaits needed for timer work. For promise-based effects, `await actor.settled()`. Pending timers are not queued events, so `settled()` does not advance time.
+No awaits needed for timer work. For promise-based effects, `await actor.settled()`. Pending timers are not queued events, so `settled()` does not advance time. It does not wait for an effect whose state was left (aborted on exit), so a walk that injects an effect's answer can await it even when the real call never answers.
 
 Assert no leaked timers at the end of a test with the clock's pending-timer inspection (`hasPending`, `pendingTimers`).
 

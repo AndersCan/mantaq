@@ -72,8 +72,16 @@ export function runEffects<ActorContext>(
           options.onError(error, options.lastGood);
         },
       );
-      pending.push(effectPromise);
+      pending.push(Promise.race([effectPromise, whenAborted(options.abort.signal)]));
     }
   }
   return { pending, ran };
+}
+
+/** Resolves once the effect is aborted: a left state's effect can no longer emit, so settled() stops waiting for it. */
+function whenAborted(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) resolve();
+    else signal.addEventListener("abort", () => resolve(), { once: true });
+  });
 }
