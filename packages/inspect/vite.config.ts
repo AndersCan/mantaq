@@ -35,5 +35,11 @@ export default defineConfig({
     },
   },
   fmt: {},
-  test: { testTimeout: 30_000 },
+  test: {
+    testTimeout: 30_000,
+    alias: {
+      "virtual:mantaq/targets": new URL("src/astro/virtual-targets.stub.ts", import.meta.url)
+        .pathname,
+    },
+  },
 });
