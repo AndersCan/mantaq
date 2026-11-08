@@ -73,6 +73,8 @@ const make = recordRuns(createInviteLinkActor);
 
 Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a stale file fails the test. Name tests as user-visible journeys: the test name is the run's label. Link a run as `?machine=<id>&run=<name>`.
 
+A journey through an effect's answer injects that answer right after the send that started the effect: `actor.send(turnOffLink.create(...)); actor.inject({ type: "linkOffFailed", payload: { folderId } });`. Do not await between the two, or the real answer arrives first.
+
 ## Design Gate
 
 ```ts
