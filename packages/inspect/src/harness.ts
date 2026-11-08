@@ -197,7 +197,9 @@ function makeSend(
     await page.click('[data-tab="step"]');
     const path = actor.region;
     const scope =
-      path === "" ? `${PANEL} [data-actor=""]` : `${PANEL} [data-actor=${quoted(path)}]`;
+      path === ""
+        ? `${PANEL} :is([data-actor=""], .explore-waiting)`
+        : `${PANEL} [data-actor=${quoted(path)}]`;
     if (
       path !== "" &&
       (await page.locator(`${PANEL} p[data-region=${quoted(path)}]`).count()) === 0
