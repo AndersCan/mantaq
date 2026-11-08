@@ -5,6 +5,7 @@ import type {
   VizEdge,
   VizLiveChild,
   VizLiveState,
+  VizLiveStep,
   VizMachine,
   VizState,
   VizStep,
@@ -91,14 +92,18 @@ const child = (key: string, at: string, since = 0): VizLiveChild => ({
   since,
 });
 
-function mount(children: VizLiveChild[], machine: VizMachine = photoQueue) {
+function mount(
+  children: VizLiveChild[],
+  machine: VizMachine = photoQueue,
+  answer?: (step: VizStep) => VizLiveStep,
+) {
   const root = document.createElement("div");
   const sent: VizStep[] = [];
   const driver: VizDriver = {
     reset: () => live(children),
     step: (step) => {
       sent.push(step);
-      return live(children, [step]);
+      return { ...live(children, [step]), last: answer?.(step) ?? null };
     },
   };
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
@@ -190,5 +195,88 @@ describe("live actor map children", () => {
     const two = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
     edgeGroup(two.root)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(two.sent).toEqual([]);
+  });
+
+  test("a child step reads the map, the key and the move", () => {
+    const { root } = mount([child("p1", "sendingPhoto")], photoQueue, () => ({
+      from: "photos.sendingPhoto",
+      event: "uploadConfirmed",
+      to: "photos.photoSent",
+      outcome: "transition",
+      actor: { map: "photos", key: "p1" },
+      effects: [],
+      context: null,
+      error: null,
+    }));
+    root
+      .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]')
+      ?.click();
+    expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
+      "uploadConfirmed: photos p1: sendingPhoto → photoSent",
+    );
+  });
+
+  test("a step to a removed child says it is not there", () => {
+    const { root } = mount([child("p1", "sendingPhoto")], photoQueue, () => ({
+      from: "",
+      event: "uploadConfirmed",
+      to: "",
+      outcome: "missing",
+      actor: { map: "photos", key: "p2" },
+      effects: [],
+      context: null,
+      error: null,
+    }));
+    root
+      .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]')
+      ?.click();
+    expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
+      "p2 is not in photos (it was removed or never added). Nothing ran.",
+    );
+  });
+
+  test("a payload event for a child opens the sheet on the child's edge and sends to it", () => {
+    const withPayload: VizMachine = {
+      ...photoQueue,
+      events: photoQueue.events.map((each) =>
+        each.id === "retryPressed"
+          ? {
+              ...each,
+              payload: [
+                {
+                  name: "note",
+                  type: "string",
+                  optional: false,
+                  doc: null,
+                  input: "text",
+                  choices: [],
+                  sample: "x",
+                },
+              ],
+            }
+          : each,
+      ),
+    };
+    const { root, sent } = mount(
+      [child("p1", "sendingPhoto"), child("p2", "waitingForRetry")],
+      withPayload,
+    );
+    root
+      .querySelector<HTMLButtonElement>('[data-actor="photos[p2]"] [data-send="retryPressed"]')
+      ?.click();
+    expect(sent).toEqual([]);
+    expect(root.querySelector('.payload-sheet [data-payload-form="retryPressed"]')).not.toBeNull();
+    expect(
+      [...root.querySelectorAll("[data-composing]")].map((each) =>
+        each.getAttribute("data-edge-id"),
+      ),
+    ).toEqual(["photos.waitingForRetry-retryPressed-photos.sendingPhoto"]);
+    root.querySelector<HTMLButtonElement>('[data-payload-send="retryPressed"]')?.click();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      kind: "event",
+      event: "retryPressed",
+      actor: { map: "photos", key: "p2" },
+    });
   });
 });
