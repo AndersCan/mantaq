@@ -145,3 +145,11 @@ test("collects console errors", async () => {
     expect(viz.problems()).toEqual(["harness-noise"]);
   });
 }, 60_000);
+
+test("an uncaught error in the page lands in problems", async () => {
+  await withViz(fixture("harness-odd.ts"), async (viz) => {
+    await viz.send("crash");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(viz.problems().join("\n")).toContain("harness-crash");
+  });
+}, 60_000);
