@@ -26,3 +26,8 @@
   border: none;
   border-radius: 0;
 }
+
+/* A clean machine needs no "No design findings." line in the docs. */
+.mantaq-findings[data-count="0"] {
+  display: none;
+}
