@@ -1,6 +1,8 @@
 import type { Snapshot } from "@mantaq/core";
 import { AsyncDirective } from "lit-html/async-directive.js";
-import { directive, type DirectiveResult } from "lit-html/directive.js";
+import { html } from "lit-html";
+import { directive, PartType, type DirectiveResult, type PartInfo } from "lit-html/directive.js";
+import { isDirectiveResult } from "lit-html/directive-helpers.js";
 
 type Watchable<C> = {
   snapshot(): Snapshot<C>;
@@ -18,6 +20,12 @@ class WatchDirective extends AsyncDirective {
   #actor: object | undefined;
   #source: Source | undefined;
   #unsubscribe: (() => void) | undefined;
+  readonly #inChild: boolean;
+
+  constructor(info: PartInfo) {
+    super(info);
+    this.#inChild = info.type === PartType.CHILD;
+  }
 
   render(source: Source): unknown {
     this.#source = source;
@@ -26,7 +34,7 @@ class WatchDirective extends AsyncDirective {
       this.#actor = source.actor;
       if (this.isConnected) this.#start();
     }
-    return source.read();
+    return this.#read(source);
   }
 
   disconnected(): void {
@@ -35,7 +43,13 @@ class WatchDirective extends AsyncDirective {
 
   reconnected(): void {
     this.#start();
-    if (this.#source) this.setValue(this.#source.read());
+    if (this.#source) this.setValue(this.#read(this.#source));
+  }
+
+  // A directive returned by `select` gets its own template part, so lit disconnects it when this part is cleared (lit unlinks nested directive chains that get shorter).
+  #read(source: Source): unknown {
+    const value = source.read();
+    return this.#inChild && isDirectiveResult(value) ? html`${value}` : value;
   }
 
   #start(): void {
@@ -44,7 +58,7 @@ class WatchDirective extends AsyncDirective {
     let seeding = true;
     this.#unsubscribe = source.listen(() => {
       if (seeding || !this.#source) return;
-      this.setValue(this.#source.read());
+      this.setValue(this.#read(this.#source));
     });
     seeding = false;
   }
