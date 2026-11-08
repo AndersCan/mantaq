@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.29.0
+
+<sub>2026-11-08</sub>
+
+- _(minor)_
+  The machines overview names, on each app-code connection, the receiver's states that have no handler for the event it sends.
+
 ## 0.28.0
 
 <sub>2026-11-08</sub>
