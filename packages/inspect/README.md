@@ -34,6 +34,8 @@ On the dev server, click a state or an arrow to leave a note; it is saved in `<m
 
 The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
 
+Effects do not run on the live page: the driver holds them and the panel asks what each one reports. The initial state's effects are the exception (core runs them while the actor is built). `createDriver(target, { effectMode: "real" })` from `@mantaq/inspect/drive` runs them.
+
 `vite build` with the plugin also writes the page as a static site: `index.html`, `viz.json` and a script under `base` (set `base: "/"` to put them at the output root). Machines load through your Vite config, and the fuzz runs at build time.
 
 Options: `base` (default `/__mantaq/`), `fuzz` (`false`, or `{ seed, iterations, timeLimitMs }`).

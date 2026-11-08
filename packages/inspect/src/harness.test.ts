@@ -160,3 +160,27 @@ test("an uncaught error in the page lands in problems", async () => {
     expect(viz.problems().join("\n")).toContain("harness-crash");
   });
 }, 60_000);
+
+test("submitPayment waits in submitting with its three reports", async () => {
+  await withViz(checkout, async (viz) => {
+    const state = async (event: string) =>
+      Either.getRight(await viz.send(event))?.state ?? `no ${event}`;
+    expect(await state("submitBasicInfo")).toBe("shippingAddress");
+    expect(await state("submitShipping")).toBe("payment");
+    expect(await state("submitPayment")).toBe("submitting");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(await viz.state()).toBe("submitting");
+    expect(await viz.waiting()).toEqual([
+      { effect: "chargeCard", reports: ["paymentOk", "paymentFail", "paymentTimeout"] },
+    ]);
+    expect(await viz.text()).toContain("Waiting for chargeCard");
+    expect(await state("paymentFail")).toBe("error");
+    expect(await state("back")).toBe("payment");
+    expect(await state("submitPayment")).toBe("submitting");
+    expect(await state("paymentTimeout")).toBe("error");
+    expect(await state("back")).toBe("payment");
+    expect(await state("submitPayment")).toBe("submitting");
+    expect(await state("paymentOk")).toBe("success");
+    expect(viz.problems()).toEqual([]);
+  });
+}, 60_000);

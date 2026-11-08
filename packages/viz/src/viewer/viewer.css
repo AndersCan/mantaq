@@ -628,3 +628,9 @@
   padding: 2px 6px;
   border-bottom: 1px solid var(--state-border);
 }
+
+.viz .explore-waiting {
+  border-left: 3px solid var(--accent);
+  padding: 4px 8px;
+  margin: 8px 0;
+}

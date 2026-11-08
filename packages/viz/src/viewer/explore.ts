@@ -47,12 +47,20 @@ function code(doc: Document, text: string): HTMLElement {
 function button(
   doc: Document,
   label: ReadonlyArray<Node | string>,
-  context: { onClick: () => void; disabled?: boolean; attrs?: Record<string, string> },
+  context: {
+    onClick: () => void;
+    disabled?: boolean;
+    attrs?: Record<string, string>;
+  },
 ): HTMLButtonElement {
   const element = html(
     doc,
     "button",
-    { type: "button", disabled: context.disabled ? "" : null, ...context.attrs },
+    {
+      type: "button",
+      disabled: context.disabled ? "" : null,
+      ...context.attrs,
+    },
     label,
   );
   element.addEventListener("click", context.onClick);
@@ -145,7 +153,7 @@ function effectsSection(doc: Document, machine: VizMachine, current: string): HT
       : html(doc, "p", { class: "explore-warning", role: "note" }, [
           `No handler in ${current} for `,
           ...unhandled.flatMap((each, index) => [index === 0 ? "" : ", ", code(doc, each.event)]),
-          ": the actor ignores it.",
+          ": in your app, an effect sending it puts the machine in its error state.",
         ]),
   ]);
 }
@@ -153,7 +161,11 @@ function effectsSection(doc: Document, machine: VizMachine, current: string): HT
 function movesSection(
   doc: Document,
   moves: ReadonlyArray<Move>,
-  context: { current: string; final: boolean; take: (step: ExploreStep) => void },
+  context: {
+    current: string;
+    final: boolean;
+    take: (step: ExploreStep) => void;
+  },
 ): HTMLElement {
   if (context.final) {
     return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
@@ -267,7 +279,10 @@ function timersSection(
     html(doc, "div", {}, [
       input,
       " ms ",
-      button(doc, ["advance"], { onClick: advance, attrs: { "data-advance": "" } }),
+      button(doc, ["advance"], {
+        onClick: advance,
+        attrs: { "data-advance": "" },
+      }),
     ]),
     problem,
   ]);
@@ -367,7 +382,10 @@ function fillPicker(
   },
 ): HTMLElement {
   const { fields, inputs, sources } = context;
-  const select = html(doc, "select", { "data-fill-from": "", "aria-label": "Values from" });
+  const select = html(doc, "select", {
+    "data-fill-from": "",
+    "aria-label": "Values from",
+  });
   sources.forEach((source, index) => {
     const values = source.values.map((each) => `${each.field} ${shown(each.value)}`);
     select.append(
@@ -411,7 +429,11 @@ function fieldsForm(
   const inputs = new Map(fields.map((field) => [field.name, fieldInput(doc, field)] as const));
   const sources = context.live === null ? [] : fillSources(fields, context.live);
   const fill = sources.length === 0 ? null : fillPicker(doc, { fields, inputs, sources });
-  const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" });
+  const problem = html(doc, "p", {
+    class: "explore-warning",
+    role: "alert",
+    hidden: "",
+  });
   const submit = () => {
     const read = readFields(fields, inputs);
     if ("bad" in read || "missing" in read) {
@@ -471,7 +493,11 @@ export function payloadForm(
 ): HTMLElement {
   const { event, samples } = context;
   if (context.fields !== null && context.fields.length > 0) {
-    return fieldsForm(doc, { ...context, fields: context.fields, live: context.live ?? null });
+    return fieldsForm(doc, {
+      ...context,
+      fields: context.fields,
+      live: context.live ?? null,
+    });
   }
   const first = samples[0];
   const box = html(doc, "textarea", {
@@ -510,7 +536,10 @@ export function payloadForm(
               onClick: () => {
                 box.value = JSON.stringify(sample);
               },
-              attrs: { "data-sample": String(index), title: JSON.stringify(sample) },
+              attrs: {
+                "data-sample": String(index),
+                title: JSON.stringify(sample),
+              },
             }),
           ),
         ),
@@ -529,6 +558,153 @@ export function payloadForm(
   ]);
 }
 
+/** One sendable event: a button that sends it, or opens its payload form. */
+function sendItem(
+  doc: Document,
+  machine: VizMachine,
+  context: { live: LiveMoves; moves: Move[]; event: string; tagged: boolean },
+): HTMLElement {
+  const { live, moves, event, tagged } = context;
+  // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
+  const asks = asksForPayload(machine, event);
+  const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
+  const move = moves.find((each) => each.edge.event === event);
+  return html(doc, "li", { "data-send-item": event }, [
+    button(doc, [code(doc, event), asks ? " …" : ""], {
+      onClick: () =>
+        asks ? live.compose(event) : live.send({ kind: "event", event, payload: null }),
+      attrs: { "data-send": event },
+    }),
+    asks || declared !== null
+      ? null
+      : button(doc, ["with payload"], {
+          onClick: () => live.compose(event),
+          attrs: { class: "link", "data-send-custom": event },
+        }),
+    move === undefined
+      ? html(doc, "span", { class: "muted", "data-ignored": "" }, [
+          ` ignored in ${live.state.state}`,
+        ])
+      : null,
+    !tagged || move === undefined || move.sentBy.length === 0
+      ? null
+      : html(doc, "span", { class: "muted", "data-sent-by": move.sentBy.join(",") }, [
+          ` from ${move.sentBy.join(", ")}`,
+        ]),
+    move === undefined ? null : docNote(doc, { text: move.edge.doc, scope: "edge" }),
+  ]);
+}
+
+type StateEffects = VizMachine["states"][number]["effects"];
+
+interface WaitingEffect {
+  /** The state the effect belongs to: the top-level state or a region's current state. */
+  from: string;
+  effect: StateEffects[number];
+}
+
+/** The held effects of the current state and of each region's current state that still wait for an answer. */
+function waitingEffects(machine: VizMachine, state: VizLiveState): WaitingEffect[] {
+  if (state.effectMode !== "held") return [];
+  return [state.state, ...Object.values(state.regions)].flatMap((from) => {
+    const effects = machine.states.find((each) => each.id === from)?.effects ?? [];
+    return state.waiting.flatMap((name) =>
+      effects.filter((effect) => effect.name === name).map((effect) => ({ from, effect })),
+    );
+  });
+}
+
+/** Events offered inside a waiting block of the top-level state; the groups leave them out. */
+function waitingReports(machine: VizMachine, state: VizLiveState): Set<string> {
+  const handled = new Set(movesFrom(machine, state.state).map((move) => move.edge.event));
+  return new Set(
+    waitingEffects(machine, state)
+      .filter((each) => each.from === state.state)
+      .flatMap((each) => (each.effect.sends ?? []).filter((event) => handled.has(event))),
+  );
+}
+
+/** Held effects first: what each one did not do, and what it reports. */
+function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): HTMLElement[] {
+  if (live.state.effectMode !== "held" || live.final) return [];
+  const { state } = live;
+  const current = state.state;
+  const effects = machine.states.find((each) => each.id === current)?.effects ?? [];
+  const waiting = waitingEffects(machine, state);
+  const blocks = waiting
+    .filter(({ effect }) => effect.sends === null || effect.sends.length > 0)
+    .map(({ from, effect }, index) => {
+      const sends = effect.sends;
+      const moves = movesFrom(machine, from);
+      const handled = new Set(moves.map((move) => move.edge.event));
+      const effectDoc = machine.edges.find(
+        (edge) => edge.kind === "effect" && edge.from === from,
+      )?.doc;
+      return html(
+        doc,
+        "section",
+        {
+          class: "explore-waiting",
+          "data-waiting-on": effect.name,
+          role: "status",
+        },
+        [
+          html(doc, "h3", {}, ["Waiting for ", code(doc, effect.name)]),
+          index === 0 || from !== current
+            ? docNote(doc, { text: effectDoc ?? null, scope: "edge" })
+            : null,
+          sends === null
+            ? html(doc, "p", {}, [
+                "It did not run, and it does not declare what it reports (",
+                code(doc, "sends"),
+                "). Pick its answer under Other internal events.",
+              ])
+            : html(doc, "p", {}, ["It did not run. Pick what it reports:"]),
+          sends === null
+            ? null
+            : html(
+                doc,
+                "ul",
+                { "data-group": "effect" },
+                sends.map((event) =>
+                  handled.has(event)
+                    ? sendItem(doc, machine, {
+                        live,
+                        moves,
+                        event,
+                        tagged: false,
+                      })
+                    : html(doc, "li", { "data-send-item": event, "data-unhandled": "" }, [
+                        code(doc, event),
+                        ` is not handled in ${from}. In your app, ${effect.name} sending it puts the machine in its error state.`,
+                      ]),
+                ),
+              ),
+        ],
+      );
+    });
+  const quiet = waiting
+    .filter(({ effect }) => effect.sends !== null && effect.sends.length === 0)
+    .map(({ effect }) =>
+      html(doc, "p", { class: "muted", "data-held-quiet": effect.name }, [
+        code(doc, effect.name),
+        " did not run. It reports nothing, so there is nothing to answer.",
+      ]),
+    );
+  const ranForReal =
+    current !== machine.initial
+      ? []
+      : effects
+          .filter((effect) => !state.waiting.includes(effect.name))
+          .map((effect) =>
+            html(doc, "p", { class: "muted", "data-ran-for-real": effect.name }, [
+              code(doc, effect.name),
+              " ran for real: a machine runs its first state's effects while it is built, before the viz can hold them. What it reports arrives on its own.",
+            ]),
+          );
+  return [...blocks, ...quiet, ...ranForReal];
+}
+
 function liveMovesSection(doc: Document, machine: VizMachine, live: LiveMoves): HTMLElement {
   const current = live.state.state;
   if (live.final) {
@@ -540,36 +716,10 @@ function liveMovesSection(doc: Document, machine: VizMachine, live: LiveMoves): 
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
   const inputs = machine.events.filter((event) => !event.internal).map((event) => event.id);
-  const events = [...new Set([...handled, ...inputs])].sort();
+  const shown = waitingReports(machine, live.state);
+  const events = [...new Set([...handled, ...inputs])].filter((event) => !shown.has(event)).sort();
   const groups: MoveGroup[] = ["input", "effect", "internal"];
-  const item = (event: string) => {
-    // An event with payload fields, or one fuzzing sent a payload with, asks for it; the rest send at once.
-    const asks = asksForPayload(machine, event);
-    const declared = machine.events.find((each) => each.id === event)?.payload ?? null;
-    const move = moves.find((each) => each.edge.event === event);
-    return html(doc, "li", { "data-send-item": event }, [
-      button(doc, [code(doc, event), asks ? " …" : ""], {
-        onClick: () =>
-          asks ? live.compose(event) : live.send({ kind: "event", event, payload: null }),
-        attrs: { "data-send": event },
-      }),
-      asks || declared !== null
-        ? null
-        : button(doc, ["with payload"], {
-            onClick: () => live.compose(event),
-            attrs: { class: "link", "data-send-custom": event },
-          }),
-      handled.has(event)
-        ? null
-        : html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`]),
-      move === undefined || move.sentBy.length === 0
-        ? null
-        : html(doc, "span", { class: "muted", "data-sent-by": move.sentBy.join(",") }, [
-            ` from ${move.sentBy.join(", ")}`,
-          ]),
-      move === undefined ? null : docNote(doc, { text: move.edge.doc, scope: "edge" }),
-    ]);
-  };
+  const item = (event: string) => sendItem(doc, machine, { live, moves, event, tagged: true });
   const groupOf = (event: string): MoveGroup =>
     moves.find((each) => each.edge.event === event)?.group ?? "input";
   return html(
@@ -620,7 +770,11 @@ function fieldValue(value: VizJson, name: string): string {
 /** One row per declared context field: meaning and value now, changed ones marked. */
 function fieldsTable(
   doc: Document,
-  context: { fields: ReadonlyArray<VizField>; value: VizJson; previous: VizJson | undefined },
+  context: {
+    fields: ReadonlyArray<VizField>;
+    value: VizJson;
+    previous: VizJson | undefined;
+  },
 ): HTMLElement {
   const { fields, value, previous } = context;
   const head = ["Field", "Type", "Meaning", "Now"];
@@ -643,7 +797,10 @@ function fieldsTable(
         return html(
           doc,
           "tr",
-          { "data-context-field": field.name, "data-context-changed": changed ? "" : null },
+          {
+            "data-context-field": field.name,
+            "data-context-changed": changed ? "" : null,
+          },
           [
             html(doc, "td", {}, [code(doc, field.name)]),
             html(doc, "td", {}, [code(doc, field.type)]),
@@ -661,7 +818,11 @@ function fieldsTable(
 /** The declared fields as a table, or the pretty-printed context with changed lines marked. */
 function contextSection(
   doc: Document,
-  context: { machine: VizMachine; value: VizJson; previous: VizJson | undefined },
+  context: {
+    machine: VizMachine;
+    value: VizJson;
+    previous: VizJson | undefined;
+  },
 ): HTMLElement {
   const { machine, value, previous } = context;
   const note = html(doc, "p", { class: "muted", "data-context-note": "" }, [
@@ -727,7 +888,12 @@ function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
 
 function stepLines(
   doc: Document,
-  context: { machine: VizMachine; step: VizLiveStep; before: VizJson | undefined },
+  context: {
+    machine: VizMachine;
+    step: VizLiveStep;
+    before: VizJson | undefined;
+    held: boolean;
+  },
 ): Array<HTMLElement | null> {
   const { machine, step, before } = context;
   const because = becauseOf(machine, step);
@@ -758,7 +924,7 @@ function stepLines(
     changed.length === 0
       ? null
       : html(doc, "p", { "data-live-changed": "" }, [`Changed: ${changed.join(", ")}`]),
-    step.effects.length === 0
+    step.effects.length === 0 || context.held
       ? null
       : html(doc, "p", { "data-live-effects": "" }, [
           "Effects started: ",
@@ -769,20 +935,32 @@ function stepLines(
 
 function liveResultSection(
   doc: Document,
-  live: { machine: VizMachine; state: VizLiveState; previous: VizJson | undefined },
+  live: {
+    machine: VizMachine;
+    state: VizLiveState;
+    previous: VizJson | undefined;
+  },
 ): HTMLElement {
   const { machine, state, previous } = live;
   const { last, after } = state;
+  const held = state.effectMode === "held";
   return html(doc, "div", { class: "explore-live" }, [
     last === null
       ? html(doc, "p", { class: "muted" }, ["Nothing has run yet."])
       : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
-          ...stepLines(doc, { machine, step: last, before: previous }),
+          ...stepLines(doc, { machine, step: last, before: previous, held }),
           last.error === null
             ? null
-            : html(doc, "p", { class: "explore-warning", role: "alert", "data-live-error": "" }, [
-                `Handler threw: ${last.error}`,
-              ]),
+            : html(
+                doc,
+                "p",
+                {
+                  class: "explore-warning",
+                  role: "alert",
+                  "data-live-error": "",
+                },
+                [`Handler threw: ${last.error}`],
+              ),
           ...after.map((step, index) =>
             html(doc, "div", { "data-live-after": "" }, [
               html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"]),
@@ -790,13 +968,18 @@ function liveResultSection(
                 machine,
                 step,
                 before: (index === 0 ? last : after[index - 1])?.context,
+                held,
               }),
               step.error === null
                 ? null
                 : html(
                     doc,
                     "p",
-                    { class: "explore-warning", role: "alert", "data-live-error": "" },
+                    {
+                      class: "explore-warning",
+                      role: "alert",
+                      "data-live-error": "",
+                    },
                     [`Handler threw: ${step.error}`],
                   ),
             ]),
@@ -855,6 +1038,48 @@ export interface ExploreParts {
   path: HTMLElement;
 }
 
+function liveNote(doc: Document, state: VizLiveState): HTMLElement {
+  return html(
+    doc,
+    "p",
+    {
+      class: "explore-note",
+      "data-live-note": "",
+      "data-effect-mode": state.effectMode,
+    },
+    [
+      state.effectMode === "held"
+        ? "This machine runs here, in your browser, but its effects do not: when a state starts one, the viz waits and you pick what it reports. Timers wait until you advance them."
+        : "This machine runs here, in your browser, with its effects. Timers wait until you advance them.",
+    ],
+  );
+}
+
+type LiveContext = NonNullable<ExploreContext["live"]>;
+
+/** Live walk, under "In <state>": held effects, the last result, then what can be sent. */
+function liveBody(
+  doc: Document,
+  machine: VizMachine,
+  context: { live: LiveContext; final: boolean },
+): Array<HTMLElement | null> {
+  const { live, final } = context;
+  const { state } = live;
+  const moves: LiveMoves = {
+    state,
+    send: live.send,
+    final,
+    compose: live.compose,
+  };
+  return [
+    ...waitingSections(doc, machine, moves),
+    liveResultSection(doc, { machine, state, previous: live.previous }),
+    state.effectMode === "held" ? null : effectsSection(doc, machine, state.state),
+    liveMovesSection(doc, machine, moves),
+    final ? null : timersSection(doc, { state, send: live.send }),
+  ];
+}
+
 /** The walk, split for the panel's tabs. */
 export function explorePanel(doc: Document, context: ExploreContext): ExploreParts {
   const { machine, path, live } = context;
@@ -864,29 +1089,23 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
   const step = html(
     doc,
     "section",
-    { class: "explore", "data-current": current, "data-done": final ? "" : null },
+    {
+      class: "explore",
+      "data-current": current,
+      "data-done": final ? "" : null,
+    },
     [
-      live
-        ? html(doc, "p", { class: "explore-note", "data-live-note": "" }, [
-            "The real machine runs here, in your browser. Effects run with the defaults the machine uses when it is built from a clock alone. While a state's effect runs, you can answer for it: pick what it reports under Effect reports back. Time stands still: timers fire only when you advance them.",
-          ])
-        : null,
+      live ? liveNote(doc, live.state) : null,
       ...nowSection(doc, machine, { current, final }),
       ...(live
-        ? [
-            liveResultSection(doc, { machine, state: live.state, previous: live.previous }),
-            effectsSection(doc, machine, current),
-            liveMovesSection(doc, machine, {
-              state: live.state,
-              send: live.send,
-              final,
-              compose: live.compose,
-            }),
-            final ? null : timersSection(doc, { state: live.state, send: live.send }),
-          ]
+        ? liveBody(doc, machine, { live, final })
         : [
             effectsSection(doc, machine, current),
-            movesSection(doc, movesFrom(machine, current), { current, final, take: context.take }),
+            movesSection(doc, movesFrom(machine, current), {
+              current,
+              final,
+              take: context.take,
+            }),
           ]),
       html(doc, "div", { class: "explore-controls" }, [
         button(doc, ["Back"], {
@@ -905,7 +1124,11 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
   return {
     step,
     context: live
-      ? contextSection(doc, { machine, value: live.state.context, previous: live.previous })
+      ? contextSection(doc, {
+          machine,
+          value: live.state.context,
+          previous: live.previous,
+        })
       : null,
     path: historySection(doc, context),
   };
@@ -929,7 +1152,11 @@ function historySection(doc: Document, context: ExploreContext): HTMLElement {
  */
 export function clickStep(
   machine: VizMachine,
-  context: { path: ReadonlyArray<ExploreStep>; selection: Selection; live?: string },
+  context: {
+    path: ReadonlyArray<ExploreStep>;
+    selection: Selection;
+    live?: string;
+  },
 ): ExploreStep | null {
   const current = context.live ?? stateAfter(machine, context.path);
   if (current === null) return null;
@@ -947,7 +1174,11 @@ export function clickStep(
 /** Mark the walk on the drawn graph: current state, path taken, possible next steps. */
 export function markExplore(
   root: HTMLElement,
-  context: { machine: VizMachine; path: ReadonlyArray<ExploreStep>; live?: string },
+  context: {
+    machine: VizMachine;
+    path: ReadonlyArray<ExploreStep>;
+    live?: string;
+  },
 ): void {
   const { machine, path } = context;
   const current = context.live ?? stateAfter(machine, path);
