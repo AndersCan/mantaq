@@ -1,6 +1,8 @@
 import { createReceiverActor } from "../fixtures/wired/receiver.ts";
 import { createSenderActor } from "../fixtures/wired/sender.ts";
 import { inspectModule } from "../inspect.ts";
+import { createDuoActor } from "../fixtures/wired-unheard/duo.ts";
+import { createQuietActor } from "../fixtures/wired/quiet.ts";
 import { createSketchActor } from "../fixtures/wired/sketch.ts";
 import { findWires, scanAppCode } from "./wires.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -12,6 +14,7 @@ const DIR = join(import.meta.dirname, "..", "fixtures", "wired");
 const ROOT = join(import.meta.dirname, "..", "fixtures");
 const files = ["sender.ts", "receiver.ts"].map((name) => join(DIR, name));
 const sketch = join(DIR, "sketch.ts");
+const quiet = join(DIR, "quiet.ts");
 
 async function machines() {
   const sender = await inspectModule(files[0] ?? "", {
@@ -49,6 +52,24 @@ describe("scanAppCode", () => {
     expect(scanned.wires).toHaveLength(3);
   });
 
+  test("lists the output no listener hears, hearing every output of an unguarded listener", async () => {
+    const sketched = await inspectModule(sketch, {
+      load: async () => ({ createSketchActor }),
+      fuzz: false,
+    });
+    const quieted = await inspectModule(quiet, {
+      load: async () => ({ createQuietActor }),
+      fuzz: false,
+    });
+    const all = [...(await machines()), ...sketched.machines, ...quieted.machines];
+    const scanned = scanAppCode({ root: ROOT, files: [...files, sketch, quiet], machines: all });
+    expect(scanned.unheard).toEqual([{ id: "quiet", outputs: ["unheard"] }]);
+    expect(scanned.notRun).toEqual([
+      { id: "sketch", factory: "createSketchActor", file: "wired/sketch.ts" },
+    ]);
+    expect(scanned.wires).toHaveLength(3);
+  });
+
   test("a machine exported only as an instance is never listed", async () => {
     const edges = join(ROOT, "wired-edges", "edges.ts");
     const scanned = scanAppCode({ root: ROOT, files: [edges], machines: await machines() });
@@ -76,6 +97,74 @@ describe("scanAppCode", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("scanAppCode unheard outputs", () => {
+  const UNHEARD = join(ROOT, "wired-unheard");
+  const duo = join(UNHEARD, "duo.ts");
+  const header =
+    'import { createDuoActor } from "../duo.ts";\nconst actor = createDuoActor();\nfunction note(): void {}\n';
+
+  async function unheardWith(listeners: string | null) {
+    const dir = mkdtempSync(join(UNHEARD, "tmp-"));
+    try {
+      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
+      if (listeners !== null) writeFileSync(join(dir, "use.ts"), header + listeners);
+      const duoed = await inspectModule(duo, {
+        load: async () => ({ createDuoActor }),
+        fuzz: false,
+      });
+      const used = listeners === null ? [] : [join(dir, "use.ts")];
+      return scanAppCode({ root: ROOT, files: [duo, ...used], machines: duoed.machines });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  test("a machine no app code runs gets a not-run entry and no unheard entry", async () => {
+    const scanned = await unheardWith(null);
+    expect(scanned.notRun.map((each) => each.id)).toEqual(["duo"]);
+    expect(scanned.unheard).toEqual([]);
+  });
+
+  test("a change listener hears no output", async () => {
+    const scanned = await unheardWith('actor.on("change", { fn: () => note() });\n');
+    expect(scanned.unheard).toEqual([{ id: "duo", outputs: ["a", "b"] }]);
+  });
+
+  test("outputs named in two listeners are both heard", async () => {
+    const scanned = await unheardWith(
+      'actor.on("output", { fn: (e) => { if (e.type === "a") note(); } });\n' +
+        'actor.on("output", { fn: (e) => { if (e.type === "b") note(); } });\n',
+    );
+    expect(scanned.unheard).toEqual([]);
+  });
+
+  test("one listener naming one output leaves the other unheard", async () => {
+    const scanned = await unheardWith(
+      'actor.on("output", { fn: (e) => { if (e.type === "a") note(); } });\n',
+    );
+    expect(scanned.unheard).toEqual([{ id: "duo", outputs: ["b"] }]);
+  });
+
+  test("a comparison on a value that is not .type names no output", async () => {
+    const scanned = await unheardWith(
+      'actor.on("output", { fn: (e) => { const kind: string = e.type; if (kind === "a") note(); } });\n',
+    );
+    expect(scanned.unheard).toEqual([]);
+  });
+
+  test("a listener that checks no output by name hears all of them", async () => {
+    const scanned = await unheardWith('actor.on("output", { fn: () => note() });\n');
+    expect(scanned.unheard).toEqual([]);
+  });
+
+  test("a checked if with an else hears every output", async () => {
+    const scanned = await unheardWith(
+      'actor.on("output", { fn: (e) => { if (e.type === "a") note(); else note(); } });\n',
+    );
+    expect(scanned.unheard).toEqual([]);
   });
 });
 

@@ -63,6 +63,16 @@ const line = (points) =>
       ))
     }
     {
+      overview.unheard.map((each) => (
+        <g class="unheard" data-from={each.from} data-outputs={each.outputs.join(" ")}>
+          <path d={line(each.points)} marker-end="url(#mantaq-machines-arrow)" />
+          <text x={each.labelAt.x} y={each.labelAt.y} text-anchor="middle">
+            {each.label}
+          </text>
+        </g>
+      ))
+    }
+    {
       boxes.map((box) => (
         <a class="box" href={box.href} data-machine={box.id} data-not-run={box.runs ? undefined : ""}>
           <rect x={box.x} y={box.y} width={box.width} height={box.height} rx="6"></rect>
@@ -75,7 +85,10 @@ const line = (points) =>
   </svg>
   <figcaption>
     An arrow is an event one machine sends out and another takes in. Click a machine to open its
-    page.{overview.notRun.length > 0 && " A dashed machine is not run by the app."}
+    page.{overview.notRun.length > 0 && " A dashed machine is not run by the app."}{
+      overview.unheard.length > 0 &&
+        " A dashed arrow to no machine is an output no app code listens to."
+    }
   </figcaption>
   {
     overview.wires.length > 0 && (
@@ -117,6 +130,9 @@ const line = (points) =>
   .mantaq-machines text {
     fill: currentColor;
     dominant-baseline: middle;
+  }
+  .mantaq-machines .unheard path {
+    stroke-dasharray: 4 3;
   }
   .mantaq-machines .link text {
     font-size: 0.8em;
