@@ -5,21 +5,30 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, test } from "vite-plus/test";
 import { EXAMPLE_ROOT } from "./examples.ts";
 import { inspectModule } from "./inspect.ts";
+import { normalizeRun } from "./runs.ts";
+import type { FuzzTarget } from "./fuzz/run.ts";
+import { VirtualClock } from "@mantaq/core";
+import { Either } from "@mantaq/utils";
+import { createCheckoutActor } from "../../../apps/docs/src/content/docs/checkout.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, "..");
 const SCRATCH = mkdtempSync(join(PACKAGE, ".record-"));
 afterAll(() => rmSync(SCRATCH, { recursive: true, force: true }));
 
-function testFile(dir: string, body: string): string {
+function testFile(
+  dir: string,
+  body: string,
+  { fixture, factory } = { fixture: join(HERE, "fixtures/timed.ts"), factory: "createTimedActor" },
+): string {
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, "a.test.ts"),
     `import { VirtualClock } from "@mantaq/core";
 import { expect, test } from "vitest";
 import { recordRuns } from ${JSON.stringify(join(HERE, "record.ts"))};
-import { createTimedActor } from ${JSON.stringify(join(HERE, "fixtures/timed.ts"))};
-const make = recordRuns(createTimedActor);
+import { ${factory} } from ${JSON.stringify(fixture)};
+const make = recordRuns(${factory});
 ${body}`,
   );
   return join(dir, "__runs__", "a.test.json");
@@ -148,6 +157,51 @@ test("empty", () => { make().send({ type: "start", payload: {} } as never); });`
     };
     expect(recorded.timed.map((each) => each.name)).toEqual(["empty"]);
     expect(recorded.timed[0]?.steps[0]?.payload).toEqual({});
+  });
+
+  test("an injected effect answer is recorded and replays to the same end", () => {
+    const dir = join(SCRATCH, "answer");
+    const file = testFile(
+      dir,
+      `test("card declined", async () => {
+  const { actor } = make({ clock: VirtualClock() });
+  actor.send({ type: "submitBasicInfo", payload: { email: "a@b.c", name: "Ann" } });
+  actor.send({ type: "submitShipping", payload: { street: "1 Main", city: "Oslo", zip: "0150" } });
+  actor.send({ type: "submitPayment", payload: { cardNumber: "4242" } });
+  actor.inject({ type: "paymentFail", payload: { reason: "Card declined" } });
+  await actor.settled();
+  expect(actor.state.name).toBe("error");
+});`,
+      {
+        fixture: join(EXAMPLE_ROOT, "apps/docs/src/content/docs/checkout.ts"),
+        factory: "createCheckoutActor",
+      },
+    );
+    const ran = run(dir, {});
+    expect(ran.ok).toBe(true);
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as {
+      checkout: Parameters<typeof normalizeRun>[1][];
+    };
+    const walk = recorded.checkout.find((each) => each.name === "card declined");
+    if (walk === undefined) throw new Error("card declined not recorded");
+    expect(walk.end).toBe("error");
+    expect(walk.steps).toHaveLength(4);
+    expect(walk.steps.at(-1)).toEqual({
+      kind: "event",
+      event: "paymentFail",
+      payload: { reason: "Card declined" },
+    });
+    expect(walk.steps.some((step) => step.kind === "event" && step.event === "paymentOk")).toBe(
+      false,
+    );
+    const target: FuzzTarget = {
+      id: "checkout",
+      create: () => {
+        const clock = VirtualClock();
+        return { actor: createCheckoutActor({ clock }).actor, clock };
+      },
+    };
+    expect(normalizeRun(target, walk)).toEqual(Either.right(walk.steps));
   });
 
   test("inspect shows the recorded runs on the fixture", async () => {
