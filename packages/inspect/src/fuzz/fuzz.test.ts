@@ -8,6 +8,8 @@ import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import { serializeViz, VIZ_SCHEMA_VERSION, parseViz } from "@mantaq/viz";
 import type { VizStep } from "@mantaq/viz";
 import { fuzz, shrink } from "./fuzz.ts";
+import { aliveAt, mutate } from "./mutate.ts";
+import { createRng } from "./rng.ts";
 import { execute } from "./run.ts";
 import type { FuzzTarget } from "./run.ts";
 import { fuzzedMachine } from "./to-viz.ts";
@@ -324,5 +326,100 @@ describe("fuzz budget", () => {
     expect(result.stopped).toBe("covered");
     expect(result.iterations).toBeLessThan(100_000);
     expect(unreached(fuzzedMachine(checkout, result))).toEqual([]);
+  });
+});
+
+describe("aliveAt", () => {
+  const children = [
+    { map: "photos", key: "p1", from: 0, until: 2 },
+    { map: "photos", key: "p2", from: 1, until: null },
+  ];
+  const keys = (at: number) => aliveAt(children, at).map((each) => each.key);
+
+  test("lists children started before the position and not gone by it", () => {
+    expect(keys(0)).toEqual([]);
+    expect(keys(1)).toEqual(["p1"]);
+    expect(keys(2)).toEqual(["p1", "p2"]);
+    expect(keys(3)).toEqual(["p2"]);
+  });
+
+  test("a child that existed before the first step is alive at 0", () => {
+    expect(aliveAt([{ map: "photos", key: "p0", from: -1, until: null }], 0)).toHaveLength(1);
+  });
+});
+
+describe("mutate with map children", () => {
+  const context = (seed: number) => ({
+    rng: createRng(seed),
+    events: [{ event: "photoAdded" }],
+    childEvents: [{ map: "photos", event: "uploadConfirmed" }],
+    payloads: {},
+    literals: { numbers: [], strings: [] },
+    maxLength: 24,
+    repeat: false,
+  });
+  const empty = { contextSteps: [], loopStarts: [] };
+
+  test("without a live child no step names the child's events", () => {
+    for (let seed = 1; seed <= 50; seed += 1) {
+      const steps = mutate({ ...empty, steps: [], children: [] }, context(seed));
+      for (const step of steps) {
+        if (step.kind === "event") expect(step.event).toBe("photoAdded");
+      }
+    }
+  });
+
+  test("with a live child, child steps name its key", () => {
+    const seen: VizStep[] = [];
+    const children = [{ map: "photos", key: "p1", from: 0, until: null }];
+    const steps: VizStep[] = [{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }];
+    for (let seed = 1; seed <= 200; seed += 1) {
+      seen.push(...mutate({ ...empty, steps, children }, context(seed)));
+    }
+    const sent = seen.filter((step) => step.kind === "event" && step.event === "uploadConfirmed");
+    expect(sent.length).toBeGreaterThan(0);
+    for (const step of sent) {
+      expect(step.kind === "event" ? step.actor : undefined).toEqual({ map: "photos", key: "p1" });
+    }
+  });
+
+  test("a child gone before any insert position gets no steps", () => {
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const steps = mutate(
+        {
+          ...empty,
+          steps: [{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }],
+          children: [{ map: "photos", key: "p1", from: 0, until: 0 }],
+        },
+        context(seed),
+      );
+      expect(steps.some((s) => s.kind === "event" && s.event === "uploadConfirmed")).toBe(false);
+    }
+  });
+
+  test("a child step goes to a child of the map that handles its event", () => {
+    const two = (seed: number) => ({
+      ...context(seed),
+      childEvents: [
+        { map: "photos", event: "uploadConfirmed" },
+        { map: "notes", event: "noteSaved" },
+      ],
+    });
+    const children = [
+      { map: "photos", key: "p1", from: 0, until: null },
+      { map: "notes", key: "n1", from: 0, until: null },
+    ];
+    const steps: VizStep[] = [{ kind: "event", event: "photoAdded", payload: null }];
+    const owner: Record<string, string> = { uploadConfirmed: "photos", noteSaved: "notes" };
+    const keys: Record<string, string> = { uploadConfirmed: "p1", noteSaved: "n1" };
+    let sent = 0;
+    for (let seed = 1; seed <= 200; seed += 1) {
+      for (const step of mutate({ ...empty, steps, children }, two(seed))) {
+        if (step.kind !== "event" || owner[step.event] === undefined) continue;
+        sent += 1;
+        expect(step.actor).toEqual({ map: owner[step.event], key: keys[step.event] });
+      }
+    }
+    expect(sent).toBeGreaterThan(0);
   });
 });

@@ -2,7 +2,7 @@ import type { VizExpectation, VizFailedExpectation, VizFuzzError, VizStep } from
 import { mutate } from "./mutate.ts";
 import type { LiteralPool, MutationContext, Parent } from "./mutate.ts";
 import { createRng } from "./rng.ts";
-import { eventCatalog, execute, mergeMissing, regionActors } from "./run.ts";
+import { childEvents, eventCatalog, execute, mergeMissing, regionActors } from "./run.ts";
 import type { FuzzTarget, MissingPayload, Trace } from "./run.ts";
 
 export interface FuzzOptions {
@@ -87,7 +87,8 @@ export function shrink(
 }
 
 function mutationContext(target: FuzzTarget, options: FuzzOptions): MutationContext {
-  const root = target.create().actor;
+  const created = target.create();
+  const root = created.actor;
   const catalog = eventCatalog(root);
   const regionEvents = regionActors(root).flatMap(({ path, actor }) => {
     const each = eventCatalog(actor);
@@ -101,6 +102,7 @@ function mutationContext(target: FuzzTarget, options: FuzzOptions): MutationCont
       ...[...catalog.inputs, ...catalog.internal].sort().map((event) => ({ event })),
       ...regionEvents,
     ],
+    childEvents: childEvents(created.made),
     payloads: target.payloads ?? {},
     literals: options.literals ?? { numbers: [], strings: [] },
     maxLength: options.maxLength ?? 24,
@@ -172,7 +174,7 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   const firstHit = new Map<string, number>();
   const corpus: CorpusEntry[] = [];
   /** Parallel to `corpus`: which steps of each entry changed context, and their cycles. */
-  const loops: Array<Pick<Parent, "contextSteps" | "loopStarts">> = [];
+  const loops: Array<Pick<Parent, "contextSteps" | "loopStarts" | "children">> = [];
 
   const missing: MissingPayload[] = [];
   const progress = { covered: false };
@@ -188,7 +190,11 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
     }
     if (discovered.length > 0 || guided) {
       corpus.push({ steps, discovered, iteration });
-      loops.push({ contextSteps: trace.contextSteps, loopStarts: trace.loopStarts });
+      loops.push({
+        contextSteps: trace.contextSteps,
+        loopStarts: trace.loopStarts,
+        children: trace.children,
+      });
     }
   }
 
@@ -203,6 +209,7 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
       steps: corpus[at]?.steps ?? [],
       contextSteps: loops[at]?.contextSteps ?? [],
       loopStarts: loops[at]?.loopStarts ?? [],
+      children: loops[at]?.children ?? [],
     };
     consider(mutate(parent, context), iteration);
     iteration += 1;
