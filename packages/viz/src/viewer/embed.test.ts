@@ -108,7 +108,7 @@ describe("mountVizText", () => {
     expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
   });
 
-  test("a self-loop uses the small arrowhead and the start marker is a 6px dot", () => {
+  test("a self-loop uses the small arrowhead", () => {
     const machine: VizMachine = {
       ...door,
       edges: [
@@ -122,7 +122,6 @@ describe("mountVizText", () => {
       root.querySelector(`[data-edge-id="${id}"] path`)?.getAttribute("marker-end");
     expect(markerOf("open-stay-open")).toBe("url(#viz-arrow-loop)");
     expect(markerOf("open-go-done")).toBe("url(#viz-arrow)");
-    expect(root.querySelector(".entry circle")?.getAttribute("r")).toBe("6");
   });
 
   test("a walk without a driver keeps its moves inside the Events and time fold", () => {

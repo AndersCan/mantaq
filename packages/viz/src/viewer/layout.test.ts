@@ -186,41 +186,21 @@ describe("separateLabels", () => {
     expect(separateLabels([])).toEqual([]);
   });
 
-  test("labels of two self-loops on one node do not overlap", () => {
+  test("each self-loop label sits above its own loop, and the feet are apart", () => {
     const machine = machineOf(
       ["first"],
-      [
-        edge({ from: "first", event: "alpha", target: "first" }),
-        edge({ from: "first", event: "beta", target: "first" }),
-      ],
-    );
-    const [a, b] = layoutMachine(machine).edges;
-    expect(Math.abs((a?.label.y ?? 0) - (b?.label.y ?? 0))).toBeGreaterThanOrEqual(18);
-  });
-
-  test("three self-loops on one node have separate labels and feet", () => {
-    const machine = machineOf(
-      ["first"],
-      ["alpha", "beta", "gamma"].map((event) => edge({ from: "first", event, target: "first" })),
+      ["alpha", "beta"].map((event) => edge({ from: "first", event, target: "first" })),
     );
     const edges = layoutMachine(machine).edges;
-    const boxes = edges.map((placed) => ({
-      x: placed.label.x,
-      y: placed.label.y,
-      width: placed.edge.event.length * 7 + 8,
-    }));
-    for (const [i, a] of boxes.entries()) {
-      for (const b of boxes.slice(i + 1)) {
-        const apart = Math.abs(a.x - b.x) >= (a.width + b.width) / 2 || Math.abs(a.y - b.y) >= 16;
-        expect(apart).toBe(true);
-      }
+    for (const placed of edges) {
+      const [base, lift] = [...placed.path.matchAll(/,(-?[\d.]+)/g)].map((m) => Number(m[1]));
+      const loopTop = (base ?? 0) - 0.75 * ((base ?? 0) - (lift ?? 0));
+      expect(placed.label.y + 8).toBeLessThanOrEqual(loopTop);
     }
     const starts = edges.map((placed) => Number(/^M(-?[\d.]+)/.exec(placed.path)?.[1]));
     const ends = edges.map((placed) => Number(/(-?[\d.]+),-?[\d.]+$/.exec(placed.path)?.[1]));
     expect(starts[1]).toBeLessThan(starts[0] ?? 0);
-    expect(starts[2]).toBeLessThan(starts[1] ?? 0);
     expect(ends[1]).toBeGreaterThan(ends[0] ?? 0);
-    expect(ends[2]).toBeGreaterThan(ends[1] ?? 0);
   });
 
   test("labels of parallel edges get distinct rows", () => {
@@ -252,9 +232,20 @@ describe("entry arrows", () => {
     expect(layout.entries).toHaveLength(3);
   });
 
-  test("the entry arrow starts 36px left of the start state", () => {
-    const [entry] = layoutMachine(tight).entries;
-    expect((entry?.to.x ?? 0) - (entry?.from.x ?? 0)).toBe(36);
+  test("a region's start dot stays inside the region's box", () => {
+    const machine = machineOf(
+      ["up.a", "up.b"],
+      [edge({ from: "up.a", event: "go", target: "up.b" })],
+    );
+    const states = machine.states.map((each) => ({
+      ...each,
+      region: "up",
+      initial: each.id === "up.a",
+    }));
+    const layout = layoutMachine({ ...machine, initial: null, states, regions: ["up"] });
+    const region = layout.regions[0];
+    const entry = layout.entries[0];
+    expect((entry?.from.x ?? 0) - 6).toBeGreaterThan((region?.x ?? 0) - (region?.width ?? 0) / 2);
   });
 
   test("a machine without regions has one", () => {

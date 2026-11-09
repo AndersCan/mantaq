@@ -318,7 +318,7 @@ function placeEntries(graph: LayoutGraph, machine: VizMachine): MachineLayout["e
   return starts.map((id) => {
     const node = box(graph.node(id));
     const left = node.x - node.width / 2;
-    return { from: { x: left - 36, y: node.y }, to: { x: left, y: node.y } };
+    return { from: { x: left - 28, y: node.y }, to: { x: left, y: node.y } };
   });
 }
 
