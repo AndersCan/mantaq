@@ -114,6 +114,27 @@ export function eventCatalog(actor: AnyActor<unknown>): { inputs: string[]; inte
   };
 }
 
+/**
+ * The events each actor-map child handles, found by starting a probe child:
+ * maps sorted by name, each map's inputs then internal events sorted. A map
+ * whose probe child fails gives none. The probe maps are disposed.
+ */
+export function childEvents(made: unknown): Array<{ map: string; event: string }> {
+  const { maps } = actorMapsOf(made);
+  return Object.entries(maps).flatMap(([map, each]) => {
+    const found = Either.from(() => {
+      each.spawn("example");
+      const child = each.get("example");
+      each.kill("example");
+      if (!isActor(child)) return [];
+      const catalog = eventCatalog(child);
+      return [...catalog.inputs, ...catalog.internal].sort();
+    });
+    Either.from(() => each.dispose());
+    return Either.isLeft(found) ? [] : found[1].map((event) => ({ map, event }));
+  });
+}
+
 /** onAny handlers live under this key in the dispatch map (core builder). */
 const ANY_KEY = "Any";
 

@@ -1,5 +1,6 @@
 import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
 import type { Rng } from "./rng.ts";
+import type { SeenChild } from "./run.ts";
 
 /** Extra values to try at payload leaves (Phase 5 literal seeding). Empty = blind mutation. */
 export interface LiteralPool {
@@ -11,6 +12,8 @@ export interface MutationContext {
   rng: Rng;
   /** Every event the machine declares, root events first, then each region's; `actor` is omitted for the root. */
   events: ReadonlyArray<{ event: string; actor?: VizActorRef }>;
+  /** Events each actor-map child handles, maps sorted by name. Empty without maps. */
+  childEvents: ReadonlyArray<{ map: string; event: string }>;
   payloads: Readonly<Record<string, ReadonlyArray<VizJson>>>;
   literals: LiteralPool;
   maxLength: number;
@@ -24,6 +27,8 @@ export interface Parent {
   contextSteps: ReadonlyArray<number>;
   /** Parallel to `contextSteps`: where the cycle ending at that step starts. */
   loopStarts: ReadonlyArray<number>;
+  /** The map children the parent run started. */
+  children: ReadonlyArray<SeenChild>;
 }
 
 const REPEAT_COUNTS = [2, 3, 5, 8, 13];
@@ -35,19 +40,37 @@ function isObject(value: VizJson): value is { [key: string]: VizJson } {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function freshEvent(context: MutationContext): VizStep {
-  const picked = context.rng.pick(context.events);
+/** The children alive just before step `at`: started earlier and not gone by then. */
+export function aliveAt(children: ReadonlyArray<SeenChild>, at: number): SeenChild[] {
+  return children.filter((child) => child.from < at && (child.until === null || child.until >= at));
+}
+
+function freshEvent(context: MutationContext, alive: ReadonlyArray<SeenChild>): VizStep {
+  const childChoices = context.childEvents.filter((each) =>
+    alive.some((child) => child.map === each.map),
+  );
+  const picked = context.rng.pick<{ event: string; actor?: VizActorRef; map?: string }>([
+    ...context.events,
+    ...childChoices,
+  ]);
   const event = picked?.event ?? "";
   const samples = context.payloads[event] ?? [];
   const payload = context.rng.pick(samples) ?? null;
+  const child =
+    picked?.map === undefined
+      ? undefined
+      : context.rng.pick(alive.filter((each) => each.map === picked.map));
+  if (picked?.map !== undefined && child !== undefined) {
+    return { kind: "event", event, payload, actor: { map: picked.map, key: child.key } };
+  }
   return picked?.actor === undefined
     ? { kind: "event", event, payload }
     : { kind: "event", event, payload, actor: picked.actor };
 }
 
-function freshStep(context: MutationContext): VizStep {
+function freshStep(context: MutationContext, alive: ReadonlyArray<SeenChild>): VizStep {
   if (context.rng.chance(0.1)) return { kind: "advance", ms: context.rng.pick(ADVANCES) ?? 1 };
-  return freshEvent(context);
+  return freshEvent(context, alive);
 }
 
 function mutateNumber(value: number, context: MutationContext): number {
@@ -98,6 +121,12 @@ function replaceAt(steps: VizStep[], at: number, step: VizStep): VizStep[] {
   return steps.map((current, index) => (index === at ? step : current));
 }
 
+type Operator = (
+  steps: VizStep[],
+  context: MutationContext,
+  children: ReadonlyArray<SeenChild>,
+) => VizStep[];
+
 function mutatePayload(steps: VizStep[], context: MutationContext): VizStep[] {
   const withPayload = steps.flatMap((step, index) =>
     step.kind === "event" && step.payload !== null ? [index] : [],
@@ -108,11 +137,15 @@ function mutatePayload(steps: VizStep[], context: MutationContext): VizStep[] {
   return replaceAt(steps, at, { ...step, payload: mutateJson(step.payload, context) });
 }
 
-function insert(steps: VizStep[], context: MutationContext): VizStep[] {
+function insert(
+  steps: VizStep[],
+  context: MutationContext,
+  children: ReadonlyArray<SeenChild>,
+): VizStep[] {
   if (steps.length >= context.maxLength) return steps;
   // Appending is favoured: most new behaviour lives past the current frontier.
   const at = context.rng.chance(0.6) ? steps.length : context.rng.int(steps.length + 1);
-  return [...steps.slice(0, at), freshStep(context), ...steps.slice(at)];
+  return [...steps.slice(0, at), freshStep(context, aliveAt(children, at)), ...steps.slice(at)];
 }
 
 function remove(steps: VizStep[], context: MutationContext): VizStep[] {
@@ -137,7 +170,16 @@ function advance(steps: VizStep[], context: MutationContext): VizStep[] {
   return [...steps.slice(0, at), { kind: "advance", ms }, ...steps.slice(at)];
 }
 
-const OPERATORS = [insert, insert, insert, remove, swap, mutatePayload, mutatePayload, advance];
+const OPERATORS: Operator[] = [
+  insert,
+  insert,
+  insert,
+  remove,
+  swap,
+  mutatePayload,
+  mutatePayload,
+  advance,
+];
 
 /** Loop lengths to try: small counts plus any integer literal a handler compares against. */
 function repeatCounts(context: MutationContext): number[] {
@@ -177,7 +219,7 @@ export function mutate(parent: Parent, context: MutationContext): VizStep[] {
   const rounds = (loop ? 0 : 1) + context.rng.int(3);
   for (let round = 0; round < rounds; round += 1) {
     const operator = context.rng.pick(OPERATORS) ?? insert;
-    child = operator(child, context);
+    child = operator(child, context, parent.children);
   }
   return child;
 }

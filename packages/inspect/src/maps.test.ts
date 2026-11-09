@@ -10,7 +10,12 @@ import { toViz, toVizMachine } from "./structure.ts";
 import { machineFindings, validateViz } from "@mantaq/viz";
 import { coverageGoal, withTestCoverage } from "./fuzz/coverage.ts";
 import { normalizeRun } from "./runs.ts";
-import { execute } from "./fuzz/run.ts";
+import { childEvents, execute } from "./fuzz/run.ts";
+import { fuzz, shrink } from "./fuzz/fuzz.ts";
+import { expectAllStatesReached } from "./reach.ts";
+import { DEFAULT_SEED } from "@mantaq/pbt";
+import { fileURLToPath } from "node:url";
+import { inspectFile } from "./load.ts";
 import { Either } from "@mantaq/utils";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
@@ -641,5 +646,107 @@ describe("execute records map children", () => {
     const trace = execute(target, [{ kind: "event", event: "photoAdded", payload: null }]);
     expect(trace.visited).toContain("photos.sendingPhoto");
     expect(trace.children).toEqual([]);
+  });
+});
+
+describe("fuzzing sends to map children", () => {
+  const withPayloads: FuzzTarget = { ...target, payloads: { photoAdded: [{ photoId: "p1" }] } };
+
+  test("childEvents lists the events a child handles", () => {
+    expect(childEvents(createPhotoQueue())).toEqual([{ map: "photos", event: "uploadConfirmed" }]);
+    expect(childEvents({ actor: createPhotoQueue().actor })).toEqual([]);
+    const throwing = {
+      spawn: () => {
+        throw new Error("no");
+      },
+    };
+    const broken = { ...createPhotoQueue(), photos: { ...createPhotoQueue().photos, ...throwing } };
+    expect(childEvents(broken)).toEqual([]);
+  });
+
+  test("a child is reached with a two-step run that names its key", () => {
+    const result = fuzz(withPayloads, { seed: DEFAULT_SEED, iterations: 2000 });
+    expect(result.firstHit.has("state:photos.photoSent")).toBe(true);
+    const entry = result.corpus.find((each) => each.discovered.includes("state:photos.photoSent"));
+    expect(entry?.steps).toHaveLength(2);
+    expect(entry?.steps[0]).toMatchObject({ event: "photoAdded", payload: { photoId: "p1" } });
+    expect(entry?.steps[1]).toMatchObject({
+      event: "uploadConfirmed",
+      actor: { map: "photos", key: "p1" },
+    });
+  });
+
+  test("the same seed gives the same result, and every corpus entry replays", () => {
+    const options = { seed: DEFAULT_SEED, iterations: 500 };
+    const first = fuzz(withPayloads, options);
+    expect(fuzz(withPayloads, options)).toEqual(first);
+    for (const entry of first.corpus) {
+      expect(execute(withPayloads, entry.steps).features).toEqual(
+        expect.arrayContaining(entry.discovered),
+      );
+    }
+  });
+
+  test("shrinking keeps the step that started the child", () => {
+    const steps = shrink(
+      withPayloads,
+      [add("p1"), add("p2"), confirm("p2")],
+      ["state:photos.photoSent"],
+    );
+    expect(steps).toEqual([add("p2"), confirm("p2")]);
+  });
+
+  test("a child dead end gets replay steps", () => {
+    const { machine } = inspect({
+      id: "photoQueue",
+      create: () => createPhotoQueueDeadEnd(),
+      payloads: { photoAdded: [{ photoId: "p1" }] },
+    });
+    const deadEnd: FuzzTarget = {
+      id: "photoQueue",
+      create: () => {
+        const clock = VirtualClock();
+        const made = createPhotoQueueDeadEnd({ clock });
+        return { actor: made.actor, clock, made };
+      },
+    };
+    const finding = machineFindings(machine).find(
+      (each) => each.kind === "deadEnd" && each.state === "photos.pausedPhoto",
+    );
+    expect(finding?.steps).not.toBeNull();
+    expect(execute(deadEnd, finding?.steps ?? []).visited).toContain("photos.pausedPhoto");
+  });
+
+  test("every state of the photo queue is reached", () => {
+    expect(() =>
+      expectAllStatesReached({
+        id: "photoQueue",
+        create: () => createPhotoQueue(),
+        payloads: { photoAdded: [{ photoId: "p1" }] },
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe("the docs photo queue", () => {
+  test("fuzzing reaches every child state and edge, with no findings", async () => {
+    const file = fileURLToPath(
+      new URL("../../../apps/docs/src/content/docs/photo-queue.ts", import.meta.url),
+    );
+    const result = await inspectFile(file, { fuzz: { seed: 1, iterations: 5000 } });
+    const machine = result.machines.find((each) => each.id === "photoQueue");
+    expect(machine).toBeDefined();
+    const states = machine?.states.filter((each) => each.region === "photos") ?? [];
+    expect(states.length).toBeGreaterThan(0);
+    for (const each of states) expect(each.coverage?.hits, each.id).toBeGreaterThan(0);
+    const edges =
+      machine?.edges.filter(
+        (each) =>
+          each.from?.startsWith("photos.") === true &&
+          each.kind !== "initial" &&
+          each.kind !== "effect",
+      ) ?? [];
+    for (const each of edges) expect(each.coverage?.hits, each.from).toBeGreaterThan(0);
+    expect(machine === undefined ? [] : machineFindings(machine)).toEqual([]);
   });
 });
