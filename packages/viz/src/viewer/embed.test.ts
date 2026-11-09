@@ -108,6 +108,22 @@ describe("mountVizText", () => {
     expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
   });
 
+  test("a self-loop uses the small arrowhead", () => {
+    const machine: VizMachine = {
+      ...door,
+      edges: [
+        edge("__initial__", "", "open"),
+        edge("open", "go", "done"),
+        { ...edge("open", "stay", "open"), kind: "stay" },
+      ],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    const markerOf = (id: string) =>
+      root.querySelector(`[data-edge-id="${id}"] path`)?.getAttribute("marker-end");
+    expect(markerOf("open-stay-open")).toBe("url(#viz-arrow-loop)");
+    expect(markerOf("open-go-done")).toBe("url(#viz-arrow)");
+  });
+
   test("a walk without a driver keeps its moves inside the Events and time fold", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelector(".panel details[data-events] summary")?.textContent).toBe(
