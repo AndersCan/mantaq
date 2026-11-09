@@ -693,7 +693,7 @@
 
 .viz .fullscreen-toggle {
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 1em;
   color: var(--fg);
   background: var(--state-bg);
   border: 1px solid var(--state-border);

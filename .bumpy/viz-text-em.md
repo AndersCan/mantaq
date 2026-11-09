@@ -2,4 +2,4 @@
 "@mantaq/viz": patch
 ---
 
-Viewer text sizes follow the host page's font size; tabs and controls match the text.
+Viewer header, tabs and controls follow the host page's font size.
