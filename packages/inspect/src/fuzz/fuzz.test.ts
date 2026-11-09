@@ -382,4 +382,44 @@ describe("mutate with map children", () => {
       expect(step.kind === "event" ? step.actor : undefined).toEqual({ map: "photos", key: "p1" });
     }
   });
+
+  test("a child gone before any insert position gets no steps", () => {
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const steps = mutate(
+        {
+          ...empty,
+          steps: [{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }],
+          children: [{ map: "photos", key: "p1", from: 0, until: 0 }],
+        },
+        context(seed),
+      );
+      expect(steps.some((s) => s.kind === "event" && s.event === "uploadConfirmed")).toBe(false);
+    }
+  });
+
+  test("a child step goes to a child of the map that handles its event", () => {
+    const two = (seed: number) => ({
+      ...context(seed),
+      childEvents: [
+        { map: "photos", event: "uploadConfirmed" },
+        { map: "notes", event: "noteSaved" },
+      ],
+    });
+    const children = [
+      { map: "photos", key: "p1", from: 0, until: null },
+      { map: "notes", key: "n1", from: 0, until: null },
+    ];
+    const steps: VizStep[] = [{ kind: "event", event: "photoAdded", payload: null }];
+    const owner: Record<string, string> = { uploadConfirmed: "photos", noteSaved: "notes" };
+    const keys: Record<string, string> = { uploadConfirmed: "p1", noteSaved: "n1" };
+    let sent = 0;
+    for (let seed = 1; seed <= 200; seed += 1) {
+      for (const step of mutate({ ...empty, steps, children }, two(seed))) {
+        if (step.kind !== "event" || owner[step.event] === undefined) continue;
+        sent += 1;
+        expect(step.actor).toEqual({ map: owner[step.event], key: keys[step.event] });
+      }
+    }
+    expect(sent).toBeGreaterThan(0);
+  });
 });
