@@ -11,6 +11,7 @@
   --mq-banner-bg: #2e2510;
   --mq-banner-fg: #f3d58c;
   --mq-added: #b794f6;
+  --mq-shadow: #4d4d4d;
 
   --sl-color-white: #ffffff;
   --sl-color-gray-1: #e6e6e6;
@@ -21,6 +22,10 @@
   --sl-color-gray-6: #161616;
   --sl-color-gray-7: #0a0a0a;
   --sl-color-black: #000000;
+
+  --mq-shadow-1: 1px 1px 0 var(--mq-shadow);
+  --mq-shadow-2: 2px 2px 0 var(--mq-shadow);
+  --mq-shadow-4: 4px 4px 0 var(--mq-shadow);
 
   --mq-font-display: "Space Grotesk Variable", system-ui, sans-serif;
   --mq-font-sans: "IBM Plex Sans Variable", system-ui, sans-serif;
@@ -48,6 +53,7 @@
   --mq-banner-bg: #fff6e0;
   --mq-banner-fg: #5a3e00;
   --mq-added: #7c3aed;
+  --mq-shadow: #c4c4c4;
 
   --sl-color-white: #000000;
   --sl-color-gray-1: #1a1a1a;
@@ -95,4 +101,43 @@ h1#_top,
 .card {
   --sl-card-border: var(--mq-fg);
   --sl-card-bg: transparent;
+}
+
+.card,
+.expressive-code .frame {
+  border: 1px solid var(--mq-fg);
+  box-shadow: var(--mq-shadow-4);
+}
+
+.sl-link-button:not(.minimal),
+site-search button[data-open-modal],
+starlight-theme-select select {
+  border: 1px solid var(--mq-fg);
+  box-shadow: var(--mq-shadow-1);
+}
+
+.sl-link-button:not(.minimal):active,
+site-search button[data-open-modal]:active {
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl-link-button:not(.minimal):active,
+  site-search button[data-open-modal]:active {
+    transform: none;
+  }
+}
+
+header.header {
+  border-bottom: 1px solid var(--mq-fg);
+}
+
+:root:not([data-theme="light"]) header.header {
+  border-bottom-color: var(--mq-hairline);
+}
+
+.hero {
+  background-image: radial-gradient(var(--mq-hairline) 1px, transparent 1.5px);
+  background-size: 16px 16px;
 }
