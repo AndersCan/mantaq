@@ -16,7 +16,12 @@
       "entry": ["scripts/bench-compare.mjs"]
     },
     "apps/docs": {
-      "entry": ["src/content/docs/*.ts", "src/tutorial/order-*.ts"]
+      "entry": ["src/content/docs/*.ts", "src/tutorial/order-*.ts"],
+      "ignoreDependencies": [
+        "@fontsource-variable/ibm-plex-sans",
+        "@fontsource-variable/space-grotesk",
+        "@fontsource/ibm-plex-mono"
+      ]
     },
     "packages/codemod": {
       "ignoreDependencies": ["@mantaq/core"]

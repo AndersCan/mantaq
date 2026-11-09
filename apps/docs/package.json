@@ -13,6 +13,9 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.41.7",
+    "@fontsource-variable/ibm-plex-sans": "catalog:",
+    "@fontsource-variable/space-grotesk": "catalog:",
+    "@fontsource/ibm-plex-mono": "catalog:",
     "@mantaq/core": "workspace:*",
     "@mantaq/inspect": "workspace:*",
     "@mantaq/sugar": "workspace:*",

@@ -1,20 +1,21 @@
 /* Follow Starlight's theme toggle instead of the OS color scheme. */
 .mantaq-machine .viz {
-  --bg: var(--sl-color-bg);
-  --fg: var(--sl-color-white);
-  --muted: var(--sl-color-gray-3);
-  --line: var(--sl-color-gray-2);
-  --state-bg: var(--sl-color-bg);
-  --state-border: var(--sl-color-gray-2);
-  --region-bg: var(--sl-color-gray-6);
-  --accent: var(--sl-color-accent);
-  --select: var(--sl-color-purple);
-  --grid: var(--sl-color-gray-5);
-  --shadow: var(--sl-color-gray-4);
-  --unknown: var(--sl-color-orange);
-  --fuzz: var(--sl-color-green);
-  --banner-bg: var(--sl-color-orange-low);
-  --banner-fg: var(--sl-color-orange-high);
+  --bg: var(--mq-bg);
+  --fg: var(--mq-fg);
+  --muted: var(--mq-muted);
+  --line: var(--mq-fg);
+  --state-bg: var(--mq-bg);
+  --state-border: var(--mq-fg);
+  --region-bg: var(--mq-wash);
+  --grid: var(--mq-hairline);
+  --shadow: var(--mq-hairline);
+  --accent: var(--mq-pink);
+  --select: var(--mq-select);
+  --unknown: var(--mq-unknown);
+  --fuzz: var(--mq-fuzz);
+  --banner-bg: var(--mq-banner-bg);
+  --banner-fg: var(--mq-banner-fg);
+  --added: var(--mq-added);
   color-scheme: inherit;
   margin-block: 1.5rem;
   padding: 1rem;

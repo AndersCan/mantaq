@@ -48,7 +48,13 @@ export default defineConfig({
         alt: "Mantaq",
         replacesTitle: true,
       },
-      customCss: ["./src/styles/machine.css"],
+      customCss: [
+        "@fontsource-variable/space-grotesk/wght.css",
+        "@fontsource-variable/ibm-plex-sans/wght.css",
+        "@fontsource/ibm-plex-mono/latin-400.css",
+        "./src/styles/theme.css",
+        "./src/styles/machine.css",
+      ],
       plugins: [
         starlightLlmsTxt({
           projectName: "Mantaq",

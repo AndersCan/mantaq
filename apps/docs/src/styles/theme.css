@@ -1,0 +1,98 @@
+:root {
+  --mq-fg: #ffffff;
+  --mq-bg: #000000;
+  --mq-muted: #9a9aa3;
+  --mq-wash: #161616;
+  --mq-hairline: #2e2e2e;
+  --mq-pink: #ff6fae;
+  --mq-select: #3fd0f0;
+  --mq-fuzz: #4cc98a;
+  --mq-unknown: #f0a742;
+  --mq-banner-bg: #2e2510;
+  --mq-banner-fg: #f3d58c;
+  --mq-added: #b794f6;
+
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e6e6e6;
+  --sl-color-gray-2: #c4c4c4;
+  --sl-color-gray-3: #9a9aa3;
+  --sl-color-gray-4: #6b6b70;
+  --sl-color-gray-5: #2e2e2e;
+  --sl-color-gray-6: #161616;
+  --sl-color-gray-7: #0a0a0a;
+  --sl-color-black: #000000;
+
+  --mq-font-display: "Space Grotesk Variable", system-ui, sans-serif;
+  --mq-font-sans: "IBM Plex Sans Variable", system-ui, sans-serif;
+  --mq-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sl-font: var(--mq-font-sans);
+  --sl-font-mono: var(--mq-font-mono);
+  --sl-text-h1: 2.441rem;
+  --sl-text-h2: 1.953rem;
+  --sl-text-h3: 1.5625rem;
+  --sl-text-h4: 1.25rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.2;
+}
+
+:root[data-theme="light"] {
+  --mq-fg: #000000;
+  --mq-bg: #ffffff;
+  --mq-muted: #6b6b70;
+  --mq-wash: #f2f2f2;
+  --mq-hairline: #d9d9d9;
+  --mq-pink: #d61f73;
+  --mq-select: #0e7c99;
+  --mq-fuzz: #138a4a;
+  --mq-unknown: #a35c00;
+  --mq-banner-bg: #fff6e0;
+  --mq-banner-fg: #5a3e00;
+  --mq-added: #7c3aed;
+
+  --sl-color-white: #000000;
+  --sl-color-gray-1: #1a1a1a;
+  --sl-color-gray-2: #3a3a3a;
+  --sl-color-gray-3: #6b6b70;
+  --sl-color-gray-4: #8a8a90;
+  --sl-color-gray-5: #d9d9d9;
+  --sl-color-gray-6: #f2f2f2;
+  --sl-color-gray-7: #fafafa;
+  --sl-color-black: #ffffff;
+}
+
+:root,
+:root[data-theme="light"] {
+  --sl-color-text: var(--sl-color-gray-1);
+  --sl-color-accent-low: var(--mq-wash);
+  --sl-color-accent: var(--mq-fg);
+  --sl-color-accent-high: var(--mq-fg);
+  --sl-color-text-accent: var(--mq-fg);
+  --sl-color-text-invert: var(--mq-bg);
+  --sl-color-bg-accent: var(--mq-fg);
+  --sl-color-bg-nav: var(--mq-bg);
+  --sl-color-bg-sidebar: var(--mq-bg);
+  --sl-color-bg-inline-code: var(--mq-wash);
+  --sl-color-hairline-light: var(--mq-hairline);
+  --sl-color-hairline: var(--mq-hairline);
+  --sl-color-hairline-shade: var(--mq-hairline);
+}
+
+.sl-heading-wrapper > :is(h1, h2, h3, h4),
+h1#_top,
+.site-title,
+.card .title,
+.hero h1 {
+  font-family: var(--mq-font-display);
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+h1#_top,
+.hero h1 {
+  font-weight: 700;
+}
+
+.card {
+  --sl-card-border: var(--mq-fg);
+  --sl-card-bg: transparent;
+}
