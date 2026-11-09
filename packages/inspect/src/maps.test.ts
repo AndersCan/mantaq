@@ -235,6 +235,21 @@ describe("driver", () => {
       { map: "photos", key: "p2", state: "photos.sendingPhoto", since: 2, until: 4 },
     ]);
     expect(live.children).toEqual([]);
+    const next = driver.step(add("p3"));
+    expect(next.removed?.map((each) => each.key)).toEqual(["p1", "p2"]);
+    driver.step({ kind: "event", event: "queueCleared", payload: null });
+    expect(next.removed).toHaveLength(2);
+    expect(live.removed).toHaveLength(2);
+  });
+
+  test("a key holding the id separator is not reported removed", () => {
+    const driver = createDriver(target);
+    driver.step(add("a\u0000b"));
+    driver.step(add("c"));
+    driver.step(add("d"));
+    const live = driver.step(confirm("a\u0000b"));
+    expect(live.children.map((each) => each.key)).toEqual(["a\u0000b", "c", "d"]);
+    expect(live.removed).toEqual([]);
   });
 
   test("a respawn under a live key removes the old child", () => {

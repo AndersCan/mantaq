@@ -137,6 +137,8 @@ function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => v
 }
 
 interface MapChild {
+  map: string;
+  key: string;
   child: AnyActor<unknown>;
   since: number;
 }
@@ -144,12 +146,12 @@ interface MapChild {
 /** Move a child from the live map to the removed list, keeping where it was. */
 function dropChild(
   at: { children: Map<string, MapChild>; removed: VizRemovedChild[] },
-  id: string,
-  until: number,
+  drop: { id: string; until: number },
 ): void {
+  const { id, until } = drop;
   const entry = at.children.get(id);
   if (entry === undefined) return;
-  const [map = "", key = ""] = id.split("\u0000");
+  const { map, key } = entry;
   at.removed.push({
     map,
     key,
@@ -170,17 +172,17 @@ function sweepRemoved(
   until: number,
 ): void {
   for (const [id, entry] of at.children) {
-    const [map = "", key = ""] = id.split("\u0000");
-    if (at.maps[map]?.get(key) !== entry.child) dropChild(at, id, until);
+    if (at.maps[entry.map]?.get(entry.key) !== entry.child) dropChild(at, { id, until });
   }
 }
 
 /** The children still in their maps: maps by name, then the map's key order. */
-function liveChildren(
-  maps: Readonly<Record<string, ActorMapLike>>,
-  children: Map<string, MapChild>,
-  watch: (name: string, key: string) => void,
-): VizLiveChild[] {
+function liveChildren(live: {
+  maps: Readonly<Record<string, ActorMapLike>>;
+  children: Map<string, MapChild>;
+  watch: (name: string, key: string) => void;
+}): VizLiveChild[] {
+  const { maps, children, watch } = live;
   return Object.entries(maps).flatMap(([name, map]) =>
     map.keys().flatMap((key) => {
       watch(name, key);
@@ -385,8 +387,9 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       if (!isActor(child)) return;
       const old = children.get(id);
       if (old?.child === child) return;
-      if (old !== undefined) dropChild({ children, removed }, id, steps.length + flags.pending);
-      children.set(id, { child, since: steps.length + flags.pending });
+      if (old !== undefined)
+        dropChild({ children, removed }, { id, until: steps.length + flags.pending });
+      children.set(id, { map: name, key, child, since: steps.length + flags.pending });
       if (effectMode === "held") holdEffects(child, held);
       watchChild(child, { root: actor, ref: { map: name, key }, prefix: name, record });
     };
@@ -405,7 +408,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       regions: Object.fromEntries(
         regionActors(actor).map((each) => [each.path, `${each.path}.${each.actor.state.name}`]),
       ),
-      children: liveChildren(maps, children, watch),
+      children: liveChildren({ maps, children, watch }),
       removed: [...removed],
       steps: [...steps],
       last: log[0] ?? null,
