@@ -5,6 +5,7 @@
  */
 import { UPDATE_EVENT } from "../html.ts";
 import { mountLive } from "./page.ts";
+import "./page.css";
 
 const root = document.querySelector<HTMLElement>("#app");
 const source = root?.dataset["src"];
