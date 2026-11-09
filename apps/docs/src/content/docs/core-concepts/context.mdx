@@ -3,16 +3,9 @@ title: Context
 description: Data that survives transitions.
 ---
 
-## What
-
-Context is the actor's mutable data record. Pass it in at construction, read
-and replace it during the run. It survives transitions.
-
-State decides where the machine is. Context decides what it knows.
-
 ## Define
 
-The examples on this page build on each other. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
 
 ```ts
 import type { CheckoutContext } from "./checkout";
@@ -20,15 +13,10 @@ import type { CheckoutContext } from "./checkout";
 const initialContext: CheckoutContext = {};
 ```
 
-Typed at compile time. No runtime cost.
-
 ## Read and write
 
-Handlers get a `context` handle:
-
-- `context.get()` returns the live record
-- `context.set(s)` writes it back (any call triggers `change`, even same reference)
-- Mutate what `get()` returned, then `set()` it
+- `get()` returns the live record; mutate it, then `set()`
+- Any `set()` triggers `change`, even with the same reference
 
 ```ts
 import { Actor } from "@mantaq/core";
@@ -56,8 +44,6 @@ const checkout = Actor({
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 ```
 
-Nested mutations work the same way (`s.items.push(item); context.set(s)`).
-
 ## Read outside transitions
 
 ```ts
@@ -66,9 +52,4 @@ checkout.context.basicInfo?.email; // "a@b.com"
 
 ## Effects
 
-Effects get the same handle. Read, mutate, `set()`, then `emit()`.
-
-## Children
-
-Child actors (regions) have their own context. They communicate via events.
-See [States](/mantaq/core-concepts/states/).
+Effects get the same handle. Regions have their own context.

@@ -3,12 +3,6 @@ title: Effects
 description: Side effects on state entry.
 ---
 
-## What
-
-An effect is a function that runs every time the actor enters a state. It does
-side-effect work and emits events back into the machine. It does not transition
-the machine directly.
-
 ## EffectInput
 
 ```ts
@@ -24,16 +18,13 @@ the machine directly.
 
 ## Rules
 
-- Run on every entry, initial state included (`event.type` is `"__init"` at construction)
-- Terminal states run entry effects too (emit completion outputs to parents)
-- Return value is ignored. Effects emit; the machine reacts.
-- Never throw. Catch and emit an internal error event instead.
+- Run on every entry, initial state included (`event.type` is `"__init"`)
+- Terminal states run entry effects too
+- Never throw: catch and emit an internal error event
 
 ## Auto-abort
 
-`signal` fires when the actor leaves the state. Check it before emitting.
-
-The examples below are `m.effect` calls from the `setup` of the docs [checkout machine](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts), where `chargeCard`, `submitting` and the payment events are declared.
+`signal` fires when the actor leaves the state; `emit` after that does nothing. Examples: [checkout machine](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts).
 
 ```ts
 m.effect(submitting, {
@@ -47,12 +38,7 @@ m.effect(submitting, {
 });
 ```
 
-Post-abort `emit` is a silent no-op anyway. The guard skips the wasted call.
-
-## Declaring what an effect sends
-
-List the internal events an effect can emit in `sends`. `emit` then accepts
-only those events. Emitting anything else is a type error.
+## `sends`
 
 ```ts
 m.effect(submitting, {
@@ -67,17 +53,11 @@ m.effect(submitting, {
 });
 ```
 
-- `sends: []`: the effect emits nothing.
-- No `sends`: `emit` takes any event, untyped. This exists for migration only.
-- `sends` lists internal events only. Inputs come from outside.
-
-The diagram uses `sends` to show which events can follow an effect. Walking
-the [diagram](/mantaq/core-concepts/diagrams/), entering `submitting` offers
-`paymentOk`, `paymentFail` and `paymentTimeout` as next steps.
+`emit` accepts only listed events; without `sends` it is untyped. The [diagram](/mantaq/core-concepts/diagrams/) reads `sends`.
 
 ## Multiple effects
 
-Call `m.effect` multiple times for one state. They run in order.
+Effects on one state run in order.
 
 ```ts
 m.effect(submitting, {
@@ -106,6 +86,4 @@ m.effect(submitting, {
 
 ## Error handling
 
-An uncaught error moves the actor to the built-in terminal `__error` state.
-`snapshot().done` becomes `true`, `snapshot().error` carries the failure. The
-actor stops accepting events.
+An uncaught error ends in `__error`: see [Error Handling](/mantaq/core-concepts/error-handling/).

@@ -3,51 +3,21 @@ title: Error Handling
 description: Errors as values, not exceptions.
 ---
 
-## What
-
-Failures are data, not exceptions. A throwing handler, rejected promise, or
-unhandled internal event never escapes `send()`. The actor enters the built-in
-terminal `__error` state and records the failure in `snapshot().error`.
-
-## No-exception rule
-
-- `send()` never throws. Worst case: machine dies to `__error`.
-- Subscribers that throw are swallowed; machine and other subscribers carry on.
-- Constructor is the only exception. Bad setup throws immediately (programmer
-  error, not runtime).
-
-## `__error` state
-
-Synthesized by the actor, not in your `states` list. Terminal.
-
-- Thrown value recorded alongside last state, context, triggering event, and
-  `ErrorReason`
-- All queued events dropped, pending effects aborted
-- Every subsequent `send` is a no-op
-- `snapshot().done` is `true`; `change` and `done` lifecycle events fire
-
 ## `snapshot().error`
 
-`undefined` while alive. When set, carries `ErrorInfo`:
+| Field     | Meaning                                                                      |
+| --------- | ---------------------------------------------------------------------------- |
+| `error`   | thrown value                                                                 |
+| `state`   | last good state                                                              |
+| `context` | its context                                                                  |
+| `event`   | trigger                                                                      |
+| `reason`  | `transition`, `effect`, `unhandled`, `budget`, `output`, `internal`, `async` |
 
-| Field     | Meaning                                     |
-| --------- | ------------------------------------------- |
-| `error`   | thrown value or rejection                   |
-| `state`   | last known good state                       |
-| `context` | context at that state                       |
-| `event`   | triggering event (`__init` at construction) |
-| `reason`  | `ErrorReason` tag                           |
+`send()` never throws: the machine dies to a terminal `__error` state and `snapshot().done` is `true`. Only the constructor throws. Queued events are dropped and later sends do nothing; throwing subscribers are swallowed.
 
-`ErrorReason` values: `transition`, `effect`, `unhandled`, `budget`, `output`,
-`internal`, `async`.
+## Catch and emit
 
-## Prefer catch and emit
-
-`__error` kills the machine. Better: catch, emit an internal error event, let a
-transition handle it. The `error` state can leave via a `back` handler or
-similar.
-
-The examples on this page use the docs checkout machine. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
 
 ```ts
 import { Actor } from "@mantaq/core";
@@ -80,8 +50,7 @@ const payments = Actor({
 
 ## `on("error")`
 
-Subscribe to death. Fired with the full `ErrorInfo`. Seeded: if the machine
-died before you subscribed, the last `ErrorInfo` replays immediately.
+Replays to late subscribers.
 
 ```ts
 import { createCheckoutActor, payment } from "./checkout";
@@ -97,23 +66,16 @@ checkout.on("error", {
 
 ## `recover()`
 
-Bring a dead machine back. Caller supplies state and context. Breaks
-determinism (no longer "same inputs, same trace"). Effects not re-run, timers
-not re-armed. No-op on a live machine.
+Breaks determinism; effects do not restart.
 
 ```ts
 checkout.recover({ state: payment, context: { paymentInfo: { cardNumber: "..." } } });
 ```
 
-## Dead vs failed in a UI
+## Dead vs failed
 
-Read `checkout.state.name`, the typed state name, not `snapshot().path[0]`.
-
-- **Dead.** `checkout.state.name === "__error"`, details in
-  `checkout.snapshot().error`. A handler threw. Recreate the actor and offer
-  Reload.
-- **Failed.** The machine models it: `submitting` moves to `error` on
-  `paymentFail`. This is a normal state. Render it like any other state.
+- **Dead:** `"__error"`. Recreate the actor.
+- **Failed:** a modelled `error` state. Render it normally.
 
 ```ts
 checkout.on("change", {
@@ -123,4 +85,4 @@ checkout.on("change", {
 });
 ```
 
-Do not call `recover()` from a UI.
+Never call `recover()` from a UI.

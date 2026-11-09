@@ -3,16 +3,9 @@ title: Actors
 description: Core runtime unit.
 ---
 
-## What
-
-An Actor is one running state machine. It owns the current state, mutable
-context, registered transitions and effects, clock, and child actors.
-
-States, events, and effects are declarations until an Actor runs them.
-
 ## Create
 
-The examples on this page drive the docs checkout machine and build on each other. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
 
 ```ts
 import { createCheckoutActor } from "./checkout";
@@ -43,7 +36,7 @@ checkout.snapshot().path[0]; // "shippingAddress"
 matches(checkout, "shippingAddress"); // true
 ```
 
-## Listen for changes
+## Listen
 
 ```ts
 const unsub = checkout.on("change", {
@@ -52,7 +45,7 @@ const unsub = checkout.on("change", {
 unsub(); // stop listening
 ```
 
-Fires immediately with current snapshot, then on every state or context change.
+Fires at once, then on every change.
 
 ## Settled
 
@@ -60,7 +53,7 @@ Fires immediately with current snapshot, then on every state or context change.
 await checkout.settled();
 ```
 
-Waits for internal events to drain and pending effects to finish.
+Waits for internal events and effects.
 
 ## Snapshot
 
@@ -69,28 +62,8 @@ checkout.snapshot();
 // { path: ["shippingAddress"], context: { basicInfo: {...} }, regions: {} }
 ```
 
-## Constructor options
+## Options and setup
 
-| Option           | Type                                | What                                 |
-| ---------------- | ----------------------------------- | ------------------------------------ |
-| `inputs`         | `EventRef[]`                        | External events accepted             |
-| `outputs`        | `EventRef[]`                        | Events to parent                     |
-| `internal`       | `EventRef[]`                        | Events from effects/transitions      |
-| `states`         | `StateRef[]`                        | All states                           |
-| `initial`        | `StateRef` or `{ state, payload? }` | Start state                          |
-| `context`        | `ActorContext`                      | Initial context                      |
-| `clock`          | `Clock`                             | Default: `RealClock`                 |
-| `setup`          | `(m: ActorBuilder) => void`         | Register transitions and effects     |
-| `regions`        | `Record<string, AnyActor>`          | Static children                      |
-| `internalBudget` | `number`                            | Max internal events (default: 10000) |
+See the [core reference](/mantaq/reference/core/).
 
-## Setup builder
-
-| Method                                 | What                                        |
-| -------------------------------------- | ------------------------------------------- |
-| `m.on(state, { event, to, handler })`  | Transition handler for one state/event pair |
-| `m.onAny({ event, to, handler })`      | Handler for an event in every state         |
-| `m.effect(state, { name, sends, fn })` | Run `fn` on state entry; `name` is required |
-
-Handlers return `{ state }` (with optional `payload` or `emit`) to transition,
-or `{}` to stay put.
+Handlers return `{ state }`, or `{}` to stay.
