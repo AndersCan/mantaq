@@ -300,6 +300,19 @@ describe("live controls", () => {
     expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
+  test("a value sent from the form is forgotten when Back undoes that send", () => {
+    const { root, live } = mount();
+    click(root, "[data-always-ask]");
+    click(root, '[data-send="submit"]');
+    const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
+    if (box) box.value = '{"amount": 42}';
+    click(root, '[data-payload-send="submit"]');
+    click(root, "[data-always-ask]");
+    click(root, '[data-explore-action="back"]');
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log.at(-1)).toEqual([{ kind: "event", event: "submit", payload: { amount: 5 } }]);
+  });
+
   test("Always ask opens the form on an edge click", () => {
     const { root, live } = mount();
     click(root, "[data-always-ask]");

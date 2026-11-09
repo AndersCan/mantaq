@@ -98,7 +98,7 @@ user ride on state payloads, so context holds only the counters.
 
 <Machine src="src/content/docs/login.ts" />
 
-Try it: click `SUBMIT` to send the example account (`ada` / `lovelace` is the account that works). For a wrong password, turn on **Always ask** and type one. `checking` starts a
+Try it: click `SUBMIT`: it sends a made-up account, which is rejected. To sign in, turn on **Always ask** and type `ada` / `lovelace`. `checking` starts a
 300 ms timer: advance it in the **Time** section, and you are back at the form.
 Open the **Context** tab: `failedAttempts` went up by one. Do it twice more and
 the third rejection goes to `lockedOut`, with a 30 s unlock timer. The diagram

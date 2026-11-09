@@ -213,6 +213,15 @@ describe("knownPayload", () => {
     expect(knownPayload([card], { ...base, samples })).toEqual({ payload: { cardNumber: "1111" } });
   });
 
+  test("a fuzz value that is only the type's default loses to the example", () => {
+    const amount: VizField = { ...field("amount", "number"), sample: 42 };
+    const result = knownPayload([card, amount], {
+      ...base,
+      samples: [{ cardNumber: "sample", amount: 1 }],
+    });
+    expect(result).toEqual({ payload: { cardNumber: "4242 4242 4242 4242", amount: 42 } });
+  });
+
   test("what this walk sent under that name, on any event, beats the fuzzer", () => {
     const result = knownPayload([card], {
       ...base,

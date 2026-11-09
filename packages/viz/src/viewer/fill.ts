@@ -130,8 +130,15 @@ function knownValue(
   const sent = from.typed?.values.find((each) => each.field === field.name);
   if (sent !== undefined) return sent.value;
   const fuzz = isObject(from.fuzzed) ? from.fuzzed[field.name] : undefined;
-  if (fuzz !== undefined && fits(field, fuzz)) return fuzz;
+  if (fuzz !== undefined && fits(field, fuzz) && !isTypeDefault(field, fuzz)) return fuzz;
   return field.optional ? undefined : field.sample;
+}
+
+/** What the fuzzer makes up for a bare string or number: it says nothing the field's example does not say better. */
+function isTypeDefault(field: VizField, value: VizJson): boolean {
+  if (field.input === "text") return value === "sample";
+  if (field.input === "number") return value === 1;
+  return false;
 }
 
 const fuzzLimit = 5;
