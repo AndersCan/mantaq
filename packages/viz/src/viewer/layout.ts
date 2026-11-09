@@ -90,6 +90,10 @@ function regionNodeId(region: string): string {
 }
 
 const HINT_WIDTH = 14;
+/** Extra height of a map-child state: one row for its children's markers. */
+const MARKER_ROW_HEIGHT = 20;
+/** Narrowest map-child state: six two-character markers, their gaps and an inset. */
+const MAP_STATE_MIN_WIDTH = 168;
 
 function stateWidth(state: VizState): number {
   const chips = state.effects.map(
@@ -121,7 +125,11 @@ function addRegions(graph: LayoutGraph, regions: ReadonlyArray<string>): void {
 
 function addStates(graph: LayoutGraph, machine: VizMachine): void {
   for (const state of machine.states) {
-    graph.setNode(state.id, { width: stateWidth(state), height: stateHeight(state) });
+    const child = state.region !== null && machine.maps.includes(state.region);
+    graph.setNode(state.id, {
+      width: child ? Math.max(stateWidth(state), MAP_STATE_MIN_WIDTH) : stateWidth(state),
+      height: stateHeight(state) + (child ? MARKER_ROW_HEIGHT : 0),
+    });
     if (state.region !== null) graph.setParent(state.id, regionNodeId(state.region));
   }
 }

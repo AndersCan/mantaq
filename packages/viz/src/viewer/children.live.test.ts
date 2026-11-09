@@ -177,24 +177,133 @@ describe("live actor map children", () => {
     expect(group?.querySelector("text")?.textContent).toBe("photos: one per key");
   });
 
-  test("clicking a map edge sends only when exactly one child is in its source", () => {
-    const edgeGroup = (root: HTMLElement) =>
-      root.querySelector<SVGGElement>(
-        '.graph g[data-edge-id="photos.sendingPhoto-uploadConfirmed-photos.photoSent"]',
-      );
+  const edgeGroup = (root: HTMLElement) =>
+    root.querySelector<SVGGElement>(
+      '.graph g[data-edge-id="photos.sendingPhoto-uploadConfirmed-photos.photoSent"]',
+    );
+  const click = (element: Element | null | undefined) =>
+    element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const sentTo = (key: string) => [
+    { kind: "event", event: "uploadConfirmed", payload: null, actor: { map: "photos", key } },
+  ];
+  const marker = (root: HTMLElement, key: string) =>
+    root.querySelector<SVGGElement>(`g.child-marker[data-marker-key="${key}"]`);
+
+  test("an arrow goes to the only child in its source", () => {
     const one = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
-    edgeGroup(one.root)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(one.sent).toEqual([
-      {
-        kind: "event",
-        event: "uploadConfirmed",
-        payload: null,
-        actor: { map: "photos", key: "p1" },
-      },
-    ]);
-    const two = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
-    edgeGroup(two.root)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    click(edgeGroup(one.root));
+    expect(one.sent).toEqual(sentTo("p1"));
+  });
+
+  test("an arrow with two children in its state goes to the first started", () => {
+    const two = mount([child("p2", "sendingPhoto", 2), child("p1", "sendingPhoto", 1)]);
+    click(edgeGroup(two.root));
+    expect(two.sent).toEqual(sentTo("p1"));
+  });
+
+  test("an arrow with no child in its state does nothing", () => {
+    const none = mount([child("p1", "waitingForRetry")]);
+    click(edgeGroup(none.root));
+    expect(none.sent).toEqual([]);
+  });
+
+  test("a picked child takes the arrow", () => {
+    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
+    click(marker(two.root, "p2"));
+    expect(marker(two.root, "p2")?.getAttribute("aria-pressed")).toBe("true");
+    click(edgeGroup(two.root));
+    expect(two.sent).toEqual(sentTo("p2"));
+  });
+
+  test("with a child picked, another child's arrow is not next and its click shows details", () => {
+    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "waitingForRetry", 2)]);
+    click(marker(two.root, "p2"));
+    click(edgeGroup(two.root));
     expect(two.sent).toEqual([]);
+    expect(two.root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
+
+  test("Esc drops the pick", () => {
+    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
+    click(marker(two.root, "p2"));
+    two.root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(marker(two.root, "p2")?.getAttribute("aria-pressed")).toBe("false");
+    click(edgeGroup(two.root));
+    expect(two.sent).toEqual(sentTo("p1"));
+  });
+
+  test("a click on a marker again drops the pick", () => {
+    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
+    click(marker(two.root, "p2"));
+    click(marker(two.root, "p2"));
+    click(edgeGroup(two.root));
+    expect(two.sent).toEqual(sentTo("p1"));
+  });
+
+  test("a pick drops when the child is gone", () => {
+    let kids = [child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)];
+    const root = document.createElement("div");
+    const sent: VizStep[] = [];
+    const driver: VizDriver = {
+      reset: () => live(kids),
+      step: (step) => {
+        sent.push(step);
+        kids = [child("p1", "sendingPhoto", 1)];
+        return live(kids, [step]);
+      },
+    };
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] }, { driver });
+    click(marker(root, "p2"));
+    click(root.querySelector('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]'));
+    expect(marker(root, "p2")).toBeNull();
+    const before = sent.length;
+    click(edgeGroup(root));
+    expect(sent).toHaveLength(before + 1);
+    expect(sent.at(-1)).toMatchObject({ actor: { key: "p1" } });
+  });
+
+  test("a marker click does not select the state", () => {
+    const one = mount([child("p1", "sendingPhoto", 1)]);
+    click(marker(one.root, "p1"));
+    expect(one.root.querySelector(".graph g.selected")).toBeNull();
+  });
+
+  test("Esc inside a dialog keeps the pick", () => {
+    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
+    click(marker(two.root, "p2"));
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    two.root.append(dialog);
+    dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(marker(two.root, "p2")?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("markers slide only after a step", () => {
+    const one = mount([child("p1", "sendingPhoto", 1)]);
+    const layer = () => one.root.querySelector(".child-markers");
+    expect(layer()?.classList.contains("still")).toBe(true);
+    click(edgeGroup(one.root));
+    expect(layer()?.classList.contains("still")).toBe(false);
+    click(marker(one.root, "p1"));
+    expect(layer()?.classList.contains("still")).toBe(true);
+  });
+
+  test("markers slide when an effect result arrives", () => {
+    const root = document.createElement("div");
+    let notify: (state: VizLiveState) => void = () => undefined;
+    const driver: VizDriver = {
+      reset: () => live([child("p1", "sendingPhoto", 1)]),
+      step: (step) => live([child("p1", "sendingPhoto", 1)], [step]),
+      listen: (callback) => {
+        notify = callback;
+      },
+    };
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] }, { driver });
+    notify(live([child("p1", "photoSent", 1)]));
+    expect(root.querySelector(".child-markers")?.classList.contains("still")).toBe(false);
+    expect(marker(root, "p1")?.getAttribute("data-marker-state")).toBe("photos.photoSent");
   });
 
   test("a child step reads the map, the key and the move", () => {
