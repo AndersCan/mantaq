@@ -1,5 +1,5 @@
 .viz {
-  /* Chrome is black and white; --accent marks graph highlights only. */
+  /* Black and white throughout; --accent marks only the clicked or focused item. */
   --fuzz: #138a4a;
   --bg: #ffffff;
   --fg: #000000;
@@ -168,7 +168,7 @@
 }
 
 .viz .edge[data-composing] path {
-  stroke: var(--accent);
+  stroke: var(--fg);
   stroke-width: 2.5;
 }
 
@@ -311,9 +311,9 @@
 }
 
 .viz .chip rect {
-  fill: var(--accent);
+  fill: var(--fg);
   fill-opacity: 0.12;
-  stroke: var(--accent);
+  stroke: var(--fg);
 }
 
 .viz .chip text {
@@ -424,7 +424,7 @@
 }
 
 .viz .edge.sent path {
-  stroke: var(--accent);
+  stroke: var(--fg);
   stroke-width: 2.5;
 }
 
@@ -479,7 +479,7 @@
 /* Explore: the walk over the drawn graph. */
 .viz .taken path,
 .viz .current .frame {
-  stroke: var(--accent);
+  stroke: var(--fg);
   stroke-width: 2.5;
 }
 
@@ -488,14 +488,14 @@
 }
 
 .viz .next path {
-  stroke: var(--accent);
+  stroke: var(--fg);
   stroke-width: 3;
   stroke-dasharray: 8 5;
   animation: viz-march 0.8s linear infinite;
 }
 
 .viz .next text {
-  fill: var(--accent);
+  fill: var(--fg);
   font-weight: 700;
 }
 
@@ -504,12 +504,12 @@
 }
 
 .viz .running path {
-  stroke: var(--accent);
+  stroke: var(--fg);
   stroke-width: 2.5;
 }
 
 .viz .running text {
-  fill: var(--accent);
+  fill: var(--fg);
   font-weight: 700;
 }
 
@@ -533,8 +533,8 @@
 
 .viz .child-marker rect:not(.hit),
 .viz .child-marker circle {
-  fill: var(--accent);
-  stroke: var(--accent);
+  fill: var(--fg);
+  stroke: var(--fg);
 }
 
 .viz .child-marker text {
@@ -550,7 +550,7 @@
 }
 
 .viz .child-marker.final text {
-  fill: var(--accent);
+  fill: var(--fg);
 }
 
 .viz .child-marker .hit {
@@ -665,7 +665,7 @@
 }
 
 .viz .reachable .frame {
-  stroke: var(--accent);
+  stroke: var(--fg);
   stroke-dasharray: 4 3;
 }
 
