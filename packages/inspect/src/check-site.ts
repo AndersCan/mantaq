@@ -139,6 +139,8 @@ async function handlesAnEvent(root: PwLocator, page: PwPage): Promise<string | u
     return undefined;
   }
   const before = await explore.first().getAttribute("data-current");
+  const fold = root.locator("details[data-events]:not([open]) > summary");
+  if ((await fold.count()) > 0) await fold.first().click();
   const sends = await root.locator("[data-send]").count();
   for (let index = 0; index < sends; index += 1) {
     await root.locator("[data-send]").nth(index).click();

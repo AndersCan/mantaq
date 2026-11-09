@@ -228,6 +228,12 @@ async function missingActor(
   return `no region ${quoted(path)} in ${id}. Regions: ${names}.`;
 }
 
+/** The Send lists sit in a fold that starts closed: open it before looking for a button. */
+async function openEvents(page: Page): Promise<void> {
+  const summary = page.locator(`${PANEL} details[data-events]:not([open]) > summary`);
+  if ((await summary.count()) > 0) await summary.first().click();
+}
+
 function makeSend(
   page: Page,
   id: string,
@@ -241,11 +247,10 @@ function makeSend(
     await page.click('[data-tab="step"]');
     const path = actorPath(actor);
     const scope =
-      path === ""
-        ? `${PANEL} :is([data-actor=""], .explore-waiting)`
-        : `${PANEL} [data-actor=${quoted(path)}]`;
+      path === "" ? `${PANEL} [data-actor=""]` : `${PANEL} [data-actor=${quoted(path)}]`;
     const missing = await missingActor(page, { id, actor, path });
     if (missing !== undefined) return Either.left(missing);
+    await openEvents(page);
     const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
     if ((await trigger.count()) === 0) {
       const offered = await attributes(page, `${scope} [data-send]`, "data-send");
@@ -340,9 +345,9 @@ function describe(
       page.locator(`${PANEL} [data-waiting-on]`).evaluateAll((nodes) =>
         nodes.map((node) => ({
           effect: node.getAttribute("data-waiting-on") ?? "",
-          reports: [...node.querySelectorAll("[data-send]")].map(
-            (each) => each.getAttribute("data-send") ?? "",
-          ),
+          reports: (node.getAttribute("data-reports") ?? "")
+            .split(" ")
+            .filter((each) => each !== ""),
         })),
       ),
     send: (event, payload) => sendTo({ region: "" }, event, payload),
@@ -356,6 +361,7 @@ function describe(
       const send = page.locator(`[data-payload-send=${quoted(event)}]`);
       if ((await send.count()) === 0) {
         await page.click('[data-tab="step"]');
+        await openEvents(page);
         const trigger = page.locator(`${PANEL} [data-send=${quoted(event)}]`).first();
         if ((await trigger.count()) === 0) {
           return Either.left(`no button for ${event}.`);

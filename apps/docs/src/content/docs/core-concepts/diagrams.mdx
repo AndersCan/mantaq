@@ -36,12 +36,11 @@ The panel runs the real machine in your browser, on a virtual clock, without run
 in the initial state, and the pulsing edges are the steps you can take next.
 Click one, or use the **Step** tab:
 
-- **Send**: every event the current state handles, plus the inputs it ignores.
-  An event that carries a payload is sent with a value the page knows (what
-  you sent before, else a fuzzed or example value). Turn on **Always ask** to
-  fill it in yourself first.
-- **Time**: pending timers. Advance the clock to fire one, or by any number of
-  milliseconds.
+- **Events and time** (closed): every event the state handles or ignores, and the
+  clock. An event that carries a payload is sent with a value the page knows
+  (what you sent before, else a fuzzed or example value). Turn on **Always ask**
+  to fill it in yourself first. Advance the clock to fire a pending timer, or by
+  any number of milliseconds.
 
 Because the handlers run, guards are evaluated: you only go where the code
 really goes. The **Context** tab shows the machine's data after each step, with

@@ -43,25 +43,9 @@ describe("bannerParts", () => {
     ).toBe("a, b and c");
   });
 
-  test("a state finding plus an event-level finding sets both parts", () => {
-    const parts = bannerParts([f("x"), f("y", { state: null, event: "go" })]);
-    expect(parts.marked).toBe(true);
-    expect(parts.wide).toEqual(["go"]);
-    expect(parts.wideText).toBe("go is");
-  });
-
-  test("several event-level findings use 'are'", () => {
-    const parts = bannerParts([
-      f("x", { state: null, event: "a" }),
-      f("y", { state: null, event: "b" }),
-    ]);
-    expect(parts.marked).toBe(false);
-    expect(parts.wideText).toBe("a and b are");
-  });
-
   test("notes are not counted", () => {
     const parts = bannerParts([f("x", { note: true })]);
     expect(parts.count).toBe(0);
-    expect(parts.wideText).toBe("");
+    expect(parts.shown).toEqual([]);
   });
 });

@@ -95,7 +95,7 @@ describe("mantaqViz for Astro", () => {
     expect(findings[1]?.dataset["count"]).toBe("1");
     expect(findings[0]?.textContent?.trim()).toBe("No design findings. Fuzzing is off.");
     expect(findings[1]?.textContent?.replace(/\s+/g, " ").trim()).toBe(
-      "1 design finding in orphan: orphan can never be reached. Click a ! on the diagram to see why.",
+      "1 design finding in orphan: orphan can never be reached.",
     );
     expect(findings[1]?.querySelector("ul")).toBeNull();
   });
@@ -113,7 +113,7 @@ describe("mantaqViz for Astro", () => {
     }
   }, 120_000);
 
-  test("the banner points at the Details tab for an input no state handles", async () => {
+  test("the banner names an input no state handles", async () => {
     const root = makeSite([unhandled]);
     try {
       await buildSite(root, [unhandled]);
@@ -121,7 +121,7 @@ describe("mantaqViz for Astro", () => {
       const banner = document.querySelector<HTMLElement>(".mantaq-findings");
       expect(banner?.dataset["count"]).toBe("1");
       expect(banner?.textContent?.replace(/\s+/g, " ").trim()).toBe(
-        "1 design finding in unhandled: callOff is declared but no state handles it. callOff is listed at the top of the Details tab.",
+        "1 design finding in unhandled: callOff is declared but no state handles it.",
       );
     } finally {
       rmSync(root, { recursive: true, force: true });

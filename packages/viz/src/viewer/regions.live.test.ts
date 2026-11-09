@@ -206,7 +206,7 @@ describe("live regions", () => {
       .querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="uploadConfirmed"]')
       ?.click();
     expect(root.querySelector('[data-actor=""]')).toBeNull();
-    expect(root.querySelector(".explore-done")).not.toBeNull();
+    expect(root.querySelector("section.explore[data-done]")).not.toBeNull();
     expect(
       root.querySelector('[data-actor="network"] [data-send="connectionLost"]'),
     ).not.toBeNull();

@@ -55,6 +55,8 @@ interface ViewState {
   composingActor: VizActorRef | undefined;
   /** Live: an edge click opens the payload form instead of sending a known value. */
   alwaysAsk: boolean;
+  /** The "Events and time" fold is open; it stays as the user left it across steps and Back. */
+  eventsOpen: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
   /** Why the requested run did not open; cleared by the next walk. */
@@ -297,6 +299,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     composing: null,
     composingActor: undefined,
     alwaysAsk: false,
+    eventsOpen: false,
     tab: "step",
     notice: null,
   };
@@ -374,12 +377,20 @@ function panelTabs(
   });
 }
 
+/** The live driver's part of the panel context, and the fold's open state, which lives in the view. */
 function liveOf(
   view: ViewState,
   handlers: Pick<LiveContext, "send" | "play" | "compose" | "routes">,
-): { live?: LiveContext } {
-  if (view.live === null) return {};
+): Pick<ExploreContext, "events"> & { live?: LiveContext } {
+  const events = {
+    open: view.eventsOpen,
+    onToggle: (open: boolean) => {
+      view.eventsOpen = open;
+    },
+  };
+  if (view.live === null) return { events };
   return {
+    events,
     live: { state: view.live, previous: view.previous, ...handlers },
   };
 }

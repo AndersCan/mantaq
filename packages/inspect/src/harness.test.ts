@@ -173,7 +173,7 @@ test("submitPayment waits in submitting with its three reports", async () => {
     expect(await viz.waiting()).toEqual([
       { effect: "chargeCard", reports: ["paymentOk", "paymentFail", "paymentTimeout"] },
     ]);
-    expect(await viz.text()).toContain("Waiting for chargeCard");
+    expect(await viz.text()).toContain("In submitting, waiting for chargeCard");
     expect(await state("paymentFail")).toBe("error");
     expect(await state("back")).toBe("payment");
     expect(await state("submitPayment")).toBe("submitting");
