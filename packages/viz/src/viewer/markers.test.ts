@@ -351,6 +351,33 @@ describe("roving focus and picks", () => {
     expect(tabbable(graph)).toEqual(["p2"]);
   });
 
+  test("the tab stop follows the picked map when two maps share a key", () => {
+    const two: VizMachine = {
+      ...machine,
+      maps: ["photos", "docs"],
+      regions: ["photos", "docs"],
+      states: [...machine.states, state("docs.sendingPhoto", { initial: true })],
+    };
+    const docs: VizLiveChild = { ...child("p1"), map: "docs", state: "docs.sendingPhoto" };
+    const graph = renderGraph(document, two, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    drawChildMarkers(graph, {
+      machine: two,
+      children: [child("p1"), docs],
+      picked: { map: "docs", key: "p1" },
+      motion: false,
+      onPick: () => undefined,
+    });
+    expect(
+      markers(graph).map(
+        (each) => each.getAttribute("data-marker-map") + ":" + each.getAttribute("tabindex"),
+      ),
+    ).toEqual(["photos:-1", "docs:0"]);
+  });
+
   test("Space and Enter prevent the page scroll and pick", () => {
     const graph = draw([child("p1")]);
     const [a] = markers(graph);

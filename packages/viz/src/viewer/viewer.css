@@ -516,11 +516,6 @@
   .viz .next path {
     animation: none;
   }
-
-  .viz .child-marker {
-    transition: none;
-    animation: none;
-  }
 }
 
 .viz .child-marker {
@@ -600,6 +595,14 @@
 .viz .child-markers.still .child-marker > * {
   transition: none;
   animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz .child-markers .child-marker,
+  .viz .child-markers .child-marker > :not(title) {
+    transition: none;
+    animation: none;
+  }
 }
 
 .viz .explore {
