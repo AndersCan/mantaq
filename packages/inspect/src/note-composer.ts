@@ -30,6 +30,7 @@ interface Session {
 }
 
 interface Form {
+  box: HTMLElement;
   target: NoteTarget;
   at: Point;
   field: HTMLTextAreaElement;
@@ -87,14 +88,19 @@ async function save(session: Session, form: Form): Promise<void> {
     note: form.field.value,
   });
   const reason = await post(session.action.url, body);
+  const open = session.box === form.box;
   if (typeof reason === "string") {
-    form.status.textContent = `Could not save this note: ${reason}. Your text is still here.`;
+    if (open) {
+      form.status.textContent = `Could not save this note: ${reason}. Your text is still here.`;
+    } else {
+      showToast(session, { text: `Could not save this note: ${reason}`, at: form.at });
+    }
     return;
   }
   if (session.phase.kind === "showing") {
     session.phase = { ...session.phase, notes: [...session.phase.notes, reason.note] };
   }
-  closeBox(session);
+  if (open) closeBox(session);
   showToast(session, { text: `Saved in ${reason.file}`, at: form.at });
 }
 
@@ -155,7 +161,7 @@ function addForm(
   field.style.cssText = "width:100%;box-sizing:border-box";
   const button = primaryButton(session);
   const idle = button.textContent;
-  const form: Form = { target, at, field, status, button };
+  const form: Form = { box: element, target, at, field, status, button };
   let busy = false;
   const sync = () => {
     button.disabled = busy || field.value.trim() === "";

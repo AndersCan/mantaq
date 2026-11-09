@@ -250,6 +250,7 @@ describe("copy mode", () => {
     press(root, "[data-note-copy]");
     await flush();
     expect(field(root).value).toBe(block);
+    expect([field(root).selectionStart, field(root).selectionEnd]).toEqual([0, block.length]);
     expect(root.querySelector<HTMLElement>("[data-note-copy]")?.hidden).toBe(true);
     expect(status(root)?.textContent).toBe("Could not copy. Copy the selected text.");
     expect(toast(root)).toBeNull();
@@ -394,6 +395,7 @@ describe("save mode", () => {
     );
     expect(field(root).value).toBe("keep me");
     expect(root.querySelector<HTMLButtonElement>("[data-note-save]")?.disabled).toBe(false);
+    expect(root.querySelector("[data-note-save]")?.textContent).toBe("Save note");
     failure = async () => {
       throw new TypeError("offline");
     };
@@ -403,6 +405,39 @@ describe("save mode", () => {
       "Could not save this note: the dev server did not answer. Your text is still here.",
     );
     expect(field(root).value).toBe("keep me");
+  });
+
+  test("a slow save does not close the box opened after it", async () => {
+    let finish: (response: Response) => void = () => {};
+    respond = (_url, init) =>
+      init?.method === "POST" ? new Promise<Response>((resolve) => (finish = resolve)) : empty();
+    const root = await mount({ notes: url });
+    rightClick(root, state("payment"));
+    type(root, "first draft");
+    press(root, "[data-note-save]");
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(composer(root)).toBeNull();
+    rightClick(root, state("shippingAddress"));
+    type(root, "second draft");
+    finish(json(200, { version: 1, file: "x.notes.md", note: note("n9") }));
+    await flush();
+    expect(composer(root)?.dataset["noteComposer"]).toBe("state shippingAddress");
+    expect(field(root).value).toBe("second draft");
+  });
+
+  test("a save that fails after the box closed says so", async () => {
+    let finish: (response: Response) => void = () => {};
+    respond = (_url, init) =>
+      init?.method === "POST" ? new Promise<Response>((resolve) => (finish = resolve)) : empty();
+    const root = await mount({ notes: url });
+    rightClick(root, state("payment"));
+    type(root, "lost");
+    press(root, "[data-note-save]");
+    field(root).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    finish(json(500, { error: "disk full" }));
+    await flush();
+    expect(composer(root)).toBeNull();
+    expect(toast(root)?.textContent).toContain("disk full");
   });
 
   test("a 409 shows the message only", async () => {
