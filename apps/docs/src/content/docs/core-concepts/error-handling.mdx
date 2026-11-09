@@ -3,10 +3,6 @@ title: Error Handling
 description: Errors as values, not exceptions.
 ---
 
-## `__error`
-
-`send()` never throws: the machine dies to a terminal `__error` state and `snapshot().done` is `true`. Only the constructor throws.
-
 ## `snapshot().error`
 
 | Field     | Meaning                                                                      |
@@ -16,6 +12,8 @@ description: Errors as values, not exceptions.
 | `context` | its context                                                                  |
 | `event`   | trigger                                                                      |
 | `reason`  | `transition`, `effect`, `unhandled`, `budget`, `output`, `internal`, `async` |
+
+`send()` never throws: the machine dies to a terminal `__error` state and `snapshot().done` is `true`. Only the constructor throws. Queued events are dropped and later sends do nothing; throwing subscribers are swallowed.
 
 ## Catch and emit
 

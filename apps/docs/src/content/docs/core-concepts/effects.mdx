@@ -24,7 +24,7 @@ description: Side effects on state entry.
 
 ## Auto-abort
 
-`signal` fires when the actor leaves the state. Examples: [checkout machine](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts).
+`signal` fires when the actor leaves the state; `emit` after that does nothing. Examples: [checkout machine](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts).
 
 ```ts
 m.effect(submitting, {
@@ -56,6 +56,8 @@ m.effect(submitting, {
 `emit` accepts only listed events; without `sends` it is untyped. The [diagram](/mantaq/core-concepts/diagrams/) reads `sends`.
 
 ## Multiple effects
+
+Effects on one state run in order.
 
 ```ts
 m.effect(submitting, {

@@ -109,7 +109,7 @@ const fraudMonitor = Actor({
 
 ## Internal events
 
-Emitted by effects; `send()` rejects them.
+Declared in `internal`, emitted by effects. `send()`'s type does not accept them. Processed after the current transition.
 
 ```ts
 const paymentOk = event("paymentOk")<{ orderId: string }>();
@@ -118,7 +118,7 @@ const paymentFail = event("paymentFail")<{ reason: string }>();
 
 ## `onAny`
 
-A state handler runs first.
+A state handler runs first; `onAny` still runs and moves only if the state handler did not.
 
 ```ts
 const cancel = event("cancel")();

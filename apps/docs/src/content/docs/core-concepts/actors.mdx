@@ -62,27 +62,8 @@ checkout.snapshot();
 // { path: ["shippingAddress"], context: { basicInfo: {...} }, regions: {} }
 ```
 
-## Options
+## Options and setup
 
-| Option           | Type                                |
-| ---------------- | ----------------------------------- |
-| `inputs`         | `EventRef[]`                        |
-| `outputs`        | `EventRef[]`                        |
-| `internal`       | `EventRef[]`                        |
-| `states`         | `StateRef[]`                        |
-| `initial`        | `StateRef` or `{ state, payload? }` |
-| `context`        | `ActorContext`                      |
-| `clock`          | `Clock`                             |
-| `setup`          | `(m: ActorBuilder) => void`         |
-| `regions`        | `Record<string, AnyActor>`          |
-| `internalBudget` | `number`                            |
-
-## Setup
-
-| Method                                 |
-| -------------------------------------- |
-| `m.on(state, { event, to, handler })`  |
-| `m.onAny({ event, to, handler })`      |
-| `m.effect(state, { name, sends, fn })` |
+See the [core reference](/mantaq/reference/core/).
 
 Handlers return `{ state }`, or `{}` to stay.

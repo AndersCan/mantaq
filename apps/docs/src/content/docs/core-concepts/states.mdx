@@ -7,6 +7,8 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 
 ## Basic states
 
+Examples build on each other: paste them into one file, in order.
+
 ```ts
 import { state } from "@mantaq/core";
 
@@ -96,4 +98,4 @@ Each region is its own actor.
 
 <Machine src="src/content/docs/photo-upload.ts" />
 
-Send events on the region: `actor.regions.upload.send(...)`.
+The parent does not pass events down. Send events on the region: `actor.regions.upload.send(...)`.
