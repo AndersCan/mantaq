@@ -1,13 +1,13 @@
 .viz {
   /* Chrome is black and white; --accent marks graph highlights only. */
   --fuzz: #138a4a;
-  --bg: #fbfbfa;
-  --fg: #1d1d1f;
+  --bg: #ffffff;
+  --fg: #000000;
   --muted: #6b6b70;
-  --line: #4a4a52;
+  --line: #000000;
   --state-bg: #ffffff;
-  --state-border: #3b3b44;
-  --region-bg: #f1f1ef;
+  --state-border: #000000;
+  --region-bg: #f2f2f2;
   --accent: #d61f73;
   --unknown: #a35c00;
   --banner-bg: #fff6e0;
@@ -74,13 +74,13 @@
 
 @media (prefers-color-scheme: dark) {
   .viz {
-    --bg: #141416;
-    --fg: #ececf0;
+    --bg: #000000;
+    --fg: #ffffff;
     --muted: #9a9aa3;
-    --line: #b4b4bf;
-    --state-bg: #1f1f23;
-    --state-border: #c9c9d2;
-    --region-bg: #1a1a1e;
+    --line: #ffffff;
+    --state-bg: #000000;
+    --state-border: #ffffff;
+    --region-bg: #161616;
     --accent: #ff6fae;
     --unknown: #f0a742;
     --fuzz: #4cc98a;
