@@ -8,7 +8,7 @@
   --state-border: var(--mq-fg);
   --region-bg: var(--mq-wash);
   --grid: var(--mq-hairline);
-  --shadow: var(--mq-hairline);
+  --shadow: var(--mq-shadow);
   --accent: var(--mq-pink);
   --select: var(--mq-select);
   --unknown: var(--mq-unknown);
@@ -19,8 +19,9 @@
   color-scheme: inherit;
   margin-block: 1.5rem;
   padding: 1rem;
-  border: 1px solid var(--sl-color-gray-5);
-  border-radius: 0.5rem;
+  border: 1px solid var(--mq-fg);
+  border-radius: 4px;
+  box-shadow: var(--mq-shadow-4);
   font-size: var(--sl-text-base);
 }
 
@@ -29,6 +30,7 @@
   margin: 0;
   border: none;
   border-radius: 0;
+  box-shadow: none;
 }
 
 /* A clean machine needs no "No design findings." line in the docs. */
