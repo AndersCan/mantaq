@@ -7,9 +7,10 @@ import { createPhotoQueueDeadEnd } from "./fixtures/photo-queue-dead-end.ts";
 import { actorMapsOf } from "./maps.ts";
 import { inspect } from "./inspect.ts";
 import { toViz, toVizMachine } from "./structure.ts";
-import { validateViz } from "@mantaq/viz";
-import { withTestCoverage } from "./fuzz/coverage.ts";
+import { machineFindings, validateViz } from "@mantaq/viz";
+import { coverageGoal, withTestCoverage } from "./fuzz/coverage.ts";
 import { normalizeRun } from "./runs.ts";
+import { execute } from "./fuzz/run.ts";
 import { Either } from "@mantaq/utils";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
@@ -92,14 +93,25 @@ describe("structure", () => {
 });
 
 describe("inspect", () => {
-  test("map states have no coverage after fuzzing and fuzzing still stops on the root", () => {
+  test("map states and edges get fuzz coverage and child states count toward coverage", () => {
     const { machine, warnings } = inspect({ id: "photoQueue", create: () => createPhotoQueue() });
-    const inChild = machine.states.filter((each) => each.region === "photos");
-    expect(inChild.map((each) => each.coverage)).toEqual([null, null]);
-    expect(
-      machine.edges.filter((each) => each.from.startsWith("photos.")).map((e) => e.coverage),
-    ).toEqual([null]);
+    const child = (id: string) => machine.states.find((each) => each.id === id);
+    expect(child("photos.sendingPhoto")?.coverage?.hits).toBeGreaterThan(0);
+    expect(child("photos.photoSent")?.coverage).toEqual({ hits: 0 });
+    const edge = machine.edges.find((each) => each.from === "photos.sendingPhoto");
+    expect(edge?.coverage).not.toBeNull();
     expect(warnings.filter((each) => each.includes("actor map"))).toEqual([]);
+  });
+
+  test("the coverage goal counts child states and edges as still to reach", () => {
+    const clear = { kind: "event", event: "queueCleared", payload: null } as const;
+    const { machine } = inspect({
+      id: "photoQueue",
+      fuzz: false,
+      create: () => createPhotoQueue(),
+    });
+    const trace = execute(target, [add("p1"), clear, add("p1")]);
+    expect(coverageGoal(machine)(trace)).toBe(false);
   });
 
   test("a child that throws gives a warning and no compartment", () => {
@@ -419,16 +431,15 @@ describe("child disposal", () => {
 });
 
 describe("test coverage", () => {
-  test("map states and edges get no tested field", () => {
+  test("map states and edges get a tested field", () => {
     const { machine } = inspect({ id: "photoQueue", create: () => createPhotoQueue() });
     const covered = withTestCoverage(target, machine, [[add("p1"), confirm("p1")]]);
-    const inChild = covered.states.filter((each) => each.id.startsWith("photos."));
-    expect(inChild.length).toBeGreaterThan(0);
-    for (const each of inChild) expect(each.tested).toBeNull();
-    for (const each of covered.edges.filter((edge) => edge.from.startsWith("photos."))) {
-      expect(each.tested).toBeNull();
-    }
-    expect(covered.states.find((each) => each.id === "open")?.tested).not.toBeNull();
+    const tested = (id: string) => covered.states.find((each) => each.id === id)?.tested;
+    expect(tested("photos.sendingPhoto")).toEqual({ hits: 1 });
+    expect(tested("photos.photoSent")).toEqual({ hits: 1 });
+    const edge = covered.edges.find((each) => each.from === "photos.sendingPhoto");
+    expect(edge?.tested).toEqual({ hits: 1 });
+    expect(tested("open")).not.toBeNull();
   });
 });
 
@@ -440,5 +451,195 @@ describe("normalizeRun with maps", () => {
       steps: [{ ...confirm("x"), actor: { map: "nope", key: "x" } }],
     });
     expect(result).toEqual(Either.left('unknown actor map "nope"'));
+  });
+});
+
+const uploadConfirmedEvent = event("uploadConfirmed")();
+const photoAddedEvent = event("photoAdded")<{ photoId: string }>();
+const clearedEvent = event("queueCleared")();
+const sendingS = state("sendingPhoto")();
+const sentS = state("photoSent")().final();
+const openS = state("open")();
+
+/** A photo queue with a custom root handler for photoAdded and an optional throwing child. */
+function inlineQueue(options: {
+  onAdded: (photos: ReturnType<typeof createActorMap>, id: string) => void;
+  childThrows?: boolean;
+  /** Changes the map the factory returns, after the root has closed over the real one. */
+  expose?: (photos: ReturnType<typeof createActorMap>) => ReturnType<typeof createActorMap>;
+  /** Keys spawned before the first step. */
+  before?: string;
+}): FuzzTarget {
+  return {
+    id: "inline",
+    create: () => {
+      const clock = VirtualClock();
+      const photos = createActorMap(() =>
+        Actor({
+          clock,
+          inputs: [uploadConfirmedEvent],
+          states: [sendingS, sentS],
+          initial: sendingS,
+          setup: (m) => {
+            m.on(sendingS, {
+              event: uploadConfirmedEvent,
+              to: [sentS],
+              handler: () => {
+                if (options.childThrows === true) throw new Error("boom");
+                return { state: sentS };
+              },
+            });
+          },
+        }),
+      );
+      const actor = Actor({
+        clock,
+        inputs: [photoAddedEvent, clearedEvent],
+        states: [openS],
+        initial: openS,
+        setup: (m) => {
+          m.on(openS, {
+            event: photoAddedEvent,
+            handler: (added) => {
+              options.onAdded(photos, added.payload.photoId);
+              return {};
+            },
+          });
+          m.on(openS, {
+            event: clearedEvent,
+            handler: () => {
+              for (const key of photos.keys()) photos.kill(key);
+              return {};
+            },
+          });
+        },
+      });
+      if (options.before !== undefined) photos.spawn(options.before);
+      return {
+        actor,
+        clock,
+        made: { actor, photos: (options.expose ?? ((each) => each))(photos) },
+      };
+    },
+  };
+}
+
+describe("execute records map children", () => {
+  test("child states and edges are visited and observed at the step that moved them", () => {
+    const trace = execute(target, [add("p1"), confirm("p1")]);
+    expect(trace.visited).toContain("photos.sendingPhoto");
+    expect(trace.visited).toContain("photos.photoSent");
+    expect(trace.features).toContain("state:photos.photoSent");
+    expect(trace.features).toContain("edge:photos.sendingPhoto>uploadConfirmed>photos.photoSent");
+    const seen = trace.observations.find((each) => each.from === "photos.sendingPhoto");
+    expect(seen?.step).toBe(1);
+  });
+
+  test("children record when they started and when they were gone", () => {
+    const trace = execute(target, [
+      add("p1"),
+      add("p2"),
+      { kind: "event", event: "queueCleared", payload: null },
+    ]);
+    expect(trace.children).toEqual([
+      { map: "photos", key: "p1", from: 0, until: 2 },
+      { map: "photos", key: "p2", from: 1, until: 2 },
+    ]);
+  });
+
+  test("ensure on a live key adds no child, spawn on a live key replaces it", () => {
+    expect(execute(target, [add("p1"), add("p1")]).children).toEqual([
+      { map: "photos", key: "p1", from: 0, until: null },
+    ]);
+    const respawn = inlineQueue({ onAdded: (photos, id) => photos.spawn(id) });
+    expect(execute(respawn, [add("p1"), add("p1")]).children).toEqual([
+      { map: "photos", key: "p1", from: 0, until: 1 },
+      { map: "photos", key: "p1", from: 1, until: null },
+    ]);
+  });
+
+  test("a child that moves inside the handler that started it is observed", () => {
+    const quick = inlineQueue({
+      onAdded: (photos, id) => {
+        photos.ensure(id);
+        photos.send(id, uploadConfirmedEvent.create());
+      },
+    });
+    const trace = execute(quick, [add("p1")]);
+    const seen = trace.observations.find((each) => each.from === "photos.sendingPhoto");
+    expect(seen).toMatchObject({ to: "photos.photoSent", step: 0 });
+    expect(trace.features).toContain("edge:photos.sendingPhoto>uploadConfirmed>photos.photoSent");
+  });
+
+  test("a child started with spawn and moved in the same handler is observed", () => {
+    const quick = inlineQueue({
+      onAdded: (photos, id) => {
+        photos.spawn(id);
+        photos.send(id, uploadConfirmedEvent.create());
+      },
+    });
+    expect(execute(quick, [add("p1")]).features).toContain(
+      "edge:photos.sendingPhoto>uploadConfirmed>photos.photoSent",
+    );
+  });
+
+  test("a child handler that throws becomes a run error and a finding", () => {
+    const throwing = inlineQueue({
+      onAdded: (photos, id) => photos.ensure(id),
+      childThrows: true,
+    });
+    const trace = execute(throwing, [add("p1"), confirm("p1")]);
+    expect(trace.errors).toEqual([
+      { from: "photos.sendingPhoto", event: "uploadConfirmed", message: "Error: boom", step: 1 },
+    ]);
+    const { machine } = inspect({
+      id: "inline",
+      create: () => throwing.create().made as ReturnType<typeof createPhotoQueue>,
+      payloads: { photoAdded: [{ photoId: "p1" }] },
+      tests: [{ name: "t", steps: [add("p1"), confirm("p1")] }],
+    });
+    const found = machineFindings(machine).filter((each) => each.kind === "handlerError");
+    expect(found.map((each) => each.state)).toContain("photos.sendingPhoto");
+  });
+
+  test("a child that was there before the first step starts at -1", () => {
+    const early = inlineQueue({ onAdded: () => {}, before: "pre" });
+    expect(execute(early, [add("p1")]).children).toEqual([
+      { map: "photos", key: "pre", from: -1, until: null },
+    ]);
+  });
+
+  test("a child removed earlier keeps the step it was gone after", () => {
+    const clear = { kind: "event", event: "queueCleared", payload: null } as const;
+    expect(execute(target, [add("p1"), clear, add("p2")]).children).toEqual([
+      { map: "photos", key: "p1", from: 0, until: 1 },
+      { map: "photos", key: "p2", from: 2, until: null },
+    ]);
+  });
+
+  test("a map that cannot be wrapped is still scanned after each step", () => {
+    const frozen = inlineQueue({
+      onAdded: (photos, id) => photos.ensure(id),
+      expose: (photos) => Object.freeze({ ...photos }),
+    });
+    const trace = execute(frozen, [add("p1"), confirm("p1")]);
+    expect(trace.children).toEqual([{ map: "photos", key: "p1", from: 0, until: null }]);
+    expect(trace.visited).toContain("photos.photoSent");
+  });
+
+  test("a key whose child is not an actor is skipped", () => {
+    const hollow = inlineQueue({
+      onAdded: (photos, id) => photos.ensure(id),
+      expose: (photos) => ({ ...photos, get: () => undefined }),
+    });
+    const trace = execute(hollow, [add("p1")]);
+    expect(trace.errors).toEqual([]);
+    expect(trace.children).toEqual([]);
+  });
+
+  test("a start without a payload keeps the child's state but names no child", () => {
+    const trace = execute(target, [{ kind: "event", event: "photoAdded", payload: null }]);
+    expect(trace.visited).toContain("photos.sendingPhoto");
+    expect(trace.children).toEqual([]);
   });
 });
