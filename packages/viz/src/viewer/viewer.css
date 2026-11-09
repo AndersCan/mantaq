@@ -1,5 +1,6 @@
 .viz {
-  /* Black and white throughout; --accent marks only the clicked or focused item. */
+  /* Black and white throughout. --accent marks the active state and its
+     transitions; --select marks what was clicked or focused. */
   --fuzz: #138a4a;
   --bg: #ffffff;
   --fg: #000000;
@@ -11,6 +12,7 @@
   --grid: #d9d9d9;
   --shadow: #c4c4c4;
   --accent: #d61f73;
+  --select: #0e7c99;
   --unknown: #a35c00;
   --banner-bg: #fff6e0;
   --banner-fg: #5a3e00;
@@ -86,6 +88,7 @@
     --grid: #2e2e2e;
     --shadow: #4d4d4d;
     --accent: #ff6fae;
+    --select: #3fd0f0;
     --unknown: #f0a742;
     --fuzz: #4cc98a;
     --banner-bg: #2e2510;
@@ -168,7 +171,7 @@
 }
 
 .viz .edge[data-composing] path {
-  stroke: var(--fg);
+  stroke: var(--accent);
   stroke-width: 2.5;
 }
 
@@ -411,7 +414,7 @@
 .viz .highlight circle,
 .viz .selected path,
 .viz .selected .frame {
-  stroke: var(--accent);
+  stroke: var(--select);
   stroke-width: 2.5;
 }
 
@@ -424,13 +427,13 @@
 }
 
 .viz .edge.sent path {
-  stroke: var(--fg);
+  stroke: var(--accent);
   stroke-width: 2.5;
 }
 
 .viz .state:focus-visible .frame,
 .viz .edge:focus-visible path {
-  stroke: var(--accent);
+  stroke: var(--select);
   stroke-width: 3;
 }
 
@@ -479,7 +482,7 @@
 /* Explore: the walk over the drawn graph. */
 .viz .taken path,
 .viz .current .frame {
-  stroke: var(--fg);
+  stroke: var(--accent);
   stroke-width: 2.5;
 }
 
@@ -488,14 +491,14 @@
 }
 
 .viz .next path {
-  stroke: var(--fg);
+  stroke: var(--accent);
   stroke-width: 3;
   stroke-dasharray: 8 5;
   animation: viz-march 0.8s linear infinite;
 }
 
 .viz .next text {
-  fill: var(--fg);
+  fill: var(--accent);
   font-weight: 700;
 }
 
@@ -504,12 +507,12 @@
 }
 
 .viz .running path {
-  stroke: var(--fg);
+  stroke: var(--accent);
   stroke-width: 2.5;
 }
 
 .viz .running text {
-  fill: var(--fg);
+  fill: var(--accent);
   font-weight: 700;
 }
 
@@ -746,7 +749,7 @@
 }
 
 .viz .finding-mark:focus-visible circle {
-  stroke: var(--accent);
+  stroke: var(--select);
   stroke-width: 3;
 }
 
