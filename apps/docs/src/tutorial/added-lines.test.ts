@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vite-plus/test";
 import { addedLines } from "./added-lines.ts";
 
@@ -22,5 +23,18 @@ describe("addedLines", () => {
   });
   test("everything is added when nothing is shared", () => {
     expect(addedLines("x", "a\nb")).toEqual([1, 2]);
+  });
+  test("a swap marks the line that moved", () => {
+    expect(addedLines("a\nb", "b\na")).toEqual([2]);
+  });
+  test("tutorial page 3 highlights exactly what step 3 adds", () => {
+    const shown = (name: string) =>
+      readFileSync(new URL(`./${name}`, import.meta.url), "utf8").replace(
+        /createOrder\d+/g,
+        "createOrder",
+      );
+    expect(addedLines(shown("order-02.ts"), shown("order-03.ts"))).toEqual([
+      1, 8, 9, 10, 13, 16, 17, 18, 19,
+    ]);
   });
 });
