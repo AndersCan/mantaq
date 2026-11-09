@@ -8,7 +8,7 @@ import { actorMapsOf } from "./maps.ts";
 import { inspect } from "./inspect.ts";
 import { toViz, toVizMachine } from "./structure.ts";
 import { machineFindings, validateViz } from "@mantaq/viz";
-import { withTestCoverage } from "./fuzz/coverage.ts";
+import { coverageGoal, withTestCoverage } from "./fuzz/coverage.ts";
 import { normalizeRun } from "./runs.ts";
 import { execute } from "./fuzz/run.ts";
 import { Either } from "@mantaq/utils";
@@ -93,7 +93,7 @@ describe("structure", () => {
 });
 
 describe("inspect", () => {
-  test("map states and edges get fuzz coverage and fuzzing still stops on the root", () => {
+  test("map states and edges get fuzz coverage and child states count toward coverage", () => {
     const { machine, warnings } = inspect({ id: "photoQueue", create: () => createPhotoQueue() });
     const child = (id: string) => machine.states.find((each) => each.id === id);
     expect(child("photos.sendingPhoto")?.coverage?.hits).toBeGreaterThan(0);
@@ -101,6 +101,17 @@ describe("inspect", () => {
     const edge = machine.edges.find((each) => each.from === "photos.sendingPhoto");
     expect(edge?.coverage).not.toBeNull();
     expect(warnings.filter((each) => each.includes("actor map"))).toEqual([]);
+  });
+
+  test("the coverage goal counts child states and edges as still to reach", () => {
+    const clear = { kind: "event", event: "queueCleared", payload: null } as const;
+    const { machine } = inspect({
+      id: "photoQueue",
+      fuzz: false,
+      create: () => createPhotoQueue(),
+    });
+    const trace = execute(target, [add("p1"), clear, add("p1")]);
+    expect(coverageGoal(machine)(trace)).toBe(false);
   });
 
   test("a child that throws gives a warning and no compartment", () => {
@@ -486,6 +497,18 @@ describe("execute records map children", () => {
     const seen = trace.observations.find((each) => each.from === "photos.sendingPhoto");
     expect(seen).toMatchObject({ to: "photos.photoSent", step: 0 });
     expect(trace.features).toContain("edge:photos.sendingPhoto>uploadConfirmed>photos.photoSent");
+  });
+
+  test("a child started with spawn and moved in the same handler is observed", () => {
+    const quick = inlineQueue({
+      onAdded: (photos, id) => {
+        photos.spawn(id);
+        photos.send(id, uploadConfirmedEvent.create());
+      },
+    });
+    expect(execute(quick, [add("p1")]).features).toContain(
+      "edge:photos.sendingPhoto>uploadConfirmed>photos.photoSent",
+    );
   });
 
   test("a child handler that throws becomes a run error and a finding", () => {
