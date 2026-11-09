@@ -122,6 +122,9 @@ describe("mountVizText", () => {
       root.querySelector(`[data-edge-id="${id}"] path`)?.getAttribute("marker-end");
     expect(markerOf("open-stay-open")).toBe("url(#viz-arrow-loop)");
     expect(markerOf("open-go-done")).toBe("url(#viz-arrow)");
+    const loopMarker = root.querySelector("#viz-arrow-loop");
+    expect(loopMarker?.getAttribute("markerUnits")).toBe("userSpaceOnUse");
+    expect(loopMarker?.querySelector("path")?.getAttribute("class")).toContain("arrow-head-loop");
   });
 
   test("a walk without a driver keeps its moves inside the Events and time fold", () => {

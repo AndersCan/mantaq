@@ -203,6 +203,27 @@ describe("separateLabels", () => {
     expect(ends[1]).toBeGreaterThan(ends[0] ?? 0);
   });
 
+  test("the outer loop clears the inner label, and the arrowheads land apart", () => {
+    const machine = machineOf(
+      ["first"],
+      ["alpha", "beta"].map((event) => edge({ from: "first", event, target: "first" })),
+    );
+    const edges = layoutMachine(machine).edges;
+    const apexOf = (path: string) => {
+      const [base, lift] = [...path.matchAll(/,(-?[\d.]+)/g)].map((m) => Number(m[1]));
+      return (base ?? 0) - 0.75 * ((base ?? 0) - (lift ?? 0));
+    };
+    const ends = edges.map((placed) => Number(/(-?[\d.]+),-?[\d.]+$/.exec(placed.path)?.[1]));
+    for (let nth = 1; nth < edges.length; nth++) {
+      const inner = edges[nth - 1];
+      const outer = edges[nth];
+      // outer apex is above the inner label's top edge (label is 16 tall)
+      expect(apexOf(outer?.path ?? "")).toBeLessThanOrEqual((inner?.label.y ?? 0) - 8);
+      // arrowheads (6 wide) do not touch
+      expect((ends[nth] ?? 0) - (ends[nth - 1] ?? 0)).toBeGreaterThanOrEqual(12);
+    }
+  });
+
   test("labels of parallel edges get distinct rows", () => {
     const machine = machineOf(
       ["first", "b"],

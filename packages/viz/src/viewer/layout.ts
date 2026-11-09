@@ -199,8 +199,8 @@ function polyline(points: ReadonlyArray<Point>): string {
 }
 
 const LOOP_RISE = 24;
-const LOOP_STEP = 32;
-const LOOP_FOOT_STEP = 12;
+const LOOP_STEP = 40;
+const LOOP_FOOT_STEP = 18;
 
 /**
  * Self-loops nest above the node: each one wider and taller than the last,

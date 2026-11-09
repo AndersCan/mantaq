@@ -29,6 +29,7 @@ catalog:
   lit-html: ^3.3.0
   playwright: ^1.62.1
   yaml: ^2.8.0
+  "@astrojs/sitemap": 3.7.3
 overrides:
   vite: "catalog:"
   vitest: "catalog:"
