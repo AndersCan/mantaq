@@ -8,6 +8,9 @@
   --state-border: var(--sl-color-gray-2);
   --region-bg: var(--sl-color-gray-6);
   --accent: var(--sl-color-accent);
+  --select: var(--sl-color-text-accent);
+  --grid: var(--sl-color-gray-5);
+  --shadow: var(--sl-color-gray-4);
   --unknown: var(--sl-color-orange);
   --fuzz: var(--sl-color-green);
   --banner-bg: var(--sl-color-orange-low);

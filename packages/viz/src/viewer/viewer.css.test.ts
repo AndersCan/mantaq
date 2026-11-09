@@ -25,3 +25,19 @@ test("reduced motion switches off the slide and the grow-in after the marker rul
   expect(block).toMatch(/transition:\s*none/);
   expect(block).toMatch(/animation:\s*none/);
 });
+
+test("a picked or focused child marker is outlined in the select colour", () => {
+  expect(rule('.viz .child-marker[aria-pressed="true"] rect:not(.hit)')).toMatch(
+    /stroke:\s*var\(--select\)/,
+  );
+  expect(rule(".viz .child-marker:focus-visible rect:not(.hit)")).toMatch(
+    /stroke:\s*var\(--select\)/,
+  );
+});
+
+test("the active walk uses the accent and controls do not", () => {
+  expect(rule(".viz .next path")).toMatch(/stroke:\s*var\(--accent\)/);
+  expect(rule(".viz .edge.sent path")).toMatch(/stroke:\s*var\(--accent\)/);
+  expect(rule(".viz button.primary")).not.toMatch(/--accent|--select/);
+  expect(rule(".viz button:focus-visible")).not.toMatch(/--accent/);
+});
