@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import sitemap from "@astrojs/sitemap";
 import starlight from "@astrojs/starlight";
 import starlightLlmsTxt from "starlight-llms-txt";
 import { mantaqViz } from "@mantaq/inspect/astro";
@@ -17,6 +18,7 @@ export default defineConfig({
   },
   vite: {},
   integrations: [
+    sitemap({ filter: (page) => !page.endsWith("/design/") }),
     mantaqViz({
       machines: [
         "src/content/docs/checkout.ts",

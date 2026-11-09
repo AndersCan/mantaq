@@ -60,11 +60,12 @@ function defs(doc: Document): SVGDefsElement {
         viewBox: "0 0 10 10",
         refX: 9,
         refY: 5,
-        markerWidth: 5,
-        markerHeight: 5,
+        markerWidth: 6,
+        markerHeight: 6,
+        markerUnits: "userSpaceOnUse",
         orient: "auto-start-reverse",
       },
-      [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head" })],
+      [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head arrow-head-loop" })],
     ),
   ]);
 }

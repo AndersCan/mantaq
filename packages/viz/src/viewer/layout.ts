@@ -199,18 +199,21 @@ function polyline(points: ReadonlyArray<Point>): string {
 }
 
 const LOOP_RISE = 24;
-const LOOP_STEP = 32;
-const LOOP_FOOT_STEP = 12;
+const LOOP_STEP = 56;
+const LOOP_FOOT_STEP = 18;
+const MIN_LOOP_MARGIN = 64;
 
 /**
  * Self-loops nest above the node: each one wider and taller than the last,
  * with its own feet, its label just above its apex.
  */
-function selfLoop(node: NodeLabel, nth: number): { path: string; label: Point } {
+function selfLoop(node: NodeLabel, nth: number, count: number): { path: string; label: Point } {
   const { x, y, width, height } = box(node);
   const top = y - height / 2;
   const rise = LOOP_RISE + nth * LOOP_STEP;
-  const half = Math.min(width / 4 + nth * LOOP_FOOT_STEP, width / 2 - 4);
+  // Feet spread over the room the node has, so arrowheads never share a spot.
+  const footStep = Math.min(LOOP_FOOT_STEP, (width / 4 - 4) / Math.max(1, count - 1));
+  const half = width / 4 + nth * footStep;
   const left = (x - half).toFixed(1);
   const right = (x + half).toFixed(1);
   const lift = (top - rise).toFixed(1);
@@ -282,7 +285,24 @@ function avoidLabelCollisions(edges: PlacedEdge[]): PlacedEdge[] {
   }));
 }
 
+function loopCounts(machine: VizMachine): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const edge of machine.edges) {
+    if (edge.kind === "initial" || edge.kind === "effect" || edge.to !== edge.from) continue;
+    counts.set(edge.from, (counts.get(edge.from) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** Room above the top rank so the outermost loop's label stays inside the view. */
+function loopHeadroom(machine: VizMachine): number {
+  const most = Math.max(0, ...loopCounts(machine).values());
+  const outerRise = LOOP_RISE + (most - 1) * LOOP_STEP;
+  return Math.max(MIN_LOOP_MARGIN, Math.ceil(outerRise * 0.75 + LABEL_HEIGHT + 6));
+}
+
 function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
+  const counts = loopCounts(machine);
   const loopsSeen = new Map<string, number>();
   return machine.edges
     .filter((edge) => edge.kind !== "initial" && edge.kind !== "effect")
@@ -294,7 +314,7 @@ function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
           edge,
           target: edge.from,
           dotGap: dotGapFor(MIN_EDGE_LENGTH),
-          ...selfLoop(graph.node(edge.from), nth),
+          ...selfLoop(graph.node(edge.from), nth, counts.get(edge.from) ?? 1),
         };
       }
       const target = edge.to ?? unknownNodeId(edge);
@@ -338,7 +358,7 @@ export function layoutMachine(machine: VizMachine): MachineLayout {
     edgesep: 14,
     marginx: 48,
     // Room above the top rank for hand-drawn self-loops.
-    marginy: 64,
+    marginy: loopHeadroom(machine),
   });
   addRegions(graph, machine.regions);
   addStates(graph, machine);

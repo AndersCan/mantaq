@@ -12,6 +12,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/sitemap": "catalog:",
     "@astrojs/starlight": "^0.41.7",
     "@fontsource-variable/ibm-plex-sans": "catalog:",
     "@fontsource-variable/space-grotesk": "catalog:",

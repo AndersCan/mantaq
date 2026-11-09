@@ -203,6 +203,88 @@ describe("separateLabels", () => {
     expect(ends[1]).toBeGreaterThan(ends[0] ?? 0);
   });
 
+  test("the outer loops clear the inner labels, and the arrowheads land apart", () => {
+    const events = ["alpha", "beta", "gamma"];
+    const machine = machineOf(
+      ["first"],
+      events.map((event) => edge({ from: "first", event, target: "first" })),
+    );
+    const laid = layoutMachine(machine);
+    const edges = laid.edges;
+    const node = laid.nodes[0];
+    const curveOf = (path: string) => {
+      const [p0, p1, p2, p3] = [...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => ({
+        x: Number(m[1]),
+        y: Number(m[2]),
+      }));
+      return [p0, p1, p2, p3] as const;
+    };
+    const at = (u: number, a: number, b: number, c: number, d: number) =>
+      (1 - u) ** 3 * a + 3 * (1 - u) ** 2 * u * b + 3 * (1 - u) * u ** 2 * c + u ** 3 * d;
+    for (let nth = 1; nth < edges.length; nth++) {
+      const inner = edges[nth - 1];
+      const outer = edges[nth];
+      const [p0, p1, p2, p3] = curveOf(outer?.path ?? "");
+      const [i0, , , i3] = curveOf(inner?.path ?? "");
+      if (!p0 || !p1 || !p2 || !p3 || !i0 || !i3 || !node) throw new Error("bad path");
+      // every foot stays on the state's box
+      expect(p0.x).toBeGreaterThanOrEqual(node.x - node.width / 2);
+      expect(p3.x).toBeLessThanOrEqual(node.x + node.width / 2);
+      // arrowheads (6 wide) do not touch on either side
+      expect(p3.x - i3.x).toBeGreaterThanOrEqual(6);
+      expect(i0.x - p0.x).toBeGreaterThanOrEqual(6);
+      // the outer curve, where it passes the inner label's height, is left of the label's text
+      const labelWidth = (events[nth - 1]?.length ?? 0) * 7 + 8;
+      const labelTop = (inner?.label.y ?? 0) - 8;
+      let leftX = Number.NaN;
+      for (let step = 0; step <= 400; step++) {
+        const u = step / 400;
+        if (at(u, p0.y, p1.y, p2.y, p3.y) <= labelTop) {
+          leftX = at(u, p0.x, p1.x, p2.x, p3.x);
+          break;
+        }
+      }
+      expect(leftX).toBeLessThan((inner?.label.x ?? 0) - labelWidth / 2);
+    }
+  });
+
+  test("outgoing edges do not shrink the foot spread of the loops", () => {
+    const loops = ["alpha", "beta"].map((event) => edge({ from: "first", event, target: "first" }));
+    const outgoing = ["x", "y", "z"].map((event, index) =>
+      edge({ from: "first", event, target: `t${index}` }),
+    );
+    const machine = machineOf(["first", "t0", "t1", "t2"], [...loops, ...outgoing]);
+    const starts = layoutMachine(machine)
+      .edges.filter((placed) => placed.edge.to === placed.edge.from)
+      .map((placed) => Number(/^M(-?[\d.]+)/.exec(placed.path)?.[1]));
+    expect((starts[0] ?? 0) - (starts[1] ?? 0)).toBeGreaterThanOrEqual(6);
+  });
+
+  test("the outermost loop label stays inside the layout", () => {
+    const machine = machineOf(
+      ["first"],
+      ["alpha", "beta", "gamma"].map((event) => edge({ from: "first", event, target: "first" })),
+    );
+    for (const placed of layoutMachine(machine).edges) {
+      expect(placed.label.y - 8).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  test("the top margin keeps 64 for one loop and grows for three", () => {
+    const topOf = (count: number) => {
+      const events = ["alpha", "beta", "gamma"].slice(0, count);
+      const machine = machineOf(
+        ["first"],
+        events.map((event) => edge({ from: "first", event, target: "first" })),
+      );
+      const node = layoutMachine(machine).nodes[0];
+      return (node?.y ?? 0) - (node?.height ?? 0) / 2;
+    };
+    expect(topOf(0)).toBe(64);
+    expect(topOf(1)).toBe(64);
+    expect(topOf(3)).toBeGreaterThan(64);
+  });
+
   test("labels of parallel edges get distinct rows", () => {
     const machine = machineOf(
       ["first", "b"],
