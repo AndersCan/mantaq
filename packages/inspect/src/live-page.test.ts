@@ -112,8 +112,10 @@ describe("mountDriven filled forms", () => {
     click('[data-payload-send="ask"]');
     click('[data-send="answered"]');
     expect(root.querySelector<HTMLInputElement>('[data-field="code"]')?.value).toBe("c1");
-    const answer = root.querySelector<HTMLSelectElement>('[data-field="answer"]');
-    if (answer) answer.value = '"declined"';
+    const declined = [
+      ...root.querySelectorAll<HTMLButtonElement>('[data-field="answer"] button'),
+    ].find((each) => each.getAttribute("data-choice") === '"declined"');
+    declined?.click();
     click('[data-payload-send="answered"]');
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
   });

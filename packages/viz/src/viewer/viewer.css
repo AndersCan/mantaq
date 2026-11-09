@@ -697,3 +697,36 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.viz .payload-title {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.viz .segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.viz .segmented button {
+  border-radius: 0;
+}
+
+.viz .segmented button + button {
+  margin-left: -1px;
+}
+
+.viz .segmented button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.viz .segmented button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.viz .segmented button[aria-pressed="true"] {
+  background: var(--region-bg);
+  border-color: var(--accent);
+  font-weight: 600;
+  position: relative;
+}

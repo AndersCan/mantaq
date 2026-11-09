@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { VizField, VizJson } from "../schema.ts";
-import { fillSources, fuzzSources, knownPayload } from "./fill.ts";
+import { fillChoices, fillSources, fuzzSources, knownPayload } from "./fill.ts";
 
 function field(name: string, input: VizField["input"], choices: VizJson[] = []): VizField {
   return { name, type: "x", optional: false, doc: null, input, choices, sample: "sample" };
@@ -173,7 +173,7 @@ describe("fillSources: what the walk sent", () => {
       ...live("s", { name: "held" }, null),
       steps: [step("EDIT_NAME", { name: "Al" }), step("EDIT_NAME", { name: "Ada" })],
     });
-    expect(result.map((each) => each.path)).toEqual(["you typed", "s"]);
+    expect(result.map((each) => each.path)).toEqual(["Last sent", "s"]);
     expect(result[0]?.values).toEqual([{ field: "name", value: "Ada" }]);
   });
 
@@ -189,7 +189,7 @@ describe("fillSources: what the walk sent", () => {
         step("E", { other: "x" }),
       ],
     });
-    expect(result).toEqual([{ path: "you typed", values: [{ field: "name", value: "kept" }] }]);
+    expect(result).toEqual([{ path: "Last sent", values: [{ field: "name", value: "kept" }] }]);
   });
 
   test("nothing sent means no typed source", () => {
@@ -253,5 +253,95 @@ describe("knownPayload", () => {
   test("without fields and nothing known: undefined", () => {
     expect(knownPayload(null, base)).toBeUndefined();
     expect(knownPayload(null, { ...base, steps: [step("pay", null)] })).toBeUndefined();
+  });
+});
+
+describe("fillChoices", () => {
+  const code = field("code", "text");
+  const mode: VizField = { ...field("mode", "choice", ["a", "b"]), sample: "a" };
+  const send = (payload: VizJson) => ({ kind: "event" as const, event: "go", payload });
+  const labels = (found: ReturnType<typeof fillChoices>) => found.map((each) => each.label);
+
+  test("orders Last sent, Fuzz 1, Fuzz 2, Example", () => {
+    const found = fillChoices([code, mode], {
+      live: null,
+      samples: [
+        { code: "z1", mode: "b" },
+        { code: "z2", mode: "b" },
+      ],
+      steps: [send({ code: "sent", mode: "b" })],
+    });
+    expect(labels(found)).toEqual(["Last sent", "Fuzz 1", "Fuzz 2", "Example"]);
+  });
+
+  test("Context is the first match that is not Last sent, titled with where it is", () => {
+    const found = fillChoices([code], {
+      live: live("idle", null, { code: "held" }),
+      samples: [],
+      steps: [send({ code: "sent" })],
+    });
+    expect(found).toEqual([
+      { label: "Last sent", title: null, values: [{ field: "code", value: "sent" }] },
+      { label: "Example", title: null, values: [{ field: "code", value: "sample" }] },
+      { label: "Context", title: "context", values: [{ field: "code", value: "held" }] },
+    ]);
+  });
+
+  test("Context is offered when nothing was sent", () => {
+    const found = fillChoices([code], {
+      live: live("idle", null, { code: "held" }),
+      samples: [],
+      steps: [],
+    });
+    expect(found.map((each) => [each.label, each.title])).toEqual([
+      ["Example", null],
+      ["Context", "context"],
+    ]);
+  });
+
+  test("a choice repeating an earlier one is dropped", () => {
+    const found = fillChoices([code], {
+      live: live("idle", null, { code: "sample" }),
+      samples: [],
+      steps: [],
+    });
+    expect(found).toEqual([]);
+  });
+
+  test("past four, Fuzz 2 goes", () => {
+    const found = fillChoices([code], {
+      live: live("idle", null, { code: "held" }),
+      samples: [{ code: "z1" }, { code: "z2" }],
+      steps: [send({ code: "sent" })],
+    });
+    expect(labels(found)).toEqual(["Last sent", "Fuzz 1", "Example", "Context"]);
+  });
+
+  test("fewer than two choices: none", () => {
+    expect(fillChoices([code], { live: null, samples: [], steps: [] })).toEqual([]);
+  });
+
+  test("with only optional fields there is no Example button", () => {
+    const note: VizField = { ...code, name: "note", optional: true };
+    const found = fillChoices([note], {
+      live: null,
+      samples: [{ note: "n" }],
+      steps: [send({ note: "sent" })],
+    });
+    expect(labels(found)).toEqual(["Last sent", "Fuzz 1"]);
+  });
+
+  test("Example leaves out optional fields", () => {
+    const note: VizField = { ...code, name: "note", optional: true };
+    const found = fillChoices([code, note], {
+      live: null,
+      samples: [{ code: "z", note: "n" }],
+      steps: [],
+    });
+    expect(found.at(-1)).toEqual({
+      label: "Example",
+      title: null,
+      values: [{ field: "code", value: "sample" }],
+    });
   });
 });

@@ -219,3 +219,13 @@ test("the planted-bug machine shows six findings and replays the dead end", asyn
     expect(viz.problems()).toEqual([]);
   });
 }, 60_000);
+
+test("fills a choice field shown as a row of buttons", async () => {
+  const answer = join(import.meta.dirname, "fixtures", "answer.ts");
+  await withViz(answer, async (viz) => {
+    const asked = await viz.send("ask", { code: "c1", album: "Trip" });
+    expect(Either.getRight(asked)).toEqual({ state: "waitingForAnswer", outcome: "transition" });
+    const answered = await viz.send("answered", { code: "c1", answer: "declined" });
+    expect(Either.getRight(answered)).toEqual({ state: "declined", outcome: "transition" });
+  });
+}, 60_000);

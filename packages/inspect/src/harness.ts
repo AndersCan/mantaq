@@ -131,6 +131,8 @@ async function fillForm(
     const tag = await field.evaluate((node) => node.tagName.toLowerCase());
     if (tag === "select") {
       await field.selectOption(JSON.stringify(value));
+    } else if (tag === "div") {
+      await field.locator(`[data-choice=${quoted(JSON.stringify(value))}]`).click();
     } else {
       await field.fill(typeof value === "string" ? value : JSON.stringify(value));
     }

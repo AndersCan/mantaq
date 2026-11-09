@@ -2,7 +2,7 @@ import type { VizField, VizJson, VizLiveState, VizStep } from "../schema.ts";
 
 /** Values for an event's payload fields, copied from one thing the machine holds now. */
 export interface FillSource {
-  /** Where they come from: `waitingForAdminToAccept`, `context`, `context.requests[1]`, or `fuzz example 1` for a payload fuzzing sent. */
+  /** Where they come from: `waitingForAdminToAccept`, `context`, `context.requests[1]`, or `fuzz example 1` for a payload fuzzing sent, `Last sent` for what this walk sent. */
   path: string;
   /** Field name to value; only fields whose value fits, in the event's field order. */
   values: Array<{ field: string; value: VizJson }>;
@@ -71,7 +71,7 @@ function typedSource(
       break;
     }
   }
-  return values.length === 0 ? null : { path: "you typed", values };
+  return values.length === 0 ? null : { path: "Last sent", values };
 }
 
 /** Everything the payload could be filled from, best first: what this walk sent, then what the machine holds. [] = nothing fits; the form stays as today. */
@@ -169,4 +169,65 @@ export function fuzzSources(
     found.push({ path: `fuzz example ${found.length + 1}`, values });
   }
   return found;
+}
+
+/** One button of the form's "Values from" row. */
+export interface FillChoice {
+  label: string;
+  /** Shown on hover: where the values come from; null = the label says it. */
+  title: string | null;
+  values: FillSource["values"];
+}
+
+const choiceLimit = 4;
+
+function withoutRepeats(wanted: ReadonlyArray<FillChoice | undefined>): FillChoice[] {
+  const seen = new Set<string>();
+  const kept: FillChoice[] = [];
+  for (const each of wanted) {
+    if (each === undefined) continue;
+    const key = JSON.stringify(each.values);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(each);
+  }
+  return kept;
+}
+
+function choiceOf(
+  label: string,
+  values: FillSource["values"] | undefined,
+  title?: string,
+): FillChoice | undefined {
+  if (values === undefined || values.length === 0) return undefined;
+  return { label, title: title ?? null, values };
+}
+
+/** The "Values from" buttons, in order: Last sent, Fuzz 1, Fuzz 2, Example, Context. A choice whose values repeat an earlier one is dropped; past four, so is Fuzz 2. Fewer than two: none. */
+export function fillChoices(
+  fields: ReadonlyArray<VizField>,
+  context: {
+    live: Pick<VizLiveState, "state" | "payload" | "context"> | null;
+    samples: ReadonlyArray<VizJson>;
+    steps: ReadonlyArray<VizStep>;
+  },
+): FillChoice[] {
+  const { live, samples, steps } = context;
+  const typed = typedSource(fields, steps);
+  const held = live === null ? [] : fillSources(fields, { ...live, steps });
+  const contextual = held.at(typed === null ? 0 : 1);
+  const [first, second] = fuzzSources(fields, samples);
+  const examples: FillSource["values"] = fields
+    .filter((field) => !field.optional)
+    .map((field) => ({ field: field.name, value: field.sample }));
+  const wanted = [
+    choiceOf("Last sent", typed?.values),
+    choiceOf("Fuzz 1", first?.values),
+    choiceOf("Fuzz 2", second?.values),
+    choiceOf("Example", examples),
+    choiceOf("Context", contextual?.values, contextual?.path),
+  ];
+  const kept = withoutRepeats(wanted);
+  const trimmed = kept.length > choiceLimit ? kept.filter((each) => each.label !== "Fuzz 2") : kept;
+  return trimmed.length < 2 ? [] : trimmed;
 }
