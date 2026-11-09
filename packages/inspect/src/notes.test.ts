@@ -1,4 +1,3 @@
-import type { VizStep } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -9,7 +8,6 @@ import {
   cleanNoteText,
   copyText,
   isNoteTarget,
-  isVizSteps,
   notesFileOf,
   parseNotes,
   parseTarget,
@@ -204,87 +202,26 @@ describe("notes file", () => {
   });
 });
 
-describe("walk notes", () => {
-  const steps = [
-    { kind: "event", event: "GO", payload: { n: 1 } },
-    { kind: "advance", ms: 3600000 },
-  ] as const;
-
-  test("appendNote writes the walk lines and parseNotes reads them back", () => {
-    const added = appendNote(undefined, {
-      file: "m.ts",
-      machine: "m",
-      target: { kind: "walk" },
-      note: "Nils picks 1 hour",
-      walk: { end: "t", steps: [...steps] },
-    });
-    expect(added.text).toContain(
-      '- id: n1\n  machine: m\n  on: walk\n  status: open\n  note: Nils picks 1 hour\n  end: t\n  steps: [{"kind":"event","event":"GO","payload":{"n":1}},{"kind":"advance","ms":3600000}]\n',
-    );
-    const [note] = Either.getRight(parseNotes(added.text, "m.notes.md")) ?? [];
-    expect(note?.target).toEqual({ kind: "walk" });
-    expect(note?.end).toBe("t");
-    expect(note?.steps).toEqual(steps);
-    expect(note).toEqual(added.note);
+describe("walk targets are gone", () => {
+  test("an `on: walk` item in a notes file parses with no target", () => {
+    const text = "mantaq notes v1\n- id: n1\n  on: walk\n  status: open\n  note: old walk note\n";
+    const [note] = Either.getRight(parseNotes(text, "x")) ?? [];
+    expect(note?.on).toBe("walk");
+    expect(note?.target).toBeUndefined();
+    expect(note?.note).toBe("old walk note");
   });
 
-  test("other notes have no end or steps", () => {
-    const [note] = Either.getRight(parseNotes(twice(), "x")) ?? [];
-    expect(note?.end).toBeUndefined();
-    expect(note?.steps).toBeUndefined();
-  });
-
-  test("malformed steps give undefined and do not throw", () => {
-    for (const bad of [
-      "{oops",
-      "{}",
-      '[{"kind":"advance","ms":-1}]',
-      '[{"kind":"event","event":"","payload":1}]',
-      '[{"kind":"event","event":"GO"}]',
-      "",
-    ]) {
-      const text = `mantaq notes v1\n- id: n1\n  on: walk\n  end: t\n  steps: ${bad}\n`;
-      const [note] = Either.getRight(parseNotes(text, "x")) ?? [];
-      expect(note?.target).toEqual({ kind: "walk" });
-      expect(note?.steps).toBeUndefined();
-      expect(note?.note).toMatch(/^\[unreadable steps\]/);
-    }
-  });
-
-  test("a payload with a newline and field-like text stays inside the steps", () => {
-    const steps = [{ kind: "event" as const, event: "GO", payload: "a\n  end: x\n- id: n9" }];
-    const added = appendNote(undefined, {
-      file: "m.ts",
-      machine: "m",
-      target: { kind: "walk" },
-      note: "hi",
-      walk: { end: "t", steps },
-    });
-    const [note] = Either.getRight(parseNotes(added.text, "x")) ?? [];
-    expect(note?.end).toBe("t");
-    expect(note?.steps).toEqual(steps);
-  });
-
-  test("walk target text, parse, guard", () => {
-    expect(targetText({ kind: "walk" })).toBe("walk");
-    expect(parseTarget("walk")).toEqual({ kind: "walk" });
-    expect(isNoteTarget({ kind: "walk" })).toBe(true);
-    expect(targetProblem(shape, { machine: "m", target: { kind: "walk" } })).toBeUndefined();
-    expect(isVizSteps([])).toBe(true);
-    expect(isVizSteps("x")).toBe(false);
+  test("walk is not a target", () => {
+    expect(parseTarget("walk")).toBeUndefined();
+    expect(isNoteTarget({ kind: "walk" })).toBe(false);
   });
 });
 
 describe("copyText", () => {
-  const walk: { end: string; steps: VizStep[] } = {
-    end: "payment",
-    steps: [{ kind: "event", event: "PAY", payload: 1 }],
-  };
-
-  test("state, edge and walk notes across two files give two groups that parse back", () => {
+  test("state and edge notes across two files give two groups that parse back", () => {
     const notes: CopiedNote[] = [
       { file: "a.ts", machine: "a", target: state("one"), note: "first" },
-      { file: "b.ts", machine: "b", target: { kind: "walk" }, note: "walk it", walk },
+      { file: "b.ts", machine: "b", target: state("two"), note: "second" },
       { file: "a.ts", machine: "a", target: { kind: "edge", from: "one", event: "GO" }, note: "x" },
     ];
     const text = copyText(notes);
@@ -300,10 +237,7 @@ describe("copyText", () => {
       state("one"),
       { kind: "edge", from: "one", event: "GO" },
     ]);
-    expect(Either.isRight(b) && b[1][0]?.end).toBe("payment");
-    expect(Either.isRight(b) && b[1][0]?.steps).toEqual([
-      { kind: "event", event: "PAY", payload: 1 },
-    ]);
+    expect(Either.isRight(b) && b[1][0]?.target).toEqual(state("two"));
   });
 
   test("a note with a newline and a tab stays on one line", () => {

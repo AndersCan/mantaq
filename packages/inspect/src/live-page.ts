@@ -18,8 +18,8 @@ import type {
 import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
-import { copyNotesFooter, pageNotes, sendBar } from "./notes-copy.ts";
-import { notesFooter } from "./notes-page.ts";
+import { listenForNotes } from "./note-composer.ts";
+import type { NoteAction } from "./note-composer.ts";
 
 export type LiveTargets = Readonly<Record<string, FuzzTarget["create"]>>;
 
@@ -123,6 +123,25 @@ function routesOf(context: { routes?: VizOutputRoutes }): { routes?: VizOutputRo
   return context.routes === undefined ? {} : { routes: context.routes };
 }
 
+/** Where notes go: the dev server when it has a url, else a copied block; undefined = none. */
+function notesOf(context: { notes?: string; copyNotes?: { file: string } }): {
+  action?: NoteAction;
+} {
+  if (context.notes !== undefined) return { action: { kind: "save", url: context.notes } };
+  if (context.copyNotes !== undefined)
+    return { action: { kind: "copy", file: context.copyNotes.file } };
+  return {};
+}
+
+function mountNotes(
+  viewer: HTMLElement,
+  context: { machine: VizMachine; action?: NoteAction },
+): void {
+  if (context.action !== undefined) {
+    listenForNotes(viewer, { machine: context.machine, action: context.action });
+  }
+}
+
 /** Mount the document at `text`; machines with a target run live, the rest stay static walks. */
 export function mountDriven(
   root: HTMLElement,
@@ -131,9 +150,9 @@ export function mountDriven(
     text: string;
     targets: LiveTargets;
     heading?: "h1" | "h2" | "h3";
-    /** URL of the dev server's notes endpoint; unset = no notes section. */
+    /** URL of the dev server's notes endpoint; unset = no notes. Right-clicking a state or arrow saves a note there. */
     notes?: string;
-    /** Page without a dev server: collect notes in the tab and copy them for the agent. `file` names the machine file in the block. `notes` wins when both are set. */
+    /** Page without a dev server: right-clicking a state or arrow copies one note for the agent. `file` names the machine file in the block. `notes` wins when both are set. */
     copyNotes?: { file: string };
     /** Where the dev page keeps each machine's outline for "what changed"; unset = no marks. */
     seen?: SeenStorage;
@@ -180,45 +199,14 @@ export function mountDriven(
   const machine = shown.machines[0];
   const changes = changesOption(context, machine, viz.machines);
   const driver = liveDriver(id, create, context.effectMode);
-  const footer = panelFooter(doc, context, machine);
   mountViewer(viewer, shown, {
     ...options,
     ...changes,
-    ...(footer === undefined ? {} : { panelFooter: footer }),
     ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...routesOf(context),
     ...(driver === undefined ? {} : { driver }),
   });
-}
-
-/** The notes box for the selected state or edge, when the page can take notes. */
-function panelFooter(
-  doc: Document,
-  context: { notes?: string; copyNotes?: { file: string } },
-  machine: VizMachine | undefined,
-): ViewerOptions["panelFooter"] {
-  if (machine === undefined) return undefined;
-  if (context.notes !== undefined) return notesFooter(doc, { url: context.notes, machine });
-  if (context.copyNotes !== undefined) return copyFooter(doc, context.copyNotes.file, machine);
-  return undefined;
-}
-
-/** A page without a dev server: notes stay in the tab, the bar copies them. */
-function copyFooter(
-  doc: Document,
-  file: string,
-  machine: VizMachine,
-): NonNullable<ViewerOptions["panelFooter"]> {
-  const store = pageNotes(doc);
-  const notes = copyNotesFooter(doc, { file, machine, store });
-  const wrapper = doc.createElement("div");
-  wrapper.className = "panel-extras";
-  const bar = sendBar(doc, store);
-  return (selection) => {
-    const part = notes(selection);
-    if (wrapper.firstChild === null && part !== undefined) wrapper.append(part, bar);
-    return wrapper;
-  };
+  if (machine !== undefined) mountNotes(viewer, { machine, ...notesOf(context) });
 }
 
 /** `?machine=<a>&compare=<b>` names two designs; undefined unless both are set and differ. */

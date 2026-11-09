@@ -10,12 +10,10 @@ import {
   appendNote,
   cleanNoteText,
   isNoteTarget,
-  isVizSteps,
   notesFileOf,
   parseNotes,
   targetProblem,
 } from "./notes.ts";
-import type { VizStep } from "@mantaq/viz";
 import type { MachineShape, Note, NoteAdded, NoteTarget, NotesList } from "./notes.ts";
 import { posix, relative, sep } from "node:path";
 
@@ -110,7 +108,6 @@ interface Post {
   machine: string;
   target: NoteTarget;
   text: string;
-  walk?: { end: string; steps: VizStep[] };
 }
 
 /** The body checks that need no machine; the machine check sits between them and the target. */
@@ -123,30 +120,6 @@ function parsePost(body: string): Either<NotesResponse, Record<string, unknown>>
   return Either.right(parsed);
 }
 
-function checkWalk(
-  body: Record<string, unknown>,
-  machine: string,
-  shape: MachineShape,
-): Either<NotesResponse, Post> {
-  const steps = body["steps"];
-  if (!isVizSteps(steps)) return Either.left(fail(400, "the journey needs its steps"));
-  if (steps.length === 0) {
-    return Either.left(fail(400, "walk the machine before saving a journey"));
-  }
-  for (const step of steps) {
-    if (step.kind === "event" && !shape.events.some((event) => event.id === step.event)) {
-      return Either.left(fail(404, `no event ${step.event} in ${machine}`));
-    }
-  }
-  const end = body["end"];
-  if (typeof end !== "string" || !/^\S+$/.test(end) || !shape.states.some((s) => s.id === end)) {
-    return Either.left(fail(404, `no state ${String(end)} in ${machine}`));
-  }
-  const text = typeof body["note"] === "string" ? cleanNoteText(body["note"]) : "";
-  if (text === "") return Either.left(fail(400, "the journey needs a name"));
-  return Either.right<Post>({ machine, target: { kind: "walk" }, text, walk: { end, steps } });
-}
-
 function checkPost(
   body: Record<string, unknown>,
   machine: string,
@@ -154,7 +127,6 @@ function checkPost(
 ): Either<NotesResponse, Post> {
   const target = body["target"];
   if (!isNoteTarget(target)) return Either.left(fail(400, "the note needs a state or an arrow"));
-  if (target.kind === "walk") return checkWalk(body, machine, shape);
   const problem = targetProblem(shape, { machine, target });
   if (problem !== undefined) return Either.left(fail(404, problem));
   const text = typeof body["note"] === "string" ? cleanNoteText(body["note"]) : "";
@@ -171,7 +143,6 @@ function save(context: NotesContext, where: Where, post: Post): NotesResponse {
     machine: post.machine,
     target: post.target,
     note: post.text,
-    ...(post.walk === undefined ? {} : { walk: post.walk }),
   });
   const written = context.files.write(where.path, added.text);
   if (Either.isLeft(written)) return fail(500, `could not write ${where.file} (${written[0]})`);
