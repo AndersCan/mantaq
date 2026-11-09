@@ -614,6 +614,71 @@ describe("live actor map children", () => {
       expect(pathTexts(root)).toEqual(["start", "uploadConfirmed: p1 sendingPhoto → photoSent"]);
     });
 
+    test("an advance that fires nothing leaves later Path entries with their own outcomes", () => {
+      const root = document.createElement("div");
+      const moves = [
+        {
+          ...stepOf("uploadFailed", "photos.sendingPhoto", "photos.waitingForRetry", "transition"),
+        },
+        {
+          ...stepOf("retryPressed", "photos.waitingForRetry", "photos.sendingPhoto", "transition"),
+        },
+      ];
+      let sent: VizStep[] = [];
+      const driver: VizDriver = {
+        reset: () => {
+          sent = [];
+          return live([child("p1", "sendingPhoto", 0)]);
+        },
+        step: (step) => {
+          sent = [...sent, step];
+          if (step.kind === "advance") return live([child("p1", "sendingPhoto", 0)], sent);
+          const done = sent.filter((each) => each.kind === "event").length;
+          return {
+            ...live([child("p1", "sendingPhoto", 0)], sent),
+            last: { ...moves[done - 1]!, actor: { map: "photos", key: "p1" } },
+          };
+        },
+      };
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withPhotoAdded] },
+        { driver },
+      );
+      root.querySelector<HTMLButtonElement>("[data-advance]")?.click();
+      sendFrom(root, "p1", "uploadFailed");
+      sendFrom(root, "p1", "retryPressed");
+      const expected = [
+        "start",
+        "advance 100 ms",
+        "uploadFailed: p1 sendingPhoto → waitingForRetry",
+        "retryPressed: p1 waitingForRetry → sendingPhoto",
+      ];
+      expect(pathTexts(root)).toEqual(expected);
+      root.querySelector<HTMLButtonElement>('[data-rewind="3"]')?.click();
+      expect(pathTexts(root)).toEqual(expected);
+    });
+
+    test("with two maps the Path entry shows the map name", () => {
+      const two: VizMachine = { ...photoQueue, maps: ["photos", "videos"] };
+      const { root } = mount([child("p1", "sendingPhoto")], two, () => ({
+        ...stepOf("uploadConfirmed", "photos.sendingPhoto", "photos.photoSent", "transition"),
+        actor: { map: "photos", key: "p1" },
+      }));
+      sendFrom(root, "p1", "uploadConfirmed");
+      expect(pathTexts(root).at(-1)).toBe("uploadConfirmed: photos p1 sendingPhoto → photoSent");
+    });
+
+    test("a short Path entry has no title", () => {
+      const root = scripted([afterAdd1], ["photoAdded"]);
+      expect(root.querySelector('[data-rewind="1"]')?.hasAttribute("title")).toBe(false);
+    });
+
+    test("an array payload reads as JSON in the Path", () => {
+      const root = scripted([afterAdd1], ['photoAdded=["a","b"]']);
+      expect(pathTexts(root).at(-1)).toBe('photoAdded ["a","b"] → p1 started');
+    });
+
     test("four removed keys are cut to three and a count", () => {
       const keys = ["p1", "p2", "p3", "p4"];
       const root = scripted(

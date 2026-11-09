@@ -50,7 +50,7 @@ interface ViewState {
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
   /** Entry i is the driver's `last` for `live.steps[i]`. */
-  outcomes: VizLiveStep[];
+  outcomes: Array<VizLiveStep | null>;
   /** Context before the last live step; undefined when no step ran. */
   previous: VizJson | undefined;
   /** Live: the event whose payload form is open. */
@@ -481,8 +481,7 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   view.previous = view.live?.context;
   const length = view.live?.steps.length ?? 0;
   view.live = stepSafely(driver, { before: view.live, step });
-  if (view.live.steps.length === length + 1 && view.live.last !== null)
-    view.outcomes.push(view.live.last);
+  if (view.live.steps.length === length + 1) view.outcomes.push(view.live.last);
   view.motion = true;
   view.composing = null;
 }
@@ -708,13 +707,13 @@ function liveState(view: ViewState): { currents?: string[] } {
 function replay(
   driver: VizDriver,
   steps: ReadonlyArray<VizStep>,
-): { live: VizLiveState; outcomes: VizLiveStep[] } {
+): { live: VizLiveState; outcomes: Array<VizLiveStep | null> } {
   let live = driver.reset();
-  const outcomes: VizLiveStep[] = [];
+  const outcomes: Array<VizLiveStep | null> = [];
   for (const step of steps) {
     const length = live.steps.length;
     live = stepSafely(driver, { before: live, step });
-    if (live.steps.length === length + 1 && live.last !== null) outcomes.push(live.last);
+    if (live.steps.length === length + 1) outcomes.push(live.last);
     if (live.last?.error) return { live, outcomes };
   }
   return { live, outcomes };

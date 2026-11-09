@@ -31,7 +31,7 @@ export interface ExploreContext {
   live?: {
     state: VizLiveState;
     /** Entry i is the driver's `last` for `state.steps[i]`. */
-    outcomes: ReadonlyArray<VizLiveStep>;
+    outcomes: ReadonlyArray<VizLiveStep | null>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
@@ -1262,9 +1262,14 @@ function liveResultSection(
 }
 
 /** `: p1 sendingPhoto → photoSent` and its kin for a step sent to a map child; "" for any other step. */
-function childMove(machine: VizMachine, step: VizStep, outcome: VizLiveStep | undefined): string {
+function childMove(
+  machine: VizMachine,
+  step: VizStep,
+  outcome: VizLiveStep | null | undefined,
+): string {
   const actor = step.kind === "event" ? step.actor : undefined;
-  if (actor === undefined || !("map" in actor) || outcome === undefined) return "";
+  if (actor === undefined || !("map" in actor) || outcome === undefined || outcome === null)
+    return "";
   const who = childWhoText(machine, actor);
   if (outcome.outcome === "transition") {
     return `: ${who} ${localName(outcome.from)} → ${localName(outcome.to)}`;
@@ -1276,7 +1281,7 @@ function childMove(machine: VizMachine, step: VizStep, outcome: VizLiveStep | un
 /** The Path entry for step `index`: what was sent, what the child did, which children it started or removed. */
 function pathEntry(
   machine: VizMachine,
-  at: { live: { state: VizLiveState; outcomes: ReadonlyArray<VizLiveStep> }; index: number },
+  at: { live: { state: VizLiveState; outcomes: ReadonlyArray<VizLiveStep | null> }; index: number },
 ): { text: string; title: string | null } {
   const { index } = at;
   const { state, outcomes } = at.live;
