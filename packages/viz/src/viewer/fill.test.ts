@@ -395,6 +395,26 @@ describe("freshKeys", () => {
     expect(ask({ photoId: "p09" }, state)).toEqual({ photoId: "p10" });
   });
 
+  test("a key with twenty digits still gets the next number", () => {
+    const big = "p99999999999999999999";
+    const state = { steps: [add(big)], children: [child(big, 1)] };
+    const next = { photoId: "p100000000000000000000" };
+    expect(ask({ photoId: big }, state)).toEqual(next);
+    const taken = { ...state, children: [...state.children, child(next.photoId, 2)] };
+    expect(ask({ photoId: big }, taken)).toEqual({ photoId: "p100000000000000000001" });
+  });
+
+  test("the number keeps its width past leading zeros", () => {
+    const state = { steps: [add("p001")], children: [child("p001", 1)] };
+    expect(ask({ photoId: "p001" }, state)).toEqual({ photoId: "p2" });
+  });
+
+  test("another step of this event with a different payload is no evidence", () => {
+    const steps = [add("x")];
+    const state = { steps, children: [child("p1", 1)] };
+    expect(ask({ photoId: "p1" }, state)).toEqual({ photoId: "p1" });
+  });
+
   test("another event's step is no evidence", () => {
     const state = { steps: [add("p1")], children: [child("p1", 1)] };
     const result = freshKeys({ photoId: "p1" }, { event: "photoRemoved", state });

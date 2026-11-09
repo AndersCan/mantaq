@@ -143,7 +143,7 @@ function nextKey(value: string, taken: ReadonlySet<string>): string {
     }
   }
   const [, prefix = "", digits = ""] = match;
-  for (let count = Number(digits) + 1; ; count += 1) {
+  for (let count = BigInt(digits) + 1n; ; count += 1n) {
     if (!taken.has(`${prefix}${count}`)) return `${prefix}${count}`;
   }
 }

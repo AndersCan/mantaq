@@ -459,6 +459,61 @@ describe("live actor map children", () => {
       root.querySelector<HTMLButtonElement>("[data-always-ask]")?.click();
       clickSend(root, "photoAdded");
       expect(form()?.value).toBe("p2");
+      const typed = form();
+      if (typed) typed.value = "p1";
+      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
+      expect(sent.at(-1)).toEqual({
+        kind: "event",
+        event: "photoAdded",
+        payload: { photoId: "p1" },
+      });
+    });
+
+    test("the form opens on the next key when the evidence is only in a removed child", () => {
+      const keyed: VizMachine = {
+        ...withPhotoAdded,
+        events: [
+          {
+            ...event("photoAdded"),
+            payload: [
+              {
+                name: "photoId",
+                type: "string",
+                optional: false,
+                doc: null,
+                input: "text",
+                choices: [],
+                sample: "p1",
+              },
+            ],
+          },
+          event("queueCleared"),
+        ],
+      };
+      const root = document.createElement("div");
+      let sent: VizStep[] = [];
+      const driver: VizDriver = {
+        reset: () => {
+          sent = [];
+          return live([]);
+        },
+        step: (step) => {
+          sent = [...sent, step];
+          return {
+            ...live([child("p1", "sendingPhoto", 2)], sent),
+            removed: [{ ...child("p1", "sendingPhoto", 1), until: 2 }],
+            last: rootStay("photoAdded"),
+          };
+        },
+      };
+      mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [keyed] }, { driver });
+      clickSend(root, "photoAdded");
+      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
+      root.querySelector<HTMLButtonElement>("[data-always-ask]")?.click();
+      clickSend(root, "photoAdded");
+      expect(
+        root.querySelector<HTMLInputElement>('[data-payload-form="photoAdded"] input')?.value,
+      ).toBe("p2");
     });
 
     test("the JSON box opens with the next free key when the event declares no fields", () => {
