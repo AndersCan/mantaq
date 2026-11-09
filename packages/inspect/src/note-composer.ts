@@ -41,7 +41,7 @@ interface Form {
 const TOAST_MS = 2000;
 const EDGE = 8;
 const LOOK =
-  "z-index:3;box-sizing:border-box;background:var(--state-bg);color:var(--fg);border:1px solid var(--accent);border-radius:6px;box-shadow:0 4px 16px rgb(0 0 0 / 25%)";
+  "z-index:3;box-sizing:border-box;background:var(--state-bg);color:var(--fg);border:1px solid var(--fg);border-radius:6px;box-shadow:0 4px 16px rgb(0 0 0 / 25%)";
 
 function closeBox(session: Session): void {
   session.box?.remove();
