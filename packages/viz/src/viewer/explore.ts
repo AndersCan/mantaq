@@ -6,6 +6,8 @@ import type {
   VizActorRef,
   VizField,
   VizJson,
+  VizLiveChild,
+  VizRemovedChild,
   VizLiveState,
   VizLiveStep,
   VizLiveTimer,
@@ -28,6 +30,8 @@ export interface ExploreContext {
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
   live?: {
     state: VizLiveState;
+    /** Entry i is the driver's `last` for `state.steps[i]`. */
+    outcomes: ReadonlyArray<VizLiveStep | null>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
@@ -182,9 +186,43 @@ function pathSection(doc: Document, context: ExploreContext): HTMLElement {
   ]);
 }
 
-function describeStep(step: VizStep): string {
-  if (step.kind === "advance") return `advance ${step.ms} ms`;
-  return step.payload === null ? step.event : `${step.event} ${JSON.stringify(step.payload)}`;
+/** An object prints `{name value, name value}` (strings raw, other values as JSON); anything else as JSON. */
+function payloadText(value: VizJson): string {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+  const fields = Object.entries(value).map(
+    ([name, each]) => `${name} ${typeof each === "string" ? each : JSON.stringify(each)}`,
+  );
+  return `{${fields.join(", ")}}`;
+}
+
+type ChildRef = { map: string; key: string };
+
+/** The key, with the map name only when the machine has more than one map. */
+function childWho(doc: Document, machine: VizMachine, ref: ChildRef): Array<Node | string> {
+  return machine.maps.length > 1
+    ? [code(doc, ref.map), " ", code(doc, ref.key)]
+    : [code(doc, ref.key)];
+}
+
+function childWhoText(machine: VizMachine, ref: ChildRef): string {
+  return machine.maps.length > 1 ? `${ref.map} ${ref.key}` : ref.key;
+}
+
+/** Children the step `n` first saw: live ones, then removed ones. */
+function startedAt(state: VizLiveState, n: number): VizLiveChild[] {
+  return [...state.children, ...(state.removed ?? [])].filter((child) => child.since === n);
+}
+
+function removedAt(state: VizLiveState, n: number): VizRemovedChild[] {
+  return (state.removed ?? []).filter((child) => child.until === n);
+}
+
+/** `p1, p2, p3`; cut, more than 3 keys read `p1, p2, p3 and N more`. */
+function keyList(keys: ReadonlyArray<string>, cut: boolean): string {
+  if (!cut || keys.length <= 3) return keys.join(", ");
+  return `${keys.slice(0, 3).join(", ")} and ${keys.length - 3} more`;
 }
 
 /** The clock starts at 0 and only `advance` steps move it. */
@@ -839,12 +877,6 @@ function childrenSections(
   const { state } = live;
   return machine.maps.map((map) => {
     const children = state.children.filter((child) => child.map === map);
-    const heading = html(doc, "h3", {}, [
-      code(doc, map),
-      children.length === 0
-        ? ": no children yet"
-        : `: ${children.length} ${children.length === 1 ? "child" : "children"}`,
-    ]);
     const rows = children.map((child) => {
       const info = machine.states.find((each) => each.id === child.state);
       const final = info?.final === true;
@@ -869,16 +901,15 @@ function childrenSections(
             code(doc, child.key),
             ": in ",
             html(doc, "strong", {}, [localName(child.state)]),
-            child.since === state.steps.length ? " (new)" : "",
             final ? " (final)" : "",
           ]),
           moves,
         ],
       );
     });
+    if (rows.length === 0) return null;
     return html(doc, "section", { class: "explore-map", "data-map": map }, [
-      heading,
-      rows.length === 0 ? null : html(doc, "ul", { class: "explore-children" }, rows),
+      html(doc, "ul", { class: "explore-children" }, rows),
     ]);
   });
 }
@@ -1048,18 +1079,13 @@ function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
   return matching.map((branch) => branch.conditions);
 }
 
-function outcomeText(doc: Document, step: VizLiveStep): Array<Node | string> {
+function outcomeText(doc: Document, machine: VizMachine, step: VizLiveStep): Array<Node | string> {
   const region = step.actor === undefined ? undefined : actorText(step.actor);
   const child = step.actor !== undefined && "map" in step.actor ? step.actor : undefined;
   if (step.outcome === "missing") {
     return child === undefined
       ? ["No region ", code(doc, region ?? ""), " in this machine. Nothing ran."]
-      : [
-          code(doc, child.key),
-          " is not in ",
-          code(doc, child.map),
-          " (it was removed or never added). Nothing ran.",
-        ];
+      : [code(doc, child.key), " is not in ", code(doc, child.map), ". Nothing ran."];
   }
   if (step.outcome === "ignored") {
     return ["No handler for ", code(doc, step.event), ` in ${step.from}. Nothing ran.`];
@@ -1067,7 +1093,7 @@ function outcomeText(doc: Document, step: VizLiveStep): Array<Node | string> {
   const names = (id: string) => (region === undefined ? id : localName(id));
   const where =
     child !== undefined
-      ? [": ", code(doc, child.map), " ", code(doc, child.key), ": "]
+      ? [": ", ...childWho(doc, machine, child), " "]
       : region === undefined
         ? [": "]
         : [": ", code(doc, region), ": "];
@@ -1119,7 +1145,7 @@ function stepLines(
   const because = becauseOf(machine, step);
   const changed = changedKeys(before, step.context);
   return [
-    html(doc, "p", { "data-live-outcome": "" }, outcomeText(doc, step)),
+    html(doc, "p", { "data-live-outcome": "" }, outcomeText(doc, machine, step)),
     because === null
       ? null
       : html(doc, "p", { "data-live-because": "" }, [
@@ -1138,6 +1164,41 @@ function stepLines(
       : html(doc, "p", { "data-live-effects": "" }, [
           "Effects started: ",
           ...step.effects.flatMap((name, index) => [index === 0 ? "" : ", ", code(doc, name)]),
+        ]),
+  ];
+}
+
+/** Which children the last step started (by state) and removed. */
+function changedChildrenLines(doc: Document, state: VizLiveState): Array<HTMLElement> {
+  const started = startedAt(state, state.steps.length);
+  const groups = new Map<string, string[]>();
+  for (const child of started) {
+    groups.set(child.state, [...(groups.get(child.state) ?? []), child.key]);
+  }
+  const removed = removedAt(state, state.steps.length).map((child) => child.key);
+  return [
+    ...(started.length === 0
+      ? []
+      : [
+          html(
+            doc,
+            "p",
+            { "data-live-started": "", "data-keys": JSON.stringify(started.map((c) => c.key)) },
+            [...groups].flatMap(([id, keys], index) => [
+              index === 0 ? "" : "; ",
+              ...keys.flatMap((key, at) => [at === 0 ? "" : ", ", code(doc, key)]),
+              " started in ",
+              localName(id),
+            ]),
+          ),
+        ]),
+    ...(removed.length === 0
+      ? []
+      : [
+          html(doc, "p", { "data-live-removed": "", "data-keys": JSON.stringify(removed) }, [
+            ...removed.flatMap((key, at) => [at === 0 ? "" : ", ", code(doc, key)]),
+            " removed",
+          ]),
         ]),
   ];
 }
@@ -1171,6 +1232,7 @@ function liveResultSection(
                 },
                 [`Handler threw: ${last.error}`],
               ),
+          ...changedChildrenLines(doc, state),
           ...after.map((step, index) =>
             html(doc, "div", { "data-live-after": "" }, [
               html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"]),
@@ -1199,7 +1261,71 @@ function liveResultSection(
   ]);
 }
 
-function livePathSection(doc: Document, context: ExploreContext, state: VizLiveState): HTMLElement {
+/** `: p1 sendingPhoto → photoSent` and its kin for a step sent to a map child; "" for any other step. */
+function childMove(
+  machine: VizMachine,
+  step: VizStep,
+  outcome: VizLiveStep | null | undefined,
+): string {
+  const actor = step.kind === "event" ? step.actor : undefined;
+  if (actor === undefined || !("map" in actor) || outcome === undefined || outcome === null)
+    return "";
+  const who = childWhoText(machine, actor);
+  if (outcome.outcome === "transition") {
+    return `: ${who} ${localName(outcome.from)} → ${localName(outcome.to)}`;
+  }
+  if (outcome.outcome === "stay") return `: ${who} stays in ${localName(outcome.from)}`;
+  return `: ${who}, nothing ran`;
+}
+
+/** The Path entry for step `index`: what was sent, what the child did, which children it started or removed. */
+function pathEntry(
+  machine: VizMachine,
+  at: { live: { state: VizLiveState; outcomes: ReadonlyArray<VizLiveStep | null> }; index: number },
+): { text: string; title: string | null } {
+  const { index } = at;
+  const { state, outcomes } = at.live;
+  const step = state.steps[index];
+  if (step === undefined) return { text: "", title: null };
+  const head =
+    step.kind === "advance"
+      ? `advance ${step.ms} ms`
+      : step.payload === null
+        ? step.event
+        : `${step.event} ${payloadText(step.payload)}`;
+  const move = childMove(machine, step, outcomes[index]);
+  const started = startedAt(state, index + 1).map((child) => child.key);
+  const removed = removedAt(state, index + 1).map((child) => child.key);
+  const suffix = (cut: boolean) => {
+    const parts = [
+      started.length === 0 ? null : `${keyList(started, cut)} started`,
+      removed.length === 0 ? null : `${keyList(removed, cut)} removed`,
+    ].filter((part): part is string => part !== null);
+    return parts.length === 0 ? "" : ` → ${parts.join("; ")}`;
+  };
+  const text = head + move + suffix(true);
+  const full = head + move + suffix(false);
+  return { text, title: full === text ? null : full };
+}
+
+function pathButton(
+  doc: Document,
+  at: { context: ExploreContext; live: NonNullable<ExploreContext["live"]>; index: number },
+): HTMLElement {
+  const { context, live, index } = at;
+  const { text, title } = pathEntry(context.machine, { live, index });
+  return button(doc, [text], {
+    onClick: () => context.rewind(index + 1),
+    attrs: { "data-rewind": String(index + 1), ...(title === null ? {} : { title }) },
+  });
+}
+
+function livePathSection(
+  doc: Document,
+  context: ExploreContext,
+  live: NonNullable<ExploreContext["live"]>,
+): HTMLElement {
+  const { state } = live;
   return html(doc, "div", { class: "explore-path" }, [
     html(doc, "h3", {}, ["Path"]),
     html(doc, "ol", {}, [
@@ -1209,12 +1335,9 @@ function livePathSection(doc: Document, context: ExploreContext, state: VizLiveS
           attrs: { "data-rewind": "0" },
         }),
       ]),
-      ...state.steps.map((step, index) =>
+      ...state.steps.map((_, index) =>
         html(doc, "li", { "aria-current": index === state.steps.length - 1 ? "step" : null }, [
-          button(doc, [describeStep(step)], {
-            onClick: () => context.rewind(index + 1),
-            attrs: { "data-rewind": String(index + 1) },
-          }),
+          pathButton(doc, { context, live, index }),
         ]),
       ),
     ]),
@@ -1285,7 +1408,6 @@ function liveParts(
   const moves: LiveMoves = { state, send: live.send, final, compose: live.compose };
   return [
     ...regionLines(doc, machine, state),
-    ...childrenSections(doc, machine, moves),
     liveResultSection(doc, {
       machine,
       state,
@@ -1296,6 +1418,7 @@ function liveParts(
       events,
       children: [
         ...liveBlocks(doc, machine, moves),
+        ...childrenSections(doc, machine, moves),
         final ? null : timersSection(doc, { state, send: live.send }),
       ],
     }),
@@ -1367,7 +1490,7 @@ function historySection(doc: Document, context: ExploreContext): HTMLElement {
     "div",
     { class: "explore-history" },
     live
-      ? [runsSection(doc, context.machine, live), livePathSection(doc, context, live.state)]
+      ? [runsSection(doc, context.machine, live), livePathSection(doc, context, live)]
       : [pathSection(doc, context)],
   );
 }
