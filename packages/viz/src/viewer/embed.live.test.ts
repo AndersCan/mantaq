@@ -3,6 +3,7 @@ import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type {
   VizDriver,
   VizEdge,
+  VizField,
   VizJson,
   VizLiveState,
   VizLiveStep,
@@ -673,16 +674,12 @@ describe("field forms and the context table", () => {
     expect(root.querySelector("[data-live-note]")).toBeNull();
   });
 
-  test("a form has one input per field, prefilled, and sends the changed choice", () => {
-    const { root, live } = mountFields();
+  test("a form has one control per field, prefilled", () => {
+    const { root } = mountFields();
     click(root, '[data-send="submit"]');
     expect(root.querySelectorAll("[data-field]").length).toBe(3);
-    expect(field(root, "validFor")?.value).toBe('"10m"');
+    expect(pressedChoice(root, "validFor")).toBe('"10m"');
     expect(field(root, "flags")?.value).toBe("");
-    const select = field(root, "validFor");
-    if (select) select.value = '"1h"';
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { validFor: "1h" } }]);
   });
 
   test("optional fields left empty are left out; a typed json field is parsed", () => {
@@ -750,13 +747,26 @@ describe("field forms and the context table", () => {
     ],
   };
   const fillFrom = (root: HTMLElement) =>
-    root.querySelector<HTMLSelectElement>("select[data-fill-from]");
+    root.querySelector<HTMLElement>('[role=group][aria-label="Values from"]');
+  const fillButtons = (root: HTMLElement) =>
+    [...(fillFrom(root)?.querySelectorAll("button") ?? [])].map((each) => each.textContent);
+  const pressedFill = (root: HTMLElement) =>
+    fillFrom(root)?.querySelector("[aria-pressed=true]")?.textContent;
+  const pressFill = (root: HTMLElement, label: string) =>
+    click(root, `[data-fill-from="${label}"]`);
 
-  test("the form starts filled from the state's payload and says where from", () => {
+  test("the form opens with what a click would send, and Context refills from the state's payload", () => {
     const { root, live } = mountFields(fillMachine, { code: "c1" });
     click(root, '[data-send="submit"]');
-    expect(fillFrom(root)).toBeNull();
+    expect(fillButtons(root)).toEqual(["Example", "Context"]);
+    expect(field(root, "code")?.value).toBe("sample");
+    expect(pressedFill(root)).toBe("Example");
+    pressFill(root, "Context");
     expect(field(root, "code")?.value).toBe("c1");
+    expect(pressedFill(root)).toBe("Context");
+    expect(fillFrom(root)?.querySelector("[data-fill-from=Context]")?.getAttribute("title")).toBe(
+      "idle",
+    );
     click(root, '[data-payload-send="submit"]');
     expect(live.log[0]).toEqual([
       {
@@ -767,15 +777,14 @@ describe("field forms and the context table", () => {
     ]);
   });
 
-  test("choosing the type's samples resets the fields", () => {
+  test("pressing Example resets the fields", () => {
     const { root } = mountFields(fuzzedMachine, { code: "c1" });
     click(root, '[data-send="submit"]');
-    const picker = fillFrom(root);
-    if (picker) {
-      picker.value = "";
-      picker.dispatchEvent(new Event("change"));
-    }
+    pressFill(root, "Context");
+    expect(field(root, "code")?.value).toBe("c1");
+    pressFill(root, "Example");
     expect(field(root, "code")?.value).toBe("sample");
+    expect(pressedFill(root)).toBe("Example");
   });
 
   const fuzzedMachine: VizMachine = {
@@ -797,139 +806,144 @@ describe("field forms and the context table", () => {
       expectations: [],
     },
   };
-  const optionTexts = (root: HTMLElement) =>
-    [...(fillFrom(root)?.options ?? [])].map((each) => each.textContent);
-  const asJson = (root: HTMLElement) =>
-    root.querySelector<HTMLButtonElement>('[data-payload-as-json="submit"]');
-  const jsonBox = (root: HTMLElement) =>
-    root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
+  const choose = (root: HTMLElement, name: string, value: string) =>
+    field(root, name)
+      ?.querySelector<HTMLButtonElement>(`button[data-choice='${JSON.stringify(value)}']`)
+      ?.click();
+  const pressedChoice = (root: HTMLElement, name: string) =>
+    field(root, name)?.querySelector("[aria-pressed=true]")?.getAttribute("data-choice");
   const alertText = (root: HTMLElement) =>
     root.querySelector(".payload-actions [role=alert]")?.textContent;
 
-  test("fuzzed payloads follow the type's examples in Values from", () => {
+  test("a click would send the first fuzz payload, so the form opens on it with Fuzz 1 pressed", () => {
     const { root, live } = mountFields(fuzzedMachine, null);
     click(root, '[data-send="submit"]');
-    expect(optionTexts(root)).toEqual([
-      "Examples from the type",
-      "fuzz example 1: code zz, validFor 1h",
-    ]);
+    expect(fillButtons(root)).toEqual(["Fuzz 1", "Example"]);
+    expect(pressedFill(root)).toBe("Fuzz 1");
+    expect(field(root, "code")?.value).toBe("zz");
+    expect(pressedChoice(root, "validFor")).toBe('"1h"');
+    pressFill(root, "Example");
     expect(field(root, "code")?.value).toBe("sample");
-    const picker = fillFrom(root);
-    if (picker) {
-      picker.value = "0";
-      picker.dispatchEvent(new Event("change"));
-    }
     click(root, '[data-payload-send="submit"]');
     expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { code: "zz", validFor: "1h" } },
+      { kind: "event", event: "submit", payload: { code: "sample", validFor: "10m" } },
     ]);
   });
 
-  test("held values stay first and selected, fuzz examples come after the type", () => {
+  test("Last sent comes first, and Context follows the type's examples", () => {
     const { root } = mountFields(fuzzedMachine, { code: "c1" });
     click(root, '[data-send="submit"]');
-    expect(optionTexts(root)).toEqual([
-      "idle: code c1",
-      "Examples from the type",
-      "fuzz example 1: code zz, validFor 1h",
+    pressFill(root, "Context");
+    click(root, '[data-payload-send="submit"]');
+    click(root, '[data-send="submit"]');
+    expect(fillButtons(root)).toEqual(["Last sent", "Fuzz 1", "Example", "Context"]);
+    expect(pressedFill(root)).toBe("Last sent");
+  });
+
+  test("the button you press stays pressed when another choice holds the same values", () => {
+    const { root } = mountFields(fuzzedMachine, { code: "c1" });
+    click(root, '[data-send="submit"]');
+    pressFill(root, "Context");
+    click(root, '[data-payload-send="submit"]');
+    click(root, '[data-send="submit"]');
+    expect(pressedFill(root)).toBe("Last sent");
+    pressFill(root, "Context");
+    expect(field(root, "code")?.value).toBe("c1");
+    expect(pressedFill(root)).toBe("Context");
+  });
+
+  test("editing a control moves the pressed Values from button off", () => {
+    const { root } = mountFields(fuzzedMachine, null);
+    click(root, '[data-send="submit"]');
+    choose(root, "validFor", "10m");
+    expect(pressedFill(root)).toBeUndefined();
+  });
+
+  test("a choice field of four or fewer options is a button row and sends the pressed one", () => {
+    const { root, live } = mountFields();
+    click(root, '[data-send="submit"]');
+    const row = field(root, "validFor");
+    expect(row?.tagName).toBe("DIV");
+    expect([...(row?.querySelectorAll("button") ?? [])].map((each) => each.textContent)).toEqual([
+      "10m",
+      "1h",
     ]);
-    expect(fillFrom(root)?.value).toBe("0");
-  });
-
-  test("Edit as JSON shows the fields as JSON and sends exactly what is typed", () => {
-    const { root, live } = mountFields();
-    click(root, '[data-send="submit"]');
-    click(root, '[data-payload-as-json="submit"]');
-    expect(root.querySelector("[data-payload-form]")?.getAttribute("data-payload-view")).toBe(
-      "json",
-    );
-    expect(JSON.parse(jsonBox(root)?.value ?? "")).toEqual({ validFor: "10m" });
-    const box = jsonBox(root);
-    if (box) box.value = '{"anything":[1,2]}';
+    expect(pressedChoice(root, "validFor")).toBe('"10m"');
+    choose(root, "validFor", "1h");
+    expect(pressedChoice(root, "validFor")).toBe('"1h"');
     click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { anything: [1, 2] } },
-    ]);
+    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { validFor: "1h" } }]);
   });
 
-  test("Edit as fields refuses extra keys, then returns with the edited values", () => {
+  test("an optional choice starts on (not set) and is left out", () => {
+    const { root, live } = mountFields(optionalChoiceMachine, null);
+    click(root, '[data-send="submit"]');
+    expect(pressedChoice(root, "tag")).toBe("");
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { size: "s" } }]);
+    click(root, '[data-send="submit"]');
+    choose(root, "tag", "b");
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[1]?.at(-1)).toEqual({
+      kind: "event",
+      event: "submit",
+      payload: { tag: "b", size: "s" },
+    });
+  });
+
+  test("a choice field of five options stays a select", () => {
+    const { root, live } = mountFields(optionalChoiceMachine, null);
+    click(root, '[data-send="submit"]');
+    const many = field(root, "size");
+    expect(many?.tagName).toBe("SELECT");
+    if (many) many.value = '"l"';
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { size: "l" } }]);
+  });
+
+  test("the form heading is the event name and there is no JSON mode", () => {
     const { root } = mountFields();
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-as-json="submit"]');
-    const box = jsonBox(root);
-    if (box) box.value = '{"validFor":"10m","extra":1,"more":2}';
-    click(root, '[data-payload-as-fields="submit"]');
-    expect(alertText(root)).toBe(
-      "Not fields of submit: extra, more. Remove them to edit as fields.",
-    );
-    expect(root.querySelector("[data-payload-form]")?.getAttribute("data-payload-view")).toBe(
-      "json",
-    );
-    if (box) box.value = "{nope";
-    click(root, '[data-payload-as-fields="submit"]');
-    expect(alertText(root)).toBe("This is not valid JSON, so it cannot be shown as fields.");
-    if (box) box.value = '{"validFor":"10m","note":"hi"}';
-    click(root, '[data-payload-as-fields="submit"]');
-    expect(root.querySelector("[data-payload-form]")?.getAttribute("data-payload-view")).toBe(
-      "fields",
-    );
-    expect(field(root, "note")?.value).toBe("hi");
-    expect(asJson(root)).not.toBeNull();
+    expect(root.querySelector(".payload-title")?.textContent).toBe("submit");
+    expect(root.querySelector("[data-payload-as-json]")).toBeNull();
+    expect(root.querySelector("[data-payload-json]")).toBeNull();
   });
 
-  test("invalid JSON in the JSON view sends nothing and says so", () => {
-    const { root, live } = mountFields();
-    click(root, '[data-send="submit"]');
-    click(root, '[data-payload-as-json="submit"]');
-    const box = jsonBox(root);
-    if (box) box.value = "{nope";
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log).toEqual([]);
-    expect(alertText(root)).toBe("Not sent: this is not valid JSON.");
+  const choiceField = (name: string, optional: boolean, choices: string[]): VizField => ({
+    name,
+    type: choices.map((each) => JSON.stringify(each)).join(" | "),
+    optional,
+    doc: null,
+    input: "choice",
+    choices,
+    sample: choices[0] ?? "",
   });
+  const optionalChoiceMachine: VizMachine = {
+    ...fieldsMachine,
+    events: [
+      {
+        id: "submit",
+        internal: false,
+        doc: null,
+        payload: [
+          choiceField("tag", true, ["a", "b"]),
+          choiceField("size", false, ["s", "m", "l", "xl", "xxl"]),
+        ],
+      },
+    ],
+  };
 
-  test("an empty JSON box sends a null payload", () => {
-    const { root, live } = mountFields();
-    click(root, '[data-send="submit"]');
-    click(root, '[data-payload-as-json="submit"]');
-    const box = jsonBox(root);
-    if (box) box.value = "  ";
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: null }]);
-  });
-
-  test("a field left empty stays out of the JSON view", () => {
+  test("a bad field focuses it without scrolling", () => {
     const { root } = mountFields();
-    click(root, '[data-send="submit"]');
-    click(root, '[data-payload-as-json="submit"]');
-    expect(Object.keys(JSON.parse(jsonBox(root)?.value ?? ""))).toEqual(["validFor"]);
-  });
-
-  test("text that is not valid JSON survives fields to JSON and back", () => {
-    const { root } = mountFields();
+    document.body.append(root);
     click(root, '[data-send="submit"]');
     const flags = field(root, "flags");
     if (flags) flags.value = "{oops";
-    click(root, '[data-payload-as-json="submit"]');
-    expect(JSON.parse(jsonBox(root)?.value ?? "")).toEqual({ validFor: "10m", flags: "{oops" });
-  });
-
-  test("Edit as fields clears inputs whose key is missing and hides an old alert", () => {
-    const { root } = mountFields();
-    click(root, '[data-send="submit"]');
-    const note = field(root, "note");
-    if (note) note.value = "old";
-    click(root, '[data-payload-as-json="submit"]');
-    const box = jsonBox(root);
-    if (box) box.value = "{nope";
-    click(root, '[data-payload-as-fields="submit"]');
-    expect(alertText(root)).not.toBe("");
-    if (box) box.value = '{"validFor":"1h"}';
-    click(root, '[data-payload-as-fields="submit"]');
-    expect(note?.value).toBe("");
-    expect(root.querySelector("[role=alert]")?.hasAttribute("hidden")).toBe(true);
-    click(root, '[data-payload-as-json="submit"]');
-    expect(root.querySelector("[role=alert]")?.hasAttribute("hidden")).toBe(true);
+    const spy = vi.spyOn(HTMLElement.prototype, "focus");
+    click(root, '[data-payload-send="submit"]');
+    expect(spy).toHaveBeenCalledWith({ preventScroll: true });
+    spy.mockRestore();
+    root.remove();
   });
 
   test("a bad field value focuses that field", () => {
@@ -942,33 +956,6 @@ describe("field forms and the context table", () => {
     expect(live.log).toEqual([]);
     expect(document.activeElement).toBe(flags);
     root.remove();
-  });
-
-  test("invalid JSON focuses the box in either direction", () => {
-    const { root } = mountFields();
-    document.body.append(root);
-    click(root, '[data-send="submit"]');
-    click(root, '[data-payload-as-json="submit"]');
-    const box = jsonBox(root);
-    if (box) box.value = "{nope";
-    click(root, '[data-payload-send="submit"]');
-    expect(document.activeElement).toBe(box);
-    (document.activeElement as HTMLElement | null)?.blur();
-    click(root, '[data-payload-as-fields="submit"]');
-    expect(document.activeElement).toBe(box);
-    root.remove();
-  });
-
-  test.each(["[1]", "5", '"x"'])("Edit as fields refuses %s as not an object", (text) => {
-    const { root } = mountFields();
-    click(root, '[data-send="submit"]');
-    click(root, '[data-payload-as-json="submit"]');
-    const box = jsonBox(root);
-    if (box) box.value = text;
-    click(root, '[data-payload-as-fields="submit"]');
-    expect(alertText(root)).toBe(
-      "Not fields of submit: not an object. Remove them to edit as fields.",
-    );
   });
 
   test("a missing required field puts the alert in the actions row and focuses the field", () => {

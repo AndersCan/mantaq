@@ -15,8 +15,8 @@ import type {
 } from "../schema.ts";
 import { changedKeys, contextLines } from "./context-diff.ts";
 import { html } from "./dom.ts";
-import { fillSources, fuzzSources } from "./fill.ts";
-import type { FillSource } from "./fill.ts";
+import { fillChoices, knownPayload } from "./fill.ts";
+import type { FillChoice } from "./fill.ts";
 import type { Selection } from "./graph.ts";
 
 export interface ExploreContext {
@@ -300,20 +300,32 @@ interface LiveMoves {
   compose: (event: string | null, actor?: VizActorRef) => void;
 }
 
-/** One input per declared payload field, started at the field's sample. */
-function fieldInput(doc: Document, field: VizField): HTMLInputElement | HTMLSelectElement {
+/** One control per declared payload field: read its text, write a text into it, focus it. */
+interface FieldControl {
+  node: HTMLElement;
+  read: () => string;
+  write: (text: string) => void;
+  focus: () => void;
+}
+
+/** A choice field with this many options or fewer is a row of buttons. */
+const segmentLimit = 4;
+
+/** One control per declared payload field, started at the field's sample. */
+function fieldControl(doc: Document, field: VizField): FieldControl {
   const attrs = { "data-field": field.name, "aria-label": field.name };
   if (field.input === "choice") {
-    const select = html(doc, "select", attrs);
-    if (field.optional) select.append(html(doc, "option", { value: "" }, ["(not set)"]));
-    for (const choice of field.choices) {
-      const option = html(doc, "option", { value: JSON.stringify(choice) }, [
-        typeof choice === "string" ? choice : JSON.stringify(choice),
-      ]);
-      select.append(option);
-    }
-    select.value = field.optional ? "" : JSON.stringify(field.sample);
-    return select;
+    const options = [
+      ...(field.optional ? [{ text: "(not set)", value: "" }] : []),
+      ...field.choices.map((choice) => ({
+        text: typeof choice === "string" ? choice : JSON.stringify(choice),
+        value: JSON.stringify(choice),
+      })),
+    ];
+    const start = field.optional ? "" : JSON.stringify(field.sample);
+    return options.length <= segmentLimit
+      ? choiceButtons(doc, { name: field.name, options, start })
+      : choiceSelect(doc, { attrs, options, start });
   }
   const input = html(doc, "input", {
     ...attrs,
@@ -325,7 +337,72 @@ function fieldInput(doc: Document, field: VizField): HTMLInputElement | HTMLSele
         ? (JSON.stringify(field.sample) ?? "")
         : field.sample;
   }
-  return input;
+  return {
+    node: input,
+    read: () => input.value,
+    write: (text) => {
+      input.value = text;
+    },
+    focus: () => input.focus({ preventScroll: true }),
+  };
+}
+
+interface ChoiceOption {
+  text: string;
+  value: string;
+}
+
+function choiceSelect(
+  doc: Document,
+  context: { attrs: Record<string, string>; options: ChoiceOption[]; start: string },
+): FieldControl {
+  const select = html(doc, "select", context.attrs);
+  for (const option of context.options) {
+    select.append(html(doc, "option", { value: option.value }, [option.text]));
+  }
+  select.value = context.start;
+  return {
+    node: select,
+    read: () => select.value,
+    write: (text) => {
+      select.value = text;
+    },
+    focus: () => select.focus({ preventScroll: true }),
+  };
+}
+
+function choiceButtons(
+  doc: Document,
+  context: { name: string; options: ChoiceOption[]; start: string },
+): FieldControl {
+  const row = html(doc, "div", {
+    class: "segmented",
+    role: "group",
+    "aria-label": context.name,
+    "data-field": context.name,
+  });
+  const buttons = context.options.map((option) =>
+    button(doc, [option.text], {
+      attrs: { "data-choice": option.value, "aria-pressed": "false" },
+      onClick: () => write(option.value),
+    }),
+  );
+  const write = (text: string) => {
+    for (const each of buttons) {
+      each.setAttribute("aria-pressed", String(each.getAttribute("data-choice") === text));
+    }
+  };
+  row.append(...buttons);
+  write(context.start);
+  return {
+    node: row,
+    read: () =>
+      buttons
+        .find((each) => each.getAttribute("aria-pressed") === "true")
+        ?.getAttribute("data-choice") ?? "",
+    write,
+    focus: () => buttons[0]?.focus({ preventScroll: true }),
+  };
 }
 
 /** The value one field's input holds, or undefined to leave the field out; bad json is an error. */
@@ -351,24 +428,19 @@ function readField(
   }
 }
 
-/** The payload typed into the field inputs, or the name of a json field that did not parse. */
+/** The payload typed into the field controls, or the name of a json field that did not parse. */
 function readFields(
   fields: ReadonlyArray<VizField>,
-  inputs: ReadonlyMap<string, HTMLInputElement | HTMLSelectElement>,
+  controls: ReadonlyMap<string, FieldControl>,
 ): { payload: Record<string, VizJson> } | { bad: string } | { missing: string } {
   const payload: Record<string, VizJson> = {};
   for (const field of fields) {
-    const read = readField(field, inputs.get(field.name)?.value ?? "");
+    const read = readField(field, controls.get(field.name)?.read() ?? "");
     if ("bad" in read) return { bad: field.name };
     if ("missing" in read) return { missing: field.name };
     if (read.value !== undefined) payload[field.name] = read.value;
   }
   return { payload };
-}
-
-function shown(value: VizJson): string {
-  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
-  return text.length > 20 ? `${text.slice(0, 20)}…` : text;
 }
 
 function filledText(field: VizField, value: VizJson): string {
@@ -377,107 +449,79 @@ function filledText(field: VizField, value: VizJson): string {
   return JSON.stringify(value) ?? "";
 }
 
-/** "Values from": fills the inputs from one thing the machine holds, the type's examples, or a fuzzed payload. */
-function fillPicker(
+/** Whether every value of a "Values from" choice is what its field's control holds now. */
+function choiceHolds(
+  choice: FillChoice,
+  fields: ReadonlyArray<VizField>,
+  controls: ReadonlyMap<string, FieldControl>,
+): boolean {
+  return choice.values.every(({ field: name, value }) => {
+    const field = fields.find((each) => each.name === name);
+    return field !== undefined && controls.get(name)?.read() === filledText(field, value);
+  });
+}
+
+/** "Values from": a row of buttons that fill the controls from what this walk sent, a fuzzed payload, the type's examples or the context. */
+function fillRow(
   doc: Document,
   context: {
     fields: ReadonlyArray<VizField>;
-    inputs: ReadonlyMap<string, HTMLInputElement | HTMLSelectElement>;
-    held: ReadonlyArray<FillSource>;
-    fuzz: ReadonlyArray<FillSource>;
+    controls: ReadonlyMap<string, FieldControl>;
+    choices: ReadonlyArray<FillChoice>;
   },
-): HTMLElement | null {
-  const { fields, inputs, held, fuzz } = context;
-  const sources = [...held, ...fuzz];
-  const select = html(doc, "select", {
-    "data-fill-from": "",
+): { node: HTMLElement; sync: () => void } {
+  const { fields, controls, choices } = context;
+  const row = html(doc, "div", {
+    class: "segmented",
+    role: "group",
     "aria-label": "Values from",
   });
-  const label = (source: FillSource) => {
-    const values = source.values.map((each) => `${each.field} ${shown(each.value)}`);
-    return `${source.path}: ${values.join(", ")}`;
+  const buttons = choices.map((choice) =>
+    button(doc, [choice.label], {
+      attrs: {
+        "data-fill-from": choice.label,
+        "aria-pressed": "false",
+        ...(choice.title === null ? {} : { title: choice.title }),
+      },
+      onClick: () => {
+        for (const field of fields) {
+          controls.get(field.name)?.write(fieldControl(doc, field).read());
+        }
+        for (const { field: name, value } of choice.values) {
+          const field = fields.find((each) => each.name === name);
+          if (field !== undefined) controls.get(name)?.write(filledText(field, value));
+        }
+        press(choice);
+      },
+    }),
+  );
+  const press = (pressed: FillChoice | undefined) => {
+    choices.forEach((choice, index) => {
+      buttons[index]?.setAttribute("aria-pressed", String(choice === pressed));
+    });
   };
-  held.forEach((source, index) => {
-    select.append(html(doc, "option", { value: String(index) }, [label(source)]));
-  });
-  select.append(html(doc, "option", { value: "" }, ["Examples from the type"]));
-  fuzz.forEach((source, index) => {
-    select.append(html(doc, "option", { value: String(held.length + index) }, [label(source)]));
-  });
-  const apply = () => {
-    for (const field of fields) {
-      const input = inputs.get(field.name);
-      if (input !== undefined) input.value = fieldInput(doc, field).value;
-    }
-    const source = sources[Number(select.value)];
-    if (select.value === "" || source === undefined) return;
-    for (const { field: name, value } of source.values) {
-      const field = fields.find((each) => each.name === name);
-      const input = inputs.get(name);
-      if (field !== undefined && input !== undefined) input.value = filledText(field, value);
-    }
+  row.append(...buttons);
+  return {
+    node: row,
+    sync: () => press(choices.find((choice) => choiceHolds(choice, fields, controls))),
   };
-  select.addEventListener("change", apply);
-  select.value = held.length > 0 ? "0" : "";
-  apply();
-  if (held.length === 1 && fuzz.length === 0) return null;
-  return html(doc, "label", { class: "explore-field", "data-fill": "" }, [
-    html(doc, "strong", {}, ["Values from"]),
-    select,
-  ]);
 }
 
-/** What the inputs hold as a JSON object; a field that would be missing is left out, bad json goes in as text. */
-function currentPayload(
-  fields: ReadonlyArray<VizField>,
-  inputs: ReadonlyMap<string, HTMLInputElement | HTMLSelectElement>,
-): Record<string, VizJson> {
-  const payload: Record<string, VizJson> = {};
-  for (const field of fields) {
-    const text = inputs.get(field.name)?.value ?? "";
-    const read = readField(field, text);
-    if ("value" in read) {
-      if (read.value !== undefined) payload[field.name] = read.value;
-    } else if ("bad" in read) payload[field.name] = text;
-  }
-  return payload;
-}
-
-function isRecord(value: unknown): value is Record<string, VizJson> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** The JSON box read back as field values, or why it cannot be shown as fields. */
-function jsonAsFields(
-  event: string,
-  fields: ReadonlyArray<VizField>,
-  text: string,
-): { values: Record<string, VizJson> } | { error: string } {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return { error: "This is not valid JSON, so it cannot be shown as fields." };
-  }
-  const known = new Set(fields.map((field) => field.name));
-  const extra = isRecord(parsed) ? Object.keys(parsed).filter((key) => !known.has(key)) : [];
-  if (!isRecord(parsed) || extra.length > 0) {
-    const what = isRecord(parsed) ? extra.join(", ") : "not an object";
-    return { error: `Not fields of ${event}: ${what}. Remove them to edit as fields.` };
-  }
-  return { values: parsed };
-}
-
-function fieldRow(doc: Document, field: VizField, input: HTMLElement | null): HTMLElement {
-  return html(doc, "label", { class: "explore-field" }, [
+function fieldRow(doc: Document, field: VizField, control: FieldControl | null): HTMLElement {
+  const grouped = control?.node.tagName === "DIV";
+  return html(doc, grouped ? "div" : "label", { class: "explore-field" }, [
     html(doc, "span", {}, [
       html(doc, "strong", {}, [field.name]),
       " ",
       html(doc, "span", { class: "muted" }, [field.type]),
     ]),
     field.doc === null ? null : html(doc, "span", { class: "muted" }, [field.doc]),
-    input,
+    control?.node ?? null,
   ]);
+}
+
+function isRecord(value: unknown): value is Record<string, VizJson> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** What a payload form fills from: the machine now, and the steps of the walk. */
@@ -496,98 +540,57 @@ function fieldsForm(
     close: () => void;
   },
 ): HTMLElement {
-  const { event, fields } = context;
-  const inputs = new Map(fields.map((field) => [field.name, fieldInput(doc, field)] as const));
-  const held = context.live === null ? [] : fillSources(fields, context.live);
-  const fuzz = fuzzSources(fields, context.samples);
-  const fill =
-    held.length + fuzz.length === 0 ? null : fillPicker(doc, { fields, inputs, held, fuzz });
+  const { event, fields, samples } = context;
+  const steps = context.live?.steps ?? [];
+  const controls = new Map(fields.map((field) => [field.name, fieldControl(doc, field)] as const));
+  const known = knownPayload(fields, { event, samples, steps });
+  const startAt = known !== undefined && isRecord(known.payload) ? known.payload : {};
+  for (const field of fields) {
+    const value = startAt[field.name];
+    if (value !== undefined) controls.get(field.name)?.write(filledText(field, value));
+  }
+  const choices = fillChoices(fields, { live: context.live, samples, steps });
+  const fill = choices.length === 0 ? null : fillRow(doc, { fields, controls, choices });
+  fill?.sync();
   const problem = html(doc, "p", {
     class: "explore-warning",
     role: "alert",
     hidden: "",
   });
-  const warn = (text: string, focus: HTMLElement | undefined) => {
+  const warn = (text: string, focus: FieldControl | undefined) => {
     problem.textContent = text;
     problem.removeAttribute("hidden");
     focus?.focus();
   };
-  const box = html(doc, "textarea", {
-    rows: "8",
-    "aria-label": `${event} payload JSON`,
-    "data-payload-json": event,
-    hidden: "",
-  });
-  const fieldLabels = fields.map((field) => fieldRow(doc, field, inputs.get(field.name) ?? null));
+  const fieldLabels = fields.map((field) => fieldRow(doc, field, controls.get(field.name) ?? null));
   const form = html(doc, "div", {
     class: "explore-payload",
     "data-payload-form": event,
-    "data-payload-view": "fields",
   });
-  const toggle = button(doc, ["Edit as JSON"], {
-    onClick: () => (form.getAttribute("data-payload-view") === "json" ? asFields() : asJson()),
-    attrs: { "data-payload-as-json": event },
-  });
-  const show = (view: "fields" | "json") => {
-    const json = view === "json";
-    form.setAttribute("data-payload-view", view);
-    if (json) box.removeAttribute("hidden");
-    else box.setAttribute("hidden", "");
-    for (const each of [fill, ...fieldLabels]) {
-      if (each === null) continue;
-      if (json) each.setAttribute("hidden", "");
-      else each.removeAttribute("hidden");
-    }
-    problem.setAttribute("hidden", "");
-    toggle.textContent = json ? "Edit as fields" : "Edit as JSON";
-    toggle.removeAttribute("data-payload-as-json");
-    toggle.removeAttribute("data-payload-as-fields");
-    toggle.setAttribute(json ? "data-payload-as-fields" : "data-payload-as-json", event);
-  };
-  const asJson = () => {
-    box.value = JSON.stringify(currentPayload(fields, inputs), null, 2);
-    show("json");
-  };
-  const asFields = () => {
-    const read = jsonAsFields(event, fields, box.value);
-    if ("error" in read) {
-      warn(read.error, box);
-      return;
-    }
-    for (const field of fields) {
-      const input = inputs.get(field.name);
-      const value = read.values[field.name];
-      if (input !== undefined) input.value = value === undefined ? "" : filledText(field, value);
-    }
-    show("fields");
-  };
   const submit = () => {
-    if (form.getAttribute("data-payload-view") === "json") {
-      try {
-        const payload = box.value.trim() === "" ? null : (JSON.parse(box.value) as VizJson);
-        context.send({ kind: "event", event, payload });
-      } catch {
-        warn("Not sent: this is not valid JSON.", box);
-      }
-      return;
-    }
-    const read = readFields(fields, inputs);
+    const read = readFields(fields, controls);
     if ("bad" in read) {
-      warn(`Not sent: ${read.bad} is not valid JSON.`, inputs.get(read.bad));
+      warn(`Not sent: ${read.bad} is not valid JSON.`, controls.get(read.bad));
       return;
     }
     if ("missing" in read) {
-      warn(`Not sent: ${read.missing} is required.`, inputs.get(read.missing));
+      warn(`Not sent: ${read.missing} is required.`, controls.get(read.missing));
       return;
     }
     context.send({ kind: "event", event, payload: read.payload });
   };
+  const resync = (changed: Event) => {
+    if (changed.target instanceof Element && changed.target.closest("[data-fill-from]")) return;
+    fill?.sync();
+  };
+  form.addEventListener("input", resync);
+  form.addEventListener("click", resync);
   form.append(
     html(doc, "div", { class: "payload-head" }, [
-      html(doc, "p", {}, ["Payload for ", code(doc, event), ":"]),
-      fill,
+      html(doc, "h3", { class: "payload-title" }, [code(doc, event)]),
+      fill?.node ?? null,
     ]),
-    html(doc, "div", { class: "payload-body" }, [...fieldLabels, box]),
+    html(doc, "div", { class: "payload-body" }, fieldLabels),
     html(doc, "div", { class: "payload-actions" }, [
       problem,
       html(doc, "div", { class: "explore-samples" }, [
@@ -599,7 +602,6 @@ function fieldsForm(
           onClick: context.close,
           attrs: { "data-payload-cancel": event },
         }),
-        toggle,
       ]),
     ]),
   );
@@ -632,13 +634,17 @@ export function payloadForm(
       live: context.live ?? null,
     });
   }
-  const first = samples[0];
+  const known = knownPayload(context.fields, {
+    event,
+    samples,
+    steps: context.live?.steps ?? [],
+  });
   const box = html(doc, "textarea", {
     rows: "3",
     "aria-label": `${event} payload JSON`,
     "data-payload-json": event,
   });
-  box.value = first === undefined ? "" : JSON.stringify(first);
+  box.value = known === undefined ? "" : (JSON.stringify(known.payload) ?? "");
   const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" }, [
     "Payload is not valid JSON. Nothing was sent.",
   ]);
@@ -652,13 +658,7 @@ export function payloadForm(
   };
   return html(doc, "div", { class: "explore-payload", "data-payload-form": event }, [
     html(doc, "div", { class: "payload-head" }, [
-      html(doc, "p", {}, [
-        "Payload for ",
-        code(doc, event),
-        samples.length === 0
-          ? ". No fuzz samples: type the JSON the handler expects."
-          : ". Edit it, or pick a fuzz sample:",
-      ]),
+      html(doc, "h3", { class: "payload-title" }, [code(doc, event)]),
     ]),
     html(doc, "div", { class: "payload-body" }, [
       samples.length === 0

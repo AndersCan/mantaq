@@ -37,9 +37,9 @@ in the initial state, and the pulsing edges are the steps you can take next.
 Click one, or use the **Step** tab:
 
 - **Send**: every event the current state handles, plus the inputs it ignores.
-  An event that carries a payload asks for one first, in a form at the
-  bottom of the viewer, already filled. Change a field, pick other values, or
-  edit it as JSON, then Send.
+  An event that carries a payload is sent with a value the page knows (what
+  you sent before, else a fuzzed or example value). Turn on **Always ask** to
+  fill it in yourself first.
 - **Time**: pending timers. Advance the clock to fire one, or by any number of
   milliseconds.
 
