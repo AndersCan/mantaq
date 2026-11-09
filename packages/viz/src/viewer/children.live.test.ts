@@ -281,4 +281,42 @@ describe("live actor map children", () => {
       actor: { map: "photos", key: "p2" },
     });
   });
+
+  test("a payload edge click with a known value sends to the child in its source", () => {
+    const withReason: VizMachine = {
+      ...photoQueue,
+      events: photoQueue.events.map((each) =>
+        each.id === "uploadFailed"
+          ? {
+              ...each,
+              payload: [
+                {
+                  name: "reason",
+                  type: "string",
+                  optional: false,
+                  doc: null,
+                  input: "text",
+                  choices: [],
+                  sample: "offline",
+                },
+              ],
+            }
+          : each,
+      ),
+    };
+    const { root, sent } = mount([child("p1", "sendingPhoto")], withReason);
+    root
+      .querySelector(
+        '.graph g[data-edge-id="photos.sendingPhoto-uploadFailed-photos.waitingForRetry"]',
+      )
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(sent).toEqual([
+      {
+        kind: "event",
+        event: "uploadFailed",
+        payload: { reason: "offline" },
+        actor: { map: "photos", key: "p1" },
+      },
+    ]);
+  });
 });

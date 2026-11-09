@@ -2,7 +2,7 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 
 function state(id: string, flags: { initial?: boolean } = {}): VizState {
   return {
@@ -233,6 +233,15 @@ describe("finding marks", () => {
     const root = mount(driver());
     mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
     expect(root.querySelector("[data-replay]")?.textContent).toBe("Replay the throw");
+  });
+
+  test("focusing the findings card does not scroll", () => {
+    const root = mount();
+    document.body.append(root);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    mark(root, "idle")?.dispatchEvent(new Event("click", { bubbles: true }));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    vi.restoreAllMocks();
   });
 
   test("a finding mark brings the card into focus; the state chip does not", () => {

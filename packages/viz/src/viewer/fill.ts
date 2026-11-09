@@ -99,6 +99,48 @@ export function fillSources(
   return ordered;
 }
 
+/** What a click sends for `event`: per field, the latest value this walk sent under that name, else the fuzzer's first payload's value, else the field's example (required fields only). Without declared fields: the payload this walk last sent with `event`, else the fuzzer's first. undefined = nothing known. */
+export function knownPayload(
+  fields: ReadonlyArray<VizField> | null,
+  context: { event: string; samples: ReadonlyArray<VizJson>; steps: ReadonlyArray<VizStep> },
+): { payload: VizJson } | undefined {
+  const { event, samples, steps } = context;
+  const [fuzzed] = samples;
+  if (fields === null || fields.length === 0) {
+    for (const step of steps.toReversed()) {
+      if (step.kind === "event" && step.event === event && step.payload !== null) {
+        return { payload: step.payload };
+      }
+    }
+    return fuzzed === undefined ? undefined : { payload: fuzzed };
+  }
+  const typed = typedSource(fields, steps);
+  const payload: Record<string, VizJson> = {};
+  for (const field of fields) {
+    const value = knownValue(field, { typed, fuzzed });
+    if (value !== undefined) payload[field.name] = value;
+  }
+  return { payload };
+}
+
+function knownValue(
+  field: VizField,
+  from: { typed: FillSource | null; fuzzed: VizJson | undefined },
+): VizJson | undefined {
+  const sent = from.typed?.values.find((each) => each.field === field.name);
+  if (sent !== undefined) return sent.value;
+  const fuzz = isObject(from.fuzzed) ? from.fuzzed[field.name] : undefined;
+  if (fuzz !== undefined && fits(field, fuzz) && !isTypeDefault(field, fuzz)) return fuzz;
+  return field.optional ? undefined : field.sample;
+}
+
+/** What the fuzzer makes up for a bare string or number: it says nothing the field's example does not say better. */
+function isTypeDefault(field: VizField, value: VizJson): boolean {
+  if (field.input === "text") return value === "sample";
+  if (field.input === "number") return value === 1;
+  return false;
+}
+
 const fuzzLimit = 5;
 
 /** Payloads fuzzing sent, as choices for the form: only fields that fit, minus any that repeat the type's examples. */
