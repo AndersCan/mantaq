@@ -224,6 +224,78 @@ describe("driver", () => {
     ]);
   });
 
+  test("clearing keeps the removed children with the step that removed them", () => {
+    const driver = createDriver(target);
+    driver.step(add("p1"));
+    driver.step(add("p2"));
+    driver.step(confirm("p1"));
+    const live = driver.step({ kind: "event", event: "queueCleared", payload: null });
+    expect(live.removed).toEqual([
+      { map: "photos", key: "p1", state: "photos.photoSent", since: 1, until: 4 },
+      { map: "photos", key: "p2", state: "photos.sendingPhoto", since: 2, until: 4 },
+    ]);
+    expect(live.children).toEqual([]);
+    const next = driver.step(add("p3"));
+    expect(next.removed?.map((each) => each.key)).toEqual(["p1", "p2"]);
+    driver.step({ kind: "event", event: "queueCleared", payload: null });
+    expect(next.removed).toHaveLength(2);
+    expect(live.removed).toHaveLength(2);
+  });
+
+  test("a key holding the id separator is not reported removed", () => {
+    const driver = createDriver(target);
+    driver.step(add("a\u0000b"));
+    driver.step(add("c"));
+    driver.step(add("d"));
+    const live = driver.step(confirm("a\u0000b"));
+    expect(live.children.map((each) => each.key)).toEqual(["a\u0000b", "c", "d"]);
+    expect(live.removed).toEqual([]);
+  });
+
+  test("a respawn under a live key removes the old child", () => {
+    const respawn: FuzzTarget = {
+      id: "respawn",
+      create: () => {
+        const clock = VirtualClock();
+        const made = createPhotoQueue({ clock });
+        const spawn = made.photos.spawn.bind(made.photos);
+        made.photos.ensure = (key) => spawn(key);
+        return { actor: made.actor, clock, made };
+      },
+    };
+    const driver = createDriver(respawn);
+    driver.step(add("a"));
+    const live = driver.step(add("a"));
+    expect(live.removed).toEqual([
+      { map: "photos", key: "a", state: "photos.sendingPhoto", since: 1, until: 2 },
+    ]);
+    expect(live.children.map((each) => [each.key, each.since])).toEqual([["a", 2]]);
+  });
+
+  test("a reaped child is removed", () => {
+    const reaping: FuzzTarget = {
+      id: "reaping",
+      create: () => {
+        const clock = VirtualClock();
+        const made = createPhotoQueue({ clock, autoReap: true });
+        return { actor: made.actor, clock, made };
+      },
+    };
+    const driver = createDriver(reaping);
+    driver.step(add("p1"));
+    const live = driver.step(confirm("p1"));
+    expect(live.children).toEqual([]);
+    expect(live.removed?.[0]).toMatchObject({ key: "p1", since: 1, until: 2 });
+    expect(live.removed?.[0]?.state.endsWith(".photoSent")).toBe(true);
+  });
+
+  test("reset forgets removed children", () => {
+    const driver = createDriver(target);
+    driver.step(add("p1"));
+    driver.step({ kind: "event", event: "queueCleared", payload: null });
+    expect(driver.reset().removed).toEqual([]);
+  });
+
   test("reset empties the children", () => {
     const driver = createDriver(target);
     driver.step(add("p1"));

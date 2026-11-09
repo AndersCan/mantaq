@@ -33,8 +33,11 @@ function createPhoto(clock: VirtualClock) {
 }
 
 /** One photo upload actor per queued photo, kept in the `photos` map. */
-export function createPhotoQueue({ clock = VirtualClock() } = {}) {
-  const photos = createActorMap(() => createPhoto(clock));
+export function createPhotoQueue({
+  clock = VirtualClock(),
+  autoReap = false,
+}: { clock?: VirtualClock; autoReap?: boolean } = {}) {
+  const photos = createActorMap(() => createPhoto(clock), { autoReap });
   const actor = Actor({
     clock,
     inputs: [photoAdded, queueCleared],
