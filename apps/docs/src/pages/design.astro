@@ -1,0 +1,145 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import { Card, CardGrid, Code, LinkButton } from "@astrojs/starlight/components";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+import Step from "../components/Step.astro";
+
+const snippet = `import { event, state } from "@mantaq/core";
+
+const cart = state("cart")();
+const payment = state("payment")();
+const pay = event("pay")();
+
+m.on(cart, { event: pay, to: [payment], handler: () => ({ state: payment }) });`;
+
+const headings = [
+  { depth: 2, slug: "headings-and-text", text: "Headings and text" },
+  { depth: 2, slug: "tables", text: "Tables" },
+  { depth: 2, slug: "inline-code", text: "Inline code" },
+  { depth: 2, slug: "code-blocks", text: "Code blocks" },
+  { depth: 2, slug: "buttons-and-cards", text: "Buttons and cards" },
+  { depth: 2, slug: "diagram", text: "Diagram" },
+  { depth: 2, slug: "design-findings", text: "Design findings line" },
+  { depth: 2, slug: "tutorial-step", text: "Tutorial step: start marker and self-transitions" },
+  { depth: 2, slug: "phone-width", text: "Phone width" },
+];
+---
+
+<StarlightPage
+  headings={headings}
+  frontmatter={{
+    title: "Design: building blocks",
+    description: "Every building block the docs use.",
+    pagefind: false,
+  }}
+>
+  <p>
+    Internal reference for maintainers. Every building block the docs and the embedded viz use, as
+    they look now. A new block, or a new look for a block, appears here first; other pages use it
+    only after it is approved here.
+  </p>
+  <p>
+    <strong>Approved</strong>: the maintainer approved this block here (linked).
+    <strong>Awaiting approval</strong>: not yet.
+  </p>
+  <p>Light and dark: use the theme switch at the top. Phone width: see the last section.</p>
+
+  <h2 id="headings-and-text">Headings and text</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <h3>A third-level heading</h3>
+  <h4>A fourth-level heading</h4>
+  <p>
+    A paragraph with a <a href="/mantaq/">link</a>, <strong>bold</strong> and <em>emphasis</em>.
+  </p>
+  <ul>
+    <li>A bulleted item</li>
+    <li>Another bulleted item</li>
+  </ul>
+  <ol>
+    <li>A numbered item</li>
+    <li>Another numbered item</li>
+  </ol>
+
+  <h2 id="tables">Tables</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Meaning</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>id</td><td>string</td><td>Names the machine</td></tr>
+      <tr><td>create</td><td>function</td><td>Returns a fresh actor</td></tr>
+      <tr><td>source</td><td>object</td><td>Where payload types are read from</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="inline-code">Inline code</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>Changed: was smaller than the text around it; now nearly the same size.</p>
+  <p>A paragraph with <code>state("checkout")()</code> inside it.</p>
+  <ul>
+    <li>A list item with <code>event("submit")()</code> inside it</li>
+  </ul>
+  <table>
+    <thead><tr><th>Call</th></tr></thead>
+    <tbody><tr><td>A table cell with <code>actor.send(submit)</code></td></tr></tbody>
+  </table>
+  <h3>A heading with <code>Actor</code></h3>
+
+  <h2 id="code-blocks">Code blocks</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    Changed: was black and white; now syntax colour, with pink for highlighted and added lines.
+  </p>
+  <Code code={snippet} lang="ts" title="order.ts" mark={[3]} ins={[5]} />
+  <Code code="npm install @mantaq/core @mantaq/inspect" lang="sh" />
+
+  <h2 id="buttons-and-cards">Buttons and cards</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    <LinkButton href="/mantaq/" variant="primary">Primary</LinkButton>
+    <LinkButton href="/mantaq/" variant="secondary">Secondary</LinkButton>
+    <LinkButton href="/mantaq/" variant="minimal">Minimal</LinkButton>
+  </p>
+  <CardGrid>
+    <Card title="Tiny API" icon="star">Three things: state, event, Actor.</Card>
+    <Card title="Typed" icon="approve-check">All types inferred from declarations.</Card>
+  </CardGrid>
+
+  <h2 id="diagram">Diagram</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    Changed: header, tabs and controls were smaller than the docs text; now they match it.
+  </p>
+  <p>A docs paragraph, so the diagram's text size is judged against the text around it.</p>
+  <Machine src="src/content/docs/checkout.ts" />
+
+  <h2 id="design-findings">Design findings line</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <Machine src="src/content/docs/checkout-with-bugs.ts" />
+
+  <h2 id="tutorial-step">Tutorial step: start marker and self-transitions</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    Changed: the start marker was a small dot, now a bigger dot with a longer arrow. Loops on one
+    state overlapped and their labels collided; now each loop has its own ends, points straight
+    down into the state, and its label sits above it.
+  </p>
+  <Step n={6}>A guard is a plain if in the handler: no items, no payment.</Step>
+
+  <h2 id="phone-width">Phone width</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <div class="design-phone">
+    <p>A paragraph with <code>state("checkout")()</code> inside it.</p>
+    <Code code={"const a = 1;\nconst b = 2;"} lang="ts" ins={[2]} />
+    <Machine src="src/tutorial/order-07.ts" />
+  </div>
+</StarlightPage>
+
+<style>
+  .design-phone {
+    max-width: 22.5rem;
+    border: 1px dashed var(--mq-hairline);
+    padding: 0.75rem;
+  }
+</style>
