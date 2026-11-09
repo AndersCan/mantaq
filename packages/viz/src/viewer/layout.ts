@@ -198,17 +198,26 @@ function polyline(points: ReadonlyArray<Point>): string {
     .join(" ");
 }
 
+const LOOP_RISE = 24;
+const LOOP_STEP = 32;
+const LOOP_FOOT_STEP = 12;
+
 /**
- * Self-loops are drawn by hand above the node: dagre routes them as a flat
- * line. The nth loop on a node is taller, so several loops stay readable.
+ * Self-loops nest above the node: each one wider and taller than the last,
+ * with its own feet, its label just above its apex.
  */
 function selfLoop(node: NodeLabel, nth: number): { path: string; label: Point } {
   const { x, y, width, height } = box(node);
   const top = y - height / 2;
-  const rise = 26 + nth * 18;
-  const spread = width / 2;
-  const path = `M${(x - width / 4).toFixed(1)},${top.toFixed(1)} C${(x - spread).toFixed(1)},${(top - rise).toFixed(1)} ${(x + spread).toFixed(1)},${(top - rise).toFixed(1)} ${(x + width / 4).toFixed(1)},${top.toFixed(1)}`;
-  return { path, label: { x, y: top - rise * 0.75 - 4 } };
+  const rise = LOOP_RISE + nth * LOOP_STEP;
+  const half = Math.min(width / 4 + nth * LOOP_FOOT_STEP, width / 2 - 4);
+  const left = (x - half).toFixed(1);
+  const right = (x + half).toFixed(1);
+  const lift = (top - rise).toFixed(1);
+  const base = top.toFixed(1);
+  const path = `M${left},${base} C${left},${lift} ${right},${lift} ${right},${base}`;
+  const apex = top - rise * 0.75;
+  return { path, label: { x, y: apex - LABEL_HEIGHT / 2 - 2 } };
 }
 
 export function pathLength(points: ReadonlyArray<Point>): number {
@@ -309,7 +318,7 @@ function placeEntries(graph: LayoutGraph, machine: VizMachine): MachineLayout["e
   return starts.map((id) => {
     const node = box(graph.node(id));
     const left = node.x - node.width / 2;
-    return { from: { x: left - 28, y: node.y }, to: { x: left, y: node.y } };
+    return { from: { x: left - 36, y: node.y }, to: { x: left, y: node.y } };
   });
 }
 
