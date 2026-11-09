@@ -6,7 +6,6 @@
 import { mountVizText, showIssues } from "./embed.ts";
 import type { ViewerOptions } from "./embed.ts";
 import "./viewer.css";
-import "./page.css";
 
 import { DOCUMENT_ELEMENT_ID } from "../html.ts";
 

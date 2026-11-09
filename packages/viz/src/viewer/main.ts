@@ -1,5 +1,6 @@
 import { mountVizText, showIssues } from "./embed.ts";
 import { linkOptions } from "./page.ts";
+import "./page.css";
 
 /** Written by `vp run viz:export`; used when no `?src=` is given. */
 const DEFAULT_SRC = "examples/examples.json";
