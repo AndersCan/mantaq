@@ -52,6 +52,17 @@ export default defineConfig({
       plugins: [
         starlightLlmsTxt({
           projectName: "Mantaq",
+          description:
+            "Mantaq is a type-safe state machine library for TypeScript, with a live diagram of every machine in a Vite dev server.",
+          details: [
+            "Set up mantaq in a Vite project (Node.js 22.12 or later):",
+            "",
+            "1. `npm install @mantaq/core @mantaq/inspect`",
+            '2. In `vite.config.ts`: `import { mantaqViz } from "@mantaq/inspect/vite";` and `plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })]`.',
+            "3. Write `src/<name>.machine.ts` that exports `create<Name>Actor()` returning `Actor({ inputs, states, initial, setup })` from `@mantaq/core`. The API is in the Reference pages of llms-full.txt.",
+            "4. Run the dev server and open `/__mantaq/?machine=<id>` on the port it prints. The id is the export name without `create` and `Actor`, first letter lowercase (`createDoorActor` → `door`). `vite build` writes `dist/__mantaq/viz.json`, which lists every id.",
+            "5. Optional: `npx skills add AndersCan/mantaq -y` installs the mantaq skill for most coding agents.",
+          ].join("\n"),
         }),
       ],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/anderscan/mantaq" }],

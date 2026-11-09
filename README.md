@@ -105,7 +105,7 @@ page. Entity IDs are fixed: the same states and events everywhere.
 Agent skills for **end users** building with `@mantaq/core`. Writing, testing, and reviewing actor-model code. These are **not** for developing the library itself.
 
 ```bash
-npx skills add AndersCan/mantaq -a claude-code -y
+npx skills add AndersCan/mantaq -y
 ```
 
 The `mantaq` skill covers philosophy, building blocks, and transition rules, with sibling files for patterns, testing, sugar helpers, and review conventions. See [Start with your coding agent](https://anderscan.github.io/mantaq/getting-started/with-an-agent/).
