@@ -6,17 +6,27 @@ import Step from "../components/Step.astro";
 
 const snippet = `import { event, state } from "@mantaq/core";
 
-const submit = event<{ card: string }>("submit");
-const checkout = state("checkout");
+const cart = state("cart")();
+const payment = state("payment")();
+const pay = event("pay")();
 
-checkout.on(submit, ({ card }) => pay(card));
-const paid = state("paid");
-checkout.on(paid, () => done());
-const done = () => {};
-const pay = (card: string) => card;`;
+m.on(cart, { event: pay, to: [payment], handler: () => ({ state: payment }) });`;
+
+const headings = [
+  { depth: 2, slug: "headings-and-text", text: "Headings and text" },
+  { depth: 2, slug: "tables", text: "Tables" },
+  { depth: 2, slug: "inline-code", text: "Inline code" },
+  { depth: 2, slug: "code-blocks", text: "Code blocks" },
+  { depth: 2, slug: "buttons-and-cards", text: "Buttons and cards" },
+  { depth: 2, slug: "diagram", text: "Diagram" },
+  { depth: 2, slug: "design-findings", text: "Design findings line" },
+  { depth: 2, slug: "tutorial-step", text: "Tutorial step: start marker and self-transitions" },
+  { depth: 2, slug: "phone-width", text: "Phone width" },
+];
 ---
 
 <StarlightPage
+  headings={headings}
   frontmatter={{
     title: "Design: building blocks",
     description: "Every building block the docs use.",
@@ -52,7 +62,6 @@ const pay = (card: string) => card;`;
 
   <h2 id="tables">Tables</h2>
   <p><strong>Awaiting approval</strong></p>
-  <p>Used on: Error handling, Machines in an app, Visualizer, Reference, Sugar, Test, Traversal.</p>
   <table>
     <thead>
       <tr><th>Name</th><th>Type</th><th>Meaning</th></tr>
@@ -67,9 +76,9 @@ const pay = (card: string) => card;`;
   <h2 id="inline-code">Inline code</h2>
   <p><strong>Awaiting approval</strong></p>
   <p>Changed: was smaller than the text around it; now nearly the same size.</p>
-  <p>A paragraph with <code>state("checkout")</code> inside it.</p>
+  <p>A paragraph with <code>state("checkout")()</code> inside it.</p>
   <ul>
-    <li>A list item with <code>event("submit")</code> inside it</li>
+    <li>A list item with <code>event("submit")()</code> inside it</li>
   </ul>
   <table>
     <thead><tr><th>Call</th></tr></thead>
@@ -82,7 +91,7 @@ const pay = (card: string) => card;`;
   <p>
     Changed: was black and white; now syntax colour, with pink for highlighted and added lines.
   </p>
-  <Code code={snippet} lang="ts" title="order.ts" mark={[3]} ins={[5, 6]} />
+  <Code code={snippet} lang="ts" title="order.ts" mark={[3]} ins={[5]} />
   <Code code="npm install @mantaq/core @mantaq/inspect" lang="sh" />
 
   <h2 id="buttons-and-cards">Buttons and cards</h2>
@@ -121,7 +130,7 @@ const pay = (card: string) => card;`;
   <h2 id="phone-width">Phone width</h2>
   <p><strong>Awaiting approval</strong></p>
   <div class="design-phone">
-    <p>A paragraph with <code>state("checkout")</code> inside it.</p>
+    <p>A paragraph with <code>state("checkout")()</code> inside it.</p>
     <Code code={"const a = 1;\nconst b = 2;"} lang="ts" ins={[2]} />
     <Machine src="src/tutorial/order-07.ts" />
   </div>
