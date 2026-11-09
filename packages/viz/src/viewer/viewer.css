@@ -38,14 +38,14 @@
 }
 
 .viz :where(button, select, textarea, input, code, pre) {
-  font-size: 0.75rem;
+  font-size: 1em;
 }
 
 /* One button look: a bordered button in the text colour. Send is the one
    filled button. Component rules below (tabs, fullscreen) still win. */
 .viz button {
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 1em;
   color: var(--fg);
   background: var(--state-bg);
   border: 1px solid var(--state-border);
@@ -106,14 +106,14 @@
 }
 
 .viz .viz-header :is(h1, h2, h3) {
-  font-size: 1.125rem;
+  font-size: 1.385em;
   margin: 0;
 }
 
 .viz .help-link {
   margin-left: auto;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 1em;
 }
 
 /* Panel below the graph unless the viewer itself is wide: a docs column is
@@ -209,7 +209,7 @@
 
 .viz .tab-strip [role="tab"] {
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 1em;
   color: var(--muted);
   background: none;
   border: none;

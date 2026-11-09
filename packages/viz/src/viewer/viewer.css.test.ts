@@ -66,3 +66,8 @@ test("the active state, running edge and composing edge use the accent", () => {
   expect(rule(".viz .running path")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz .edge[data-composing] path")).toMatch(/stroke:\s*var\(--accent\)/);
 });
+
+test("tabs and the help link follow the host's text size", () => {
+  expect(rule('.viz .tab-strip [role="tab"]')).toMatch(/font-size:\s*1em/);
+  expect(rule(".viz .help-link")).toMatch(/font-size:\s*1em/);
+});
