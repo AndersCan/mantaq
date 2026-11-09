@@ -84,6 +84,8 @@ function draw(
   return graph;
 }
 
+const cy = (marker: Element) =>
+  Number(/, ([-\d.]+)px/.exec((marker as SVGGElement).style.transform)?.[1]);
 const markers = (graph: Element) => [...graph.querySelectorAll<SVGGElement>("g.child-marker")];
 const tx = (marker: Element) =>
   Number(/translate\(([-\d.]+)px/.exec((marker as SVGGElement).style.transform)?.[1]);
@@ -267,5 +269,124 @@ describe("pills or dots", () => {
     expect(shown.length).toBeLessThan(40);
     expect(graph.querySelector(".marker-count")?.getAttribute("data-marker-count")).toBe("40");
     for (const each of shown) expect(tx(each) + 8).toBeLessThanOrEqual(frame.x + frame.width);
+  });
+});
+
+describe("pill boundary and bounds", () => {
+  test("six two-character keys exactly fill the state and are pills; seven are dots", () => {
+    const six = draw(["aa", "bb", "cc", "dd", "ee", "ff"].map((key) => child(key)));
+    expect(markers(six).some((each) => each.classList.contains("dot"))).toBe(false);
+    const frame = box(six, "photos.sendingPhoto");
+    const edges = markers(six).map((each) => {
+      const left = tx(each);
+      return [left, left + Number(each.querySelector("rect")?.getAttribute("width"))] as const;
+    });
+    expect(Math.min(...edges.map(([l]) => l))).toBeGreaterThanOrEqual(frame.x + 8);
+    expect(Math.max(...edges.map(([, r]) => r))).toBeLessThanOrEqual(frame.x + frame.width - 8);
+    const seven = draw(["aa", "bb", "cc", "dd", "ee", "ff", "gg"].map((key) => child(key)));
+    expect(markers(seven).every((each) => each.classList.contains("dot"))).toBe(true);
+  });
+
+  test("pills sit inside the frame at the bottom, not below it", () => {
+    const graph = draw([child("p1"), child("p2")]);
+    const frame = box(graph, "photos.sendingPhoto");
+    for (const each of markers(graph)) {
+      expect(cy(each) + 7).toBeLessThanOrEqual(frame.y + frame.height);
+      expect(cy(each)).toBeGreaterThan(frame.y + frame.height - 14);
+      expect(each.classList.contains("dot")).toBe(false);
+    }
+  });
+
+  test("dots and their count stay inside the frame", () => {
+    const graph = draw(Array.from({ length: 40 }, (_, i) => child(`p${i + 1}`)));
+    const frame = box(graph, "photos.sendingPhoto");
+    const count = graph.querySelector<SVGElement>(".marker-count");
+    const countLeft = tx(count!);
+    expect(countLeft + String(40).length * 6).toBeLessThanOrEqual(frame.x + frame.width - 8);
+    expect(markers(graph)).toHaveLength(11);
+    const last = Math.max(...markers(graph).map((each) => tx(each) + 8));
+    expect(last).toBeLessThanOrEqual(countLeft);
+    expect(cy(count!)).toBeLessThanOrEqual(frame.y + frame.height);
+  });
+});
+
+describe("roving focus and picks", () => {
+  const key = (name: string) =>
+    new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true });
+  const tabbable = (graph: Element) =>
+    markers(graph)
+      .filter((each) => each.getAttribute("tabindex") === "0")
+      .map((each) => each.getAttribute("data-marker-key"));
+
+  test("ArrowRight on the last marker keeps exactly one in the tab order", () => {
+    const graph = draw([child("p1"), child("p2")]);
+    document.body.append(graph);
+    const [, b] = markers(graph);
+    b?.focus();
+    b?.dispatchEvent(key("ArrowRight"));
+    expect(tabbable(graph)).toEqual(["p2"]);
+    b?.dispatchEvent(key("ArrowLeft"));
+    b?.dispatchEvent(key("ArrowLeft"));
+    expect(tabbable(graph)).toEqual(["p1"]);
+    graph.remove();
+  });
+
+  test("after a redraw the focused marker keeps the tab stop, else the picked one", () => {
+    const graph = draw([child("p1"), child("p2"), child("p3")]);
+    document.body.append(graph);
+    const [, b] = markers(graph);
+    b?.focus();
+    b?.dispatchEvent(key("End"));
+    draw([child("p1"), child("p2"), child("p3")], {}, graph);
+    expect(tabbable(graph)).toEqual(["p3"]);
+    draw([child("p1"), child("p2")], { picked: { map: "photos", key: "p2" } }, graph);
+    expect(tabbable(graph)).toEqual(["p2"]);
+    draw([child("p1"), child("p2")], {}, graph);
+    expect(tabbable(graph)).toEqual(["p2"]);
+    graph.remove();
+  });
+
+  test("the picked marker gets the tab stop on a fresh draw", () => {
+    const graph = draw([child("p1"), child("p2")], { picked: { map: "photos", key: "p2" } });
+    expect(tabbable(graph)).toEqual(["p2"]);
+  });
+
+  test("Space and Enter prevent the page scroll and pick", () => {
+    const graph = draw([child("p1")]);
+    const [a] = markers(graph);
+    for (const name of [" ", "Enter"]) {
+      const event = key(name);
+      a?.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    }
+    const other = key("a");
+    a?.dispatchEvent(other);
+    expect(other.defaultPrevented).toBe(false);
+  });
+
+  test("the same key in two maps is picked as one marker", () => {
+    const two: VizMachine = {
+      ...machine,
+      maps: ["photos", "docs"],
+      regions: ["photos", "docs"],
+      states: [...machine.states, state("docs.sendingPhoto", { initial: true })],
+    };
+    const docs: VizLiveChild = { ...child("p1"), map: "docs", state: "docs.sendingPhoto" };
+    const graph = renderGraph(document, two, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    drawChildMarkers(graph, {
+      machine: two,
+      children: [child("p1"), docs],
+      picked: { map: "docs", key: "p1" },
+      motion: false,
+      onPick: () => undefined,
+    });
+    expect(markers(graph).map((each) => each.getAttribute("aria-pressed"))).toEqual([
+      "false",
+      "true",
+    ]);
   });
 });

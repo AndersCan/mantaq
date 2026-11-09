@@ -225,6 +225,12 @@ describe("live actor map children", () => {
     );
   });
 
+  test("children that started together go to the first in array order", () => {
+    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 1)]);
+    click(edgeGroup(two.root));
+    expect(two.sent).toEqual(sentTo("p1"));
+  });
+
   test("Esc drops the pick", () => {
     const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
     click(marker(two.root, "p2"));

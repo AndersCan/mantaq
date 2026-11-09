@@ -538,6 +538,7 @@
 .viz .child-marker text {
   fill: var(--bg);
   font-size: 10px;
+  stroke: none;
 }
 
 .viz .child-marker.final rect:not(.hit),
@@ -585,16 +586,18 @@
 
 @keyframes viz-marker-in {
   from {
-    transform-origin: center;
     scale: 0;
   }
 }
 
-.viz .child-marker.entering {
+.viz .child-marker.entering > :not(title) {
   animation: viz-marker-in 150ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
-.viz .child-markers.still .child-marker {
+.viz .child-markers.still .child-marker,
+.viz .child-markers.still .child-marker > * {
   transition: none;
   animation: none;
 }
