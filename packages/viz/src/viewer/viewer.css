@@ -518,6 +518,93 @@
   }
 }
 
+.viz .child-marker {
+  cursor: pointer;
+  outline: none;
+  transition: transform 250ms ease-out;
+}
+
+.viz .child-marker rect:not(.hit),
+.viz .child-marker circle {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.viz .child-marker text {
+  fill: var(--bg);
+  font-size: 10px;
+  stroke: none;
+}
+
+.viz .child-marker.final rect:not(.hit),
+.viz .child-marker.final circle {
+  fill: var(--bg);
+  stroke-width: 1.5;
+}
+
+.viz .child-marker.final text {
+  fill: var(--accent);
+}
+
+.viz .child-marker .hit {
+  fill: transparent;
+  stroke: none;
+}
+
+.viz .child-marker[aria-pressed="true"] rect:not(.hit),
+.viz .child-marker[aria-pressed="true"] circle {
+  stroke: var(--fg);
+  stroke-width: 2;
+}
+
+.viz .child-marker:focus-visible rect:not(.hit),
+.viz .child-marker:focus-visible circle {
+  stroke: var(--fg);
+  stroke-width: 3;
+}
+
+.viz .child-marker .marker-key {
+  display: none;
+  fill: var(--fg);
+}
+
+.viz .child-marker.dot:hover .marker-key,
+.viz .child-marker.dot:focus .marker-key,
+.viz .child-marker.dot[aria-pressed="true"] .marker-key {
+  display: block;
+}
+
+.viz .marker-count {
+  fill: var(--muted);
+  font-size: 10px;
+}
+
+@keyframes viz-marker-in {
+  from {
+    scale: 0;
+  }
+}
+
+.viz .child-marker.entering > :not(title) {
+  animation: viz-marker-in 150ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.viz .child-markers.still .child-marker,
+.viz .child-markers.still .child-marker > * {
+  transition: none;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz .child-markers .child-marker,
+  .viz .child-markers .child-marker > :not(title) {
+    transition: none;
+    animation: none;
+  }
+}
+
 .viz .explore {
   background: var(--region-bg);
   border-radius: 6px;

@@ -49,11 +49,15 @@ export function regionPaths(state: VizLiveState): string[] {
 }
 
 /** Every state the actor is in: the machine's own, each region's, then each map child's. */
-export function currentsOf(state: VizLiveState): string[] {
+export function currentsOf(
+  state: VizLiveState,
+  picked: { map: string; key: string } | null = null,
+): string[] {
+  const only = state.children.filter((c) => c.map === picked?.map && c.key === picked.key);
   return [
     state.state,
     ...regionPaths(state).map((path) => state.regions[path] ?? ""),
-    ...state.children.map((child) => child.state),
+    ...(only.length > 0 ? only : state.children).map((child) => child.state),
   ];
 }
 

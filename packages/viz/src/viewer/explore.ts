@@ -1380,7 +1380,7 @@ export function clickStep(
   machine: VizMachine,
   context: { path: ReadonlyArray<ExploreStep>; selection: Selection; currents?: string[] },
 ): ExploreStep | null {
-  const currents = currentsIn(machine, context);
+  const currents = [...new Set(currentsIn(machine, context))];
   const { selection } = context;
   const steps = currents.flatMap((current) =>
     movesFrom(machine, current).flatMap((move) =>

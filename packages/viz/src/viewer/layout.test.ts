@@ -49,6 +49,7 @@ function machineOf(names: string[], edges: VizEdge[]): VizMachine {
     states: names.map(state),
     edges,
     events: [],
+    maps: [],
     regions: [],
   } as unknown as VizMachine;
 }
@@ -228,5 +229,39 @@ describe("entry arrows", () => {
 
   test("a machine without regions has one", () => {
     expect(layoutMachine(tight).entries).toHaveLength(1);
+  });
+});
+
+describe("map-child states", () => {
+  const base = machineOf(
+    ["first", "photos.sending"],
+    [edge({ from: "first", event: "go", target: "photos.sending" })],
+  );
+  const size = (machine: VizMachine, id: string) => {
+    const placed = layoutMachine(machine).nodes.find(
+      (node) => node.kind === "state" && node.id === id,
+    );
+    return placed?.kind === "state" ? placed : undefined;
+  };
+
+  test("reserve a marker row and a minimum width", () => {
+    const states = base.states.map((each) =>
+      each.id === "first" ? each : { ...each, region: "photos" },
+    );
+    const map = layoutMachine({ ...base, states, regions: ["photos"], maps: ["photos"] });
+    const child = map.nodes.find((node) => node.kind === "state" && node.id === "photos.sending");
+    expect(child?.height).toBe(56);
+    expect(child?.width).toBeGreaterThanOrEqual(168);
+    const root = map.nodes.find((node) => node.kind === "state" && node.id === "first");
+    expect(root?.height).toBe(36);
+  });
+
+  test("a region that is not a map keeps the plain size", () => {
+    const states = base.states.map((each) =>
+      each.id === "first" ? each : { ...each, region: "photos" },
+    );
+    const plain = size({ ...base, states, regions: ["photos"], maps: [] }, "photos.sending");
+    expect(plain?.height).toBe(36);
+    expect(plain?.width).toBeLessThan(168);
   });
 });

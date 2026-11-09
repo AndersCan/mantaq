@@ -32,6 +32,7 @@ import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { knownPayload } from "./fill.ts";
+import { drawChildMarkers } from "./markers.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
@@ -57,6 +58,10 @@ interface ViewState {
   alwaysAsk: boolean;
   /** The "Events and time" fold is open; it stays as the user left it across steps and Back. */
   eventsOpen: boolean;
+  /** Live: the child a click in the child graph goes to; null = the one that started first. */
+  picked: { map: string; key: string } | null;
+  /** True only right after a step or an effect result: markers slide and new ones grow in. */
+  motion: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
   /** Why the requested run did not open; cleared by the next walk. */
@@ -169,8 +174,8 @@ export function mountViewer(
   openInitial(view, { machine: first, driver, options });
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
-  listenOnRoot(root, () => back());
   let redraw: () => void = () => undefined;
+  listenOnRoot(root, { back: () => back(), unpick: () => unpickIn(view, redraw) });
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
 
@@ -187,6 +192,7 @@ export function mountViewer(
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     const refresh = () => {
+      dropGonePick(view);
       const parts = explorePanel(doc, {
         machine,
         path: view.path,
@@ -200,7 +206,7 @@ export function mountViewer(
         replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
       });
       fillPanel(panel, { doc, view, parts, details, refresh, footer: options.panelFooter });
-      markDiagram(root, { machine, view, send, compose });
+      markDiagram(root, { machine, view, send, compose, refresh });
     };
     redraw = refresh;
     const walked = (run?: string) => {
@@ -221,10 +227,7 @@ export function mountViewer(
       refresh();
     };
     const take = (step: ExploreStep) => {
-      if (driver !== undefined) {
-        liveTake(machine, step, { send, compose, view });
-        return;
-      }
+      if (driver !== undefined) return liveTake(machine, step, { send, compose, view });
       view.path = [...view.path, step];
       walked();
     };
@@ -300,6 +303,8 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     composingActor: undefined,
     alwaysAsk: false,
     eventsOpen: false,
+    picked: null,
+    motion: false,
     tab: "step",
     notice: null,
   };
@@ -403,17 +408,24 @@ function knownFor(machine: VizMachine, event: string, view: ViewState) {
   });
 }
 
-/** Who an edge click sends to; "none" = a map edge without exactly one child in its source state. */
+/** Who an edge click sends to: the picked child, else the one that started first; "none" = no such child in the edge's source state. */
 function actorOf(
   machine: VizMachine,
   edge: VizEdge,
-  children: ReadonlyArray<VizLiveChild>,
+  live: { children: ReadonlyArray<VizLiveChild>; picked: { map: string; key: string } | null },
 ): VizActorRef | undefined | "none" {
   const region = scopeOf(edge.from);
   if (machine.maps.includes(region)) {
-    const inSource = children.filter((child) => child.state === edge.from);
-    const [only] = inSource;
-    return inSource.length === 1 && only !== undefined ? { map: only.map, key: only.key } : "none";
+    const { picked } = live;
+    const inSource = live.children.filter((child) => child.state === edge.from);
+    const target =
+      picked === null
+        ? inSource.reduce<VizLiveChild | undefined>(
+            (first, each) => (first === undefined || each.since < first.since ? each : first),
+            undefined,
+          )
+        : inSource.find((each) => each.map === picked.map && each.key === picked.key);
+    return target === undefined ? "none" : { map: target.map, key: target.key };
   }
   return region === "" ? undefined : { region };
 }
@@ -427,7 +439,10 @@ function liveTake(
   const edge = machine.edges.find((each) => each.id === step.edge);
   if (edge === undefined) return;
   const { event } = edge;
-  const actor = actorOf(machine, edge, handlers.view.live?.children ?? []);
+  const actor = actorOf(machine, edge, {
+    children: handlers.view.live?.children ?? [],
+    picked: handlers.view.picked,
+  });
   if (actor === "none") return;
   const withActor = actor ? { actor } : {};
   if (!asksForPayload(machine, event)) {
@@ -446,6 +461,7 @@ function watchDriver(
 ): void {
   context.driver?.listen?.((state) => {
     view.live = state;
+    view.motion = true;
     context.redraw();
   });
 }
@@ -460,6 +476,7 @@ function walkedSteps(machine: VizMachine, view: ViewState): string[] {
 function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   view.previous = view.live?.context;
   view.live = stepSafely(driver, { before: view.live, step });
+  view.motion = true;
   view.composing = null;
 }
 
@@ -524,11 +541,27 @@ function isTextControl(target: EventTarget | null): boolean {
   );
 }
 
+/** A pick of a child that is gone is dropped. */
+function dropGonePick(view: ViewState): void {
+  const { picked } = view;
+  const there = view.live?.children.some((c) => c.map === picked?.map && c.key === picked.key);
+  if (picked !== null && there !== true) view.picked = null;
+}
+
+function unpickIn(view: ViewState, redraw: () => void): void {
+  if (view.picked === null) return;
+  view.picked = null;
+  redraw();
+}
+
 /** Listeners that outlive each render: ArrowLeft steps back, and the button label follows fullscreen. */
-function listenOnRoot(root: HTMLElement, back: () => void): void {
+function listenOnRoot(root: HTMLElement, keys: { back: () => void; unpick: () => void }): void {
   root.addEventListener("keydown", (event) => {
     if (!("key" in event) || isTextControl(event.target)) return;
-    if (event.key === "ArrowLeft") back();
+    if (event.key === "ArrowLeft") keys.back();
+    const inDialog =
+      event.target instanceof Element && event.target.closest('[role="dialog"]') !== null;
+    if (event.key === "Escape" && !inDialog) keys.unpick();
   });
   root.addEventListener("fullscreenchange", () => {
     const toggle = root.querySelector<HTMLButtonElement>(".fullscreen-toggle");
@@ -623,10 +656,27 @@ function headerOf(
 /** Everything drawn over the graph: walk marks, selection, and the edge of the open payload sheet. */
 function markDiagram(
   root: HTMLElement,
-  context: { machine: VizMachine; view: ViewState } & Pick<LiveContext, "send" | "compose">,
+  context: { machine: VizMachine; view: ViewState; refresh: () => void } & Pick<
+    LiveContext,
+    "send" | "compose"
+  >,
 ): void {
   const { machine, view } = context;
   markExplore(root, { machine, path: view.path, ...liveState(view) });
+  const graph = root.querySelector<SVGSVGElement>("svg");
+  if (view.live !== null && graph !== null) {
+    drawChildMarkers(graph, {
+      machine,
+      children: view.live.children,
+      picked: view.picked,
+      motion: view.motion,
+      onPick: (child) => {
+        view.picked = child;
+        context.refresh();
+      },
+    });
+    view.motion = false;
+  }
   markSelection(root, view.selection);
   showPayloadSheet(root, { ...context, ...view });
 }
@@ -642,7 +692,7 @@ function markSelection(root: HTMLElement, selection: Selection | null): void {
 }
 
 function liveState(view: ViewState): { currents?: string[] } {
-  return view.live === null ? {} : { currents: currentsOf(view.live) };
+  return view.live === null ? {} : { currents: currentsOf(view.live, view.picked) };
 }
 
 /** Back is reset plus replay: the driver keeps no history. Stops at the first step the driver throws on. */

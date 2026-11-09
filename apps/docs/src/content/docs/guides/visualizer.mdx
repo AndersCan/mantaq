@@ -13,6 +13,8 @@ The viewer keeps a cursor on one state, starting at the initial one. Pulsing edg
 - clicking a state that exactly one next step reaches,
 - using a button in the panel.
 
+In an actor map an arrow goes to the child you picked (click its pill), else to the child that started first.
+
 The panel groups the next steps:
 
 - **Send an input**: edges on input events.
@@ -29,16 +31,17 @@ An edge with an unknown target (dashed, orange) offers each target its handler e
 
 ## Nodes
 
-| Style                      | Meaning                                               |
-| -------------------------- | ----------------------------------------------------- |
-| Box                        | A state                                               |
-| Double border              | A final state                                         |
-| Thick border               | The state the walk is on                              |
-| Dot and arrow on the left  | The initial state                                     |
-| Dashed box `*`             | An `onAny` registration: any non-final state          |
-| Dashed circle `?`          | An unknown target                                     |
-| Shaded rectangle           | A region: its own start arrow and current state       |
-| Box labelled "one per key" | An actor map: its graph is drawn once for every child |
+| Style                      | Meaning                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Box                        | A state                                                                                                                     |
+| Double border              | A final state                                                                                                               |
+| Thick border               | The state the walk is on                                                                                                    |
+| Dot and arrow on the left  | The initial state                                                                                                           |
+| Dashed box `*`             | An `onAny` registration: any non-final state                                                                                |
+| Dashed circle `?`          | An unknown target                                                                                                           |
+| Shaded rectangle           | A region: its own start arrow and current state                                                                             |
+| Box labelled "one per key" | An actor map: its graph is drawn once for every child                                                                       |
+| Pill with a key (`p1`)     | One child of an actor map, on the state it is in; outlined when finished; dots and a count when a state holds more than fit |
 
 ## Edges
 
