@@ -31,6 +31,10 @@ export default defineConfig({
         "src/tutorial/order-03.ts",
         "src/tutorial/order-04.ts",
         "src/tutorial/order-05.ts",
+        "src/tutorial/order-06.ts",
+        "src/tutorial/order-07.ts",
+        "src/tutorial/order-08.ts",
+        "src/tutorial/order-09.ts",
       ],
       // Seeded, so every build draws the same coverage. 2000 runs miss the saga's
       // five-step path to `completed` on this seed; 5000 take ~0.3s.
@@ -60,7 +64,11 @@ export default defineConfig({
             { label: "Events", slug: "getting-started/events" },
             { label: "Final states", slug: "getting-started/final-states" },
             { label: "Context", slug: "getting-started/context" },
-            { label: "Your first machine", slug: "getting-started/first-machine" },
+            { label: "Guards", slug: "getting-started/guards" },
+            { label: "Effects", slug: "getting-started/effects" },
+            { label: "Timers", slug: "getting-started/timers" },
+            { label: "Regions", slug: "getting-started/regions" },
+            { label: "Test it", slug: "getting-started/first-machine" },
             { label: "Start with your coding agent", slug: "getting-started/with-an-agent" },
           ],
         },
