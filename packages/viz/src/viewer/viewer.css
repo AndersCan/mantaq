@@ -8,6 +8,7 @@
   --state-bg: #ffffff;
   --state-border: #000000;
   --region-bg: #f2f2f2;
+  --grid: #d9d9d9;
   --accent: #d61f73;
   --unknown: #a35c00;
   --banner-bg: #fff6e0;
@@ -81,6 +82,7 @@
     --state-bg: #000000;
     --state-border: #ffffff;
     --region-bg: #161616;
+    --grid: #2e2e2e;
     --accent: #ff6fae;
     --unknown: #f0a742;
     --fuzz: #4cc98a;
@@ -808,4 +810,34 @@
 .viz .explore-events > summary {
   cursor: pointer;
   margin: 8px 0;
+}
+
+/* Depth: a dot grid under the diagram, hard offset shadows on states
+   and buttons, in the text colour so the page stays black and white. */
+.viz .canvas {
+  background-image: radial-gradient(var(--grid) 1px, transparent 1.5px);
+  background-size: 16px 16px;
+}
+
+.viz .state .frame:not(.inner) {
+  filter: drop-shadow(3px 3px 0 var(--fg));
+}
+
+.viz button:not([role="tab"]) {
+  box-shadow: 2px 2px 0 var(--fg);
+}
+
+.viz button:not([role="tab"]):active:not(:disabled) {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+.viz button:disabled {
+  box-shadow: none;
+}
+
+/* A dashed frame's shadow repeats the dashes as noise. */
+.viz .reachable .frame:not(.inner),
+.viz.coverage-on .unreached .frame:not(.inner) {
+  filter: none;
 }
