@@ -177,7 +177,8 @@ function sendsFrom(scan: Scan, call: ts.CallExpression, depth: number): Found[] 
 }
 
 function exits(statement: ts.Statement): boolean {
-  if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) return true;
+  if (ts.isThrowStatement(statement)) return true;
+  if (ts.isReturnStatement(statement)) return statement.expression === undefined;
   return ts.isBlock(statement) && statement.statements.length > 0 && exits(statement.statements[0]);
 }
 
@@ -240,13 +241,12 @@ function triggerOf(
   ) {
     if (ts.isBlock(node)) {
       for (const statement of node.statements) {
-        if (statement.pos >= call.pos) break;
+        if (statement.end > call.pos) break;
         const literal = earlyReturnLiteral(checker, statement, outputs);
         if (literal !== null) return literal;
       }
     }
     if (
-      node !== listener &&
       ts.isIfStatement(node) &&
       call.pos >= node.thenStatement.pos &&
       call.end <= node.thenStatement.end

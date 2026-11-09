@@ -177,9 +177,19 @@ describe("scanAppCode unheard outputs", () => {
       'if (e.ok) { if (e.type !== "a") return; } note();',
       [],
     ],
+    ["a guard whose return carries a value", 'if (e.type !== "a") return forward(e); note();', []],
+    [
+      "an equality guard is a plain check, not an early return",
+      'if (e.type === "a") return; note();',
+      ["b"],
+    ],
+    ["a guard on another property", 'if (e.kind !== "a") return; note();', []],
+    ["a guard against an event's type", "if (e.type !== known.type) return; note();", ["b"]],
     ["a guard in a block that returns", 'if (e.type !== "a") { return; } note();', ["b"]],
   ])("early-return: %s", async (_name, body, unheard) => {
-    const scanned = await unheardWith(`actor.on("output", { fn: (e) => { ${body} } });\n`);
+    const scanned = await unheardWith(
+      `const known = { type: "a" } as const;\nfunction forward(e: unknown): void {}\nactor.on("output", { fn: (e) => { ${body} } });\n`,
+    );
     expect(scanned.unheard).toEqual(unheard.map((output) => ({ id: "duo", outputs: [output] })));
   });
 
@@ -299,6 +309,22 @@ describe("findWires", () => {
       "a guard with an else does not",
       `if (e.type !== "handedOver") return; else note();\n    ${send}`,
       "output",
+    ],
+    [
+      "a guard with a throwing send does not",
+      `if (e.type !== "handedOver") throw ${send}`,
+      "output",
+    ],
+    ["an equality guard does not", `if (e.type === "handedOver") return;\n    ${send}`, "output"],
+    [
+      "a guard on another property does not",
+      `if (e.kind !== "handedOver") return;\n    ${send}`,
+      "output",
+    ],
+    [
+      "a guard in an enclosing block names the output",
+      `if (e.ok) {\n    if (e.type !== "handedOver") return;\n    ${send}\n    }`,
+      "handedOver",
     ],
     [
       "a guard names a send in a later nested function",
