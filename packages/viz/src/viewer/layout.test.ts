@@ -209,7 +209,9 @@ describe("separateLabels", () => {
       ["first"],
       events.map((event) => edge({ from: "first", event, target: "first" })),
     );
-    const edges = layoutMachine(machine).edges;
+    const laid = layoutMachine(machine);
+    const edges = laid.edges;
+    const node = laid.nodes[0];
     const curveOf = (path: string) => {
       const [p0, p1, p2, p3] = [...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => ({
         x: Number(m[1]),
@@ -224,7 +226,10 @@ describe("separateLabels", () => {
       const outer = edges[nth];
       const [p0, p1, p2, p3] = curveOf(outer?.path ?? "");
       const [i0, , , i3] = curveOf(inner?.path ?? "");
-      if (!p0 || !p1 || !p2 || !p3 || !i0 || !i3) throw new Error("bad path");
+      if (!p0 || !p1 || !p2 || !p3 || !i0 || !i3 || !node) throw new Error("bad path");
+      // every foot stays on the state's box
+      expect(p0.x).toBeGreaterThanOrEqual(node.x - node.width / 2);
+      expect(p3.x).toBeLessThanOrEqual(node.x + node.width / 2);
       // arrowheads (6 wide) do not touch on either side
       expect(p3.x - i3.x).toBeGreaterThanOrEqual(6);
       expect(i0.x - p0.x).toBeGreaterThanOrEqual(6);
@@ -241,6 +246,18 @@ describe("separateLabels", () => {
       }
       expect(leftX).toBeLessThan((inner?.label.x ?? 0) - labelWidth / 2);
     }
+  });
+
+  test("outgoing edges do not shrink the foot spread of the loops", () => {
+    const loops = ["alpha", "beta"].map((event) => edge({ from: "first", event, target: "first" }));
+    const outgoing = ["x", "y", "z"].map((event, index) =>
+      edge({ from: "first", event, target: `t${index}` }),
+    );
+    const machine = machineOf(["first", "t0", "t1", "t2"], [...loops, ...outgoing]);
+    const starts = layoutMachine(machine)
+      .edges.filter((placed) => placed.edge.to === placed.edge.from)
+      .map((placed) => Number(/^M(-?[\d.]+)/.exec(placed.path)?.[1]));
+    expect((starts[0] ?? 0) - (starts[1] ?? 0)).toBeGreaterThanOrEqual(6);
   });
 
   test("the outermost loop label stays inside the layout", () => {
