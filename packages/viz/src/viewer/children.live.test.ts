@@ -416,6 +416,92 @@ describe("live actor map children", () => {
       children: [child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)],
     };
 
+    test("Always ask opens the form with the next free key", () => {
+      const keyed: VizMachine = {
+        ...withPhotoAdded,
+        events: [
+          {
+            ...event("photoAdded"),
+            payload: [
+              {
+                name: "photoId",
+                type: "string",
+                optional: false,
+                doc: null,
+                input: "text",
+                choices: [],
+                sample: "p1",
+              },
+            ],
+          },
+          event("queueCleared"),
+        ],
+      };
+      const root = document.createElement("div");
+      let sent: VizStep[] = [];
+      const driver: VizDriver = {
+        reset: () => {
+          sent = [];
+          return live([]);
+        },
+        step: (step) => {
+          sent = [...sent, step];
+          return { ...live([child("p1", "sendingPhoto", 1)], sent), last: rootStay("photoAdded") };
+        },
+      };
+      mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [keyed] }, { driver });
+      clickSend(root, "photoAdded");
+      const form = () =>
+        root.querySelector<HTMLInputElement>('[data-payload-form="photoAdded"] input');
+      expect(form()?.value).toBe("p1");
+      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
+      expect(sent).toEqual([{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }]);
+      root.querySelector<HTMLButtonElement>("[data-always-ask]")?.click();
+      clickSend(root, "photoAdded");
+      expect(form()?.value).toBe("p2");
+    });
+
+    test("the JSON box opens with the next free key when the event declares no fields", () => {
+      const bare: VizMachine = {
+        ...withPhotoAdded,
+        events: [{ ...event("photoAdded"), payload: [] }, event("queueCleared")],
+        fuzz: {
+          seed: 1,
+          iterations: 1,
+          corpus: [
+            {
+              steps: [{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }],
+              discovered: [],
+            },
+          ],
+          errors: [],
+          failedExpectations: [],
+        } as unknown as VizMachine["fuzz"],
+      };
+      const root = document.createElement("div");
+      let sent: VizStep[] = [];
+      const driver: VizDriver = {
+        reset: () => {
+          sent = [];
+          return live([]);
+        },
+        step: (step) => {
+          sent = [...sent, step];
+          return { ...live([child("p1", "sendingPhoto", 1)], sent), last: rootStay("photoAdded") };
+        },
+      };
+      mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [bare] }, { driver });
+      const box = () => root.querySelector<HTMLTextAreaElement>('[data-payload-json="photoAdded"]');
+      clickSend(root, "photoAdded");
+      const first = box();
+      if (first) first.value = '{"photoId":"p1"}';
+      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
+      expect(sent).toHaveLength(1);
+      root.querySelector<HTMLButtonElement>("[data-always-ask]")?.click();
+      clickSend(root, "photoAdded");
+      expect(box()?.value).toBe('{"photoId":"p2"}');
+    });
+
     test("a step that starts a child says so", () => {
       const root = scripted([afterAdd1]);
       clickSend(root, "photoAdded");

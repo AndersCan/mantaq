@@ -820,18 +820,18 @@ describe("field forms and the context table", () => {
   const alertText = (root: HTMLElement) =>
     root.querySelector(".payload-actions [role=alert]")?.textContent;
 
-  test("a click would send the first fuzz payload, so the form opens on it with Fuzz 1 pressed", () => {
+  test("a click would send the field's example, so the form opens on it with Example pressed", () => {
     const { root, live } = mountFields(fuzzedMachine, null);
     click(root, '[data-send="submit"]');
     expect(fillButtons(root)).toEqual(["Fuzz 1", "Example"]);
-    expect(pressedFill(root)).toBe("Fuzz 1");
-    expect(field(root, "code")?.value).toBe("zz");
-    expect(pressedChoice(root, "validFor")).toBe('"1h"');
-    pressFill(root, "Example");
+    expect(pressedFill(root)).toBe("Example");
     expect(field(root, "code")?.value).toBe("sample");
+    expect(pressedChoice(root, "validFor")).toBe('"10m"');
+    pressFill(root, "Fuzz 1");
+    expect(field(root, "code")?.value).toBe("zz");
     click(root, '[data-payload-send="submit"]');
     expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { code: "sample", validFor: "10m" } },
+      { kind: "event", event: "submit", payload: { code: "zz", validFor: "1h" } },
     ]);
   });
 
@@ -860,7 +860,7 @@ describe("field forms and the context table", () => {
   test("editing a control moves the pressed Values from button off", () => {
     const { root } = mountFields(fuzzedMachine, null);
     click(root, '[data-send="submit"]');
-    choose(root, "validFor", "10m");
+    choose(root, "validFor", "1h");
     expect(pressedFill(root)).toBeUndefined();
   });
 
@@ -911,7 +911,7 @@ describe("field forms and the context table", () => {
   test("typing in a text field moves the pressed Values from button off", () => {
     const { root } = mountFields(fuzzedMachine, null);
     click(root, '[data-send="submit"]');
-    expect(pressedFill(root)).toBe("Fuzz 1");
+    expect(pressedFill(root)).toBe("Example");
     const code = field(root, "code");
     if (code) code.value = "typed";
     code?.dispatchEvent(new Event("input", { bubbles: true }));

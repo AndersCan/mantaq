@@ -21,7 +21,10 @@ const waitingForRetry = state("waitingForRetry")();
 const photoSent = state("photoSent")().final();
 
 /** A photo was added to the queue. */
-const photoAdded = event("photoAdded")<{ photoId: string }>();
+const photoAdded = event("photoAdded")<{
+  /** @example p1 */
+  photoId: string;
+}>();
 /** The queue was cleared. */
 const queueCleared = event("queueCleared")();
 /** The server confirmed the upload. */

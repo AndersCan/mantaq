@@ -17,7 +17,7 @@ import type {
 } from "../schema.ts";
 import { changedKeys, contextLines } from "./context-diff.ts";
 import { html } from "./dom.ts";
-import { fillChoices, knownPayload } from "./fill.ts";
+import { fillChoices, freshKeys, knownPayload } from "./fill.ts";
 import type { FillChoice } from "./fill.ts";
 import type { Selection } from "./graph.ts";
 
@@ -519,7 +519,18 @@ function isRecord(value: unknown): value is Record<string, VizJson> {
 /** What a payload form fills from: the machine now, and the steps of the walk. */
 type FillLive = Pick<VizLiveState, "state" | "payload" | "context"> & {
   steps?: ReadonlyArray<VizStep>;
+  children?: VizLiveState["children"];
+  removed?: VizLiveState["removed"];
 };
+
+/** The form's start values: a key that already started a child gives way to the next free one. */
+function startValues(payload: VizJson, event: string, live: FillLive | null | undefined): VizJson {
+  if (live?.children === undefined) return payload;
+  return freshKeys(payload, {
+    event,
+    state: { steps: live.steps ?? [], children: live.children, removed: live.removed },
+  });
+}
 
 function fieldsForm(
   doc: Document,
@@ -536,7 +547,8 @@ function fieldsForm(
   const steps = context.live?.steps ?? [];
   const controls = new Map(fields.map((field) => [field.name, fieldControl(doc, field)] as const));
   const known = knownPayload(fields, { event, samples, steps });
-  const startAt = known !== undefined && isRecord(known.payload) ? known.payload : {};
+  const fresh = known === undefined ? undefined : startValues(known.payload, event, context.live);
+  const startAt = isRecord(fresh) ? fresh : {};
   for (const field of fields) {
     const value = startAt[field.name];
     if (value !== undefined) controls.get(field.name)?.write(filledText(field, value));
@@ -636,7 +648,8 @@ export function payloadForm(
     "aria-label": `${event} payload JSON`,
     "data-payload-json": event,
   });
-  box.value = known === undefined ? "" : (JSON.stringify(known.payload) ?? "");
+  const start = known === undefined ? undefined : startValues(known.payload, event, context.live);
+  box.value = start === undefined ? "" : (JSON.stringify(start) ?? "");
   const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" }, [
     "Payload is not valid JSON. Nothing was sent.",
   ]);

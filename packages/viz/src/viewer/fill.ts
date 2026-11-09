@@ -99,7 +99,7 @@ export function fillSources(
   return ordered;
 }
 
-/** What a click sends for `event`: per field, the latest value this walk sent under that name, else the fuzzer's first payload's value, else the field's example (required fields only). Without declared fields: the payload this walk last sent with `event`, else the fuzzer's first. undefined = nothing known. */
+/** What a click sends for `event`: per field, the latest value this walk sent under that name, else the field's example (required fields), else the fuzzer's first payload's value. Without declared fields: the payload this walk last sent with `event`, else the fuzzer's first. undefined = nothing known. */
 export function knownPayload(
   fields: ReadonlyArray<VizField> | null,
   context: { event: string; samples: ReadonlyArray<VizJson>; steps: ReadonlyArray<VizStep> },
@@ -129,9 +129,55 @@ function knownValue(
 ): VizJson | undefined {
   const sent = from.typed?.values.find((each) => each.field === field.name);
   if (sent !== undefined) return sent.value;
+  if (!field.optional) return field.sample;
   const fuzz = isObject(from.fuzzed) ? from.fuzzed[field.name] : undefined;
   if (fuzz !== undefined && fits(field, fuzz) && !isTypeDefault(field, fuzz)) return fuzz;
-  return field.optional ? undefined : field.sample;
+  return undefined;
+}
+
+function nextKey(value: string, taken: ReadonlySet<string>): string {
+  const match = /^(.*?)(\d+)$/.exec(value);
+  if (match === null) {
+    for (let count = 2; ; count += 1) {
+      if (!taken.has(`${value}-${count}`)) return `${value}-${count}`;
+    }
+  }
+  const [, prefix = "", digits = ""] = match;
+  for (let count = Number(digits) + 1; ; count += 1) {
+    if (!taken.has(`${prefix}${count}`)) return `${prefix}${count}`;
+  }
+}
+
+/** A payload that would start a child under a key that is live gets the next free key instead, when this event started a child under that key earlier in the walk. */
+export function freshKeys(
+  payload: VizJson,
+  context: {
+    event: string;
+    state: {
+      steps: ReadonlyArray<VizStep>;
+      children: VizLiveState["children"];
+      removed?: VizLiveState["removed"];
+    };
+  },
+): VizJson {
+  if (!isObject(payload)) return payload;
+  const { event, state } = context;
+  const live = new Set(state.children.map((child) => child.key));
+  const everyChild = [...state.children, ...(state.removed ?? [])];
+  const fresh: Record<string, VizJson> = { ...payload };
+  for (const [name, value] of Object.entries(payload)) {
+    if (typeof value !== "string" || !live.has(value)) continue;
+    const started = state.steps.some(
+      (step, index) =>
+        step.kind === "event" &&
+        step.event === event &&
+        isObject(step.payload) &&
+        step.payload[name] === value &&
+        everyChild.some((child) => child.key === value && child.since === index + 1),
+    );
+    if (started) fresh[name] = nextKey(value, live);
+  }
+  return fresh;
 }
 
 /** What the fuzzer makes up for a bare string or number: it says nothing the field's example does not say better. */

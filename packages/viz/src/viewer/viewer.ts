@@ -32,7 +32,7 @@ import {
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
-import { knownPayload } from "./fill.ts";
+import { freshKeys, knownPayload } from "./fill.ts";
 import { drawChildMarkers } from "./markers.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
 import { tabs } from "./tabs.ts";
@@ -405,11 +405,13 @@ function liveOf(
 }
 
 function knownFor(machine: VizMachine, event: string, view: ViewState) {
-  return knownPayload(machine.events.find((each) => each.id === event)?.payload ?? null, {
+  const known = knownPayload(machine.events.find((each) => each.id === event)?.payload ?? null, {
     event,
     samples: payloadSamples(machine, event),
     steps: view.live?.steps ?? [],
   });
+  if (known === undefined || view.live === null) return known;
+  return { payload: freshKeys(known.payload, { event, state: view.live }) };
 }
 
 /** Who an edge click sends to: the picked child, else the one that started first; "none" = no such child in the edge's source state. */
