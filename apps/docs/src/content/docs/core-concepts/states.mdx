@@ -5,17 +5,7 @@ description: Nodes in the state graph.
 
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 
-## What
-
-A state is a named, typed node in the machine's graph. `state("basicInfo")()`
-creates one.
-
-State is not data. Data lives in [Context](/mantaq/core-concepts/context/).
-State answers "where am I?". Context answers "what do I know?".
-
 ## Basic states
-
-The examples on this page build on each other: paste them into one file, in order.
 
 ```ts
 import { state } from "@mantaq/core";
@@ -33,12 +23,9 @@ const success = state("success")().final();
 success.isFinal; // true
 ```
 
-Entering a final state fires `"done"` subscribers, sets `snapshot().done` to
-`true`, and stops the actor from accepting events.
+A final state fires `"done"`, sets `snapshot().done`, and stops the actor.
 
 ## Payloads
-
-States carry an optional payload, passed on entry, read by effects.
 
 ```ts
 import { Actor, event } from "@mantaq/core";
@@ -68,10 +55,7 @@ const payments = Actor({
 payments.send(paymentFail.create({ reason: "card declined" })); // logs "card declined"
 ```
 
-## Regions (hierarchical states)
-
-Sub-actors passed as `regions` to the Actor constructor. Child runs alongside
-parent. Snapshot nests.
+## Regions
 
 ```ts
 import { matches } from "@mantaq/sugar";
@@ -106,16 +90,10 @@ fraudMonitor.send(scanDone.create({ risky: false }));
 matches(checkout, "basicInfo.fraud.cleared"); // true
 ```
 
-`matches(checkout, "basicInfo.fraud.cleared")` checks a child state.
+Each region is its own actor.
 
-Multiple regions run simultaneously: `regions: { fraud: fraudMonitor, analytics: analyticsMonitor }`.
-
-Each is its own actor. Both run independently.
-
-## Regions: parts that run side by side
-
-Two things run at once in the photo upload: the upload and the network. The machine is in one state of each, and you send each region its own events.
+## Side by side
 
 <Machine src="src/content/docs/photo-upload.ts" />
 
-Send a region its events on the region itself: `actor.regions.upload.send(...)`. The machine does not pass events down. The viewer lists them under each region.
+Send events on the region: `actor.regions.upload.send(...)`.

@@ -3,14 +3,9 @@ title: Events
 description: Messages that trigger transitions.
 ---
 
-## What
-
-An event is a typed message that triggers a transition. `event("back")()`
-declares one.
-
 ## Declare
 
-The examples on this page build on each other. Save [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) next to your file (it also needs `@mantaq/sugar`), then paste the examples into one file, in order.
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
 
 ```ts
 import { event } from "@mantaq/core";
@@ -20,7 +15,7 @@ const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }
 back.type; // "back"
 ```
 
-Payload must be `object | void`. Default: no payload.
+Payload must be `object | void`.
 
 ## Create instances
 
@@ -64,9 +59,7 @@ const checkout = Actor({
 });
 ```
 
-`event.payload` is typed from the event ref.
-
-The handler's second argument also carries the current state as `state: { name, payload }`, typed from the state ref. Carry a payload forward without a guard:
+The handler also gets `state: { name, payload }`:
 
 ```ts
 const picking = state("picking")<{ orderId: string }>();
@@ -90,10 +83,9 @@ order.send(ship.create());
 order.snapshot().payload; // { orderId: "ord_1" }
 ```
 
-## Guards (conditional transitions)
+## Guards
 
-No guard syntax. Plain `if` in the handler picks which `{ state }` to return.
-Return `{}` to stay put.
+A plain `if` picks the `{ state }`; `{}` stays put.
 
 ```ts
 const scanning = state("scanning")();
@@ -117,8 +109,7 @@ const fraudMonitor = Actor({
 
 ## Internal events
 
-Declared in `internal`, not `inputs`. Emitted by effects. Processed after the
-current transition. Nothing external can send them via `send()`.
+Emitted by effects; `send()` rejects them.
 
 ```ts
 const paymentOk = event("paymentOk")<{ orderId: string }>();
@@ -127,10 +118,7 @@ const paymentFail = event("paymentFail")<{ reason: string }>();
 
 ## `onAny`
 
-Handles an event in every non-final state, for events that do the same thing
-everywhere: cancel, disconnect, purge. A state-specific handler for the same
-event runs first; `onAny` still runs and may transition only if the state
-handler did not.
+A state handler runs first.
 
 ```ts
 const cancel = event("cancel")();
@@ -145,10 +133,7 @@ const form = Actor({
 });
 ```
 
-When the target depends on the current state, as with `back`, register one
-`m.on` per state instead of branching on `actor.state` inside `onAny`. Each
-registration declares its exact target, so diagrams show which state leads
-where.
+Target depends on state? Register one `m.on` per state.
 
 ```ts
 const steps = Actor({
@@ -165,5 +150,3 @@ const steps = Actor({
   },
 });
 ```
-
-See the checkout's `back` edges drawn in [Diagrams](/mantaq/core-concepts/diagrams/).
