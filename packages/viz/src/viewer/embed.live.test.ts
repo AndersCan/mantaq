@@ -299,6 +299,11 @@ describe("live controls", () => {
     clickEdge(root, "on-flip-off");
     expect(log.at(-1)).toEqual({ kind: "event", event: "flip", payload: { n: 42 } });
     expect(root.querySelector(".payload-sheet")).toBeNull();
+    click(root, "[data-always-ask]");
+    click(root, '[data-send="flip"]');
+    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]')?.value).toBe(
+      '{"n":42}',
+    );
   });
 
   test("a value sent from the form is forgotten when Back undoes that send", () => {
@@ -891,6 +896,71 @@ describe("field forms and the context table", () => {
     });
   });
 
+  test("a choice field with exactly four options is a button row", () => {
+    const { root } = mountFields(sizedMachine(["a", "b", "c", "d"], false));
+    click(root, '[data-send="submit"]');
+    expect(field(root, "pick")?.tagName).toBe("DIV");
+  });
+
+  test("an optional choice with four choices has five options and is a select", () => {
+    const { root } = mountFields(sizedMachine(["a", "b", "c", "d"], true));
+    click(root, '[data-send="submit"]');
+    expect(field(root, "pick")?.tagName).toBe("SELECT");
+  });
+
+  test("typing in a text field moves the pressed Values from button off", () => {
+    const { root } = mountFields(fuzzedMachine, null);
+    click(root, '[data-send="submit"]');
+    expect(pressedFill(root)).toBe("Fuzz 1");
+    const code = field(root, "code");
+    if (code) code.value = "typed";
+    code?.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(pressedFill(root)).toBeUndefined();
+  });
+
+  test("a source that covers some fields resets the others", () => {
+    const { root } = mountFields(fillMachine, { code: "c1" });
+    click(root, '[data-send="submit"]');
+    choose(root, "validFor", "1h");
+    pressFill(root, "Context");
+    expect(field(root, "code")?.value).toBe("c1");
+    expect(pressedChoice(root, "validFor")).toBe('"10m"');
+    expect(pressedFill(root)).toBe("Context");
+    choose(root, "validFor", "10m");
+    expect(pressedFill(root)).toBe("Context");
+  });
+
+  test("a partial source is pressed only when the other fields are at their reset", () => {
+    const fuzzedOptional: VizMachine = {
+      ...optionalChoiceMachine,
+      fuzz: {
+        ...fuzzedMachine.fuzz!,
+        corpus: [
+          {
+            steps: [{ kind: "event", event: "submit", payload: { tag: "b", size: "m" } }],
+            discovered: [],
+          },
+        ],
+      },
+    };
+    const { root, live } = mountFields(fuzzedOptional, null);
+    click(root, '[data-send="submit"]');
+    click(root, '[data-field="tag"] [data-choice=""]');
+    const size = field(root, "size");
+    if (size) size.value = JSON.stringify("s");
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { size: "s" } }]);
+    click(root, '[data-send="submit"]');
+    expect(pressedChoice(root, "tag")).toBe('"b"');
+    expect(pressedFill(root)).not.toBe("Last sent");
+    pressFill(root, "Last sent");
+    expect(pressedChoice(root, "tag")).toBe("");
+    expect(pressedFill(root)).toBe("Last sent");
+    pressFill(root, "Last sent");
+    expect(pressedChoice(root, "tag")).toBe("");
+    expect(pressedFill(root)).toBe("Last sent");
+  });
+
   test("a choice field of five options stays a select", () => {
     const { root, live } = mountFields(optionalChoiceMachine, null);
     click(root, '[data-send="submit"]');
@@ -917,6 +987,17 @@ describe("field forms and the context table", () => {
     input: "choice",
     choices,
     sample: choices[0] ?? "",
+  });
+  const sizedMachine = (choices: string[], optional: boolean): VizMachine => ({
+    ...fieldsMachine,
+    events: [
+      {
+        id: "submit",
+        internal: false,
+        doc: null,
+        payload: [choiceField("pick", optional, choices)],
+      },
+    ],
   });
   const optionalChoiceMachine: VizMachine = {
     ...fieldsMachine,

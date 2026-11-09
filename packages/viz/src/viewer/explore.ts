@@ -449,15 +449,21 @@ function filledText(field: VizField, value: VizJson): string {
   return JSON.stringify(value) ?? "";
 }
 
-/** Whether every value of a "Values from" choice is what its field's control holds now. */
+/** Whether every control holds what pressing the choice would put there: its value, else the field's reset value. */
 function choiceHolds(
-  choice: FillChoice,
-  fields: ReadonlyArray<VizField>,
-  controls: ReadonlyMap<string, FieldControl>,
+  doc: Document,
+  context: {
+    choice: FillChoice;
+    fields: ReadonlyArray<VizField>;
+    controls: ReadonlyMap<string, FieldControl>;
+  },
 ): boolean {
-  return choice.values.every(({ field: name, value }) => {
-    const field = fields.find((each) => each.name === name);
-    return field !== undefined && controls.get(name)?.read() === filledText(field, value);
+  const { choice, fields, controls } = context;
+  return fields.every((field) => {
+    const given = choice.values.find((each) => each.field === field.name);
+    const wanted =
+      given === undefined ? fieldControl(doc, field).read() : filledText(field, given.value);
+    return controls.get(field.name)?.read() === wanted;
   });
 }
 
@@ -503,7 +509,7 @@ function fillRow(
   row.append(...buttons);
   return {
     node: row,
-    sync: () => press(choices.find((choice) => choiceHolds(choice, fields, controls))),
+    sync: () => press(choices.find((choice) => choiceHolds(doc, { choice, fields, controls }))),
   };
 }
 

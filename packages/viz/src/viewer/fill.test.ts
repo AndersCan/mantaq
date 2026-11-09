@@ -321,6 +321,16 @@ describe("fillChoices", () => {
     expect(fillChoices([code], { live: null, samples: [], steps: [] })).toEqual([]);
   });
 
+  test("with only optional fields there is no Example button", () => {
+    const note: VizField = { ...code, name: "note", optional: true };
+    const found = fillChoices([note], {
+      live: null,
+      samples: [{ note: "n" }],
+      steps: [send({ note: "sent" })],
+    });
+    expect(labels(found)).toEqual(["Last sent", "Fuzz 1"]);
+  });
+
   test("Example leaves out optional fields", () => {
     const note: VizField = { ...code, name: "note", optional: true };
     const found = fillChoices([code, note], {
