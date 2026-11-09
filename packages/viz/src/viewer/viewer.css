@@ -1,13 +1,18 @@
 .viz {
+  /* Black and white throughout. --accent marks the active state and its
+     transitions; --select marks what was clicked or focused. */
   --fuzz: #138a4a;
-  --bg: #fbfbfa;
-  --fg: #1d1d1f;
+  --bg: #ffffff;
+  --fg: #000000;
   --muted: #6b6b70;
-  --line: #4a4a52;
+  --line: #000000;
   --state-bg: #ffffff;
-  --state-border: #3b3b44;
-  --region-bg: #f1f1ef;
-  --accent: #2463eb;
+  --state-border: #000000;
+  --region-bg: #f2f2f2;
+  --grid: #d9d9d9;
+  --shadow: #c4c4c4;
+  --accent: #d61f73;
+  --select: #0e7c99;
   --unknown: #a35c00;
   --banner-bg: #fff6e0;
   --banner-fg: #5a3e00;
@@ -61,26 +66,29 @@
 
 .viz button.primary {
   color: var(--bg);
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--fg);
+  border-color: var(--fg);
   font-weight: 600;
 }
 
 .viz button.primary:hover:not(:disabled) {
-  background: var(--accent);
-  filter: brightness(1.1);
+  background: var(--fg);
+  opacity: 0.85;
 }
 
 @media (prefers-color-scheme: dark) {
   .viz {
-    --bg: #141416;
-    --fg: #ececf0;
+    --bg: #000000;
+    --fg: #ffffff;
     --muted: #9a9aa3;
-    --line: #b4b4bf;
-    --state-bg: #1f1f23;
-    --state-border: #c9c9d2;
-    --region-bg: #1a1a1e;
-    --accent: #7aa7ff;
+    --line: #ffffff;
+    --state-bg: #000000;
+    --state-border: #ffffff;
+    --region-bg: #161616;
+    --grid: #2e2e2e;
+    --shadow: #4d4d4d;
+    --accent: #ff6fae;
+    --select: #3fd0f0;
     --unknown: #f0a742;
     --fuzz: #4cc98a;
     --banner-bg: #2e2510;
@@ -131,7 +139,7 @@
   max-height: min(60vh, 26rem);
   box-sizing: border-box;
   background: var(--state-bg);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--fg);
   border-top-width: 2px;
   border-radius: 6px 6px 0 0;
   box-shadow: 0 -4px 16px rgb(0 0 0 / 25%);
@@ -212,7 +220,7 @@
 
 .viz .tab-strip [role="tab"][aria-selected="true"] {
   color: var(--fg);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--fg);
   font-weight: 600;
 }
 
@@ -241,7 +249,8 @@
 }
 
 .viz .link {
-  color: var(--accent);
+  color: var(--fg);
+  text-decoration: underline;
   cursor: pointer;
 }
 
@@ -305,9 +314,9 @@
 }
 
 .viz .chip rect {
-  fill: var(--accent);
+  fill: var(--fg);
   fill-opacity: 0.12;
-  stroke: var(--accent);
+  stroke: var(--fg);
 }
 
 .viz .chip text {
@@ -405,7 +414,7 @@
 .viz .highlight circle,
 .viz .selected path,
 .viz .selected .frame {
-  stroke: var(--accent);
+  stroke: var(--select);
   stroke-width: 2.5;
 }
 
@@ -424,7 +433,7 @@
 
 .viz .state:focus-visible .frame,
 .viz .edge:focus-visible path {
-  stroke: var(--accent);
+  stroke: var(--select);
   stroke-width: 3;
 }
 
@@ -458,7 +467,8 @@
 }
 
 .viz .branch[data-branch-status="this edge"] .branch-status {
-  color: var(--accent);
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .viz .prediction-note,
@@ -506,6 +516,12 @@
   font-weight: 700;
 }
 
+/* A clicked item stays teal even when it is also on the walk. */
+.viz .graph .selected path,
+.viz .graph .selected .frame {
+  stroke: var(--select);
+}
+
 @keyframes viz-march {
   to {
     stroke-dashoffset: -13;
@@ -526,8 +542,8 @@
 
 .viz .child-marker rect:not(.hit),
 .viz .child-marker circle {
-  fill: var(--accent);
-  stroke: var(--accent);
+  fill: var(--fg);
+  stroke: var(--fg);
 }
 
 .viz .child-marker text {
@@ -543,7 +559,7 @@
 }
 
 .viz .child-marker.final text {
-  fill: var(--accent);
+  fill: var(--fg);
 }
 
 .viz .child-marker .hit {
@@ -553,13 +569,13 @@
 
 .viz .child-marker[aria-pressed="true"] rect:not(.hit),
 .viz .child-marker[aria-pressed="true"] circle {
-  stroke: var(--fg);
+  stroke: var(--select);
   stroke-width: 2;
 }
 
 .viz .child-marker:focus-visible rect:not(.hit),
 .viz .child-marker:focus-visible circle {
-  stroke: var(--fg);
+  stroke: var(--select);
   stroke-width: 3;
 }
 
@@ -658,7 +674,7 @@
 }
 
 .viz .reachable .frame {
-  stroke: var(--accent);
+  stroke: var(--fg);
   stroke-dasharray: 4 3;
 }
 
@@ -702,7 +718,7 @@
   gap: 4px;
   margin: 4px 0 8px;
   padding: 6px 8px;
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--fg);
 }
 
 .viz .explore-payload p {
@@ -739,7 +755,7 @@
 }
 
 .viz .finding-mark:focus-visible circle {
-  stroke: var(--accent);
+  stroke: var(--select);
   stroke-width: 3;
 }
 
@@ -764,8 +780,9 @@
 }
 
 .viz .always-ask[aria-pressed="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--fg);
+  background: var(--region-bg);
+  font-weight: 600;
 }
 
 .viz .payload-title {
@@ -796,7 +813,7 @@
 
 .viz .segmented button[aria-pressed="true"] {
   background: var(--region-bg);
-  border-color: var(--accent);
+  border-color: var(--fg);
   font-weight: 600;
   position: relative;
 }
@@ -804,4 +821,34 @@
 .viz .explore-events > summary {
   cursor: pointer;
   margin: 8px 0;
+}
+
+/* Depth: a dot grid under the diagram, hard offset shadows on states
+   and buttons, in grey so the page stays black and white. */
+.viz .canvas {
+  background-image: radial-gradient(var(--grid) 1px, transparent 1.5px);
+  background-size: 16px 16px;
+}
+
+.viz .state .frame:not(.inner) {
+  filter: drop-shadow(2px 2px 0 var(--shadow));
+}
+
+.viz button:not([role="tab"]) {
+  box-shadow: 1px 1px 0 var(--shadow);
+}
+
+.viz button:not([role="tab"]):active:not(:disabled) {
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}
+
+.viz button:disabled {
+  box-shadow: none;
+}
+
+/* A dashed frame's shadow repeats the dashes as noise. */
+.viz .reachable .frame:not(.inner),
+.viz.coverage-on .unreached .frame:not(.inner) {
+  filter: none;
 }
