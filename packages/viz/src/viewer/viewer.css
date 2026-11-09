@@ -16,7 +16,7 @@
   --unknown: #a35c00;
   --banner-bg: #fff6e0;
   --banner-fg: #5a3e00;
-  --added: #7c3aed;
+  --added: #2f5fd0;
   color-scheme: light;
   background: var(--bg);
   color: var(--fg);
@@ -93,7 +93,7 @@
     --fuzz: #4cc98a;
     --banner-bg: #2e2510;
     --banner-fg: #f3d58c;
-    --added: #b794f6;
+    --added: #7aa2ff;
     color-scheme: dark;
   }
 }
