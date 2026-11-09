@@ -563,11 +563,6 @@
   color: var(--unknown);
 }
 
-.viz .explore-done {
-  border-left: 3px solid var(--accent);
-  padding: 4px 8px;
-}
-
 .viz .explore-warning {
   background: var(--banner-bg);
   color: var(--banner-fg);
@@ -661,12 +656,6 @@
   stroke-width: 3;
 }
 
-.viz .explore-note {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
 .viz .explore-field {
   display: flex;
   flex-direction: column;
@@ -685,12 +674,6 @@
   vertical-align: top;
   padding: 2px 6px;
   border-bottom: 1px solid var(--state-border);
-}
-
-.viz .explore-waiting {
-  border-left: 3px solid var(--accent);
-  padding: 4px 8px;
-  margin: 8px 0;
 }
 
 .viz .always-ask[aria-pressed="true"] {
@@ -729,4 +712,9 @@
   border-color: var(--accent);
   font-weight: 600;
   position: relative;
+}
+
+.viz .explore-events > summary {
+  cursor: pointer;
+  margin: 8px 0;
 }

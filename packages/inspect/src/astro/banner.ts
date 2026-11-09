@@ -16,14 +16,10 @@ const names = (items: string[]) =>
 
 export function bannerParts(findings: BannerFinding[]) {
   const bugs = findings.filter((f) => !f.note);
-  const wide = unique(bugs.filter((f) => f.state === null).map((f) => f.event ?? ""));
   return {
     count: bugs.length,
     machines: names(unique(bugs.map((f) => f.machine))),
     shown: bugs.slice(0, LIMIT).map((f) => f.title),
     more: bugs.length > LIMIT ? `; and ${bugs.length - LIMIT} more` : "",
-    marked: bugs.some((f) => f.state !== null),
-    wide,
-    wideText: wide.length > 0 ? `${names(wide)} ${wide.length === 1 ? "is" : "are"}` : "",
   };
 }

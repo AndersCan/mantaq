@@ -483,9 +483,7 @@ describe("viewer: explore", () => {
     take(root, "submitShipping");
     take(root, "submitPayment");
     expect(current(root)).toBe("submitting");
-    expect(root.querySelector('.panel [data-effect="chargeCard"]')?.textContent).toBe(
-      "chargeCard sends paymentOk, paymentFail, paymentTimeout",
-    );
+    expect(root.querySelector(".panel [data-effect]")).toBeNull();
     expect(groupEvents(root, "effect")).toEqual(["paymentFail", "paymentOk", "paymentTimeout"]);
     expect(groupEvents(root, "input")).toEqual([]);
     const running = root.querySelector(".graph .chip.running");
@@ -512,8 +510,8 @@ describe("viewer: explore", () => {
       take(root, event);
     }
     expect(current(root)).toBe("success");
-    expect(root.querySelector(".panel .explore-end")?.textContent).toBe(
-      "Done. success is final: the actor has stopped.",
+    expect(root.querySelector(".panel section.explore[data-done]")?.textContent).toContain(
+      "In success (final)",
     );
     expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(0);
     expect(root.querySelectorAll(".graph .edge.next, .graph .state.reachable")).toHaveLength(0);

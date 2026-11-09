@@ -87,32 +87,6 @@ describe("mountVizText", () => {
     expect(root.querySelector("[data-runs]")).toBeNull();
   });
 
-  test("the walkthrough shows the doc of the current state's effects", () => {
-    const withEffect: VizMachine = {
-      ...door,
-      states: door.states.map((each) =>
-        each.id === "open" ? { ...each, effects: [{ name: "greet", sends: [] }] } : each,
-      ),
-      edges: [
-        ...door.edges,
-        {
-          ...edge("open", "effect:open", "open"),
-          kind: "effect",
-          doc: "Greets whoever walks in.",
-        },
-      ],
-    };
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect] }));
-    expect(root.querySelector('.explore-effects [data-doc="edge"]')?.textContent).toBe(
-      "Greets whoever walks in.",
-    );
-    expect(
-      mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] })).querySelector(
-        ".explore-effects",
-      ),
-    ).toBeNull();
-  });
-
   test("internal and stay edges carry a dot gap variable and never an inline dasharray", () => {
     const machine: VizMachine = {
       ...door,
@@ -134,13 +108,27 @@ describe("mountVizText", () => {
     expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
   });
 
+  test("a walk without a driver keeps its moves inside the Events and time fold", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    expect(root.querySelector(".panel details[data-events] summary")?.textContent).toBe(
+      "Events and time",
+    );
+    expect(root.querySelectorAll(".panel details[data-events] [data-take]").length).toBeGreaterThan(
+      0,
+    );
+    expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(
+      root.querySelectorAll(".panel details[data-events] [data-take]").length,
+    );
+  });
+
   test("draws a valid document and walks it to Done", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelectorAll(".graph g[data-node-id]")).toHaveLength(2);
     root.querySelector<HTMLButtonElement>('[data-take="open-go-done"]')?.click();
-    expect(root.querySelector(".panel .explore-done")?.textContent).toBe(
-      "Done. done is final: the actor has stopped.",
+    expect(root.querySelector(".panel section.explore[data-done]")?.textContent).toContain(
+      "In done (final)",
     );
+    expect(root.querySelector(".panel details[data-events]")).toBeNull();
     expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(0);
   });
 });

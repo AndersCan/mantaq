@@ -17,7 +17,7 @@ if (doc.machines.length === 0) {
 const docRoutes = Object.fromEntries(
   doc.machines.flatMap((id) => (routes[id] === undefined ? [] : [[id, routes[id]]])),
 );
-const { count, machines, shown, more, marked, wideText } = bannerParts(doc.findings);
+const { count, machines, shown, more } = bannerParts(doc.findings);
 ---
 
 <section class="mantaq-findings" data-count={count}>
@@ -28,10 +28,7 @@ const { count, machines, shown, more, marked, wideText } = bannerParts(doc.findi
           {count} design finding{count === 1 ? "" : "s"} in {machines}
         </strong>
         : {shown.join("; ")}
-        {more}.{marked ? " Click a ! on the diagram to see why." : ""}
-        {wideText !== ""
-          ? ` ${wideText} listed at the top of the Details tab.`
-          : ""}
+        {more}.
       </p>
     ) : (
       <p>No design findings.{doc.fuzzed ? "" : " Fuzzing is off."}</p>

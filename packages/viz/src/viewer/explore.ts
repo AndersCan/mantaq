@@ -1,4 +1,4 @@
-import { asksForPayload, movesFrom, stateAfter, unhandledSends } from "../moves.ts";
+import { asksForPayload, movesFrom, stateAfter } from "../moves.ts";
 import { coveredByAny } from "../schema.ts";
 import { actorOf, actorText, localName, offeredEvents, regionPaths } from "./compartments.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
@@ -37,6 +37,8 @@ export interface ExploreContext {
     /** Open the payload form for an event, or close it with null. */
     compose: (event: string | null, actor?: VizActorRef) => void;
   };
+  /** The closed-by-default "Events and time" fold: its open state lives with the view. */
+  events: { open: boolean; onToggle: (open: boolean) => void };
 }
 
 const GROUP_TITLES: Record<MoveGroup, string> = {
@@ -117,52 +119,6 @@ function moveItem(
   ]);
 }
 
-function effectsSection(doc: Document, machine: VizMachine, current: string): HTMLElement | null {
-  const effects = machine.states.find((state) => state.id === current)?.effects ?? [];
-  if (effects.length === 0) return null;
-  const unhandled = unhandledSends(machine, current);
-  const isUnhandled = (effect: string, event: string) =>
-    unhandled.some((each) => each.effect === effect && each.event === event);
-  const effectDoc = machine.edges.find(
-    (edge) => edge.kind === "effect" && edge.from === current,
-  )?.doc;
-  return html(doc, "div", { class: "explore-effects" }, [
-    html(doc, "p", {}, [`Entering ${current} runs:`]),
-    docNote(doc, { text: effectDoc ?? null, scope: "edge" }),
-    html(
-      doc,
-      "ul",
-      {},
-      effects.map((effect) => {
-        const sends = effect.sends ?? [];
-        const summary =
-          effect.sends === null
-            ? html(doc, "span", { class: "muted" }, [" (sends not declared)"])
-            : sends.length === 0
-              ? " sends nothing"
-              : " sends ";
-        return html(doc, "li", { "data-effect": effect.name }, [
-          code(doc, effect.name),
-          summary,
-          ...sends.flatMap((event, index) => [
-            index === 0 ? "" : ", ",
-            html(doc, "span", { class: isUnhandled(effect.name, event) ? "unhandled" : null }, [
-              code(doc, event),
-            ]),
-          ]),
-        ]);
-      }),
-    ),
-    unhandled.length === 0
-      ? null
-      : html(doc, "p", { class: "explore-warning", role: "note" }, [
-          `No handler in ${current} for `,
-          ...unhandled.flatMap((each, index) => [index === 0 ? "" : ", ", code(doc, each.event)]),
-          ": in your app, an effect sending it puts the machine in its error state.",
-        ]),
-  ]);
-}
-
 function movesSection(
   doc: Document,
   moves: ReadonlyArray<Move>,
@@ -171,13 +127,8 @@ function movesSection(
     final: boolean;
     take: (step: ExploreStep) => void;
   },
-): HTMLElement {
-  if (context.final) {
-    return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
-      html(doc, "strong", {}, ["Done."]),
-      ` ${context.current} is final: the actor has stopped.`,
-    ]);
-  }
+): HTMLElement | null {
+  if (context.final) return null;
   if (moves.length === 0) {
     return html(doc, "p", { class: "explore-end" }, [`No handler in ${context.current}: stuck.`]);
   }
@@ -278,9 +229,6 @@ function timersSection(
         ]);
       }),
     ),
-    context.state.timers.length === 0
-      ? html(doc, "p", { class: "muted", "data-no-timers": "" }, ["No timers pending."])
-      : null,
     html(doc, "div", {}, [
       input,
       " ms ",
@@ -777,99 +725,6 @@ function waitingEffects(machine: VizMachine, state: VizLiveState): WaitingEffect
   });
 }
 
-/** Events offered inside a waiting block of the top-level state; the groups leave them out. */
-function waitingReports(machine: VizMachine, state: VizLiveState): Set<string> {
-  const handled = new Set(movesFrom(machine, state.state).map((move) => move.edge.event));
-  return new Set(
-    waitingEffects(machine, state)
-      .filter((each) => each.compartment === "")
-      .flatMap((each) => (each.effect.sends ?? []).filter((event) => handled.has(event))),
-  );
-}
-
-/** Held effects first: what each one did not do, and what it reports. */
-function waitingSections(doc: Document, machine: VizMachine, live: LiveMoves): HTMLElement[] {
-  if (live.state.effectMode !== "held" || live.final) return [];
-  const { state } = live;
-  const current = state.state;
-  const effects = machine.states.find((each) => each.id === current)?.effects ?? [];
-  const waiting = waitingEffects(machine, state);
-  const blocks = waiting
-    .filter(({ effect }) => effect.sends === null || effect.sends.length > 0)
-    .map(({ compartment, from, effect }, index) => {
-      const sends = effect.sends;
-      const moves = movesFrom(machine, from);
-      const handled = new Set(moves.map((move) => move.edge.event));
-      const effectDoc = machine.edges.find(
-        (edge) => edge.kind === "effect" && edge.from === from,
-      )?.doc;
-      return html(
-        doc,
-        "section",
-        {
-          class: "explore-waiting",
-          "data-waiting-on": effect.name,
-          role: "status",
-        },
-        [
-          html(doc, "h3", {}, ["Waiting for ", code(doc, effect.name)]),
-          index === 0 || compartment !== ""
-            ? docNote(doc, { text: effectDoc ?? null, scope: "edge" })
-            : null,
-          sends === null
-            ? html(doc, "p", {}, [
-                "It did not run, and it does not declare what it reports (",
-                code(doc, "sends"),
-                "). Pick its answer under Other internal events.",
-              ])
-            : html(doc, "p", {}, ["It did not run. Pick what it reports:"]),
-          sends === null
-            ? null
-            : html(
-                doc,
-                "ul",
-                { "data-group": "effect" },
-                sends.map((event) =>
-                  handled.has(event)
-                    ? sendItem(doc, machine, {
-                        live,
-                        moves,
-                        event,
-                        tagged: false,
-                        current: from,
-                        compartment,
-                      })
-                    : html(doc, "li", { "data-send-item": event, "data-unhandled": "" }, [
-                        code(doc, event),
-                        ` is not handled in ${from}. In your app, ${effect.name} sending it puts the machine in its error state.`,
-                      ]),
-                ),
-              ),
-        ],
-      );
-    });
-  const quiet = waiting
-    .filter(({ effect }) => effect.sends !== null && effect.sends.length === 0)
-    .map(({ effect }) =>
-      html(doc, "p", { class: "muted", "data-held-quiet": effect.name }, [
-        code(doc, effect.name),
-        " did not run. It reports nothing, so there is nothing to answer.",
-      ]),
-    );
-  const ranForReal =
-    current !== machine.initial
-      ? []
-      : effects
-          .filter((effect) => !state.waiting.includes(effect.name))
-          .map((effect) =>
-            html(doc, "p", { class: "muted", "data-ran-for-real": effect.name }, [
-              code(doc, effect.name),
-              " ran for real: a machine runs its first state's effects while it is built, before the viz can hold them. What it reports arrives on its own.",
-            ]),
-          );
-  return [...blocks, ...quiet, ...ranForReal];
-}
-
 /** The Send list of one actor: the machine itself (""), a region (its path) or, with `child`, a map's child. */
 function liveMovesSection(
   doc: Document,
@@ -880,12 +735,7 @@ function liveMovesSection(
   const actor = child === undefined ? actorOf(compartment) : { actor: child };
   if (child !== undefined && live.final) return null;
   const title = compartment === "" ? "h3" : "h4";
-  if (live.final && compartment === "") {
-    return html(doc, "p", { class: "explore-end explore-done", role: "status" }, [
-      html(doc, "strong", {}, ["Done."]),
-      ` ${current} is final: the actor has stopped.`,
-    ]);
-  }
+  if (live.final && compartment === "") return null;
   const heading =
     compartment === "" || child !== undefined
       ? []
@@ -911,8 +761,6 @@ function liveMovesSection(
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
   const events = offeredEvents(machine, compartment, [...handled]);
-  const shown = compartment === "" ? waitingReports(machine, live.state) : new Set<string>();
-  const offered = events.filter((event) => !shown.has(event));
   const groups: MoveGroup[] = ["input", "effect", "internal"];
   const item = (event: string) =>
     sendItem(doc, machine, {
@@ -928,7 +776,7 @@ function liveMovesSection(
     moves.find((each) => each.edge.event === event)?.group ?? "input";
   return block(
     groups.flatMap((group) => {
-      const members = offered.filter((event) => groupOf(event) === group);
+      const members = events.filter((event) => groupOf(event) === group);
       return members.length === 0
         ? []
         : [
@@ -937,6 +785,26 @@ function liveMovesSection(
           ];
     }),
   );
+}
+
+/** ", waiting for a, b" for the held effects of one compartment that still wait; nothing when none do. */
+function waitingText(
+  doc: Document,
+  machine: VizMachine,
+  context: { state: VizLiveState; compartment: string },
+): Array<Node | string> {
+  const { state, compartment } = context;
+  const waiting = waitingEffects(machine, state).filter(
+    (each) => each.compartment === compartment && each.effect.sends?.length !== 0,
+  );
+  return waiting.flatMap(({ from, effect }, index) => {
+    const handled = new Set(movesFrom(machine, from).map((move) => move.edge.event));
+    const reports = (effect.sends ?? []).filter((event) => handled.has(event)).join(" ");
+    return [
+      index === 0 ? ", waiting for " : ", ",
+      html(doc, "code", { "data-waiting-on": effect.name, "data-reports": reports }, [effect.name]),
+    ];
+  });
 }
 
 /** One line per region: where it is now. */
@@ -954,6 +822,7 @@ function regionLines(doc: Document, machine: VizMachine, state: VizLiveState): H
           ": in ",
           html(doc, "strong", {}, [localName(id)]),
           info?.final ? " (final)" : "",
+          ...(info?.final ? [] : waitingText(doc, machine, { state, compartment: path })),
         ],
       ),
       docNote(doc, { text: info?.doc ?? null, scope: "state" }),
@@ -1122,15 +991,11 @@ function contextSection(
   },
 ): HTMLElement {
   const { machine, value, previous } = context;
-  const note = html(doc, "p", { class: "muted", "data-context-note": "" }, [
-    "The machine starts with this context. You can't type it in: only its handlers change it, when you send events.",
-  ]);
   const body =
     machine.context !== null
       ? fieldsTable(doc, { fields: machine.context, value, previous })
       : prettyContext(doc, value, previous);
   return html(doc, "div", { class: "explore-context" }, [
-    note,
     html(doc, "div", { "data-live-context": "" }, [body]),
   ]);
 }
@@ -1291,7 +1156,7 @@ function liveResultSection(
   const held = state.effectMode === "held";
   return html(doc, "div", { class: "explore-live" }, [
     last === null
-      ? html(doc, "p", { class: "muted" }, ["Nothing has run yet."])
+      ? null
       : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
           ...stepLines(doc, { machine, step: last, before: previous, held, routes }),
           last.error === null
@@ -1359,14 +1224,17 @@ function livePathSection(doc: Document, context: ExploreContext, state: VizLiveS
 function nowSection(
   doc: Document,
   machine: VizMachine,
-  context: { current: string; final: boolean },
+  context: { current: string; final: boolean; state?: VizLiveState },
 ): Array<HTMLElement | null> {
-  const { current, final } = context;
+  const { current, final, state } = context;
   return [
     html(doc, "p", { class: "explore-now" }, [
       "In ",
       html(doc, "strong", {}, [current]),
       final ? " (final)" : "",
+      ...(state === undefined || final
+        ? []
+        : waitingText(doc, machine, { state, compartment: "" })),
     ]),
     docNote(doc, {
       text: machine.states.find((state) => state.id === current)?.doc ?? null,
@@ -1384,51 +1252,59 @@ export interface ExploreParts {
   path: HTMLElement;
 }
 
-function liveNote(doc: Document, state: VizLiveState): HTMLElement {
-  return html(
+/** The closed "Events and time" fold; null when nothing would be inside. */
+function eventsFold(
+  doc: Document,
+  context: { events: ExploreContext["events"]; children: Array<HTMLElement | null> },
+): HTMLElement | null {
+  const children = context.children.filter((child): child is HTMLElement => child !== null);
+  if (children.length === 0) return null;
+  const details = html(
     doc,
-    "p",
-    {
-      class: "explore-note",
-      "data-live-note": "",
-      "data-effect-mode": state.effectMode,
-    },
-    [
-      state.effectMode === "held"
-        ? "This machine runs here, in your browser, but its effects do not: when a state starts one, the viz waits and you pick what it reports. Timers wait until you advance them."
-        : "This machine runs here, in your browser, with its effects. Timers wait until you advance them.",
-    ],
+    "details",
+    { class: "explore-events", "data-events": "", open: context.events.open ? "" : null },
+    [html(doc, "summary", {}, ["Events and time"]), ...children],
   );
+  details.addEventListener("toggle", () => context.events.onToggle(details.open));
+  return details;
 }
 
 /** Live Step tab, below the root's state: regions, held effects, outcome, Send lists, time. */
 function liveParts(
   doc: Document,
   machine: VizMachine,
-  context: { live: NonNullable<ExploreContext["live"]>; current: string; final: boolean },
+  context: {
+    live: NonNullable<ExploreContext["live"]>;
+    current: string;
+    final: boolean;
+    events: ExploreContext["events"];
+  },
 ): Array<HTMLElement | null> {
-  const { live, current, final } = context;
+  const { live, final, events } = context;
   const { state } = live;
   const moves: LiveMoves = { state, send: live.send, final, compose: live.compose };
   return [
     ...regionLines(doc, machine, state),
     ...childrenSections(doc, machine, moves),
-    ...waitingSections(doc, machine, moves),
     liveResultSection(doc, {
       machine,
       state,
       previous: live.previous,
       routes: live.routes,
     }),
-    state.effectMode === "held" ? null : effectsSection(doc, machine, current),
-    ...liveBlocks(doc, machine, moves),
-    final ? null : timersSection(doc, { state, send: live.send }),
+    eventsFold(doc, {
+      events,
+      children: [
+        ...liveBlocks(doc, machine, moves),
+        final ? null : timersSection(doc, { state, send: live.send }),
+      ],
+    }),
   ];
 }
 
 /** The walk, split for the panel's tabs. */
 export function explorePanel(doc: Document, context: ExploreContext): ExploreParts {
-  const { machine, path, live } = context;
+  const { machine, path, live, events } = context;
   const current = live?.state.state ?? stateAfter(machine, path) ?? "";
   const final = machine.states.find((state) => state.id === current)?.final === true;
   const length = live?.state.steps.length ?? path.length;
@@ -1438,19 +1314,23 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
     {
       class: "explore",
       "data-current": current,
+      ...(live ? { "data-live-note": "", "data-effect-mode": live.state.effectMode } : {}),
       "data-done": final ? "" : null,
     },
     [
-      live ? liveNote(doc, live.state) : null,
-      ...nowSection(doc, machine, { current, final }),
+      ...nowSection(doc, machine, { current, final, ...(live ? { state: live.state } : {}) }),
       ...(live
-        ? liveParts(doc, machine, { live, current, final })
+        ? liveParts(doc, machine, { live, current, final, events })
         : [
-            effectsSection(doc, machine, current),
-            movesSection(doc, movesFrom(machine, current), {
-              current,
-              final,
-              take: context.take,
+            eventsFold(doc, {
+              events,
+              children: [
+                movesSection(doc, movesFrom(machine, current), {
+                  current,
+                  final,
+                  take: context.take,
+                }),
+              ],
             }),
           ]),
       html(doc, "div", { class: "explore-controls" }, [

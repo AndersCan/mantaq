@@ -1065,7 +1065,6 @@ describe("field forms and the context table", () => {
     const row = root.querySelector('[data-context-field="amount"]');
     expect(row?.textContent).toContain("What is owed.");
     expect(row?.textContent).toContain("not set");
-    expect(root.querySelector("[data-context-note]")).not.toBeNull();
     expect(root.querySelector("[data-context-changed]")).toBeNull();
   });
 
@@ -1552,25 +1551,11 @@ describe("live effect reports", () => {
     expect(current(root)).toBe("fetching");
   });
 
-  test("a report no state handles is flagged", () => {
-    const root = mountFetcher();
-    expect(root.querySelector('.explore-warning[role="note"]')?.textContent).toContain(
-      "No handler in fetching for fetchGone",
-    );
-  });
-
   test("inputs are grouped apart and marked ignored", () => {
     const root = mountFetcher();
     expect(
       root.querySelector('[data-group="input"] [data-send-item="start"]')?.textContent,
     ).toContain(" ignored in fetching");
-  });
-
-  test("the note says effects run", () => {
-    const root = mountFetcher();
-    expect(root.querySelector("[data-live-note]")?.textContent).toBe(
-      "This machine runs here, in your browser, with its effects. Timers wait until you advance them.",
-    );
   });
 
   test("a handled internal event no effect sends sits under Other internal events", () => {
@@ -1601,8 +1586,8 @@ describe("live effect reports", () => {
   });
 
   describe("held", () => {
-    const waitingBlock = (root: HTMLElement) =>
-      root.querySelector('section[data-waiting-on="fetchList"]');
+    const waitingOn = (root: HTMLElement) =>
+      root.querySelector<HTMLElement>('.explore-now [data-waiting-on="fetchList"]');
     const withEffect = (sends: string[] | null): VizMachine => ({
       ...fetcher,
       states: fetcher.states.map((each) =>
@@ -1610,40 +1595,30 @@ describe("live effect reports", () => {
       ),
     });
 
-    test("the note says effects do not run", () => {
+    test("the live section carries the effect mode and no explaining paragraph", () => {
       const root = mountFetcher({ mode: "held" });
-      const note = root.querySelector("[data-live-note]");
-      expect(note?.getAttribute("data-effect-mode")).toBe("held");
-      expect(note?.textContent).toBe(
-        "This machine runs here, in your browser, but its effects do not: when a state starts one, the viz waits and you pick what it reports. Timers wait until you advance them.",
-      );
+      const section = root.querySelector("section.explore");
+      expect(section?.hasAttribute("data-live-note")).toBe(true);
+      expect(section?.getAttribute("data-effect-mode")).toBe("held");
+      expect(root.querySelector(".explore-note")).toBeNull();
+      expect(root.querySelector(".explore-waiting")).toBeNull();
     });
 
-    test("the waiting block comes right after the now section", () => {
+    test("the state line says what it waits for and what that reports", () => {
       const root = mountFetcher({ mode: "held" });
-      const now = root.querySelector(".explore-now");
-      expect(now?.nextElementSibling).toBe(waitingBlock(root));
-      expect(waitingBlock(root)?.querySelector("h3")?.textContent).toBe("Waiting for fetchList");
+      expect(root.querySelector(".explore-now")?.textContent).toBe(
+        "In fetching, waiting for fetchList",
+      );
+      expect(waitingOn(root)?.getAttribute("data-reports")).toBe("listFetched fetchFailed");
     });
 
-    test("its reports are in declared order and are not repeated in the groups", () => {
+    test("its reports are sends in the fold's effect group", () => {
       const root = mountFetcher({ mode: "held" });
-      const inBlock = [...(waitingBlock(root)?.querySelectorAll("[data-send]") ?? [])].map((each) =>
-        each.getAttribute("data-send"),
-      );
-      expect(inBlock).toEqual(["listFetched", "fetchFailed"]);
-      expect(root.querySelector('.explore-moves [data-group="effect"]')).toBeNull();
-      expect(root.querySelector('.explore-moves [data-send="fetchFailed"]')).toBeNull();
-    });
-
-    test("a declared report the state does not handle has text and no button", () => {
-      const root = mountFetcher({ mode: "held" });
-      const item = waitingBlock(root)?.querySelector('[data-send-item="fetchGone"]');
-      expect(item?.hasAttribute("data-unhandled")).toBe(true);
-      expect(item?.querySelector("button")).toBeNull();
-      expect(item?.textContent).toBe(
-        "fetchGone is not handled in fetching. In your app, fetchList sending it puts the machine in its error state.",
-      );
+      const inGroup = [
+        ...root.querySelectorAll('.explore-moves [data-group="effect"] [data-send]'),
+      ].map((each) => each.getAttribute("data-send"));
+      expect(inGroup).toContain("listFetched");
+      expect(inGroup).toContain("fetchFailed");
     });
 
     test("the outcome does not repeat the effects line", () => {
@@ -1652,49 +1627,24 @@ describe("live effect reports", () => {
       expect(root.querySelector(".explore-effects")).toBeNull();
     });
 
-    test("an effect that reports nothing says so and has no block", () => {
+    test("an effect that reports nothing is not named", () => {
       const root = mountFetcher({ mode: "held", machine: withEffect([]) });
-      expect(waitingBlock(root)).toBeNull();
-      expect(root.querySelector('[data-held-quiet="fetchList"]')?.textContent).toBe(
-        "fetchList did not run. It reports nothing, so there is nothing to answer.",
-      );
+      expect(root.querySelector("[data-waiting-on]")).toBeNull();
+      expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching");
     });
 
-    test("an effect that does not declare its reports points to the internal events", () => {
+    test("an effect that does not declare its reports is named with none", () => {
       const root = mountFetcher({ mode: "held", machine: withEffect(null) });
-      expect(waitingBlock(root)?.querySelector("p")?.textContent).toBe(
-        "It did not run, and it does not declare what it reports (sends). Pick its answer under Other internal events.",
-      );
-      expect(waitingBlock(root)?.querySelector("[data-send]")).toBeNull();
+      expect(waitingOn(root)?.getAttribute("data-reports")).toBe("");
+      expect(waitingOn(root)?.textContent).toBe("fetchList");
     });
 
-    test("an effect of a later state that is not waiting does not claim it ran for real", () => {
+    test("an effect that is not waiting is not named", () => {
       const root = mountFetcher({ mode: "held", held: [] });
-      expect(waitingBlock(root)).toBeNull();
-      expect(root.querySelector("[data-ran-for-real]")).toBeNull();
+      expect(root.querySelector("[data-waiting-on]")).toBeNull();
     });
 
-    test("an effect of the initial state that is not waiting ran for real", () => {
-      const machine: VizMachine = {
-        ...fetcher,
-        states: fetcher.states.map((each) =>
-          each.id === "waiting" ? { ...each, effects: [{ name: "warmUp", sends: [] }] } : each,
-        ),
-      };
-      const root = document.createElement("div");
-      mountViewer(
-        root,
-        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
-        {
-          driver: fetchDriver("held", []),
-        },
-      );
-      expect(root.querySelector('[data-ran-for-real="warmUp"]')?.textContent).toContain(
-        "warmUp ran for real",
-      );
-    });
-
-    test("a held effect in a region shows a waiting block with its reports", () => {
+    test("a held effect in a region is named on the region's line", () => {
       const machine: VizMachine = {
         ...fetcher,
         regions: ["upload"],
@@ -1729,19 +1679,128 @@ describe("live effect reports", () => {
           driver: { reset: () => live, step: () => live },
         },
       );
-      expect(root.querySelector('section[data-waiting-on="sendPhoto"]')).not.toBeNull();
+      const line = root.querySelector('.explore-region-now [data-waiting-on="sendPhoto"]');
+      expect(line?.getAttribute("data-reports")).toBe("photoSent");
       expect(
-        root.querySelector('[data-waiting-on="sendPhoto"] [data-send="photoSent"]'),
-      ).not.toBeNull();
+        root.querySelector(".explore-now:not(.explore-region-now) [data-waiting-on]"),
+      ).toBeNull();
+      expect(root.querySelector('[data-send="photoSent"]')).not.toBeNull();
+    });
+
+    test("two waiting effects are joined with a comma", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        states: fetcher.states.map((each) =>
+          each.id === "fetching"
+            ? {
+                ...each,
+                effects: [
+                  { name: "fetchList", sends: ["listFetched"] },
+                  { name: "fetchMore", sends: ["fetchFailed"] },
+                ],
+              }
+            : each,
+        ),
+      };
+      const root = mountFetcher({ mode: "held", machine, held: ["fetchList", "fetchMore"] });
+      expect(root.querySelector(".explore-now")?.textContent).toBe(
+        "In fetching, waiting for fetchList, fetchMore",
+      );
+    });
+
+    test("a final root with a held effect does not say it waits", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        states: fetcher.states.map((each) =>
+          each.id === "fetching" ? { ...each, final: true } : each,
+        ),
+      };
+      const root = mountFetcher({ mode: "held", machine });
+      expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching (final)");
+      expect(root.querySelector("[data-waiting-on]")).toBeNull();
+      expect(root.querySelector("details[data-events]")).toBeNull();
+      expect(root.querySelector("[data-advance]")).toBeNull();
+    });
+
+    test("a final region with a held effect does not say it waits", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        regions: ["upload"],
+        states: [
+          state("waiting", { initial: true }),
+          {
+            ...state("upload.sending"),
+            final: true,
+            effects: [{ name: "sendPhoto", sends: ["photoSent"] }],
+          },
+        ],
+        events: [{ id: "photoSent", internal: true, doc: null, payload: null }],
+        edges: [],
+      };
+      const live: VizLiveState = {
+        state: "waiting",
+        steps: [],
+        last: null,
+        after: [],
+        timers: [],
+        context: null,
+        payload: null,
+        children: [],
+        regions: { upload: "upload.sending" },
+        effectMode: "held",
+        waiting: ["sendPhoto"],
+      };
+      const root = document.createElement("div");
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+        { driver: { reset: () => live, step: () => live } },
+      );
+      expect(root.querySelector(".explore-region-now")?.textContent).toBe(
+        "upload: in sending (final)",
+      );
+      expect(root.querySelector("[data-waiting-on]")).toBeNull();
     });
 
     test("picking a report moves on and Back returns to waiting", () => {
       const root = mountFetcher({ mode: "held" });
-      click(root, '[data-waiting-on="fetchList"] [data-send="fetchFailed"]');
+      click(root, '[data-send="fetchFailed"]');
       expect(current(root)).toBe("couldNotFetch");
-      expect(waitingBlock(root)).toBeNull();
+      expect(waitingOn(root)).toBeNull();
       click(root, '[data-explore-action="back"]');
-      expect(waitingBlock(root)).not.toBeNull();
+      expect(waitingOn(root)).not.toBeNull();
+    });
+  });
+
+  describe("the Events and time fold", () => {
+    const fold = (root: HTMLElement) =>
+      root.querySelector<HTMLDetailsElement>("details[data-events]");
+
+    test("at rest the Step tab shows the state line and a closed Events and time fold", () => {
+      const root = mountFetcher();
+      expect(fold(root)?.open).toBe(false);
+      expect(fold(root)?.querySelector("summary")?.textContent).toBe("Events and time");
+      expect(fold(root)?.querySelector("[data-send]")).not.toBeNull();
+      expect(fold(root)?.querySelector("[data-advance]")).not.toBeNull();
+      expect(root.querySelector(".explore > [data-send]")).toBeNull();
+    });
+
+    test("the fold stays open across a step and Back", () => {
+      const root = mountFetcher();
+      const details = fold(root);
+      if (details === null) throw new Error("no fold");
+      details.open = true;
+      details.dispatchEvent(new Event("toggle"));
+      click(root, '[data-send="start"]');
+      expect(fold(root)?.open).toBe(true);
+      click(root, '[data-explore-action="back"]');
+      expect(fold(root)?.open).toBe(true);
+    });
+
+    test("a closed fold stays closed across a step", () => {
+      const root = mountFetcher();
+      click(root, '[data-send="start"]');
+      expect(fold(root)?.open).toBe(false);
     });
   });
 });

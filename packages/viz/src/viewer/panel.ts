@@ -372,7 +372,6 @@ export function renderPanel(
   return html(doc, "div", {}, [
     machineWide(doc, machine, context.replay),
     notesSection(doc, wide, context.replay),
-    html(doc, "p", { class: "hint" }, ["Select a state or edge."]),
     fuzzSummary(doc, machine),
   ]);
 }
