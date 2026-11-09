@@ -29,9 +29,9 @@ const paymentFail = event("paymentFail")();
 /** The charge took too long. */
 const paymentTimeout = event("paymentTimeout")();
 
-/** Stands in for your payment provider. */
+/** Stands in for your payment provider. It declines 100 items or more. */
 async function chargeCard(items: number): Promise<boolean> {
-  return items > 0;
+  return items > 0 && items < 100;
 }
 
 export function createOrder8(clock: Clock) {
@@ -69,10 +69,12 @@ export function createOrder8(clock: Clock) {
         name: "chargeCard",
         sends: [paymentOk, paymentFail],
         fn: ({ context, signal, emit }) => {
-          chargeCard(context.get().items).then((ok) => {
-            if (signal.aborted) return;
-            emit(ok ? paymentOk.create() : paymentFail.create());
-          });
+          chargeCard(context.get().items)
+            .catch(() => false)
+            .then((ok) => {
+              if (signal.aborted) return;
+              emit(ok ? paymentOk.create() : paymentFail.create());
+            });
         },
       });
       /** Gives the charge 10 seconds. */

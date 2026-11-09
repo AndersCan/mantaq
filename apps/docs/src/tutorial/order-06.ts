@@ -1,4 +1,5 @@
 import { Actor, event, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 
 type OrderContext = { items: number };
 
@@ -16,12 +17,13 @@ const pay = event("pay")();
 /** The visitor sent their card details. */
 const confirm = event("confirm")();
 
-export function createOrder6() {
+export function createOrder6(clock: Clock) {
   const initialContext: OrderContext = { items: 0 };
   return Actor({
     inputs: [addItem, pay, confirm],
     states: [cart, payment, paid],
     initial: cart,
+    clock,
     context: initialContext,
     setup: (m) => {
       /** One more item is counted, and the cart stays open. */

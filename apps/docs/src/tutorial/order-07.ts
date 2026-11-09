@@ -1,4 +1,5 @@
 import { Actor, event, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 
 type OrderContext = { items: number };
 
@@ -26,18 +27,19 @@ const paymentOk = event("paymentOk")();
 /** The card was declined. */
 const paymentFail = event("paymentFail")();
 
-/** Stands in for your payment provider. */
+/** Stands in for your payment provider. It declines 100 items or more. */
 async function chargeCard(items: number): Promise<boolean> {
-  return items > 0;
+  return items > 0 && items < 100;
 }
 
-export function createOrder7() {
+export function createOrder7(clock: Clock) {
   const initialContext: OrderContext = { items: 0 };
   return Actor({
     inputs: [addItem, pay, confirm, retry],
     internal: [paymentOk, paymentFail],
     states: [cart, payment, paying, paid, failed],
     initial: cart,
+    clock,
     context: initialContext,
     setup: (m) => {
       /** One more item is counted, and the cart stays open. */
@@ -65,10 +67,12 @@ export function createOrder7() {
         name: "chargeCard",
         sends: [paymentOk, paymentFail],
         fn: ({ context, signal, emit }) => {
-          chargeCard(context.get().items).then((ok) => {
-            if (signal.aborted) return;
-            emit(ok ? paymentOk.create() : paymentFail.create());
-          });
+          chargeCard(context.get().items)
+            .catch(() => false)
+            .then((ok) => {
+              if (signal.aborted) return;
+              emit(ok ? paymentOk.create() : paymentFail.create());
+            });
         },
       });
       /** The charge worked, so the order is done. */
