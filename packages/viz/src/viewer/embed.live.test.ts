@@ -1687,6 +1687,81 @@ describe("live effect reports", () => {
       expect(root.querySelector('[data-send="photoSent"]')).not.toBeNull();
     });
 
+    test("two waiting effects are joined with a comma", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        states: fetcher.states.map((each) =>
+          each.id === "fetching"
+            ? {
+                ...each,
+                effects: [
+                  { name: "fetchList", sends: ["listFetched"] },
+                  { name: "fetchMore", sends: ["fetchFailed"] },
+                ],
+              }
+            : each,
+        ),
+      };
+      const root = mountFetcher({ mode: "held", machine, held: ["fetchList", "fetchMore"] });
+      expect(root.querySelector(".explore-now")?.textContent).toBe(
+        "In fetching, waiting for fetchList, fetchMore",
+      );
+    });
+
+    test("a final root with a held effect does not say it waits", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        states: fetcher.states.map((each) =>
+          each.id === "fetching" ? { ...each, final: true } : each,
+        ),
+      };
+      const root = mountFetcher({ mode: "held", machine });
+      expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching (final)");
+      expect(root.querySelector("[data-waiting-on]")).toBeNull();
+      expect(root.querySelector("details[data-events]")).toBeNull();
+      expect(root.querySelector("[data-advance]")).toBeNull();
+    });
+
+    test("a final region with a held effect does not say it waits", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        regions: ["upload"],
+        states: [
+          state("waiting", { initial: true }),
+          {
+            ...state("upload.sending"),
+            final: true,
+            effects: [{ name: "sendPhoto", sends: ["photoSent"] }],
+          },
+        ],
+        events: [{ id: "photoSent", internal: true, doc: null, payload: null }],
+        edges: [],
+      };
+      const live: VizLiveState = {
+        state: "waiting",
+        steps: [],
+        last: null,
+        after: [],
+        timers: [],
+        context: null,
+        payload: null,
+        children: [],
+        regions: { upload: "upload.sending" },
+        effectMode: "held",
+        waiting: ["sendPhoto"],
+      };
+      const root = document.createElement("div");
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+        { driver: { reset: () => live, step: () => live } },
+      );
+      expect(root.querySelector(".explore-region-now")?.textContent).toBe(
+        "upload: in sending (final)",
+      );
+      expect(root.querySelector("[data-waiting-on]")).toBeNull();
+    });
+
     test("picking a report moves on and Back returns to waiting", () => {
       const root = mountFetcher({ mode: "held" });
       click(root, '[data-send="fetchFailed"]');

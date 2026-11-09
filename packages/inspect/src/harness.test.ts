@@ -92,6 +92,13 @@ test("waiting is empty where no effect waits", async () => {
 
 const fixture = (file: string) => join(import.meta.dirname, "fixtures", file);
 
+test("waiting gives no reports for an effect that declares no sends", async () => {
+  await withViz(fixture("harness-silent.ts"), async (viz) => {
+    await viz.send("start");
+    expect(await viz.waiting()).toEqual([{ effect: "quiet", reports: [] }]);
+  });
+}, 60_000);
+
 test("an event the state ignores is a result, not an error", async () => {
   await withViz(checkout, async (viz) => {
     const result = await viz.send("submitShipping");

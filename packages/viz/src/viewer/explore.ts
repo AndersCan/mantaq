@@ -761,7 +761,6 @@ function liveMovesSection(
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
   const events = offeredEvents(machine, compartment, [...handled]);
-  const offered = events;
   const groups: MoveGroup[] = ["input", "effect", "internal"];
   const item = (event: string) =>
     sendItem(doc, machine, {
@@ -777,7 +776,7 @@ function liveMovesSection(
     moves.find((each) => each.edge.event === event)?.group ?? "input";
   return block(
     groups.flatMap((group) => {
-      const members = offered.filter((event) => groupOf(event) === group);
+      const members = events.filter((event) => groupOf(event) === group);
       return members.length === 0
         ? []
         : [

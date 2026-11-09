@@ -108,6 +108,19 @@ describe("mountVizText", () => {
     expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
   });
 
+  test("a walk without a driver keeps its moves inside the Events and time fold", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    expect(root.querySelector(".panel details[data-events] summary")?.textContent).toBe(
+      "Events and time",
+    );
+    expect(root.querySelectorAll(".panel details[data-events] [data-take]").length).toBeGreaterThan(
+      0,
+    );
+    expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(
+      root.querySelectorAll(".panel details[data-events] [data-take]").length,
+    );
+  });
+
   test("draws a valid document and walks it to Done", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelectorAll(".graph g[data-node-id]")).toHaveLength(2);
