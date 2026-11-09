@@ -7,7 +7,7 @@ description: From an empty Vite project to your machine in the live viewer, with
 
 - Node.js 22.12 or later
 - A Vite project
-- [Claude Code](https://claude.com/claude-code)
+- A coding agent
 
 No project yet:
 
@@ -19,8 +19,10 @@ cd my-app && npm install
 ## 1. Install the skill
 
 ```sh
-npx skills add AndersCan/mantaq -a claude-code -y
+npx skills add AndersCan/mantaq -y
 ```
+
+No skills support? Tell your agent to read https://anderscan.github.io/mantaq/llms.txt.
 
 ## 2. Tell your agent what to model
 
@@ -32,7 +34,7 @@ Or describe your own flow in plain words.
 
 ## 3. What you get
 
-The agent installs `@mantaq/core` and `@mantaq/inspect`, writes `src/checkout.machine.ts` and the Vite plugin, and starts the dev server. The browser opens `http://localhost:5173/__mantaq/?machine=checkout`.
+The agent installs `@mantaq/core` and `@mantaq/inspect`, writes `src/checkout.machine.ts` and the Vite plugin, and starts the dev server. The viewer is at `/__mantaq/?machine=checkout` on the port the dev server prints.
 
 The Vite config looks like this:
 
@@ -45,6 +47,4 @@ export default defineConfig({
 });
 ```
 
-## 4. Keep going
-
-Click a pulsing edge to take a step. Ask for changes in chat; saving the file redraws the page.
+New to state machines? [Walk the tutorial](/mantaq/getting-started/).
