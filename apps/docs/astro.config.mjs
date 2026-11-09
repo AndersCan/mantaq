@@ -26,6 +26,11 @@ export default defineConfig({
         "src/content/docs/photo-upload.ts",
         "src/content/docs/photo-queue.ts",
         "src/first-machine/traffic-light.ts",
+        "src/tutorial/order-01.ts",
+        "src/tutorial/order-02.ts",
+        "src/tutorial/order-03.ts",
+        "src/tutorial/order-04.ts",
+        "src/tutorial/order-05.ts",
       ],
       // Seeded, so every build draws the same coverage. 2000 runs miss the saga's
       // five-step path to `completed` on this seed; 5000 take ~0.3s.
@@ -48,30 +53,37 @@ export default defineConfig({
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/anderscan/mantaq" }],
       sidebar: [
         {
-          label: "Getting Started",
+          label: "Getting started",
           items: [
-            { label: "Start with your agent", slug: "getting-started/with-an-agent" },
-            { label: "Introduction", slug: "getting-started/introduction" },
-            { label: "State Machines & Statecharts", slug: "getting-started/state-machines" },
-            { label: "Installation", slug: "getting-started/installation" },
+            { label: "This is a state", slug: "getting-started" },
+            { label: "A second state", slug: "getting-started/second-state" },
+            { label: "Events", slug: "getting-started/events" },
+            { label: "Final states", slug: "getting-started/final-states" },
+            { label: "Context", slug: "getting-started/context" },
             { label: "Your first machine", slug: "getting-started/first-machine" },
+            { label: "Start with your coding agent", slug: "getting-started/with-an-agent" },
           ],
         },
         {
-          label: "Core Concepts",
+          label: "Guides",
           items: [
-            { label: "Actors", slug: "core-concepts/actors" },
-            { label: "States", slug: "core-concepts/states" },
-            { label: "Events", slug: "core-concepts/events" },
-            { label: "Diagrams", slug: "core-concepts/diagrams" },
-            { label: "Effects", slug: "core-concepts/effects" },
-            { label: "Context", slug: "core-concepts/context" },
-            { label: "Error Handling", slug: "core-concepts/error-handling" },
             { label: "Testing", slug: "guides/actor-testing" },
             { label: "Test Harness", slug: "guides/testing-guide" },
             { label: "Machines in an app", slug: "guides/machines-in-an-app" },
             { label: "Visualizer", slug: "guides/visualizer" },
             { label: "Design gate", slug: "guides/design-gate" },
+          ],
+        },
+        {
+          label: "Reference",
+          items: [
+            { label: "Actors", slug: "core-concepts/actors" },
+            { label: "States", slug: "core-concepts/states" },
+            { label: "Events", slug: "core-concepts/events" },
+            { label: "Effects", slug: "core-concepts/effects" },
+            { label: "Context", slug: "core-concepts/context" },
+            { label: "Error Handling", slug: "core-concepts/error-handling" },
+            { label: "Diagrams", slug: "core-concepts/diagrams" },
           ],
         },
         {

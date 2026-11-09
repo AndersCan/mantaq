@@ -16,7 +16,7 @@
       "entry": ["scripts/bench-compare.mjs"]
     },
     "apps/docs": {
-      "entry": ["src/content/docs/*.ts"]
+      "entry": ["src/content/docs/*.ts", "src/tutorial/order-*.ts"]
     },
     "packages/codemod": {
       "ignoreDependencies": ["@mantaq/core"]

@@ -1,0 +1,40 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, test } from "vite-plus/test";
+import { addedLines } from "./added-lines.ts";
+
+describe("addedLines", () => {
+  test("identical text has no added lines", () => {
+    expect(addedLines("a\nb", "a\nb")).toEqual([]);
+  });
+  test("an appended line", () => {
+    expect(addedLines("a\nb", "a\nb\nc")).toEqual([3]);
+  });
+  test("an inserted middle line", () => {
+    expect(addedLines("a\nc", "a\nb\nc")).toEqual([2]);
+  });
+  test("a changed line counts as added", () => {
+    expect(addedLines("a\nb\nc", "a\nB\nc")).toEqual([2]);
+  });
+  test("trailing spaces are ignored", () => {
+    expect(addedLines("a  \nb", "a\nb  ")).toEqual([]);
+  });
+  test("a removed line adds nothing", () => {
+    expect(addedLines("a\nb\nc", "a\nc")).toEqual([]);
+  });
+  test("everything is added when nothing is shared", () => {
+    expect(addedLines("x", "a\nb")).toEqual([1, 2]);
+  });
+  test("a swap marks the line that moved", () => {
+    expect(addedLines("a\nb", "b\na")).toEqual([2]);
+  });
+  test("tutorial page 3 highlights exactly what step 3 adds", () => {
+    const shown = (name: string) =>
+      readFileSync(new URL(`./${name}`, import.meta.url), "utf8").replace(
+        /createOrder\d+/g,
+        "createOrder",
+      );
+    expect(addedLines(shown("order-02.ts"), shown("order-03.ts"))).toEqual([
+      1, 8, 9, 10, 13, 16, 17, 18, 19,
+    ]);
+  });
+});

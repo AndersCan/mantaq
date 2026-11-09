@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "strict": true },
-  "include": ["src/first-machine/*.ts"]
+  "include": ["src/first-machine/*.ts", "src/tutorial/*.ts"]
 }
