@@ -20,7 +20,8 @@ test("reduced motion switches off the slide and the grow-in after the marker rul
   expect(media).toBeGreaterThan(css.indexOf(".viz .child-marker.entering"));
   expect(media).toBeGreaterThan(css.indexOf("transition: transform 250ms"));
   const block = css.slice(media);
-  expect(block).toMatch(/\.child-marker > :not\(title\)/);
+  expect(block).toContain(".viz .child-markers .child-marker > :not(title)");
+  expect(block).toContain(".viz .child-markers .child-marker,");
   expect(block).toMatch(/transition:\s*none/);
   expect(block).toMatch(/animation:\s*none/);
 });
