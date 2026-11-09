@@ -258,6 +258,12 @@ export interface VizLiveChild {
   since: number;
 }
 
+/** An actor map child that is gone: killed, replaced by a new child under its key, or reaped when it finished. */
+export interface VizRemovedChild extends VizLiveChild {
+  /** `steps.length` when the driver first saw it gone: the step that removed it is `steps[until - 1]`. */
+  until: number;
+}
+
 /** Where a running actor is, after the steps in `steps`. */
 export interface VizLiveState {
   state: string;
@@ -265,6 +271,8 @@ export interface VizLiveState {
   regions: Record<string, string>;
   /** Live actor map children: maps sorted by name, then in the map's key order. [] without maps. */
   children: VizLiveChild[];
+  /** Children that are gone, in the order they went; `state` is where each was when it went. Omitted: the driver does not report removals. */
+  removed?: VizRemovedChild[];
   steps: VizStep[];
   last: VizLiveStep | null;
   /** Transitions an effect caused after the step's own one, sync or later, in order. */

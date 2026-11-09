@@ -3,7 +3,9 @@ import type {
   VizDriver,
   VizJson,
   VizLiveState,
+  VizLiveChild,
   VizLiveStep,
+  VizRemovedChild,
   VizStep,
 } from "@mantaq/viz";
 import { actorMapsOf } from "./maps.ts";
@@ -137,6 +139,57 @@ function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => v
 interface MapChild {
   child: AnyActor<unknown>;
   since: number;
+}
+
+/** Move a child from the live map to the removed list, keeping where it was. */
+function dropChild(
+  at: { children: Map<string, MapChild>; removed: VizRemovedChild[] },
+  id: string,
+  until: number,
+): void {
+  const entry = at.children.get(id);
+  if (entry === undefined) return;
+  const [map = "", key = ""] = id.split("\u0000");
+  at.removed.push({
+    map,
+    key,
+    state: `${map}.${entry.child.state.name}`,
+    since: entry.since,
+    until,
+  });
+  at.children.delete(id);
+}
+
+/** Drop every child its map no longer holds (killed, replaced or reaped). */
+function sweepRemoved(
+  at: {
+    maps: Readonly<Record<string, ActorMapLike>>;
+    children: Map<string, MapChild>;
+    removed: VizRemovedChild[];
+  },
+  until: number,
+): void {
+  for (const [id, entry] of at.children) {
+    const [map = "", key = ""] = id.split("\u0000");
+    if (at.maps[map]?.get(key) !== entry.child) dropChild(at, id, until);
+  }
+}
+
+/** The children still in their maps: maps by name, then the map's key order. */
+function liveChildren(
+  maps: Readonly<Record<string, ActorMapLike>>,
+  children: Map<string, MapChild>,
+  watch: (name: string, key: string) => void,
+): VizLiveChild[] {
+  return Object.entries(maps).flatMap(([name, map]) =>
+    map.keys().flatMap((key) => {
+      watch(name, key);
+      const entry = children.get(`${name}\u0000${key}`);
+      return entry === undefined
+        ? []
+        : [{ map: name, key, state: `${name}.${entry.child.state.name}`, since: entry.since }];
+    }),
+  );
 }
 
 /** Core reports a transition after its effects ran, so a follow-up a sync effect sent is recorded before the transition that started it: put the starter first. */
@@ -325,21 +378,26 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     watchRegions(actor, record);
 
     const children = new Map<string, MapChild>();
+    const removed: VizRemovedChild[] = [];
     const watch = (name: string, key: string): void => {
       const child = maps[name]?.get(key);
       const id = `${name}\u0000${key}`;
-      if (!isActor(child) || children.get(id)?.child === child) return;
+      if (!isActor(child)) return;
+      const old = children.get(id);
+      if (old?.child === child) return;
+      if (old !== undefined) dropChild({ children, removed }, id, steps.length + flags.pending);
       children.set(id, { child, since: steps.length + flags.pending });
       if (effectMode === "held") holdEffects(child, held);
       watchChild(child, { root: actor, ref: { map: name, key }, prefix: name, record });
     };
     watchMaps(maps, watch);
     flags.inside = false;
-    return { actor, clock, internal, log, steps, flags, held, maps, children, watch };
+    return { actor, clock, internal, log, steps, flags, held, maps, children, removed, watch };
   }
 
   function view(): VizLiveState {
-    const { actor, clock, steps, log, held, maps, children, watch } = session;
+    const { actor, clock, steps, log, held, maps, children, removed, watch } = session;
+    sweepRemoved({ maps, children, removed }, steps.length);
     const waiting = held.filter((each) => !each.signal.aborted);
     held.splice(0, held.length, ...waiting);
     return {
@@ -347,15 +405,8 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       regions: Object.fromEntries(
         regionActors(actor).map((each) => [each.path, `${each.path}.${each.actor.state.name}`]),
       ),
-      children: Object.entries(maps).flatMap(([name, map]) =>
-        map.keys().flatMap((key) => {
-          watch(name, key);
-          const entry = children.get(`${name}\u0000${key}`);
-          return entry === undefined
-            ? []
-            : [{ map: name, key, state: `${name}.${entry.child.state.name}`, since: entry.since }];
-        }),
-      ),
+      children: liveChildren(maps, children, watch),
+      removed: [...removed],
       steps: [...steps],
       last: log[0] ?? null,
       after: log.slice(1),
