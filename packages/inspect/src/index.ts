@@ -3,7 +3,14 @@ export type { VizInput } from "./structure.ts";
 export { fuzz, shrink } from "./fuzz/fuzz.ts";
 export type { CorpusEntry, FuzzOptions, FuzzResult, FuzzStop } from "./fuzz/fuzz.ts";
 export { eventCatalog, execute } from "./fuzz/run.ts";
-export type { FuzzTarget, MissingPayload, Observation, RunError, Trace } from "./fuzz/run.ts";
+export type {
+  FuzzTarget,
+  MissingPayload,
+  Observation,
+  RunError,
+  SeenChild,
+  Trace,
+} from "./fuzz/run.ts";
 export type { LiteralPool } from "./fuzz/mutate.ts";
 export { fuzzedMachine } from "./fuzz/to-viz.ts";
 export { coverageGoal, withTestCoverage } from "./fuzz/coverage.ts";

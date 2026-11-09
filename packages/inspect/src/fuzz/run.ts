@@ -62,6 +62,18 @@ export interface Trace {
   features: string[];
   /** Events sent without a payload whose fields the machine then read, sorted by event. */
   missingPayloads: MissingPayload[];
+  /** The map children the run started, in start order; a key started twice appears twice. */
+  children: SeenChild[];
+}
+
+/** A map child a run started, with the steps it was alive for. */
+export interface SeenChild {
+  map: string;
+  key: string;
+  /** Index of the step that started it; -1 when it existed before the first step. */
+  from: number;
+  /** Index of the step after which it was gone; null while it is alive at the end. */
+  until: number | null;
 }
 
 /** An event fuzzing sent without a payload, and the payload fields the machine read from it. */
@@ -268,6 +280,106 @@ export function applyStep(
   } else actor.send(toEvent(step, context.emptyPayload));
 }
 
+type Sinks = {
+  visited: string[];
+  observations: Observation[];
+  errors: RunError[];
+  plain: (payload: unknown) => unknown;
+};
+
+/** Record one region or child actor's moves and errors under its dotted path. */
+function recordActor(
+  child: AnyActor<unknown>,
+  path: string,
+  context: { root: AnyActor<unknown>; at: () => number; sinks: Sinks },
+): void {
+  const { root, at, sinks } = context;
+  child.on("transition", {
+    fn: ({ event, from, to, transitioned, effects }) => {
+      sinks.observations.push({
+        from: `${path}.${from}`,
+        event: event.type,
+        to: `${path}.${to}`,
+        transitioned,
+        effects,
+        step: at(),
+        payload: sinks.plain(event.payload),
+        context: parsed(contextText(root)),
+      });
+      if (transitioned) sinks.visited.push(`${path}.${to}`);
+    },
+  });
+  child.on("error", {
+    fn: (info) => {
+      sinks.errors.push({
+        from: `${path}.${info.state.name}`,
+        event: info.event.type,
+        message: messageOf(info.error),
+        step: at(),
+      });
+    },
+  });
+}
+
+/**
+ * Record every map child as it starts: its start state, moves and errors under
+ * the map's name. `scan` after each step also finds children a map that cannot
+ * be wrapped started, and marks the ones that are gone.
+ */
+function recordChildren(context: {
+  root: AnyActor<unknown>;
+  maps: Readonly<Record<string, ActorMapLike>>;
+  at: () => number;
+  sinks: Sinks;
+}): { children: SeenChild[]; scan: () => void } {
+  const { root, maps, at, sinks } = context;
+  let running = false;
+  const children: SeenChild[] = [];
+  const watched = new Set<object>();
+  const alive = new Map<SeenChild, object>();
+  const watch = (name: string, key: string): void => {
+    const child = maps[name]?.get(key);
+    if (!isActor(child) || watched.has(child)) return;
+    watched.add(child);
+    sinks.visited.push(`${name}.${child.state.name}`);
+    recordActor(child, name, { root, at, sinks });
+    if (typeof key === "string") {
+      const seen: SeenChild = { map: name, key, from: running ? at() : -1, until: null };
+      children.push(seen);
+      alive.set(seen, child);
+    }
+  };
+  for (const [name, map] of Object.entries(maps)) {
+    const spawn = map.spawn.bind(map);
+    const ensure = map.ensure.bind(map);
+    // A frozen map cannot be wrapped: the scan after each step still sees its children.
+    Either.from(() => {
+      map.spawn = (key) => {
+        spawn(key);
+        watch(name, key);
+      };
+      map.ensure = (key) => {
+        ensure(key);
+        watch(name, key);
+      };
+    });
+    for (const key of map.keys()) watch(name, key);
+  }
+  running = true;
+  const scan = (): void => {
+    for (const [name, map] of Object.entries(maps)) {
+      for (const key of map.keys()) watch(name, key);
+    }
+    for (const [seen, child] of alive) {
+      if (maps[seen.map]?.get(seen.key) !== child) {
+        seen.until = at();
+        alive.delete(seen);
+      }
+    }
+  };
+  return { children, scan };
+}
+
 /**
  * Replay steps against a fresh actor. Synchronous and deterministic: effects
  * only run via the virtual clock, and nothing here reads wall time.
@@ -297,6 +409,14 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   /** The actor's state before each step. */
   const statesBefore: string[] = [];
   let index = 0;
+  const sinks = { visited, observations, errors, plain };
+  const at = (): number => index;
+  const recorder = recordChildren({
+    root: actor,
+    maps,
+    at,
+    sinks,
+  });
   actor.on("transition", {
     fn: ({ event, from, to, transitioned, effects }) => {
       const context = parsed(contextText(actor));
@@ -324,33 +444,8 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
       });
     },
   });
-  for (const { path, actor: region } of regions) {
-    region.on("transition", {
-      fn: ({ event, from, to, transitioned, effects }) => {
-        observations.push({
-          from: `${path}.${from}`,
-          event: event.type,
-          to: `${path}.${to}`,
-          transitioned,
-          effects,
-          step: index,
-          payload: plain(event.payload),
-          context: parsed(contextText(actor)),
-        });
-        if (transitioned) visited.push(`${path}.${to}`);
-      },
-    });
-    region.on("error", {
-      fn: (info) => {
-        errors.push({
-          from: `${path}.${info.state.name}`,
-          event: info.event.type,
-          message: messageOf(info.error),
-          step: index,
-        });
-      },
-    });
-  }
+  for (const { path, actor: region } of regions)
+    recordActor(region, path, { root: actor, at, sinks });
   for (const step of steps) {
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
@@ -371,6 +466,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
       });
       break;
     }
+    recorder.scan();
     if (contextText(actor) !== before) {
       contextSteps.push(index);
       // A state not seen before this step has no cycle: loop the step alone.
@@ -383,5 +479,14 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   actor.dispose();
   const features = [...new Set([...featuresOf({ visited, observations, errors }), ...hits])].sort();
   const missingPayloads = recording.missing();
-  return { visited, observations, errors, contextSteps, loopStarts, features, missingPayloads };
+  return {
+    visited,
+    observations,
+    errors,
+    contextSteps,
+    loopStarts,
+    features,
+    missingPayloads,
+    children: recorder.children,
+  };
 }
