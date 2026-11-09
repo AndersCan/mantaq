@@ -8,6 +8,7 @@ export default defineConfig({
       typeCheck: true,
     },
   },
-  test: {},
+  // Every test builds a full TypeScript program; the first also loads the lib and core types cold.
+  test: { testTimeout: 30_000 },
   fmt: {},
 });
