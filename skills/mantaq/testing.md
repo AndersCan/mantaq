@@ -45,7 +45,7 @@ Use this for internal failure events (`PAYMENT_FAILED`, timeouts, retries) witho
 
 ## An App That Does Not Use Mantaq
 
-`assertMatchesModel` (`@mantaq/test` 2.1) runs random walks on a model machine and on the app, and fails with the shortest event sequence after which their states differ.
+`assertMatchesModel` (`@mantaq/test` 2.1) runs random walks on a model machine and on the app, and fails with a minimal event sequence after which their states differ.
 
 ```ts
 import { assertMatchesModel } from "@mantaq/test";
