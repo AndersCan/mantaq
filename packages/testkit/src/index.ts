@@ -12,3 +12,5 @@ export {
   assertEffectRan,
   assertEffectNeverRan,
 } from "./assertions.ts";
+export { assertMatchesModel } from "./match-model.ts";
+export type { MatchModelOptions } from "./match-model.ts";

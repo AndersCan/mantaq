@@ -444,6 +444,9 @@ importers:
       '@mantaq/traversal':
         specifier: workspace:*
         version: link:../traversal
+      fast-check:
+        specifier: 'catalog:'
+        version: 4.9.0
     devDependencies:
       '@types/node':
         specifier: ^26.2.0

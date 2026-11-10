@@ -47,7 +47,8 @@
   },
   "dependencies": {
     "@mantaq/core": "workspace:*",
-    "@mantaq/traversal": "workspace:*"
+    "@mantaq/traversal": "workspace:*",
+    "fast-check": "catalog:"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
