@@ -1,0 +1,52 @@
+---
+title: Test an app without mantaq
+description: Check an app that has no mantaq in it against a machine you wrote.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+import counterSource from "../../../conform/counter.ts?raw";
+import modelSource from "../../../conform/counter-model.ts?raw";
+import testSource from "../../../conform/counter.test.ts?raw";
+import failure from "../../../conform/counter-broken.txt?raw";
+
+<Machine src="src/conform/counter-model.ts" />
+
+The model of a counter app. The app has no mantaq in it.
+
+<Code code={counterSource} lang="ts" title="counter.ts" />
+
+<Code code={modelSource} lang="ts" title="counter-model.ts" />
+
+`events` does each model event in the app. `state` reads the app back as a model state name.
+`assertMatchesModel` runs 100 random walks of up to 30 events, compares both states after every event, and fails when a model edge was never taken.
+
+<Code code={testSource.replace('"vite-plus/test"', '"vitest"')} lang="ts" title="counter.test.ts" />
+
+```bash
+npm install -D @mantaq/core @mantaq/test vitest
+npx vitest run
+```
+
+## When the app and the model disagree
+
+Change `count < max` to `count <= max` in `counter.ts` and run again. The test fails with the shortest sequence it found:
+
+<Code code={failure} lang="text" />
+
+## Events with data
+
+An event with data needs sample payloads; walks pick among them.
+
+```ts
+payloads: { setCount: [{ count: 0 }, { count: 3 }] },
+```
+
+## Async apps
+
+Adapters may return promises. Write an async result the app waits for as a model event: the adapter makes it happen, then awaits the app. Pass a timeout to `test` for slow apps.
+
+```ts
+save: (app) => { app.save(); },
+saveFinished: async (app) => { backend.finish(); await app.saving; },
+```

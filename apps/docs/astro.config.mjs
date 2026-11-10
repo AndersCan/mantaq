@@ -27,6 +27,7 @@ export default defineConfig({
         "src/content/docs/photo-upload.ts",
         "src/content/docs/photo-queue.ts",
         "src/first-machine/traffic-light.ts",
+        "src/conform/counter-model.ts",
         "src/tutorial/order-01.ts",
         "src/tutorial/order-02.ts",
         "src/tutorial/order-03.ts",
@@ -97,6 +98,7 @@ export default defineConfig({
             { label: "Machines in an app", slug: "guides/machines-in-an-app" },
             { label: "Visualizer", slug: "guides/visualizer" },
             { label: "Design gate", slug: "guides/design-gate" },
+            { label: "Test an app without mantaq", slug: "guides/app-without-mantaq" },
           ],
         },
         {
