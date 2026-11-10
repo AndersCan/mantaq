@@ -322,6 +322,16 @@ describe("findWires", () => {
       "output",
     ],
     [
+      "a guard that contains the send does not",
+      `if (e.type !== "handedOver") return void ${send}`,
+      "output",
+    ],
+    [
+      "a guard whose return carries a value does not",
+      `if (e.type !== "handedOver") return note();\n    ${send}`,
+      "output",
+    ],
+    [
       "a guard in an enclosing block names the output",
       `if (e.ok) {\n    if (e.type !== "handedOver") return;\n    ${send}\n    }`,
       "handedOver",
