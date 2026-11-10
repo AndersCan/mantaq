@@ -1,13 +1,10 @@
 /**
- * Whole-page entries: a self-contained HTML file (`mountEmbedded`) and a live
- * page served by a dev server (`mountLive`). Both keep `?machine=&step=` in
- * the address bar so a walk can be shared.
+ * The live page served by a dev server (`mountLive`). It keeps
+ * `?machine=&step=` in the address bar so a walk can be shared.
  */
 import { mountVizText, showIssues } from "./embed.ts";
 import type { ViewerOptions } from "./embed.ts";
 import "./viewer.css";
-
-import { DOCUMENT_ELEMENT_ID } from "../html.ts";
 
 function rememberWalk(where: { machine: string; steps: string[]; run?: string }): void {
   const next = new URLSearchParams(location.search);
@@ -30,12 +27,6 @@ export function linkOptions(): ViewerOptions {
     steps: params.getAll("step"),
     onNavigate: rememberWalk,
   };
-}
-
-/** Mount the document embedded in the page itself. */
-export function mountEmbedded(root: HTMLElement): void {
-  const text = document.getElementById(DOCUMENT_ELEMENT_ID)?.textContent ?? "";
-  mountVizText(root, { source: document.title, text }, linkOptions());
 }
 
 /** Fetch the document from `source` and mount it; call again to redraw, keeping the walk. */

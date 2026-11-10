@@ -9,7 +9,7 @@ describe("page.css", () => {
     expect(importsPageCss("page.ts")).toBe(false);
   });
 
-  it.each(["live.ts", "main.ts", "standalone.ts"])("%s brings the page chrome itself", (name) => {
+  it.each(["live.ts", "main.ts"])("%s brings the page chrome itself", (name) => {
     expect(importsPageCss(name)).toBe(true);
   });
 });
