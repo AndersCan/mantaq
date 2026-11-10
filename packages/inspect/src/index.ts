@@ -32,6 +32,7 @@ export type {
   Expectations,
   StateExpectations,
 } from "./expectations.ts";
+export { machineBrief } from "./brief.ts";
 export { inspectFile } from "./load.ts";
 export type { FileOptions } from "./load.ts";
 export { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts";

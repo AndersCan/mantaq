@@ -105,6 +105,8 @@ const json = serializeViz(vizDocument([machine]));
 
 `inspectFile(file)` / `inspectModule(file, { load })` do the discovery the Vite plugin does, and read recorded runs from `__runs__/*.json` next to the machine file (`{ [machineId]: { name, end, steps }[] }`). A run is replayed on a fresh actor; internal events the replay already produces (timers, synchronous emits) are dropped, and a run that replays to a different state than `end` is dropped with a warning. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
 
+`machineBrief(machine)` turns a machine into a Markdown brief of its states, the events each takes and under which condition, entry effects and ignored events, for whoever builds the feature.
+
 ## Check the built site
 
 ```sh
