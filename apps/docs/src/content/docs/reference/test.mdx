@@ -19,6 +19,43 @@ harness.assertStateVisited("shippingAddress");
 
 ---
 
+## `assertMatchesModel(options)`
+
+```ts
+function assertMatchesModel<M extends AnyActor<unknown>, App>(
+  options: MatchModelOptions<M, App>,
+): Promise<void>;
+
+type MatchModelOptions<M, App> = {
+  model: () => M;
+  start: () => App | Promise<App>;
+  events: { [type in ModelInput]: (app: App, event: Event) => void | Promise<void> };
+  state: (app: App) => ModelStateName | Promise<ModelStateName>;
+  payloads?: { [type in InputWithData]: ReadonlyArray<Payload> };
+  walks?: number;
+  steps?: number;
+  seed?: number;
+};
+```
+
+Checks an app that has no mantaq in it against a machine you wrote. Each walk builds a fresh model and a fresh app, sends random model inputs to the model, calls the matching `events` function on the app, and compares `state(app)` with the model state name after every event. On a difference it rejects with the shortest failing sequence it finds, with both states after each step. It also rejects when a walk set passed but never took some model edge. Only the top-level state name is compared; regions and child states are ignored.
+
+`payloads` is required when an input carries data: each walk picks among the samples. Defaults: `walks` 100, `steps` 30, `seed` 107806 (0x1a51e). Adapters may return promises; they are awaited before the state is read.
+
+```ts
+await assertMatchesModel({
+  model: () => counterModel(),
+  start: () => new Counter(),
+  events: {
+    increment: (counter) => counter.increment(),
+    decrement: (counter) => counter.decrement(),
+  },
+  state: (counter) => counter.stateName(),
+});
+```
+
+---
+
 ## `computeCoverage(graph, history)`
 
 ```ts
