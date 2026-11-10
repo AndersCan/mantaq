@@ -160,6 +160,39 @@ describe("scanAppCode unheard outputs", () => {
     expect(scanned.unheard).toEqual([]);
   });
 
+  test("an early-return type guard hears only the output it lets through", async () => {
+    const scanned = await unheardWith(
+      'actor.on("output", { fn: (e) => { if (e.type !== "a") return; note(); } });\n',
+    );
+    expect(scanned.unheard).toEqual([{ id: "duo", outputs: ["b"] }]);
+  });
+
+  test.each([
+    ["a throw guard", 'if (e.type !== "a") throw new Error("no"); note();', ["b"]],
+    ["a guard with an else", 'if (e.type !== "a") return; else note();', []],
+    ["a guard with an empty block", 'if (e.type !== "a") {} note();', []],
+    ["a guard on a literal that is no output", 'if (e.type !== "zzz") return; note();', []],
+    [
+      "a guard nested under another condition",
+      'if (e.ok) { if (e.type !== "a") return; } note();',
+      [],
+    ],
+    ["a guard whose return carries a value", 'if (e.type !== "a") return forward(e); note();', []],
+    [
+      "an equality guard is a plain check, not an early return",
+      'if (e.type === "a") return; note();',
+      ["b"],
+    ],
+    ["a guard on another property", 'if (e.kind !== "a") return; note();', []],
+    ["a guard against an event's type", "if (e.type !== known.type) return; note();", ["b"]],
+    ["a guard in a block that returns", 'if (e.type !== "a") { return; } note();', ["b"]],
+  ])("early-return: %s", async (_name, body, unheard) => {
+    const scanned = await unheardWith(
+      `const known = { type: "a" } as const;\nfunction forward(e: unknown): void {}\nactor.on("output", { fn: (e) => { ${body} } });\n`,
+    );
+    expect(scanned.unheard).toEqual(unheard.map((output) => ({ id: "duo", outputs: [output] })));
+  });
+
   test("a checked if with an else hears every output", async () => {
     const scanned = await unheardWith(
       'actor.on("output", { fn: (e) => { if (e.type === "a") note(); else note(); } });\n',
@@ -241,6 +274,87 @@ describe("findWires", () => {
         { from: "sender", to: "receiver", trigger: "output", event: "take", at: at(send, 4) },
       ].sort((a, b) => a.at.localeCompare(b.at)),
     );
+  });
+
+  test("an early-return type guard names the output the listener hears", async () => {
+    const dir = mkdtempSync(join(ROOT, "wired-edges", "tmp-"));
+    try {
+      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../../../../tsconfig.json"}');
+      const file = join(dir, "listen.ts");
+      writeFileSync(
+        file,
+        'import { receiverActor, take } from "../../wired/receiver.ts";\nimport { senderActor } from "../../wired/sender.ts";\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    if (e.type !== "handedOver") return;\n    receiverActor.send(take.create());\n  },\n});\n',
+      );
+      const found = findWires({ root: ROOT, files: [file], machines: await machines() });
+      expect(found.map((wire) => wire.trigger)).toEqual(["handedOver"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  const send = "receiverActor.send(take.create());";
+  test.each([
+    [
+      "a guard before a send names the output",
+      `if (e.type !== "handedOver") return;\n    ${send}`,
+      "handedOver",
+    ],
+    [
+      "a guard after a send does not",
+      `${send}\n    if (e.type !== "handedOver") return;`,
+      "output",
+    ],
+    ["a guard on a non-output does not", `if (e.type !== "zzz") return;\n    ${send}`, "output"],
+    [
+      "a guard with an else does not",
+      `if (e.type !== "handedOver") return; else note();\n    ${send}`,
+      "output",
+    ],
+    [
+      "a guard with a throwing send does not",
+      `if (e.type !== "handedOver") throw ${send}`,
+      "output",
+    ],
+    ["an equality guard does not", `if (e.type === "handedOver") return;\n    ${send}`, "output"],
+    [
+      "a guard on another property does not",
+      `if (e.kind !== "handedOver") return;\n    ${send}`,
+      "output",
+    ],
+    [
+      "a guard that contains the send does not",
+      `if (e.type !== "handedOver") return void ${send}`,
+      "output",
+    ],
+    [
+      "a guard whose return carries a value does not",
+      `if (e.type !== "handedOver") return note();\n    ${send}`,
+      "output",
+    ],
+    [
+      "a guard in an enclosing block names the output",
+      `if (e.ok) {\n    if (e.type !== "handedOver") return;\n    ${send}\n    }`,
+      "handedOver",
+    ],
+    [
+      "a guard names a send in a later nested function",
+      `if (e.type !== "handedOver") return;\n    const later = () => ${send}\n    later();`,
+      "handedOver",
+    ],
+  ])("early-return trigger: %s", async (_name, body, trigger) => {
+    const dir = mkdtempSync(join(ROOT, "wired-edges", "tmp-"));
+    try {
+      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../../../../tsconfig.json"}');
+      const file = join(dir, "listen.ts");
+      writeFileSync(
+        file,
+        `import { receiverActor, take } from "../../wired/receiver.ts";\nimport { senderActor } from "../../wired/sender.ts";\nconst note = () => {};\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    ${body}\n  },\n});\n`,
+      );
+      const found = findWires({ root: ROOT, files: [file], machines: await machines() });
+      expect([...new Set(found.map((wire) => wire.trigger))]).toEqual([trigger]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("ignores listeners in test files", async () => {
