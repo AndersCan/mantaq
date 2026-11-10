@@ -7,7 +7,7 @@ import type { FuzzTarget } from "./run.ts";
 /**
  * no-loop: Phase 3 mutation only. blind: + looping context-changing steps.
  * literals: + AST literal seeding. distance: + branch-distance guide only.
- * guided: literals + distance (what viz:export uses).
+ * guided: literals + distance.
  */
 type Arm = "no-loop" | "blind" | "literals" | "distance" | "guided";
 

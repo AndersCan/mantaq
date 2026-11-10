@@ -49,7 +49,6 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "vp dev",
     "build": "vp pack",
     "test": "vp test",
     "check": "vp check",
