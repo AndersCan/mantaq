@@ -105,6 +105,7 @@ describe("machineBrief", () => {
       doc: null,
       explanation: branches,
     });
+    const withDoc = (each: ReturnType<typeof edge>, doc: string) => ({ ...each, doc });
     const analyzed = (branches: Array<{ conditions: string[]; target: unknown }>) =>
       ({
         status: "analyzed",
@@ -122,7 +123,7 @@ describe("machineBrief", () => {
       ...base,
       id: "synthetic",
       initial: null,
-      regions: ["net"],
+      regions: ["net", "empty"],
       maps: [],
       outputs: ["done"],
       events: [
@@ -150,7 +151,15 @@ describe("machineBrief", () => {
       ],
       edges: [
         edge("e1", "net.idle", null),
-        edge("e2", "net.idle", null),
+        withDoc(edge("e2", "net.idle", null), "second"),
+        {
+          ...edge(
+            "e4",
+            "net.idle",
+            analyzed([{ conditions: ["z"], target: { kind: "state", state: "idle" } }]),
+          ),
+          event: "pick",
+        },
         edge(
           "e3",
           null,
@@ -171,5 +180,50 @@ describe("machineBrief", () => {
     expect(brief).toContain("- `go` → decided at run time (`pick()`) when `y`");
     expect(brief).toContain("## Outputs\n\n- `done`");
     expect(brief).toContain("with `n?: number`");
+    expect(brief).toContain("- `pick` → `net.idle` when `z`");
+    expect(brief).not.toContain("second");
+    expect(brief).not.toContain("Ignores .");
+    expect(brief).not.toContain("Region `empty`");
+  });
+
+  test("a machine with no events has no empty Events section and ends with one newline", async () => {
+    const brief = machineBrief(await load("no-events"));
+    expect(brief).not.toContain("## Events");
+    expect(brief.endsWith("\n\n")).toBe(false);
+  });
+
+  test("a registration without a state change reads stays", async () => {
+    const brief = machineBrief(await load("credit"));
+    expect(brief).toContain("- `setTier` → stays");
+    expect(brief).not.toContain("- `setTier` → `idle`");
+  });
+
+  test("an actor map's states sit under Each <map> child", async () => {
+    expect(machineBrief(await load("photo-queue"))).toContain("## Each `photos` child");
+  });
+
+  test("a state with no rows says Takes no events", async () => {
+    expect(machineBrief(await load("conditional"))).toContain(
+      "### `approved`\n\nTakes no events.\n\nIgnores `review`.",
+    );
+  });
+
+  test("an unanalyzed edge with no target is decided at run time", async () => {
+    const machine = await load("retry");
+    const edges = machine.edges.map((edge) =>
+      edge.event === "reset"
+        ? {
+            ...edge,
+            to: null,
+            explanation: {
+              status: "not_analyzed" as const,
+              location: null,
+              reason: "x",
+              snippet: null,
+            },
+          }
+        : edge,
+    );
+    expect(machineBrief({ ...machine, edges })).toContain("- `reset` → decided at run time\n");
   });
 });

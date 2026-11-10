@@ -168,7 +168,9 @@ export function machineBrief(machine: VizMachine): string {
       ),
     );
   }
-  blocks.push("## Events", machine.events.map(eventLine).join("\n"));
+  if (machine.events.length > 0) {
+    blocks.push("## Events", machine.events.map(eventLine).join("\n"));
+  }
   if (machine.outputs.length > 0) {
     blocks.push("## Outputs", machine.outputs.map((each) => `- ${code(each)}`).join("\n"));
   }
