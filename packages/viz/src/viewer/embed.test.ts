@@ -285,7 +285,7 @@ describe("mountViewer with a driver", () => {
       [...root.querySelectorAll("[data-tab-panel]")]
         .filter((panel) => !panel.hasAttribute("hidden"))
         .map((panel) => panel.getAttribute("data-tab-panel"));
-    expect(labels()).toEqual(["Step", "Context", "Path", "Details"]);
+    expect(labels()).toEqual(["Step", "Context", "Path", "Details", "Controls"]);
     expect(shown()).toEqual(["step"]);
     send(root, "go");
     expect(labels()[1]).toBe("Context (1 changed)");

@@ -67,11 +67,13 @@ interface ViewState {
   motion: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
+  /** Only the diagram and a "Show controls" button are drawn. View state: not an option, not saved. */
+  diagramOnly: boolean;
   /** Why the requested run did not open; cleared by the next walk. */
   notice: string | null;
 }
 
-type PanelTab = "step" | "context" | "path" | "details";
+type PanelTab = "step" | "context" | "path" | "details" | "controls";
 
 function effectiveMode(view: ViewState, machine: VizMachine): CoverageMode {
   const modes = availableModes(machine);
@@ -182,6 +184,7 @@ export function mountViewer(
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
 
+  const setDiagramOnly = diagramOnlySwitch(root, view, () => render());
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
     root.replaceChildren();
@@ -192,6 +195,19 @@ export function mountViewer(
     }
     const mode = effectiveMode(view, machine);
     root.classList.toggle("coverage-on", mode !== "off");
+    root.classList.toggle("diagram-only", view.diagramOnly);
+    const chrome: Chrome = {
+      root,
+      viz,
+      machine,
+      view,
+      heading: options.heading ?? "h1",
+      mode,
+      render,
+      onNavigate: options.onNavigate,
+      live: driver !== undefined,
+      setDiagramOnly,
+    };
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     const refresh = () => {
@@ -208,7 +224,9 @@ export function mountViewer(
         select,
         replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
       });
-      fillPanel(panel, { doc, view, parts, details, refresh, footer: options.panelFooter });
+      const controls = controlsOf(doc, chrome);
+      const footer = options.panelFooter;
+      fillPanel(panel, { doc, view, parts, details, controls, refresh, footer });
       markDiagram(root, { machine, view, send, compose, refresh });
     };
     redraw = refresh;
@@ -259,29 +277,49 @@ export function mountViewer(
     const graph = renderGraph(doc, machine, { select, showDetails, mode });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
-    root.append(
-      ...noticeOf(doc, view),
-      headerOf(doc, {
-        root,
-        viz,
-        machine,
-        view,
-        heading: options.heading ?? "h1",
-        mode,
-        render,
-        onNavigate: options.onNavigate,
-        live: driver !== undefined,
-      }),
-      ...changes,
-      html(doc, "div", { class: "viz-main" }, [
-        html(doc, "div", { class: "canvas" }, [graph]),
-        panel,
-      ]),
-    );
+    root.append(...layoutOf(doc, { chrome, graph, panel, changes }));
     refresh();
   }
 
   render();
+}
+
+/** Turns Diagram only on or off, then puts focus on the button that undoes it. */
+function diagramOnlySwitch(
+  root: HTMLElement,
+  view: ViewState,
+  render: () => void,
+): (on: boolean) => void {
+  return (on) => {
+    view.diagramOnly = on;
+    if (!on) view.tab = "controls";
+    render();
+    root
+      .querySelector<HTMLElement>(on ? "[data-show-controls]" : "[data-diagram-only]")
+      ?.focus({ preventScroll: true });
+  };
+}
+
+/** Everything the viewer draws under its root: the controls and panel, or with Diagram only just the canvas. */
+function layoutOf(
+  doc: Document,
+  context: { chrome: Chrome; graph: Node; panel: HTMLElement; changes: HTMLElement[] },
+): HTMLElement[] {
+  const { chrome } = context;
+  const canvas = html(doc, "div", { class: "canvas" }, [context.graph]);
+  const { view } = chrome;
+  if (!view.diagramOnly) {
+    return [
+      ...noticeOf(doc, view),
+      headerOf(doc, chrome),
+      ...context.changes,
+      html(doc, "div", { class: "viz-main" }, [canvas, context.panel]),
+    ];
+  }
+  const show = html(doc, "button", { type: "button", class: "show-controls" }, ["Show controls"]);
+  show.setAttribute("data-show-controls", "");
+  show.addEventListener("click", () => chrome.setDiagramOnly(false));
+  return [show, html(doc, "div", { class: "viz-main" }, [canvas])];
 }
 
 function rewindView(view: ViewState, driver: VizDriver | undefined, length: number): void {
@@ -310,6 +348,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     picked: null,
     motion: false,
     tab: "step",
+    diagramOnly: false,
     notice: null,
   };
 }
@@ -355,10 +394,16 @@ function runNotice(machine: VizMachine, run: { name: string; found: boolean }): 
 
 type LiveContext = NonNullable<ExploreContext["live"]>;
 
-/** Step, Context (live only), Path and Details as tabs; Context counts the lines the last step changed. */
+/** Step, Context (live only), Path, Details and Controls as tabs; Context counts the lines the last step changed. */
 function panelTabs(
   doc: Document,
-  context: { view: ViewState; parts: ExploreParts; details: HTMLElement; refresh: () => void },
+  context: {
+    view: ViewState;
+    parts: ExploreParts;
+    details: HTMLElement;
+    controls: HTMLElement;
+    refresh: () => void;
+  },
 ): HTMLElement {
   const { view, parts } = context;
   const changed = view.live === null ? 0 : changedLines(view.live, view.previous);
@@ -373,6 +418,7 @@ function panelTabs(
         },
     { id: "path", label: "Path", content: parts.path },
     { id: "details", label: "Details", content: context.details },
+    { id: "controls", label: "Controls", content: context.controls },
   ];
   const shown = all.filter((tab): tab is Tab<PanelTab> => tab !== null);
   const active = shown.some((tab) => tab.id === view.tab) ? view.tab : "step";
@@ -612,20 +658,21 @@ function alwaysAskButton(doc: Document, view: ViewState): HTMLElement {
   return button;
 }
 
-function headerOf(
-  doc: Document,
-  context: {
-    root: HTMLElement;
-    viz: VizDocument;
-    machine: VizMachine;
-    view: ViewState;
-    heading: "h1" | "h2" | "h3";
-    mode: CoverageMode;
-    render: () => void;
-    onNavigate: ViewerOptions["onNavigate"];
-    live: boolean;
-  },
-): HTMLElement {
+/** What the header and the Controls tab are built from. */
+interface Chrome {
+  root: HTMLElement;
+  viz: VizDocument;
+  machine: VizMachine;
+  view: ViewState;
+  heading: "h1" | "h2" | "h3";
+  mode: CoverageMode;
+  render: () => void;
+  onNavigate: ViewerOptions["onNavigate"];
+  live: boolean;
+  setDiagramOnly: (on: boolean) => void;
+}
+
+function headerOf(doc: Document, context: Chrome): HTMLElement {
   const { machine, view, render } = context;
   return html(doc, "header", { class: "viz-header" }, [
     html(doc, context.heading, {}, [`Viz: ${machine.id}`]),
@@ -656,10 +703,23 @@ function headerOf(
       { class: "help-link", href: DOCS_URL, target: "_blank", rel: "noopener noreferrer" },
       ["How this works"],
     ),
+  ]);
+}
+
+/** The Controls tab: Full screen (where the browser allows), Always ask (live, a payload event), Diagram only. */
+function controlsOf(doc: Document, context: Chrome): HTMLElement {
+  const { root, machine, view } = context;
+  const diagramOnly = html(doc, "button", { type: "button", class: "diagram-only-toggle" }, [
+    "Diagram only",
+  ]);
+  diagramOnly.setAttribute("data-diagram-only", "");
+  diagramOnly.addEventListener("click", () => context.setDiagramOnly(true));
+  return html(doc, "div", { class: "controls" }, [
+    fullscreenButton(doc, root),
     context.live && machine.events.some((each) => asksForPayload(machine, each.id))
       ? alwaysAskButton(doc, view)
       : null,
-    fullscreenButton(doc, context.root),
+    diagramOnly,
   ]);
 }
 

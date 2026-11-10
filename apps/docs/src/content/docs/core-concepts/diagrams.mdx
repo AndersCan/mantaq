@@ -38,7 +38,7 @@ Click one, or use the **Step** tab:
 
 - **Events and time** (closed): every event the state handles or ignores, and the
   clock. An event that carries a payload is sent with a value the page knows
-  (what you sent before, else a fuzzed or example value). Turn on **Always ask**
+  (what you sent before, else a fuzzed or example value). Turn on **Always ask** in the **Controls** tab
   to fill it in yourself first. Advance the clock to fire a pending timer, or by
   any number of milliseconds.
 
@@ -97,7 +97,7 @@ user ride on state payloads, so context holds only the counters.
 
 <Machine src="src/content/docs/login.ts" />
 
-Try it: click `SUBMIT`: it sends a made-up account, which is rejected. To sign in, turn on **Always ask** and type `ada` / `lovelace`. `checking` starts a
+Try it: click `SUBMIT`: it sends a made-up account, which is rejected. To sign in, turn on **Always ask** in the **Controls** tab and type `ada` / `lovelace`. `checking` starts a
 300 ms timer: advance it in the **Time** section, and you are back at the form.
 Open the **Context** tab: `failedAttempts` went up by one. Do it twice more and
 the third rejection goes to `lockedOut`, with a 30 s unlock timer. The diagram
