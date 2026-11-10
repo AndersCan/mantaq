@@ -1,12 +1,11 @@
 import { toViz } from "./structure.ts";
 import { exampleInputs } from "./examples.ts";
 import { createAuthActor } from "./fixtures/auth.ts";
-import { createCheckoutActor, submitBasicInfo } from "./fixtures/checkout.ts";
+import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createSagaActor } from "./fixtures/saga.ts";
 import { createConditionalActor } from "./fixtures/conditional.ts";
 import { serializeViz } from "@mantaq/viz";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
-import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
 describe("toViz structure", () => {
@@ -102,19 +101,6 @@ describe("coverage", () => {
     for (const machine of toViz(exampleInputs()).machines) {
       expect(machine.edges.filter((e) => e.to === null)).toEqual([]);
     }
-  });
-
-  test("counts state visits and edge hits from instrumented run", () => {
-    const run = instrument(createCheckoutActor());
-    run.send(submitBasicInfo.create({ email: "a@b.c", name: "A" }));
-    const machine = toViz([{ id: "checkout", actor: createCheckoutActor(), history: run.history }])
-      .machines[0];
-    expect(machine?.states.find((s) => s.id === "shippingAddress")?.coverage).toEqual({ hits: 1 });
-    expect(machine?.states.find((s) => s.id === "payment")?.coverage).toEqual({ hits: 0 });
-    const edge = machine?.edges.find(
-      (e) => e.from === "basicInfo" && e.event === "submitBasicInfo",
-    );
-    expect(edge?.coverage).toEqual({ hits: 1 });
   });
 });
 

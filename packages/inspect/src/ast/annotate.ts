@@ -50,11 +50,6 @@ function sitesOf(loaded: LoadedSource): HandlerSite[] {
   });
 }
 
-/** Explain every handler registration in a file. Left = the file could not be analyzed at all. */
-export function analyzeSource(source: AnalysisSource): Either<string, HandlerSite[]> {
-  return Either.chain(loadSource(source), { onRight: (loaded) => Either.right(sitesOf(loaded)) });
-}
-
 function docsOf(loaded: LoadedSource): SourceDocs {
   return {
     sites: sitesOf(loaded),

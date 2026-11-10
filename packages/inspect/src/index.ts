@@ -15,7 +15,7 @@ export type { LiteralPool } from "./fuzz/mutate.ts";
 export { fuzzedMachine } from "./fuzz/to-viz.ts";
 export { coverageGoal, withTestCoverage } from "./fuzz/coverage.ts";
 export { branchDistance, branchDistanceGuide, guidance, literalPool } from "./fuzz/guided.ts";
-export { analyzeSource, annotateMachine } from "./ast/annotate.ts";
+export { annotateMachine } from "./ast/annotate.ts";
 export type { HandlerSite } from "./ast/annotate.ts";
 export type { AnalysisSource } from "./ast/program.ts";
 export { inspect, inspectModule, machineId, vizDocument } from "./inspect.ts";
