@@ -16,8 +16,14 @@ const failed = state("failed")();
 
 /** The visitor put one more item in the cart. */
 const addItem = event("addItem")();
-/** The visitor is ready to pay. */
-const pay = event("pay")();
+/** The visitor is ready to pay, and gives an email for the receipt. */
+const pay = event("pay")<{
+  /**
+   * Where the receipt goes.
+   * @example ana@example.com
+   */
+  email: string;
+}>();
 /** The visitor sent their card details. */
 const confirm = event("confirm")();
 /** The visitor tries the payment again. */
@@ -77,11 +83,12 @@ export function createOrder9(clock: Clock) {
           return {};
         },
       });
-      /** The card form opens only when the cart has items. */
+      /** The card form opens once the visitor gave an email and the cart has items. */
       m.on(cart, {
         event: pay,
         to: [payment],
-        handler: (_event, { context }) => {
+        handler: (event, { context }) => {
+          if (event.payload.email === "") return {};
           if (context.get().items === 0) return {};
           return { state: payment };
         },

@@ -34,7 +34,7 @@ describe("addedLines", () => {
         "createOrder",
       );
     expect(addedLines(shown("order-02.ts"), shown("order-03.ts"))).toEqual([
-      1, 8, 9, 10, 13, 16, 17, 18, 19,
+      1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
     ]);
   });
 });

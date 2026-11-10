@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 import { VirtualClock, event } from "@mantaq/core";
 import { expectNoDesignErrors } from "@mantaq/inspect";
+import { createOrder3 } from "./order-03.ts";
 import { createOrder4 } from "./order-04.ts";
 import { createOrder5 } from "./order-05.ts";
 import { createOrder6 } from "./order-06.ts";
@@ -9,17 +10,26 @@ import { createOrder8 } from "./order-08.ts";
 import { createOrder9 } from "./order-09.ts";
 
 const addItem = event("addItem")();
-const pay = event("pay")();
+const pay = event("pay")<{ email: string }>();
+const email = "ana@example.com";
+const payloads = { pay: [{ email }, { email: "" }] };
 const confirm = event("confirm")();
 const retry = event("retry")();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("tutorial machines", () => {
+  test("step 3 opens the card form only with an email", () => {
+    const actor = createOrder3();
+    actor.send(pay.create({ email: "" }));
+    expect(actor.state.name).toBe("cart");
+    actor.send(pay.create({ email }));
+    expect(actor.state.name).toBe("payment");
+  });
   test("step 4 has no design errors", () => {
-    expectNoDesignErrors({ id: "order4", create: createOrder4 });
+    expectNoDesignErrors({ id: "order4", create: createOrder4, payloads });
   });
   test("step 5 has no design errors", () => {
-    expectNoDesignErrors({ id: "order5", create: createOrder5 });
+    expectNoDesignErrors({ id: "order5", create: createOrder5, payloads });
   });
   test("step 5 counts items and stays in cart", () => {
     const actor = createOrder5();
@@ -30,16 +40,16 @@ describe("tutorial machines", () => {
     expect(actor.state.name).toBe("cart");
   });
   test("step 6 has no design errors", () => {
-    expectNoDesignErrors({ id: "order6", create: () => createOrder6(VirtualClock()) });
+    expectNoDesignErrors({ id: "order6", create: () => createOrder6(VirtualClock()), payloads });
   });
   test("step 7 has no design errors", () => {
-    expectNoDesignErrors({ id: "order7", create: () => createOrder7(VirtualClock()) });
+    expectNoDesignErrors({ id: "order7", create: () => createOrder7(VirtualClock()), payloads });
   });
   test("step 8 has no design errors", () => {
-    expectNoDesignErrors({ id: "order8", create: () => createOrder8(VirtualClock()) });
+    expectNoDesignErrors({ id: "order8", create: () => createOrder8(VirtualClock()), payloads });
   });
   test("step 9 has no design errors", () => {
-    expectNoDesignErrors({ id: "order9", create: () => createOrder9(VirtualClock()) });
+    expectNoDesignErrors({ id: "order9", create: () => createOrder9(VirtualClock()), payloads });
   });
   test("step 9 promo region takes applyPromo whatever the order is doing", () => {
     const actor = createOrder9(VirtualClock());
@@ -50,12 +60,12 @@ describe("tutorial machines", () => {
     expect(actor.state.name).toBe("cart");
   });
 
-  type Order = { send(e: { type: string }): unknown; state: { name: string } };
+  type Order = { send(e: { type: string; payload?: unknown }): unknown; state: { name: string } };
   const toPaying = (create: (clock: VirtualClock) => Order, items = 1) => {
     const clock = VirtualClock();
     const actor = create(clock);
     for (let n = 0; n < items; n++) actor.send(addItem.create());
-    actor.send(pay.create());
+    actor.send(pay.create({ email }));
     actor.send(confirm.create());
     return { clock, actor };
   };
@@ -68,10 +78,10 @@ describe("tutorial machines", () => {
   ] as const) {
     test(`step ${step} refuses pay with an empty cart, then accepts it with an item`, () => {
       const actor = create(VirtualClock());
-      actor.send(pay.create());
+      actor.send(pay.create({ email }));
       expect(actor.state.name).toBe("cart");
       actor.send(addItem.create());
-      actor.send(pay.create());
+      actor.send(pay.create({ email }));
       expect(actor.state.name).toBe("payment");
     });
   }

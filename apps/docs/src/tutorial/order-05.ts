@@ -11,8 +11,14 @@ const paid = state("paid")().final();
 
 /** The visitor put one more item in the cart. */
 const addItem = event("addItem")();
-/** The visitor is ready to pay. */
-const pay = event("pay")();
+/** The visitor is ready to pay, and gives an email for the receipt. */
+const pay = event("pay")<{
+  /**
+   * Where the receipt goes.
+   * @example ana@example.com
+   */
+  email: string;
+}>();
 /** The visitor sent their card details. */
 const confirm = event("confirm")();
 
@@ -33,8 +39,15 @@ export function createOrder5() {
           return {};
         },
       });
-      /** The cart is done, so the card form opens. */
-      m.on(cart, { event: pay, to: [payment], handler: () => ({ state: payment }) });
+      /** The card form opens once the visitor gave an email. */
+      m.on(cart, {
+        event: pay,
+        to: [payment],
+        handler: (event) => {
+          if (event.payload.email === "") return {};
+          return { state: payment };
+        },
+      });
       /** The card details are in, so the order is done. */
       m.on(payment, { event: confirm, to: [paid], handler: () => ({ state: paid }) });
     },
