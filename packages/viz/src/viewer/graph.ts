@@ -390,7 +390,7 @@ const LABEL_CAP_EM = 1.4;
  * 10px) nor grow past 1.4em. A machine too wide for that scrolls sideways by
  * the reader's hand.
  */
-export function graphWidth(units: number): string {
+function graphWidth(units: number): string {
   const size = (scale: number) => ((units * scale) / LABEL_UNITS).toFixed(2);
   return `width: clamp(${size(LABEL_FLOOR_REM)}rem, 100%, ${size(LABEL_CAP_EM)}em)`;
 }
