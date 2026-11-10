@@ -109,3 +109,18 @@ describe("Diagram only", () => {
     expect(mount().querySelector(".viz-header")).not.toBeNull();
   });
 });
+
+describe("Diagram only, after a canvas click", () => {
+  test("Show controls returns to the Controls tab with focus on Diagram only", () => {
+    const root = mount();
+    root.querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
+    root
+      .querySelector('[data-node-id="open"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    const shown = root.querySelector('[role="tab"][aria-selected="true"]');
+    expect(shown?.textContent).toBe("Controls");
+    expect(document.activeElement).toBe(root.querySelector("[data-diagram-only]"));
+    expect(document.activeElement?.closest("[hidden]")).toBeNull();
+  });
+});

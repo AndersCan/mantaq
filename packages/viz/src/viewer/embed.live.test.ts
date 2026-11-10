@@ -1804,3 +1804,33 @@ describe("live effect reports", () => {
     });
   });
 });
+
+describe("Controls tab, live", () => {
+  test("Always ask sits in the Controls tab, not the header", () => {
+    const { root } = mount();
+    expect(root.querySelector('[data-tab-panel="controls"] [data-always-ask]')).not.toBeNull();
+    expect(root.querySelector(".viz-header [data-always-ask]")).toBeNull();
+  });
+
+  test("Diagram only hides the changes list and the run notice", () => {
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      {
+        driver: driver(),
+        run: "nope",
+        changes: {
+          machine: "checkout",
+          before: { states: ["idle"], arrows: [] },
+          onSeen: () => {},
+        },
+      },
+    );
+    expect(root.querySelector("section.changes")).not.toBeNull();
+    expect(root.querySelector("[data-run-missing]")).not.toBeNull();
+    click(root, "[data-diagram-only]");
+    expect(root.querySelector("section.changes")).toBeNull();
+    expect(root.querySelector("[data-run-missing]")).toBeNull();
+  });
+});

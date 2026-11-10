@@ -292,6 +292,7 @@ function diagramOnlySwitch(
 ): (on: boolean) => void {
   return (on) => {
     view.diagramOnly = on;
+    if (!on) view.tab = "controls";
     render();
     root
       .querySelector<HTMLElement>(on ? "[data-show-controls]" : "[data-diagram-only]")
