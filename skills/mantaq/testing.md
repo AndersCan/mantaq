@@ -43,6 +43,38 @@ Use this for internal failure events (`PAYMENT_FAILED`, timeouts, retries) witho
 - `actor.snapshot()`: path, context, regions, `done`, `error`. Snapshot context is a copy.
 - `actor.context`: live accumulated data.
 
+## An App That Does Not Use Mantaq
+
+`assertMatchesModel` (`@mantaq/test` 2.1) runs random walks on a model machine and on the app, and fails with the shortest event sequence after which their states differ.
+
+```ts
+import { assertMatchesModel } from "@mantaq/test";
+
+test("the counter app matches its model", async () => {
+  await assertMatchesModel({
+    model: createCounterModel,
+    start: () => createCounter(3),
+    events: {
+      increment: (app) => app.increment(),
+      decrement: (app) => app.decrement(),
+      reset: (app) => app.reset(),
+    },
+    state: (app) => (app.count === 0 ? "empty" : app.count >= 3 ? "full" : "counting"),
+  });
+});
+```
+
+Adapter rules:
+
+- Every model input needs an `events` entry. The compiler names the missing one.
+- `state` returns a model state name. The compiler lists them.
+- An event the app cannot take right now does nothing in the adapter.
+- An async result the app waits for (a save finishing) is a model input: the adapter makes it happen (resolve a fake request, then `await` the app).
+
+Defaults: a fresh model and app per walk, 100 walks of up to 30 events, fixed seed, state compared after every event. It also fails when a model edge was never taken. Events with data need `payloads: { event: [...] }`.
+
+Guide: https://anderscan.github.io/mantaq/guides/app-without-mantaq/
+
 ## Coverage (Harness + Traversal)
 
 Prove behavior, don't just assert happy paths. The harness records visited states, fired transitions and executed effects, and offers `assert*` / `was*` helpers plus a `coverage()` report:
