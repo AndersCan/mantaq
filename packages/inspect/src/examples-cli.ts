@@ -14,11 +14,9 @@ import { parseArgs } from "node:util";
 
 const DEFAULT_ITERATIONS = 2000;
 const DEFAULT_COMPARE_SEEDS = 30;
-const USAGE = [
-  "usage: node src/examples-cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]",
-  "       node src/examples-cli.ts compare [--seeds N] [--iterations N]",
-  "",
-].join("\n");
+const USAGE = ["usage: node src/examples-cli.ts compare [--seeds N] [--iterations N]", ""].join(
+  "\n",
+);
 
 function compareExamples(options: { seeds: number; iterations: number }): void {
   const seeds = Array.from({ length: options.seeds }, (_, index) => index + 1);
