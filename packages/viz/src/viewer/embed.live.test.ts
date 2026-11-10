@@ -356,14 +356,19 @@ describe("live controls", () => {
     expect(staticRoot.querySelector("[data-always-ask]")).toBeNull();
   });
 
-  test("an edge click does not scroll or move focus", () => {
+  test("clicks never scroll or rebuild the canvas", () => {
     const { root } = mount();
+    const canvas = root.querySelector(".canvas");
     const scroll = vi
       .spyOn(Element.prototype, "scrollIntoView")
       .mockImplementation(() => undefined);
     const focus = vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(() => undefined);
     clickEdge(root, "idle-submit-paying");
     clickEdge(root, "paying-paymentTimeout-error");
+    root.querySelector("[data-node-id]")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    click(root, "[data-send]");
+    expect(canvas).not.toBeNull();
+    expect(root.querySelector(".canvas")).toBe(canvas);
     expect(scroll).not.toHaveBeenCalled();
     for (const call of focus.mock.calls) expect(call[0]).toEqual({ preventScroll: true });
     vi.restoreAllMocks();

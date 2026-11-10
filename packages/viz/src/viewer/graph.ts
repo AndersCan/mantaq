@@ -377,20 +377,25 @@ function wireChips(root: SVGSVGElement, doc: Document, machine: VizMachine): voi
   }
 }
 
-/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. */
 /** Label size in viewBox units (`.graph text`). */
 const LABEL_UNITS = 12;
 
+/** Smallest label size (rem): follows the reader's font setting, not the host's text size. */
+const LABEL_FLOOR_REM = 0.6;
+/** Largest label size (em): tracks the host text. */
+const LABEL_CAP_EM = 1.4;
+
 /**
- * Width relative to the viewer's text (em), so labels track it and the
- * reader's font settings: fills the canvas, labels between 0.85em and 1.4em.
- * Below the floor the canvas scrolls sideways rather than shrink unreadably.
+ * Fills the canvas on every surface; labels never drop under 0.6rem (about
+ * 10px) nor grow past 1.4em. A machine too wide for that scrolls sideways by
+ * the reader's hand.
  */
-function graphWidth(units: number): string {
-  const em = (scale: number) => `${((units * scale) / LABEL_UNITS).toFixed(2)}em`;
-  return `width: clamp(${em(0.85)}, 100%, ${em(1.4)})`;
+export function graphWidth(units: number): string {
+  const size = (scale: number) => ((units * scale) / LABEL_UNITS).toFixed(2);
+  return `width: clamp(${size(LABEL_FLOOR_REM)}rem, 100%, ${size(LABEL_CAP_EM)}em)`;
 }
 
+/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. */
 export function renderGraph(
   doc: Document,
   machine: VizMachine,
