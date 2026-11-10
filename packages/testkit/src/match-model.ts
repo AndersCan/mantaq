@@ -24,12 +24,6 @@ export type MatchModelOptions<M extends AnyActor<unknown>, App> = {
   };
   /** Reads the app's current state as a model state name. */
   state: (app: App) => ModelStateName<M> | Promise<ModelStateName<M>>;
-  /** Random walks to run. Default 100. */
-  walks?: number;
-  /** Most events in one walk. Default 30. */
-  steps?: number;
-  /** fast-check seed. Default 0x1a51e (107806), the same default as @mantaq/pbt. */
-  seed?: number;
 } & ([PayloadInput<M>] extends [never]
   ? { payloads?: never }
   : {
@@ -56,7 +50,9 @@ type Setup = {
   adapters: object;
 };
 
-const DEFAULT_SEED = 0x1a51e;
+const SEED = 0x1a51e;
+const WALKS = 100;
+const STEPS = 30;
 const PREFIX = "assertMatchesModel: ";
 
 function attempt<T>(fn: () => T | Promise<T>): Promise<Outcome<T>> {
@@ -70,10 +66,7 @@ function attempt<T>(fn: () => T | Promise<T>): Promise<Outcome<T>> {
 
 function isRef(value: unknown): value is EventRefLike {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof Reflect.get(value, "type") === "string" &&
-    typeof Reflect.get(value, "create") === "function"
+    typeof value === "object" && value !== null && typeof Reflect.get(value, "type") === "string"
   );
 }
 
@@ -82,13 +75,17 @@ function isAdapter(value: unknown): value is (app: unknown, event: InternalEvent
 }
 
 function describeError(error: unknown): string {
-  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return String(error);
 }
 
 function eventLabel(choice: Choice): string {
   return choice.hasPayload
     ? `${choice.ref.type} ${JSON.stringify(choice.payload)}`
     : choice.ref.type;
+}
+
+function failed(what: string, after: string, error: string): Failure {
+  return { head: `${what} failed ${after}: ${error}`, hint: "" };
 }
 
 function formatTable(rows: Row[]): string {
@@ -113,18 +110,11 @@ function formatFailure(failure: Failure, rows: Row[]): string {
 }
 
 function checkOptions(options: {
-  walks: number;
-  steps: number;
   inputs: string[];
   eventKeys: string[];
+  payloads: Record<string, readonly unknown[]> | undefined;
 }): string | undefined {
-  const { walks, steps, inputs, eventKeys } = options;
-  if (!Number.isInteger(walks) || walks < 1) {
-    return `walks must be a positive integer, got ${walks}`;
-  }
-  if (!Number.isInteger(steps) || steps < 1) {
-    return `steps must be a positive integer, got ${steps}`;
-  }
+  const { inputs, eventKeys, payloads } = options;
   if (inputs.length === 0) return "the model has no input events to walk.";
   const list = inputs.join(", ");
   const missing = inputs.find((type) => !eventKeys.includes(type));
@@ -133,13 +123,18 @@ function checkOptions(options: {
   }
   const extra = eventKeys.find((key) => !inputs.includes(key));
   if (extra !== undefined) return `events.${extra} is not a model input. Model inputs: ${list}.`;
+  const empty = Object.entries(payloads ?? {}).find(([, samples]) => samples.length === 0);
+  if (empty !== undefined) return `payloads.${empty[0]} has no samples.`;
   return undefined;
 }
 
-function buildChoices(refs: EventRefLike[], payloads: object | undefined): Choice[] {
+function buildChoices(
+  refs: EventRefLike[],
+  payloads: Record<string, readonly unknown[]> | undefined,
+): Choice[] {
   return refs.flatMap((ref): Choice[] => {
-    const list: unknown = payloads === undefined ? undefined : Reflect.get(payloads, ref.type);
-    return Array.isArray(list) && list.length > 0
+    const list = payloads?.[ref.type];
+    return list !== undefined
       ? list.map((payload: unknown) => ({ ref, payload, hasPayload: true }))
       : [{ ref, payload: undefined, hasPayload: false }];
   });
@@ -155,18 +150,16 @@ async function checkStep(
   const read = await attempt(() => Reflect.apply(setup.state, undefined, [app]));
   if (!read.ok) {
     rows.push({ event: label, model: modelName, app: "(threw)", note });
-    return {
-      head: `state(app) threw ${after}: ${describeError(read.error)}`,
-      hint: "",
-    };
+    return failed("state(app)", after, describeError(read.error));
   }
   const value = read.value;
-  if (typeof value !== "string" || !setup.stateNames.includes(value)) {
+  if (!setup.stateNames.some((name) => name === value)) {
     rows.push({ event: label, model: modelName, app: String(JSON.stringify(value)), note });
-    return {
-      head: `state(app) returned ${JSON.stringify(value)}, which is not a model state (${setup.stateNames.join(", ")}), ${after}.`,
-      hint: "Return one of the model's state names from state(app).",
-    };
+    return failed(
+      "state(app)",
+      after,
+      `returned ${JSON.stringify(value)}, which is not a model state (${setup.stateNames.join(", ")})`,
+    );
   }
   if (value === modelName) {
     rows.push({ event: label, model: modelName, app: value, note });
@@ -218,19 +211,21 @@ async function walkEvents(setup: Setup, app: unknown, walk: readonly Choice[], r
       const modelName = model.state.name;
       if (modelName === "__error") {
         run.rows.push({ event: label, model: modelName, app: "-", note: "" });
-        return {
-          head: `The model failed on ${label} in ${before} after ${sent} events (seed ${setup.seed}): ${describeError(modelError)}`,
-          hint: "Fix the model's handler; the app was not checked on this step.",
-        };
+        return failed(
+          `The model on ${label} in ${before}`,
+          `after ${sent} events (seed ${setup.seed})`,
+          describeError(modelError),
+        );
       }
       const adapter: unknown = Reflect.get(setup.adapters, choice.ref.type);
       const done = await attempt(() => (isAdapter(adapter) ? adapter(app, event) : undefined));
       if (!done.ok) {
         run.rows.push({ event: label, model: modelName, app: "(threw)", note: "" });
-        return {
-          head: `events.${choice.ref.type} threw after ${sent} events (seed ${setup.seed}): ${describeError(done.error)}`,
-          hint: "Make the adapter do nothing when the app cannot take this event now.",
-        };
+        return failed(
+          `events.${choice.ref.type}`,
+          `after ${sent} events (seed ${setup.seed})`,
+          describeError(done.error),
+        );
       }
       const note = handled ? "" : "model did not handle it";
       const failure = await checkStep(setup, { app, rows: run.rows, label, modelName, note });
@@ -246,10 +241,11 @@ async function runWalk(setup: Setup, walk: readonly Choice[]): Promise<Run> {
   const run: Run = { rows: [], taken: new Set() };
   const started = await attempt(() => setup.start());
   if (!started.ok) {
-    run.failure = {
-      head: `start() threw after 0 events (seed ${setup.seed}): ${describeError(started.error)}`,
-      hint: "",
-    };
+    run.failure = failed(
+      "start()",
+      `after 0 events (seed ${setup.seed})`,
+      describeError(started.error),
+    );
     return run;
   }
   run.failure = await walkEvents(setup, started.value, walk, run);
@@ -260,12 +256,7 @@ function findUncovered(graph: ActorGraph, taken: ReadonlySet<string>): string[] 
   return graph.edges
     .filter(
       (edge) =>
-        edge.isInternal !== true &&
-        edge.isUndetermined !== true &&
-        edge.source !== INITIAL_NODE_ID &&
-        edge.target !== "__error" &&
-        !edge.source.includes(".") &&
-        !edge.target.includes("."),
+        edge.isInternal !== true && edge.source !== INITIAL_NODE_ID && !edge.source.includes("."),
     )
     .filter((edge) => {
       const suffix = `>${edge.label}>${edge.target}`;
@@ -285,10 +276,6 @@ function findUncovered(graph: ActorGraph, taken: ReadonlySet<string>): string[] 
 export async function assertMatchesModel<M extends AnyActor<unknown>, App>(
   options: MatchModelOptions<M, App>,
 ): Promise<void> {
-  const walks = options.walks ?? 100;
-  const steps = options.steps ?? 30;
-  const seed = options.seed ?? DEFAULT_SEED;
-
   const probe = options.model();
   const probeOptions = probe.options ?? {};
   const rawInputs: unknown = Reflect.get(probeOptions, "inputs");
@@ -300,15 +287,14 @@ export async function assertMatchesModel<M extends AnyActor<unknown>, App>(
   probe.dispose();
 
   const optionError = checkOptions({
-    walks,
-    steps,
+    payloads: options.payloads,
     inputs: refs.map((ref) => ref.type),
     eventKeys: Object.keys(options.events),
   });
   if (optionError !== undefined) throw new Error(PREFIX + optionError);
 
   const setup: Setup = {
-    seed,
+    seed: SEED,
     stateNames,
     model: options.model,
     start: options.start,
@@ -320,38 +306,29 @@ export async function assertMatchesModel<M extends AnyActor<unknown>, App>(
 
   const details = await fc.check(
     fc.asyncProperty(
-      fc.array(fc.constantFrom(...choices), { minLength: 1, maxLength: steps, size: "max" }),
+      fc.array(fc.constantFrom(...choices), { minLength: 1, maxLength: STEPS, size: "max" }),
       async (walk) => {
         const result = await runWalk(setup, walk);
         for (const key of result.taken) taken.add(key);
         return result.failure === undefined;
       },
     ),
-    { seed, numRuns: walks, endOnFailure: false },
+    { seed: SEED, numRuns: WALKS, endOnFailure: false },
   );
 
   if (details.failed) {
-    return rethrowCounterexample(setup, details.counterexample?.[0], details.errorInstance);
+    return rethrowCounterexample(setup, details.counterexample?.[0] ?? []);
   }
   const uncovered = findUncovered(graph, taken);
   if (uncovered.length > 0) {
     throw new Error(
-      `The app matched the model on ${walks} walks (seed ${seed}), but no walk took these model edges:\n${uncovered.join("\n")}\nRaise walks or steps, add payloads that lead there, or remove the edge from the model.`,
+      `The app matched the model on ${WALKS} walks (seed ${SEED}), but no walk took these model edges:\n${uncovered.join("\n")}\nAdd payloads that lead there, or remove the edge from the model.`,
     );
   }
 }
 
-async function rethrowCounterexample(
-  setup: Setup,
-  counterexample: readonly Choice[] | undefined,
-  errorInstance: unknown,
-): Promise<never> {
-  if (counterexample === undefined) {
-    throw new Error(
-      `${PREFIX}fast-check failed without a counterexample: ${describeError(errorInstance)}`,
-    );
-  }
-  const result = await runWalk(setup, counterexample);
+async function rethrowCounterexample(setup: Setup, walk: readonly Choice[]): Promise<never> {
+  const result = await runWalk(setup, walk);
   if (result.failure === undefined) {
     throw new Error(`${PREFIX}the failing walk passed when run again; the app is not repeatable.`);
   }
