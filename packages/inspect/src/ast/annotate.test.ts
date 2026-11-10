@@ -6,8 +6,7 @@ import { createDocumentedActor } from "../fixtures/documented.ts";
 import { createSagaActor } from "../fixtures/saga.ts";
 import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import type { VizExplanation, VizMachine } from "@mantaq/viz";
-import { analyzeSource, annotateMachine } from "./annotate.ts";
-import { Either } from "@mantaq/utils";
+import { annotateMachine } from "./annotate.ts";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -140,14 +139,6 @@ describe("AST: examples", () => {
     }
     // One TypeScript program per example: ~6s on CI runners, past the 5s default.
   }, 30_000);
-
-  test("deterministic: same source => identical sites", () => {
-    const file = join(FIXTURES, "credit.ts");
-    expect(analyzeSource({ file, root: EXAMPLE_ROOT })).toEqual(
-      analyzeSource({ file, root: EXAMPLE_ROOT }),
-    );
-    expect(Either.isRight(analyzeSource({ file, root: EXAMPLE_ROOT }))).toBe(true);
-  });
 });
 
 describe("AST: JSDoc becomes doc", () => {

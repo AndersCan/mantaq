@@ -4,7 +4,8 @@ import { annotateMachine } from "../ast/annotate.ts";
 import { EXAMPLE_ROOT, exampleInputs, exampleTargets, handWrittenBaselines } from "../examples.ts";
 import { withTestCoverage } from "../fuzz/coverage.ts";
 import { DEFAULT_SEED } from "@mantaq/pbt";
-import { createCheckoutActor, submitBasicInfo } from "../fixtures/checkout.ts";
+
+import { createCheckoutActor } from "../fixtures/checkout.ts";
 import { createStateRoutingActor } from "../fixtures/state-routing.ts";
 import { join } from "node:path";
 import type { VizDocument, VizExplanation } from "@mantaq/viz";
@@ -12,7 +13,6 @@ import { fuzz } from "../fuzz/fuzz.ts";
 import { fuzzedMachine } from "../fuzz/to-viz.ts";
 import { VIZ_SCHEMA_VERSION } from "@mantaq/viz";
 import { mountViewer } from "@mantaq/viz/viewer";
-import { instrument } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
 function mount(viz: VizDocument, options: Parameters<typeof mountViewer>[2] = {}): HTMLElement {
@@ -230,9 +230,15 @@ function pick(root: HTMLElement, mode: string): void {
 }
 
 function checkoutWithRun(): VizDocument {
-  const run = instrument(createCheckoutActor());
-  run.send(submitBasicInfo.create({ email: "a@b.c", name: "A" }));
-  return toViz([{ id: "checkout", actor: createCheckoutActor(), history: run.history }]);
+  const target = exampleTargets().find((each) => each.id === "checkout");
+  if (!target) return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [] };
+  const steps = handWrittenBaselines()["checkout"]?.[0]?.slice(0, 1) ?? [];
+  const machine = withTestCoverage(
+    target,
+    toVizMachine({ id: "checkout", actor: target.create().actor }),
+    [steps],
+  );
+  return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] };
 }
 
 describe("viewer: coverage and switching", () => {
