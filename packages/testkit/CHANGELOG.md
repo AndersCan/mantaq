@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0
+
+<sub>2026-11-10</sub>
+
+- _(minor)_
+  Add `assertMatchesModel`: run seeded random walks on a model machine and an app without mantaq, and fail on the first state that differs.
+
 ## 2.0.8
 
 <sub>2026-11-08</sub>

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.32.0
+
+<sub>2026-11-10</sub>
+
+- _(minor)_
+  The live diagram has a Controls tab with Full screen, Always ask and Diagram only. Diagram only shows just the diagram and a Show controls button.
+- _(minor)_
+  Breaking: `toViz`/`toVizMachine` no longer take `history` or `sampleContexts` (coverage comes from `fuzzedMachine` and `withTestCoverage`); removed `analyzeSource` (use `analyzeModule`). The viz "supplied run" coverage mode stays, but nothing in this repo produces it.
+- _(patch)_
+  inspect: a listener that starts with `if (e.type !== X) return;` now counts as hearing only X, and sends after it are labelled with X
+
 ## 0.31.0
 
 <sub>2026-11-10</sub>

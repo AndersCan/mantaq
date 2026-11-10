@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.23.0
+
+<sub>2026-11-10</sub>
+
+- _(minor)_
+  The live diagram has a Controls tab with Full screen, Always ask and Diagram only. Diagram only shows just the diagram and a Show controls button.
+- _(minor)_
+  Breaking: removed the `@mantaq/viz/standalone` entry, `standaloneHtml` and `DOCUMENT_ELEMENT_ID`; nothing used them since the inspect CLI was removed. Use the `@mantaq/inspect` Vite plugin or `@mantaq/viz/viewer`.
+- _(patch)_
+  The live diagram fits its box down to about 10px labels (was 13.6px on docs pages), so wide machines no longer clip on a laptop.
+
 ## 0.22.0
 
 <sub>2026-11-10</sub>
