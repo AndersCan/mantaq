@@ -15,7 +15,7 @@ beforeAll(async () => {
     root: join(import.meta.dirname, "fixtures"),
     configFile: false,
     logLevel: "silent",
-    server: { port: 0, host: "127.0.0.1" },
+    server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
     plugins: [mantaqViz({ machines: ["retry.ts", "credit.ts"], fuzz: { iterations: 100 } })],
   });
   await server.listen();
@@ -104,7 +104,7 @@ describe("mantaqViz fuzz budget", () => {
       root: join(import.meta.dirname, "fixtures"),
       configFile: false,
       customLogger: logger,
-      server: { port: 0, host: "127.0.0.1" },
+      server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
       plugins: [mantaqViz({ machines: ["checkout.ts"], ...(fuzz === undefined ? {} : { fuzz }) })],
     });
     await dev.listen();
