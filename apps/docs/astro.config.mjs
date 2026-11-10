@@ -23,8 +23,6 @@ export default defineConfig({
     mantaqViz({
       machines: [
         "src/content/docs/checkout.ts",
-        "src/content/docs/saga.ts",
-        "src/content/docs/login.ts",
         "src/content/docs/checkout-with-bugs.ts",
         "src/content/docs/photo-upload.ts",
         "src/content/docs/photo-queue.ts",
@@ -39,8 +37,7 @@ export default defineConfig({
         "src/tutorial/order-08.ts",
         "src/tutorial/order-09.ts",
       ],
-      // Seeded, so every build draws the same coverage. 2000 runs miss the saga's
-      // five-step path to `completed` on this seed; 5000 take ~0.3s.
+      // Seeded, so every build draws the same coverage.
       fuzz: { seed: 1, iterations: 5000 },
     }),
     starlight({
