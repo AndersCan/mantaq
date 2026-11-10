@@ -5,8 +5,14 @@ const cart = state("cart")();
 /** The visitor enters their card details. */
 const payment = state("payment")();
 
-/** The visitor is ready to pay. */
-const pay = event("pay")();
+/** The visitor is ready to pay, and gives an email for the receipt. */
+const pay = event("pay")<{
+  /**
+   * Where the receipt goes.
+   * @example ana@example.com
+   */
+  email: string;
+}>();
 
 export function createOrder3() {
   return Actor({
@@ -14,8 +20,15 @@ export function createOrder3() {
     states: [cart, payment],
     initial: cart,
     setup: (m) => {
-      /** The cart is done, so the card form opens. */
-      m.on(cart, { event: pay, to: [payment], handler: () => ({ state: payment }) });
+      /** The card form opens once the visitor gave an email. */
+      m.on(cart, {
+        event: pay,
+        to: [payment],
+        handler: (event) => {
+          if (event.payload.email === "") return {};
+          return { state: payment };
+        },
+      });
     },
   });
 }

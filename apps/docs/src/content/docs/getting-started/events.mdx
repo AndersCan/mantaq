@@ -6,6 +6,7 @@ description: An event moves the order between states.
 import Step from "../../../components/Step.astro";
 
 <Step n={3}>
-  An event moves the order from one state to another. Click `pay`. The `!` that remains is
-  `payment`, now a dead end.
+  An event moves the order from one state to another, and can carry data: `pay` carries an email,
+  read as `event.payload`, and an empty one keeps the order in `cart`. Click `pay`. The `!` that
+  remains is `payment`, now a dead end. More in [Events](/mantaq/core-concepts/events/).
 </Step>
