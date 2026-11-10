@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.22.0
+
+<sub>2026-11-10</sub>
+
+- _(minor)_
+  Clicking an edge on the live viz fires it with a value the page already knows (what you sent before, else the first fuzz value, else the type's example). An "Always ask" toggle in the header opens the form first.
+
+  Breaking: none
+
+- _(minor)_
+  The live driver lists children that are gone as `VizLiveState.removed`, each with the step that removed it.
+
+  Breaking: none
+
+- _(minor)_
+  The payload form on the live viz starts at the values a click would send. "Values from" is a row of buttons (Last sent, Fuzz 1, Fuzz 2, Example, Context), a choice field of up to four options is a button row, and "Edit as JSON" is gone.
+
+  Breaking: none
+
+- _(minor)_
+  The live viz drops its explaining text. A held effect shows as one line ("In submitting, waiting for chargeCard") and its answers are the arrows out of the state. The event lists and the time controls sit in one closed "Events and time" fold under the step line, which stays as you left it across steps and Back. The design-findings banner no longer tells you to click a `!`.
+
+  Breaking: none
+
+- _(minor)_
+  The live viz draws each actor-map child as a marker with its key on its state; an arrow in the child graph goes to the picked child, else the one that started first. Breaking: none (map-child states draw taller, with a marker row)
+- _(minor)_
+  The live viz log names each child that starts, moves or is removed, in the Step tab and the Path; child rows move into Events and time.
+
+  Breaking: none
+
+- _(minor)_
+  On the live viz, clicking an event that started a child sends the next free key, so repeated adds start new children; a field's @example comes before fuzz values.
+
+  Breaking: none
+
+- _(minor)_
+  Viewer text, lines and controls are black and white; colour appears only on graph highlights.
+
+  Breaking: `--accent` no longer colours controls (they use `--fg`). Themed embeds should also map the new `--select`, `--grid` and `--shadow` variables.
+
+- _(patch)_
+  The live page no longer scrolls when an edge is clicked, drops the "save as journey" box, and shows real buttons with a single filled Send.
+
+  Breaking: none
+
+- _(patch)_
+  Embeds (the Astro `<Machine>`) no longer pull in the standalone page's body style, which set the host page's text to 14px.
+
+  Breaking: none
+
+- _(patch)_ Added states in compare mode are now blue instead of purple.
+- _(patch)_
+  Self-transitions on one state draw as separate nested loops with their labels above them and a smaller arrowhead pointing into the state; the start marker is bigger.
+- _(patch)_ Viewer header, tabs and controls follow the host page's font size.
+- _(patch)_
+  Self-transition loops get small arrowheads in the loop's colour, and nested loops sit further apart so labels do not overlap.
+
 ## 0.21.0
 
 <sub>2026-11-08</sub>
