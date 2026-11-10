@@ -13,6 +13,7 @@ export default defineConfig({
   devToolbar: {
     enabled: false,
   },
+  redirects: { "/getting-started/first-machine": "/mantaq/getting-started/test-it/" },
   markdown: {
     remarkPlugins: [remarkGfm],
   },
@@ -87,7 +88,7 @@ export default defineConfig({
             { label: "Effects", slug: "getting-started/effects" },
             { label: "Timers", slug: "getting-started/timers" },
             { label: "Regions", slug: "getting-started/regions" },
-            { label: "Test it", slug: "getting-started/first-machine" },
+            { label: "Test it", slug: "getting-started/test-it" },
             { label: "Start with your coding agent", slug: "getting-started/with-an-agent" },
           ],
         },
