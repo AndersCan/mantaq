@@ -857,3 +857,18 @@
 .viz.coverage-on .unreached .frame:not(.inner) {
   filter: none;
 }
+
+.viz .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.viz .show-controls {
+  margin-left: auto;
+  display: block;
+}
+
+.viz.diagram-only .finding-mark {
+  display: none;
+}
