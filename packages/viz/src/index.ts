@@ -12,6 +12,6 @@ export { decodePath, encodeStep, movesFrom, stateAfter, unhandledSends } from ".
 export type { ExploreStep, Move, MoveGroup } from "./moves.ts";
 export { routingWarnings } from "./routing.ts";
 export type { RoutingWarning } from "./routing.ts";
-export { DOCUMENT_ELEMENT_ID, UPDATE_EVENT, livePageHtml, standaloneHtml } from "./html.ts";
+export { UPDATE_EVENT, livePageHtml } from "./html.ts";
 export { isUnchanged, outlineChanges, outlineOf } from "./outline.ts";
 export type { MachineChanges, MachineOutline, OutlineArrow } from "./outline.ts";
