@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.31.0
+
+<sub>2026-11-10</sub>
+
+- _(minor)_
+  `<Machine runEffects />` runs that diagram's effects in the reader's browser, so its timers move when the time buttons are pressed. Off by default.
+
+  Breaking: none
+
+- _(minor)_
+  Notes on the live viz open by right-clicking a state or arrow; no notes box on the page. Breaking: none (the notes endpoint no longer takes journeys, which nothing sends since the journey box was removed)
+- _(minor)_
+  The live driver lists children that are gone as `VizLiveState.removed`, each with the step that removed it.
+
+  Breaking: none
+
+- _(minor)_
+  Fuzz runs and test replays record actor-map children: child states and edges get coverage, and child handler errors become findings.
+
+  Breaking: none. Machines with actor maps now get coverage on child states and may get new findings on them, so a `failOnFindings` build can newly fail on a real bug.
+
+- _(minor)_
+  Fuzzing sends events to actor-map children that an earlier step started, by key, so child states are reached and their findings replay.
+
+  Breaking: none.
+
+- _(minor)_
+  Viewer text, lines and controls are black and white; colour appears only on graph highlights.
+
+  Breaking: `--accent` no longer colours controls (they use `--fg`). Themed embeds should also map the new `--select`, `--grid` and `--shadow` variables.
+
+- _(patch)_
+  The live page no longer scrolls when an edge is clicked, drops the "save as journey" box, and shows real buttons with a single filled Send.
+
+  Breaking: none
+
+- _(patch)_
+  Clicking an edge on the live viz fires it with a value the page already knows (what you sent before, else the first fuzz value, else the type's example). An "Always ask" toggle in the header opens the form first.
+
+  Breaking: none
+
+- _(patch)_
+  The payload form on the live viz starts at the values a click would send. "Values from" is a row of buttons (Last sent, Fuzz 1, Fuzz 2, Example, Context), a choice field of up to four options is a button row, and "Edit as JSON" is gone.
+
+  Breaking: none
+
+- _(patch)_
+  The live viz drops its explaining text. A held effect shows as one line ("In submitting, waiting for chargeCard") and its answers are the arrows out of the state. The event lists and the time controls sit in one closed "Events and time" fold under the step line, which stays as you left it across steps and Back. The design-findings banner no longer tells you to click a `!`.
+
+  Breaking: none
+
+- _(patch)_
+  The live viz draws each actor-map child as a marker with its key on its state; an arrow in the child graph goes to the picked child, else the one that started first. Breaking: none (map-child states draw taller, with a marker row)
+- _(patch)_
+  On the live viz, clicking an event that started a child sends the next free key, so repeated adds start new children; a field's @example comes before fuzz values.
+
+  Breaking: none
+
 ## 0.30.0
 
 <sub>2026-11-08</sub>
