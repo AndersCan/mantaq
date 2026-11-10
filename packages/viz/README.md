@@ -90,7 +90,3 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 - **examples + fuzz** (`reached`): neither an example nor fuzzing reached this. The default when both sources are present, and the same merge `expectReached` uses. Fix a miss by adding an example to `tests`.
 - **example tests** (`tested`): no test exercises this. It is the classic "what is untested" view. Supply the event sequences your tests send (`inspect({ tests })`).
 - **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
-
-## Contributing (repo only)
-
-Dev page with the bundled examples, from the [mantaq repo](https://github.com/AndersCan/mantaq): `vp run viz:export`, then `vp dev` in `packages/viz`. It loads `examples/examples.json`, `?src=<url>`, or a picked file.

@@ -1,67 +1,22 @@
 /**
  * Repo-only CLI for the bundled example machines (users run `cli.ts`).
  *
- *   node src/examples-cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]
  *   node src/examples-cli.ts compare [--seeds N] [--iterations N]
  *
- * export: one JSON per example machine plus `examples.json` (all of them),
- * which the viewer loads by default. Pipeline: probe structure, annotate
- * edges from handler source (AST), fuzz guided by the AST's literals and
- * comparisons (seeded from MANTAQ_SEED, default from @mantaq/pbt), annotate
- * fuzz-found edges, then replay the transcribed example tests for `tested`
- * coverage. Same seed => identical files.
- *
- * compare: blind vs literal-seeded vs branch-distance fuzzing on every
- * example, as a Markdown report (seeds 1..N).
+ * Blind vs literal-seeded vs branch-distance fuzzing on every example, as a
+ * Markdown report (seeds 1..N).
  */
-import type { VizMachine } from "@mantaq/viz";
 import { toVizMachine } from "./structure.ts";
 import { annotateMachine } from "./ast/annotate.ts";
-import { VIZ_SCHEMA_VERSION, serializeViz } from "@mantaq/viz";
-import { inspect } from "./inspect.ts";
-import type { Inspected } from "./inspect.ts";
-import { EXAMPLE_ROOT, exampleTargets, handWrittenRuns } from "./examples.ts";
-import type { Example } from "./examples.ts";
+import { EXAMPLE_ROOT, exampleTargets } from "./examples.ts";
 import { compareArms, renderComparison } from "./fuzz/compare.ts";
-import { SEED_ENV, parseSeed } from "@mantaq/pbt";
-import { Either } from "@mantaq/utils";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-const DEFAULT_OUT = resolve(import.meta.dirname, "..", "..", "viz", "public", "examples");
 const DEFAULT_ITERATIONS = 2000;
 const DEFAULT_COMPARE_SEEDS = 30;
-const USAGE = [
-  "usage: node src/examples-cli.ts export [outDir] [--iterations N] [--no-fuzz] [--no-ast]",
-  "       node src/examples-cli.ts compare [--seeds N] [--iterations N]",
-  "",
-].join("\n");
-
-function writeDocument(path: string, machines: VizMachine[]): void {
-  writeFileSync(path, serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines }));
-  process.stdout.write(`wrote ${path}\n`);
-}
-
-interface ExportOptions {
-  outDir: string;
-  seed: number;
-  /** null = structure only, no fuzzing. */
-  iterations: number | null;
-  ast: boolean;
-}
-
-function exampleMachine(example: Example, options: ExportOptions): Inspected {
-  return inspect({
-    id: example.id,
-    create: () => example.create().actor,
-    ...(options.ast ? { source: { file: example.source, root: EXAMPLE_ROOT } } : {}),
-    payloads: example.payloads ?? {},
-    tests: handWrittenRuns()[example.id] ?? [],
-    fuzz:
-      options.iterations === null ? false : { seed: options.seed, iterations: options.iterations },
-  });
-}
+const USAGE = ["usage: node src/examples-cli.ts compare [--seeds N] [--iterations N]", ""].join(
+  "\n",
+);
 
 function compareExamples(options: { seeds: number; iterations: number }): void {
   const seeds = Array.from({ length: options.seeds }, (_, index) => index + 1);
@@ -83,54 +38,24 @@ function compareExamples(options: { seeds: number; iterations: number }): void {
   process.stdout.write(renderComparison(rows));
 }
 
-function exportExamples(options: ExportOptions): void {
-  mkdirSync(options.outDir, { recursive: true });
-  const inspected = exampleTargets().map((example) => exampleMachine(example, options));
-  for (const { machine, warnings } of inspected) {
-    writeDocument(join(options.outDir, `${machine.id}.json`), [machine]);
-    for (const warning of warnings) process.stderr.write(`warning: ${machine.id}: ${warning}\n`);
-  }
-  writeDocument(
-    join(options.outDir, "examples.json"),
-    inspected.map(({ machine }) => machine),
-  );
-}
-
 function main(): void {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
     options: {
       iterations: { type: "string" },
       seeds: { type: "string" },
-      "no-fuzz": { type: "boolean" },
-      "no-ast": { type: "boolean" },
     },
   });
-  const [command, outArg] = positionals;
-  const seed = parseSeed(process.env[SEED_ENV]);
+  const [command] = positionals;
   const iterations = Number(values.iterations ?? DEFAULT_ITERATIONS);
   const seeds = Number(values.seeds ?? DEFAULT_COMPARE_SEEDS);
   const counts = [iterations, seeds].every((count) => Number.isInteger(count) && count >= 0);
-  if ((command !== "export" && command !== "compare") || !counts) {
+  if (command !== "compare" || !counts) {
     process.stderr.write(USAGE);
     process.exitCode = 1;
     return;
   }
-  if (command === "compare") {
-    compareExamples({ seeds, iterations });
-    return;
-  }
-  if (Either.isLeft(seed)) {
-    process.stderr.write(`${seed[0].message}\n`);
-    process.exitCode = 1;
-    return;
-  }
-  exportExamples({
-    outDir: outArg === undefined ? DEFAULT_OUT : resolve(outArg),
-    seed: seed[1],
-    iterations: values["no-fuzz"] === true ? null : iterations,
-    ast: values["no-ast"] !== true,
-  });
+  compareExamples({ seeds, iterations });
 }
 
 main();

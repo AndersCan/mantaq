@@ -192,7 +192,6 @@ These sections apply to the [mantaq repo](https://github.com/AndersCan/mantaq), 
 ### Repo scripts
 
 ```sh
-vp run viz:export     # bundled examples -> packages/viz/public/examples/*.json (the viz dev page loads them)
 vp run viz:compare    # blind vs guided fuzzing report (Markdown, 30 seeds)
 ```
 
