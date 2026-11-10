@@ -7,10 +7,6 @@ import { createLogger, createServer } from "vite";
 import type { ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 
-// wires.test.ts writes temp projects under fixtures/wired*/ while these servers are up. A real
-// watcher event would drop the cached document mid-test; the tests emit their own events.
-const ignoredTemp = ["**/wired*/**"];
-
 let server: ViteDevServer;
 let origin = "";
 
@@ -19,7 +15,7 @@ beforeAll(async () => {
     root: join(import.meta.dirname, "fixtures"),
     configFile: false,
     logLevel: "silent",
-    server: { port: 0, host: "127.0.0.1", watch: { ignored: ignoredTemp } },
+    server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
     plugins: [mantaqViz({ machines: ["retry.ts", "credit.ts"], fuzz: { iterations: 100 } })],
   });
   await server.listen();
@@ -108,7 +104,7 @@ describe("mantaqViz fuzz budget", () => {
       root: join(import.meta.dirname, "fixtures"),
       configFile: false,
       customLogger: logger,
-      server: { port: 0, host: "127.0.0.1", watch: { ignored: ignoredTemp } },
+      server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
       plugins: [mantaqViz({ machines: ["checkout.ts"], ...(fuzz === undefined ? {} : { fuzz }) })],
     });
     await dev.listen();
