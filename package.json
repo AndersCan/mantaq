@@ -24,6 +24,7 @@
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",
     "@stryker-mutator/vitest-runner": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "@varlock/bumpy": "catalog:",
     "knip": "catalog:",
     "vite": "catalog:",

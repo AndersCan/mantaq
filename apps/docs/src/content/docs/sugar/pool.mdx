@@ -1,0 +1,45 @@
+---
+title: Pool
+description: One inbox hands work to n workers; the diagram shows who talks to whom.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+import poolSource from "../../../pool/team-inbox.ts?raw";
+
+<Machine src="src/pool/team-inbox.ts" />
+
+`createPool` builds one inbox and `n` workers that pull work. Boxes are machines, arrows are events, and `workers ×3` is three actors drawn once.
+
+## Try it
+
+1. Read the boxes: `teamInbox` is `empty`, `workers ×3` is `free 3`. `team.ITEMS_ASSIGNED` runs from the inbox to the workers; `team.ITEMS_FINISHED`, `team.ITEMS_FAILED` and `team.ITEMS_RETURNED` run back.
+2. On the Step tab, send `team.ITEM_ARRIVED`. Workers read `free 2 · working 1`, the `team.ITEMS_ASSIGNED` arrow turns pink, and the step line ends `then w1: free → working`.
+3. Send three more. `teamInbox` reads `holding`: that is where work waits. Workers read `working 3`.
+4. In w1's Send list, press `team.RUN_SUCCEEDED`. The inbox hands w1 the waiting item, so `teamInbox` reads `empty` and workers still read `working 3`.
+5. Click the `team.ITEMS_ASSIGNED` arrow. Details names who sends it and the states that take it. **Open workers at free** jumps to the worker's diagram at that arrow; **← System** comes back.
+6. On the Path tab, pick the run `Four items, three workers`. It ends at `holding` with `working 3`.
+
+## The code
+
+<Code code={poolSource} lang="ts" title="team-inbox.ts" />
+
+`run` gets the items and resolves when they are done. If it rejects, the items go back to the front of the inbox. `keep: "set"` drops an arrival whose key already waits, and `batch: Infinity` hands a worker everything that waits: use both when a second request for the same thing adds nothing.
+
+## Why the diagram looks like this
+
+| You see                                                | Why                                                                                                                                                                                                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One arrow per event, not one per state                 | The inbox handles each event the same way in both states, so it uses `onAny`: one `any state` source instead of one per state. Each event still gets one arrow per target state.                                                        |
+| `workers ×3`, not three boxes                          | The workers are an actor map. The count is live; a hand-written copy per worker is three boxes, so use a map.                                                                                                                           |
+| Arrows between boxes, not loops on a parent            | A parent that only forwards events draws self-loops and hides the receiver. Wire the parts in the factory.                                                                                                                              |
+| Every arrow is listed, even with no run yet            | Arrows come from the declared outputs, so they are complete before any test runs.                                                                                                                                                       |
+| A busy worker sent work sends it back                  | `team.ITEMS_RETURNED` puts the items at the front of the inbox. Nothing is dropped.                                                                                                                                                     |
+| A design finding and payload warnings in the build log | The fuzzer finds payload samples only in the machine's own file. A machine built inside `createPool` gets none, so it sends `team.ITEMS_RETURNED` with no payload and the inbox throws. This is a fuzz artefact, not a bug in the pool. |
+| Map arrows show no hit count                           | The fuzzer does not send to map children, so the arrows to `workers ×3` have no hit count. Run the steps by hand to see them fire.                                                                                                      |
+
+## Limits
+
+- The queue lives in memory and is lost on restart.
+- It has no size limit.
+- Each pool needs its own `name`: the name prefixes every event id, so two pools with one name share ids.
