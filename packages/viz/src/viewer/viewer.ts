@@ -35,8 +35,16 @@ import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { freshKeys, knownPayload } from "./fill.ts";
 import { drawChildMarkers } from "./markers.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
-import { markSystem, renderSystem, sendsLines, systemDetails, systemFor } from "./system.ts";
-import type { OpenTarget, SystemSelection } from "./system.ts";
+import { keyLine } from "./key.ts";
+import {
+  markSystem,
+  renderSystem,
+  sendsLines,
+  systemDetails,
+  systemFor,
+  systemPrefix,
+} from "./system.ts";
+import type { OpenTarget, SystemCallbacks, SystemSelection } from "./system.ts";
 import type { MachineSystem } from "../system.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
@@ -285,12 +293,14 @@ export function mountViewer(
       return step === null ? showDetails(selection) : take(step);
     };
     const open = openIn(root, view, () => render());
+    const live = driver === undefined ? null : { send, compose };
     const graph = inSystem
-      ? renderSystem(doc, machine, system, { select: systemSelector(view, () => refresh()) })
+      ? renderSystem(doc, machine, system, systemCallbacks({ machine, view, refresh, live }))
       : renderGraph(doc, machine, { select, showDetails, mode });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
-    root.append(...layoutOf(doc, { chrome, graph, panel, changes }));
+    const key = systemKey(doc, inSystem ? system : null);
+    root.append(...layoutOf(doc, { chrome, graph, key, panel, changes }));
     refresh();
   }
 
@@ -309,6 +319,28 @@ function chromeOf(
 ): Chrome {
   const { options, ...shared } = from;
   return { ...shared, ...rest, heading: options.heading ?? "h1", onNavigate: options.onNavigate };
+}
+
+/** The system view's clicks; the entry lines send only when a driver runs. */
+function systemCallbacks(context: {
+  machine: VizMachine;
+  view: ViewState;
+  refresh: () => void;
+  live: Pick<LiveContext, "send" | "compose"> | null;
+}): SystemCallbacks {
+  const { machine, view, live } = context;
+  const select = systemSelector(view, context.refresh);
+  if (live === null) return { select };
+  return {
+    select,
+    send: (event) => sendEvent(machine, event, { actor: undefined, ...live, view }),
+  };
+}
+
+/** The line under the system diagram: the prefix its event names share. */
+function systemKey(doc: Document, system: MachineSystem | null): HTMLElement | null {
+  const prefix = system === null ? "" : systemPrefix(system);
+  return keyLine(doc, prefix === "" ? [] : [`events: ${prefix}*`]);
 }
 
 /** A click on an arrow or box in the system view: its details show, nothing is walked. */
@@ -400,10 +432,16 @@ function diagramOnlySwitch(
 /** Everything the viewer draws under its root: the controls and panel, or with Diagram only just the canvas. */
 function layoutOf(
   doc: Document,
-  context: { chrome: Chrome; graph: Node; panel: HTMLElement; changes: HTMLElement[] },
+  context: {
+    chrome: Chrome;
+    graph: Node;
+    key: HTMLElement | null;
+    panel: HTMLElement;
+    changes: HTMLElement[];
+  },
 ): HTMLElement[] {
   const { chrome } = context;
-  const canvas = html(doc, "div", { class: "canvas" }, [context.graph]);
+  const canvas = html(doc, "div", { class: "canvas" }, [context.graph, context.key]);
   const { view } = chrome;
   if (!view.diagramOnly) {
     return [
@@ -596,12 +634,23 @@ function liveTake(
 ): void {
   const edge = machine.edges.find((each) => each.id === step.edge);
   if (edge === undefined) return;
-  const { event } = edge;
   const actor = actorOf(machine, edge, {
     children: handlers.view.live?.children ?? [],
     picked: handlers.view.picked,
   });
   if (actor === "none") return;
+  sendEvent(machine, edge.event, { actor, ...handlers });
+}
+
+function sendEvent(
+  machine: VizMachine,
+  event: string,
+  handlers: Pick<LiveContext, "send" | "compose"> & {
+    view: ViewState;
+    actor: VizActorRef | undefined;
+  },
+): void {
+  const { actor } = handlers;
   const withActor = actor ? { actor } : {};
   if (!asksForPayload(machine, event)) {
     handlers.send({ kind: "event", event, payload: null, ...withActor });

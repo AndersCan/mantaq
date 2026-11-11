@@ -21,9 +21,17 @@ export interface SystemLink {
   senders: string[];
 }
 
+/** An event that enters a part from outside the machine: handled there, brought by no link. */
+export interface SystemEntry {
+  to: string;
+  event: string;
+}
+
 export interface MachineSystem {
   parts: SystemPart[];
   links: SystemLink[];
+  /** Sorted by part, then event. Actor maps have none. */
+  entries: SystemEntry[];
 }
 
 function partsOf(machine: VizMachine): SystemPart[] {
@@ -91,7 +99,32 @@ export function systemOf(machine: VizMachine): MachineSystem {
       }));
     });
   });
-  return { parts, links };
+  return { parts, links, entries: entriesOf(machine, parts, links) };
+}
+
+/** Non-internal events a root or region handles that no link brings to it. */
+function entriesOf(
+  machine: VizMachine,
+  parts: ReadonlyArray<SystemPart>,
+  links: ReadonlyArray<SystemLink>,
+): SystemEntry[] {
+  const internal = new Set(
+    machine.events.filter((event) => event.internal).map((event) => event.id),
+  );
+  return parts
+    .filter((part) => part.kind !== "map")
+    .flatMap((part) => {
+      const events = machine.edges
+        .filter(
+          (edge) =>
+            (edge.kind === "transition" || edge.kind === "stay") &&
+            scopeOf(edge.from) === part.id &&
+            !internal.has(edge.event) &&
+            !links.some((link) => link.to === part.id && link.event === edge.event),
+        )
+        .map((edge) => edge.event);
+      return [...new Set(events)].sort().map((event): SystemEntry => ({ to: part.id, event }));
+    });
 }
 
 /** True when some arrow goes from one part to another, so the machine has a system to draw. */

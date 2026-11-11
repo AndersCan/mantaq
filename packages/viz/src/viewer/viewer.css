@@ -894,3 +894,30 @@
 .viz .link-end text {
   fill: var(--muted);
 }
+
+/* System view: the pill where work enters, the pair arrows and the key line. */
+.viz .link-start rect {
+  fill: var(--state-bg);
+  stroke: var(--muted);
+  stroke-dasharray: 2 3;
+}
+
+.viz .link-start text {
+  fill: var(--muted);
+}
+
+.viz .link-pair.took path {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.viz .edge.entry {
+  cursor: pointer;
+}
+
+.viz .viz-key {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: pre;
+}

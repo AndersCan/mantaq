@@ -11,6 +11,7 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
+import { sharedPrefix } from "./system.ts";
 import { describe, expect, test } from "vite-plus/test";
 
 const state = (id: string, initial = false): VizState => ({
@@ -332,5 +333,100 @@ describe("system view", () => {
     expect(root.querySelector('g[data-part="workers"]')?.getAttribute("aria-label")).toBe(
       "workers, none running",
     );
+  });
+});
+
+describe("pool view arrows", () => {
+  const pairs = (root: HTMLElement) => root.querySelectorAll("g.link-pair:not([data-link-out])");
+
+  test("one arrow each way between the boxes, with the entry pill into the root", () => {
+    const root = mount([pool]);
+    expect(pairs(root)).toHaveLength(2);
+    expect(text(root, "g.link-start")).toBe("from outside");
+    expect(root.querySelector('g.link-in [data-entry-event="ITEM_ARRIVED"]')).not.toBeNull();
+  });
+
+  test("two events from one part to another are lines on one arrow", () => {
+    const busy: VizMachine = {
+      ...pool,
+      partOutputs: { workers: ["WORK_DONE", "WORK_FAILED"] },
+      edges: [...pool.edges, edge("holding", "WORK_FAILED", "empty")],
+    };
+    const root = mount([busy]);
+    const back = root.querySelector('g.link-pair[data-from="workers"]:not([data-link-out])');
+    expect(back?.querySelectorAll("g.link")).toHaveLength(2);
+    expect(root.querySelectorAll('g.link-pair[data-from="workers"]')).toHaveLength(1);
+  });
+
+  test("a step turns the pair pink and clicking the pill sends the event", () => {
+    const root = mount([pool]);
+    const assigned = root.querySelector('g.link-pair[data-from=""][data-to="workers"]');
+    expect(assigned?.classList.contains("took")).toBe(false);
+    root
+      .querySelector<SVGGElement>('[data-entry-event="ITEM_ARRIVED"]')
+      ?.dispatchEvent(new Event("click"));
+    expect(assigned?.classList.contains("took")).toBe(true);
+    expect(text(root, 'g[data-part=""] .part-chip')).toBe("holding");
+  });
+
+  test("without a driver the entry line is drawn and does nothing", () => {
+    const root = mount([pool], false);
+    const line = root.querySelector<SVGGElement>('[data-entry-event="ITEM_ARRIVED"]');
+    expect(line).not.toBeNull();
+    expect(line?.getAttribute("tabindex")).toBeNull();
+    expect(line?.getAttribute("role")).toBeNull();
+  });
+
+  const team: VizMachine = {
+    ...pool,
+    events: [event("team.ITEM_ARRIVED"), event("team.ITEMS_ASSIGNED"), event("team.WORK_DONE")],
+    outputs: ["team.ITEMS_ASSIGNED"],
+    partOutputs: { workers: ["team.WORK_DONE"] },
+    edges: [
+      edge("empty", "team.ITEM_ARRIVED", "holding", ["team.ITEMS_ASSIGNED"]),
+      edge("holding", "team.WORK_DONE", "empty"),
+      edge("workers.free", "team.ITEMS_ASSIGNED", "workers.working", ["team.WORK_DONE"]),
+    ],
+  };
+
+  test("a shared prefix is written once in the key and kept in ids", () => {
+    const root = mount([team]);
+    expect(text(root, "[data-viz-key]")).toBe("events: team.*");
+    const line = root.querySelector('g.link[data-event="team.ITEMS_ASSIGNED"]');
+    expect(line?.textContent).toBe("ITEMS_ASSIGNED");
+    expect(line?.getAttribute("aria-label")).toContain("team.ITEMS_ASSIGNED");
+  });
+
+  test("mixed prefixes show full names and no key", () => {
+    const root = mount([pool]);
+    expect(root.querySelector("[data-viz-key]")).toBeNull();
+    expect(arrow(root, "ITEMS_ASSIGNED")?.textContent).toBe("ITEMS_ASSIGNED");
+    const mixed: VizMachine = {
+      ...team,
+      events: [...team.events, event("OTHER.X")],
+      outputs: ["team.ITEMS_ASSIGNED", "OTHER.X"],
+    };
+    const again = mount([mixed]);
+    expect(again.querySelector("[data-viz-key]")).toBeNull();
+    expect(again.querySelector('g.link[data-event="team.ITEMS_ASSIGNED"]')?.textContent).toBe(
+      "team.ITEMS_ASSIGNED",
+    );
+  });
+});
+
+describe("sharedPrefix", () => {
+  test("is the text up to the first dot when 2 or more events share it", () => {
+    expect(sharedPrefix(["team.A", "team.B"])).toBe("team.");
+    expect(sharedPrefix(["a.b.A", "a.b.B"])).toBe("a.");
+  });
+
+  test("is empty for one event, no dot or a differing prefix", () => {
+    expect(sharedPrefix([])).toBe("");
+    expect(sharedPrefix(["team.A"])).toBe("");
+    expect(sharedPrefix(["team.A", "team.A"])).toBe("");
+    expect(sharedPrefix(["A", "B"])).toBe("");
+    expect(sharedPrefix([".A", ".B"])).toBe("");
+    expect(sharedPrefix(["team.A", "other.B"])).toBe("");
+    expect(sharedPrefix(["team.", "team.B"])).toBe("");
   });
 });
