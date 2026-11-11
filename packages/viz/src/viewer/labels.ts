@@ -35,6 +35,15 @@ function goes(branch: VizBranch, to: string): boolean {
   return branch.target.kind === "state" && branch.target.state === to;
 }
 
+function allOf(branch: VizBranch): string {
+  const { conditions } = branch;
+  if (conditions.length === 1) return tidy(conditions[0] ?? "");
+  return conditions
+    .map(tidy)
+    .map((c) => (c.includes("||") ? `(${c})` : c))
+    .join(" && ");
+}
+
 /**
  * When a handler can also go elsewhere, the condition under which it reaches
  * `edge.to`, read from the analyzed branches. null when it is unconditional,
@@ -50,7 +59,8 @@ export function edgeCondition(edge: VizEdge): string | null {
   const going = explanation.branches.filter((branch) => goes(branch, to));
   if (going.length === 0 || going.length === explanation.branches.length) return null;
   if (going.some((branch) => branch.conditions.length === 0)) return null;
-  return going.map((branch) => branch.conditions.map(tidy).join(" && ")).join(" || ");
+  if (explanation.branches.some((branch) => branch.target.kind === "unresolved")) return null;
+  return going.map(allOf).join(" || ");
 }
 
 /** The lines drawn on an edge: the event, then its condition cut to fit. */
