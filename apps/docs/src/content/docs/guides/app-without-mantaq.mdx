@@ -8,6 +8,8 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 import counterSource from "../../../conform/counter.ts?raw";
 import modelSource from "../../../conform/counter-model.ts?raw";
 import testSource from "../../../conform/counter.test.ts?raw";
+import briefTestSource from "../../../conform/counter-brief.test.ts?raw";
+import brief from "../../../conform/counter-brief.md?raw";
 import failure from "../../../conform/counter-broken.txt?raw";
 
 <Machine src="src/conform/counter-model.ts" />
@@ -50,3 +52,21 @@ Adapters may return promises. Write an async result the app waits for as a model
 save: (app) => { app.save(); },
 saveFinished: async (app) => { backend.finish(); await app.saving; },
 ```
+
+## Hand the model to whoever builds it
+
+`machineBrief` turns the model into Markdown that lists every state, the events it takes, where each goes and when, and what it ignores.
+
+<Code
+  code={briefTestSource.replace('"vite-plus/test"', '"vitest"')}
+  lang="ts"
+  title="counter-brief.test.ts"
+/>
+
+```bash
+npm install -D @mantaq/inspect
+```
+
+The first run writes `counter-brief.md`. Later runs fail when the model changes, so the brief stays true.
+
+<Code code={brief} lang="md" title="counter-brief.md" />
