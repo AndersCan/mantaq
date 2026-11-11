@@ -49,10 +49,10 @@ afterEach(() => {
   Reflect.deleteProperty(document, "fullscreenEnabled");
 });
 
-function mount(): HTMLElement {
+function mount(options: { diagramOnly?: boolean } = {}): HTMLElement {
   const root = document.createElement("div");
   document.body.append(root);
-  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] });
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, options);
   return root;
 }
 
@@ -107,6 +107,14 @@ describe("Diagram only", () => {
   test("a new mount starts with the controls shown", () => {
     mount().querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
     expect(mount().querySelector(".viz-header")).not.toBeNull();
+  });
+
+  test("the diagramOnly option opens with only the canvas, and Show controls still works", () => {
+    const root = mount({ diagramOnly: true });
+    expect(root.classList.contains("diagram-only")).toBe(true);
+    expect(root.querySelector(".panel")).toBeNull();
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(root.querySelector(".viz-header")).not.toBeNull();
   });
 });
 

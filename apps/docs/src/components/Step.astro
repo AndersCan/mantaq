@@ -22,7 +22,7 @@ const ins = before === undefined ? [] : addedLines(before, shown);
 ---
 
 <div class="mantaq-tutorial">
-  <Machine src={`src/tutorial/${name(n)}`} />
+  <Machine src={`src/tutorial/${name(n)}`} diagramOnly />
 </div>
 <div class="mantaq-caption"><slot /></div>
 <Code code={shown} lang="ts" title="order.ts" ins={ins} />

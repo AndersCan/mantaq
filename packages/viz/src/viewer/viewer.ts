@@ -72,7 +72,7 @@ interface ViewState {
   motion: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
-  /** Only the diagram and a "Show controls" button are drawn. View state: not an option, not saved. */
+  /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
   diagramOnly: boolean;
   /** Why the requested run did not open; cleared by the next walk. */
   notice: string | null;
@@ -170,6 +170,8 @@ export interface ViewerOptions {
   changes?: ChangesOption;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
+  /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
+  diagramOnly?: boolean;
 }
 
 /**
@@ -439,7 +441,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     picked: null,
     motion: false,
     tab: "step",
-    diagramOnly: false,
+    diagramOnly: options.diagramOnly ?? false,
     notice: null,
     drilled: false,
     systemSelection: null,
