@@ -32,3 +32,15 @@ test("A worker runs an item for one second on the pool's clock", async () => {
   await pool.actor.settled();
   expect(pool.workers.get("w1")?.state.name).toBe("free");
 });
+
+test("Disposing the workers mid-run stops the one-second wait", async () => {
+  const clock = VirtualClock();
+  const pool = createTeamInbox({ clock });
+  pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
+  await pool.actor.settled();
+  expect(pool.workers.get("w1")?.state.name).toBe("working");
+  pool.workers.dispose();
+  clock.advance(1000);
+  await pool.actor.settled();
+  expect(pool.workers.get("w1")).toBeUndefined();
+});

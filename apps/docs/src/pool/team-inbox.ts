@@ -4,10 +4,8 @@ import { createPool } from "@mantaq/sugar";
 
 function wait(options: { clock: Clock; ms: number; signal: AbortSignal }): Promise<void> {
   const { clock, ms, signal } = options;
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) return reject(signal.reason);
+  return new Promise((resolve) => {
     clock.setTimeout(ms, { cb: resolve, signal });
-    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
   });
 }
 
