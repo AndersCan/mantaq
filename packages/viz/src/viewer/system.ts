@@ -344,17 +344,11 @@ function openButton(
 function receiverLine(machine: VizMachine, system: MachineSystem, link: SystemLink): string {
   const part = partOf(system, link.to ?? "");
   if (part === undefined) return "";
-  const all = statesOf(machine, part.id);
-  const where =
-    all.length === link.handledIn.length
-      ? "in every state"
-      : `in: ${link.handledIn.map(localName).join(", ")}`;
-  const taken = `${part.label} ${part.kind === "map" ? "take" : "takes"} it ${where}.`;
-  const ignored = all
-    .filter((state) => !state.final && !link.handledIn.includes(state.id))
-    .map((state) => state.label);
-  if (ignored.length === 0) return taken;
-  return `${taken} ${part.kind === "map" ? "They ignore" : "It ignores"} it in: ${ignored.join(", ")}.`;
+  const anyState = machine.edges.some(
+    (each) => each.event === link.event && isAnyState(each.from) && scopeOf(each.from) === part.id,
+  );
+  const where = anyState ? "in every state" : `in: ${link.handledIn.map(localName).join(", ")}`;
+  return `${part.label} ${part.kind === "map" ? "take" : "takes"} it ${where}.`;
 }
 
 function senderLine(machine: VizMachine, system: MachineSystem, link: SystemLink): string {

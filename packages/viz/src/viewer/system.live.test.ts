@@ -189,9 +189,7 @@ describe("system view", () => {
     expect(text(root, "[data-link-sender]")).toBe(
       "teamInbox sends ITEMS_ASSIGNED. On: ITEM_ARRIVED.",
     );
-    expect(text(root, "[data-link-receiver]")).toBe(
-      "workers take it in: free. They ignore it in: working.",
-    );
+    expect(text(root, "[data-link-receiver]")).toBe("workers take it in: free.");
     const buttons = [...root.querySelectorAll("[data-open-part]")].map((each) => each.textContent);
     expect(buttons).toEqual(["Open teamInbox", "Open workers at free"]);
   });
@@ -248,18 +246,6 @@ describe("system view", () => {
     expect(text(root, "[data-link-receiver]")).toBe("workers take it in every state.");
   });
 
-  test("a final state that ignores the event is not listed as ignoring it", () => {
-    const withFinal: VizMachine = {
-      ...pool,
-      states: [...pool.states, { ...state("workers.done"), final: true }],
-    };
-    const root = mount([withFinal]);
-    arrow(root, "ITEMS_ASSIGNED")?.dispatchEvent(new Event("click"));
-    expect(text(root, "[data-link-receiver]")).toBe(
-      "workers take it in: free. They ignore it in: working.",
-    );
-  });
-
   test("a step the receiver never ran does not turn the arrow pink", () => {
     const root = document.createElement("div");
     const driver: VizDriver = {
@@ -275,6 +261,37 @@ describe("system view", () => {
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] }, { driver });
     root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(false);
+  });
+
+  test("the step's own event turns its arrow pink when the receiver's actor took it", () => {
+    const root = document.createElement("div");
+    const driver: VizDriver = {
+      reset: () => snapshot(0),
+      step: () => {
+        const live = snapshot(1);
+        return {
+          ...live,
+          last: {
+            ...(live.last as VizLiveStep),
+            event: "ITEMS_ASSIGNED",
+            actor: { map: "workers", key: "w1" },
+          },
+          after: [],
+        };
+      },
+    };
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] }, { driver });
+    root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
+    expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(true);
+  });
+
+  test("back shows the arrow's Details, not the diagram edge Open selected", () => {
+    const root = mount([pool]);
+    arrow(root, "ITEMS_ASSIGNED")?.dispatchEvent(new Event("click"));
+    root.querySelectorAll<HTMLButtonElement>("[data-open-part]")[1]?.click();
+    root.querySelector<HTMLButtonElement>("[data-system-back]")?.click();
+    expect(root.querySelector("[data-selected-link]")).not.toBeNull();
+    expect(root.querySelector("[data-sends]")).toBeNull();
   });
 
   test("an arrow with no known sender edge opens its sender's first state", () => {
