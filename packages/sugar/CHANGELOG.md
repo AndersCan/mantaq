@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0
+
+<sub>2026-11-11</sub>
+
+- _(minor)_
+  Add `createPool`: one inbox and n workers with typed events, pull-based, failed work goes back to the front. `onOutput` now accepts an actor whose context is an `interface`.
+
 ## 2.1.1
 
 <sub>2026-11-08</sub>
