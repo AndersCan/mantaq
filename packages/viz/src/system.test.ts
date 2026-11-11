@@ -184,6 +184,58 @@ describe("systemOf", () => {
   });
 });
 
+describe("entries", () => {
+  const pool: VizMachine = {
+    ...base,
+    regions: ["workers"],
+    maps: ["workers"],
+    states: [state("empty"), state("workers.free")],
+    events: [
+      { id: "ARRIVED", internal: false, doc: null, payload: null },
+      { id: "BACK", internal: false, doc: null, payload: null },
+      { id: "RUN_DONE", internal: true, doc: null, payload: null },
+    ],
+    partOutputs: { workers: ["BACK"] },
+    edges: [
+      edge("empty", "ARRIVED"),
+      edge("empty", "BACK"),
+      edge("empty", "RUN_DONE"),
+      edge("workers.free", "ARRIVED"),
+      edge("workers.free", "BACK", ["BACK"]),
+    ],
+  };
+
+  test("an event the root handles that no link brings is an entry", () => {
+    expect(systemOf(pool).entries).toEqual([{ to: "", event: "ARRIVED" }]);
+  });
+
+  test("an event brought by a link, an internal event and a map's events are not entries", () => {
+    const events = systemOf(pool).entries.map((entry) => entry.event);
+    expect(events).not.toContain("BACK");
+    expect(events).not.toContain("RUN_DONE");
+    expect(systemOf(pool).entries.some((entry) => entry.to === "workers")).toBe(false);
+  });
+
+  test("entries are sorted and listed once per event", () => {
+    const machine: VizMachine = {
+      ...pool,
+      edges: [edge("empty", "ZED"), edge("empty", "ARRIVED"), edge("other", "ARRIVED")],
+    };
+    expect(systemOf(machine).entries).toEqual([
+      { to: "", event: "ARRIVED" },
+      { to: "", event: "ZED" },
+    ]);
+  });
+
+  test("a region has entries of its own", () => {
+    const machine: VizMachine = {
+      ...upload,
+      edges: [...upload.edges, edge("upload.waiting", "pick")],
+    };
+    expect(systemOf(machine).entries).toContainEqual({ to: "upload", event: "pick" });
+  });
+});
+
 describe("partOutputs in the document", () => {
   const doc: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [upload] };
 

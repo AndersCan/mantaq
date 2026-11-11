@@ -3,7 +3,7 @@ import type { EdgeLabel, GraphLabel, NodeLabel } from "@dagrejs/dagre";
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizActorRef, VizLiveState, VizLiveStep, VizMachine } from "../schema.ts";
 import { linksInside, systemOf } from "../system.ts";
-import type { MachineSystem, SystemLink, SystemPart } from "../system.ts";
+import type { MachineSystem, SystemEntry, SystemLink, SystemPart } from "../system.ts";
 import { localName } from "./compartments.ts";
 import { activatable, html, svg } from "./dom.ts";
 import { polyline } from "./layout.ts";
@@ -12,6 +12,8 @@ export type SystemSelection = { kind: "link"; id: string } | { kind: "part"; id:
 
 export interface SystemCallbacks {
   select(selection: SystemSelection): void;
+  /** Sends a root event as a pulsing arrow's click does. Unset without a driver: the entry lines are not clickable. */
+  send?(entry: SystemEntry): void;
 }
 
 /** Where the viewer goes from the system view: a state or an edge of the diagram, or nowhere in particular. */
@@ -21,6 +23,8 @@ const CHAR_WIDTH = 7;
 const NODE_HEIGHT = 48;
 const END_HEIGHT = 28;
 const LABEL_HEIGHT = 16;
+const ENTRY_NODE = "entry";
+const ENTRY_TEXT = "from outside";
 
 /** The system of a machine when it has arrows between parts, else null: the viewer then draws the diagram alone. */
 export function systemFor(machine: VizMachine): MachineSystem | null {
@@ -54,10 +58,69 @@ function chipWidth(machine: VizMachine, part: SystemPart): number {
   return Math.max(0, ...states.map((label) => label.length));
 }
 
+/** `p.` when 2 or more events share the text `p` before the first `.` and stay non-empty stripped; else "". */
+export function sharedPrefix(events: ReadonlyArray<string>): string {
+  const unique = [...new Set(events)];
+  const [first] = unique;
+  if (first === undefined || unique.length < 2) return "";
+  const dot = first.indexOf(".");
+  if (dot <= 0) return "";
+  const prefix = first.slice(0, dot + 1);
+  const shared = unique.every((event) => event.startsWith(prefix) && event.length > prefix.length);
+  return shared ? prefix : "";
+}
+
+/** The prefix every event name drawn in the system view shares, else "". */
+export function systemPrefix(system: MachineSystem): string {
+  return sharedPrefix([
+    ...system.links.map((link) => link.event),
+    ...system.entries.map((entry) => entry.event),
+  ]);
+}
+
+interface Pair {
+  key: string;
+  from: string;
+  /** null = leaves the machine. */
+  to: string | null;
+  links: SystemLink[];
+}
+
+/** One pair per `from>to`: its events are lines on one arrow. */
+function pairsOf(system: MachineSystem): Pair[] {
+  const pairs = new Map<string, Pair>();
+  for (const link of system.links) {
+    const key = `${link.from}>${link.to ?? "out"}`;
+    const pair = pairs.get(key) ?? { key, from: link.from, to: link.to, links: [] };
+    pair.links.push(link);
+    pairs.set(key, pair);
+  }
+  return [...pairs.values()];
+}
+
+/** The parts that take events from outside, each with its sorted events. */
+function entryGroups(system: MachineSystem): Array<{ to: string; events: string[] }> {
+  return system.parts.flatMap((part) => {
+    const events = system.entries
+      .filter((entry) => entry.to === part.id)
+      .map((entry) => entry.event);
+    return events.length === 0 ? [] : [{ to: part.id, events }];
+  });
+}
+
+function labelFor(lines: ReadonlyArray<string>): EdgeLabel {
+  return {
+    width: Math.max(...lines.map((line) => line.length)) * CHAR_WIDTH + 8,
+    height: LABEL_HEIGHT * lines.length,
+    labelpos: "c",
+  };
+}
+
 function placeLinks(
   machine: VizMachine,
   system: MachineSystem,
-): { graph: Graph<GraphLabel, NodeLabel, EdgeLabel>; ends: Map<string, string> } {
+  prefix: string,
+): { graph: Graph<GraphLabel, NodeLabel, EdgeLabel> } {
   const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({ multigraph: true });
   graph.setGraph({
     rankdir: "LR",
@@ -74,30 +137,38 @@ function placeLinks(
       height: NODE_HEIGHT,
     });
   }
-  const ends = new Map<string, string>();
-  for (const link of system.links) {
-    const key = linkKey(link);
-    const label: EdgeLabel = {
-      width: link.event.length * CHAR_WIDTH + 8,
-      height: LABEL_HEIGHT,
-      labelpos: "c",
-    };
-    if (link.to === null) {
-      ends.set(key, `end:${key}`);
-      graph.setNode(`end:${key}`, {
+  for (const pair of pairsOf(system)) {
+    const lines = pair.links.map((link) => link.event.slice(prefix.length));
+    if (pair.to === null) {
+      graph.setNode(`end:${pair.from}`, {
         width: endText(machine).length * CHAR_WIDTH + 16,
         height: END_HEIGHT,
       });
     }
     graph.setEdge(
-      `part:${link.from}`,
-      link.to === null ? `end:${key}` : `part:${link.to}`,
-      label,
-      key,
+      `part:${pair.from}`,
+      pair.to === null ? `end:${pair.from}` : `part:${pair.to}`,
+      labelFor(lines),
+      pair.key,
+    );
+  }
+  const groups = entryGroups(system);
+  if (groups.length > 0) {
+    graph.setNode(ENTRY_NODE, {
+      width: ENTRY_TEXT.length * CHAR_WIDTH + 24,
+      height: END_HEIGHT,
+    });
+  }
+  for (const group of groups) {
+    graph.setEdge(
+      ENTRY_NODE,
+      `part:${group.to}`,
+      labelFor(group.events.map((event) => event.slice(prefix.length))),
+      `in>${group.to}`,
     );
   }
   layout(graph);
-  return { graph, ends };
+  return { graph };
 }
 
 function endText(machine: VizMachine): string {
@@ -123,10 +194,10 @@ function partGroup(doc: Document, part: SystemPart, at: NodeLabel, callbacks: Sy
   return group;
 }
 
-function endMark(doc: Document, at: NodeLabel, text: string): SVGGElement {
+function endMark(doc: Document, at: NodeLabel, text: string, className: string): SVGGElement {
   const x = at.x ?? 0;
   const y = at.y ?? 0;
-  return svg(doc, "g", { class: "link-end" }, [
+  return svg(doc, "g", { class: className }, [
     svg(doc, "rect", {
       x: x - at.width / 2,
       y: y - at.height / 2,
@@ -138,56 +209,121 @@ function endMark(doc: Document, at: NodeLabel, text: string): SVGGElement {
   ]);
 }
 
-function linkGroup(
+/** Baseline of line `index` of `count` stacked lines centred on `y`. */
+function lineY(y: number, index: number, count: number): number {
+  return y - (LABEL_HEIGHT * count) / 2 + LABEL_HEIGHT * index + LABEL_HEIGHT - 4;
+}
+
+function lineText(doc: Document, text: string, at: { x: number; y: number }) {
+  return svg(doc, "text", { x: at.x, y: at.y, "text-anchor": "middle" }, [text]);
+}
+
+function pairGroup(
   doc: Document,
-  link: SystemLink,
+  pair: Pair,
   context: {
     graph: Graph<GraphLabel, NodeLabel, EdgeLabel>;
     machine: VizMachine;
     callbacks: SystemCallbacks;
     system: MachineSystem;
+    prefix: string;
   },
 ) {
-  const { graph, machine, callbacks, system } = context;
-  const key = linkKey(link);
-  const end = link.to === null ? `end:${key}` : `part:${link.to}`;
-  const placed = graph.edge(`part:${link.from}`, end, key);
-  const endNode = link.to === null ? graph.node(end) : null;
-  const group = svg(
+  const { graph, machine, callbacks, system, prefix } = context;
+  const end = pair.to === null ? `end:${pair.from}` : `part:${pair.to}`;
+  const placed = graph.edge(`part:${pair.from}`, end, pair.key);
+  const endNode = pair.to === null ? graph.node(end) : null;
+  const lines = pair.links.map((link, index) => {
+    const group = svg(
+      doc,
+      "g",
+      {
+        class: "edge link",
+        "data-link": linkKey(link),
+        "data-from": link.from,
+        "data-to": link.to ?? "",
+        "data-event": link.event,
+        ...(link.to === null ? { "data-link-out": "" } : {}),
+        "aria-label": `${link.event}: ${labelOf(system, link.from)} to ${link.to === null ? endText(machine) : labelOf(system, link.to)}`,
+      },
+      [
+        lineText(doc, link.event.slice(prefix.length), {
+          x: placed.x ?? 0,
+          y: lineY(placed.y ?? 0, index, pair.links.length),
+        }),
+      ],
+    );
+    activatable(group, () => callbacks.select({ kind: "link", id: linkKey(link) }));
+    return group;
+  });
+  return svg(
     doc,
     "g",
     {
-      class: "edge link",
-      "data-link": key,
-      "data-from": link.from,
-      "data-to": link.to ?? "",
-      "data-event": link.event,
-      ...(link.to === null ? { "data-link-out": "" } : {}),
-      "aria-label": `${link.event}: ${labelOf(system, link.from)} to ${link.to === null ? endText(machine) : labelOf(system, link.to)}`,
+      class: "edge link-pair",
+      "data-from": pair.from,
+      "data-to": pair.to ?? "",
+      ...(pair.to === null ? { "data-link-out": "" } : {}),
     },
     [
       svg(doc, "path", { d: polyline(placed.points ?? []), "marker-end": "url(#viz-arrow)" }),
-      svg(doc, "text", { x: placed.x ?? 0, y: (placed.y ?? 0) + 4, "text-anchor": "middle" }, [
-        link.event,
-      ]),
-      endNode === null ? null : endMark(doc, endNode, endText(machine)),
+      ...lines,
+      endNode === null ? null : endMark(doc, endNode, endText(machine), "link-end"),
     ],
   );
-  activatable(group, () => callbacks.select({ kind: "link", id: key }));
-  return group;
 }
 
-/** The system SVG: one box per part, one arrow per event between parts. Counts and colours come from `markSystem`. */
+function entryGroup(
+  doc: Document,
+  group: { to: string; events: string[] },
+  context: {
+    graph: Graph<GraphLabel, NodeLabel, EdgeLabel>;
+    callbacks: SystemCallbacks;
+    system: MachineSystem;
+    prefix: string;
+  },
+) {
+  const { graph, callbacks, system, prefix } = context;
+  const placed = graph.edge(ENTRY_NODE, `part:${group.to}`, `in>${group.to}`);
+  const { send } = callbacks;
+  const lines = group.events.map((event, index) => {
+    const line = svg(
+      doc,
+      "g",
+      {
+        class: "edge entry",
+        "data-entry-event": event,
+        "aria-label": `${event}: ${ENTRY_TEXT} to ${labelOf(system, group.to)}`,
+      },
+      [
+        lineText(doc, event.slice(prefix.length), {
+          x: placed.x ?? 0,
+          y: lineY(placed.y ?? 0, index, group.events.length),
+        }),
+      ],
+    );
+    if (send !== undefined) activatable(line, () => send({ event, to: group.to }));
+    return line;
+  });
+  return svg(doc, "g", { class: "edge link-in", "data-to": group.to }, [
+    svg(doc, "path", { d: polyline(placed.points ?? []), "marker-end": "url(#viz-arrow)" }),
+    ...lines,
+  ]);
+}
+
+/** The system SVG: one box per part, one arrow per direction between parts, a pill where work enters. Counts and colours come from `markSystem`. */
 export function renderSystem(
   doc: Document,
   machine: VizMachine,
   system: MachineSystem,
   callbacks: SystemCallbacks,
 ): SVGSVGElement {
-  const { graph } = placeLinks(machine, system);
+  const prefix = systemPrefix(system);
+  const { graph } = placeLinks(machine, system, prefix);
   const size = graph.graph();
   const width = Math.ceil(size.width ?? 0);
   const height = Math.ceil(size.height ?? 0);
+  const groups = entryGroups(system);
   return svg(
     doc,
     "svg",
@@ -218,7 +354,11 @@ export function renderSystem(
           [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head" })],
         ),
       ]),
-      ...system.links.map((link) => linkGroup(doc, link, { graph, machine, callbacks, system })),
+      groups.length === 0 ? null : endMark(doc, graph.node(ENTRY_NODE), ENTRY_TEXT, "link-start"),
+      ...groups.map((group) => entryGroup(doc, group, { graph, callbacks, system, prefix })),
+      ...pairsOf(system).map((pair) =>
+        pairGroup(doc, pair, { graph, machine, callbacks, system, prefix }),
+      ),
       ...system.parts.map((part) => partGroup(doc, part, graph.node(`part:${part.id}`), callbacks)),
     ],
   );
@@ -292,6 +432,7 @@ export function markSystem(
   const { machine, system, live, selection } = context;
   const took = tookKeys(system, live);
   const groups = [...root.querySelectorAll("g.part, g.link")];
+  const pairs = [...root.querySelectorAll("g.link-pair")];
   for (const part of system.parts) {
     const group = groups.find(
       (each) => each.classList.contains("part") && each.getAttribute("data-part") === part.id,
@@ -310,6 +451,17 @@ export function markSystem(
     if (key === null) continue;
     group.classList.toggle("took", took.has(key));
     group.classList.toggle("selected", selection?.kind === "link" && selection.id === key);
+  }
+  for (const pair of pairs) {
+    const lines = [...pair.querySelectorAll("g.link")];
+    pair.classList.toggle(
+      "took",
+      lines.some((line) => line.classList.contains("took")),
+    );
+    pair.classList.toggle(
+      "selected",
+      lines.some((line) => line.classList.contains("selected")),
+    );
   }
 }
 
