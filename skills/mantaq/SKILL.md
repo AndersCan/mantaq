@@ -9,7 +9,7 @@ allowed-tools: Read Grep Glob Edit Write Bash Shell
 
 Actor-model state machine library for TypeScript. `npm install @mantaq/core`. Minimal primitives: states + events, context, effects, regions, one injectable clock.
 
-**Written against:** `@mantaq/core` 0.7, `@mantaq/sugar` 2.1, `@mantaq/test` 2.1, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.32, `@mantaq/viz` 0.23. Sibling files share this stamp.
+**Written against:** `@mantaq/core` 0.7, `@mantaq/sugar` 2.2, `@mantaq/test` 2.1, `@mantaq/traversal` 0.3, `@mantaq/inspect` 0.33, `@mantaq/viz` 0.24. Sibling files share this stamp.
 
 ## Trust the installed package over this skill
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.24.0
+
+<sub>2026-11-11</sub>
+
+- _(minor)_
+  Record which parts of a machine talk. `VizMachine.partOutputs` (schema 16) holds the declared outputs of each region and actor map child, and `systemOf` joins them to the parts that handle them. A step that moves other parts says so: the Path reads `team.ITEM_ARRIVED {item a}, then w1: free → working`, and the panel says `Then w1 took team.ITEMS_ASSIGNED` instead of "came back".
+
+  Breaking: documents with `schemaVersion` 15 are refused; regenerate them. Hand-built `VizMachine` values need `partOutputs: {}`.
+
+- _(minor)_
+  The viewer opens on a system view when the parts of a machine (its regions and actor maps) send each other events: a box per part with its state, `workers ×3` with a count per state for a map, and an arrow per event between parts. A step turns the arrow that carried it pink. Click an arrow for who sends it and who takes it in which states, then Open to land on it in the part's diagram; `← System` comes back. Edges that send to another part say so in their Details.
+
+  Breaking: a machine whose parts link now opens on the system view instead of the diagram. That affects any embed of such a machine, such as the docs' photo-upload.
+
 ## 0.23.0
 
 <sub>2026-11-10</sub>
