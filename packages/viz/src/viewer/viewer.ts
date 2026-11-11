@@ -27,12 +27,10 @@ import {
   encodeLiveStep,
   encodeStep,
   asksForPayload,
-  payloadSamples,
 } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
-import { freshKeys, knownPayload } from "./fill.ts";
 import { drawChildMarkers } from "./markers.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
@@ -72,7 +70,6 @@ interface ViewState {
   /** Live: the region the open payload form sends to; undefined = the machine itself. */
   composingActor: VizActorRef | undefined;
   /** Live: an edge click opens the payload form instead of sending a known value. */
-  alwaysAsk: boolean;
   /** The "Events and time" fold is open; it stays as the user left it across steps and Back. */
   eventsOpen: boolean;
   /** Live: the child a click in the child graph goes to; null = the one that started first. */
@@ -492,7 +489,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     previous: undefined,
     composing: null,
     composingActor: undefined,
-    alwaysAsk: false,
     eventsOpen: false,
     picked: null,
     motion: false,
@@ -607,16 +603,6 @@ function liveOf(
   };
 }
 
-function knownFor(machine: VizMachine, event: string, view: ViewState) {
-  const known = knownPayload(machine.events.find((each) => each.id === event)?.payload ?? null, {
-    event,
-    samples: payloadSamples(machine, event),
-    steps: view.live?.steps ?? [],
-  });
-  if (known === undefined || view.live === null) return known;
-  return { payload: freshKeys(known.payload, { event, state: view.live }) };
-}
-
 /** Who an edge click sends to: the picked child, else the one that started first; "none" = no such child in the edge's source state. */
 function actorOf(
   machine: VizMachine,
@@ -639,7 +625,7 @@ function actorOf(
   return region === "" ? undefined : { region };
 }
 
-/** A live click on an edge sends at once with a payload the page already knows; Always ask (or nothing known) opens the form. */
+/** A live click on an edge sends at once when the event has no payload; otherwise it opens the form, and nothing is sent until Send. */
 function liveTake(
   machine: VizMachine,
   step: ExploreStep,
@@ -669,9 +655,7 @@ function sendEvent(
     handlers.send({ kind: "event", event, payload: null, ...withActor });
     return;
   }
-  const known = handlers.view.alwaysAsk ? undefined : knownFor(machine, event, handlers.view);
-  if (known === undefined) handlers.compose(event, actor);
-  else handlers.send({ kind: "event", event, payload: known.payload, ...withActor });
+  handlers.compose(event, actor);
 }
 
 /** An effect result that arrives later replaces the live state. */
@@ -814,25 +798,6 @@ function fullscreenButton(doc: Document, root: HTMLElement): HTMLButtonElement |
   return button;
 }
 
-function alwaysAskButton(doc: Document, view: ViewState): HTMLElement {
-  const button = html(
-    doc,
-    "button",
-    {
-      type: "button",
-      class: "always-ask",
-      "data-always-ask": "",
-      "aria-pressed": String(view.alwaysAsk),
-    },
-    ["Always ask"],
-  );
-  button.addEventListener("click", () => {
-    view.alwaysAsk = !view.alwaysAsk;
-    button.setAttribute("aria-pressed", String(view.alwaysAsk));
-  });
-  return button;
-}
-
 /** What the header and the Controls tab are built from. */
 interface Chrome {
   root: HTMLElement;
@@ -891,7 +856,7 @@ function headerOf(doc: Document, context: Chrome): HTMLElement {
   ]);
 }
 
-/** The Controls tab: Coverage from (when a mode has data), Full screen (where the browser allows), Always ask (live, a payload event), Diagram only. */
+/** The Controls tab: Coverage from (when a mode has data), Full screen (where the browser allows), Diagram only. */
 function controlsOf(doc: Document, context: Chrome): HTMLElement {
   const { root, machine, view, render } = context;
   const diagramOnly = html(doc, "button", { type: "button", class: "diagram-only-toggle" }, [
@@ -909,9 +874,6 @@ function controlsOf(doc: Document, context: Chrome): HTMLElement {
       },
     }),
     fullscreenButton(doc, root),
-    context.live && machine.events.some((each) => asksForPayload(machine, each.id))
-      ? alwaysAskButton(doc, view)
-      : null,
     diagramOnly,
   ]);
 }
