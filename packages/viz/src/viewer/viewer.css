@@ -309,6 +309,11 @@
   stroke-width: 1.5;
 }
 
+.viz .edge .edge-condition {
+  font-size: 0.85em;
+  fill: var(--muted);
+}
+
 .viz .edge.internal path {
   stroke-dasharray: 1 var(--viz-dot-gap, 3);
   stroke-linecap: round;

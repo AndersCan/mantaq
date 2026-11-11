@@ -368,3 +368,37 @@ describe("map-child states", () => {
     expect(plain?.width).toBeLessThan(168);
   });
 });
+
+describe("two-line edge labels", () => {
+  test("guarded parallel edges keep their labels two lines apart", () => {
+    const analyzed = {
+      status: "analyzed",
+      location: { file: "a.ts", line: 1, column: 1 },
+      registration: "on",
+      branches: [
+        { conditions: ["ok"], target: { kind: "state", state: "b" } },
+        { conditions: ["!(ok)"], target: { kind: "stay" } },
+      ],
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    } as VizEdge["explanation"];
+    const pair = (explanation: VizEdge["explanation"]) =>
+      layoutMachine(
+        machineOf(
+          ["first", "b"],
+          [
+            { ...edge({ from: "first", event: "pay", target: "b" }), explanation },
+            { ...edge({ from: "first", event: "pay2", target: "b" }), explanation },
+          ],
+        ),
+      );
+    const spread = (layout: ReturnType<typeof pair>) =>
+      Math.abs((layout.edges[0]?.label.y ?? 0) - (layout.edges[1]?.label.y ?? 0));
+    expect(spread(pair(analyzed))).toBeGreaterThanOrEqual(32);
+    expect(spread(pair(null))).toBeLessThan(32);
+  });
+});

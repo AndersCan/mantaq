@@ -47,3 +47,52 @@ describe("renderGraph width", () => {
     expect(Number(match?.[2])).toBeCloseTo((units * 1.4) / 12, 0);
   });
 });
+
+describe("renderGraph guard condition", () => {
+  const analyzed = {
+    status: "analyzed",
+    location: { file: "a.ts", line: 1, column: 1 },
+    registration: "on",
+    branches: [
+      { conditions: ["ok"], target: { kind: "state", state: "busy" } },
+      { conditions: ["!(ok)"], target: { kind: "stay" } },
+    ],
+    payloadReads: [],
+    contextReads: [],
+    contextWrites: [],
+    readsActorState: false,
+    comparisons: [],
+    literals: [],
+  };
+  const guarded = {
+    ...machine,
+    edges: [
+      {
+        id: "idle-go-busy",
+        from: "idle",
+        event: "go",
+        to: "busy",
+        kind: "transition",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: analyzed,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+    ],
+  } as unknown as VizMachine;
+
+  test("the condition is a second line on the arrow and in its aria-label", () => {
+    const graph = renderGraph(document, guarded, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    const edge = graph.querySelector('g.edge[data-edge-id="idle-go-busy"]');
+    expect(edge?.querySelector(".edge-condition")?.textContent).toBe("ok");
+    expect(edge?.querySelector("tspan")?.textContent).toBe("go");
+    expect(edge?.getAttribute("aria-label")).toBe("idle on go to busy when ok");
+  });
+});

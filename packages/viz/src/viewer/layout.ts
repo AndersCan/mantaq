@@ -1,6 +1,6 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { edgeText } from "./labels.ts";
+import { edgeLines } from "./labels.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -144,6 +144,14 @@ function addAnyNodes(graph: LayoutGraph, machine: VizMachine): void {
   }
 }
 
+function labelSize(edge: VizEdge): { width: number; height: number } {
+  const lines = edgeLines(edge);
+  return {
+    width: Math.max(...lines.map((line) => line.length)) * CHAR_WIDTH + 8,
+    height: LABEL_HEIGHT * lines.length,
+  };
+}
+
 function addEdges(graph: LayoutGraph, machine: VizMachine): void {
   for (const edge of machine.edges) {
     if (edge.kind === "initial" || edge.kind === "effect" || edge.to === edge.from) continue;
@@ -154,8 +162,7 @@ function addEdges(graph: LayoutGraph, machine: VizMachine): void {
       if (region !== null) graph.setParent(target, regionNodeId(region));
     }
     const label: EdgeLabel = {
-      width: edgeText(edge).length * CHAR_WIDTH + 8,
-      height: LABEL_HEIGHT,
+      ...labelSize(edge),
       labelpos: "c",
     };
     graph.setEdge(edge.from, target, label, edge.id);
@@ -275,8 +282,7 @@ function avoidLabelCollisions(edges: PlacedEdge[]): PlacedEdge[] {
   const moved = separateLabels(
     edges.map((placed) => ({
       ...placed.label,
-      width: edgeText(placed.edge).length * CHAR_WIDTH + 8,
-      height: LABEL_HEIGHT,
+      ...labelSize(placed.edge),
     })),
   );
   return edges.map((placed, index) => ({
