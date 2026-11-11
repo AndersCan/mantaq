@@ -1,0 +1,38 @@
+{
+  "teamInbox": [
+    {
+      "name": "Four items, three workers",
+      "end": "holding",
+      "steps": [
+        {
+          "kind": "event",
+          "event": "team.ITEM_ARRIVED",
+          "payload": {
+            "item": "a"
+          }
+        },
+        {
+          "kind": "event",
+          "event": "team.ITEM_ARRIVED",
+          "payload": {
+            "item": "b"
+          }
+        },
+        {
+          "kind": "event",
+          "event": "team.ITEM_ARRIVED",
+          "payload": {
+            "item": "c"
+          }
+        },
+        {
+          "kind": "event",
+          "event": "team.ITEM_ARRIVED",
+          "payload": {
+            "item": "d"
+          }
+        }
+      ]
+    }
+  ]
+}

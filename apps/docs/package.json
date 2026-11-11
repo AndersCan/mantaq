@@ -25,6 +25,7 @@
     "starlight-llms-txt": "catalog:"
   },
   "devDependencies": {
+    "@typescript/native-preview": "catalog:",
     "remark-gfm": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
