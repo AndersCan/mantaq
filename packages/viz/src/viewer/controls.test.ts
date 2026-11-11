@@ -116,6 +116,13 @@ describe("Diagram only", () => {
     root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
     expect(root.querySelector(".viz-header")).not.toBeNull();
   });
+
+  test("with the diagramOnly option, Show controls opens the Step tab", () => {
+    const root = mount({ diagramOnly: true });
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    const shown = root.querySelector('[role="tab"][aria-selected="true"]');
+    expect(shown?.textContent).toBe("Step");
+  });
 });
 
 describe("Diagram only, after a canvas click", () => {

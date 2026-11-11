@@ -195,7 +195,7 @@ export function mountViewer(
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
 
-  const setDiagramOnly = diagramOnlySwitch(root, view, () => render());
+  const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
     root.replaceChildren();
@@ -376,15 +376,16 @@ function detailsOf(
   );
 }
 
-/** Turns Diagram only on or off, then puts focus on the button that undoes it. */
+/** Turns Diagram only on or off (Show controls opens the Step tab when the page asked for Diagram only, else Controls), then puts focus on the button that undoes it. */
 function diagramOnlySwitch(
   root: HTMLElement,
   view: ViewState,
   render: () => void,
+  fromOption: boolean | undefined,
 ): (on: boolean) => void {
   return (on) => {
     view.diagramOnly = on;
-    if (!on) view.tab = "controls";
+    if (!on) view.tab = fromOption === true ? "step" : "controls";
     render();
     root
       .querySelector<HTMLElement>(on ? "[data-show-controls]" : "[data-diagram-only]")
