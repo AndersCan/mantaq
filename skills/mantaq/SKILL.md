@@ -78,6 +78,10 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 - **Every journey ends in a named outcome**, success included. One state per way it can end. Never fall back to the start state to mean done. Mark the outcome final when the actor's work is over. An actor reused for the next attempt keeps it non-final and says so in its JSDoc. Exception: a cyclic controller (traffic light) has no outcome or final state; every state must be on the cycle, reachable back to the start.
 - Test with `VirtualClock` and the `@mantaq/test` harness. See `testing.md`.
 
+## Hand a machine to a builder
+
+To build an app or feature from a machine, or to give it to another agent, write its brief instead of describing it from memory: `machineBrief` from `@mantaq/inspect` (0.33 or later) turns `inspectFile`'s machines into Markdown (start state, arrows with conditions, entry effects, ignored events, event payloads). Keep it true with a test, `inspectFile` taking an absolute path: `await expect(machines.map(machineBrief).join("\n")).toMatchFileSnapshot("./<machine>-brief.md")`. Paste the brief in the reply; never retype it.
+
 ## Live design
 
 To set mantaq up, design or explain a machine with the live viz page, read `designing.md`.
