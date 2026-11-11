@@ -38,6 +38,7 @@ const machine: VizMachine = {
       explanation: null,
       doc: null,
       coverage: null,
+      tested: null,
     },
   ],
   fuzz: null,
@@ -49,10 +50,10 @@ afterEach(() => {
   Reflect.deleteProperty(document, "fullscreenEnabled");
 });
 
-function mount(options: { diagramOnly?: boolean } = {}): HTMLElement {
+function mount(options: { diagramOnly?: boolean } = {}, shown: VizMachine = machine): HTMLElement {
   const root = document.createElement("div");
   document.body.append(root);
-  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, options);
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shown] }, options);
   return root;
 }
 
@@ -161,5 +162,36 @@ describe("Diagram only, after a canvas click", () => {
     expect(shown?.textContent).toBe("Controls");
     expect(document.activeElement).toBe(root.querySelector("[data-diagram-only]"));
     expect(document.activeElement?.closest("[hidden]")).toBeNull();
+  });
+});
+
+describe("Coverage from picker", () => {
+  const fresh = (): VizMachine => structuredClone(machine);
+  const covered = (): VizMachine => {
+    const copy = fresh();
+    copy.states = copy.states.map((state) => ({ ...state, coverage: { hits: 1 } }));
+    return copy;
+  };
+
+  test("is in the Controls tab, not the header, when a mode has data", () => {
+    const root = mount({}, covered());
+    expect(root.querySelector('[data-tab-panel="controls"] .coverage-mode')).not.toBeNull();
+    expect(root.querySelector(".viz-header .coverage-mode")).toBeNull();
+    expect(root.querySelector(".viz-header")?.textContent).toContain("Viz: door");
+  });
+
+  test("is absent everywhere without coverage data", () => {
+    const root = mount({}, fresh());
+    expect(root.querySelector(".coverage-mode")).toBeNull();
+  });
+});
+
+describe("Coverage from picker, order", () => {
+  test("is the first item in the Controls tab", () => {
+    const shown = structuredClone(machine);
+    shown.states = shown.states.map((state) => ({ ...state, coverage: { hits: 1 } }));
+    const root = mount({}, shown);
+    const first = root.querySelector('[data-tab-panel="controls"] .controls')?.firstElementChild;
+    expect(first?.querySelector(".coverage-mode")).not.toBeNull();
   });
 });

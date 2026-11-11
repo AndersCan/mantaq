@@ -818,14 +818,6 @@ function headerOf(doc: Document, context: Chrome): HTMLElement {
             render();
           },
         }),
-    coveragePicker(doc, {
-      machine,
-      mode: context.mode,
-      onChange: (next) => {
-        view.coverage = next;
-        render();
-      },
-    }),
     html(
       doc,
       "a",
@@ -835,15 +827,23 @@ function headerOf(doc: Document, context: Chrome): HTMLElement {
   ]);
 }
 
-/** The Controls tab: Full screen (where the browser allows), Always ask (live, a payload event), Diagram only. */
+/** The Controls tab: Coverage from (when a mode has data), Full screen (where the browser allows), Always ask (live, a payload event), Diagram only. */
 function controlsOf(doc: Document, context: Chrome): HTMLElement {
-  const { root, machine, view } = context;
+  const { root, machine, view, render } = context;
   const diagramOnly = html(doc, "button", { type: "button", class: "diagram-only-toggle" }, [
     "Diagram only",
   ]);
   diagramOnly.setAttribute("data-diagram-only", "");
   diagramOnly.addEventListener("click", () => context.setDiagramOnly(true));
   return html(doc, "div", { class: "controls" }, [
+    coveragePicker(doc, {
+      machine,
+      mode: context.mode,
+      onChange: (next) => {
+        view.coverage = next;
+        render();
+      },
+    }),
     fullscreenButton(doc, root),
     context.live && machine.events.some((each) => asksForPayload(machine, each.id))
       ? alwaysAskButton(doc, view)
