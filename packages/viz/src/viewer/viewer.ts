@@ -376,7 +376,7 @@ function detailsOf(
   );
 }
 
-/** Turns Diagram only on or off (Show controls opens the Step tab when the page asked for Diagram only, else Controls), then puts focus on the button that undoes it. */
+/** Turns Diagram only on or off (Show controls opens the Step tab when the page asked for Diagram only, else Controls), then puts focus on the Step tab or the button that undoes it. */
 function diagramOnlySwitch(
   root: HTMLElement,
   view: ViewState,
@@ -385,11 +385,15 @@ function diagramOnlySwitch(
 ): (on: boolean) => void {
   return (on) => {
     view.diagramOnly = on;
-    if (!on) view.tab = fromOption === true ? "step" : "controls";
+    const toStep = !on && fromOption === true;
+    if (!on) view.tab = toStep ? "step" : "controls";
     render();
-    root
-      .querySelector<HTMLElement>(on ? "[data-show-controls]" : "[data-diagram-only]")
-      ?.focus({ preventScroll: true });
+    const target = on
+      ? "[data-show-controls]"
+      : toStep
+        ? '[role="tab"][aria-selected="true"]'
+        : "[data-diagram-only]";
+    root.querySelector<HTMLElement>(target)?.focus({ preventScroll: true });
   };
 }
 

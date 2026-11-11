@@ -123,6 +123,21 @@ describe("Diagram only", () => {
     const shown = root.querySelector('[role="tab"][aria-selected="true"]');
     expect(shown?.textContent).toBe("Step");
   });
+
+  test("with the diagramOnly option, Show controls leaves focus on a shown control", () => {
+    const root = mount({ diagramOnly: true });
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(root.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.closest("[hidden]")).toBeNull();
+    expect(document.activeElement?.getAttribute("role")).toBe("tab");
+  });
+
+  test("without the option, Show controls focuses the Diagram only button", () => {
+    const root = mount({});
+    root.querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(document.activeElement?.hasAttribute("data-diagram-only")).toBe(true);
+  });
 });
 
 describe("Diagram only, after a canvas click", () => {
