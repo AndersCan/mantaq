@@ -18,3 +18,17 @@ test("Four items, three workers", async () => {
     .filter((id) => pool.workers.get(id)?.state.name === "working");
   expect(working).toEqual(["w1", "w2", "w3"]);
 });
+
+test("A worker runs an item for one second on the pool's clock", async () => {
+  const clock = VirtualClock();
+  const pool = createTeamInbox({ clock });
+  pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
+  await pool.actor.settled();
+  expect(pool.workers.get("w1")?.state.name).toBe("working");
+  clock.advance(999);
+  await pool.actor.settled();
+  expect(pool.workers.get("w1")?.state.name).toBe("working");
+  clock.advance(1);
+  await pool.actor.settled();
+  expect(pool.workers.get("w1")?.state.name).toBe("free");
+});
