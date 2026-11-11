@@ -10,12 +10,12 @@ import type { AddressInfo } from "node:net";
 import { extname, join, resolve, sep } from "node:path";
 
 export type SiteCheck = { pages: number; failures: string[] };
-export type SiteCheckOptions = { links?: string[]; site?: string };
+export type SiteCheckOptions = { links?: string[]; site?: string; overview?: string };
 
 type WalkLink = { where: string; text: string; target: URL };
 type Viewer = { src: string; ids: string[]; label: string };
 type Box = { id: string; href: string };
-type Scan = { viewers: Viewer[]; boxes: Box[] };
+type Scan = { viewers: Viewer[]; boxes: Box[]; overview: boolean };
 type Site = { dir: string; base: string; origin: string };
 type PageResult = { scan: Scan | undefined; problems: string[] };
 
@@ -129,7 +129,8 @@ async function scan(page: PwPage): Promise<Scan> {
     const boxes = [...document.querySelectorAll<HTMLAnchorElement>(".mantaq-machines a.box")].map(
       (a) => ({ id: a.dataset["machine"] ?? "", href: a.getAttribute("href") ?? "" }),
     );
-    return { viewers, boxes };
+    const overview = document.querySelector(".mantaq-machines") !== null;
+    return { viewers, boxes, overview };
   });
 }
 
@@ -374,6 +375,21 @@ function linksToCheck(
   return Either.right({ siteUrl: parsed, links: read[1] });
 }
 
+function checkOverview(
+  base: string,
+  path: string | undefined,
+  opened: Map<string, Scan>,
+): string[] {
+  if (path === undefined) {
+    return [];
+  }
+  const url = `${base}${path}`;
+  if (opened.get(url)?.overview === true) {
+    return [];
+  }
+  return [`${url}: --overview names this page, but it shows no machine overview (<Machines>)`];
+}
+
 export async function checkSite(
   dirArg: string,
   baseArg: string,
@@ -429,6 +445,7 @@ export async function checkSite(
     for (const [url, found] of opened) {
       failures.push(...checkBoxes(site, url, found.boxes, opened));
     }
+    failures.push(...checkOverview(base, options.overview, opened));
     failures.push(...(await checkWalkLinks(browser, site, siteUrl, links)));
   } finally {
     await browser.close();
