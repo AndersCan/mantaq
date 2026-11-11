@@ -3,7 +3,7 @@ import type { EdgeLabel, GraphLabel, NodeLabel } from "@dagrejs/dagre";
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizActorRef, VizLiveState, VizLiveStep, VizMachine } from "../schema.ts";
 import { linksInside, systemOf } from "../system.ts";
-import type { MachineSystem, SystemLink, SystemPart } from "../system.ts";
+import type { MachineSystem, SystemEntry, SystemLink, SystemPart } from "../system.ts";
 import { localName } from "./compartments.ts";
 import { activatable, html, svg } from "./dom.ts";
 import { polyline } from "./layout.ts";
@@ -13,7 +13,7 @@ export type SystemSelection = { kind: "link"; id: string } | { kind: "part"; id:
 export interface SystemCallbacks {
   select(selection: SystemSelection): void;
   /** Sends a root event as a pulsing arrow's click does. Unset without a driver: the entry lines are not clickable. */
-  send?(event: string): void;
+  send?(entry: SystemEntry): void;
 }
 
 /** Where the viewer goes from the system view: a state or an edge of the diagram, or nowhere in particular. */
@@ -260,7 +260,7 @@ function pairGroup(
     doc,
     "g",
     {
-      class: "link-pair",
+      class: "edge link-pair",
       "data-from": pair.from,
       "data-to": pair.to ?? "",
       ...(pair.to === null ? { "data-link-out": "" } : {}),
@@ -302,10 +302,10 @@ function entryGroup(
         }),
       ],
     );
-    if (send !== undefined) activatable(line, () => send(event));
+    if (send !== undefined) activatable(line, () => send({ event, to: group.to }));
     return line;
   });
-  return svg(doc, "g", { class: "link-in", "data-to": group.to }, [
+  return svg(doc, "g", { class: "edge link-in", "data-to": group.to }, [
     svg(doc, "path", { d: polyline(placed.points ?? []), "marker-end": "url(#viz-arrow)" }),
     ...lines,
   ]);
@@ -457,6 +457,10 @@ export function markSystem(
     pair.classList.toggle(
       "took",
       lines.some((line) => line.classList.contains("took")),
+    );
+    pair.classList.toggle(
+      "selected",
+      lines.some((line) => line.classList.contains("selected")),
     );
   }
 }

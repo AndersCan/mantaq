@@ -126,12 +126,15 @@ function snapshot(arrived: number): VizLiveState {
   };
 }
 
-function mount(machines: VizMachine[], live = true) {
+function mount(machines: VizMachine[], live = true, steps: VizStep[] = []) {
   const root = document.createElement("div");
   let arrived = 0;
   const driver: VizDriver = {
     reset: () => snapshot((arrived = 0)),
-    step: () => snapshot(++arrived),
+    step: (step) => {
+      steps.push(step);
+      return snapshot(++arrived);
+    },
   };
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines }, live ? { driver } : {});
   return root;
@@ -428,5 +431,127 @@ describe("sharedPrefix", () => {
     expect(sharedPrefix([".A", ".B"])).toBe("");
     expect(sharedPrefix(["team.A", "other.B"])).toBe("");
     expect(sharedPrefix(["team.", "team.B"])).toBe("");
+  });
+});
+
+describe("pool view arrows: attacked", () => {
+  const pairOf = (root: HTMLElement, from: string, to: string) =>
+    root.querySelector(`g.link-pair[data-from="${from}"][data-to="${to}"]`);
+  const lineY = (line: Element | null | undefined) =>
+    Number(line?.querySelector("text")?.getAttribute("y"));
+
+  test("the pill sends its own event to the root", () => {
+    const steps: VizStep[] = [];
+    const root = mount([pool], true, steps);
+    root.querySelector('[data-entry-event="ITEM_ARRIVED"]')?.dispatchEvent(new Event("click"));
+    expect(steps).toEqual([{ kind: "event", event: "ITEM_ARRIVED", payload: null }]);
+  });
+
+  const lanes: VizMachine = {
+    ...pool,
+    regions: ["workers", "net"],
+    states: [...pool.states, state("net.up", true), state("net.down")],
+    events: [...pool.events, event("DROP"), event("RESTORE")],
+    edges: [
+      ...pool.edges,
+      edge("net.up", "DROP", "net.down"),
+      edge("net.down", "RESTORE", "net.up"),
+    ],
+  };
+
+  test("an entry line into a region sends to that region", () => {
+    const steps: VizStep[] = [];
+    const root = mount([lanes], true, steps);
+    root.querySelector('[data-entry-event="DROP"]')?.dispatchEvent(new Event("click"));
+    expect(steps).toEqual([
+      { kind: "event", event: "DROP", payload: null, actor: { region: "net" } },
+    ]);
+  });
+
+  test("the root's entries leave out region events and keep only its own", () => {
+    const root = mount([lanes]);
+    const events = [...root.querySelectorAll('g.link-in[data-to=""] [data-entry-event]')].map(
+      (line) => line.getAttribute("data-entry-event"),
+    );
+    expect(events).toEqual(["ITEM_ARRIVED"]);
+  });
+
+  test("a pair is pink when one of its lines took and the other did not", () => {
+    const mixed: VizMachine = {
+      ...pool,
+      events: [...pool.events, event("ITEMS_HELD")],
+      outputs: ["ITEMS_ASSIGNED", "ITEMS_HELD", "LOST"],
+      edges: [
+        edge("empty", "ITEM_ARRIVED", "holding", ["ITEMS_ASSIGNED", "ITEMS_HELD"]),
+        ...pool.edges.slice(1),
+        edge("workers.free", "ITEMS_HELD", "workers.free"),
+      ],
+    };
+    const root = mount([mixed]);
+    root.querySelector('[data-entry-event="ITEM_ARRIVED"]')?.dispatchEvent(new Event("click"));
+    const into = pairOf(root, "", "workers");
+    expect(into?.querySelectorAll("g.link")).toHaveLength(2);
+    expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(true);
+    expect(arrow(root, "ITEMS_HELD")?.classList.contains("took")).toBe(false);
+    expect(into?.classList.contains("took")).toBe(true);
+  });
+
+  test("every arrow path sits in a .edge group so it keeps the arrow style", () => {
+    const root = mount([pool]);
+    const paths = [...root.querySelectorAll("svg path:not(.arrow-head)")];
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.filter((path) => path.closest(".edge") === null)).toHaveLength(0);
+  });
+
+  test("selecting a line turns its pair teal", () => {
+    const root = mount([pool]);
+    root.querySelector('g.link[data-event="ITEMS_ASSIGNED"]')?.dispatchEvent(new Event("click"));
+    expect(pairOf(root, "", "workers")?.classList.contains("selected")).toBe(true);
+    expect(pairOf(root, "workers", "")?.classList.contains("selected")).toBe(false);
+  });
+
+  const stacked: VizMachine = {
+    ...pool,
+    partOutputs: { workers: ["WORK_DONE", "WORK_FAILED", "WORK_LOST"] },
+    edges: [
+      ...pool.edges,
+      edge("holding", "WORK_FAILED", "empty"),
+      edge("holding", "WORK_LOST", "empty"),
+    ],
+  };
+
+  test("stacked lines sit one row apart", () => {
+    const root = mount([stacked]);
+    const lines = [...(pairOf(root, "workers", "")?.querySelectorAll("g.link") ?? [])];
+    expect(lines).toHaveLength(3);
+    expect(lineY(lines[1]) - lineY(lines[0])).toBe(16);
+    expect(lineY(lines[2]) - lineY(lines[1])).toBe(16);
+  });
+
+  test("a part's entry shows although another part links into it", () => {
+    const both: VizMachine = {
+      ...pool,
+      edges: [...pool.edges, edge("empty", "WORK_DONE", "empty")],
+    };
+    const root = mount([both]);
+    expect(root.querySelector('[data-entry-event="ITEM_ARRIVED"]')).not.toBeNull();
+  });
+
+  test("entry text drops the shared prefix; an unshared entry keeps its name", () => {
+    const prefixed: VizMachine = {
+      ...pool,
+      events: [event("team.ITEM_ARRIVED"), event("team.ITEMS_ASSIGNED"), event("team.WORK_DONE")],
+      outputs: ["team.ITEMS_ASSIGNED"],
+      partOutputs: { workers: ["team.WORK_DONE"] },
+      edges: [
+        edge("empty", "team.ITEM_ARRIVED", "holding", ["team.ITEMS_ASSIGNED"]),
+        edge("holding", "team.WORK_DONE", "empty"),
+        edge("workers.free", "team.ITEMS_ASSIGNED", "workers.working", ["team.WORK_DONE"]),
+      ],
+    };
+    const root = mount([prefixed]);
+    const entry = root.querySelector('[data-entry-event="team.ITEM_ARRIVED"]');
+    expect(entry?.textContent).toBe("ITEM_ARRIVED");
+    expect(entry?.getAttribute("aria-label")).toContain("team.ITEM_ARRIVED");
   });
 });

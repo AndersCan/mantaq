@@ -906,13 +906,8 @@
   fill: var(--muted);
 }
 
-.viz .link-pair.took path {
-  stroke: var(--accent);
-  stroke-width: 2.5;
-}
-
-.viz .edge.entry {
-  cursor: pointer;
+.viz .edge.entry:not([tabindex]) {
+  cursor: default;
 }
 
 .viz .viz-key {

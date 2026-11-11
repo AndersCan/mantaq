@@ -333,7 +333,12 @@ function systemCallbacks(context: {
   if (live === null) return { select };
   return {
     select,
-    send: (event) => sendEvent(machine, event, { actor: undefined, ...live, view }),
+    send: ({ event, to }) =>
+      sendEvent(machine, event, {
+        actor: to === "" ? undefined : { region: to },
+        ...live,
+        view,
+      }),
   };
 }
 
@@ -842,7 +847,9 @@ function backToSystem(doc: Document, context: Chrome): HTMLElement | null {
   button.addEventListener("click", () => {
     view.drilled = false;
     context.render();
-    context.root.querySelector<HTMLElement>(".graph .selected")?.focus({ preventScroll: true });
+    context.root
+      .querySelector<HTMLElement>(".graph .selected[tabindex]")
+      ?.focus({ preventScroll: true });
   });
   return button;
 }
