@@ -217,4 +217,21 @@ describe("system view: branches no other test pins", () => {
     root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(false);
   });
+
+  test("a * edge for another event does not make the receiver take an arrow in every state", () => {
+    const other: VizMachine = { ...pool, edges: [...pool.edges, edge("*", "FINISH", "empty")] };
+    const root = mount([other]);
+    arrow(root, "WORK_DONE")?.dispatchEvent(new Event("click"));
+    expect(text(root, "[data-link-receiver]")).toBe("teamInbox takes it in: holding.");
+  });
+
+  test("a * edge in another part does not make the receiver take an arrow in every state", () => {
+    const elsewhere: VizMachine = {
+      ...pool,
+      edges: [...pool.edges, edge("workers.*", "WORK_DONE", "workers.free")],
+    };
+    const root = mount([elsewhere]);
+    arrow(root, "WORK_DONE")?.dispatchEvent(new Event("click"));
+    expect(text(root, "[data-link-receiver]")).toBe("teamInbox takes it in: holding.");
+  });
 });

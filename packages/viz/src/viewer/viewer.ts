@@ -363,7 +363,7 @@ function detailsOf(
   return (
     shown ??
     renderPanel(doc, machine, {
-      selection: system === null ? view.selection : null,
+      selection: view.selection,
       select: context.select,
       replay: context.replay,
       sends:
