@@ -60,6 +60,7 @@ const photoQueue: VizMachine = {
   ],
   events: [event("uploadConfirmed"), event("uploadFailed"), event("retryPressed")],
   outputs: [],
+  partOutputs: {},
   context: null,
   edges: [
     edge("photos.sendingPhoto", "uploadConfirmed", "photos.photoSent"),
@@ -835,6 +836,211 @@ describe("live actor map children", () => {
       expect(root.querySelector('[data-rewind="1"]')?.textContent).toBe(
         "queueCleared → p1, p2, p3 and 1 more removed",
       );
+    });
+
+    const childMoved = (key: string, from: string, to: string): VizLiveStep => ({
+      ...stepOf("photoAdded", `photos.${from}`, `photos.${to}`, "transition"),
+      actor: { map: "photos", key },
+    });
+    const rootMoved: VizLiveStep = {
+      ...stepOf("photoDone", "showingQueue", "showingQueue", "transition"),
+      actor: undefined,
+    };
+
+    test("a step that moved a child names it on the Path", () => {
+      const root = scripted(
+        [
+          {
+            children: [child("p1", "photoSent", 0)],
+            last: rootStay("photoAdded"),
+            after: [childMoved("p1", "sendingPhoto", "photoSent")],
+          },
+        ],
+        ["photoAdded"],
+      );
+      expect(pathTexts(root)).toEqual(["start", "photoAdded, then p1: sendingPhoto → photoSent"]);
+    });
+
+    test("a later move of the step's own part is named too, and past three they are counted", () => {
+      const root = scripted(
+        [
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [
+              rootMoved,
+              childMoved("p1", "a", "b"),
+              childMoved("p2", "a", "b"),
+              childMoved("p3", "a", "b"),
+              childMoved("p4", "a", "b"),
+              { ...childMoved("p5", "a", "a"), outcome: "stay" },
+            ],
+          },
+        ],
+        ["photoAdded"],
+      );
+      expect(pathTexts(root)[1]).toBe(
+        "photoAdded, then photoQueue: showingQueue → showingQueue; p1: a → b; p2: a → b and 2 more",
+      );
+    });
+
+    test("the panel says a child took the event; the step's own part came back", () => {
+      const root = scripted(
+        [
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [childMoved("p1", "sendingPhoto", "photoSent"), rootMoved],
+          },
+        ],
+        ["photoAdded"],
+      );
+      const entries = [...root.querySelectorAll("[data-live-after] > p.muted")].map(
+        (each) => each.textContent,
+      );
+      expect(entries).toEqual([
+        "Then p1 took photoAdded: sendingPhoto → photoSent",
+        "Then photoDone came back",
+      ]);
+    });
+
+    test("review: data-live-cascade marks only a step after which another part moved", () => {
+      const root = scripted(
+        [
+          { children: [], last: rootStay("photoAdded"), after: [] },
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [{ ...childMoved("p1", "a", "a"), outcome: "stay" }],
+          },
+          { children: [], last: rootStay("photoAdded"), after: [childMoved("p1", "a", "b")] },
+        ],
+        ["photoAdded", "photoAdded", "photoAdded"],
+      );
+      const marked = [...root.querySelectorAll("[data-live-cascade]")].map((each) =>
+        each.getAttribute("data-rewind"),
+      );
+      expect(marked).toEqual(["3"]);
+    });
+
+    test("a stay on another part shows no arrow, and a region is named by its path", () => {
+      const root = scripted(
+        [
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [
+              { ...childMoved("p1", "a", "a"), outcome: "stay" },
+              { ...rootMoved, actor: { region: "upload" }, outcome: "transition" },
+            ],
+          },
+        ],
+        ["photoAdded"],
+      );
+      const entries = [...root.querySelectorAll("[data-live-after] > p.muted")].map(
+        (each) => each.textContent,
+      );
+      expect(entries).toEqual([
+        "Then p1 took photoAdded",
+        "Then upload took photoDone: showingQueue → showingQueue",
+      ]);
+      expect(pathTexts(root)[1]).toBe("photoAdded, then upload: showingQueue → showingQueue");
+    });
+
+    test("an earlier step keeps what moved after it when a later step is taken", () => {
+      const root = scripted(
+        [
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [childMoved("p1", "sendingPhoto", "photoSent")],
+          },
+          { children: [], last: rootStay("photoAdded"), after: [] },
+        ],
+        ["photoAdded", "photoAdded"],
+      );
+      expect(pathTexts(root)).toEqual([
+        "start",
+        "photoAdded, then p1: sendingPhoto → photoSent",
+        "photoAdded",
+      ]);
+    });
+
+    test("exactly three moves are all named, with no count", () => {
+      const root = scripted(
+        [
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [
+              childMoved("p1", "a", "b"),
+              childMoved("p2", "a", "b"),
+              childMoved("p3", "a", "b"),
+            ],
+          },
+        ],
+        ["photoAdded"],
+      );
+      expect(pathTexts(root)[1]).toBe("photoAdded, then p1: a → b; p2: a → b; p3: a → b");
+    });
+
+    test("the root is named by the machine when a child's step moved it", () => {
+      const root = scripted(
+        [
+          {
+            children: [],
+            last: childMoved("p1", "sendingPhoto", "photoSent"),
+            after: [rootMoved],
+          },
+        ],
+        ["photoAdded"],
+      );
+      expect(root.querySelector("[data-live-after] > p.muted")?.textContent).toBe(
+        "Then photoQueue took photoDone: showingQueue → showingQueue",
+      );
+    });
+
+    test("a step taken after others keeps its own moves, and a late move joins the last step", () => {
+      const root = document.createElement("div");
+      const hold: { notify?: (state: VizLiveState) => void } = {};
+      const photoAdded: VizStep = { kind: "event", event: "photoAdded", payload: null };
+      let taken = 0;
+      const driver: VizDriver = {
+        reset: () => live([]),
+        step: () => {
+          taken += 1;
+          const steps = Array.from({ length: taken }, () => photoAdded);
+          const after = taken === 1 ? [childMoved("p1", "a", "b")] : [];
+          return { ...live([], steps), last: rootStay("photoAdded"), after };
+        },
+        listen: (onChange) => {
+          hold.notify = onChange;
+        },
+      };
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withPhotoAdded] },
+        { driver },
+      );
+      clickSend(root, "photoAdded");
+      clickSend(root, "photoAdded");
+      expect(pathTexts(root)).toEqual(["start", "photoAdded, then p1: a → b", "photoAdded"]);
+      hold.notify?.({
+        ...live([], [photoAdded, photoAdded]),
+        last: rootStay("photoAdded"),
+        after: [childMoved("p2", "a", "b")],
+      });
+      expect(pathTexts(root)).toEqual([
+        "start",
+        "photoAdded, then p1: a → b",
+        "photoAdded, then p2: a → b",
+      ]);
+      clickSend(root, "photoAdded");
+      expect(pathTexts(root).slice(0, 3)).toEqual([
+        "start",
+        "photoAdded, then p1: a → b",
+        "photoAdded, then p2: a → b",
+      ]);
     });
 
     test("Back rebuilds the Path texts", () => {

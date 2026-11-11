@@ -15,3 +15,5 @@ export type { RoutingWarning } from "./routing.ts";
 export { UPDATE_EVENT, livePageHtml } from "./html.ts";
 export { isUnchanged, outlineChanges, outlineOf } from "./outline.ts";
 export type { MachineChanges, MachineOutline, OutlineArrow } from "./outline.ts";
+export { linksInside, systemOf } from "./system.ts";
+export type { MachineSystem, SystemLink, SystemPart } from "./system.ts";

@@ -50,6 +50,7 @@ const door: VizMachine = {
   ],
   events: [{ id: "go", internal: false, doc: null, payload: null }],
   outputs: [],
+  partOutputs: {},
   context: null,
   edges: [
     edge("__initial__", "", "open"),

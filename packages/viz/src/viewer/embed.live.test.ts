@@ -58,6 +58,7 @@ const checkout: VizMachine = {
     { id: "paymentTimeout", internal: true, doc: null, payload: null },
   ],
   outputs: [],
+  partOutputs: {},
   context: null,
   edges: [edge("idle", "submit", "paying"), edge("paying", "paymentTimeout", "error")],
   runs: [],

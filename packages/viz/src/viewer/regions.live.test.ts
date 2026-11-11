@@ -59,6 +59,7 @@ const photoUpload: VizMachine = {
     event("connectionRestored"),
   ],
   outputs: [],
+  partOutputs: {},
   context: null,
   edges: [
     edge("showingUploadScreen", "photoUploaded", "showingUploadedPhoto"),

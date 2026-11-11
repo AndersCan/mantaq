@@ -52,6 +52,7 @@ function machine(states: string[], edges: VizEdge[], id = "m"): VizMachine {
     states: states.map((each, index) => state(each, index === 0)),
     events: [],
     outputs: [],
+    partOutputs: {},
     context: null,
     edges: [edge("__initial__", "", states[0] ?? "", "initial"), ...edges],
     fuzz: null,

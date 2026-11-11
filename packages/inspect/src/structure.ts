@@ -91,6 +91,7 @@ interface MapChild {
   initial: string | undefined;
   internal: Set<string>;
   inputs: string[];
+  outputs: string[];
 }
 
 /** What one map's probe child looks like, or why it cannot be drawn. */
@@ -120,6 +121,7 @@ function probeChild(name: string, map: ActorMapLike): Either<string, MapChild> {
     initial: parseInitialName(child.options),
     internal: parseInternalEventIds(child.options),
     inputs: eventTypes(child.options, "inputs"),
+    outputs: eventTypes(child.options, "outputs"),
   };
   cleanup();
   return Either.right(found);
@@ -225,6 +227,14 @@ export function toVizMachine(input: VizInput): VizMachine {
   ].sort();
 
   const outputs = eventTypes(input.actor.options, "outputs").sort();
+  const partOutputs = Object.fromEntries(
+    [
+      ...regionActorList.map((each) => [each.path, eventTypes(each.actor.options, "outputs")]),
+      ...children.map((each) => [each.name, each.outputs]),
+    ]
+      .filter(([, list]) => list.length > 0)
+      .map(([name, list]) => [name, [...list].sort()]),
+  );
   return {
     id: input.id,
     initial,
@@ -233,6 +243,7 @@ export function toVizMachine(input: VizInput): VizMachine {
     states,
     events,
     outputs,
+    partOutputs,
     context: null,
     edges,
     fuzz: null,
