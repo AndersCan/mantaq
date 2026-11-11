@@ -40,6 +40,7 @@ test("Disposing the workers mid-run stops the one-second wait", async () => {
   await pool.actor.settled();
   expect(pool.workers.get("w1")?.state.name).toBe("working");
   pool.workers.dispose();
+  expect(clock.pendingTimers()).toEqual([]);
   clock.advance(1000);
   await pool.actor.settled();
   expect(pool.workers.get("w1")).toBeUndefined();
