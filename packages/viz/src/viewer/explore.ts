@@ -1312,14 +1312,8 @@ function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
 }
 
 /** `, then w1: free → working; w2: free → working`: the other parts that moved after the step; "" when none did. */
-function thenMoves(
-  machine: VizMachine,
-  own: VizActorRef | undefined,
-  later: ReadonlyArray<VizLiveStep>,
-): string {
-  const moved = later.filter(
-    (each) => each.outcome === "transition" && !sameActor(each.actor, own),
-  );
+function thenMoves(machine: VizMachine, later: ReadonlyArray<VizLiveStep>): string {
+  const moved = later.filter((each) => each.outcome === "transition");
   if (moved.length === 0) return "";
   const shown = moved
     .slice(0, 3)
@@ -1341,20 +1335,19 @@ function pathEntry(
     };
     index: number;
   },
-): { text: string; title: string | null } {
+): { text: string; title: string | null; cascade: boolean } {
   const { index } = at;
   const { state, outcomes, afters } = at.live;
   const step = state.steps[index];
-  if (step === undefined) return { text: "", title: null };
+  if (step === undefined) return { text: "", title: null, cascade: false };
   const head =
     step.kind === "advance"
       ? `advance ${step.ms} ms`
       : step.payload === null
         ? step.event
         : `${step.event} ${payloadText(step.payload)}`;
-  const own = step.kind === "event" ? step.actor : undefined;
   const later = index === state.steps.length - 1 ? state.after : (afters?.[index] ?? []);
-  const move = childMove(machine, step, outcomes[index]) + thenMoves(machine, own, later);
+  const move = childMove(machine, step, outcomes[index]) + thenMoves(machine, later);
   const started = startedAt(state, index + 1).map((child) => child.key);
   const removed = removedAt(state, index + 1).map((child) => child.key);
   const suffix = (cut: boolean) => {
@@ -1366,7 +1359,11 @@ function pathEntry(
   };
   const text = head + move + suffix(true);
   const full = head + move + suffix(false);
-  return { text, title: full === text ? null : full };
+  return {
+    text,
+    title: full === text ? null : full,
+    cascade: later.some((each) => each.outcome === "transition"),
+  };
 }
 
 function pathButton(
@@ -1374,10 +1371,14 @@ function pathButton(
   at: { context: ExploreContext; live: NonNullable<ExploreContext["live"]>; index: number },
 ): HTMLElement {
   const { context, live, index } = at;
-  const { text, title } = pathEntry(context.machine, { live, index });
+  const { text, title, cascade } = pathEntry(context.machine, { live, index });
   return button(doc, [text], {
     onClick: () => context.rewind(index + 1),
-    attrs: { "data-rewind": String(index + 1), ...(title === null ? {} : { title }) },
+    attrs: {
+      "data-rewind": String(index + 1),
+      ...(title === null ? {} : { title }),
+      ...(cascade ? { "data-live-cascade": "" } : {}),
+    },
   });
 }
 

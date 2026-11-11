@@ -861,7 +861,7 @@ describe("live actor map children", () => {
       expect(pathTexts(root)).toEqual(["start", "photoAdded, then p1: sendingPhoto → photoSent"]);
     });
 
-    test("only moves of other parts are named, and past three they are counted", () => {
+    test("a later move of the step's own part is named too, and past three they are counted", () => {
       const root = scripted(
         [
           {
@@ -880,7 +880,7 @@ describe("live actor map children", () => {
         ["photoAdded"],
       );
       expect(pathTexts(root)[1]).toBe(
-        "photoAdded, then p1: a → b; p2: a → b; p3: a → b and 1 more",
+        "photoAdded, then photoQueue: showingQueue → showingQueue; p1: a → b; p2: a → b and 2 more",
       );
     });
 
@@ -902,6 +902,30 @@ describe("live actor map children", () => {
         "Then p1 took photoAdded: sendingPhoto → photoSent",
         "Then photoDone came back",
       ]);
+    });
+
+    test("a stay on another part shows no arrow, and a region is named by its path", () => {
+      const root = scripted(
+        [
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [
+              { ...childMoved("p1", "a", "a"), outcome: "stay" },
+              { ...rootMoved, actor: { region: "upload" }, outcome: "transition" },
+            ],
+          },
+        ],
+        ["photoAdded"],
+      );
+      const entries = [...root.querySelectorAll("[data-live-after] > p.muted")].map(
+        (each) => each.textContent,
+      );
+      expect(entries).toEqual([
+        "Then p1 took photoAdded",
+        "Then upload took photoDone: showingQueue → showingQueue",
+      ]);
+      expect(pathTexts(root)[1]).toBe("photoAdded, then upload: showingQueue → showingQueue");
     });
 
     test("an earlier step keeps what moved after it when a later step is taken", () => {
@@ -988,6 +1012,12 @@ describe("live actor map children", () => {
         after: [childMoved("p2", "a", "b")],
       });
       expect(pathTexts(root)).toEqual([
+        "start",
+        "photoAdded, then p1: a → b",
+        "photoAdded, then p2: a → b",
+      ]);
+      clickSend(root, "photoAdded");
+      expect(pathTexts(root).slice(0, 3)).toEqual([
         "start",
         "photoAdded, then p1: a → b",
         "photoAdded, then p2: a → b",

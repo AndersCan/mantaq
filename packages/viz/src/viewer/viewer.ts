@@ -522,6 +522,9 @@ function watchDriver(
 ): void {
   context.driver?.listen?.((state) => {
     view.live = state;
+    if (view.afters.length > 0 && view.afters.length === state.steps.length) {
+      view.afters[view.afters.length - 1] = state.after;
+    }
     view.motion = true;
     context.redraw();
   });

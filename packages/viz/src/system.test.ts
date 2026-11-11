@@ -125,6 +125,24 @@ describe("systemOf", () => {
     expect(linksInside(system)).toBe(false);
   });
 
+  test("a root output the root itself handles leaves the machine", () => {
+    const machine: VizMachine = {
+      ...base,
+      outputs: ["done"],
+      states: [state("a")],
+      edges: [edge("a", "done")],
+    };
+    expect(systemOf(machine).links).toMatchObject([{ to: null, handledIn: [] }]);
+  });
+
+  test("senders list only the edges in the sending part", () => {
+    const machine: VizMachine = {
+      ...upload,
+      edges: [...upload.edges, edge("showing", "other", ["photoUploaded"])],
+    };
+    expect(systemOf(machine).links[0]?.senders).toEqual(["upload.sending-uploadConfirmed"]);
+  });
+
   test("a map output links to the root and to a region that takes it", () => {
     const machine: VizMachine = {
       ...base,
@@ -178,6 +196,11 @@ describe("partOutputs in the document", () => {
     expect(validateViz({ ...doc, machines: [without] })[0]).toEqual([
       { path: "$.machines[0].partOutputs", message: "expected object" },
     ]);
+    for (const wrong of [[], "x", null]) {
+      expect(validateViz({ ...doc, machines: [{ ...upload, partOutputs: wrong }] })[0]).toEqual([
+        { path: "$.machines[0].partOutputs", message: "expected object" },
+      ]);
+    }
     const bad = { ...upload, partOutputs: { upload: "photoUploaded" } };
     expect(validateViz({ ...doc, machines: [bad] })[0]).toEqual([
       { path: "$.machines[0].partOutputs.upload", message: "expected string[]" },

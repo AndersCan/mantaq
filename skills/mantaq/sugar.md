@@ -27,3 +27,7 @@ This lists what exists and when to reach for it. Get exact signatures from
 - Return actor maps from the factory next to the actor, `return { actor, photos }`, so the viz draws and drives the children, and fuzzing sends to the ones it started.
 - Fuzzing sends to a child by the key a step started it with, so give the event that starts it a payload sample (`source` or `payloads`).
 - Prefer sugar over raw core where it fits. Reach for the map, broadcast, tag and parts helpers when the need arises, not preemptively.
+
+## Pool: machines that pass work
+
+`createPool({ name, workers, run })` builds one inbox and `workers` workers (`w1`..`wn`) that pull items. The inbox hands items to free workers with `${name}.ITEMS_ASSIGNED`; a worker reports back with `${name}.RUN_SUCCEEDED` or `${name}.RUN_FAILED`. Return the pool's actor and its worker map from the factory so the viz draws and drives the workers. In the viewer, a step that moves another part names it on the Path (`[data-live-cascade]`): `team.ITEM_ARRIVED {item a}, then w1: free → working`.
