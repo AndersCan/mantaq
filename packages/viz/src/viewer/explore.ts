@@ -32,6 +32,8 @@ export interface ExploreContext {
     state: VizLiveState;
     /** Entry i is the driver's `last` for `state.steps[i]`. */
     outcomes: ReadonlyArray<VizLiveStep | null>;
+    /** Entry i is what moved after `state.steps[i]`, as the driver reported it then. */
+    afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
@@ -1248,7 +1250,15 @@ function liveResultSection(
           ...changedChildrenLines(doc, state),
           ...after.map((step, index) =>
             html(doc, "div", { "data-live-after": "" }, [
-              html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"]),
+              sameActor(step.actor, last.actor)
+                ? html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"])
+                : html(doc, "p", { class: "muted" }, [
+                    `Then ${partName(machine, step.actor)} took `,
+                    code(doc, step.event),
+                    step.outcome === "transition"
+                      ? `: ${localName(step.from)} → ${localName(step.to)}`
+                      : "",
+                  ]),
               ...stepLines(doc, {
                 machine,
                 step,
@@ -1291,13 +1301,49 @@ function childMove(
   return `: ${who}, nothing ran`;
 }
 
+function sameActor(left: VizActorRef | undefined, right: VizActorRef | undefined): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+/** What a moved part is called in a sentence: the machine, a region path, or a map child. */
+function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
+  if (actor === undefined) return machine.id;
+  return "region" in actor ? actor.region : childWhoText(machine, actor);
+}
+
+/** `, then w1: free → working; w2: free → working`: the other parts that moved after the step; "" when none did. */
+function thenMoves(
+  machine: VizMachine,
+  own: VizActorRef | undefined,
+  later: ReadonlyArray<VizLiveStep>,
+): string {
+  const moved = later.filter(
+    (each) => each.outcome === "transition" && !sameActor(each.actor, own),
+  );
+  if (moved.length === 0) return "";
+  const shown = moved
+    .slice(0, 3)
+    .map(
+      (each) => `${partName(machine, each.actor)}: ${localName(each.from)} → ${localName(each.to)}`,
+    );
+  const more = moved.length > 3 ? ` and ${moved.length - 3} more` : "";
+  return `, then ${shown.join("; ")}${more}`;
+}
+
 /** The Path entry for step `index`: what was sent, what the child did, which children it started or removed. */
 function pathEntry(
   machine: VizMachine,
-  at: { live: { state: VizLiveState; outcomes: ReadonlyArray<VizLiveStep | null> }; index: number },
+  at: {
+    live: {
+      state: VizLiveState;
+      outcomes: ReadonlyArray<VizLiveStep | null>;
+      afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
+    };
+    index: number;
+  },
 ): { text: string; title: string | null } {
   const { index } = at;
-  const { state, outcomes } = at.live;
+  const { state, outcomes, afters } = at.live;
   const step = state.steps[index];
   if (step === undefined) return { text: "", title: null };
   const head =
@@ -1306,7 +1352,9 @@ function pathEntry(
       : step.payload === null
         ? step.event
         : `${step.event} ${payloadText(step.payload)}`;
-  const move = childMove(machine, step, outcomes[index]);
+  const own = step.kind === "event" ? step.actor : undefined;
+  const later = index === state.steps.length - 1 ? state.after : (afters?.[index] ?? []);
+  const move = childMove(machine, step, outcomes[index]) + thenMoves(machine, own, later);
   const started = startedAt(state, index + 1).map((child) => child.key);
   const removed = removedAt(state, index + 1).map((child) => child.key);
   const suffix = (cut: boolean) => {

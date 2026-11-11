@@ -276,6 +276,7 @@ exports[`determinism > auth snapshot 1`] = `
       "initial": "checkingAuth",
       "maps": [],
       "outputs": [],
+      "partOutputs": {},
       "regions": [],
       "runs": [],
       "states": [
@@ -377,7 +378,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 15
+  "schemaVersion": 16
 }
 "
 `;
@@ -610,6 +611,7 @@ exports[`determinism > checkout snapshot 1`] = `
       "initial": "basicInfo",
       "maps": [],
       "outputs": [],
+      "partOutputs": {},
       "regions": [],
       "runs": [],
       "states": [
@@ -691,7 +693,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 15
+  "schemaVersion": 16
 }
 "
 `;
@@ -1138,6 +1140,7 @@ exports[`determinism > saga snapshot 1`] = `
       "initial": "idle",
       "maps": [],
       "outputs": [],
+      "partOutputs": {},
       "regions": [],
       "runs": [],
       "states": [
@@ -1291,7 +1294,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 15
+  "schemaVersion": 16
 }
 "
 `;

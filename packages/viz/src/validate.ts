@@ -132,6 +132,22 @@ function checkReferences(reader: Reader, machine: VizMachine, path: string): voi
   }
 }
 
+/** `partOutputs`: an object of string lists, one per region path or map name. */
+function readPartOutputs(
+  reader: Reader,
+  at: { record: JsonObject; path: string },
+): Record<string, string[]> {
+  const value = at.record["partOutputs"];
+  const path = `${at.path}.partOutputs`;
+  if (!isRecord(value)) {
+    report(reader, { path, message: "expected object" });
+    return {};
+  }
+  return Object.fromEntries(
+    Object.keys(value).map((key) => [key, readStrings(reader, { record: value, key, path })]),
+  );
+}
+
 function readMachine(reader: Reader, record: JsonObject, path: string): VizMachine {
   const machine: VizMachine = {
     id: readString(reader, { record, key: "id", path }),
@@ -142,6 +158,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
       readState(reader, item, at),
     ),
     outputs: readStrings(reader, { record, key: "outputs", path }),
+    partOutputs: readPartOutputs(reader, { record, path }),
     context: readFields(reader, { record, key: "context", path }),
     events: readList(reader, { record, key: "events", path }, (item, at) =>
       readEvent(reader, item, at),

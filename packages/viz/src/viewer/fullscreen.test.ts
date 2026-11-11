@@ -24,6 +24,7 @@ const machine: VizMachine = {
   ],
   events: [],
   outputs: [],
+  partOutputs: {},
   context: null,
   edges: [
     {

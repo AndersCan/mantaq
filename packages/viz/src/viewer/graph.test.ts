@@ -25,6 +25,7 @@ const machine: VizMachine = {
   states: [state("idle", true), state("busy", false)],
   events: [],
   outputs: [],
+  partOutputs: {},
   context: null,
   edges: [],
   runs: [],

@@ -51,6 +51,8 @@ interface ViewState {
   live: VizLiveState | null;
   /** Entry i is the driver's `last` for `live.steps[i]`. */
   outcomes: Array<VizLiveStep | null>;
+  /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
+  afters: VizLiveStep[][];
   /** Context before the last live step; undefined when no step ran. */
   previous: VizJson | undefined;
   /** Live: the event whose payload form is open. */
@@ -340,6 +342,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
         : decodePath(machine, options.steps ?? []),
     live: null,
     outcomes: [],
+    afters: [],
     previous: undefined,
     composing: null,
     composingActor: undefined,
@@ -446,7 +449,13 @@ function liveOf(
   if (view.live === null) return { events };
   return {
     events,
-    live: { state: view.live, outcomes: view.outcomes, previous: view.previous, ...handlers },
+    live: {
+      state: view.live,
+      outcomes: view.outcomes,
+      afters: view.afters,
+      previous: view.previous,
+      ...handlers,
+    },
   };
 }
 
@@ -529,7 +538,10 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   view.previous = view.live?.context;
   const length = view.live?.steps.length ?? 0;
   view.live = stepSafely(driver, { before: view.live, step });
-  if (view.live.steps.length === length + 1) view.outcomes.push(view.live.last);
+  if (view.live.steps.length === length + 1) {
+    view.outcomes.push(view.live.last);
+    view.afters.push(view.live.after);
+  }
   view.motion = true;
   view.composing = null;
 }
@@ -541,6 +553,7 @@ function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<Viz
   const played = replay(driver, steps);
   view.live = played.live;
   view.outcomes = played.outcomes;
+  view.afters = played.afters;
   view.composing = null;
 }
 
@@ -769,14 +782,18 @@ function liveState(view: ViewState): { currents?: string[] } {
 function replay(
   driver: VizDriver,
   steps: ReadonlyArray<VizStep>,
-): { live: VizLiveState; outcomes: Array<VizLiveStep | null> } {
+): { live: VizLiveState; outcomes: Array<VizLiveStep | null>; afters: VizLiveStep[][] } {
   let live = driver.reset();
   const outcomes: Array<VizLiveStep | null> = [];
+  const afters: VizLiveStep[][] = [];
   for (const step of steps) {
     const length = live.steps.length;
     live = stepSafely(driver, { before: live, step });
-    if (live.steps.length === length + 1) outcomes.push(live.last);
-    if (live.last?.error) return { live, outcomes };
+    if (live.steps.length === length + 1) {
+      outcomes.push(live.last);
+      afters.push(live.after);
+    }
+    if (live.last?.error) return { live, outcomes, afters };
   }
-  return { live, outcomes };
+  return { live, outcomes, afters };
 }

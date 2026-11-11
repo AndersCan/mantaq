@@ -48,6 +48,7 @@ const machine: VizMachine = {
   ],
   events: [],
   outputs: [],
+  partOutputs: {},
   context: null,
   edges: [edge("photos.sendingPhoto", "uploadConfirmed", "photos.photoSent")],
   runs: [],
