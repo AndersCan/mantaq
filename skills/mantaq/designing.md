@@ -125,3 +125,7 @@ When the user says "apply the viz notes" (or "the notes"):
 6. Renamed or removed a state or an event: update every `on:` line that names it (`state <id>` and both parts of `edge <from> <event>`), done notes too.
 7. Never delete a note, never change its `id:`, `machine:` or `note:` lines, never add a note, except the pasted ones above. Keep one field per line with the two-space indent.
 8. Reply with one line per note: `<id> <on>: <what changed>. done` or `<id> <on>: asked "<question>"`. Right-clicking the state or arrow on the page shows each note as Done.
+
+## 12. Hand the machine to whoever builds it
+
+To build an app or feature from a machine, or to give the machine to another agent, write its brief instead of describing it from memory. `machineBrief(machine)` from `@mantaq/inspect` (0.33 or later) turns an inspected machine into Markdown: the start state, each state's arrows with their conditions, its entry effects, the events it ignores, and the events with their payload fields. Keep it true with a test: `expect(machines.map(machineBrief).join("\n")).toMatchFileSnapshot("./<machine>-brief.md")`, with `machines` from `inspectFile` (absolute path). Conditions are the handler's source text, copied as written. Paste the brief in the reply; never retype it.
