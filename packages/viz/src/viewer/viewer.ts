@@ -37,6 +37,7 @@ import { drawChildMarkers } from "./markers.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
 import {
+  dotKey,
   markSystem,
   renderSystem,
   sendsLines,
@@ -299,7 +300,7 @@ export function mountViewer(
       : renderGraph(doc, machine, { select, showDetails, mode });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
-    const key = systemKey(doc, inSystem ? system : null);
+    const key = systemKey(doc, { machine, system: inSystem ? system : null, dots: live !== null });
     root.append(...layoutOf(doc, { chrome, graph, key, panel, changes }));
     refresh();
   }
@@ -342,10 +343,19 @@ function systemCallbacks(context: {
   };
 }
 
-/** The line under the system diagram: the prefix its event names share. */
-function systemKey(doc: Document, system: MachineSystem | null): HTMLElement | null {
-  const prefix = system === null ? "" : systemPrefix(system);
-  return keyLine(doc, prefix === "" ? [] : [`events: ${prefix}*`]);
+/** The line under the system diagram: the prefix its event names share, and what the child dots mean when a driver draws them. */
+function systemKey(
+  doc: Document,
+  context: { machine: VizMachine; system: MachineSystem | null; dots: boolean },
+): HTMLElement | null {
+  const { machine, system, dots } = context;
+  if (system === null) return null;
+  const prefix = systemPrefix(system);
+  const dotItem = dots ? dotKey(machine, system) : null;
+  return keyLine(doc, [
+    ...(prefix === "" ? [] : [`events: ${prefix}*`]),
+    ...(dotItem === null ? [] : [dotItem]),
+  ]);
 }
 
 /** A click on an arrow or box in the system view: its details show, nothing is walked. */

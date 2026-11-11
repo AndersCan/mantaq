@@ -141,6 +141,10 @@ function mount(machines: VizMachine[], live = true, steps: VizStep[] = []) {
 }
 
 const text = (root: HTMLElement, selector: string) => root.querySelector(selector)?.textContent;
+const dots = (root: HTMLElement) =>
+  [...root.querySelectorAll("g.child-dot")].map(
+    (dot) => `${dot.getAttribute("data-child")}:${dot.getAttribute("data-state")}`,
+  );
 const arrow = (root: HTMLElement, event: string) =>
   root.querySelector<SVGGElement>(`g.link[data-event="${event}"]`);
 
@@ -150,7 +154,7 @@ describe("system view", () => {
     expect(root.querySelector("svg[data-system]")).not.toBeNull();
     expect(root.querySelector("svg.graph:not([data-system])")).toBeNull();
     expect(text(root, 'g[data-part="workers"] .part-label')).toBe("workers ×3");
-    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("free 3");
+    expect(dots(root)).toEqual(["w1:free", "w2:free", "w3:free"]);
     expect(text(root, 'g[data-part=""] .part-chip')).toBe("empty");
     expect(root.querySelector('g[data-part="workers"]')?.getAttribute("aria-label")).toBe(
       "workers, 3 running: free 3",
@@ -161,7 +165,11 @@ describe("system view", () => {
     const root = mount([pool]);
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(false);
     root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
-    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("free 2 · working 1");
+    expect(dots(root)).toEqual(["w1:working", "w2:free", "w3:free"]);
+    expect(root.querySelector('g.child-dot[data-child="w1"] title')?.textContent).toBe(
+      "w1, working",
+    );
+    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("");
     expect(text(root, 'g[data-part=""] .part-chip')).toBe("holding");
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(true);
     expect(arrow(root, "WORK_DONE")?.classList.contains("took")).toBe(false);
@@ -324,6 +332,59 @@ describe("system view", () => {
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("selected")).toBe(false);
   });
 
+  test("the first state is an open ring and the second a filled dot", () => {
+    const root = mount([pool]);
+    root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
+    const marks = [...root.querySelectorAll("g.child-dot")].map((dot) =>
+      dot.getAttribute("data-mark"),
+    );
+    expect(marks).toEqual(["second", "first", "first"]);
+  });
+
+  test("a child machine without two non-final states keeps the count text and no key item", () => {
+    const three: VizMachine = {
+      ...pool,
+      states: [...pool.states, state("workers.stuck")],
+    };
+    const root = mount([three]);
+    expect(root.querySelector("g.child-dot")).toBeNull();
+    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("free 3");
+    expect(root.querySelector("[data-viz-key]")).toBeNull();
+  });
+
+  test("six children get dots; seven fall back to the count text", () => {
+    const withChildren = (count: number) => {
+      const root = document.createElement("div");
+      const live = (): VizLiveState => ({
+        ...snapshot(0),
+        children: Array.from({ length: count }, (_, index) => ({
+          map: "workers",
+          key: `w${index}`,
+          state: "workers.free",
+          since: 0,
+        })),
+      });
+      mountViewer(
+        root,
+        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] },
+        { driver: { reset: live, step: live } },
+      );
+      return root;
+    };
+    expect(withChildren(6).querySelectorAll("g.child-dot")).toHaveLength(6);
+    const seven = withChildren(7);
+    expect(seven.querySelector("g.child-dot")).toBeNull();
+    expect(text(seven, 'g[data-part="workers"] .part-chip')).toBe("free 7");
+  });
+
+  test("no driver: no dots and no dot key", () => {
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] });
+    expect(root.querySelector("g.child-dot")).toBeNull();
+    expect(root.querySelector("[data-viz-key]")).toBeNull();
+    expect(text(root, 'g[data-part="workers"] .part-label')).toBe("workers ×n");
+  });
+
   test("a map with no children reads none running", () => {
     const root = document.createElement("div");
     const driver: VizDriver = {
@@ -394,7 +455,7 @@ describe("pool view arrows", () => {
 
   test("a shared prefix is written once in the key and kept in ids", () => {
     const root = mount([team]);
-    expect(text(root, "[data-viz-key]")).toBe("events: team.*");
+    expect(text(root, "[data-viz-key]")).toBe("events: team.*   ○ free  ● working");
     const line = root.querySelector('g.link[data-event="team.ITEMS_ASSIGNED"]');
     expect(line?.textContent).toBe("ITEMS_ASSIGNED");
     expect(line?.getAttribute("aria-label")).toContain("team.ITEMS_ASSIGNED");
@@ -402,7 +463,7 @@ describe("pool view arrows", () => {
 
   test("mixed prefixes show full names and no key", () => {
     const root = mount([pool]);
-    expect(root.querySelector("[data-viz-key]")).toBeNull();
+    expect(text(root, "[data-viz-key]")).toBe("○ free  ● working");
     expect(arrow(root, "ITEMS_ASSIGNED")?.textContent).toBe("ITEMS_ASSIGNED");
     const mixed: VizMachine = {
       ...team,
@@ -410,7 +471,7 @@ describe("pool view arrows", () => {
       outputs: ["team.ITEMS_ASSIGNED", "OTHER.X"],
     };
     const again = mount([mixed]);
-    expect(again.querySelector("[data-viz-key]")).toBeNull();
+    expect(again.querySelector("[data-viz-key]")?.textContent).toBe("○ free  ● working");
     expect(again.querySelector('g.link[data-event="team.ITEMS_ASSIGNED"]')?.textContent).toBe(
       "team.ITEMS_ASSIGNED",
     );
@@ -610,7 +671,7 @@ describe("pool view arrows: every branch", () => {
       "ITEM_ARRIVED",
     );
     expect(arrow(root, "team.ITEMS_ASSIGNED")?.textContent).toBe("team.ITEMS_ASSIGNED");
-    expect(root.querySelector(".viz-key")).toBeNull();
+    expect(text(root, ".viz-key")).toBe("○ free  ● working");
   });
 
   test("an event a link brings to one part is still an entry of another part", () => {
