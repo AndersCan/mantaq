@@ -132,6 +132,15 @@ describe("Diagram only", () => {
     expect(document.activeElement?.getAttribute("role")).toBe("tab");
   });
 
+  test("with diagramOnly: false, Show controls opens the Controls tab", () => {
+    const root = mount({ diagramOnly: false });
+    root.querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    const shown = root.querySelector('[role="tab"][aria-selected="true"]');
+    expect(shown?.textContent).toBe("Controls");
+    expect(document.activeElement?.hasAttribute("data-diagram-only")).toBe(true);
+  });
+
   test("without the option, Show controls focuses the Diagram only button", () => {
     const root = mount({});
     root.querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
