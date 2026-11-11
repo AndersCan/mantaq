@@ -437,7 +437,9 @@
 }
 
 .viz .state:focus-visible .frame,
-.viz .edge:focus-visible path {
+.viz .edge:focus-visible path,
+.viz .link-pair:has(> .link:focus-visible) > path,
+.viz .link-in:has(> .entry:focus-visible) > path {
   stroke: var(--select);
   stroke-width: 3;
 }
