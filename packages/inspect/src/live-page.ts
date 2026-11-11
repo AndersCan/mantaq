@@ -160,6 +160,8 @@ export function mountDriven(
     routes?: VizOutputRoutes;
     /** "real": effects run, timers wait for the time buttons. Default "held": the viewer asks what each effect reports. */
     effectMode?: "held" | "real";
+    /** Open with only the diagram and a "Show controls" button. */
+    diagramOnly?: boolean;
   },
 ): void {
   const parsed = parseViz(context.text);
@@ -205,6 +207,7 @@ export function mountDriven(
     ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...routesOf(context),
     ...(driver === undefined ? {} : { driver }),
+    ...(context.diagramOnly === true ? { diagramOnly: true } : {}),
   });
   if (machine !== undefined) mountNotes(viewer, { machine, ...notesOf(context) });
 }

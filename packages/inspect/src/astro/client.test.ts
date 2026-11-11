@@ -61,4 +61,16 @@ describe("astro client", () => {
     await import("./client.ts");
     expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({ effectMode: "held" });
   });
+
+  test("data-mantaq-diagram-only opens with only the diagram", async () => {
+    machineRoot({ mantaqViz: "{}", mantaqDiagramOnly: "" });
+    await import("./client.ts");
+    expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({ diagramOnly: true });
+  });
+
+  test("without data-mantaq-diagram-only the controls show", async () => {
+    machineRoot({ mantaqViz: "{}" });
+    await import("./client.ts");
+    expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({ diagramOnly: false });
+  });
 });

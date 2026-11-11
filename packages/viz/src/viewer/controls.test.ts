@@ -49,10 +49,10 @@ afterEach(() => {
   Reflect.deleteProperty(document, "fullscreenEnabled");
 });
 
-function mount(): HTMLElement {
+function mount(options: { diagramOnly?: boolean } = {}): HTMLElement {
   const root = document.createElement("div");
   document.body.append(root);
-  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] });
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, options);
   return root;
 }
 
@@ -107,6 +107,45 @@ describe("Diagram only", () => {
   test("a new mount starts with the controls shown", () => {
     mount().querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
     expect(mount().querySelector(".viz-header")).not.toBeNull();
+  });
+
+  test("the diagramOnly option opens with only the canvas, and Show controls still works", () => {
+    const root = mount({ diagramOnly: true });
+    expect(root.classList.contains("diagram-only")).toBe(true);
+    expect(root.querySelector(".panel")).toBeNull();
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(root.querySelector(".viz-header")).not.toBeNull();
+  });
+
+  test("with the diagramOnly option, Show controls opens the Step tab", () => {
+    const root = mount({ diagramOnly: true });
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    const shown = root.querySelector('[role="tab"][aria-selected="true"]');
+    expect(shown?.textContent).toBe("Step");
+  });
+
+  test("with the diagramOnly option, Show controls leaves focus on a shown control", () => {
+    const root = mount({ diagramOnly: true });
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(root.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.closest("[hidden]")).toBeNull();
+    expect(document.activeElement?.getAttribute("role")).toBe("tab");
+  });
+
+  test("with diagramOnly: false, Show controls opens the Controls tab", () => {
+    const root = mount({ diagramOnly: false });
+    root.querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    const shown = root.querySelector('[role="tab"][aria-selected="true"]');
+    expect(shown?.textContent).toBe("Controls");
+    expect(document.activeElement?.hasAttribute("data-diagram-only")).toBe(true);
+  });
+
+  test("without the option, Show controls focuses the Diagram only button", () => {
+    const root = mount({});
+    root.querySelector<HTMLButtonElement>("[data-diagram-only]")?.click();
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(document.activeElement?.hasAttribute("data-diagram-only")).toBe(true);
   });
 });
 

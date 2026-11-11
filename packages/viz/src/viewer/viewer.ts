@@ -72,7 +72,7 @@ interface ViewState {
   motion: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
-  /** Only the diagram and a "Show controls" button are drawn. View state: not an option, not saved. */
+  /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
   diagramOnly: boolean;
   /** Why the requested run did not open; cleared by the next walk. */
   notice: string | null;
@@ -170,6 +170,8 @@ export interface ViewerOptions {
   changes?: ChangesOption;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
+  /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
+  diagramOnly?: boolean;
 }
 
 /**
@@ -193,7 +195,7 @@ export function mountViewer(
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
 
-  const setDiagramOnly = diagramOnlySwitch(root, view, () => render());
+  const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
     root.replaceChildren();
@@ -374,19 +376,24 @@ function detailsOf(
   );
 }
 
-/** Turns Diagram only on or off, then puts focus on the button that undoes it. */
+/** Turns Diagram only on or off (Show controls opens the Step tab when the page asked for Diagram only, else Controls), then puts focus on the Step tab or the button that undoes it. */
 function diagramOnlySwitch(
   root: HTMLElement,
   view: ViewState,
   render: () => void,
+  fromOption: boolean | undefined,
 ): (on: boolean) => void {
   return (on) => {
     view.diagramOnly = on;
-    if (!on) view.tab = "controls";
+    const toStep = !on && fromOption === true;
+    if (!on) view.tab = toStep ? "step" : "controls";
     render();
-    root
-      .querySelector<HTMLElement>(on ? "[data-show-controls]" : "[data-diagram-only]")
-      ?.focus({ preventScroll: true });
+    const target = on
+      ? "[data-show-controls]"
+      : toStep
+        ? '[role="tab"][aria-selected="true"]'
+        : "[data-diagram-only]";
+    root.querySelector<HTMLElement>(target)?.focus({ preventScroll: true });
   };
 }
 
@@ -439,7 +446,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     picked: null,
     motion: false,
     tab: "step",
-    diagramOnly: false,
+    diagramOnly: options.diagramOnly ?? false,
     notice: null,
     drilled: false,
     systemSelection: null,
