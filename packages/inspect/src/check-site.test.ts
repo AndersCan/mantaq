@@ -272,6 +272,14 @@ describe("mantaq-check-site", () => {
     );
   });
 
+  test("--overview fails naming a page that is not built", () => {
+    const run = spawnSync("node", [cli, good, "--overview", "gone/"], { encoding: "utf8" });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain(
+      "mantaq-check-site: /gone/: --overview names this page, but it shows no machine overview (<Machines>)",
+    );
+  });
+
   test("--overview passes on the overview page and fails naming a page without one", () => {
     const run = (page: string) =>
       spawnSync("node", [cli, good, "--overview", page], { encoding: "utf8" });
