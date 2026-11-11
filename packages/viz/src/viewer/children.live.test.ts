@@ -904,6 +904,25 @@ describe("live actor map children", () => {
       ]);
     });
 
+    test("review: data-live-cascade marks only a step after which another part moved", () => {
+      const root = scripted(
+        [
+          { children: [], last: rootStay("photoAdded"), after: [] },
+          {
+            children: [],
+            last: rootStay("photoAdded"),
+            after: [{ ...childMoved("p1", "a", "a"), outcome: "stay" }],
+          },
+          { children: [], last: rootStay("photoAdded"), after: [childMoved("p1", "a", "b")] },
+        ],
+        ["photoAdded", "photoAdded", "photoAdded"],
+      );
+      const marked = [...root.querySelectorAll("[data-live-cascade]")].map((each) =>
+        each.getAttribute("data-rewind"),
+      );
+      expect(marked).toEqual(["3"]);
+    });
+
     test("a stay on another part shows no arrow, and a region is named by its path", () => {
       const root = scripted(
         [
