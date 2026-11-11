@@ -268,6 +268,26 @@ broadcast(map, { type: "ping" });
 
 Works with any object implementing `{ keys(): string[]; send(key, event): void }`.
 
+### `createPool({ name, workers, run, keep?, key?, batch?, clock? })`
+
+One inbox and `workers` workers (`w1`..`wn`) that pull work. The inbox hands items to free workers only; a failed run puts its items back at the front. Event ids are `${name}.ITEM_ARRIVED` and so on, so two pools with different names never cross.
+
+```ts
+import { createPool } from "@mantaq/sugar";
+
+const pool = createPool<string, "team">({
+  name: "team",
+  workers: 3,
+  run: async (items, { signal }) => {
+    await fetch(`/work/${items[0]}`, { signal });
+  },
+});
+
+pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
+```
+
+`pool.actor` is the inbox (states `empty`, `holding`). `pool.workers` is an `ActorMap` (states `free`, `working`). `keep: "set"` skips an item whose `key` (default `JSON.stringify`) already waits. `batch` is the most items one worker takes (default 1; `Infinity` takes all). A worker sent work while busy returns it. Waiting items live in memory: persisting them is the app's job.
+
 ### `onOutput(actor, handler)`
 
 Route an actor's emitted outputs to a handler. `regions` auto-wire child

@@ -8,8 +8,8 @@ import type { AnyActor, InternalEvent } from "@mantaq/core";
  * factory connects a child's declared outputs to a receiver — pass several
  * handlers to feed multiple receivers.
  */
-export function onOutput(
-  actor: AnyActor,
+export function onOutput<C>(
+  actor: AnyActor<C>,
   ...handlers: [handler: (event: InternalEvent) => void]
 ): void {
   for (const handler of handlers) {

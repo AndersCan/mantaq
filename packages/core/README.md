@@ -545,7 +545,7 @@ export function bind<
 
 ### Any Handler
 
-Use `onAny` to intercept an event in every state. Useful for universal cancel, cleanup, or logging. A state's own `m.on` for the same event wins.
+Use `onAny` to intercept an event in every state. Useful for universal cancel, cleanup, or logging. A state's own `m.on` for the same event runs first; `onAny` then runs too, and may move the actor only if the state's handler stayed.
 
 ```ts
 import { Actor, state, event } from "@mantaq/core";

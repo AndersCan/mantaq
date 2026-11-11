@@ -262,10 +262,31 @@ type Part<S, I, Int, O, C>; // (m: ActorBuilder<S, I, Int, O, C>) => void — on
 
 ---
 
+## `createPool(options)`
+
+```ts
+function createPool<T, const N extends string>(options: {
+  name: N;
+  workers: number;
+  run: (items: readonly T[], options: { signal: AbortSignal }) => Promise<void>;
+  keep?: "queue" | "set";
+  key?: (item: T) => string;
+  batch?: number;
+  clock?: Clock;
+}): { actor: Actor; workers: ActorMap; events: PoolEvents<T, N> };
+function poolEvents<T, const N extends string>(name: N): PoolEvents<T, N>;
+```
+
+One inbox (`actor`: `empty` or `holding`) and `workers` workers `w1`..`wn` (`free` or `working`). The inbox hands items to free workers only. `run` resolves: the items are done. `run` rejects or throws: the items go back to the front. Send `events.ITEM_ARRIVED.create({ item })` to `actor`. Event ids are `${name}.ITEM_ARRIVED`, `ITEMS_ASSIGNED`, `ITEMS_FINISHED`, `ITEMS_FAILED`, `ITEMS_RETURNED`, `RUN_SUCCEEDED` and `RUN_FAILED`.
+
+`keep: "set"` skips an item whose `key` (default `JSON.stringify`) already waits. `batch` is the most items one worker takes (default 1, `Infinity` for all that wait). A busy worker sent work returns it with `ITEMS_RETURNED`. Waiting items are in memory and unbounded.
+
+---
+
 ## `onOutput(actor, handler)`
 
 ```ts
-function onOutput(actor: AnyActor, handler: (event: InternalEvent) => void): void;
+function onOutput<C>(actor: AnyActor<C>, handler: (event: InternalEvent) => void): void;
 ```
 
 Route actor emitted outputs to a handler. `regions` auto-wire child outputs to parent; `ActorMap` children do not. One call connects declared outputs to a receiver.
