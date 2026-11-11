@@ -28,15 +28,13 @@ import poolSource from "../../../pool/team-inbox.ts?raw";
 
 ## Why the diagram looks like this
 
-| You see                                                | Why                                                                                                                                                                                                                                     |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One arrow per event, not one per state                 | The inbox handles each event the same way in both states, so it uses `onAny`: one `any state` source instead of one per state. Each event still gets one arrow per target state.                                                        |
-| `workers ×3`, not three boxes                          | The workers are an actor map. The count is live; a hand-written copy per worker is three boxes, so use a map.                                                                                                                           |
-| Arrows between boxes, not loops on a parent            | A parent that only forwards events draws self-loops and hides the receiver. Wire the parts in the factory.                                                                                                                              |
-| Every arrow is listed, even with no run yet            | Arrows come from the declared outputs, so they are complete before any test runs.                                                                                                                                                       |
-| A busy worker sent work sends it back                  | `team.ITEMS_RETURNED` puts the items at the front of the inbox. Nothing is dropped.                                                                                                                                                     |
-| A design finding and payload warnings in the build log | The fuzzer finds payload samples only in the machine's own file. A machine built inside `createPool` gets none, so it sends `team.ITEMS_RETURNED` with no payload and the inbox throws. This is a fuzz artefact, not a bug in the pool. |
-| Map arrows show no hit count                           | The fuzzer does not send to map children, so the arrows to `workers ×3` have no hit count. Run the steps by hand to see them fire.                                                                                                      |
+| You see                                     | Why                                                                                                                                                                              |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One arrow per event, not one per state      | The inbox handles each event the same way in both states, so it uses `onAny`: one `any state` source instead of one per state. Each event still gets one arrow per target state. |
+| `workers ×3`, not three boxes               | The workers are an actor map. The count is live; a hand-written copy per worker is three boxes, so use a map.                                                                    |
+| Arrows between boxes, not loops on a parent | A parent that only forwards events draws self-loops and hides the receiver. Wire the parts in the factory.                                                                       |
+| Every arrow is listed, even with no run yet | Arrows come from the declared outputs, so they are complete before any test runs.                                                                                                |
+| A busy worker sent work sends it back       | `team.ITEMS_RETURNED` puts the items at the front of the inbox. Nothing is dropped.                                                                                              |
 
 ## Limits
 

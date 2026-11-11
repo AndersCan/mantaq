@@ -1,6 +1,6 @@
-import type { VizField } from "@mantaq/viz";
+import type { VizField, VizJson } from "@mantaq/viz";
 import ts from "typescript";
-import { fieldsOf } from "./payloads.ts";
+import { actorEventSamples, fieldsOf } from "./payloads.ts";
 import type { LoadedSource } from "./program.ts";
 
 /**
@@ -40,15 +40,24 @@ function unwrapOf(
   return hasAll(checker.getTypeOfSymbolAtLocation(actor, node), ACTOR_KEYS) ? "actor" : null;
 }
 
+/** The actor type reached by `unwrap`. */
+function actorTypeOf(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
+): ts.Type {
+  const { type, unwrap, node } = context;
+  const actor = unwrap === "self" ? undefined : type.getProperty("actor");
+  return actor === undefined ? type : checker.getTypeOfSymbolAtLocation(actor, node);
+}
+
 /** Fields of the `context` property of the actor type reached by `unwrap`. */
 function contextOf(
   checker: ts.TypeChecker,
   context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
 ): VizField[] | null {
-  const { type, unwrap, node } = context;
-  const actor = unwrap === "self" ? undefined : type.getProperty("actor");
-  const actorType = actor === undefined ? type : checker.getTypeOfSymbolAtLocation(actor, node);
-  const property = actorType?.getProperty("context");
+  const { node } = context;
+  const actorType = actorTypeOf(checker, context);
+  const property = actorType.getProperty("context");
   if (property === undefined) return null;
   const fields = fieldsOf(
     checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(property, node)),
@@ -91,42 +100,61 @@ function machineExport(
   checker: ts.TypeChecker,
   symbol: ts.Symbol,
   node: ts.Node,
-): MachineExport | null {
+): { found: MachineExport; actor: ts.Type } | null {
   const target =
     symbol.getFlags() & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
   const type = checker.getTypeOfSymbolAtLocation(target, node);
   const name = symbol.getName();
   const self = unwrapOf(checker, type, node);
   if (self !== null) {
+    const at = { type, unwrap: self, node };
     return {
-      name,
-      call: "instance",
-      unwrap: self,
-      context: contextOf(checker, { type, unwrap: self, node }),
+      found: { name, call: "instance", unwrap: self, context: contextOf(checker, at) },
+      actor: actorTypeOf(checker, at),
     };
   }
   for (const signature of checker.getSignaturesOfType(type, ts.SignatureKind.Call)) {
     const unwrap = unwrapOf(checker, signature.getReturnType(), node);
     const call = unwrap === null ? null : callOf(checker, signature, node);
     if (unwrap !== null && call !== null) {
-      const returned = signature.getReturnType();
-      return { name, call, unwrap, context: contextOf(checker, { type: returned, unwrap, node }) };
+      const at = { type: signature.getReturnType(), unwrap, node };
+      return {
+        found: { name, call, unwrap, context: contextOf(checker, at) },
+        actor: actorTypeOf(checker, at),
+      };
     }
   }
   return null;
 }
 
-/** Exports of the file that are actors or build one, in source order. */
-export function machineExports(loaded: LoadedSource): MachineExport[] {
+function exportedMachines(loaded: LoadedSource): Array<{ found: MachineExport; actor: ts.Type }> {
   const { checker, sourceFile } = loaded;
   const module = checker.getSymbolAtLocation(sourceFile);
   if (module === undefined) return [];
   return checker
     .getExportsOfModule(module)
     .flatMap((symbol) => {
-      const found = machineExport(checker, symbol, sourceFile);
-      return found === null ? [] : [{ found, at: symbol.declarations?.[0]?.getStart() ?? 0 }];
+      const machine = machineExport(checker, symbol, sourceFile);
+      return machine === null ? [] : [{ machine, at: symbol.declarations?.[0]?.getStart() ?? 0 }];
     })
     .sort((left, right) => left.at - right.at)
-    .map(({ found }) => found);
+    .map(({ machine }) => machine);
+}
+
+/** Exports of the file that are actors or build one, in source order. */
+export function machineExports(loaded: LoadedSource): MachineExport[] {
+  return exportedMachines(loaded).map(({ found }) => found);
+}
+
+/**
+ * Sample payloads per event the file's machines declare, read from each
+ * actor's type. Covers handlers registered in another file, such as the
+ * inbox and workers `createPool` builds.
+ */
+export function exportedPayloadSamples(loaded: LoadedSource): Record<string, VizJson[]> {
+  return Object.fromEntries(
+    exportedMachines(loaded).flatMap(({ actor }) =>
+      actorEventSamples(loaded.checker, { actor, node: loaded.sourceFile }),
+    ),
+  );
 }

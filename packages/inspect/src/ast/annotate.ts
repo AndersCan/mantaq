@@ -1,5 +1,5 @@
 import type { VizEdge, VizExplanation, VizField, VizJson, VizMachine } from "@mantaq/viz";
-import { machineExports } from "./discover.ts";
+import { exportedPayloadSamples, machineExports } from "./discover.ts";
 import type { MachineExport } from "./discover.ts";
 import { explainRegistration } from "./handler.ts";
 import { payloadFields, payloadSamples } from "./payloads.ts";
@@ -77,7 +77,8 @@ export function analyzeModule(source: AnalysisSource): Either<string, ModuleAnal
     onRight: (loaded) =>
       Either.right({
         ...docsOf(loaded),
-        payloads: payloadSamples(loaded),
+        // Samples from the file's own handlers win over the ones read from `send`.
+        payloads: { ...exportedPayloadSamples(loaded), ...payloadSamples(loaded) },
         machines: machineExports(loaded),
       }),
   });

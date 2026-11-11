@@ -55,6 +55,17 @@ describe("analyzeModule: payload samples from event types", () => {
       { order: { orderId: "sample", items: ["sample"], amount: 1 } },
     ]);
   });
+
+  test("a machine built in another package gets samples from its actor type, outputs included", () => {
+    const items = { worker: "sample", items: ["sample"] };
+    expect(analysis("pool")?.payloads).toEqual({
+      "team.ITEM_ARRIVED": [{ item: "sample" }],
+      "team.ITEMS_FINISHED": [items],
+      "team.ITEMS_FAILED": [{ ...items, error: "sample" }],
+      "team.ITEMS_RETURNED": [items],
+      "team.ITEMS_ASSIGNED": [items],
+    });
+  });
 });
 
 describe("analyzeModule: context and payload fields from types", () => {

@@ -224,3 +224,44 @@ export function payloadSamples(loaded: LoadedSource): Record<string, VizJson[]> 
   });
   return Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right)));
 }
+
+/** The payload type of an EventRef type: the parameter of its one-argument `create`. */
+function refPayload(checker: ts.TypeChecker, ref: ts.Type, node: ts.Node): ts.Type | null {
+  const create = ref.getProperty("create");
+  if (create === undefined) return null;
+  const parameter = checker
+    .getSignaturesOfType(checker.getTypeOfSymbolAtLocation(create, node), ts.SignatureKind.Call)
+    .find((signature) => signature.parameters.length === 1)?.parameters[0];
+  return parameter === undefined ? null : checker.getTypeOfSymbolAtLocation(parameter, node);
+}
+
+/**
+ * Sample payloads per event an actor declares (`inputs`, `internal`, `outputs`),
+ * read from its type. An output sample also feeds the children that take it,
+ * e.g. a pool's workers, whose own types are erased in an `ActorMap`.
+ * Events without a payload are left out.
+ */
+export function actorEventSamples(
+  checker: ts.TypeChecker,
+  context: { actor: ts.Type; node: ts.Node },
+): Array<[string, VizJson[]]> {
+  const { actor, node } = context;
+  const options = actor.getProperty("options");
+  if (options === undefined) return [];
+  const optionsType = checker.getTypeOfSymbolAtLocation(options, node);
+  return ["inputs", "internal", "outputs"].flatMap((list): Array<[string, VizJson[]]> => {
+    const property = optionsType.getProperty(list);
+    if (property === undefined) return [];
+    const refs = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(property, node));
+    const element = checker.getIndexTypeOfType(refs, ts.IndexKind.Number);
+    if (element === undefined) return [];
+    return (element.isUnion() ? element.types : [element]).flatMap((ref) => {
+      const id = ref.getProperty("type");
+      const name = id === undefined ? null : checker.getTypeOfSymbolAtLocation(id, node);
+      const payload = refPayload(checker, ref, node);
+      if (name === null || !name.isStringLiteral() || payload === null) return [];
+      const samples = samplesOf(payload, { checker, node, depth: 0 });
+      return samples.length === 0 ? [] : [[name.value, samples] as [string, VizJson[]]];
+    });
+  });
+}
