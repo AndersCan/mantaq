@@ -17,7 +17,7 @@ Someone asks you to design, plan or rethink a feature or a rule ("design this wi
 Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the vite config.
 
 1. Vite only. No `vite` in package.json: say the live viewer runs on Vite and ask before adding it. A user who asked for a clickable diagram has consented.
-   - Empty folder: `npm create vite@latest . -- --template vanilla-ts`. Its tsconfig includes only `src`: add `vite.config.ts` to `include`.
+   - Empty folder: `npm create vite@latest . -- --template vanilla-ts`. Its tsconfig includes only `src`: add `vite.config.ts` to `include`, or step 6 skips the config and a mistyped `mantaqViz` option passes.
    - Bare `npm init` project (CommonJS, so Vite warns "ESM syntax in a file loaded as CommonJS"): `npm pkg set type=module`, `npm i -D vite typescript`, and a `tsconfig.json` with `"strict": true`, `"module": "ESNext"`, `"moduleResolution": "Bundler"`, `"include": ["src", "vite.config.ts"]`.
 2. Use the project's package manager.
 3. Install `@mantaq/core` and `-D @mantaq/inspect`, no versions. Check one core with `npm ls @mantaq/core`. Two versions: install core at the version `@mantaq/inspect` depends on.
@@ -36,8 +36,8 @@ Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the v
 
 5. Machine file `src/<name>.machine.ts`. Export a factory, not an instance: `export function create<Name>({ clock }: { clock: Clock } = { clock: VirtualClock() })` returning `Actor({ ..., clock, ... })`. Ports go in the same options object, each with a working default. States, events and JSDoc as in sections 4 and 5.
 6. Typecheck: `npx tsc --noEmit` (or the repo's script). Fix against the types.
-7. Start the server in the background: `npx vite --open "/__mantaq/?machine=<id>"`. Read the output: the `Local:` URL and `mantaq viz: /__mantaq/`. Any `[mantaq-viz]` line is a problem to fix.
-8. Check it is drawn: `curl -s <Local URL>__mantaq/viz.json | grep -c '"id": "<id>"'` is at least 1.
+7. Start the server in the background: `npx vite`. Read its output for the `Local:` URL and `mantaq viz: /__mantaq/`.
+8. Check it is drawn: `curl -s <Local URL>__mantaq/viz.json | grep -c '"id": "<id>"'` is at least 1. This request builds the page, so read the server output again: any `[mantaq-viz]` line is a problem to fix.
 9. Reply with the link `<Local URL>__mantaq/?machine=<id>` and the states in one line. Leave the server running while the user designs.
 
 ## 1. The machine in the code is the design

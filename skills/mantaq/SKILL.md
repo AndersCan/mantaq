@@ -53,7 +53,7 @@ Everything runs synchronously in one call stack with `VirtualClock`. No awaits n
 
 Design before code. Suggested order; follow the user's:
 
-1. **States first.** List every state the system can be in. If the user hasn't said, read the existing code or ask questions to understand the app, then propose the states. Mark which are final. Failures that are part of the domain (declined, timed out) are states too. Read each name after "Right now:". If a stranger cannot tell what is on screen or what is awaited, rename it.
+1. **States first.** List every state the system can be in. If the user hasn't said, read the existing code or ask questions to understand the app, then propose the states. Mark which are final. Failures that are part of the domain (declined, timed out) are states too. Read each name alone, as the live page's state line shows it: `In waitingForAnswer`. If a stranger cannot tell what is on screen or what is awaited, rename it.
 2. **Then edges.** For each state, which events move it where? Name the events and say which are inputs (from callers) and which are internal (emitted by effects). Draw the whole graph before writing handlers.
 3. **Then effects.** For each state, ask what must happen on entry: calls, timers, logging, I/O. Effects run on entry to a state, not on an edge. "When going A→B, send a log" is an effect on B. If it must only fire when coming from A, model a separate state, or carry the source in context or state payload.
 4. **Decisions are transitions, not effects.** "Validate, then go to B or C" is a handler returning B or C. If validation is async, the effect does the work and emits an internal event, and a handler on that event picks B or C.
