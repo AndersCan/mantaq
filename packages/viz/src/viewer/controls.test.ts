@@ -185,3 +185,13 @@ describe("Coverage from picker", () => {
     expect(root.querySelector(".coverage-mode")).toBeNull();
   });
 });
+
+describe("Coverage from picker, order", () => {
+  test("is the first item in the Controls tab", () => {
+    const shown = structuredClone(machine);
+    shown.states = shown.states.map((state) => ({ ...state, coverage: { hits: 1 } }));
+    const root = mount({}, shown);
+    const first = root.querySelector('[data-tab-panel="controls"] .controls')?.firstElementChild;
+    expect(first?.querySelector(".coverage-mode")).not.toBeNull();
+  });
+});
