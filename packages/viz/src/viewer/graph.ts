@@ -6,7 +6,7 @@ import type { VizCoverage, VizEdge, VizMachine } from "../schema.ts";
 import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { activatable, svg } from "./dom.ts";
-import { edgeText } from "./labels.ts";
+import { edgeCondition, edgeLines, edgeText } from "./labels.ts";
 import { layoutMachine } from "./layout.ts";
 import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
@@ -262,9 +262,35 @@ function nodeGroup(
   return node.kind === "any" ? anyGroup(doc, node) : unknownGroup(doc, node);
 }
 
+const LINE_HEIGHT = 16;
+
 function edgeAria(edge: VizEdge, text: string): string {
   if (edge.kind === "stay") return `${sourceText(edge.from)} on ${text} stays`;
-  return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}`;
+  const condition = edgeCondition(edge);
+  const when = condition === null ? "" : ` when ${condition}`;
+  return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}${when}`;
+}
+
+function edgeLabel(doc: Document, placed: PlacedEdge): SVGElement {
+  const lines = edgeLines(placed.edge);
+  const top = placed.label.y + 4 - ((lines.length - 1) * LINE_HEIGHT) / 2;
+  return svg(
+    doc,
+    "text",
+    { x: placed.label.x, y: top, "text-anchor": "middle" },
+    lines.map((line, index) =>
+      svg(
+        doc,
+        "tspan",
+        {
+          x: placed.label.x,
+          dy: index === 0 ? 0 : LINE_HEIGHT,
+          class: index === 0 ? null : "edge-condition",
+        },
+        [line],
+      ),
+    ),
+  );
 }
 
 function edgeGroup(
@@ -302,9 +328,7 @@ function edgeGroup(
             ? `--viz-dot-gap: ${placed.dotGap.toFixed(1)}`
             : null,
       }),
-      svg(doc, "text", { x: placed.label.x, y: placed.label.y + 4, "text-anchor": "middle" }, [
-        text,
-      ]),
+      edgeLabel(doc, placed),
     ],
   );
   activatable(group, () => context.callbacks.select({ kind: "edge", id: edge.id }));

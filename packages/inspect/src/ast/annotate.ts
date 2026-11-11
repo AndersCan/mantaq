@@ -119,9 +119,21 @@ function explain(
   };
 }
 
+/** A fuzz-found stay that the handler's own analyzed `stay` branch already explains. */
+function explainedStay(edge: VizEdge): boolean {
+  const { explanation } = edge;
+  return (
+    edge.origin === "fuzz" &&
+    edge.kind === "stay" &&
+    explanation !== null &&
+    explanation.status === "analyzed" &&
+    explanation.branches.some((branch) => branch.target.kind === "stay")
+  );
+}
+
 /**
- * Fill `explanation` on handler-driven edges. Never adds or removes edges:
- * the runtime graph stays the source of truth. A source that cannot be
+ * Fill `explanation` on handler-driven edges. Never adds edges; the only one
+ * it drops is a fuzz stay that the handler's own `stay` branch explains. A source that cannot be
  * analyzed marks every handler edge `not_analyzed` with the reason.
  */
 export function annotateMachine(machine: VizMachine, source: AnalysisSource): VizMachine {
@@ -152,6 +164,7 @@ export function annotateWith(
     };
   });
   if (Either.isLeft(analysis)) return { ...machine, edges };
+  const drawn = edges.filter((edge) => !explainedStay(edge));
   const { stateDocs, eventDocs, eventPayloads } = analysis[1];
   return {
     ...machine,
@@ -164,6 +177,6 @@ export function annotateWith(
       doc: eventDocs.get(event.id) ?? null,
       payload: eventPayloads.get(event.id) ?? null,
     })),
-    edges,
+    edges: drawn,
   };
 }
