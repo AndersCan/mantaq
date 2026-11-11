@@ -300,7 +300,7 @@ export function mountViewer(
       : renderGraph(doc, machine, { select, showDetails, mode });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
-    const key = systemKey(doc, { machine, system: inSystem ? system : null, dots: live !== null });
+    const key = systemKey(doc, { machine, system: inSystem ? system : null, live: null });
     root.append(...layoutOf(doc, { chrome, graph, key, panel, changes }));
     refresh();
   }
@@ -346,12 +346,12 @@ function systemCallbacks(context: {
 /** The line under the system diagram: the prefix its event names share, and what the child dots mean when a driver draws them. */
 function systemKey(
   doc: Document,
-  context: { machine: VizMachine; system: MachineSystem | null; dots: boolean },
+  context: { machine: VizMachine; system: MachineSystem | null; live: VizLiveState | null },
 ): HTMLElement | null {
-  const { machine, system, dots } = context;
+  const { machine, system, live } = context;
   if (system === null) return null;
   const prefix = systemPrefix(system);
-  const dotItem = dots ? dotKey(machine, system) : null;
+  const dotItem = dotKey(machine, { system, live });
   return keyLine(doc, [
     ...(prefix === "" ? [] : [`events: ${prefix}*`]),
     ...(dotItem === null ? [] : [dotItem]),
@@ -928,6 +928,11 @@ function markSystemView(
 ): void {
   const { machine, system, view } = context;
   markSystem(root, { machine, system, live: view.live, selection: view.systemSelection });
+  const canvas = root.querySelector(".canvas");
+  const doc = root.ownerDocument;
+  canvas?.querySelector("[data-viz-key]")?.remove();
+  const key = systemKey(doc, { machine, system, live: view.live });
+  if (key !== null) canvas?.append(key);
   showPayloadSheet(root, { ...context, ...view });
 }
 

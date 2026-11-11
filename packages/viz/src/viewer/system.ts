@@ -61,12 +61,31 @@ function dotStatesOf(machine: VizMachine, part: SystemPart): [string, string] | 
   return [first.id, second.id];
 }
 
-/** The key item for child dots, `○ free  ● working`, or null when no map draws dots. */
-export function dotKey(machine: VizMachine, system: MachineSystem): string | null {
-  for (const part of system.parts) {
-    const states = dotStatesOf(machine, part);
-    if (states === null) continue;
-    return `○ ${localName(states[0])}  ● ${localName(states[1])}`;
+/** The dots a map draws: its two states and its children sorted by key; null when it draws the count text instead (other shape, no children, over the limit, or a child outside the two states). */
+function dotsOf(
+  machine: VizMachine,
+  context: { part: SystemPart; live: VizLiveState | null },
+): { states: [string, string]; children: VizLiveState["children"] } | null {
+  const { part, live } = context;
+  const states = dotStatesOf(machine, part);
+  if (states === null || live === null) return null;
+  const children = live.children
+    .filter((child) => child.map === part.id)
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  if (children.length === 0 || children.length > MAX_DOTS) return null;
+  if (children.some((child) => !states.includes(child.state))) return null;
+  return { states, children };
+}
+
+/** The key item for child dots, `○ free  ● working`, or null when no map draws dots right now. */
+export function dotKey(
+  machine: VizMachine,
+  context: { system: MachineSystem; live: VizLiveState | null },
+): string | null {
+  for (const part of context.system.parts) {
+    const drawn = dotsOf(machine, { part, live: context.live });
+    if (drawn === null) continue;
+    return `○ ${localName(drawn.states[0])}  ● ${localName(drawn.states[1])}`;
   }
   return null;
 }
@@ -447,17 +466,12 @@ function markDots(
   const { machine, part, live } = context;
   const holder = group.querySelector("g.part-dots");
   if (holder === null) return false;
-  const states = dotStatesOf(machine, part);
-  const children =
-    live === null
-      ? []
-      : live.children
-          .filter((child) => child.map === part.id)
-          .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-  if (states === null || children.length === 0 || children.length > MAX_DOTS) {
+  const drawn = dotsOf(machine, { part, live });
+  if (drawn === null) {
     holder.replaceChildren();
     return false;
   }
+  const { states, children } = drawn;
   const doc = holder.ownerDocument;
   holder.replaceChildren(
     ...children.map((child, index) => {

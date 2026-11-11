@@ -707,3 +707,93 @@ describe("pool view arrows: every branch", () => {
     expect(height(stacked) - height(pool)).toBeGreaterThanOrEqual(16);
   });
 });
+
+describe("child dots: the key and the marks match what is drawn", () => {
+  const withChildren = (machine: VizMachine, states: string[]) => {
+    const root = document.createElement("div");
+    const live = (): VizLiveState => ({
+      ...snapshot(0),
+      children: states.map((at, index) => ({
+        map: "workers",
+        key: `w${index}`,
+        state: at,
+        since: 0,
+      })),
+    });
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver: { reset: live, step: live } },
+    );
+    return root;
+  };
+
+  test("seven children: count text and no dot key", () => {
+    const root = withChildren(
+      pool,
+      Array.from({ length: 7 }, () => "workers.free"),
+    );
+    expect(root.querySelector("g.child-dot")).toBeNull();
+    expect(text(root, "[data-viz-key]")).toBe(undefined);
+  });
+
+  test("no children: no dot key", () => {
+    const root = withChildren(pool, []);
+    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("none running");
+    expect(text(root, "[data-viz-key]")).toBe(undefined);
+  });
+
+  test("a child in a final state is not drawn as the second state", () => {
+    const withDone: VizMachine = {
+      ...pool,
+      states: [...pool.states, { ...state("workers.done"), final: true }],
+    };
+    const root = withChildren(withDone, ["workers.free", "workers.done"]);
+    expect(root.querySelector('g.child-dot[data-child="w1"]')?.getAttribute("data-mark")).not.toBe(
+      "second",
+    );
+  });
+
+  test("dots are drawn sorted by key, one circle each at distinct positions", () => {
+    const root = withChildren(pool, ["workers.free", "workers.working", "workers.free"]);
+    const keys = (r: HTMLElement) => [...r.querySelectorAll("g.child-dot")];
+    const unsorted = document.createElement("div");
+    const live = (): VizLiveState => ({
+      ...snapshot(0),
+      children: ["w3", "w1", "w2"].map((key) => ({
+        map: "workers",
+        key,
+        state: "workers.free",
+        since: 0,
+      })),
+    });
+    mountViewer(
+      unsorted,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] },
+      { driver: { reset: live, step: live } },
+    );
+    expect(dots(unsorted)).toEqual(["w1:free", "w2:free", "w3:free"]);
+    const cx = keys(root).map((dot) => dot.querySelector("circle")?.getAttribute("cx"));
+    expect(cx).toEqual(["-16", "0", "16"]);
+    expect(text(root, "[data-viz-key]")).toContain("○ free  ● working");
+  });
+
+  test("a child in a final state draws the count text and no dot key", () => {
+    const withDone: VizMachine = {
+      ...pool,
+      states: [...pool.states, { ...state("workers.done"), final: true }],
+    };
+    const root = withChildren(withDone, ["workers.free", "workers.done"]);
+    expect(root.querySelector("g.child-dot")).toBeNull();
+    expect(text(root, "[data-viz-key]")).toBe(undefined);
+  });
+
+  test("a child machine with one non-final state draws no dots", () => {
+    const one: VizMachine = {
+      ...pool,
+      states: pool.states.filter((s) => s.id !== "workers.working"),
+    };
+    const root = withChildren(one, ["workers.free"]);
+    expect(root.querySelector("g.child-dot")).toBeNull();
+  });
+});
