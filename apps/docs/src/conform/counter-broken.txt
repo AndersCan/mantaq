@@ -1,0 +1,9 @@
+The app does not match the model after 5 events (seed 107806).
+  #  event      model     app
+  0  (start)    empty     empty
+  1  increment  counting  counting
+  2  increment  counting  counting
+  3  increment  full      full
+  4  increment  full      full      model did not handle it
+  5  decrement  counting  full      <- differs
+The app has a bug, or the model is wrong.
