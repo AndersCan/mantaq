@@ -223,6 +223,19 @@ describe("createPool", () => {
     expect(control.starts).toEqual([["a"], ["x"]]);
   });
 
+  test("returned items go ahead of the items that already wait", async () => {
+    const control = controlled();
+    const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
+    pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
+    pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "b" }));
+    await flush();
+    pool.workers.send("w1", pool.events.ITEMS_ASSIGNED.create({ worker: "w1", items: ["x"] }));
+    await flush();
+    control.runs[0]?.resolve();
+    await flush();
+    expect(control.starts.slice(0, 2)).toEqual([["a"], ["x"]]);
+  });
+
   test("ids the pool does not know change nothing", async () => {
     const control = controlled();
     const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
