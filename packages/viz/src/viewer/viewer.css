@@ -521,6 +521,12 @@
   font-weight: 700;
 }
 
+/* System view: pink on the arrow that carried the last step. */
+.viz .edge.took path {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
 /* A clicked item stays teal even when it is also on the walk. */
 .viz .graph .selected path,
 .viz .graph .selected .frame {
@@ -871,4 +877,20 @@
 
 .viz.diagram-only .finding-mark {
   display: none;
+}
+
+/* System view: grey chip and end mark. */
+.viz .part-chip {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.viz .link-end rect {
+  fill: var(--state-bg);
+  stroke: var(--muted);
+  stroke-dasharray: 2 3;
+}
+
+.viz .link-end text {
+  fill: var(--muted);
 }

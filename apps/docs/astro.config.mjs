@@ -26,6 +26,8 @@ export default defineConfig({
         "src/content/docs/checkout-with-bugs.ts",
         "src/content/docs/photo-upload.ts",
         "src/content/docs/photo-queue.ts",
+        "src/design/out-arrow.ts",
+        "src/design/pool.ts",
         "src/first-machine/traffic-light.ts",
         "src/tutorial/order-01.ts",
         "src/tutorial/order-02.ts",

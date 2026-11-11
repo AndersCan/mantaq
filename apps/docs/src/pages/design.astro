@@ -19,6 +19,7 @@ const headings = [
   { depth: 2, slug: "code-blocks", text: "Code blocks" },
   { depth: 2, slug: "buttons-and-cards", text: "Buttons and cards" },
   { depth: 2, slug: "diagram", text: "Diagram" },
+  { depth: 2, slug: "system-view", text: "System view" },
   { depth: 2, slug: "design-findings", text: "Design findings line" },
   { depth: 2, slug: "tutorial-step", text: "Tutorial step: start marker and self-transitions" },
   { depth: 2, slug: "phone-width", text: "Phone width" },
@@ -114,6 +115,19 @@ const headings = [
   </p>
   <p>A docs paragraph, so the diagram's text size is judged against the text around it.</p>
   <Machine src="src/content/docs/checkout.ts" />
+
+  <h2 id="system-view">System view</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: four blocks. A system node (a part's name and its state), a <code>×n</code> node (one box
+    for every child of an actor map, with a count per state), an out arrow (an output nobody in
+    the machine takes ends at <code>out of &lt;machine&gt;</code>), and the <code>← System</code>
+    button in the header after Open. Pink marks the arrow that carried the last step; teal marks
+    the clicked arrow or box.
+  </p>
+  <Machine src="src/content/docs/photo-upload.ts" />
+  <Machine src="src/design/out-arrow.ts" />
+  <Machine src="src/design/pool.ts" />
 
   <h2 id="design-findings">Design findings line</h2>
   <p><strong>Awaiting approval</strong></p>

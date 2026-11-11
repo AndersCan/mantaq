@@ -35,6 +35,9 @@ import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { freshKeys, knownPayload } from "./fill.ts";
 import { drawChildMarkers } from "./markers.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
+import { markSystem, renderSystem, sendsLines, systemDetails, systemFor } from "./system.ts";
+import type { OpenTarget, SystemSelection } from "./system.ts";
+import type { MachineSystem } from "../system.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
@@ -73,6 +76,10 @@ interface ViewState {
   diagramOnly: boolean;
   /** Why the requested run did not open; cleared by the next walk. */
   notice: string | null;
+  /** A machine whose parts talk opens on the system view; true once the reader opened a part in the diagram. */
+  drilled: boolean;
+  /** The clicked arrow or box in the system view; kept while the diagram is open. */
+  systemSelection: SystemSelection | null;
 }
 
 type PanelTab = "step" | "context" | "path" | "details" | "controls";
@@ -196,20 +203,14 @@ export function mountViewer(
       return;
     }
     const mode = effectiveMode(view, machine);
+    const system = systemFor(machine);
+    const inSystem = system !== null && !view.drilled;
     root.classList.toggle("coverage-on", mode !== "off");
     root.classList.toggle("diagram-only", view.diagramOnly);
-    const chrome: Chrome = {
-      root,
-      viz,
-      machine,
-      view,
-      heading: options.heading ?? "h1",
-      mode,
-      render,
-      onNavigate: options.onNavigate,
-      live: driver !== undefined,
-      setDiagramOnly,
-    };
+    const chrome = chromeOf(
+      { root, viz, machine, view, options },
+      { mode, render, setDiagramOnly, live: driver !== undefined },
+    );
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     const refresh = () => {
@@ -221,15 +222,20 @@ export function mountViewer(
         rewind,
         ...liveOf(view, { send, play, compose, routes: options.routes }),
       });
-      const details = renderPanel(doc, machine, {
-        selection: view.selection,
+      const details = detailsOf(doc, {
+        machine,
+        view,
+        system: inSystem ? system : null,
+        sends: system,
+        open,
         select,
         replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
       });
       const controls = controlsOf(doc, chrome);
       const footer = options.panelFooter;
       fillPanel(panel, { doc, view, parts, details, controls, refresh, footer });
-      markDiagram(root, { machine, view, send, compose, refresh });
+      if (inSystem) markSystemView(root, { machine, system, view, send, compose });
+      else markDiagram(root, { machine, view, send, compose, refresh });
     };
     redraw = refresh;
     const walked = (run?: string) => {
@@ -276,7 +282,10 @@ export function mountViewer(
       if (step !== null) view.selection = selection;
       return step === null ? showDetails(selection) : take(step);
     };
-    const graph = renderGraph(doc, machine, { select, showDetails, mode });
+    const open = openIn(root, view, () => render());
+    const graph = inSystem
+      ? renderSystem(doc, machine, system, { select: systemSelector(view, () => refresh()) })
+      : renderGraph(doc, machine, { select, showDetails, mode });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(...layoutOf(doc, { chrome, graph, panel, changes }));
@@ -284,6 +293,85 @@ export function mountViewer(
   }
 
   render();
+}
+
+function chromeOf(
+  from: {
+    root: HTMLElement;
+    viz: VizDocument;
+    machine: VizMachine;
+    view: ViewState;
+    options: ViewerOptions;
+  },
+  rest: Pick<Chrome, "mode" | "render" | "setDiagramOnly" | "live">,
+): Chrome {
+  const { options, ...shared } = from;
+  return { ...shared, ...rest, heading: options.heading ?? "h1", onNavigate: options.onNavigate };
+}
+
+/** A click on an arrow or box in the system view: its details show, nothing is walked. */
+function systemSelector(
+  view: ViewState,
+  refresh: () => void,
+): (selection: SystemSelection) => void {
+  return (selection) => {
+    view.systemSelection = selection;
+    view.tab = "details";
+    refresh();
+  };
+}
+
+/** Open: the diagram, on the target, without walking (a click on the diagram would walk). */
+function openIn(
+  root: HTMLElement,
+  view: ViewState,
+  render: () => void,
+): (target: OpenTarget) => void {
+  return (target) => {
+    view.drilled = true;
+    view.selection = target;
+    view.tab = "details";
+    render();
+    const element = root.querySelector<SVGGElement>(".graph g.selected");
+    if (typeof element?.scrollIntoView === "function")
+      element.scrollIntoView({ block: "nearest", inline: "center" });
+    root.querySelector<HTMLElement>("[data-system-back]")?.focus({ preventScroll: true });
+  };
+}
+
+/** The Details tab: the clicked arrow or box in the system view, else the diagram's selection. */
+function detailsOf(
+  doc: Document,
+  context: {
+    machine: VizMachine;
+    view: ViewState;
+    /** Set while the system view shows. */
+    system: MachineSystem | null;
+    /** Set when the machine has a system, shown or not. */
+    sends: MachineSystem | null;
+    open: (target: OpenTarget) => void;
+    select: (selection: Selection) => void;
+    replay: Parameters<typeof renderPanel>[2]["replay"];
+  },
+): HTMLElement {
+  const { machine, view, system, sends, open } = context;
+  const chosen = view.systemSelection;
+  const shown =
+    system === null || chosen === null
+      ? null
+      : systemDetails(doc, { machine, system, selection: chosen, live: view.live, open });
+  return (
+    shown ??
+    renderPanel(doc, machine, {
+      selection: view.selection,
+      select: context.select,
+      replay: context.replay,
+      sends:
+        sends === null
+          ? undefined
+          : (edge) => sendsLines(doc, { machine, system: sends, edge, open }),
+    })
+  );
 }
 
 /** Turns Diagram only on or off, then puts focus on the button that undoes it. */
@@ -353,6 +441,8 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     tab: "step",
     diagramOnly: false,
     notice: null,
+    drilled: false,
+    systemSelection: null,
   };
 }
 
@@ -688,9 +778,23 @@ interface Chrome {
   setDiagramOnly: (on: boolean) => void;
 }
 
+/** "← System": back from a part's diagram to the system view, the system selection kept. Only after Open. */
+function backToSystem(doc: Document, context: Chrome): HTMLElement | null {
+  const { view, machine } = context;
+  if (!view.drilled || systemFor(machine) === null) return null;
+  const button = html(doc, "button", { type: "button", "data-system-back": "" }, ["← System"]);
+  button.addEventListener("click", () => {
+    view.drilled = false;
+    context.render();
+    context.root.querySelector<HTMLElement>(".graph .selected")?.focus({ preventScroll: true });
+  });
+  return button;
+}
+
 function headerOf(doc: Document, context: Chrome): HTMLElement {
   const { machine, view, render } = context;
   return html(doc, "header", { class: "viz-header" }, [
+    backToSystem(doc, context),
     html(doc, context.heading, {}, [`Viz: ${machine.id}`]),
     context.live
       ? null
@@ -699,6 +803,8 @@ function headerOf(doc: Document, context: Chrome): HTMLElement {
           onChange: (id) => {
             view.machineId = id;
             view.selection = null;
+            view.drilled = false;
+            view.systemSelection = null;
             view.path = [];
             view.notice = null;
             context.onNavigate?.({ machine: id, steps: [] });
@@ -737,6 +843,19 @@ function controlsOf(doc: Document, context: Chrome): HTMLElement {
       : null,
     diagramOnly,
   ]);
+}
+
+/** The system view's marks, and the payload sheet, which a send from the Step tab opens as in the diagram. */
+function markSystemView(
+  root: HTMLElement,
+  context: { machine: VizMachine; system: MachineSystem; view: ViewState } & Pick<
+    LiveContext,
+    "send" | "compose"
+  >,
+): void {
+  const { machine, system, view } = context;
+  markSystem(root, { machine, system, live: view.live, selection: view.systemSelection });
+  showPayloadSheet(root, { ...context, ...view });
 }
 
 /** Everything drawn over the graph: walk marks, selection, and the edge of the open payload sheet. */
