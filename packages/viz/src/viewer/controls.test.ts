@@ -38,6 +38,7 @@ const machine: VizMachine = {
       explanation: null,
       doc: null,
       coverage: null,
+      tested: null,
     },
   ],
   fuzz: null,
@@ -165,20 +166,22 @@ describe("Diagram only, after a canvas click", () => {
 });
 
 describe("Coverage from picker", () => {
-  const covered = {
-    ...machine,
-    states: machine.states.map((state) => ({ ...state, coverage: { hits: 1 } })),
-  } as unknown as VizMachine;
+  const fresh = (): VizMachine => structuredClone(machine);
+  const covered = (): VizMachine => {
+    const copy = fresh();
+    copy.states = copy.states.map((state) => ({ ...state, coverage: { hits: 1 } }));
+    return copy;
+  };
 
   test("is in the Controls tab, not the header, when a mode has data", () => {
-    const root = mount({}, covered);
+    const root = mount({}, covered());
     expect(root.querySelector('[data-tab-panel="controls"] .coverage-mode')).not.toBeNull();
     expect(root.querySelector(".viz-header .coverage-mode")).toBeNull();
     expect(root.querySelector(".viz-header")?.textContent).toContain("Viz: door");
   });
 
   test("is absent everywhere without coverage data", () => {
-    const root = mount();
+    const root = mount({}, fresh());
     expect(root.querySelector(".coverage-mode")).toBeNull();
   });
 });
