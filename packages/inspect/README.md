@@ -151,7 +151,7 @@ The viewer's "Coverage from" picker dims elements with zero hits. What dimmed me
 
 **Payloads** (`analyzeModule`): the TypeScript checker reads each handled event's payload type (`event("x")<{ ... }>()`) and builds samples: `"sample"` for strings, `1` for numbers, every member of a literal union (varied one field at a time), one element per array. The fuzzer mutates from there. Samples you pass replace them per event.
 
-**AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { event, handler })` / `m.onAny({ event, handler })` and resolves names from the literal types of `state.name` / `event.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. A specific `on` wins over `onAny`, as at runtime.
+**AST** (`annotateMachine`, Phase 4): one `ts.Program` per source file with the project tsconfig. It finds `m.on(state, { event, handler })` / `m.onAny({ event, handler })` and resolves names from the literal types of `state.name` / `event.type`. It walks inline handlers: if/else, early returns, ternaries, and a ternary inside `state:`. For a state with its own `on`, the AST explains that handler; at runtime `onAny` also runs after it and moves only if the state's handler stayed.
 
 **Guidance** (`guidance`, Phase 5): literal seeding plus a branch-distance guide built from AST comparisons on payload and context. It helps when handlers compare payload fields against literals far from the samples, or count in context toward a threshold. See [`docs/atlas/phase5-comparison.md`](https://github.com/AndersCan/mantaq/blob/main/docs/atlas/phase5-comparison.md).
 
