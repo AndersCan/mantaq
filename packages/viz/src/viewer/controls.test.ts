@@ -49,10 +49,10 @@ afterEach(() => {
   Reflect.deleteProperty(document, "fullscreenEnabled");
 });
 
-function mount(options: { diagramOnly?: boolean } = {}): HTMLElement {
+function mount(options: { diagramOnly?: boolean } = {}, shown: VizMachine = machine): HTMLElement {
   const root = document.createElement("div");
   document.body.append(root);
-  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, options);
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shown] }, options);
   return root;
 }
 
@@ -161,5 +161,24 @@ describe("Diagram only, after a canvas click", () => {
     expect(shown?.textContent).toBe("Controls");
     expect(document.activeElement).toBe(root.querySelector("[data-diagram-only]"));
     expect(document.activeElement?.closest("[hidden]")).toBeNull();
+  });
+});
+
+describe("Coverage from picker", () => {
+  const covered = {
+    ...machine,
+    states: machine.states.map((state) => ({ ...state, coverage: { hits: 1 } })),
+  } as unknown as VizMachine;
+
+  test("is in the Controls tab, not the header, when a mode has data", () => {
+    const root = mount({}, covered);
+    expect(root.querySelector('[data-tab-panel="controls"] .coverage-mode')).not.toBeNull();
+    expect(root.querySelector(".viz-header .coverage-mode")).toBeNull();
+    expect(root.querySelector(".viz-header")?.textContent).toContain("Viz: door");
+  });
+
+  test("is absent everywhere without coverage data", () => {
+    const root = mount();
+    expect(root.querySelector(".coverage-mode")).toBeNull();
   });
 });

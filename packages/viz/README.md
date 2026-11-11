@@ -87,7 +87,7 @@ Bump `VIZ_SCHEMA_VERSION` on any breaking change. The validator accepts only the
 
 ## Coverage: two sources, two questions
 
-The viewer's "Coverage from" picker dims elements with zero hits. What dimmed means depends on the source:
+The viewer's "Coverage from" picker in the Controls tab dims elements with zero hits. What dimmed means depends on the source:
 
 - **examples + fuzz** (`reached`): neither an example nor fuzzing reached this. The default when both sources are present, and the same merge `expectReached` uses. Fix a miss by adding an example to `tests`.
 - **example tests** (`tested`): no test exercises this. It is the classic "what is untested" view. Supply the event sequences your tests send (`inspect({ tests })`).
