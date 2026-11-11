@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- *   mantaq-check-site <dir> [--base <path>] [--links <file> ... --site <url>]
+ *   mantaq-check-site <dir> [--base <path>] [--overview <path>] [--links <file> ... --site <url>]
  *
  * Serves a built Astro site and checks, in headless Chromium, that every
  * machine draws, every live machine handles an event and every overview box
@@ -11,10 +11,12 @@ import { Either } from "@mantaq/utils";
 import { parseArgs } from "node:util";
 import { checkSite } from "./check-site.ts";
 
-const USAGE = "usage: mantaq-check-site <dir> [--base <path>] [--links <file> ... --site <url>]";
+const USAGE =
+  "usage: mantaq-check-site <dir> [--base <path>] [--overview <path>] [--links <file> ... --site <url>]";
 
 const OPTIONS = {
   base: { type: "string" },
+  overview: { type: "string" },
   links: { type: "string", multiple: true },
   site: { type: "string" },
 } as const;
@@ -40,6 +42,7 @@ async function main(): Promise<number> {
   const result = await checkSite(dir, parsed.values.base ?? "/", {
     links: parsed.values.links ?? [],
     site: parsed.values.site,
+    overview: parsed.values.overview,
   });
   if (Either.isLeft(result)) {
     console.error(`mantaq-check-site: ${result[0]}`);
