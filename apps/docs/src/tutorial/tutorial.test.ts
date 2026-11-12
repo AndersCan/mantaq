@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 import { VirtualClock, event } from "@mantaq/core";
 import { expectNoDesignErrors } from "@mantaq/inspect";
+import { createMeal } from "./meal.ts";
 import { createOrder3 } from "./order-03.ts";
 import { createOrder4 } from "./order-04.ts";
 import { createOrder5 } from "./order-05.ts";
@@ -9,6 +10,7 @@ import { createOrder7 } from "./order-07.ts";
 import { createOrder8 } from "./order-08.ts";
 import { createOrder9 } from "./order-09.ts";
 
+const eat = event("eat")();
 const addItem = event("addItem")();
 const pay = event("pay")<{ email: string }>();
 const email = "ana@example.com";
@@ -18,6 +20,11 @@ const retry = event("retry")();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("tutorial machines", () => {
+  test("page one: eat moves the person from hungry to full", () => {
+    const actor = createMeal();
+    actor.send(eat.create());
+    expect(actor.state.name).toBe("full");
+  });
   test("step 3 opens the card form only with an email", () => {
     const actor = createOrder3();
     actor.send(pay.create({ email: "" }));

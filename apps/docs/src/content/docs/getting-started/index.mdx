@@ -1,11 +1,19 @@
 ---
-title: This is a state
-description: A state is where the order is now.
+title: A state and an event
+description: "`hungry` is where the person is now; `eat` moves them to `full`."
 ---
 
-import Step from "../../../components/Step.astro";
+import { Code } from "@astrojs/starlight/components";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+import mealSource from "../../../tutorial/meal.ts?raw";
 
-<Step n={1}>A state is where the order is now. This one is `cart`.</Step>
+<div class="mantaq-tutorial" data-pagefind-ignore>
+  <Machine src="src/tutorial/meal.ts" diagramOnly />
+</div>
+<div class="mantaq-caption">
+  `hungry` is where the person is now. `eat` moves them to `full`. Click `eat`.
+</div>
+<Code code={mealSource} lang="ts" title="src/meal.ts" />
 
 ```sh
 npm create vite@latest my-app -- --template vanilla-ts
