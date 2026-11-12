@@ -1,30 +1,33 @@
 ---
 title: Test it
-description: Test a traffic light on a virtual clock.
+description: Test a door lock that locks itself after 30 seconds, on a virtual clock.
 ---
 
 import { Code } from "@astrojs/starlight/components";
 import Machine from "@mantaq/inspect/astro/Machine.astro";
-import lightSource from "../../../first-machine/traffic-light.ts?raw";
-import testSource from "../../../first-machine/traffic-light.test.ts?raw";
+import lockSource from "../../../first-machine/door-lock.ts?raw";
+import testSource from "../../../first-machine/door-lock.test.ts?raw";
 
 <div data-pagefind-ignore>
 
-<Machine src="src/first-machine/traffic-light.ts" runEffects />
+<Machine src="src/first-machine/door-lock.ts" runEffects />
 
 </div>
 
-A virtual clock makes time a plain function call.
+A wrong code leaves the door locked; the right one opens it, and `withTimeout` locks it again after 30
+seconds. Leaving `unlocked` cancels the timer. Relocking after 30 seconds is a choice made for this door;
+yours may need another time, or to stay open.
 
-<Code code={lightSource} lang="ts" title="traffic-light.ts" />
+<Code code={lockSource} lang="ts" title="src/door-lock.ts" />
 
 <Code
   code={testSource.replace('"vite-plus/test"', '"vitest"')}
   lang="ts"
-  title="traffic-light.test.ts"
+  title="src/door-lock.test.ts"
 />
 
+A virtual clock makes time a plain function call.
+
 ```bash
-npm install -D vitest
 npx vitest run
 ```

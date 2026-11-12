@@ -1,5 +1,6 @@
 import { Actor, event, state } from "@mantaq/core";
 import type { Clock } from "@mantaq/core";
+import { withTimeout } from "@mantaq/sugar";
 
 type OrderContext = { items: number };
 
@@ -88,9 +89,7 @@ export function createOrder8(clock: Clock) {
       m.effect(paying, {
         name: "chargeTimer",
         sends: [paymentTimeout],
-        fn: ({ clock, signal, emit }) => {
-          clock.setTimeout(10_000, { signal, cb: () => emit(paymentTimeout.create()) });
-        },
+        fn: (input) => withTimeout(10_000, { input, event: () => paymentTimeout.create() }),
       });
       /** The charge worked, so the order is done. */
       m.on(paying, { event: paymentOk, to: [paid], handler: () => ({ state: paid }) });
