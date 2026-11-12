@@ -37,6 +37,7 @@ import { drawChildMarkers } from "./markers.ts";
 import { showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
 import {
+  dotKey,
   markSystem,
   renderSystem,
   sendsLines,
@@ -299,8 +300,7 @@ export function mountViewer(
       : renderGraph(doc, machine, { select, showDetails, mode });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
-    const key = systemKey(doc, inSystem ? system : null);
-    root.append(...layoutOf(doc, { chrome, graph, key, panel, changes }));
+    root.append(...layoutOf(doc, { chrome, graph, panel, changes }));
     refresh();
   }
 
@@ -342,10 +342,19 @@ function systemCallbacks(context: {
   };
 }
 
-/** The line under the system diagram: the prefix its event names share. */
-function systemKey(doc: Document, system: MachineSystem | null): HTMLElement | null {
-  const prefix = system === null ? "" : systemPrefix(system);
-  return keyLine(doc, prefix === "" ? [] : [`events: ${prefix}*`]);
+/** The line under the system diagram: the prefix its event names share, and what the child dots mean when a driver draws them. */
+function systemKey(
+  doc: Document,
+  context: { machine: VizMachine; system: MachineSystem | null; live: VizLiveState | null },
+): HTMLElement | null {
+  const { machine, system, live } = context;
+  if (system === null) return null;
+  const prefix = systemPrefix(system);
+  const dotItem = dotKey(machine, { system, live });
+  return keyLine(doc, [
+    ...(prefix === "" ? [] : [`events: ${prefix}*`]),
+    ...(dotItem === null ? [] : [dotItem]),
+  ]);
 }
 
 /** A click on an arrow or box in the system view: its details show, nothing is walked. */
@@ -440,13 +449,12 @@ function layoutOf(
   context: {
     chrome: Chrome;
     graph: Node;
-    key: HTMLElement | null;
     panel: HTMLElement;
     changes: HTMLElement[];
   },
 ): HTMLElement[] {
   const { chrome } = context;
-  const canvas = html(doc, "div", { class: "canvas" }, [context.graph, context.key]);
+  const canvas = html(doc, "div", { class: "canvas" }, [context.graph]);
   const { view } = chrome;
   if (!view.diagramOnly) {
     return [
@@ -918,6 +926,11 @@ function markSystemView(
 ): void {
   const { machine, system, view } = context;
   markSystem(root, { machine, system, live: view.live, selection: view.systemSelection });
+  const canvas = root.querySelector(".canvas");
+  const doc = root.ownerDocument;
+  canvas?.querySelector("[data-viz-key]")?.remove();
+  const key = systemKey(doc, { machine, system, live: view.live });
+  if (key !== null) canvas?.append(key);
   showPayloadSheet(root, { ...context, ...view });
 }
 

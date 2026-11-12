@@ -45,7 +45,8 @@ test("the pool pill sends team.ITEM_ARRIVED to the root and a worker starts", ()
     { driver: createDriver({ id: "teamInbox", create }) },
   );
   root.querySelector('[data-entry-event="team.ITEM_ARRIVED"]')?.dispatchEvent(new Event("click"));
-  expect(root.querySelector('g[data-part="workers"] .part-chip')?.textContent).toBe(
-    "free 2 · working 1",
+  const dots = [...root.querySelectorAll('g[data-part="workers"] g.child-dot')].map(
+    (dot) => `${dot.getAttribute("data-child")}:${dot.getAttribute("data-state")}`,
   );
+  expect(dots).toEqual(["w1:working", "w2:free", "w3:free"]);
 });

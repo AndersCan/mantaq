@@ -892,6 +892,19 @@
   font-size: 11px;
 }
 
+.viz .child-dot circle {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.viz .child-dot[data-mark="first"] circle {
+  fill: none;
+}
+
+.viz .child-dot[data-mark="second"] circle {
+  fill: var(--muted);
+}
+
 .viz .link-end rect {
   fill: var(--state-bg);
   stroke: var(--muted);
