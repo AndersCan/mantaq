@@ -400,7 +400,8 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     const steps: VizStep[] = [];
     const flags = { inside: true, disposed: quiet, segment: 0, pending: 0 };
     const held: HeldEffect[] = [];
-    if (effectMode === "held") holdEffects(actor, held);
+    const holding = quiet || effectMode === "held";
+    if (holding) holdEffects(actor, held);
 
     markTimerStarts(clock, () => {
       flags.segment = log.length;
@@ -431,7 +432,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       if (old !== undefined)
         dropChild({ children, removed }, { id, until: steps.length + flags.pending });
       children.set(id, { map: name, key, child, since: steps.length + flags.pending });
-      if (effectMode === "held") holdEffects(child, held);
+      if (holding) holdEffects(child, held);
       watchChild(child, { root: actor, ref: { map: name, key }, prefix: name, record });
     };
     watchMaps(maps, watch);
