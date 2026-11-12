@@ -30,10 +30,10 @@ describe("addedLines", () => {
   test("tutorial page 3 highlights exactly what step 3 adds", () => {
     const shown = (name: string) =>
       readFileSync(new URL(`./${name}`, import.meta.url), "utf8").replace(
-        /createOrder\d+/g,
-        "createOrder",
+        /createMeal\d+/g,
+        "createMeal",
       );
-    expect(addedLines(shown("order-02.ts"), shown("order-03.ts"))).toEqual([
+    expect(addedLines(shown("meal-02.ts"), shown("meal-03.ts"))).toEqual([
       1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
     ]);
   });

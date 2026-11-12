@@ -147,18 +147,18 @@ const headings = [
     state overlapped and their labels collided; now each loop has its own ends, points straight
     down into the state, and its label sits above it.
   </p>
-  <Step n={6}>A guard is a plain if in the handler: no items, no payment.</Step>
+  <Step n={6}>A guard is a plain if in the handler: no plates, no full.</Step>
 
   <h2 id="blocked-arrow">Blocked arrow</h2>
   <p><strong>Awaiting approval</strong></p>
   <p>
     New: an arrow whose guard the current context does not meet is grey with a lock; clicking it
-    shows why and sends nothing. Here <code>pay</code> is blocked until <code>addItem</code> puts an
-    item in the cart.
+    shows why and sends nothing. Here <code>eat</code> is blocked until <code>serve</code> puts a plate
+    on the table.
   </p>
   <Step n={6}>
-    A guard is a plain if in the handler: no items, no payment. With no items, pay is blocked: click
-    addItem first.
+    A guard is a plain if in the handler: no plates, no full. With no plates, eat is blocked: click
+    serve first.
   </Step>
 
   <h2 id="phone-width">Phone width</h2>
@@ -166,7 +166,7 @@ const headings = [
   <div class="design-phone">
     <p>A paragraph with <code>state("checkout")()</code> inside it.</p>
     <Code code={"const a = 1;\nconst b = 2;"} lang="ts" ins={[2]} />
-    <Machine src="src/tutorial/order-07.ts" />
+    <Machine src="src/tutorial/meal-07.ts" />
   </div>
 </StarlightPage>
 

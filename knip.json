@@ -16,7 +16,7 @@
       "entry": ["scripts/bench-compare.mjs"]
     },
     "apps/docs": {
-      "entry": ["src/content/docs/*.ts", "src/tutorial/order-*.ts", "src/design/*.ts"],
+      "entry": ["src/content/docs/*.ts", "src/tutorial/meal-*.ts", "src/design/*.ts"],
       "ignoreDependencies": [
         "@fontsource-variable/ibm-plex-sans",
         "@fontsource-variable/space-grotesk",

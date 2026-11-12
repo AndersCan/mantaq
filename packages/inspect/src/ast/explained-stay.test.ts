@@ -2,14 +2,14 @@ import { VirtualClock } from "@mantaq/core";
 import type { VizEdge, VizMachine } from "@mantaq/viz";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { createOrder6 } from "../../../../apps/docs/src/tutorial/order-06.ts";
+import { createMeal9 } from "../../../../apps/docs/src/tutorial/meal-09.ts";
 import { EXAMPLE_ROOT } from "../examples.ts";
 import { createCreditActor } from "../fixtures/credit.ts";
 import { toVizMachine } from "../structure.ts";
 import { annotateMachine } from "./annotate.ts";
 
-const ORDER = {
-  file: join(EXAMPLE_ROOT, "apps/docs/src/tutorial/order-06.ts"),
+const MEAL = {
+  file: join(EXAMPLE_ROOT, "apps/docs/src/tutorial/meal-09.ts"),
   root: EXAMPLE_ROOT,
 };
 
@@ -30,30 +30,30 @@ function fuzzStay(
   return { ...machine, edges: [...machine.edges, added] };
 }
 
-const order = () => toVizMachine({ id: "order", actor: createOrder6(VirtualClock()) as never });
+const meal = () => toVizMachine({ id: "meal", actor: createMeal9(VirtualClock()) as never });
 
 describe("a fuzz stay the handler explains", () => {
   test("is dropped, and the declared edge keeps its three branches", () => {
-    const machine = annotateMachine(fuzzStay(order(), "cart", "pay"), ORDER);
+    const machine = annotateMachine(fuzzStay(meal(), "hungry", "eat"), MEAL);
     expect(machine.edges.filter((edge) => edge.origin === "fuzz")).toEqual([]);
-    const pay = machine.edges.find((edge) => edge.id === "cart-pay-payment");
-    expect(pay?.explanation?.status === "analyzed" && pay.explanation.branches).toHaveLength(3);
+    const eat = machine.edges.find((edge) => edge.id === "hungry-eat-full");
+    expect(eat?.explanation?.status === "analyzed" && eat.explanation.branches).toHaveLength(3);
   });
 
   test("stays when the handler has no stay branch", () => {
-    const machine = annotateMachine(fuzzStay(order(), "payment", "confirm"), ORDER);
+    const machine = annotateMachine(fuzzStay(meal(), "cooking", "cooked"), MEAL);
     expect(machine.edges.filter((edge) => edge.origin === "fuzz")).toHaveLength(1);
   });
 
   test("stays when it is a fuzz transition, not a stay", () => {
-    const machine = annotateMachine(fuzzStay(order(), "cart", "pay", "transition"), ORDER);
+    const machine = annotateMachine(fuzzStay(meal(), "hungry", "eat", "transition"), MEAL);
     expect(machine.edges.filter((edge) => edge.origin === "fuzz")).toHaveLength(1);
   });
 
   test("stays when the handler is not found in the source", () => {
     const credit = toVizMachine({ id: "credit", actor: createCreditActor() });
     const first = credit.edges.find((edge) => edge.kind === "transition") as VizEdge;
-    const machine = annotateMachine(fuzzStay(credit, first.from, first.event), ORDER);
+    const machine = annotateMachine(fuzzStay(credit, first.from, first.event), MEAL);
     expect(machine.edges.filter((edge) => edge.origin === "fuzz")).toHaveLength(1);
   });
 
