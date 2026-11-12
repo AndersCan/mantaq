@@ -300,8 +300,7 @@ export function mountViewer(
       : renderGraph(doc, machine, { select, showDetails, mode });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
-    const key = systemKey(doc, { machine, system: inSystem ? system : null, live: null });
-    root.append(...layoutOf(doc, { chrome, graph, key, panel, changes }));
+    root.append(...layoutOf(doc, { chrome, graph, panel, changes }));
     refresh();
   }
 
@@ -450,13 +449,12 @@ function layoutOf(
   context: {
     chrome: Chrome;
     graph: Node;
-    key: HTMLElement | null;
     panel: HTMLElement;
     changes: HTMLElement[];
   },
 ): HTMLElement[] {
   const { chrome } = context;
-  const canvas = html(doc, "div", { class: "canvas" }, [context.graph, context.key]);
+  const canvas = html(doc, "div", { class: "canvas" }, [context.graph]);
   const { view } = chrome;
   if (!view.diagramOnly) {
     return [

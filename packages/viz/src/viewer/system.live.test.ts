@@ -796,4 +796,13 @@ describe("child dots: the key and the marks match what is drawn", () => {
     const root = withChildren(one, ["workers.free"]);
     expect(root.querySelector("g.child-dot")).toBeNull();
   });
+  test("a child machine with a final state still draws dots for its two other states", () => {
+    const withDone: VizMachine = {
+      ...pool,
+      states: [...pool.states, { ...state("workers.done"), final: true }],
+    };
+    const root = withChildren(withDone, ["workers.free", "workers.working"]);
+    expect(dots(root)).toEqual(["w0:free", "w1:working"]);
+    expect(text(root, "[data-viz-key]")).toContain("○ free  ● working");
+  });
 });
