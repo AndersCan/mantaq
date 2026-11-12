@@ -10,11 +10,11 @@ const locked = state("locked")();
 /** The door opens with a push, for 30 seconds. */
 const unlocked = state("unlocked")();
 
-/**
- * Someone typed a code at the door.
- * @example 1234
- */
-export const enterCode = event("enterCode")<{ code: string }>();
+/** Someone typed a code at the door. */
+export const enterCode = event("enterCode")<{
+  /** @example 1234 */
+  code: string;
+}>();
 /** 30 seconds passed with the door unlocked. */
 const timeRanOut = event("timeRanOut")();
 
