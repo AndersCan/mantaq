@@ -286,7 +286,7 @@ const pool = createPool<string, "team">({
 pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
 ```
 
-`pool.actor` is the inbox (states `empty`, `holding`). `pool.workers` is an `ActorMap` (states `free`, `working`). `keep: "set"` skips an item whose `key` (default `JSON.stringify`) already waits. `batch` is the most items one worker takes (default 1; `Infinity` takes all). A worker sent work while busy returns it. Waiting items live in memory: persisting them is the app's job.
+`pool.actor` is the inbox (states `allWorkersFree`, `workersBusy`, `workWaiting`). `pool.workers` is an `ActorMap` (states `free`, `working`). `keep: "set"` skips an item whose `key` (default `JSON.stringify`) already waits. `batch` is the most items one worker takes (default 1; `Infinity` takes all). Waiting items live in memory: persisting them is the app's job.
 
 ### `onOutput(actor, handler)`
 

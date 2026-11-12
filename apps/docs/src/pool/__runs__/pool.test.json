@@ -2,7 +2,7 @@
   "teamInbox": [
     {
       "name": "Four items, three workers",
-      "end": "holding",
+      "end": "workWaiting",
       "steps": [
         {
           "kind": "event",

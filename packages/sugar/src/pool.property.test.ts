@@ -89,7 +89,13 @@ describe("createPool property tests", () => {
             if (JSON.stringify(starts) !== JSON.stringify(model.starts)) return false;
           }
           const state = pool.actor.state.name;
-          return state === (model.waiting.length > 0 ? "holding" : "empty");
+          const expected =
+            model.waiting.length > 0
+              ? "workWaiting"
+              : model.running.length > 0
+                ? "workersBusy"
+                : "allWorkersFree";
+          return state === expected;
         },
       ),
       { numRuns: 100 },

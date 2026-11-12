@@ -28,7 +28,7 @@ carry data alongside "where it is". Everything below describes that model.
 | **State** | One situation the machine can be in, a named point in the flow. Answer: "where am I?" | `state("payment")()` builds a state. States are declared and listed in the actor. |
 | **Event** | An occurrence the machine reacts to. The only thing that moves a machine. | `event("submitPayment")()` builds one. You send it with `actor.send(...)`. |
 | **Transition** | A move from one state to another, triggered by an event. | A handler you register that says "on this event in this state, go there". |
-| **Inbox** | An actor that holds incoming work until a worker is free, then hands it out. | The root actor of `createPool` (`empty` or `holding`). |
+| **Inbox** | An actor that holds incoming work until a worker is free, then hands it out. | The root actor of `createPool` (`allWorkersFree`, `workersBusy` or `workWaiting`). |
 | **Pool** | An inbox and n workers that pull work from it. Failed work goes back to the front. | `createPool` in `@mantaq/sugar`. |
 | **Source state** | The state a transition leaves. | The current state when the event arrives. |
 | **Target state** | The state a transition enters. | The `state` your handler returns. |

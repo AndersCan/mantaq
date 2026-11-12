@@ -64,7 +64,7 @@ test("pool: w1 finishes and takes the waiting item; the Path names both moves (p
   );
   const texts = pathTexts(root);
   expect(texts).toHaveLength(5);
-  expect(texts[4]).toContain("teamInbox: holding → empty");
+  expect(texts[4]).toContain("teamInbox: workWaiting → workersBusy");
   expect(texts[4]).toContain("w1: free → working");
 });
 

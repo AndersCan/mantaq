@@ -74,7 +74,7 @@ describe("createPool", () => {
     expect({ peak, started: control.starts.flat(), end: pool.actor.state.name }).toEqual({
       peak: 3,
       started: ["item1", "item2", "item3", "item4", "item5", "item6", "item7"],
-      end: "empty",
+      end: "allWorkersFree",
     });
   });
 
@@ -84,12 +84,12 @@ describe("createPool", () => {
     pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
     pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "b" }));
     await flush();
-    expect(pool.actor.state.name).toBe("holding");
+    expect(pool.actor.state.name).toBe("workWaiting");
     control.runs[0]?.resolve();
     await flush();
     expect({ starts: control.starts, state: pool.actor.state.name }).toEqual({
       starts: [["a"], ["b"]],
-      state: "empty",
+      state: "workersBusy",
     });
   });
 
@@ -124,7 +124,7 @@ describe("createPool", () => {
     await flush();
     expect({ starts, end: pool.actor.state.name }).toEqual({
       starts: [["a"], ["a"]],
-      end: "empty",
+      end: "allWorkersFree",
     });
   });
 
@@ -147,7 +147,7 @@ describe("createPool", () => {
     await flush();
     expect({ starts: control.starts, end: pool.actor.state.name }).toEqual({
       starts: [["stuck:5"], ["stuck:7", "stuck:5"]],
-      end: "empty",
+      end: "allWorkersFree",
     });
   });
 
@@ -213,29 +213,6 @@ describe("createPool", () => {
     expect(sizes).toEqual([1, 1, 1, 2]);
   });
 
-  test("a busy worker sent more work returns it, and it is assigned next", async () => {
-    const control = controlled();
-    const pool = createPool<string, "p">({ name: "p", workers: 2, run: control.run });
-    pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
-    await flush();
-    pool.workers.send("w1", pool.events.ITEMS_ASSIGNED.create({ worker: "w1", items: ["x"] }));
-    await flush();
-    expect(control.starts).toEqual([["a"], ["x"]]);
-  });
-
-  test("returned items go ahead of the items that already wait", async () => {
-    const control = controlled();
-    const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
-    pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
-    pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "b" }));
-    await flush();
-    pool.workers.send("w1", pool.events.ITEMS_ASSIGNED.create({ worker: "w1", items: ["x"] }));
-    await flush();
-    control.runs[0]?.resolve();
-    await flush();
-    expect(control.starts.slice(0, 2)).toEqual([["a"], ["x"]]);
-  });
-
   test("ids the pool does not know change nothing", async () => {
     const control = controlled();
     const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
@@ -243,7 +220,6 @@ describe("createPool", () => {
     for (const worker of ["w9", "", "__proto__"]) {
       pool.actor.send(pool.events.ITEMS_FINISHED.create({ worker, items: ["z"] }));
       pool.actor.send(pool.events.ITEMS_FAILED.create({ worker, items: ["z"], error: "e" }));
-      pool.actor.send(pool.events.ITEMS_RETURNED.create({ worker, items: ["z"] }));
     }
     await flush();
     expect({ snapshot: pool.actor.snapshot(), starts: control.starts }).toEqual({
@@ -269,7 +245,7 @@ describe("createPool", () => {
     const left = Object.values(a.events).map((ref) => ref.type);
     const right = Object.values(b.events).map((ref) => ref.type);
     expect({ left: left.length, shared: left.filter((id) => right.includes(id)) }).toEqual({
-      left: 7,
+      left: 6,
       shared: [],
     });
     expect(left.every((id) => id.startsWith("a."))).toBe(true);
@@ -312,20 +288,20 @@ describe("createPool details", () => {
       workers: workerStates(pool),
       items: pool.workers.keys().map((key) => pool.workers.snapshot(key)?.context),
     }).toEqual({
-      inbox: "empty",
+      inbox: "allWorkersFree",
       workers: ["free", "free"],
       items: [{ items: [] }, { items: [] }],
     });
   });
 
-  test("a worker that is working is called working, and holding names a waiting inbox", async () => {
+  test("a worker that is working is called working, and workWaiting names a waiting inbox", async () => {
     const control = controlled();
     const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
     pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
     pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "b" }));
     await flush();
     expect({ inbox: pool.actor.state.name, workers: workerStates(pool) }).toEqual({
-      inbox: "holding",
+      inbox: "workWaiting",
       workers: ["working"],
     });
     control.runs[0]?.resolve();
@@ -359,20 +335,18 @@ describe("createPool details", () => {
     ]);
   });
 
-  test("a worker reports finished, failed (with the reason) and returned to the inbox", async () => {
+  test("a worker reports finished and failed (with the reason) to the inbox", async () => {
     const control = controlled();
     const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
     const heard: Array<{ type: string; payload?: unknown }> = [];
     listen(pool.workers.get("w1"), heard);
     pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
     await flush();
-    pool.workers.send("w1", pool.events.ITEMS_ASSIGNED.create({ worker: "w1", items: ["x"] }));
     control.runs[0]?.reject(new Error("boom"));
     await flush();
     control.runs[1]?.resolve();
     await flush();
     expect(heard).toEqual([
-      { type: "p.ITEMS_RETURNED", payload: { worker: "w1", items: ["x"] } },
       { type: "p.ITEMS_FAILED", payload: { worker: "w1", items: ["a"], error: "Error: boom" } },
       { type: "p.ITEMS_FINISHED", payload: { worker: "w1", items: ["a"] } },
     ]);
@@ -430,8 +404,16 @@ describe("createPool details", () => {
     expect({
       inputs: options.inputs.map((ref) => ref.type),
       outputs: options.outputs.map((ref) => ref.type),
-      targets: ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED", "p.ITEMS_RETURNED"].map(
-        (id) => options.targets.Any?.[id],
+      targets: Object.fromEntries(
+        ["allWorkersFree", "workersBusy", "workWaiting"].map((name) => [
+          name,
+          Object.fromEntries(
+            ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED"].flatMap((id) => {
+              const to = options.targets[name]?.[id];
+              return to === undefined ? [] : [[id.slice(1), to]];
+            }),
+          ),
+        ]),
       ),
       workerInputs: workerOptions.inputs.map((ref) => ref.type),
       workerOutputs: workerOptions.outputs.map((ref) => ref.type),
@@ -442,11 +424,23 @@ describe("createPool details", () => {
       assignTargets: workerOptions.targets.free?.["p.ITEMS_ASSIGNED"],
       effect: workerOptions.effects.working?.map((e) => [e.name, e.sends]),
     }).toEqual({
-      inputs: ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED", "p.ITEMS_RETURNED"],
+      inputs: ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED"],
       outputs: ["p.ITEMS_ASSIGNED"],
-      targets: Array(4).fill(["empty", "holding"]),
+      targets: {
+        allWorkersFree: { ".ITEM_ARRIVED": ["workersBusy"] },
+        workersBusy: {
+          ".ITEM_ARRIVED": ["workersBusy", "workWaiting"],
+          ".ITEMS_FINISHED": ["allWorkersFree", "workersBusy"],
+          ".ITEMS_FAILED": ["workersBusy", "workWaiting"],
+        },
+        workWaiting: {
+          ".ITEM_ARRIVED": ["workWaiting"],
+          ".ITEMS_FINISHED": ["workWaiting", "workersBusy"],
+          ".ITEMS_FAILED": ["workWaiting", "workersBusy"],
+        },
+      },
       workerInputs: ["p.ITEMS_ASSIGNED"],
-      workerOutputs: ["p.ITEMS_FINISHED", "p.ITEMS_FAILED", "p.ITEMS_RETURNED"],
+      workerOutputs: ["p.ITEMS_FINISHED", "p.ITEMS_FAILED"],
       workerTargets: [["free"], ["free"]],
       assignTargets: ["working"],
       effect: [["runItems", ["p.RUN_SUCCEEDED", "p.RUN_FAILED"]]],

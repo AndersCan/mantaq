@@ -5,7 +5,7 @@ import { withPromise } from "./effects/promise.ts";
 import { Actor, event, state } from "@mantaq/core";
 import type { Clock, EventRef } from "@mantaq/core";
 
-/** The seven events of a pool, every id prefixed with the pool's name. */
+/** The six events of a pool, every id prefixed with the pool's name. */
 export interface PoolEvents<T, N extends string> {
   /** App → inbox: one item to hand out. */
   ITEM_ARRIVED: EventRef<`${N}.ITEM_ARRIVED`, { item: T }>;
@@ -15,8 +15,6 @@ export interface PoolEvents<T, N extends string> {
   ITEMS_FINISHED: EventRef<`${N}.ITEMS_FINISHED`, { worker: string; items: T[] }>;
   /** Worker → inbox: the run rejected or threw. */
   ITEMS_FAILED: EventRef<`${N}.ITEMS_FAILED`, { worker: string; items: T[]; error: string }>;
-  /** Worker → inbox: the worker was busy, so it hands the items back. */
-  ITEMS_RETURNED: EventRef<`${N}.ITEMS_RETURNED`, { worker: string; items: T[] }>;
   /** Worker internal: the run resolved. */
   RUN_SUCCEEDED: EventRef<`${N}.RUN_SUCCEEDED`, void>;
   /** Worker internal: the run rejected or threw. */
@@ -61,7 +59,6 @@ export function poolEvents<T, const N extends string>(name: N): PoolEvents<T, N>
     ITEMS_ASSIGNED: event(`${name}.ITEMS_ASSIGNED`)<{ worker: string; items: T[] }>(),
     ITEMS_FINISHED: event(`${name}.ITEMS_FINISHED`)<{ worker: string; items: T[] }>(),
     ITEMS_FAILED: event(`${name}.ITEMS_FAILED`)<{ worker: string; items: T[]; error: string }>(),
-    ITEMS_RETURNED: event(`${name}.ITEMS_RETURNED`)<{ worker: string; items: T[] }>(),
     RUN_SUCCEEDED: event(`${name}.RUN_SUCCEEDED`)(),
     RUN_FAILED: event(`${name}.RUN_FAILED`)<{ error: string }>(),
   };
@@ -81,8 +78,12 @@ interface Shared<T, N extends string> {
   clock: Clock | undefined;
 }
 
-const empty = state("empty")();
-const holding = state("holding")();
+/** Nothing waits and no worker is running. */
+const allWorkersFree = state("allWorkersFree")();
+/** At least one worker is running and nothing waits. */
+const workersBusy = state("workersBusy")();
+/** Items wait in line: every worker is running. */
+const workWaiting = state("workWaiting")();
 const free = state("free")();
 const working = state("working")();
 
@@ -100,89 +101,145 @@ function settle<T>(options: { context: InboxContext<T>; batch: number }) {
   return { context: { waiting, free: spare }, assignments };
 }
 
+/** Put `items` ahead of `waiting`; with "set", leave out those whose key already waits. */
+function inFront<T, N extends string>(
+  shared: Shared<T, N>,
+  items: readonly T[],
+  waiting: readonly T[],
+): T[] {
+  const { setOfKeys, keyOf } = shared;
+  if (!setOfKeys) return [...items, ...waiting];
+  const waits = new Set(waiting.map(keyOf));
+  return [...items.filter((item) => !waits.has(keyOf(item))), ...waiting];
+}
+
+/** Store the new context and hand out work; says what is left waiting and running. */
+function apply<T, N extends string>(
+  shared: Shared<T, N>,
+  slot: { set(value: InboxContext<T>): void },
+  next: InboxContext<T>,
+) {
+  const { batch, ids, events } = shared;
+  const settled = settle({ context: next, batch });
+  slot.set(settled.context);
+  return {
+    waits: settled.context.waiting.length > 0,
+    busy: settled.context.free.length < ids.length,
+    emit: settled.assignments.map((assignment) => events.ITEMS_ASSIGNED.create(assignment)),
+  };
+}
+
+/** The context after a worker reports: it is free again, and `items` go to the front. */
+function afterReport<T, N extends string>(
+  shared: Shared<T, N>,
+  options: {
+    current: InboxContext<T>;
+    worker: string;
+    items: readonly T[];
+  },
+): InboxContext<T> {
+  const { current, worker, items } = options;
+  const running = shared.ids.includes(worker) && !current.free.includes(worker);
+  if (!running) return current;
+  return { waiting: inFront(shared, items, current.waiting), free: [...current.free, worker] };
+}
+
+/** Every arrival waits at the back, unless "set" already has its key waiting. */
+function arrival<T, N extends string>(
+  shared: Shared<T, N>,
+  current: InboxContext<T>,
+  item: T,
+): InboxContext<T> {
+  const { setOfKeys, keyOf } = shared;
+  const skip = setOfKeys && current.waiting.some((w) => keyOf(w) === keyOf(item));
+  return { ...current, waiting: skip ? current.waiting : [...current.waiting, item] };
+}
+
 function buildInbox<T, N extends string>(shared: Shared<T, N>) {
-  const { events, ids, batch, setOfKeys, keyOf, clock } = shared;
-  const known = new Set(ids);
-
-  /** Put `items` ahead of `waiting`; with "set", leave out those whose key already waits. */
-  function inFront(items: readonly T[], waiting: readonly T[]): T[] {
-    if (!setOfKeys) return [...items, ...waiting];
-    const waits = new Set(waiting.map(keyOf));
-    return [...items.filter((item) => !waits.has(keyOf(item))), ...waiting];
-  }
-
-  /** Store the new context, hand out work, and settle in `holding` if anything still waits. */
-  function apply(slot: { set(value: InboxContext<T>): void }, next: InboxContext<T>) {
-    const settled = settle({ context: next, batch });
-    slot.set(settled.context);
-    return {
-      state: settled.context.waiting.length > 0 ? holding : empty,
-      emit: settled.assignments.map((assignment) => events.ITEMS_ASSIGNED.create(assignment)),
-    };
-  }
-
+  const { events, ids, clock } = shared;
   const start: InboxContext<T> = { waiting: [], free: [...ids] };
   return Actor({
-    inputs: [
-      events.ITEM_ARRIVED,
-      events.ITEMS_FINISHED,
-      events.ITEMS_FAILED,
-      events.ITEMS_RETURNED,
-    ],
+    inputs: [events.ITEM_ARRIVED, events.ITEMS_FINISHED, events.ITEMS_FAILED],
     outputs: [events.ITEMS_ASSIGNED],
-    states: [empty, holding],
-    initial: empty,
+    states: [allWorkersFree, workersBusy, workWaiting],
+    initial: allWorkersFree,
     context: start,
     ...(clock && { clock }),
     setup: (m) => {
-      /** Every arrival waits at the back, unless "set" already has its key waiting. */
-      m.onAny({
+      /** A free worker always exists, so the item goes straight out. */
+      m.on(allWorkersFree, {
         event: events.ITEM_ARRIVED,
-        to: [empty, holding],
+        to: [workersBusy],
         handler: ({ payload }, { context }) => {
-          const current = context.get();
-          const skip = setOfKeys && current.waiting.some((w) => keyOf(w) === keyOf(payload.item));
-          return apply(context, {
-            ...current,
-            waiting: skip ? current.waiting : [...current.waiting, payload.item],
-          });
+          const next = apply(shared, context, arrival(shared, context.get(), payload.item));
+          return { state: workersBusy, emit: next.emit };
         },
       });
-      /** A busy worker is free again. An id that is free or unknown changes nothing. */
-      m.onAny({
+      /** The item waits only if no worker is free. */
+      m.on(workersBusy, {
+        event: events.ITEM_ARRIVED,
+        to: [workersBusy, workWaiting],
+        handler: ({ payload }, { context }) => {
+          const next = apply(shared, context, arrival(shared, context.get(), payload.item));
+          return { state: next.waits ? workWaiting : workersBusy, emit: next.emit };
+        },
+      });
+      /** Every worker is running, so the item joins the line. */
+      m.on(workWaiting, {
+        event: events.ITEM_ARRIVED,
+        to: [workWaiting],
+        handler: ({ payload }, { context }) => {
+          const next = apply(shared, context, arrival(shared, context.get(), payload.item));
+          return { state: workWaiting, emit: next.emit };
+        },
+      });
+      /** A running worker is free again. An id that is free or unknown changes nothing. */
+      m.on(workersBusy, {
         event: events.ITEMS_FINISHED,
-        to: [empty, holding],
+        to: [allWorkersFree, workersBusy],
         handler: ({ payload }, { context }) => {
           const current = context.get();
-          const busy = known.has(payload.worker) && !current.free.includes(payload.worker);
-          return apply(
-            context,
-            busy ? { ...current, free: [...current.free, payload.worker] } : current,
-          );
+          const done = afterReport(shared, { current, worker: payload.worker, items: [] });
+          const next = apply(shared, context, done);
+          return { state: next.busy ? workersBusy : allWorkersFree, emit: next.emit };
         },
       });
-      /** Failed items go to the front; a busy worker is free again. */
-      m.onAny({
+      /** The freed worker takes the front of the line at once. */
+      m.on(workWaiting, {
+        event: events.ITEMS_FINISHED,
+        to: [workWaiting, workersBusy],
+        handler: ({ payload }, { context }) => {
+          const current = context.get();
+          const done = afterReport(shared, { current, worker: payload.worker, items: [] });
+          const next = apply(shared, context, done);
+          return { state: next.waits ? workWaiting : workersBusy, emit: next.emit };
+        },
+      });
+      /** Failed items go to the front; the freed worker or another free one takes them. */
+      m.on(workersBusy, {
         event: events.ITEMS_FAILED,
-        to: [empty, holding],
+        to: [workersBusy, workWaiting],
         handler: ({ payload }, { context }) => {
           const current = context.get();
-          const busy = known.has(payload.worker) && !current.free.includes(payload.worker);
-          if (!busy) return apply(context, current);
-          return apply(context, {
-            waiting: inFront(payload.items, current.waiting),
-            free: [...current.free, payload.worker],
-          });
+          const next = apply(
+            shared,
+            context,
+            afterReport(shared, { current, worker: payload.worker, items: payload.items }),
+          );
+          return { state: next.waits ? workWaiting : workersBusy, emit: next.emit };
         },
       });
-      /** A busy worker refused: its items go to the front and it stays busy. */
-      m.onAny({
-        event: events.ITEMS_RETURNED,
-        to: [empty, holding],
+      m.on(workWaiting, {
+        event: events.ITEMS_FAILED,
+        to: [workWaiting, workersBusy],
         handler: ({ payload }, { context }) => {
           const current = context.get();
-          if (!known.has(payload.worker)) return apply(context, current);
-          return apply(context, { ...current, waiting: inFront(payload.items, current.waiting) });
+          const next = apply(
+            shared,
+            context,
+            afterReport(shared, { current, worker: payload.worker, items: payload.items }),
+          );
+          return { state: next.waits ? workWaiting : workersBusy, emit: next.emit };
         },
       });
     },
@@ -196,7 +253,7 @@ function buildWorker<T, N extends string>(options: { shared: Shared<T, N>; worke
   return Actor({
     inputs: [events.ITEMS_ASSIGNED],
     internal: [events.RUN_SUCCEEDED, events.RUN_FAILED],
-    outputs: [events.ITEMS_FINISHED, events.ITEMS_FAILED, events.ITEMS_RETURNED],
+    outputs: [events.ITEMS_FINISHED, events.ITEMS_FAILED],
     states: [free, working],
     initial: free,
     context: idle,
@@ -210,13 +267,6 @@ function buildWorker<T, N extends string>(options: { shared: Shared<T, N>; worke
           context.set({ items: payload.items });
           return { state: working };
         },
-      });
-      /** Already running: hand the items back instead of dropping them. */
-      m.on(working, {
-        event: events.ITEMS_ASSIGNED,
-        handler: ({ payload }) => ({
-          emit: [events.ITEMS_RETURNED.create({ worker: workerId, items: payload.items })],
-        }),
       });
       /** Run the items; a synchronous throw counts as a failure. */
       m.effect(working, {

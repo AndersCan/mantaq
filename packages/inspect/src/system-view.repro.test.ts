@@ -30,7 +30,5 @@ test("plan #555 Try it step 5: the ITEMS_ASSIGNED arrow names the states that ta
   expect(root.querySelector("[data-link-sender]")?.textContent).toBe(
     "teamInbox sends team.ITEMS_ASSIGNED. On: team.ITEM_ARRIVED.",
   );
-  expect(root.querySelector("[data-link-receiver]")?.textContent).toBe(
-    "workers take it in: free, working.",
-  );
+  expect(root.querySelector("[data-link-receiver]")?.textContent).toBe("workers take it in: free.");
 });
