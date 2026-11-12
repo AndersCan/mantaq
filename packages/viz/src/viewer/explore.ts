@@ -1146,6 +1146,28 @@ function sentLine(
   ]);
 }
 
+function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLiveStep }) {
+  const { machine, step } = context;
+  const declared = machine.states.find((each) => each.id === step.to)?.effects ?? [];
+  return html(doc, "p", { "data-live-not-run": "" }, [
+    "Not run here: ",
+    ...step.effects.flatMap((name, index) => {
+      const sends = declared.find((each) => each.name === name)?.sends ?? [];
+      return [
+        index === 0 ? "" : "; ",
+        code(doc, name),
+        ...(sends.length === 0
+          ? []
+          : [
+              " (it would send ",
+              ...sends.flatMap((event, at) => [at === 0 ? "" : " or ", code(doc, event)]),
+              ")",
+            ]),
+      ];
+    }),
+  ]);
+}
+
 function stepLines(
   doc: Document,
   context: {
@@ -1174,6 +1196,7 @@ function stepLines(
       ? null
       : html(doc, "p", { "data-live-changed": "" }, [`Changed: ${changed.join(", ")}`]),
     sentLine(doc, { machine, step, routes: context.routes }),
+    step.effects.length > 0 && context.held ? notRunLine(doc, { machine, step }) : null,
     step.effects.length === 0 || context.held
       ? null
       : html(doc, "p", { "data-live-effects": "" }, [

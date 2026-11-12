@@ -1533,7 +1533,19 @@ describe("live effect reports", () => {
       return {
         state: current,
         steps,
-        last: null,
+        last:
+          current === "fetching"
+            ? {
+                from: "waiting",
+                event: "start",
+                to: "fetching",
+                outcome: "transition",
+                effects: ["fetchList"],
+                sent: [],
+                context: null,
+                error: null,
+              }
+            : null,
         after: [],
         timers: [],
         context: null,
@@ -1639,6 +1651,8 @@ describe("live effect reports", () => {
   });
 
   describe("held", () => {
+    const line = (root: HTMLElement, hook: string) =>
+      root.querySelector(`[data-live-${hook}]`)?.textContent;
     const waitingOn = (root: HTMLElement) =>
       root.querySelector<HTMLElement>('.explore-now [data-waiting-on="fetchList"]');
     const withEffect = (sends: string[] | null): VizMachine => ({
@@ -1672,6 +1686,32 @@ describe("live effect reports", () => {
       ].map((each) => each.getAttribute("data-send"));
       expect(inGroup).toContain("listFetched");
       expect(inGroup).toContain("fetchFailed");
+    });
+
+    test("a step into fetching names the effect it did not run and what it would send", () => {
+      const root = mountFetcher({ mode: "held" });
+      expect(line(root, "not-run")).toBe(
+        "Not run here: fetchList (it would send listFetched or fetchFailed or fetchGone)",
+      );
+    });
+
+    test("an effect that declares no sends is named alone", () => {
+      const machine: VizMachine = {
+        ...fetcher,
+        states: fetcher.states.map((each) =>
+          each.id === "fetching"
+            ? { ...each, effects: [{ name: "fetchList", sends: null }] }
+            : each,
+        ),
+      };
+      const root = mountFetcher({ mode: "held", machine });
+      expect(line(root, "not-run")).toBe("Not run here: fetchList");
+    });
+
+    test("real mode has no Not run here line", () => {
+      const root = mountFetcher({ mode: "real" });
+      expect(root.querySelector("[data-live-not-run]")).toBeNull();
+      expect(line(root, "effects")).toBe("Effects started: fetchList");
     });
 
     test("the outcome does not repeat the effects line", () => {
