@@ -242,4 +242,14 @@ describe("edge form focus with two forms", () => {
     expect(document.activeElement?.getAttribute("data-edge-id")).toBe("shut-PEEK-shut");
     root.remove();
   });
+  test("stepping back from a state box while a form is open leaves focus on that box", () => {
+    const { root, press } = mount();
+    press("shut-PEEK-shut");
+    press("shut-KNOCK-shut");
+    const box = root.querySelector<SVGGElement>('[data-node-id="shut"]');
+    box?.focus();
+    box?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(document.activeElement?.getAttribute("data-node-id")).toBe("shut");
+    root.remove();
+  });
 });
