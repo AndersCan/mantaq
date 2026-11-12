@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.34.0
+
+<sub>2026-11-12</sub>
+
+- _(minor)_
+  `ViewerOptions.diagramOnly` opens the viewer with only the diagram and a "Show controls" button. `<Machine diagramOnly />` (and `mountDriven({ diagramOnly: true })`) pass it on. The docs' getting-started steps, the home page, States (side by side) and the app-without-mantaq guide open this way, and step 1 no longer asks readers to ignore the tabs.
+- _(minor)_ The viewer's "Coverage from" picker moves from the header into the Controls tab.
+- _(minor)_
+  A guarded arrow says when it reaches its state: step 6's `pay` arrow reads `email !== "" && items !== 0` under its name, and the green loop that fuzzing saw for the same guard is no longer drawn.
+- _(minor)_
+  Diagram only draws just the diagram: no finding marks or "?" hints on states, and `<Machine diagramOnly />` renders no design-findings banner. "Show controls" brings them back.
+- _(patch)_
+  In the live viewer, clicking an arrow for an event with data opens its form, and nothing is sent until Send. The Always ask toggle is gone. Breaking: none
+- _(patch)_
+  In the live viewer, a step names each effect it did not run and the events it would send ("Not run here: fetchList (it would send listFetched or fetchFailed)"). Breaking: none
+
 ## 0.33.0
 
 <sub>2026-11-11</sub>
