@@ -19,6 +19,8 @@ export interface GraphCallbacks {
   showDetails(selection: Selection, options?: { findings: boolean }): void;
   /** Coverage source the overlay dims by. */
   mode: CoverageMode;
+  /** Draw only state names, effect names and arrow labels: no finding marks, no "?" hints. */
+  bare?: boolean;
 }
 
 function sourceText(from: string): string {
@@ -97,7 +99,7 @@ function regionGroup(doc: Document, placed: PlacedRegion, isMap: boolean): SVGGE
   );
 }
 
-function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
+function chipGroups(doc: Document, placed: PlacedState, bare: boolean): SVGGElement[] {
   const top = placed.y - placed.height / 2;
   const width = placed.width - 16;
   return placed.state.effects.map((effect, index) => {
@@ -118,7 +120,7 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
       [
         svg(doc, "rect", { x: placed.x - width / 2, y, width, height: 16, rx: 8 }),
         svg(doc, "text", { x: placed.x, y: y + 12, "text-anchor": "middle" }, [effect.name]),
-        effect.sends === null
+        effect.sends === null && !bare
           ? svg(
               doc,
               "text",
@@ -208,8 +210,10 @@ function stateGroup(
           })
         : null,
       svg(doc, "text", { x: placed.x, y: top + 22, "text-anchor": "middle" }, [state.label]),
-      ...chipGroups(doc, placed),
-      findings.length === 0 ? null : findingMark(doc, placed, { findings, callbacks }),
+      ...chipGroups(doc, placed, callbacks.bare === true),
+      findings.length === 0 || callbacks.bare === true
+        ? null
+        : findingMark(doc, placed, { findings, callbacks }),
     ],
   );
   activatable(group, () => callbacks.select({ kind: "state", id: state.id }));

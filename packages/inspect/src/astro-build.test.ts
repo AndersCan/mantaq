@@ -100,6 +100,25 @@ describe("mantaqViz for Astro", () => {
     expect(findings[1]?.querySelector("ul")).toBeNull();
   });
 
+  test("diagramOnly drops the findings section and keeps the diagram", async () => {
+    const root = makeSite([orphan]);
+    try {
+      writeFileSync(
+        join(root, "src", "pages", "index.astro"),
+        `---\nimport Machine from "@mantaq/inspect/astro/Machine.astro";\n---\n<html><body>\n<Machine src="${orphan}" diagramOnly />\n</body></html>\n`,
+      );
+      await buildSite(root, [orphan]);
+      document.documentElement.innerHTML = readFileSync(join(root, "dist", "index.html"), "utf8");
+      expect(document.querySelector(".mantaq-findings")).toBeNull();
+      expect(document.body.textContent).not.toContain("design finding");
+      expect(
+        document.querySelector(".mantaq-machine")?.hasAttribute("data-mantaq-diagram-only"),
+      ).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
   test("the banner for a machine with only a naming note says no findings", async () => {
     const root = makeSite([vagueNames]);
     try {
