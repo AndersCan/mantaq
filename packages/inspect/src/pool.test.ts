@@ -18,7 +18,7 @@ describe("a pool, as parts that talk", () => {
   test("records the declared outputs of the worker map", () => {
     expect(machine?.outputs).toEqual(["team.ITEMS_ASSIGNED"]);
     expect(machine?.partOutputs).toEqual({
-      workers: ["team.ITEMS_FAILED", "team.ITEMS_FINISHED", "team.ITEMS_RETURNED"],
+      workers: ["team.ITEMS_FAILED", "team.ITEMS_FINISHED"],
     });
   });
 
@@ -32,15 +32,14 @@ describe("a pool, as parts that talk", () => {
     expect(assigned).toMatchObject({
       from: "",
       to: "workers",
-      handledIn: ["workers.free", "workers.working"],
+      handledIn: ["workers.free"],
     });
     expect(system.links.filter((link) => link.to === "").map((link) => link.event)).toEqual([
       "team.ITEMS_FAILED",
       "team.ITEMS_FINISHED",
-      "team.ITEMS_RETURNED",
     ]);
     for (const link of system.links.filter((each) => each.to === "")) {
-      expect(link.handledIn).toEqual(["empty", "holding"]);
+      expect(link.handledIn).toEqual(["workWaiting", "workersBusy"]);
     }
   });
 });

@@ -27,7 +27,7 @@ describe("createPool failures", () => {
       await flush();
       expect({ starts, state: pool.actor.state.name }).toEqual({
         starts: [["a"], ["a"], ["a"], ["a"]],
-        state: "empty",
+        state: "allWorkersFree",
       });
     },
   );
@@ -49,7 +49,7 @@ describe("createPool failures", () => {
     }
     await flush();
     expect(starts.sort()).toEqual(["bad", "bad", "good1", "good2"]);
-    expect(pool.actor.state.name).toBe("empty");
+    expect(pool.actor.state.name).toBe("allWorkersFree");
   });
 
   test("items sent to a disposed pool are dropped without a throw", () => {

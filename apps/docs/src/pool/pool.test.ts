@@ -12,7 +12,7 @@ test("Four items, three workers", async () => {
     pool.actor.send(pool.events.ITEM_ARRIVED.create({ item }));
     await pool.actor.settled();
   }
-  expect(pool.actor.state.name).toBe("holding");
+  expect(pool.actor.state.name).toBe("workWaiting");
   const working = pool.workers
     .keys()
     .filter((id) => pool.workers.get(id)?.state.name === "working");
