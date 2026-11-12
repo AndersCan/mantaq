@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.25.0
+
+<sub>2026-11-12</sub>
+
+- _(minor)_
+  `ViewerOptions.diagramOnly` opens the viewer with only the diagram and a "Show controls" button. `<Machine diagramOnly />` (and `mountDriven({ diagramOnly: true })`) pass it on. The docs' getting-started steps, the home page, States (side by side) and the app-without-mantaq guide open this way, and step 1 no longer asks readers to ignore the tabs.
+- _(minor)_ The viewer's "Coverage from" picker moves from the header into the Controls tab.
+- _(minor)_
+  The system view shows where work enters and one arrow each way between two parts, with the event names stacked on it. A prefix every event shares is written once under the diagram.
+- _(minor)_
+  A guarded arrow says when it reaches its state: step 6's `pay` arrow reads `email !== "" && items !== 0` under its name, and the green loop that fuzzing saw for the same guard is no longer drawn.
+- _(minor)_
+  The system view draws one dot per worker in an actor map whose workers have two states: open when free, filled when working. A key line under the diagram names the two states.
+- _(minor)_
+  Diagram only draws just the diagram: no finding marks or "?" hints on states, and `<Machine diagramOnly />` renders no design-findings banner. "Show controls" brings them back.
+- _(minor)_
+  In the live viewer, clicking an arrow for an event with data opens its form, and nothing is sent until Send. The Always ask toggle is gone. Breaking: none
+- _(minor)_
+  In the live viewer, a step names each effect it did not run and the events it would send ("Not run here: fetchList (it would send listFetched or fetchFailed)"). Breaking: none
+- _(patch)_ The system view shrinks to fit a narrow frame, so the whole diagram stays in view instead of scrolling sideways.
+- _(patch)_ In the system view, clicking the "from outside" pill sends the entry event, as its label does. Enter and Space work too.
+- _(patch)_ In the system view, the "from outside" arrow now moves when its event can be sent in the current state.
+
 ## 0.24.0
 
 <sub>2026-11-11</sub>
