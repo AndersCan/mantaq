@@ -120,4 +120,67 @@ describe("system view entry line on an event with data", () => {
       { kind: "event", event: "DROP", payload: { reason: "offline" }, actor: { region: "net" } },
     ]);
   });
+  test("after Escape or Send from an entry line's form, focus is back on that entry line", () => {
+    const steps: VizStep[] = [];
+    const driver: VizDriver = {
+      reset: () => snapshot([]),
+      step: (step) => {
+        steps.push(step);
+        return snapshot([...steps]);
+      },
+    };
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [lanes] }, { driver });
+    const line = () => root.querySelector<SVGGElement>('[data-entry-event="DROP"]');
+    line()?.focus();
+    line()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(document.activeElement?.closest(".payload-sheet")).not.toBeNull();
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    expect(document.activeElement?.getAttribute("data-entry-event")).toBe("DROP");
+    line()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    root.querySelector<HTMLButtonElement>('[data-payload-send="DROP"]')?.click();
+    expect(steps).toHaveLength(1);
+    expect(document.activeElement?.getAttribute("data-entry-event")).toBe("DROP");
+    root.remove();
+  });
+});
+
+describe("edge form focus", () => {
+  test("Escape gives focus back to the arrow the form came from, not the first arrow", () => {
+    const flat: VizMachine = {
+      ...lanes,
+      id: "door",
+      initial: "shut",
+      regions: [],
+      maps: [],
+      states: [state("shut", true), state("open")],
+      events: [event("PEEK"), lanes.events.find((each) => each.id === "DROP")!],
+      outputs: [],
+      partOutputs: {},
+      edges: [edge("shut", "PEEK", "shut"), edge("shut", "DROP", "open")],
+    };
+    const live = (steps: VizStep[]): VizLiveState => ({
+      ...snapshot(steps),
+      state: steps.length === 0 ? "shut" : "open",
+      regions: {},
+      children: [],
+    });
+    const driver: VizDriver = { reset: () => live([]), step: (step) => live([step]) };
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [flat] }, { driver });
+    const arrow = root.querySelector<SVGGElement>('[data-edge-id="shut-DROP-open"]');
+    arrow?.focus();
+    arrow?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(document.activeElement?.closest(".payload-sheet")).not.toBeNull();
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("shut-DROP-open");
+    root.remove();
+  });
 });

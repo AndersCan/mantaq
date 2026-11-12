@@ -19,12 +19,31 @@ function anchorOf(
   );
 }
 
-/** Gives keyboard focus back to the edge a closed form was opened from. */
-function focusEdge(root: HTMLElement, id: string | null): void {
-  if (id === null) return;
-  [...root.querySelectorAll<HTMLElement>("[data-edge-id]")]
-    .find((each) => each.getAttribute("data-edge-id") === id)
-    ?.focus({ preventScroll: true });
+/** What had focus when each open form was opened: an arrow or an entry line, as a selector, since a redraw replaces the element. */
+const openedFrom = new WeakMap<Element, string>();
+
+function selectorOf(element: Element): string | null {
+  for (const name of ["data-edge-id", "data-entry-event"]) {
+    const value = element.getAttribute(name);
+    if (value !== null) return `[${name}="${CSS.escape(value)}"]`;
+  }
+  return null;
+}
+
+/**
+ * Removes the open sheets. `opener` is what the next sheet returns focus to;
+ * `focusBack` is set when focus was inside a removed sheet, so it must move now.
+ */
+function removeSheets(root: HTMLElement): { opener: string | null; focusBack: string | null } {
+  const active = root.ownerDocument.activeElement;
+  let opener = active !== null && root.contains(active) ? selectorOf(active) : null;
+  let focusBack: string | null = null;
+  for (const old of root.querySelectorAll(".payload-sheet")) {
+    opener = openedFrom.get(old) ?? null;
+    if (old.contains(active)) focusBack = opener;
+    old.remove();
+  }
+  return { opener, focusBack };
 }
 
 /** The state the actor a form sends to is in; the machine's own when it has no actor. */
@@ -53,29 +72,25 @@ export function showPayloadSheet(
   },
 ): void {
   const doc = root.ownerDocument;
-  let returnTo: string | null = null;
-  for (const old of root.querySelectorAll(".payload-sheet")) {
-    if (old.contains(doc.activeElement)) returnTo = old.getAttribute("data-anchor");
-    old.remove();
-  }
+  const { opener, focusBack } = removeSheets(root);
   for (const marked of root.querySelectorAll("[data-composing]")) {
     marked.removeAttribute("data-composing");
   }
   const { machine, live, composing: event, composingActor: actor } = context;
   if (live === null || event === null) {
-    focusEdge(root, returnTo);
+    if (focusBack !== null) {
+      root.querySelector<HTMLElement>(focusBack)?.focus({ preventScroll: true });
+    }
     return;
   }
   const close = () => context.compose(null);
-  const anchor = anchorOf(root, {
+  anchorOf(root, {
     machine,
     state: actorState(live, actor),
     event,
-  });
-  anchor?.setAttribute("data-composing", "");
+  })?.setAttribute("data-composing", "");
   const sheet = html(doc, "section", {
     class: "payload-sheet",
-    "data-anchor": anchor?.getAttribute("data-edge-id") ?? "",
     role: "dialog",
     "aria-label": `Payload for ${event}`,
   });
@@ -93,6 +108,7 @@ export function showPayloadSheet(
   sheet.addEventListener("keydown", (key) => {
     if (key.key === "Escape") close();
   });
+  if (opener !== null) openedFrom.set(sheet, opener);
   root.append(sheet);
   sheet.querySelector<HTMLElement>("textarea, input, select")?.focus({ preventScroll: true });
 }
