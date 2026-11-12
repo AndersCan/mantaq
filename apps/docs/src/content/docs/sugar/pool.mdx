@@ -1,6 +1,6 @@
 ---
 title: Pool
-description: One inbox hands work to n workers; the diagram shows who talks to whom.
+description: Work waits in one inbox, a free worker takes it, and failed work goes back to the front.
 ---
 
 import { Code } from "@astrojs/starlight/components";
@@ -9,20 +9,15 @@ import poolSource from "../../../pool/team-inbox.ts?raw";
 
 <div data-pagefind-ignore>
 
-<Machine src="src/pool/team-inbox.ts" />
+<Machine src="src/pool/team-inbox.ts" runEffects />
 
 </div>
 
-`createPool` builds one inbox and `n` workers that pull work. Boxes are machines, arrows are events, and `workers ×3` is three actors drawn once, one dot each.
+`createPool` builds one inbox and `n` workers. Work waits in the inbox, a free worker takes it, and work that fails goes back to the front.
 
 ## Try it
 
-1. Read the diagram: work enters at **from outside** and goes to `teamInbox`, which is `allWorkersFree`. `workers ×3` shows three open dots: all free. One arrow runs from the inbox to the workers (`ITEMS_ASSIGNED`) and one runs back (`ITEMS_FINISHED`, `ITEMS_FAILED`). The line under the diagram reads `events: team.*   ○ free  ● working`.
-2. On the Step tab, send `team.ITEM_ARRIVED`. The dot for `w1` fills, the `ITEMS_ASSIGNED` arrow turns pink, and the step line ends `then w1: free → working`.
-3. Send three more. `teamInbox` reads `workWaiting`: that is where work waits. All three dots are filled.
-4. In w1's Send list, press `team.RUN_SUCCEEDED`. The inbox hands w1 the waiting item, so `teamInbox` reads `workersBusy` and the three dots stay filled.
-5. Click the `ITEMS_ASSIGNED` arrow. Details names who sends it and the states that take it. **Open workers at free** jumps to the worker's diagram at that arrow; **← System** comes back.
-6. On the Path tab, pick the run `Four items, three workers`. It ends at `workWaiting` with three filled dots.
+1. Open the run [Four items, three workers](?machine=teamInbox&run=Four%20items%2C%20three%20workers). Three workers take one item each; the fourth waits.
 
 ## The code
 
@@ -30,16 +25,9 @@ import poolSource from "../../../pool/team-inbox.ts?raw";
 
 `run` gets the items and resolves when they are done. If it rejects, the items go back to the front of the inbox. `keep: "set"` drops an arrival whose key already waits, and `batch: Infinity` hands a worker everything that waits: use both when a second request for the same thing adds nothing.
 
-## Why the diagram looks like this
-
-| You see                                     | Why                                                                                                                                                                               |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One dot per worker, not three boxes         | The workers are an actor map: one box, and one dot for each worker that is running. Open is free, filled is working. A hand-written copy per worker is three boxes, so use a map. |
-| Arrows between boxes, not loops on a parent | A parent that only forwards events draws self-loops and hides the receiver. Wire the parts in the factory.                                                                        |
-| Map arrows show no hit count                | The fuzzer does not send to map children, so the arrows to `workers ×3` have no hit count. Run the steps by hand to see them fire.                                                |
-
 ## Limits
 
 - The queue lives in memory and is lost on restart.
 - It has no size limit.
+- A failed item is tried again at once, with no limit: resolve in `run` when it should give up.
 - Each pool needs its own `name`: the name prefixes every event id, so two pools with one name share ids.
