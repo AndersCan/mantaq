@@ -217,5 +217,14 @@ export function payloadSamples(machine: VizMachine, event: string): VizJson[] {
 export function asksForPayload(machine: VizMachine, event: string): boolean {
   const fields = machine.events.find((each) => each.id === event)?.payload ?? null;
   if (fields !== null && fields.length > 0) return true;
-  return payloadSamples(machine, event).length > 0;
+  return payloadSamples(machine, event).some((sample) => !isEmptyObject(sample));
+}
+
+function isEmptyObject(value: VizJson): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+  );
 }
