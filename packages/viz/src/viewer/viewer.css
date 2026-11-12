@@ -926,6 +926,15 @@
   fill: var(--muted);
 }
 
+.viz .link-start[tabindex] {
+  cursor: pointer;
+}
+
+.viz .link-start[tabindex]:focus-visible rect {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
 .viz .edge.entry:not([tabindex]) {
   cursor: default;
 }

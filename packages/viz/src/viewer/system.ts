@@ -256,6 +256,23 @@ function endMark(doc: Document, at: NodeLabel, text: string, className: string):
   ]);
 }
 
+/** The "from outside" pill. With a driver and a single entry event it sends that event, as its label does. */
+function entryPill(
+  doc: Document,
+  at: NodeLabel,
+  groups: Array<{ to: string; events: string[] }>,
+  context: { callbacks: SystemCallbacks; system: MachineSystem },
+): SVGGElement {
+  const pill = endMark(doc, at, ENTRY_TEXT, "link-start");
+  const { send } = context.callbacks;
+  const only = groups.length === 1 && groups[0]?.events.length === 1 ? groups[0] : undefined;
+  const event = only?.events[0];
+  if (send === undefined || only === undefined || event === undefined) return pill;
+  pill.setAttribute("aria-label", `${event}: ${ENTRY_TEXT} to ${labelOf(context.system, only.to)}`);
+  activatable(pill, () => send({ event, to: only.to }));
+  return pill;
+}
+
 /** Baseline of line `index` of `count` stacked lines centred on `y`. */
 function lineY(y: number, index: number, count: number): number {
   return y - (LABEL_HEIGHT * count) / 2 + LABEL_HEIGHT * index + LABEL_HEIGHT - 4;
@@ -401,7 +418,9 @@ export function renderSystem(
           [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head" })],
         ),
       ]),
-      groups.length === 0 ? null : endMark(doc, graph.node(ENTRY_NODE), ENTRY_TEXT, "link-start"),
+      groups.length === 0
+        ? null
+        : entryPill(doc, graph.node(ENTRY_NODE), groups, { callbacks, system }),
       ...groups.map((group) => entryGroup(doc, group, { graph, callbacks, system, prefix })),
       ...pairsOf(system).map((pair) =>
         pairGroup(doc, pair, { graph, machine, callbacks, system, prefix }),

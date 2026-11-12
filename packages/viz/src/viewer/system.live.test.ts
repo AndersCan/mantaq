@@ -433,6 +433,37 @@ describe("pool view arrows", () => {
     expect(text(root, 'g[data-part=""] .part-chip')).toBe("holding");
   });
 
+  const workerStates = (root: HTMLElement) =>
+    root.querySelector('g[data-part="workers"]')?.getAttribute("aria-label");
+
+  test("clicking the pill turns a worker dot to working", () => {
+    const root = mount([pool]);
+    const before = workerStates(root);
+    root.querySelector("g.link-start")?.dispatchEvent(new Event("click"));
+    expect(workerStates(root)).not.toBe(before);
+    expect(workerStates(root)).toContain("working");
+  });
+
+  test.each(["Enter", " "])("key %j on the pill sends and keeps focus", (key) => {
+    const steps: VizStep[] = [];
+    const root = mount([pool], true, steps);
+    const pill = root.querySelector<SVGGElement>("g.link-start");
+    expect(pill?.getAttribute("role")).toBe("button");
+    pill?.dispatchEvent(new KeyboardEvent("keydown", { key }));
+    expect(steps).toEqual([{ kind: "event", event: "ITEM_ARRIVED", payload: null }]);
+    expect(root.querySelector("g.link-start")).toBe(pill);
+  });
+
+  test("the pill is plain without a driver or with several entry events", () => {
+    expect(mount([pool], false).querySelector("g.link-start")?.getAttribute("tabindex")).toBeNull();
+    const two: VizMachine = {
+      ...pool,
+      events: [...pool.events, event("OTHER")],
+      edges: [...pool.edges, edge("empty", "OTHER", "holding")],
+    };
+    expect(mount([two]).querySelector("g.link-start")?.getAttribute("tabindex")).toBeNull();
+  });
+
   test("without a driver the entry line is drawn and does nothing", () => {
     const root = mount([pool], false);
     const line = root.querySelector<SVGGElement>('[data-entry-event="ITEM_ARRIVED"]');
