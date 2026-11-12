@@ -3,16 +3,16 @@ import { Code } from "@astrojs/starlight/components";
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 import { addedLines } from "../tutorial/added-lines.ts";
 
-const sources = import.meta.glob<string>("../tutorial/order-*.ts", {
+const sources = import.meta.glob<string>("../tutorial/meal-*.ts", {
   query: "?raw",
   import: "default",
   eager: true,
 });
 
 const { n } = Astro.props;
-const name = (k: number) => `order-${String(k).padStart(2, "0")}.ts`;
+const name = (k: number) => `meal-${String(k).padStart(2, "0")}.ts`;
 const shownOf = (k: number) =>
-  sources[`../tutorial/${name(k)}`]?.replace(/createOrder\d+/g, "createOrder");
+  sources[`../tutorial/${name(k)}`]?.replace(/createMeal\d+/g, "createMeal");
 const shown = Number.isInteger(n) ? shownOf(n) : undefined;
 if (shown === undefined) {
   throw new Error(`<Step n={${n}}>: no src/tutorial/${name(n)}; steps are 1-9`);
@@ -25,4 +25,4 @@ const ins = before === undefined ? [] : addedLines(before, shown);
   <Machine src={`src/tutorial/${name(n)}`} diagramOnly />
 </div>
 <div class="mantaq-caption"><slot /></div>
-<Code code={shown} lang="ts" title="order.ts" ins={ins} />
+<Code code={shown} lang="ts" title="meal.ts" ins={ins} />
