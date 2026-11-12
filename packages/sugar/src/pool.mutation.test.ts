@@ -228,6 +228,52 @@ describe("createPool", () => {
     });
   });
 
+  test("reports from a worker that is not running change nothing while work runs or waits", async () => {
+    const control = controlled();
+    const pool = createPool<string, "p">({ name: "p", workers: 2, run: control.run });
+    const now = () => ({ state: pool.actor.state.name, ...pool.actor.snapshot() });
+    pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
+    await flush();
+    const busy = now();
+    for (const worker of ["w9", "", "__proto__", "w2"]) {
+      pool.actor.send(pool.events.ITEMS_FINISHED.create({ worker, items: ["z"] }));
+      pool.actor.send(pool.events.ITEMS_FAILED.create({ worker, items: ["z"], error: "e" }));
+    }
+    await flush();
+    expect({ before: busy.state, after: now(), starts: control.starts }).toEqual({
+      before: "workersBusy",
+      after: busy,
+      starts: [["a"]],
+    });
+    for (const item of ["b", "c"]) pool.actor.send(pool.events.ITEM_ARRIVED.create({ item }));
+    await flush();
+    const waits = now();
+    for (const worker of ["w9", "", "__proto__"]) {
+      pool.actor.send(pool.events.ITEMS_FINISHED.create({ worker, items: ["z"] }));
+      pool.actor.send(pool.events.ITEMS_FAILED.create({ worker, items: ["z"], error: "e" }));
+    }
+    await flush();
+    expect({ before: waits.state, after: now(), starts: control.starts }).toEqual({
+      before: "workWaiting",
+      after: waits,
+      starts: [["a"], ["b"]],
+    });
+  });
+
+  test("a worker that finishes takes the next item; the inbox waits until the line is empty", async () => {
+    const control = controlled();
+    const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
+    for (const item of ["a", "b", "c"]) pool.actor.send(pool.events.ITEM_ARRIVED.create({ item }));
+    await flush();
+    const states: string[] = [];
+    for (let run = 0; run < 3; run++) {
+      control.runs[run]?.resolve();
+      await flush();
+      states.push(pool.actor.state.name);
+    }
+    expect(states).toEqual(["workWaiting", "workersBusy", "allWorkersFree"]);
+  });
+
   test("a finish for a worker that is not busy does not add it twice", async () => {
     const control = controlled();
     const pool = createPool<string, "p">({ name: "p", workers: 1, run: control.run });
