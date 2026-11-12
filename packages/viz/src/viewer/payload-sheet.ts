@@ -39,7 +39,7 @@ function removeSheets(root: HTMLElement): { opener: string | null; focusBack: st
   let opener = active !== null && root.contains(active) ? selectorOf(active) : null;
   let focusBack: string | null = null;
   for (const old of root.querySelectorAll(".payload-sheet")) {
-    opener = openedFrom.get(old) ?? null;
+    opener = opener ?? openedFrom.get(old) ?? null;
     if (old.contains(active)) focusBack = opener;
     old.remove();
   }

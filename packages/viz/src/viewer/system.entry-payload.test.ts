@@ -184,3 +184,62 @@ describe("edge form focus", () => {
     root.remove();
   });
 });
+
+describe("edge form focus with two forms", () => {
+  const knock = { ...lanes.events.find((each) => each.id === "DROP")!, id: "KNOCK" };
+  const door: VizMachine = {
+    ...lanes,
+    id: "door",
+    initial: "shut",
+    regions: [],
+    maps: [],
+    states: [state("shut", true), state("open")],
+    events: [event("PEEK"), knock, lanes.events.find((each) => each.id === "DROP")!],
+    outputs: [],
+    partOutputs: {},
+    edges: [
+      edge("shut", "PEEK", "shut"),
+      edge("shut", "KNOCK", "shut"),
+      edge("shut", "DROP", "open"),
+    ],
+  };
+  const live = (steps: VizStep[]): VizLiveState => ({
+    ...snapshot(steps),
+    state: "shut",
+    regions: {},
+    children: [],
+  });
+  const mount = () => {
+    const driver: VizDriver = { reset: () => live([]), step: (step) => live([step]) };
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }, { driver });
+    const press = (id: string) => {
+      const arrow = root.querySelector<SVGGElement>(`[data-edge-id="${id}"]`);
+      arrow?.focus();
+      arrow?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    };
+    return { root, press };
+  };
+  test("a form opened from a second arrow while the first is open gives focus back to the second", () => {
+    const { root, press } = mount();
+    press("shut-KNOCK-shut");
+    press("shut-DROP-open");
+    expect(root.querySelector(".payload-sheet")?.getAttribute("aria-label")).toBe(
+      "Payload for DROP",
+    );
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("shut-DROP-open");
+    root.remove();
+  });
+  test("sending another arrow while a form is open leaves focus on that arrow", () => {
+    const { root, press } = mount();
+    press("shut-KNOCK-shut");
+    press("shut-PEEK-shut");
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("shut-PEEK-shut");
+    root.remove();
+  });
+});
