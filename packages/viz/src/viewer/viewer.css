@@ -442,6 +442,7 @@
 }
 
 .viz .state:focus-visible .frame,
+.viz .link-start:focus-visible rect,
 .viz .edge:focus-visible path,
 .viz .link-pair:has(> .link:focus-visible) > path,
 .viz .link-in:has(> .entry:focus-visible) > path {
@@ -928,11 +929,7 @@
 
 .viz .link-start[tabindex] {
   cursor: pointer;
-}
-
-.viz .link-start[tabindex]:focus-visible rect {
-  stroke: var(--text);
-  stroke-width: 2;
+  outline: none;
 }
 
 .viz .edge.entry:not([tabindex]) {

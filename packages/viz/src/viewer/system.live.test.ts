@@ -568,6 +568,34 @@ describe("pool view arrows: attacked", () => {
     expect(events).toEqual(["ITEM_ARRIVED"]);
   });
 
+  test("repro: the pill is plain when entries reach two parts", () => {
+    const pill = mount([lanes]).querySelector("g.link-start");
+    expect(pill?.getAttribute("tabindex")).toBeNull();
+    expect(pill?.getAttribute("role")).toBeNull();
+  });
+
+  test("repro: a pill whose one entry goes into a region sends to that region", () => {
+    const steps: VizStep[] = [];
+    const netOnly: VizMachine = {
+      ...lanes,
+      events: lanes.events.map((each) =>
+        each.id === "ITEM_ARRIVED" || each.id === "RESTORE" ? { ...each, internal: true } : each,
+      ),
+    };
+    const root = mount([netOnly], true, steps);
+    const pill = root.querySelector("g.link-start");
+    expect(pill?.getAttribute("aria-label")).toBe("DROP: from outside to net");
+    pill?.dispatchEvent(new Event("click"));
+    expect(steps).toEqual([
+      { kind: "event", event: "DROP", payload: null, actor: { region: "net" } },
+    ]);
+  });
+
+  test("repro: the pill is named for the event it sends", () => {
+    const pill = mount([pool]).querySelector("g.link-start");
+    expect(pill?.getAttribute("aria-label")).toBe("ITEM_ARRIVED: from outside to teamInbox");
+  });
+
   test("a pair is pink when one of its lines took and the other did not", () => {
     const mixed: VizMachine = {
       ...pool,
