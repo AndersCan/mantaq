@@ -31,6 +31,7 @@ export default defineConfig({
         "src/pool/team-inbox.ts",
         "src/first-machine/door-lock.ts",
         "src/conform/counter-model.ts",
+        "src/tutorial/meal.ts",
         "src/tutorial/order-01.ts",
         "src/tutorial/order-02.ts",
         "src/tutorial/order-03.ts",
@@ -80,7 +81,8 @@ export default defineConfig({
         {
           label: "Getting started",
           items: [
-            { label: "This is a state", slug: "getting-started" },
+            { label: "A state and an event", slug: "getting-started" },
+            { label: "Now an order", slug: "getting-started/an-order" },
             { label: "A second state", slug: "getting-started/second-state" },
             { label: "Events", slug: "getting-started/events" },
             { label: "Final states", slug: "getting-started/final-states" },
