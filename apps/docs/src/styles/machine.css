@@ -33,7 +33,7 @@
   box-shadow: none;
 }
 
-/* A clean machine needs no "No design findings." line in the docs. */
-.mantaq-findings[data-count="0"] {
+/* Readers of the docs never see the design findings banner, whatever its count. */
+.mantaq-findings {
   display: none;
 }
