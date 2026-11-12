@@ -503,7 +503,8 @@
   stroke-width: 3.5;
 }
 
-.viz .next path {
+.viz .next path,
+.viz .link-in:has(.next) > path {
   stroke: var(--accent);
   stroke-width: 3;
   stroke-dasharray: 8 5;
@@ -548,7 +549,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .viz .next path {
+  .viz .next path,
+  .viz .link-in:has(.next) > path {
     animation: none;
   }
 }

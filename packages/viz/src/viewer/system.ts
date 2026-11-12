@@ -1,6 +1,7 @@
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel } from "@dagrejs/dagre";
 import { isAnyState, scopeOf } from "../schema.ts";
+import { movesFrom } from "../moves.ts";
 import type { VizActorRef, VizLiveState, VizLiveStep, VizMachine } from "../schema.ts";
 import { linksInside, systemOf } from "../system.ts";
 import type { MachineSystem, SystemEntry, SystemLink, SystemPart } from "../system.ts";
@@ -550,24 +551,11 @@ function markPart(
   group.classList.toggle("selected", selection?.kind === "part" && selection.id === part.id);
 }
 
-/** Every state of `part` the actor is in now: the root's, a region's, or each child's of a map. */
-function currentsOf(part: string, live: VizLiveState): string[] {
-  const child = live.children.filter((each) => each.map === part).map((each) => each.state);
-  if (child.length > 0) return child;
-  const id = part === "" ? live.state : live.regions[part];
-  return id === undefined ? [] : [id];
-}
-
-/** Whether `part` handles `event` in a state it is in now. A final state handles nothing. */
+/** Whether `part` handles `event` in the state it is in now. A final state handles nothing. */
 function canTake(machine: VizMachine, part: string, event: string, live: VizLiveState): boolean {
-  return currentsOf(part, live).some(
-    (current) =>
-      machine.states.find((state) => state.id === current)?.final !== true &&
-      machine.edges.some(
-        (each) =>
-          each.event === event &&
-          (each.from === current || (isAnyState(each.from) && scopeOf(each.from) === part)),
-      ),
+  const current = part === "" ? live.state : live.regions[part];
+  return (
+    current !== undefined && movesFrom(machine, current).some((move) => move.edge.event === event)
   );
 }
 
@@ -594,13 +582,10 @@ export function markSystem(
   }
   for (const entry of root.querySelectorAll("g.link-in")) {
     const part = entry.getAttribute("data-to") ?? "";
-    const events = [...entry.querySelectorAll("g.entry")].map(
-      (line) => line.getAttribute("data-entry-event") ?? "",
-    );
-    entry.classList.toggle(
-      "next",
-      live !== null && events.some((event) => canTake(machine, part, event, live)),
-    );
+    for (const line of entry.querySelectorAll("g.entry")) {
+      const event = line.getAttribute("data-entry-event") ?? "";
+      line.classList.toggle("next", live !== null && canTake(machine, part, event, live));
+    }
   }
   for (const pair of pairs) {
     const lines = [...pair.querySelectorAll("g.link")];

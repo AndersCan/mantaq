@@ -94,7 +94,7 @@ function mount(machine: VizMachine, withDriver = true) {
 }
 
 const entry = (root: HTMLElement) => root.querySelector("g.link-in");
-const isNext = (root: HTMLElement) => entry(root)?.classList.contains("next");
+const isNext = (root: HTMLElement) => entry(root)?.querySelector(".next") !== null;
 
 describe("system view entry arrow", () => {
   test("moves while the current state handles the entry event", () => {
