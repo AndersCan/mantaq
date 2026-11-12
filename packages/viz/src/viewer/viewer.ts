@@ -901,7 +901,6 @@ function markSystemView(
   showPayloadSheet(root, { ...context, ...view });
 }
 
-/** Everything drawn over the graph: walk marks, selection, and the edge of the open payload sheet. */
 /** Recomputes the blocked arrows when the live state or the picked child changed; no `dryRun` blocks nothing. */
 function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver | undefined): void {
   const { live, blockedFor } = view;
@@ -941,6 +940,7 @@ function openBlocked(
   return true;
 }
 
+/** Everything drawn over the graph: walk marks, selection, and the edge of the open payload sheet. */
 function markDiagram(
   root: HTMLElement,
   context: {

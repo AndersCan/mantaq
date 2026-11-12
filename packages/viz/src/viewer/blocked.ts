@@ -1,4 +1,4 @@
-import { asksForPayload, payloadSamples, movesFrom } from "../moves.ts";
+import { payloadSamples, movesFrom } from "../moves.ts";
 import type {
   VizActorRef,
   VizEdge,
@@ -15,7 +15,6 @@ import { knownPayload } from "./fill.ts";
  * payload-only guard does not block the arrow. null when the event takes no data.
  */
 export function examplePayload(machine: VizMachine, event: string): VizJson {
-  if (!asksForPayload(machine, event)) return null;
   const fields = machine.events.find((each) => each.id === event)?.payload ?? null;
   const samples = payloadSamples(machine, event);
   return knownPayload(fields, { event, samples, steps: [] })?.payload ?? null;
@@ -92,7 +91,6 @@ export function blockedEdges(
     asked.set(key, entry);
   }
   const blocked = new Map<string, string>();
-  if (asked.size === 0) return blocked;
   const entries = [...asked.values()];
   try {
     const outcomes = from.dryRun(entries.map((each) => each.step));

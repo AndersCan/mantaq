@@ -23,8 +23,7 @@ function blockedNote(
   anchor: Element | null,
   blocked: ReadonlyMap<string, string> | undefined,
 ): string | null {
-  const id = anchor?.getAttribute("data-edge-id");
-  return id === null || id === undefined ? null : (blocked?.get(id) ?? null);
+  return blocked?.get(anchor?.getAttribute("data-edge-id") ?? "") ?? null;
 }
 
 /** The sheet element: the blocked note when there is a reason, else the form. */

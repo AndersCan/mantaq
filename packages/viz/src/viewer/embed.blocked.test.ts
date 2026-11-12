@@ -222,3 +222,203 @@ describe("a blocked arrow", () => {
     expect(dryRuns()).toBe(once + 1);
   });
 });
+
+function stateIn(id: string, initial = false): VizState {
+  return {
+    ...state(id, initial),
+    region: id.includes(".") ? id.slice(0, id.lastIndexOf(".")) : null,
+  };
+}
+
+function guardedEdge(
+  from: string,
+  event: string,
+  to: string,
+  comparisons: Array<{ path: string; operator: "!==" | ">" | "<"; literal: number }>,
+): VizEdge {
+  return {
+    id: `${from}-${event}-${to}`,
+    from,
+    event,
+    to,
+    kind: "transition",
+    origin: "declared",
+    emits: [],
+    contexts: [],
+    explanation: {
+      status: "analyzed",
+      location: { file: "m.ts", line: 1, column: 1 },
+      registration: "on",
+      branches: [],
+      payloadReads: [],
+      contextReads: comparisons.map((each) => each.path),
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: comparisons.map((each) => ({ source: "context" as const, ...each })),
+      literals: [],
+    },
+    doc: null,
+    coverage: null,
+    tested: null,
+  };
+}
+
+const eventOf = (id: string) => ({ id, internal: false, doc: null, payload: null });
+
+function liveState(over: Partial<VizLiveState>): VizLiveState {
+  return {
+    state: "cart",
+    steps: [],
+    last: null,
+    after: [],
+    timers: [],
+    context: { items: 0 },
+    payload: null,
+    regions: {},
+    children: [],
+    effectMode: "held",
+    waiting: [],
+    ...over,
+  };
+}
+
+function stayedStep(step: VizStep) {
+  return {
+    from: "x",
+    event: step.kind === "event" ? step.event : "",
+    to: "x",
+    outcome: "stay" as const,
+    effects: [],
+    sent: [],
+    context: null,
+    error: null,
+  };
+}
+
+describe("a blocked arrow, more cases", () => {
+  test("a path compared twice is named once", () => {
+    const machine: VizMachine = {
+      id: "cart",
+      initial: "cart",
+      regions: [],
+      maps: [],
+      states: [stateIn("cart", true), stateIn("payment")],
+      events: [eventOf("pay")],
+      outputs: [],
+      partOutputs: {},
+      context: null,
+      edges: [
+        guardedEdge("cart", "pay", "payment", [
+          { path: "items", operator: ">", literal: 0 },
+          { path: "items", operator: "<", literal: 10 },
+        ]),
+      ],
+      runs: [],
+      fuzz: null,
+    };
+    const driver: VizDriver = {
+      reset: () => liveState({}),
+      step: () => liveState({}),
+      dryRun: (steps) => steps.map(stayedStep),
+    };
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
+    root
+      .querySelector('[data-edge-id="cart-pay-payment"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector('[data-blocked-note="pay"]')?.textContent).toBe(
+      "pay is blocked: items is 0",
+    );
+  });
+
+  test("Enter then Escape on the focused element closes the note", () => {
+    const machine: VizMachine = {
+      id: "cart",
+      initial: "cart",
+      regions: [],
+      maps: [],
+      states: [stateIn("cart", true), stateIn("payment")],
+      events: [eventOf("pay")],
+      outputs: [],
+      partOutputs: {},
+      context: null,
+      edges: [
+        guardedEdge("cart", "pay", "payment", [{ path: "items", operator: "!==", literal: 0 }]),
+      ],
+      runs: [],
+      fuzz: null,
+    };
+    const driver: VizDriver = {
+      reset: () => liveState({}),
+      step: () => liveState({}),
+      dryRun: (steps) => steps.map(stayedStep),
+    };
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
+    const pay = root.querySelector<SVGGElement>('[data-edge-id="cart-pay-payment"]');
+    pay?.focus();
+    pay?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")).not.toBeNull();
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+    root.remove();
+  });
+
+  test("picking another map child tries its arrows again", () => {
+    const machine: VizMachine = {
+      id: "queue",
+      initial: "showingQueue",
+      regions: ["photos"],
+      maps: ["photos"],
+      states: [
+        stateIn("showingQueue", true),
+        stateIn("photos.sending", true),
+        stateIn("photos.sent"),
+      ],
+      events: [eventOf("confirm")],
+      outputs: [],
+      partOutputs: {},
+      context: null,
+      edges: [
+        guardedEdge("photos.sending", "confirm", "photos.sent", [
+          { path: "quota", operator: "!==", literal: 0 },
+        ]),
+      ],
+      runs: [],
+      fuzz: null,
+    };
+    const state0 = liveState({
+      state: "showingQueue",
+      context: { quota: 0 },
+      children: [
+        { map: "photos", key: "p1", state: "photos.sending", since: 0 },
+        { map: "photos", key: "p2", state: "photos.sending", since: 1 },
+      ],
+    });
+    const driver: VizDriver = {
+      reset: () => state0,
+      step: () => state0,
+      // p1's handler stays, p2's moves on.
+      dryRun: (steps) =>
+        steps.map((step) =>
+          step.kind === "event" &&
+          step.actor !== undefined &&
+          "key" in step.actor &&
+          step.actor.key === "p2"
+            ? { ...stayedStep(step), outcome: "transition" as const }
+            : stayedStep(step),
+        ),
+    };
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
+    const arrow = () => root.querySelector('[data-edge-id="photos.sending-confirm-photos.sent"]');
+    expect(arrow()?.classList.contains("blocked")).toBe(true);
+    root
+      .querySelector('g.child-marker[data-marker-key="p2"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(arrow()?.classList.contains("blocked")).toBe(false);
+  });
+});
