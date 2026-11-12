@@ -239,9 +239,13 @@ function fuzzRun(
 function inspectWith(
   target: InspectTarget,
   analysis: Either<string, ModuleAnalysis> | null,
+  fromTypes: Readonly<Record<string, ReadonlyArray<VizJson>>> = {},
 ): Inspected {
   const annotate = annotator(target, analysis);
-  const inferred = Either.getRight(analysis ?? Either.left("none"))?.payloads ?? {};
+  const inferred = {
+    ...fromTypes,
+    ...Either.getRight(analysis ?? Either.left("none"))?.payloads,
+  };
   const created = createdOf(target.create());
   const structure = annotate(toVizMachine({ id: target.id, ...created }));
   const expected = checkExpectations(
@@ -431,6 +435,7 @@ export async function inspectModule(
         ...(replayed.runs.length === 0 ? {} : { tests: replayed.runs }),
       },
       analysis,
+      each.samples,
     );
     const withContext: VizMachine | null =
       inspected.machine === null ? null : { ...inspected.machine, context: each.context };

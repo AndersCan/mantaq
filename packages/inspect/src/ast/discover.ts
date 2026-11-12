@@ -1,6 +1,6 @@
-import type { VizField } from "@mantaq/viz";
+import type { VizField, VizJson } from "@mantaq/viz";
 import ts from "typescript";
-import { fieldsOf } from "./payloads.ts";
+import { fieldsOf, samplesOf } from "./payloads.ts";
 import type { LoadedSource } from "./program.ts";
 
 /**
@@ -20,6 +20,8 @@ export interface MachineExport {
   unwrap: "self" | "actor";
   /** Fields of the actor's context type. null = no declared fields, or not an object type. */
   context: VizField[] | null;
+  /** Sample payloads per event id, read from the actor's `send` type and the result's `events` refs. */
+  samples: Record<string, VizJson[]>;
 }
 
 const ACTOR_KEYS = ["send", "snapshot", "inject", "settled"];
@@ -55,6 +57,67 @@ function contextOf(
     { checker, node, depth: 0 },
   );
   return fields === null || fields.length === 0 ? null : fields;
+}
+
+/** The event shapes a `{ type, payload }` union holds, one per member. */
+function membersOf(type: ts.Type): ts.Type[] {
+  return type.isUnion() ? type.types : [type];
+}
+
+/** Event shapes the factory's result offers through an `events` map of event refs (`create` returns one). */
+function refShapes(checker: ts.TypeChecker, context: { type: ts.Type; node: ts.Node }): ts.Type[] {
+  const { type, node } = context;
+  const events = type.getProperty("events");
+  if (events === undefined) return [];
+  return checker
+    .getPropertiesOfType(checker.getTypeOfSymbolAtLocation(events, node))
+    .flatMap((ref) => {
+      const create = checker.getTypeOfSymbolAtLocation(ref, node).getProperty("create");
+      if (create === undefined) return [];
+      const signature = checker
+        .getSignaturesOfType(checker.getTypeOfSymbolAtLocation(create, node), ts.SignatureKind.Call)
+        .at(-1);
+      return signature === undefined ? [] : [signature.getReturnType()];
+    });
+}
+
+/**
+ * Samples per event from the types the machine is built from: the union the
+ * actor's `send` accepts and the refs in the result's `events` map. Each shape
+ * needs a literal `type` and a `payload`. This covers machines built by a
+ * helper, whose handlers are not registered in the inspected file.
+ */
+function samplesFromTypes(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
+): Record<string, VizJson[]> {
+  const { type, unwrap, node } = context;
+  const actor = unwrap === "self" ? undefined : type.getProperty("actor");
+  const actorType = actor === undefined ? type : checker.getTypeOfSymbolAtLocation(actor, node);
+  const send = actorType.getProperty("send");
+  const parameter =
+    send === undefined
+      ? undefined
+      : checker.getSignaturesOfType(
+          checker.getTypeOfSymbolAtLocation(send, node),
+          ts.SignatureKind.Call,
+        )[0]?.parameters[0];
+  const sendShapes =
+    parameter === undefined ? [] : membersOf(checker.getTypeOfSymbolAtLocation(parameter, node));
+  const shapes = [...sendShapes, ...refShapes(checker, { type, node })];
+  const entries = shapes.flatMap((shape): Array<[string, VizJson[]]> => {
+    const typeProperty = shape.getProperty("type");
+    const payloadProperty = shape.getProperty("payload");
+    if (typeProperty === undefined || payloadProperty === undefined) return [];
+    const id = checker.getTypeOfSymbolAtLocation(typeProperty, node);
+    if (!id.isStringLiteral()) return [];
+    const samples = samplesOf(
+      checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(payloadProperty, node)),
+      { checker, node, depth: 0 },
+    );
+    return samples.length === 0 ? [] : [[id.value, samples]];
+  });
+  return Object.fromEntries(entries);
 }
 
 function isRequired(parameter: ts.Symbol): boolean {
@@ -103,6 +166,7 @@ function machineExport(
       call: "instance",
       unwrap: self,
       context: contextOf(checker, { type, unwrap: self, node }),
+      samples: samplesFromTypes(checker, { type, unwrap: self, node }),
     };
   }
   for (const signature of checker.getSignaturesOfType(type, ts.SignatureKind.Call)) {
@@ -110,7 +174,14 @@ function machineExport(
     const call = unwrap === null ? null : callOf(checker, signature, node);
     if (unwrap !== null && call !== null) {
       const returned = signature.getReturnType();
-      return { name, call, unwrap, context: contextOf(checker, { type: returned, unwrap, node }) };
+      const at = { type: returned, unwrap, node };
+      return {
+        name,
+        call,
+        unwrap,
+        context: contextOf(checker, at),
+        samples: samplesFromTypes(checker, at),
+      };
     }
   }
   return null;

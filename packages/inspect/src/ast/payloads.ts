@@ -64,7 +64,7 @@ function objectSamples(type: ts.Type, walk: Walk): VizJson[] {
 }
 
 /** JSON samples a value of `type` could take. Empty when the type has no JSON form (void, functions). */
-function samplesOf(type: ts.Type, walk: Walk): VizJson[] {
+export function samplesOf(type: ts.Type, walk: Walk): VizJson[] {
   if (walk.depth > MAX_DEPTH) return [null];
   const flags = type.getFlags();
   if (flags & (ts.TypeFlags.Void | ts.TypeFlags.Undefined | ts.TypeFlags.Never)) return [];
