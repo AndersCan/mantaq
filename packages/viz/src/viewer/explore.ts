@@ -16,10 +16,11 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { changedKeys, contextLines } from "./context-diff.ts";
-import { html } from "./dom.ts";
+import { html, svg } from "./dom.ts";
 import { fillChoices, freshKeys, knownPayload } from "./fill.ts";
 import type { FillChoice } from "./fill.ts";
 import type { Selection } from "./graph.ts";
+import { CHAR_WIDTH } from "./layout.ts";
 
 export interface ExploreContext {
   machine: VizMachine;
@@ -1616,20 +1617,29 @@ function currentsIn(
 /** Mark the walk on the drawn graph: current state, path taken, possible next steps. */
 export function markExplore(
   root: HTMLElement,
-  context: { machine: VizMachine; path: ReadonlyArray<ExploreStep>; currents?: string[] },
+  context: {
+    machine: VizMachine;
+    path: ReadonlyArray<ExploreStep>;
+    currents?: string[];
+    /** Edge id → why its guard blocks it; these are not next steps and reach nothing. */
+    blocked?: ReadonlyMap<string, string>;
+  },
 ): void {
   const { machine, path } = context;
+  const blocked = context.blocked ?? new Map<string, string>();
   const currents = currentsIn(machine, context);
   const moves = currents.flatMap((current) => movesFrom(machine, current));
-  const next = new Set(moves.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
+  const open = moves.filter((move) => !blocked.has(move.edge.id));
+  const next = new Set(open.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
   const reachable = new Set(
-    moves.flatMap((move) => move.targets).filter((to) => !currents.includes(to)),
+    open.flatMap((move) => move.targets).filter((to) => !currents.includes(to)),
   );
   const taken = new Set(path.map((step) => step.edge));
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
     element.classList.toggle("taken", taken.has(id));
     element.classList.toggle("next", next.has(id));
+    markBlocked(element, blocked.get(id));
   }
   for (const element of root.querySelectorAll<SVGGElement>(".graph g.chip")) {
     element.classList.toggle("running", currents.includes(element.dataset["state"] ?? ""));
@@ -1639,4 +1649,36 @@ export function markExplore(
     element.classList.toggle("current", id !== undefined && currents.includes(id));
     element.classList.toggle("reachable", id !== undefined && reachable.has(id));
   }
+}
+
+const LOCK_WIDTH = 8;
+const LOCK_HEIGHT = 10;
+
+/** A blocked arrow: grey lock left of the label's first line, and `aria-disabled`; the reason is in the note a click opens. */
+function markBlocked(element: SVGGElement, reason: string | undefined): void {
+  element.classList.toggle("blocked", reason !== undefined);
+  element.querySelector(":scope > .blocked-lock")?.remove();
+  if (reason === undefined) {
+    element.removeAttribute("aria-disabled");
+    return;
+  }
+  element.setAttribute("aria-disabled", "true");
+  const doc = element.ownerDocument;
+  const text = element.querySelector("text");
+  const first = text?.querySelector("tspan");
+  if (text === null || text === undefined || first === null || first === undefined) return;
+  const left =
+    Number(text.getAttribute("x")) -
+    ((first.textContent ?? "").length * CHAR_WIDTH) / 2 -
+    LOCK_WIDTH -
+    4;
+  const top = Number(first.getAttribute("y") ?? text.getAttribute("y")) - LOCK_HEIGHT + 2;
+  element.append(
+    svg(doc, "g", { class: "blocked-lock", "aria-hidden": "true" }, [
+      svg(doc, "rect", { x: left, y: top + 4, width: LOCK_WIDTH, height: LOCK_HEIGHT - 4 }),
+      svg(doc, "path", {
+        d: `M${left + 1.5} ${top + 4} V${top + 2.5} a2.5 2.5 0 0 1 5 0 V${top + 4}`,
+      }),
+    ]),
+  );
 }

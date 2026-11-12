@@ -64,7 +64,7 @@ export interface MachineLayout {
   entries: Array<{ from: Point; to: Point }>;
 }
 
-const CHAR_WIDTH = 7;
+export const CHAR_WIDTH = 7;
 const NODE_HEIGHT = 36;
 const CHIP_ROW_HEIGHT = 20;
 const LABEL_HEIGHT = 16;

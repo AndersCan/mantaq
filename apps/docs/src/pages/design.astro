@@ -149,6 +149,18 @@ const headings = [
   </p>
   <Step n={6}>A guard is a plain if in the handler: no items, no payment.</Step>
 
+  <h2 id="blocked-arrow">Blocked arrow</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: an arrow whose guard the current context does not meet is grey with a lock; clicking it
+    shows why and sends nothing. Here <code>pay</code> is blocked until <code>addItem</code> puts an
+    item in the cart.
+  </p>
+  <Step n={6}>
+    A guard is a plain if in the handler: no items, no payment. With no items, pay is blocked: click
+    addItem first.
+  </Step>
+
   <h2 id="phone-width">Phone width</h2>
   <p><strong>Awaiting approval</strong></p>
   <div class="design-phone">

@@ -516,6 +516,24 @@
   font-weight: 700;
 }
 
+.viz .edge.blocked path {
+  stroke: var(--muted);
+}
+
+.viz .edge.blocked text {
+  fill: var(--muted);
+}
+
+.viz .edge.blocked {
+  cursor: not-allowed;
+}
+
+.viz .blocked-lock {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
 .viz .chip.running rect {
   fill-opacity: 0.35;
 }
