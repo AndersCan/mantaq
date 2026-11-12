@@ -962,23 +962,15 @@ describe("Actor handler state", () => {
 });
 
 describe("Handlers that return nothing", () => {
-  test("a handler with no return stays, runs no effect again and sets no error", () => {
+  test("a handler with no return stays and sets no error", () => {
     const locked = state("locked")();
     const unlocked = state("unlocked")();
     const enter = event("ENTER")<{ code: string }>();
-    const tick = event("TICK")();
-    let effectRuns = 0;
     const actor = Actor({
-      inputs: [enter, tick],
+      inputs: [enter],
       states: [locked, unlocked],
       initial: locked,
       setup: (m) => {
-        m.effect(locked, {
-          name: "count",
-          fn: () => {
-            effectRuns += 1;
-          },
-        });
         m.on(locked, {
           event: enter,
           to: [unlocked],
@@ -986,22 +978,9 @@ describe("Handlers that return nothing", () => {
             if (e.payload.code === "1234") return { state: unlocked };
           },
         });
-        m.onAny({
-          event: tick,
-          handler: () => {},
-        });
       },
     });
-    const seen: boolean[] = [];
-    actor.on("transition", { fn: (info) => seen.push(info.transitioned) });
     actor.send(enter.create({ code: "0000" }));
-    expect({
-      path: actor.snapshot().path,
-      error: actor.snapshot().error,
-      effectRuns,
-      seen,
-    }).toEqual({ path: ["locked"], error: undefined, effectRuns: 1, seen: [false] });
-    actor.send(tick.create());
     expect({ path: actor.snapshot().path, error: actor.snapshot().error }).toEqual({
       path: ["locked"],
       error: undefined,

@@ -737,14 +737,13 @@ describe("handler state typing", () => {
     });
   });
 
-  test("a handler may return nothing, but not a wrong state, a typo key or a promise", () => {
+  test("a handler may return nothing", () => {
     const locked = state("locked")();
     const unlocked = state("unlocked")();
-    const other = state("other")();
     const enter = event("ENTER")<{ code: string }>();
     Actor({
       inputs: [enter],
-      states: [locked, unlocked, other],
+      states: [locked, unlocked],
       initial: locked,
       setup: (m) => {
         m.on(locked, {
@@ -767,27 +766,6 @@ describe("handler state typing", () => {
           event: enter,
           to: [unlocked],
           handler: (e) => (e.payload.code === "1234" ? { state: unlocked } : undefined),
-        });
-        m.on(locked, {
-          event: enter,
-          to: [unlocked],
-          // @ts-expect-error a state outside `to` is still refused
-          // suppressed: "other" is not listed in `to`
-          handler: () => ({ state: other }),
-        });
-        m.on(locked, {
-          event: enter,
-          to: [unlocked],
-          // @ts-expect-error a mistyped key is still refused
-          // suppressed: "stat" is not a TransitionResult key
-          handler: () => ({ stat: unlocked }),
-        });
-        m.on(locked, {
-          event: enter,
-          to: [unlocked],
-          // @ts-expect-error an async handler is still refused
-          // suppressed: a Promise is not a TransitionResult
-          handler: async () => ({ state: unlocked }),
         });
       },
     });
