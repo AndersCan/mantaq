@@ -929,7 +929,7 @@ function markSystemView(
   const canvas = root.querySelector(".canvas");
   const doc = root.ownerDocument;
   canvas?.querySelector("[data-viz-key]")?.remove();
-  const key = systemKey(doc, { machine, system, live: view.live });
+  const key = view.diagramOnly ? null : systemKey(doc, { machine, system, live: view.live });
   if (key !== null) canvas?.append(key);
   showPayloadSheet(root, { ...context, ...view });
 }

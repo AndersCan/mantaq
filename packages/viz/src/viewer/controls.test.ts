@@ -138,7 +138,7 @@ describe("Diagram only", () => {
     expect(root.querySelector(".hint")).toBeNull();
     const texts = [...root.querySelectorAll("button, svg text")].map((node) => node.textContent);
     expect(texts).toEqual(["Show controls", "open", "ring", "orphan"]);
-    expect(root.textContent).not.toContain("finding");
+    expect(root.textContent).toBe(`Show controls${["open", "ring", "orphan"].join("")}`);
   });
 
   test("Show controls brings the finding mark and the panel back", () => {
