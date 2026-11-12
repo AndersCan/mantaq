@@ -72,7 +72,10 @@ function followKeyboard(sheet: HTMLElement): (() => void) | null {
  * Removes the open sheets. `opener` is what the next sheet returns focus to;
  * `focusBack` is set when focus was inside a removed sheet, so it must move now.
  */
-function removeSheets(root: HTMLElement): { opener: string | null; focusBack: string | null } {
+export function removeSheets(root: HTMLElement): {
+  opener: string | null;
+  focusBack: string | null;
+} {
   const active = root.ownerDocument.activeElement;
   let opener = active !== null && root.contains(active) ? selectorOf(active) : null;
   let focusBack: string | null = null;
