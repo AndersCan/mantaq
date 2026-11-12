@@ -8,5 +8,10 @@ import Step from "../../../components/Step.astro";
 <Step n={1}>A state is where the order is now. This one is `cart`.</Step>
 
 ```sh
-npm install @mantaq/core
+npm create vite@latest my-app -- --template vanilla-ts
+cd my-app && npm install
+npm install @mantaq/core @mantaq/sugar
+npm install -D vitest
 ```
+
+Set `"strict": true` under `compilerOptions` in `tsconfig.json`, and put each file from this guide in `src/`.

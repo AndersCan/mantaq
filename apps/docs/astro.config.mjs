@@ -29,7 +29,7 @@ export default defineConfig({
         "src/design/out-arrow.ts",
         "src/design/pool.ts",
         "src/pool/team-inbox.ts",
-        "src/first-machine/traffic-light.ts",
+        "src/first-machine/door-lock.ts",
         "src/conform/counter-model.ts",
         "src/tutorial/order-01.ts",
         "src/tutorial/order-02.ts",
