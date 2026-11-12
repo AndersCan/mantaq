@@ -7,7 +7,11 @@ import { Code } from "@astrojs/starlight/components";
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 import poolSource from "../../../pool/team-inbox.ts?raw";
 
+<div data-pagefind-ignore>
+
 <Machine src="src/pool/team-inbox.ts" />
+
+</div>
 
 `createPool` builds one inbox and `n` workers that pull work. Boxes are machines, arrows are events, and `workers ×3` is three actors drawn once, one dot each.
 
