@@ -882,10 +882,6 @@
   display: block;
 }
 
-.viz.diagram-only .finding-mark {
-  display: none;
-}
-
 /* System view: grey chip and end mark. */
 .viz .part-chip {
   fill: var(--muted);

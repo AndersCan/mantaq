@@ -57,6 +57,18 @@ function mount(options: { diagramOnly?: boolean } = {}, shown: VizMachine = mach
   return root;
 }
 
+/** An orphan state nothing reaches is a finding; the open state has an effect with no declared sends. */
+function withFinding(): VizMachine {
+  const copy = structuredClone(machine);
+  const [open] = copy.states;
+  if (open === undefined) throw new Error("fixture has no state");
+  copy.states = [
+    { ...open, effects: [{ name: "ring", sends: null }] },
+    { ...open, id: "orphan", label: "orphan", initial: false },
+  ] as unknown as VizMachine["states"];
+  return copy;
+}
+
 const tabNames = (root: HTMLElement) =>
   [...root.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent);
 
@@ -115,6 +127,26 @@ describe("Diagram only", () => {
     expect(root.classList.contains("diagram-only")).toBe(true);
     expect(root.querySelector(".panel")).toBeNull();
     root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(root.querySelector(".viz-header")).not.toBeNull();
+  });
+
+  test("Diagram only on a machine with a finding draws the diagram and Show controls, nothing else", () => {
+    const root = mount({ diagramOnly: true }, withFinding());
+    expect(root.querySelector(".finding-mark")).toBeNull();
+    expect(root.querySelector(".panel")).toBeNull();
+    expect(root.querySelector(".viz-header")).toBeNull();
+    expect(root.querySelector(".hint")).toBeNull();
+    const texts = [...root.querySelectorAll("button, svg text")].map((node) => node.textContent);
+    expect(texts).toEqual(["Show controls", "open", "ring", "orphan"]);
+    expect(root.textContent).not.toContain("finding");
+  });
+
+  test("Show controls brings the finding mark and the panel back", () => {
+    const root = mount({ diagramOnly: true }, withFinding());
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    expect(root.querySelector(".finding-mark")).not.toBeNull();
+    expect(root.querySelector(".hint")).not.toBeNull();
+    expect(root.querySelector(".panel")).not.toBeNull();
     expect(root.querySelector(".viz-header")).not.toBeNull();
   });
 

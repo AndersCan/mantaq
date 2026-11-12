@@ -297,7 +297,7 @@ export function mountViewer(
     const live = driver === undefined ? null : { send, compose };
     const graph = inSystem
       ? renderSystem(doc, machine, system, systemCallbacks({ machine, view, refresh, live }))
-      : renderGraph(doc, machine, { select, showDetails, mode });
+      : renderGraph(doc, machine, { select, showDetails, mode, bare: view.diagramOnly });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(...layoutOf(doc, { chrome, graph, panel, changes }));

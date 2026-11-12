@@ -78,7 +78,3 @@ test("buttons, the full screen toggle and the header heading follow the host's t
   expect(rule(".viz .fullscreen-toggle")).toMatch(/font-size:\s*1em/);
   expect(rule(".viz .viz-header :is(h1, h2, h3)")).toMatch(/font-size:\s*1\.385em/);
 });
-
-test("Diagram only hides the finding marks", () => {
-  expect(rule(".viz.diagram-only .finding-mark")).toMatch(/display:\s*none/);
-});

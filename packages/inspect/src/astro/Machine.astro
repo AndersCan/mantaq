@@ -20,6 +20,8 @@ const docRoutes = Object.fromEntries(
 const { count, machines, shown, more } = bannerParts(doc.findings);
 ---
 
+{
+  diagramOnly !== true && (
 <section class="mantaq-findings" data-count={count}>
   {
     count > 0 ? (
@@ -35,6 +37,8 @@ const { count, machines, shown, more } = bannerParts(doc.findings);
     )
   }
 </section>
+  )
+}
 <div
   class="mantaq-machine"
   data-mantaq-viz={doc.text}
