@@ -960,3 +960,32 @@ describe("Actor handler state", () => {
     expect(seen).toEqual([{ name: "second", payload: { n: 2 } }]);
   });
 });
+
+describe("Handlers that return nothing", () => {
+  test("a handler with no return stays and sets no error", () => {
+    const locked = state("locked")();
+    const unlocked = state("unlocked")();
+    const enter = event("ENTER")<{ code: string }>();
+    const actor = Actor({
+      inputs: [enter],
+      states: [locked, unlocked],
+      initial: locked,
+      setup: (m) => {
+        m.on(locked, {
+          event: enter,
+          to: [unlocked],
+          handler: (e) => {
+            if (e.payload.code === "1234") return { state: unlocked };
+          },
+        });
+      },
+    });
+    actor.send(enter.create({ code: "0000" }));
+    expect({ path: actor.snapshot().path, error: actor.snapshot().error }).toEqual({
+      path: ["locked"],
+      error: undefined,
+    });
+    actor.send(enter.create({ code: "1234" }));
+    expect(actor.snapshot().path).toEqual(["unlocked"]);
+  });
+});

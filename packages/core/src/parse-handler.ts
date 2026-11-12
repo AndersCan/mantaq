@@ -12,6 +12,10 @@ export type RuntimeTransitionHandler<States extends readonly AnyStateRef[], Acto
   },
 ) => TransitionResult<States[number], string>;
 
+type AuthoredHandler<States extends readonly AnyStateRef[], ActorContext> = (
+  ...args: Parameters<RuntimeTransitionHandler<States, ActorContext>>
+) => TransitionResult<States[number], string> | void;
+
 /**
  * Boundary parser for transition handlers. Registration receives handlers
  * whose event parameter is the declared envelope of one concrete event. The
@@ -21,15 +25,16 @@ export type RuntimeTransitionHandler<States extends readonly AnyStateRef[], Acto
  * The runtime contract guarantees the envelope matches at dispatch time
  * (`Actor` only routes events whose `type` key was used at registration).
  * It is also where the `state` payload type is restored, like `parseEffectFn`.
+ * A handler that returns nothing stays, the same as `{}`.
  */
 export function parseTransitionHandler<States extends readonly AnyStateRef[], ActorContext>(
   candidate: unknown,
 ): RuntimeTransitionHandler<States, ActorContext> {
-  const handler = candidate as RuntimeTransitionHandler<States, ActorContext> | undefined;
+  const handler = candidate as AuthoredHandler<States, ActorContext> | undefined;
   if (typeof handler !== "function") {
     return () => ({});
   }
-  return handler;
+  return (event, options) => handler(event, options) ?? {};
 }
 
 /**

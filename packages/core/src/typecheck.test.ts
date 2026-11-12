@@ -736,4 +736,38 @@ describe("handler state typing", () => {
       },
     });
   });
+
+  test("a handler may return nothing", () => {
+    const locked = state("locked")();
+    const unlocked = state("unlocked")();
+    const enter = event("ENTER")<{ code: string }>();
+    Actor({
+      inputs: [enter],
+      states: [locked, unlocked],
+      initial: locked,
+      setup: (m) => {
+        m.on(locked, {
+          event: enter,
+          to: [unlocked],
+          handler: (e) => {
+            if (e.payload.code === "1234") return { state: unlocked };
+          },
+        });
+        m.on(locked, { event: enter, handler: () => {} });
+        m.on(locked, {
+          event: enter,
+          to: [unlocked],
+          handler: (e) => {
+            if (e.payload.code === "1234") return { state: unlocked };
+            return;
+          },
+        });
+        m.on(locked, {
+          event: enter,
+          to: [unlocked],
+          handler: (e) => (e.payload.code === "1234" ? { state: unlocked } : undefined),
+        });
+      },
+    });
+  });
 });
