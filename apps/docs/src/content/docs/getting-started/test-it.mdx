@@ -1,32 +1,21 @@
 ---
 title: Test it
-description: Test a door lock that locks itself after 30 seconds, on a virtual clock.
+description: Test that food left on the stove for 10 seconds burns, on a virtual clock.
 ---
 
 import { Code } from "@astrojs/starlight/components";
-import Machine from "@mantaq/inspect/astro/Machine.astro";
-import lockSource from "../../../first-machine/door-lock.ts?raw";
-import testSource from "../../../first-machine/door-lock.test.ts?raw";
-
-<div data-pagefind-ignore>
-
-<Machine src="src/first-machine/door-lock.ts" runEffects />
-
-</div>
-
-A wrong code leaves the door locked; the right one opens it, and `withTimeout` locks it again after 30
-seconds. Leaving `unlocked` cancels the timer. Relocking after 30 seconds is a choice made for this door;
-yours may need another time, or to stay open.
-
-<Code code={lockSource} lang="ts" title="src/door-lock.ts" />
+import testSource from "../../../tutorial/meal.test.ts?raw";
 
 <Code
-  code={testSource.replace('"vite-plus/test"', '"vitest"')}
+  code={testSource
+    .replace('"vite-plus/test"', '"vitest"')
+    .replace('"./meal-09"', '"./meal"')
+    .replaceAll("createMeal9", "createMeal")}
   lang="ts"
-  title="src/door-lock.test.ts"
+  title="src/meal.test.ts"
 />
 
-A virtual clock makes time a plain function call.
+A virtual clock makes time a plain function call: the food is still cooking at 9.999 seconds and burnt at 10. Burning after 10 seconds is a choice made for this stove; yours may need another time.
 
 ```bash
 npx vitest run
