@@ -397,7 +397,7 @@ interface Clock {
 
 The type-safe transition/effect registrar passed to `setup`. Targets validate against declared `States`/`Inputs`/`Internal`/`Outputs`. An undeclared target fails to compile.
 
-`to` lists every state the handler may return. The handler's return type is narrowed to `to[number]`, so returning an unlisted state fails to compile; omit `to` for a handler that only stays. The builder records `to` in `BuiltMaps.targets`, so the full transition graph is static data: tooling reads it without running a handler.
+`to` lists every state the handler may return. The handler's return type is narrowed to `to[number]`, so returning an unlisted state fails to compile; omit `to` for a handler that only stays. A handler that returns nothing stays, the same as `{}`. The builder records `to` in `BuiltMaps.targets`, so the full transition graph is static data: tooling reads it without running a handler.
 
 ```ts
 class ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {

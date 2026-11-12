@@ -34,7 +34,7 @@ export interface BuiltMaps<States extends readonly AnyStateRef[], ActorContext> 
 
 type StateInput<S> = S extends AnyStateRef ? { name: S["name"]; payload: PayloadOf<S> } : never;
 
-/** Handler may only return states listed in `to`; no `to` means it can only stay. */
+/** Handler may only return states listed in `to`; no `to` means it can only stay. Returning nothing stays, like `{}`. */
 type HandlerFn<
   Current extends AnyStateRef,
   To extends AnyStateRef,
@@ -48,7 +48,7 @@ type HandlerFn<
     actor: AnyActor<ActorContext>;
     state: StateInput<Current>;
   },
-) => TransitionResult<To, EventTypeOf<Outputs[number]>>;
+) => TransitionResult<To, EventTypeOf<Outputs[number]>> | void;
 
 interface HandlerOptions<
   Current extends AnyStateRef,
