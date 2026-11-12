@@ -30,17 +30,60 @@ function selectorOf(element: Element): string | null {
   return null;
 }
 
+/** Stops each sheet's keyboard tracking; called when the sheet goes. */
+const stopFollowing = new WeakMap<Element, () => void>();
+
+/**
+ * Keeps the sheet and its focused field above the on-screen keyboard: sets
+ * `--viz-keyboard` (the keyboard's height) and `--viz-visible` (the room left)
+ * from the visual viewport. Returns the function that removes the listeners, or null without a visual viewport.
+ */
+function followKeyboard(sheet: HTMLElement): (() => void) | null {
+  const view = sheet.ownerDocument.defaultView;
+  const viewport = view?.visualViewport;
+  if (!view || !viewport) return null;
+  const update = () => {
+    sheet.style.setProperty(
+      "--viz-keyboard",
+      `${Math.max(0, view.innerHeight - (viewport.height + viewport.offsetTop))}px`,
+    );
+    sheet.style.setProperty("--viz-visible", `${viewport.height}px`);
+    const active = sheet.ownerDocument.activeElement;
+    if (
+      active !== null &&
+      sheet.contains(active) &&
+      ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)
+    ) {
+      active.scrollIntoView({ block: "nearest" });
+    }
+  };
+  update();
+  viewport.addEventListener("resize", update);
+  viewport.addEventListener("scroll", update);
+  sheet.addEventListener("focusin", update);
+  return () => {
+    viewport.removeEventListener("resize", update);
+    viewport.removeEventListener("scroll", update);
+    sheet.removeEventListener("focusin", update);
+  };
+}
+
 /**
  * Removes the open sheets. `opener` is what the next sheet returns focus to;
  * `focusBack` is set when focus was inside a removed sheet, so it must move now.
  */
-function removeSheets(root: HTMLElement): { opener: string | null; focusBack: string | null } {
+export function removeSheets(root: HTMLElement): {
+  opener: string | null;
+  focusBack: string | null;
+} {
   const active = root.ownerDocument.activeElement;
   let opener = active !== null && root.contains(active) ? selectorOf(active) : null;
   let focusBack: string | null = null;
   for (const old of root.querySelectorAll(".payload-sheet")) {
     opener = opener ?? openedFrom.get(old) ?? null;
     if (old.contains(active)) focusBack = opener;
+    stopFollowing.get(old)?.();
+    stopFollowing.delete(old);
     old.remove();
   }
   return { opener, focusBack };
@@ -110,5 +153,7 @@ export function showPayloadSheet(
   });
   if (opener !== null) openedFrom.set(sheet, opener);
   root.append(sheet);
+  const stop = followKeyboard(sheet);
+  if (stop !== null) stopFollowing.set(sheet, stop);
   sheet.querySelector<HTMLElement>("textarea, input, select")?.focus({ preventScroll: true });
 }

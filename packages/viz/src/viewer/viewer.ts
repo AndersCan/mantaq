@@ -32,7 +32,7 @@ import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { drawChildMarkers } from "./markers.ts";
-import { showPayloadSheet } from "./payload-sheet.ts";
+import { removeSheets, showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
 import {
   dotKey,
@@ -203,6 +203,7 @@ export function mountViewer(
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
+    removeSheets(root);
     root.replaceChildren();
     root.classList.add("viz", "not-content");
     if (!machine) {
