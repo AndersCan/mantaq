@@ -5,7 +5,11 @@ description: The state graph drawn from the builder's declared targets.
 
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 
+<div data-pagefind-ignore>
+
 <Machine src="src/content/docs/checkout.ts" />
+
+</div>
 
 The docs' checkout machine ([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)), drawn at build time from each handler's `to` list. It cannot drift from the code.
 
@@ -23,7 +27,11 @@ The panel runs the real machine in your browser. Pulsing arrows are the steps yo
 
 ## Parts that talk
 
+<div data-pagefind-ignore>
+
 <Machine src="src/content/docs/photo-upload.ts" />
+
+</div>
 
 A machine whose regions or actor maps send each other events opens on this view. A box is a part, an arrow is an event one part sends and another takes, and the line under the name is where the part is now. A box for an actor map reads `name ×n`, with a count per state. Click an arrow to see who sends it and in which states it is taken, then **Open** to land on that arrow in the part's diagram. **← System** comes back.
 

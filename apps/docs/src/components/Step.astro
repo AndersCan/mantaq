@@ -21,7 +21,7 @@ const before = n > 1 ? shownOf(n - 1) : undefined;
 const ins = before === undefined ? [] : addedLines(before, shown);
 ---
 
-<div class="mantaq-tutorial">
+<div class="mantaq-tutorial" data-pagefind-ignore>
   <Machine src={`src/tutorial/${name(n)}`} diagramOnly />
 </div>
 <div class="mantaq-caption"><slot /></div>
