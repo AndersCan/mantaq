@@ -342,6 +342,47 @@ function sameActor(left: VizActorRef | undefined, right: VizActorRef | undefined
   return left.map === right.map && left.key === right.key;
 }
 
+interface Stepping {
+  actor: AnyActor<unknown>;
+  clock: VirtualClock;
+  internal: Set<string>;
+  log: VizLiveStep[];
+  steps: VizStep[];
+  flags: { inside: boolean; segment: number; pending: number };
+  maps: Record<string, ActorMapLike>;
+}
+
+/** Apply one step to a session and return the log entry it produced. */
+function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
+  const { actor, clock, internal, log, steps, flags, maps } = at;
+  log.length = 0;
+  flags.segment = 0;
+  flags.inside = true;
+  flags.pending = 1;
+  const before = actor.state.name;
+  const target = step.kind === "event" ? targetOf(actor, step.actor, maps) : undefined;
+  try {
+    applyStep(actor, { step, clock, internal, maps });
+  } finally {
+    flags.inside = false;
+    flags.pending = 0;
+  }
+  steps.push(step);
+  if (step.kind !== "event") return undefined;
+  const own = log.findIndex(
+    (entry) => entry.event === step.event && sameActor(entry.actor, step.actor),
+  );
+  const [entry] = own === -1 ? [] : log.splice(own, 1);
+  if (entry !== undefined) log.unshift(entry);
+  else log.unshift(unhandled(step, { actor, target, root: before }));
+  return log[0];
+}
+
+/** The state name of every region, as one comparable string. */
+function regionsOf(at: Stepping): string {
+  return JSON.stringify(regionActors(at.actor).map((each) => [each.path, each.actor.state.name]));
+}
+
 /**
  * A running actor for the viewer. Steps go through the same function the
  * fuzzer replays with, so live and fuzzed behaviour cannot drift. No node APIs.
@@ -351,13 +392,13 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
   let session = start(target);
   let onChange: ((state: VizLiveState) => void) | null = null;
 
-  function start(from: FuzzTarget) {
+  function start(from: FuzzTarget, quiet = false) {
     const { actor, clock, made } = from.create();
     const maps: Record<string, ActorMapLike> = actorMapsOf(made).maps;
     const internal = new Set(eventCatalog(actor).internal);
     const log: VizLiveStep[] = [];
     const steps: VizStep[] = [];
-    const flags = { inside: true, disposed: false, segment: 0, pending: 0 };
+    const flags = { inside: true, disposed: quiet, segment: 0, pending: 0 };
     const held: HeldEffect[] = [];
     if (effectMode === "held") holdEffects(actor, held);
 
@@ -426,6 +467,23 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     };
   }
 
+  /** Replay the walk on a fresh quiet copy, then apply the candidate. Null when the copy drifted or threw. */
+  function tryOnCopy(candidate: VizStep): VizLiveStep | null {
+    const live = session;
+    const copy = start(target, true);
+    const result = Either.from(() => {
+      for (const done of live.steps) stepOn(copy, done);
+      const same =
+        copy.actor.state.name === live.actor.state.name &&
+        regionsOf(copy) === regionsOf(live) &&
+        contextText(copy.actor) === contextText(live.actor);
+      return same ? (stepOn(copy, candidate) ?? null) : null;
+    });
+    for (const map of Object.values(copy.maps)) map.dispose();
+    copy.actor.dispose();
+    return Either.isRight(result) ? result[1] : null;
+  }
+
   return {
     listen(callback) {
       onChange = callback;
@@ -438,29 +496,11 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       return view();
     },
     step(step) {
-      const { actor, clock, internal, log, steps, flags, maps } = session;
-      log.length = 0;
-      flags.segment = 0;
-      flags.inside = true;
-      flags.pending = 1;
-      const before = actor.state.name;
-      const target = step.kind === "event" ? targetOf(actor, step.actor, maps) : undefined;
-      try {
-        applyStep(actor, { step, clock, internal, maps });
-      } finally {
-        flags.inside = false;
-        flags.pending = 0;
-      }
-      steps.push(step);
-      if (step.kind === "event") {
-        const own = log.findIndex(
-          (entry) => entry.event === step.event && sameActor(entry.actor, step.actor),
-        );
-        const [entry] = own === -1 ? [] : log.splice(own, 1);
-        if (entry !== undefined) log.unshift(entry);
-        else log.unshift(unhandled(step, { actor, target, root: before }));
-      }
+      stepOn(session, step);
       return view();
+    },
+    dryRun(candidates) {
+      return candidates.map((candidate) => tryOnCopy(candidate));
     },
   };
 }
