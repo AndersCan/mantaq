@@ -13,11 +13,12 @@ function analysis(name: string): ModuleAnalysis | undefined {
 
 describe("analyzeModule: machine exports", () => {
   test("each factory shape is called the way its type allows", () => {
-    expect(analysis("factories")?.machines).toEqual([
-      { name: "createDoorActor", call: "clock", unwrap: "self", context: null },
-      { name: "createGate", call: "options", unwrap: "actor", context: null },
-      { name: "createRealDoor", call: "call", unwrap: "self", context: null },
-      { name: "sharedDoor", call: "instance", unwrap: "self", context: null },
+    const shapes = analysis("factories")?.machines.map((machine) => ({ ...machine, samples: {} }));
+    expect(shapes).toEqual([
+      { name: "createDoorActor", call: "clock", unwrap: "self", context: null, samples: {} },
+      { name: "createGate", call: "options", unwrap: "actor", context: null, samples: {} },
+      { name: "createRealDoor", call: "call", unwrap: "self", context: null, samples: {} },
+      { name: "sharedDoor", call: "instance", unwrap: "self", context: null, samples: {} },
     ]);
   });
 
@@ -28,6 +29,7 @@ describe("analyzeModule: machine exports", () => {
         call: "instance",
         unwrap: "self",
         context: [expect.objectContaining({ name: "attempts", input: "number" })],
+        samples: {},
       },
     ]);
   });
