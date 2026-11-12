@@ -380,7 +380,7 @@ export function renderSystem(
       viewBox: `0 0 ${width} ${height}`,
       width,
       height,
-      style: `width: clamp(${((width * 0.6) / 12).toFixed(2)}rem, 100%, ${((width * 1.4) / 12).toFixed(2)}em)`,
+      style: `width: min(100%, ${((width * 1.4) / 12).toFixed(2)}em)`,
       role: "group",
       "aria-label": `parts of ${machine.id}`,
     },

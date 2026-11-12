@@ -235,3 +235,24 @@ describe("system view: branches no other test pins", () => {
     expect(text(root, "[data-link-receiver]")).toBe("teamInbox takes it in: holding.");
   });
 });
+
+describe("system view: nothing is cut off", () => {
+  test("the viewBox holds every box, and the width has no floor that overflows the frame", () => {
+    const svg = mount([pool]).querySelector("svg.system-graph");
+    const [x0, y0, w, h] = (svg?.getAttribute("viewBox") ?? "").split(" ").map(Number);
+    const boxes = [
+      ...(svg?.querySelectorAll("g.part rect, g.link-start rect, g.link-end rect") ?? []),
+    ];
+    expect(boxes.length).toBe(4);
+    for (const box of boxes) {
+      const [x, y, bw, bh] = ["x", "y", "width", "height"].map((name) =>
+        Number(box.getAttribute(name)),
+      );
+      expect(x).toBeGreaterThanOrEqual(x0 ?? 0);
+      expect(y).toBeGreaterThanOrEqual(y0 ?? 0);
+      expect((x ?? 0) + (bw ?? 0)).toBeLessThanOrEqual((x0 ?? 0) + (w ?? 0));
+      expect((y ?? 0) + (bh ?? 0)).toBeLessThanOrEqual((y0 ?? 0) + (h ?? 0));
+    }
+    expect(svg?.getAttribute("style")).toMatch(/^width: min\(100%, [\d.]+em\)$/);
+  });
+});
