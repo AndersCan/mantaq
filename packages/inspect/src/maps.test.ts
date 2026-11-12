@@ -401,6 +401,16 @@ describe("driver effects and reset", () => {
     expect(driver.step(goStep).waiting).toEqual([]);
     expect(ran).toEqual(["work"]);
   });
+
+  test("real: a dry run holds the copy's map child effects", () => {
+    ran.length = 0;
+    const driver = createDriver(effectTarget, { effectMode: "real" });
+    driver.step(addStep);
+    driver.step(goStep);
+    expect(ran).toEqual(["work"]);
+    expect(driver.dryRun?.([addStep])).toHaveLength(1);
+    expect(ran).toEqual(["work"]);
+  });
 });
 
 function capturedQueue(seen: Array<ReturnType<typeof createPhotoQueue>>): FuzzTarget {

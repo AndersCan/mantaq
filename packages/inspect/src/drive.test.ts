@@ -5,6 +5,7 @@ import { createDriver } from "./drive.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createSenderActor } from "./fixtures/wired/sender.ts";
 import { createThrowingActor } from "./fixtures/throwing.ts";
+import { createOrder6 } from "../../../apps/docs/src/tutorial/order-06.ts";
 import type { VizJson } from "@mantaq/viz";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
@@ -525,5 +526,57 @@ describe("createDriver held effects", () => {
     expect(live).toMatchObject({ effectMode: "real", waiting: [] });
     await macrotask();
     expect(seen).toEqual(["paid"]);
+  });
+});
+
+describe("dryRun", () => {
+  const order: FuzzTarget = {
+    id: "order6",
+    create: () => {
+      const clock = VirtualClock();
+      return { actor: createOrder6(clock), clock };
+    },
+  };
+  const pay = {
+    kind: "event",
+    event: "pay",
+    payload: { email: "ana@example.com" },
+  } as const;
+  const addItem = { kind: "event", event: "addItem", payload: null } as const;
+
+  test("a guarded step stays until the context meets it, then transitions", () => {
+    const driver = createDriver(order);
+    expect(driver.dryRun?.([pay])).toMatchObject([{ outcome: "stay", from: "cart" }]);
+    driver.step(addItem);
+    expect(driver.dryRun?.([pay])).toMatchObject([{ outcome: "transition", to: "payment" }]);
+  });
+
+  test("the live actor, its steps and its listener are untouched", () => {
+    const driver = createDriver(order);
+    driver.step(addItem);
+    let calls = 0;
+    driver.listen?.(() => {
+      calls += 1;
+    });
+    const before = driver.step(addItem);
+    calls = 0;
+    driver.dryRun?.([pay, addItem]);
+    const after = driver.reset();
+    expect(calls).toBe(0);
+    expect(after.steps).toHaveLength(0);
+    expect(before.steps).toHaveLength(2);
+    driver.step(addItem);
+    driver.dryRun?.([pay]);
+    const live = driver.step(addItem);
+    expect(live.steps).toHaveLength(2);
+    expect(live.state).toBe("cart");
+  });
+
+  test("candidates are independent of each other", () => {
+    const driver = createDriver(order);
+    expect(driver.dryRun?.([addItem, pay])).toMatchObject([
+      { event: "addItem", context: { items: 1 } },
+      { event: "pay", outcome: "stay", from: "cart" },
+    ]);
   });
 });

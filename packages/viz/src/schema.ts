@@ -296,6 +296,14 @@ export interface VizLiveState {
 export interface VizDriver {
   reset(): VizLiveState;
   step(step: VizStep): VizLiveState;
+  /**
+   * What each step would do from where the actor is now, tried on a throwaway copy: the walk so
+   * far is replayed on a fresh actor with effect bodies held, then the step is applied. The live
+   * actor, its steps and its listener are untouched. Entry i is null when the copy did not reach
+   * the live state, regions and context (an effect ran for real, a timer fired), or the step threw
+   * in the driver itself.
+   */
+  dryRun?(steps: ReadonlyArray<VizStep>): Array<VizLiveStep | null>;
   /** Called with the new state whenever the actor changes outside step()/reset() (an async effect result). */
   listen?(onChange: (state: VizLiveState) => void): void;
 }
