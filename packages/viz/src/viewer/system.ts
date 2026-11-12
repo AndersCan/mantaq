@@ -1,6 +1,7 @@
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel } from "@dagrejs/dagre";
 import { isAnyState, scopeOf } from "../schema.ts";
+import { movesFrom } from "../moves.ts";
 import type { VizActorRef, VizLiveState, VizLiveStep, VizMachine } from "../schema.ts";
 import { linksInside, systemOf } from "../system.ts";
 import type { MachineSystem, SystemEntry, SystemLink, SystemPart } from "../system.ts";
@@ -550,6 +551,14 @@ function markPart(
   group.classList.toggle("selected", selection?.kind === "part" && selection.id === part.id);
 }
 
+/** Whether `part` handles `event` in the state it is in now. A final state handles nothing. */
+function canTake(machine: VizMachine, part: string, event: string, live: VizLiveState): boolean {
+  const current = part === "" ? live.state : live.regions[part];
+  return (
+    current !== undefined && movesFrom(machine, current).some((move) => move.edge.event === event)
+  );
+}
+
 /** Fills chips and names from the driver, and sets the pink and teal marks. Runs after every step and selection. */
 export function markSystem(
   root: ParentNode,
@@ -570,6 +579,13 @@ export function markSystem(
     if (key === null) continue;
     group.classList.toggle("took", took.has(key));
     group.classList.toggle("selected", selection?.kind === "link" && selection.id === key);
+  }
+  for (const entry of root.querySelectorAll("g.link-in")) {
+    const part = entry.getAttribute("data-to") ?? "";
+    for (const line of entry.querySelectorAll("g.entry")) {
+      const event = line.getAttribute("data-entry-event") ?? "";
+      line.classList.toggle("next", live !== null && canTake(machine, part, event, live));
+    }
   }
   for (const pair of pairs) {
     const lines = [...pair.querySelectorAll("g.link")];
