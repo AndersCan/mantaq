@@ -433,6 +433,37 @@ describe("pool view arrows", () => {
     expect(text(root, 'g[data-part=""] .part-chip')).toBe("holding");
   });
 
+  const workerStates = (root: HTMLElement) =>
+    root.querySelector('g[data-part="workers"]')?.getAttribute("aria-label");
+
+  test("clicking the pill turns a worker dot to working", () => {
+    const root = mount([pool]);
+    const before = workerStates(root);
+    root.querySelector("g.link-start")?.dispatchEvent(new Event("click"));
+    expect(workerStates(root)).not.toBe(before);
+    expect(workerStates(root)).toContain("working");
+  });
+
+  test.each(["Enter", " "])("key %j on the pill sends and keeps focus", (key) => {
+    const steps: VizStep[] = [];
+    const root = mount([pool], true, steps);
+    const pill = root.querySelector<SVGGElement>("g.link-start");
+    expect(pill?.getAttribute("role")).toBe("button");
+    pill?.dispatchEvent(new KeyboardEvent("keydown", { key }));
+    expect(steps).toEqual([{ kind: "event", event: "ITEM_ARRIVED", payload: null }]);
+    expect(root.querySelector("g.link-start")).toBe(pill);
+  });
+
+  test("the pill is plain without a driver or with several entry events", () => {
+    expect(mount([pool], false).querySelector("g.link-start")?.getAttribute("tabindex")).toBeNull();
+    const two: VizMachine = {
+      ...pool,
+      events: [...pool.events, event("OTHER")],
+      edges: [...pool.edges, edge("empty", "OTHER", "holding")],
+    };
+    expect(mount([two]).querySelector("g.link-start")?.getAttribute("tabindex")).toBeNull();
+  });
+
   test("without a driver the entry line is drawn and does nothing", () => {
     const root = mount([pool], false);
     const line = root.querySelector<SVGGElement>('[data-entry-event="ITEM_ARRIVED"]');
@@ -535,6 +566,34 @@ describe("pool view arrows: attacked", () => {
       (line) => line.getAttribute("data-entry-event"),
     );
     expect(events).toEqual(["ITEM_ARRIVED"]);
+  });
+
+  test("repro: the pill is plain when entries reach two parts", () => {
+    const pill = mount([lanes]).querySelector("g.link-start");
+    expect(pill?.getAttribute("tabindex")).toBeNull();
+    expect(pill?.getAttribute("role")).toBeNull();
+  });
+
+  test("repro: a pill whose one entry goes into a region sends to that region", () => {
+    const steps: VizStep[] = [];
+    const netOnly: VizMachine = {
+      ...lanes,
+      events: lanes.events.map((each) =>
+        each.id === "ITEM_ARRIVED" || each.id === "RESTORE" ? { ...each, internal: true } : each,
+      ),
+    };
+    const root = mount([netOnly], true, steps);
+    const pill = root.querySelector("g.link-start");
+    expect(pill?.getAttribute("aria-label")).toBe("DROP: from outside to net");
+    pill?.dispatchEvent(new Event("click"));
+    expect(steps).toEqual([
+      { kind: "event", event: "DROP", payload: null, actor: { region: "net" } },
+    ]);
+  });
+
+  test("repro: the pill is named for the event it sends", () => {
+    const pill = mount([pool]).querySelector("g.link-start");
+    expect(pill?.getAttribute("aria-label")).toBe("ITEM_ARRIVED: from outside to teamInbox");
   });
 
   test("a pair is pink when one of its lines took and the other did not", () => {
