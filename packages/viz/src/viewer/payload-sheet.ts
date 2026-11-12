@@ -19,6 +19,14 @@ function anchorOf(
   );
 }
 
+/** Gives keyboard focus back to the edge a closed form was opened from. */
+function focusEdge(root: HTMLElement, id: string | null): void {
+  if (id === null) return;
+  [...root.querySelectorAll<HTMLElement>("[data-edge-id]")]
+    .find((each) => each.getAttribute("data-edge-id") === id)
+    ?.focus({ preventScroll: true });
+}
+
 /** The state the actor a form sends to is in; the machine's own when it has no actor. */
 function actorState(live: VizLiveState, actor: VizActorRef | undefined): string {
   if (actor === undefined) return live.state;
@@ -44,21 +52,30 @@ export function showPayloadSheet(
     compose: (event: string | null) => void;
   },
 ): void {
-  for (const old of root.querySelectorAll(".payload-sheet")) old.remove();
+  const doc = root.ownerDocument;
+  let returnTo: string | null = null;
+  for (const old of root.querySelectorAll(".payload-sheet")) {
+    if (old.contains(doc.activeElement)) returnTo = old.getAttribute("data-anchor");
+    old.remove();
+  }
   for (const marked of root.querySelectorAll("[data-composing]")) {
     marked.removeAttribute("data-composing");
   }
   const { machine, live, composing: event, composingActor: actor } = context;
-  if (live === null || event === null) return;
-  const doc = root.ownerDocument;
+  if (live === null || event === null) {
+    focusEdge(root, returnTo);
+    return;
+  }
   const close = () => context.compose(null);
-  anchorOf(root, {
+  const anchor = anchorOf(root, {
     machine,
     state: actorState(live, actor),
     event,
-  })?.setAttribute("data-composing", "");
+  });
+  anchor?.setAttribute("data-composing", "");
   const sheet = html(doc, "section", {
     class: "payload-sheet",
+    "data-anchor": anchor?.getAttribute("data-edge-id") ?? "",
     role: "dialog",
     "aria-label": `Payload for ${event}`,
   });

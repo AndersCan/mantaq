@@ -262,6 +262,25 @@ describe("live controls", () => {
     expect(marked.map((each) => each.getAttribute("data-edge-id"))).toEqual(["idle-submit-paying"]);
   });
 
+  test("after Send or Escape from an edge's form, focus is back on that edge", () => {
+    const { root, live } = mount();
+    document.body.append(root);
+    const edge = () => root.querySelector<SVGGElement>('[data-edge-id="idle-submit-paying"]');
+    edge()?.focus();
+    edge()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(document.activeElement?.closest(".payload-sheet")).not.toBeNull();
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    edge()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log).toHaveLength(1);
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    root.remove();
+  });
+
   test("Send from the edge's form logs exactly that payload; Cancel logs nothing", () => {
     const { root, live } = mount();
     clickEdge(root, "idle-submit-paying");
@@ -1840,9 +1859,12 @@ describe("live effect reports", () => {
 });
 
 describe("Controls tab, live", () => {
-  test("the Controls tab has no ask-first toggle", () => {
+  test("the live Controls tab has no ask toggle: here it holds only Diagram only", () => {
     const { root } = mount();
-    expect(root.querySelector("[data-ask-first]")).toBeNull();
+    const panel = root.querySelector('[data-tab-panel="controls"] .controls');
+    expect([...(panel?.querySelectorAll("button") ?? [])].map((each) => each.textContent)).toEqual([
+      "Diagram only",
+    ]);
   });
 
   test("Diagram only hides the changes list and the run notice", () => {

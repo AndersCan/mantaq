@@ -69,7 +69,6 @@ interface ViewState {
   composing: string | null;
   /** Live: the region the open payload form sends to; undefined = the machine itself. */
   composingActor: VizActorRef | undefined;
-  /** Live: an edge click opens the payload form instead of sending a known value. */
   /** The "Events and time" fold is open; it stays as the user left it across steps and Back. */
   eventsOpen: boolean;
   /** Live: the child a click in the child graph goes to; null = the one that started first. */
@@ -334,7 +333,6 @@ function systemCallbacks(context: {
       sendEvent(machine, event, {
         actor: to === "" ? undefined : { region: to },
         ...live,
-        view,
       }),
   };
 }
@@ -645,7 +643,6 @@ function sendEvent(
   machine: VizMachine,
   event: string,
   handlers: Pick<LiveContext, "send" | "compose"> & {
-    view: ViewState;
     actor: VizActorRef | undefined;
   },
 ): void {
