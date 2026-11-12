@@ -31,6 +31,7 @@ import {
 import type { ExploreStep } from "../moves.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
+import { blockedEdges } from "./blocked.ts";
 import { drawChildMarkers } from "./markers.ts";
 import { removeSheets, showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
@@ -85,6 +86,10 @@ interface ViewState {
   drilled: boolean;
   /** The clicked arrow or box in the system view; kept while the diagram is open. */
   systemSelection: SystemSelection | null;
+  /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
+  blocked: Map<string, string>;
+  /** What `blocked` was computed for; it is recomputed when either changes. */
+  blockedFor: { live: VizLiveState; picked: ViewState["picked"] } | null;
 }
 
 type PanelTab = "step" | "context" | "path" | "details" | "controls";
@@ -199,7 +204,6 @@ export function mountViewer(
   listenOnRoot(root, { back: () => back(), unpick: () => unpickIn(view, redraw) });
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
-
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
@@ -243,7 +247,7 @@ export function mountViewer(
       const footer = options.panelFooter;
       fillPanel(panel, { doc, view, parts, details, controls, refresh, footer });
       if (inSystem) markSystemView(root, { machine, system, view, send, compose });
-      else markDiagram(root, { machine, view, send, compose, refresh });
+      else markDiagram(root, { machine, view, driver, send, compose, refresh });
     };
     redraw = refresh;
     const walked = (run?: string) => {
@@ -286,6 +290,7 @@ export function mountViewer(
     };
     // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {
+      if (openBlocked(machine, view, selection, compose)) return;
       const step = clickStep(machine, { path: view.path, selection, ...liveState(view) });
       if (step !== null) view.selection = selection;
       return step === null ? showDetails(selection) : take(step);
@@ -496,6 +501,8 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     notice: null,
     drilled: false,
     systemSelection: null,
+    blocked: new Map(),
+    blockedFor: null,
   };
 }
 
@@ -895,15 +902,57 @@ function markSystemView(
 }
 
 /** Everything drawn over the graph: walk marks, selection, and the edge of the open payload sheet. */
+/** Recomputes the blocked arrows when the live state or the picked child changed; no `dryRun` blocks nothing. */
+function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver | undefined): void {
+  const { live, blockedFor } = view;
+  if (live === null || driver?.dryRun === undefined) {
+    view.blocked = new Map();
+    view.blockedFor = null;
+    return;
+  }
+  const same =
+    blockedFor?.live === live &&
+    blockedFor.picked?.map === view.picked?.map &&
+    blockedFor.picked?.key === view.picked?.key;
+  if (same) return;
+  view.blockedFor = { live, picked: view.picked };
+  view.blocked = blockedEdges(machine, {
+    live,
+    currents: currentsOf(live, view.picked),
+    dryRun: (steps) => driver.dryRun?.(steps) ?? [],
+    actorOf: (edge) => actorOf(machine, edge, { children: live.children, picked: view.picked }),
+  });
+}
+
+/** A click on a blocked edge opens the reason where the form would be, and sends nothing. Returns whether it was one. */
+function openBlocked(
+  machine: VizMachine,
+  view: ViewState,
+  selection: Selection,
+  compose: (event: string | null, actor?: VizActorRef) => void,
+): boolean {
+  if (selection.kind !== "edge" || !view.blocked.has(selection.id)) return false;
+  const edge = machine.edges.find((each) => each.id === selection.id);
+  const actor =
+    edge === undefined
+      ? "none"
+      : actorOf(machine, edge, { children: view.live?.children ?? [], picked: view.picked });
+  if (edge !== undefined && actor !== "none") compose(edge.event, actor);
+  return true;
+}
+
 function markDiagram(
   root: HTMLElement,
-  context: { machine: VizMachine; view: ViewState; refresh: () => void } & Pick<
-    LiveContext,
-    "send" | "compose"
-  >,
+  context: {
+    machine: VizMachine;
+    view: ViewState;
+    driver: VizDriver | undefined;
+    refresh: () => void;
+  } & Pick<LiveContext, "send" | "compose">,
 ): void {
   const { machine, view } = context;
-  markExplore(root, { machine, path: view.path, ...liveState(view) });
+  updateBlocked(machine, view, context.driver);
+  markExplore(root, { machine, path: view.path, blocked: view.blocked, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>("svg");
   if (view.live !== null && graph !== null) {
     drawChildMarkers(graph, {

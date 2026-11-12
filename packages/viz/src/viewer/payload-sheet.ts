@@ -19,6 +19,38 @@ function anchorOf(
   );
 }
 
+function blockedNote(
+  anchor: Element | null,
+  blocked: ReadonlyMap<string, string> | undefined,
+): string | null {
+  const id = anchor?.getAttribute("data-edge-id");
+  return id === null || id === undefined ? null : (blocked?.get(id) ?? null);
+}
+
+/** The sheet element: the blocked note when there is a reason, else the form. */
+function sheetFor(
+  doc: Document,
+  context: { event: string; reason: string | null; body: () => HTMLElement },
+): HTMLElement {
+  const { event, reason } = context;
+  const sheet = html(doc, "section", {
+    class: "payload-sheet",
+    role: "dialog",
+    "aria-label": reason ?? `Payload for ${event}`,
+    "data-blocked-note": reason === null ? null : event,
+  });
+  sheet.append(reason === null ? context.body() : html(doc, "p", {}, [reason]));
+  return sheet;
+}
+
+/** The first field takes focus; a note has none, so the sheet does, which lets Escape close it. */
+function focusSheet(sheet: HTMLElement): void {
+  const field = sheet.querySelector<HTMLElement>("textarea, input, select");
+  if (field !== null) return field.focus({ preventScroll: true });
+  sheet.setAttribute("tabindex", "-1");
+  sheet.focus({ preventScroll: true });
+}
+
 /** What had focus when each open form was opened: an arrow or an entry line, as a selector, since a redraw replaces the element. */
 const openedFrom = new WeakMap<Element, string>();
 
@@ -110,6 +142,8 @@ export function showPayloadSheet(
     composing: string | null;
     /** The region the open form sends to; none = the machine itself. */
     composingActor?: VizActorRef;
+    /** Edge id → why its guard blocks it; the sheet then holds that sentence instead of the form. */
+    blocked?: ReadonlyMap<string, string>;
     send: (step: VizStep) => void;
     compose: (event: string | null) => void;
   },
@@ -127,27 +161,27 @@ export function showPayloadSheet(
     return;
   }
   const close = () => context.compose(null);
-  anchorOf(root, {
+  const anchor = anchorOf(root, {
     machine,
     state: actorState(live, actor),
     event,
-  })?.setAttribute("data-composing", "");
-  const sheet = html(doc, "section", {
-    class: "payload-sheet",
-    role: "dialog",
-    "aria-label": `Payload for ${event}`,
   });
-  sheet.append(
-    payloadForm(doc, {
-      event,
-      samples: payloadSamples(machine, event),
-      fields: machine.events.find((each) => each.id === event)?.payload ?? null,
-      live,
-      send: (step) =>
-        context.send(actor === undefined || step.kind !== "event" ? step : { ...step, actor }),
-      close,
-    }),
-  );
+  anchor?.setAttribute("data-composing", "");
+  const reason = blockedNote(anchor, context.blocked);
+  const sheet = sheetFor(doc, {
+    event,
+    reason,
+    body: () =>
+      payloadForm(doc, {
+        event,
+        samples: payloadSamples(machine, event),
+        fields: machine.events.find((each) => each.id === event)?.payload ?? null,
+        live,
+        send: (step) =>
+          context.send(actor === undefined || step.kind !== "event" ? step : { ...step, actor }),
+        close,
+      }),
+  });
   sheet.addEventListener("keydown", (key) => {
     if (key.key === "Escape") close();
   });
@@ -155,5 +189,5 @@ export function showPayloadSheet(
   root.append(sheet);
   const stop = followKeyboard(sheet);
   if (stop !== null) stopFollowing.set(sheet, stop);
-  sheet.querySelector<HTMLElement>("textarea, input, select")?.focus({ preventScroll: true });
+  focusSheet(sheet);
 }
