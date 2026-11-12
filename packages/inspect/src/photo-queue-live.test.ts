@@ -36,10 +36,15 @@ const clickEdge = (root: HTMLElement, id: string) =>
     .querySelector(`g[data-edge-id="${id}"]`)
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
+function sendOnEdge(root: HTMLElement, id: string) {
+  clickEdge(root, id);
+  root.querySelector<HTMLButtonElement>("[data-payload-send]")?.click();
+}
+
 function addThree(root: HTMLElement) {
-  clickEdge(root, "showingEmptyQueue-photoAdded-showingQueue");
-  clickEdge(root, "showingQueue-photoAdded-stay");
-  clickEdge(root, "showingQueue-photoAdded-stay");
+  sendOnEdge(root, "showingEmptyQueue-photoAdded-showingQueue");
+  sendOnEdge(root, "showingQueue-photoAdded-stay");
+  sendOnEdge(root, "showingQueue-photoAdded-stay");
 }
 
 const markers = (root: HTMLElement) => [...root.querySelectorAll("g.child-marker")];
@@ -63,7 +68,7 @@ describe("the docs photo queue on the live page", () => {
   test("uploadConfirmed goes to p1", async () => {
     const root = await mounted();
     addThree(root);
-    clickEdge(root, "photos.sendingPhoto-uploadConfirmed-photoSent");
+    sendOnEdge(root, "photos.sendingPhoto-uploadConfirmed-photoSent");
     const p1 = root.querySelector('g.child-marker[data-marker-key="p1"]');
     expect(p1?.getAttribute("data-marker-state")).toBe("photos.photoSent");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
@@ -74,7 +79,7 @@ describe("the docs photo queue on the live page", () => {
   test("queueCleared names every removed child", async () => {
     const root = await mounted();
     addThree(root);
-    clickEdge(root, "showingQueue-queueCleared-showingEmptyQueue");
+    sendOnEdge(root, "showingQueue-queueCleared-showingEmptyQueue");
     expect(root.querySelector("[data-live-removed]")?.textContent).toBe("p1, p2, p3 removed");
     expect(markers(root)).toEqual([]);
   });

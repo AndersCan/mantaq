@@ -247,14 +247,97 @@ describe("live controls", () => {
     expect(root.querySelector("[data-payload-form]")).toBeNull();
   });
 
-  test("an edge click sends the first fuzz payload at once", () => {
+  test("an edge click on a data event opens the form at the known values and sends nothing", () => {
     const { root, live } = mount();
     clickEdge(root, "idle-submit-paying");
+    expect(live.log).toEqual([]);
+    expect(root.querySelector('.payload-sheet [data-payload-form="submit"]')).not.toBeNull();
+    expect(root.querySelector(".payload-sheet")?.getAttribute("aria-label")).toBe(
+      "Payload for submit",
+    );
+    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]')?.value).toBe(
+      '{"amount":5}',
+    );
+    const marked = [...root.querySelectorAll("[data-composing]")];
+    expect(marked.map((each) => each.getAttribute("data-edge-id"))).toEqual(["idle-submit-paying"]);
+  });
+
+  test("after Send or Escape from an edge's form, focus is back on that edge", () => {
+    const { root, live } = mount();
+    document.body.append(root);
+    const edge = () => root.querySelector<SVGGElement>('[data-edge-id="idle-submit-paying"]');
+    edge()?.focus();
+    edge()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(document.activeElement?.closest(".payload-sheet")).not.toBeNull();
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    edge()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    click(root, '[data-payload-send="submit"]');
+    expect(live.log).toHaveLength(1);
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    root.remove();
+  });
+
+  test("Send from the edge's form logs exactly that payload; Cancel logs nothing", () => {
+    const { root, live } = mount();
+    clickEdge(root, "idle-submit-paying");
+    click(root, '[data-payload-cancel="submit"]');
+    expect(live.log).toEqual([]);
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    clickEdge(root, "idle-submit-paying");
+    click(root, '[data-payload-send="submit"]');
     expect(live.log).toEqual([[{ kind: "event", event: "submit", payload: { amount: 5 } }]]);
     expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
-  test("a second click on the same event sends what this walk sent last", () => {
+  test("an edge click on an event with no payload still sends at once", () => {
+    const toggle: VizMachine = {
+      ...checkout,
+      states: [state("off", { initial: true }), state("on")],
+      initial: "off",
+      events: [{ id: "flip", internal: false, doc: null, payload: null }],
+      edges: [edge("off", "flip", "on")],
+      fuzz: null,
+    };
+    const log: VizStep[] = [];
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [toggle] },
+      {
+        driver: {
+          reset: () => flipLive([]),
+          step: (step) => {
+            log.push(step);
+            return flipLive([...log]);
+          },
+        },
+      },
+    );
+    function flipLive(steps: VizStep[]): VizLiveState {
+      return {
+        state: steps.length === 0 ? "off" : "on",
+        steps,
+        last: null,
+        after: [],
+        timers: [],
+        context: null,
+        payload: null,
+        regions: {},
+        children: [],
+        effectMode: "real",
+        waiting: [],
+      };
+    }
+    clickEdge(root, "off-flip-on");
+    expect(log).toEqual([{ kind: "event", event: "flip", payload: null }]);
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+  });
+
+  test("a second click on the same event opens the form at what this walk sent last", () => {
     const toggle: VizMachine = {
       ...checkout,
       states: [state("off", { initial: true }), state("on")],
@@ -291,16 +374,17 @@ describe("live controls", () => {
     }
     const root = document.createElement("div");
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [toggle] }, { driver: flip });
-    click(root, "[data-always-ask]");
     click(root, '[data-send="flip"]');
     const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]');
     if (box) box.value = '{"n": 42}';
     click(root, '[data-payload-send="flip"]');
-    click(root, "[data-always-ask]");
     clickEdge(root, "on-flip-off");
+    expect(log).toHaveLength(1);
+    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]')?.value).toBe(
+      '{"n":42}',
+    );
+    click(root, '[data-payload-send="flip"]');
     expect(log.at(-1)).toEqual({ kind: "event", event: "flip", payload: { n: 42 } });
-    expect(root.querySelector(".payload-sheet")).toBeNull();
-    click(root, "[data-always-ask]");
     click(root, '[data-send="flip"]');
     expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]')?.value).toBe(
       '{"n":42}',
@@ -308,53 +392,16 @@ describe("live controls", () => {
   });
 
   test("a value sent from the form is forgotten when Back undoes that send", () => {
-    const { root, live } = mount();
-    click(root, "[data-always-ask]");
+    const { root } = mount();
     click(root, '[data-send="submit"]');
     const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
     if (box) box.value = '{"amount": 42}';
     click(root, '[data-payload-send="submit"]');
-    click(root, "[data-always-ask]");
     click(root, '[data-explore-action="back"]');
     clickEdge(root, "idle-submit-paying");
-    expect(live.log.at(-1)).toEqual([{ kind: "event", event: "submit", payload: { amount: 5 } }]);
-  });
-
-  test("Always ask opens the form on an edge click", () => {
-    const { root, live } = mount();
-    click(root, "[data-always-ask]");
-    expect(root.querySelector("[data-always-ask]")?.getAttribute("aria-pressed")).toBe("true");
-    clickEdge(root, "idle-submit-paying");
-    expect(live.log).toEqual([]);
-    expect(root.querySelector('.payload-sheet [data-payload-form="submit"]')).not.toBeNull();
-    expect(root.querySelector(".payload-sheet")?.getAttribute("aria-label")).toBe(
-      "Payload for submit",
+    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]')?.value).toBe(
+      '{"amount":5}',
     );
-    const marked = [...root.querySelectorAll("[data-composing]")];
-    expect(marked.map((each) => each.getAttribute("data-edge-id"))).toEqual(["idle-submit-paying"]);
-  });
-
-  test("Always ask survives a re-render and toggles off", () => {
-    const { root, live } = mount();
-    click(root, "[data-always-ask]");
-    click(root, "[data-always-ask]");
-    expect(root.querySelector("[data-always-ask]")?.getAttribute("aria-pressed")).toBe("false");
-    clickEdge(root, "idle-submit-paying");
-    expect(live.log).toHaveLength(1);
-  });
-
-  test("Always ask is hidden when no event takes a payload, and without a driver", () => {
-    const plain: VizMachine = { ...checkout, fuzz: null };
-    const root = document.createElement("div");
-    mountViewer(
-      root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [plain] },
-      { driver: driver() },
-    );
-    expect(root.querySelector("[data-always-ask]")).toBeNull();
-    const staticRoot = document.createElement("div");
-    mountViewer(staticRoot, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] });
-    expect(staticRoot.querySelector("[data-always-ask]")).toBeNull();
   });
 
   test("clicks never scroll or rebuild the canvas", () => {
@@ -1812,10 +1859,12 @@ describe("live effect reports", () => {
 });
 
 describe("Controls tab, live", () => {
-  test("Always ask sits in the Controls tab, not the header", () => {
+  test("the live Controls tab has no ask toggle: here it holds only Diagram only", () => {
     const { root } = mount();
-    expect(root.querySelector('[data-tab-panel="controls"] [data-always-ask]')).not.toBeNull();
-    expect(root.querySelector(".viz-header [data-always-ask]")).toBeNull();
+    const panel = root.querySelector('[data-tab-panel="controls"] .controls');
+    expect([...(panel?.querySelectorAll("button") ?? [])].map((each) => each.textContent)).toEqual([
+      "Diagram only",
+    ]);
   });
 
   test("Diagram only hides the changes list and the run notice", () => {

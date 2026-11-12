@@ -21,9 +21,9 @@ A box is a state, an arrow is one target of a `to` list labelled with its event.
 
 The panel runs the real machine in your browser. Pulsing arrows are the steps you can take next.
 
-1. Click `submitBasicInfo`. It sends an example payload and moves to `shippingAddress`. The **Context** tab marks the lines that changed.
-2. Click `submitShipping`, then `submitPayment`. Effects do not run here: in `submitting` the panel waits for `chargeCard` and offers what it reports.
-3. Click `paymentOk`. The walk ends in `success`.
+1. Click `submitBasicInfo`: the form shows an example payload; press **Send**. The walk moves to `shippingAddress`. The **Context** tab marks the lines that changed.
+2. Click `submitShipping` and press **Send**, then the same for `submitPayment`. Effects do not run here: in `submitting` the panel waits for `chargeCard` and offers what it reports.
+3. Click `paymentOk` and press **Send**. The walk ends in `success`.
 
 ## Parts that talk
 

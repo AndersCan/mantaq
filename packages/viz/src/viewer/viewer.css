@@ -798,12 +798,6 @@
   border-bottom: 1px solid var(--state-border);
 }
 
-.viz .always-ask[aria-pressed="true"] {
-  border-color: var(--fg);
-  background: var(--region-bg);
-  font-weight: 600;
-}
-
 .viz .payload-title {
   margin: 0;
   font-size: 0.875rem;
