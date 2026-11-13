@@ -506,11 +506,17 @@ function screenWalk(context: {
 }): VizStep[] | null {
   const { machine, view, driver, selection } = context;
   if (view.tab !== "screen" || driver === undefined || selection.kind !== "state") return null;
-  return walkTo(machine, driver, selection.id);
+  if (selection.id === view.live?.state) return null;
+  return walkTo({ machine, view, driver }, selection.id);
 }
 
 /** The shortest known walk to state `id`, cut at the first step that lands there; null when there is none. */
-function walkTo(machine: VizMachine, driver: VizDriver, id: string): VizStep[] | null {
+function walkTo(
+  context: { machine: VizMachine; view: ViewState; driver: VizDriver },
+  id: string,
+): VizStep[] | null {
+  const { machine, view, driver } = context;
+  if (id === machine.initial) return [];
   const steps = pathTo(machine, id);
   if (steps === null) return null;
   let live = driver.reset();
@@ -518,6 +524,7 @@ function walkTo(machine: VizMachine, driver: VizDriver, id: string): VizStep[] |
     live = stepSafely(driver, { before: live, step });
     if (live.state === id) return steps.slice(0, index + 1);
   }
+  replayInto(view, driver, view.live?.steps ?? []);
   return null;
 }
 

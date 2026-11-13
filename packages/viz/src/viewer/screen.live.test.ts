@@ -138,7 +138,7 @@ describe("Screen tab", () => {
     const root = mount({ onNavigate: (where) => navigated.push(where.steps) });
     clickState(root, "c");
     expect(drawn(root)).toBe("screen of c");
-    expect(navigated.at(-1)).toHaveLength(3);
+    expect(navigated.at(-1)).toEqual(["go", "go", "go"]);
   });
 
   test("clicking the next state takes one step and stays on Screen", () => {
