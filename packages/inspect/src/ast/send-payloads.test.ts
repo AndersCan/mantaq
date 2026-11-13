@@ -22,6 +22,7 @@ describe("samples from the actor's send type", () => {
       "jobs.ITEMS_FINISHED": [{ worker: "sample", items: ["sample"] }],
       "jobs.ITEMS_FAILED": [{ worker: "sample", items: ["sample"], error: "sample" }],
       "jobs.RUN_FAILED": [{ error: "sample" }],
+      "jobs.WORKERS_RESIZED": [{ count: 1 }],
     });
   });
 

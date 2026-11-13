@@ -291,7 +291,7 @@ describe("createPool", () => {
     const left = Object.values(a.events).map((ref) => ref.type);
     const right = Object.values(b.events).map((ref) => ref.type);
     expect({ left: left.length, shared: left.filter((id) => right.includes(id)) }).toEqual({
-      left: 6,
+      left: 7,
       shared: [],
     });
     expect(left.every((id) => id.startsWith("a."))).toBe(true);
@@ -454,10 +454,12 @@ describe("createPool details", () => {
         ["allWorkersFree", "workersBusy", "workWaiting"].map((name) => [
           name,
           Object.fromEntries(
-            ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED"].flatMap((id) => {
-              const to = options.targets[name]?.[id];
-              return to === undefined ? [] : [[id.slice(1), to]];
-            }),
+            ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED", "p.WORKERS_RESIZED"].flatMap(
+              (id) => {
+                const to = options.targets[name]?.[id];
+                return to === undefined ? [] : [[id.slice(1), to]];
+              },
+            ),
           ),
         ]),
       ),
@@ -470,19 +472,24 @@ describe("createPool details", () => {
       assignTargets: workerOptions.targets.free?.["p.ITEMS_ASSIGNED"],
       effect: workerOptions.effects.working?.map((e) => [e.name, e.sends]),
     }).toEqual({
-      inputs: ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED"],
+      inputs: ["p.ITEM_ARRIVED", "p.ITEMS_FINISHED", "p.ITEMS_FAILED", "p.WORKERS_RESIZED"],
       outputs: ["p.ITEMS_ASSIGNED"],
       targets: {
-        allWorkersFree: { ".ITEM_ARRIVED": ["workersBusy"] },
+        allWorkersFree: {
+          ".ITEM_ARRIVED": ["workersBusy"],
+          ".WORKERS_RESIZED": ["allWorkersFree", "workersBusy", "workWaiting"],
+        },
         workersBusy: {
           ".ITEM_ARRIVED": ["workersBusy", "workWaiting"],
           ".ITEMS_FINISHED": ["allWorkersFree", "workersBusy"],
           ".ITEMS_FAILED": ["workersBusy", "workWaiting"],
+          ".WORKERS_RESIZED": ["allWorkersFree", "workersBusy", "workWaiting"],
         },
         workWaiting: {
           ".ITEM_ARRIVED": ["workWaiting"],
           ".ITEMS_FINISHED": ["workWaiting", "workersBusy"],
           ".ITEMS_FAILED": ["workWaiting", "workersBusy"],
+          ".WORKERS_RESIZED": ["allWorkersFree", "workersBusy", "workWaiting"],
         },
       },
       workerInputs: ["p.ITEMS_ASSIGNED"],
