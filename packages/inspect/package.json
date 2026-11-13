@@ -70,7 +70,6 @@
     "dev": "vp pack --watch",
     "test": "vp test",
     "check": "vp check",
-    "viz:compare": "node src/examples-cli.ts compare",
     "prepublishOnly": "vp run build",
     "prepack": "vp run build"
   },

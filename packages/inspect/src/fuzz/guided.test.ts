@@ -3,7 +3,6 @@ import { toVizMachine } from "../structure.ts";
 import { EXAMPLE_ROOT, exampleTargets } from "../examples.ts";
 import type { Example } from "../examples.ts";
 import type { VizComparison, VizMachine } from "@mantaq/viz";
-import { compareArms, renderComparison } from "./compare.ts";
 import { fuzz } from "./fuzz.ts";
 import { branchDistance, guidance, literalPool } from "./guided.ts";
 import { DEFAULT_SEED } from "@mantaq/pbt";
@@ -82,27 +81,5 @@ describe("literal seeding", () => {
     const run = () =>
       fuzz(loaded.example, { seed: 9, iterations: 400, ...guidance(loaded.machine) }).corpus;
     expect(run()).toEqual(run());
-  });
-});
-
-describe("comparison report", () => {
-  test("renders every arm per example", () => {
-    const loaded = credit();
-    if (!loaded) return;
-    const row = compareArms(loaded.example, {
-      machine: loaded.machine,
-      seeds: [1, 2],
-      checkpoints: [10, 50],
-    });
-    expect(row.arms.map((arm) => arm.arm)).toEqual([
-      "no-loop",
-      "blind",
-      "literals",
-      "distance",
-      "guided",
-    ]);
-    const report = renderComparison([row]);
-    expect(report).toContain("### credit");
-    expect(report).toMatch(/^\| guided \| /m);
   });
 });
