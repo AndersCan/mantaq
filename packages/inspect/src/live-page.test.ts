@@ -68,6 +68,37 @@ describe("mountDriven", () => {
   });
 });
 
+describe("mountDriven preview", () => {
+  const create = () => {
+    const clock = VirtualClock();
+    return { actor: createCheckoutActor(clock), clock };
+  };
+  const frameOf = async (preview?: { path: string; machines: string[] }) => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: await documentText(),
+      targets: { checkout: create },
+      ...(preview === undefined ? {} : { preview }),
+    });
+    return root.querySelector("iframe");
+  };
+
+  test("a previewed machine opens on a frame of the preview page with the live state", async () => {
+    const frame = await frameOf({ path: "/__mantaq/preview", machines: ["checkout"] });
+    const src = new URL(frame?.getAttribute("src") ?? "", "http://x");
+    expect(src.pathname).toBe("/__mantaq/preview");
+    expect(src.searchParams.get("machine")).toBe("checkout");
+    expect(JSON.parse(src.searchParams.get("state") ?? "{}").name).toBe("basicInfo");
+  });
+
+  test("no frame without a preview, or for a machine that has none", async () => {
+    expect(await frameOf()).toBeNull();
+    expect(await frameOf({ path: "/p", machines: ["other"] })).toBeNull();
+  });
+});
+
 describe("mountDriven targets", () => {
   test("a target on a real clock stays a static walk instead of throwing", async () => {
     const root = document.createElement("div");

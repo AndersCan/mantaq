@@ -11,6 +11,7 @@ export default defineConfig({
       record: "src/record.ts",
       drive: "src/drive.ts",
       "live-entry": "src/live-entry.ts",
+      "preview-entry": "src/preview-entry.ts",
       "check-site-cli": "src/check-site-cli.ts",
     },
     dts: {

@@ -1,6 +1,14 @@
 declare module "virtual:mantaq/targets" {
   import type { LiveTargets } from "./live-page.ts";
   export const targets: LiveTargets;
+  export const previewed: string[];
+}
+
+declare module "virtual:mantaq/previews" {
+  export const previews: Record<
+    string,
+    () => Promise<{ default: (element: HTMLElement, state: unknown) => void }>
+  >;
 }
 
 declare module "virtual:mantaq/documents" {

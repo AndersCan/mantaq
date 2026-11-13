@@ -16,7 +16,12 @@ beforeAll(async () => {
     configFile: false,
     logLevel: "silent",
     server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
-    plugins: [mantaqViz({ machines: ["retry.ts", "credit.ts"], fuzz: { iterations: 100 } })],
+    plugins: [
+      mantaqViz({
+        machines: ["retry.ts", "credit.ts", "previewed.ts", "previewed.preview.ts"],
+        fuzz: { iterations: 100 },
+      }),
+    ],
   });
   await server.listen();
   const address = server.httpServer?.address();
@@ -43,6 +48,7 @@ describe("mantaqViz", () => {
     const machines = Either.getRight(parseViz(text))?.machines ?? [];
     expect(machines.map((machine) => [machine.id, machine.initial])).toEqual([
       ["credit", "idle"],
+      ["door", "closed"],
       ["retry", "idle"],
     ]);
   });
@@ -88,10 +94,44 @@ describe("mantaqViz targets", () => {
     const result = await server.ssrLoadModule("virtual:mantaq/targets");
     const targets: Record<string, () => { actor: { state: { name: string } }; clock: unknown }> =
       result["targets"];
-    expect(Object.keys(targets).sort()).toEqual(["credit", "retry"]);
+    expect(Object.keys(targets).sort()).toEqual(["credit", "door", "retry"]);
     const made = targets["retry"]?.();
     expect(made?.actor.state.name).toBe("idle");
     expect(made?.clock).toBeDefined();
+  });
+});
+
+describe("mantaqViz previews", () => {
+  test("only machines with a sibling preview file are previewed", async () => {
+    const result = await server.ssrLoadModule("virtual:mantaq/targets");
+    expect(result["previewed"]).toEqual(["door"]);
+  });
+
+  test("the previews module imports the preview file", async () => {
+    const result = await server.ssrLoadModule("virtual:mantaq/previews");
+    const previews: Record<
+      string,
+      () => Promise<{ default: (e: HTMLElement, s: unknown) => void }>
+    > = result["previews"];
+    expect(Object.keys(previews)).toEqual(["door"]);
+    const element: { textContent: string } = { textContent: "" };
+    (await previews["door"]?.())?.default(element as HTMLElement, { name: "open" });
+    expect(element.textContent).toBe("door is open");
+  });
+
+  test("the frame page loads the entry through Vite", async () => {
+    const response = await fetch(`${origin}/__mantaq/preview?machine=door`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain("/@vite/client");
+    expect(html).toContain("preview-entry");
+  });
+
+  test("a preview file is not inspected as a machine", async () => {
+    const response = await fetch(`${origin}/__mantaq/viz.json`);
+    const viz = parseViz(await response.text());
+    const ids = Either.isRight(viz) ? viz[1].machines.map((m) => m.id).sort() : [];
+    expect(ids).toEqual(["credit", "door", "retry"]);
   });
 });
 
