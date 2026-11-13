@@ -122,8 +122,8 @@ describe("Screen walk", () => {
     const root = mount();
     clickState(root, "c");
     expect(current(root)).toBe("c");
-    clickState(root, "idle"); // walkTo resets the driver, then returns null
-    clickState(root, "a"); // the next state of c
+    clickState(root, "idle"); // no walk lands; the driver is restored to the shown state
+    clickState(root, "a"); // the next state of idle
     expect(current(root)).toBe("a");
   });
 
