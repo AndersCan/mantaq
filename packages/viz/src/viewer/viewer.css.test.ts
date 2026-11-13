@@ -78,3 +78,15 @@ test("buttons, the full screen toggle and the header heading follow the host's t
   expect(rule(".viz .fullscreen-toggle")).toMatch(/font-size:\s*1em/);
   expect(rule(".viz .viz-header :is(h1, h2, h3)")).toMatch(/font-size:\s*1\.385em/);
 });
+
+test("the side panel sticks to the top in the wide layout only", () => {
+  const wide = css.slice(css.indexOf("@container (min-width: 1100px)"));
+  const block = wide.slice(0, wide.indexOf("\n}\n"));
+  const panel = block.split("}").find((b) => b.includes(".viz .panel {")) ?? "";
+  expect(panel).toMatch(/position:\s*sticky/);
+  expect(panel).toMatch(/top:\s*0/);
+  expect(panel).toMatch(/align-self:\s*start/);
+  expect(panel).toMatch(/max-height:\s*100vh/);
+  expect(panel).toMatch(/overflow:\s*auto/);
+  expect(rule(".viz .panel {")).not.toMatch(/sticky/);
+});
