@@ -198,3 +198,26 @@ describe("boxes in boxes: the row of parts drawn alone", () => {
     expect(height).toBeGreaterThan(bottom + 48);
   });
 });
+
+describe("boxes in boxes: a box wider than the board sets the row limit", () => {
+  test("small parts after a box wider than the board share the widened row", () => {
+    const wide = "w".repeat(200);
+    const names = [wide, "aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh"];
+    const machine: VizMachine = {
+      ...board,
+      id: "row",
+      regions: ["cooks", ...names],
+      partOutputs: { cooks: ["DONE"] },
+      states: [
+        ...board.states.filter((each) => each.id !== "net.up"),
+        ...names.map((name) => state(`${name}.up`, true)),
+      ],
+      edges: board.edges.filter((each) => each.from !== "net.up"),
+    };
+    const svg = renderSystem(document, machine, systemOf(machine), { select: () => {} });
+    const y = (name: string) =>
+      Number(svg.querySelector(`g.part[data-part="${name}"] rect`)?.getAttribute("y"));
+    expect(y("aa")).toBeGreaterThan(y(wide));
+    expect(y("hh")).toBe(y("aa"));
+  });
+});

@@ -93,6 +93,13 @@ describe("system view: boxes in boxes", () => {
     }
   });
 
+  test("the frame's top and height keep their padding around the holder's box", () => {
+    const { svg } = draw(false);
+    const frame = svg.querySelector("rect.part-frame");
+    expect(Number(frame?.getAttribute("y"))).toBe(20);
+    expect(Number(frame?.getAttribute("height"))).toBe(125);
+  });
+
   test("a part with no arrow to another part sits in a row under the board, with no entry or end", () => {
     const { svg, box } = draw(false);
     const net = box('g.part[data-part="net"]');
