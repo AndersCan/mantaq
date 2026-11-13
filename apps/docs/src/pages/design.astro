@@ -129,6 +129,14 @@ const headings = [
   <Machine src="src/design/out-arrow.ts" />
   <Machine src="src/design/pool.ts" />
   <p>
+    Changed: a part that talks to only one bigger part sits inside it, in a dashed frame. A part
+    with no arrow to another part sits in a row under the board. On a phone the board runs top to
+    bottom.
+  </p>
+  <div class="design-phone">
+    <Machine src="src/design/pool.ts" />
+  </div>
+  <p>
     New: two blocks on the Pool diagram. A <code>from outside</code> pill with an arrow into the
     part that takes root events (click a line to send it; drawn unclickable without a driver), and
     a key line under the diagram that writes a shared event prefix once

@@ -8,7 +8,7 @@ import { createPhotoUploadActor } from "../../../apps/docs/src/content/docs/phot
 import { createDriver } from "./drive.ts";
 import { toViz } from "./structure.ts";
 
-test("an entry line into a region sends to that region", () => {
+test("the network part, drawn alone, takes connectionLost from its panel", () => {
   const create = () => {
     const clock = VirtualClock();
     return { actor: createPhotoUploadActor({ clock }), clock };
@@ -20,9 +20,11 @@ test("an entry line into a region sends to that region", () => {
     { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
     { driver: createDriver({ id: "photoUpload", create }) },
   );
-  const line = root.querySelector('[data-entry-event="connectionLost"]');
-  expect(line?.closest("g.link-in")?.getAttribute("data-to")).toBe("network");
-  line?.dispatchEvent(new Event("click"));
+  expect(root.querySelector('[data-entry-event="connectionLost"]')).toBeNull();
+  root.querySelector('g[data-part="network"]')?.dispatchEvent(new Event("click"));
+  const send = root.querySelector('[data-send="connectionLost"]');
+  expect(send).not.toBeNull();
+  send?.dispatchEvent(new Event("click"));
   expect(root.querySelector('g[data-part="network"] .part-chip')?.textContent).toBe("offline");
 });
 

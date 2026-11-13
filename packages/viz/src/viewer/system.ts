@@ -15,6 +15,8 @@ export interface SystemCallbacks {
   select(selection: SystemSelection): void;
   /** Sends a root event as a pulsing arrow's click does. Unset without a driver: the entry lines are not clickable. */
   send?(entry: SystemEntry): void;
+  /** The host is a phone: the board runs top to bottom. Unset = left to right. */
+  narrow?: boolean;
 }
 
 /** Where the viewer goes from the system view: a state or an edge of the diagram, or nowhere in particular. */
@@ -128,10 +130,12 @@ interface Pair {
   links: SystemLink[];
 }
 
-/** One pair per `from>to`: its events are lines on one arrow. */
+/** One pair per `from>to`: its events are lines on one arrow. Parts drawn alone have none. */
 function pairsOf(system: MachineSystem): Pair[] {
   const pairs = new Map<string, Pair>();
+  const alone = new Set(system.parts.filter((part) => part.alone).map((part) => part.id));
   for (const link of system.links) {
+    if (alone.has(link.from)) continue;
     const key = `${link.from}>${link.to ?? "out"}`;
     const pair = pairs.get(key) ?? { key, from: link.from, to: link.to, links: [] };
     pair.links.push(link);
@@ -140,9 +144,10 @@ function pairsOf(system: MachineSystem): Pair[] {
   return [...pairs.values()];
 }
 
-/** The parts that take events from outside, each with its sorted events. */
+/** The parts that take events from outside, each with its sorted events. Parts drawn alone have no entry line. */
 function entryGroups(system: MachineSystem): Array<{ to: string; events: string[] }> {
   return system.parts.flatMap((part) => {
+    if (part.alone) return [];
     const events = system.entries
       .filter((entry) => entry.to === part.id)
       .map((entry) => entry.event);
@@ -158,26 +163,35 @@ function labelFor(lines: ReadonlyArray<string>): EdgeLabel {
   };
 }
 
+/** Size of a part's box on the board. */
+function nodeSize(machine: VizMachine, part: SystemPart): { width: number; height: number } {
+  const chars = Math.max(part.label.length + 3, chipWidth(machine, part));
+  return { width: Math.max(96, chars * CHAR_WIDTH + 24), height: NODE_HEIGHT };
+}
+
 function placeLinks(
   machine: VizMachine,
   system: MachineSystem,
   prefix: string,
+  options: { narrow: boolean },
 ): { graph: Graph<GraphLabel, NodeLabel, EdgeLabel> } {
-  const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({ multigraph: true });
+  const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({ multigraph: true, compound: true });
   graph.setGraph({
-    rankdir: "LR",
+    rankdir: options.narrow ? "TB" : "LR",
     nodesep: 36,
     ranksep: 96,
     edgesep: 14,
     marginx: 32,
     marginy: 32,
   });
-  for (const part of system.parts) {
-    const chars = Math.max(part.label.length + 3, chipWidth(machine, part));
-    graph.setNode(`part:${part.id}`, {
-      width: Math.max(96, chars * CHAR_WIDTH + 24),
-      height: NODE_HEIGHT,
-    });
+  const onBoard = system.parts.filter((part) => !part.alone);
+  for (const part of onBoard) graph.setNode(`part:${part.id}`, nodeSize(machine, part));
+  for (const holder of holdersOf(system)) {
+    graph.setNode(frameNode(holder), { width: 0, height: 0 });
+    graph.setParent(`part:${holder}`, frameNode(holder));
+    for (const part of onBoard.filter((each) => each.within === holder)) {
+      graph.setParent(`part:${part.id}`, frameNode(holder));
+    }
   }
   for (const pair of pairsOf(system)) {
     const lines = pair.links.map((link) => link.event.slice(prefix.length));
@@ -211,6 +225,66 @@ function placeLinks(
   }
   layout(graph);
   return { graph };
+}
+
+function frameNode(holder: string): string {
+  return `frame:${holder}`;
+}
+
+/** The parts that hold others, in part order. */
+function holdersOf(system: MachineSystem): string[] {
+  return system.parts
+    .filter((part) => system.parts.some((other) => other.within === part.id))
+    .map((part) => part.id);
+}
+
+const FRAME_PAD = 12;
+const ALONE_GAP = 12;
+const ALONE_TOP = 16;
+const BOARD_MARGIN = 32;
+
+/** Boxes of the parts drawn alone: a wrapped row under the board, in part order. */
+function aloneRow(
+  machine: VizMachine,
+  system: MachineSystem,
+  board: { width: number; height: number },
+): { placed: Array<{ part: SystemPart; at: NodeLabel }>; width: number; height: number } {
+  const alone = system.parts.filter((part) => part.alone);
+  if (alone.length === 0) return { placed: [], width: board.width, height: board.height };
+  const sizes = alone.map((part) => nodeSize(machine, part));
+  const limit = Math.max(board.width, Math.max(...sizes.map((size) => size.width)) + 64);
+  let x = BOARD_MARGIN;
+  let y = board.height + ALONE_TOP;
+  let rowEnd = 0;
+  const placed = alone.map((part, index) => {
+    const size = sizes[index] ?? nodeSize(machine, part);
+    if (x > BOARD_MARGIN && x + size.width > limit - BOARD_MARGIN) {
+      x = BOARD_MARGIN;
+      y += NODE_HEIGHT + ALONE_GAP;
+    }
+    const at: NodeLabel = { ...size, x: x + size.width / 2, y: y + NODE_HEIGHT / 2 };
+    x += size.width + ALONE_GAP;
+    rowEnd = Math.max(rowEnd, x - ALONE_GAP + BOARD_MARGIN);
+    return { part, at };
+  });
+  return {
+    placed,
+    width: Math.max(board.width, rowEnd),
+    height: y + NODE_HEIGHT + BOARD_MARGIN / 2,
+  };
+}
+
+/** One rounded outline around a holder's box and the boxes within it. */
+function frameRect(doc: Document, at: NodeLabel): SVGRectElement {
+  return svg(doc, "rect", {
+    class: "part-frame",
+    "aria-hidden": "true",
+    x: (at.x ?? 0) - at.width / 2 - FRAME_PAD,
+    y: (at.y ?? 0) - at.height / 2 - FRAME_PAD,
+    width: at.width + FRAME_PAD * 2,
+    height: at.height + FRAME_PAD * 2,
+    rx: 12,
+  });
 }
 
 function endText(machine: VizMachine): string {
@@ -384,10 +458,11 @@ export function renderSystem(
   callbacks: SystemCallbacks,
 ): SVGSVGElement {
   const prefix = systemPrefix(system);
-  const { graph } = placeLinks(machine, system, prefix);
+  const { graph } = placeLinks(machine, system, prefix, { narrow: callbacks.narrow === true });
   const size = graph.graph();
-  const width = Math.ceil(size.width ?? 0);
-  const height = Math.ceil(size.height ?? 0);
+  const row = aloneRow(machine, system, { width: size.width ?? 0, height: size.height ?? 0 });
+  const width = Math.ceil(row.width);
+  const height = Math.ceil(row.height);
   const groups = entryGroups(system);
   return svg(
     doc,
@@ -419,6 +494,7 @@ export function renderSystem(
           [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head" })],
         ),
       ]),
+      ...holdersOf(system).map((holder) => frameRect(doc, graph.node(frameNode(holder)))),
       groups.length === 0
         ? null
         : entryPill(doc, graph.node(ENTRY_NODE), groups, { callbacks, system }),
@@ -428,7 +504,7 @@ export function renderSystem(
       ),
       ...system.parts.map((part) =>
         partGroup(doc, part, {
-          at: graph.node(`part:${part.id}`),
+          at: row.placed.find((each) => each.part === part)?.at ?? graph.node(`part:${part.id}`),
           dots: dotStatesOf(machine, part) !== null,
           callbacks,
         }),

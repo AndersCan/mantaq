@@ -68,7 +68,7 @@ const lanes: VizMachine = {
     event("RESTORE"),
   ],
   outputs: ["ITEMS_ASSIGNED", "LOST"],
-  partOutputs: { workers: ["WORK_DONE"] },
+  partOutputs: { workers: ["WORK_DONE"], net: ["NET_UP"] },
   context: null,
   edges: [
     edge("empty", "ITEM_ARRIVED", "holding", ["ITEMS_ASSIGNED"]),
@@ -76,7 +76,8 @@ const lanes: VizMachine = {
     edge("workers.free", "ITEMS_ASSIGNED", "workers.working", ["WORK_DONE"]),
     edge("workers.working", "FINISH", "workers.free"),
     edge("net.up", "DROP", "net.down"),
-    edge("net.down", "RESTORE", "net.up"),
+    edge("net.down", "RESTORE", "net.up", ["NET_UP"]),
+    edge("empty", "NET_UP", "empty"),
   ],
   runs: [],
   fuzz: null,

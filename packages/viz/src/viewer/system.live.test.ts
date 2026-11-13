@@ -542,12 +542,14 @@ describe("pool view arrows: attacked", () => {
   const lanes: VizMachine = {
     ...pool,
     regions: ["workers", "net"],
+    partOutputs: { workers: ["WORK_DONE"], net: ["NET_UP"] },
     states: [...pool.states, state("net.up", true), state("net.down")],
     events: [...pool.events, event("DROP"), event("RESTORE")],
     edges: [
       ...pool.edges,
       edge("net.up", "DROP", "net.down"),
-      edge("net.down", "RESTORE", "net.up"),
+      edge("net.down", "RESTORE", "net.up", ["NET_UP"]),
+      edge("empty", "NET_UP", "empty"),
     ],
   };
 
@@ -682,12 +684,14 @@ describe("pool view arrows: every branch", () => {
   const lanes: VizMachine = {
     ...pool,
     regions: ["workers", "net"],
+    partOutputs: { workers: ["WORK_DONE"], net: ["NET_UP"] },
     states: [...pool.states, state("net.up", true), state("net.down")],
     events: [...pool.events, event("DROP"), event("RESTORE")],
     edges: [
       ...pool.edges,
       edge("net.up", "DROP", "net.down"),
-      edge("net.down", "RESTORE", "net.up"),
+      edge("net.down", "RESTORE", "net.up", ["NET_UP"]),
+      edge("empty", "NET_UP", "empty"),
     ],
   };
   const stacked: VizMachine = {

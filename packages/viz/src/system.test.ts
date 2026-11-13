@@ -63,8 +63,8 @@ describe("systemOf", () => {
   test("a region output links to its parent, with the states that take it", () => {
     const system = systemOf(upload);
     expect(system.parts).toEqual([
-      { id: "", kind: "root", label: "photoUpload" },
-      { id: "upload", kind: "region", label: "upload" },
+      { id: "", kind: "root", label: "photoUpload", within: "upload", alone: false },
+      { id: "upload", kind: "region", label: "upload", within: null, alone: false },
     ]);
     expect(system.links).toEqual([
       {
@@ -257,5 +257,86 @@ describe("partOutputs in the document", () => {
     expect(validateViz({ ...doc, machines: [bad] })[0]).toEqual([
       { path: "$.machines[0].partOutputs.upload", message: "expected string[]" },
     ]);
+  });
+});
+
+describe("arrange: within and alone", () => {
+  const partOf = (machine: VizMachine, id: string) =>
+    systemOf(machine).parts.find((part) => part.id === id);
+
+  test("a small part sits within the bigger part it talks to", () => {
+    const machine: VizMachine = {
+      ...upload,
+      states: [
+        state("showing"),
+        state("b"),
+        state("c"),
+        state("upload.waiting"),
+        state("upload.sending"),
+      ],
+    };
+    expect(partOf(machine, "upload")).toMatchObject({ within: "", alone: false });
+    expect(partOf(machine, "")).toMatchObject({ within: null, alone: false });
+  });
+
+  test("equal state counts sit within nothing", () => {
+    const machine: VizMachine = {
+      ...upload,
+      states: [state("showing"), state("b"), state("upload.waiting"), state("upload.sending")],
+    };
+    expect(partOf(machine, "upload")).toMatchObject({ within: null });
+    expect(partOf(machine, "")).toMatchObject({ within: null });
+  });
+
+  test("a part with only a grey end is alone", () => {
+    const machine: VizMachine = {
+      ...upload,
+      regions: ["upload", "net"],
+      states: [...upload.states, state("net.up")],
+      partOutputs: { upload: ["photoUploaded"], net: ["nobodyTakesThis"] },
+    };
+    expect(partOf(machine, "net")).toMatchObject({ alone: true, within: null });
+    expect(partOf(machine, "upload")?.alone).toBe(false);
+  });
+
+  test("a part joined to two parts sits within neither", () => {
+    const machine: VizMachine = {
+      ...base,
+      id: "chain",
+      regions: ["a", "c"],
+      states: [state("b1"), state("b2"), state("b3"), state("a.x"), state("c.x"), state("c.y")],
+      partOutputs: { a: ["fromA"], c: ["fromC"] },
+      edges: [edge("b1", "fromA"), edge("b1", "fromC")],
+    };
+    expect(partOf(machine, "a")).toMatchObject({ within: "" });
+    expect(partOf(machine, "c")).toMatchObject({ within: "" });
+    expect(partOf(machine, "")).toMatchObject({ within: null, alone: false });
+  });
+
+  test("no part sits within a part that sits within another", () => {
+    const machines: VizMachine[] = [
+      upload,
+      {
+        ...base,
+        regions: ["a", "c"],
+        states: [state("b1"), state("b2"), state("b3"), state("a.x"), state("c.x"), state("c.y")],
+        partOutputs: { a: ["fromA"], c: ["fromC"] },
+        edges: [edge("b1", "fromA"), edge("b1", "fromC")],
+      },
+      {
+        ...base,
+        regions: ["a", "c"],
+        states: [state("b1"), state("a.x"), state("a.y"), state("a.z"), state("c.x")],
+        partOutputs: { a: ["fromA"], c: ["fromC"] },
+        edges: [edge("b1", "fromA"), edge("a.x", "fromC")],
+      },
+    ];
+    for (const machine of machines) {
+      const { parts } = systemOf(machine);
+      for (const part of parts) {
+        const holder = parts.find((other) => other.id === part.within);
+        if (holder !== undefined) expect(holder.within).toBeNull();
+      }
+    }
   });
 });
