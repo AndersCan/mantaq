@@ -7,6 +7,10 @@ export interface SystemPart {
   id: string;
   kind: "root" | "region" | "map";
   label: string;
+  /** The part this one sits inside on the board: it talks only to that part, which has more states. null = on the board by itself. */
+  within: string | null;
+  /** True when no arrow joins this part to another part: the board lists it apart. */
+  alone: boolean;
 }
 
 /** One declared output of a part, and the part that takes it. */
@@ -36,11 +40,13 @@ export interface MachineSystem {
 
 function partsOf(machine: VizMachine): SystemPart[] {
   return [
-    { id: "", kind: "root", label: machine.id },
+    { id: "", kind: "root", label: machine.id, within: null, alone: false },
     ...machine.regions.map((id): SystemPart => ({
       id,
       kind: machine.maps.includes(id) ? "map" : "region",
       label: id,
+      within: null,
+      alone: false,
     })),
   ];
 }
@@ -99,7 +105,40 @@ export function systemOf(machine: VizMachine): MachineSystem {
       }));
     });
   });
-  return { parts, links, entries: entriesOf(machine, parts, links) };
+  return {
+    parts: arrange(machine, parts, links),
+    links,
+    entries: entriesOf(machine, parts, links),
+  };
+}
+
+/**
+ * Fills `within` and `alone` from the arrows. A part with no partner is alone.
+ * A part whose only partner has more states sits within it, so a small part
+ * is drawn inside the part it talks to. Entries and ends leaving the machine
+ * make no partner.
+ */
+function arrange(
+  machine: VizMachine,
+  parts: ReadonlyArray<SystemPart>,
+  links: ReadonlyArray<SystemLink>,
+): SystemPart[] {
+  return parts.map((part) => {
+    const partners = new Set(
+      links.flatMap((link) => {
+        if (link.to === null) return [];
+        if (link.from === part.id) return [link.to];
+        return link.to === part.id ? [link.from] : [];
+      }),
+    );
+    partners.delete(part.id);
+    const [only] = partners;
+    const bigger =
+      only !== undefined &&
+      partners.size === 1 &&
+      statesOf(machine, only).length > statesOf(machine, part.id).length;
+    return { ...part, alone: partners.size === 0, within: bigger ? only : null };
+  });
 }
 
 /** Non-internal events a root or region handles that no link brings to it. */
