@@ -283,3 +283,18 @@ describe("resize property", () => {
     expect(live.map((run) => run.items)).toEqual([["a"]]);
   });
 });
+
+describe("resize past the array length limit", () => {
+  test.each([2 ** 32, 1e10, Number.MAX_SAFE_INTEGER])(
+    "resize(%s) does not stop the pool",
+    async (count) => {
+      const { pool, live, send } = controlled(2);
+      pool.resize(count);
+      await turns();
+      expect(pool.actor.state.name).not.toBe("__error");
+      send("a");
+      await turns();
+      expect(live.map((run) => run.items)).toEqual([["a"]]);
+    },
+  );
+});

@@ -175,7 +175,7 @@ function afterReport<T, N extends string>(
 
 /** The context that keeps `count` workers: free ones above it go now, new ones start free. */
 function resized<T>(current: InboxContext<T>, count: number): InboxContext<T> {
-  if (count === Number.POSITIVE_INFINITY) return current;
+  if (count > 2 ** 32 - 1) return current;
   const size = clampWorkers(count);
   const wanted = Array.from({ length: size }, (_, index) => workerId(index + 1));
   const kept = current.workers.filter((key) => indexOf(key) <= size || !current.free.includes(key));
