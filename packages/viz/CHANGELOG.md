@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.1
+
+<sub>2026-11-13</sub>
+
+- _(patch)_ Clicking an arrow for an event that takes no data sends it at once again, even when fuzzing only recorded `{}` for it.
+
 ## 0.26.0
 
 <sub>2026-11-13</sub>

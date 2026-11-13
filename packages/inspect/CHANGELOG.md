@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.36.1
+
+<sub>2026-11-13</sub>
+
+- _(patch)_ Updated dependency `@mantaq/viz` v0.26.1
+
 ## 0.36.0
 
 <sub>2026-11-13</sub>
