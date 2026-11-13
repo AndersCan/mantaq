@@ -7,6 +7,7 @@ import Step from "../../../components/Step.astro";
 
 <Step n={3}>
   An event moves the person from one state to another, and can carry data: `eat` carries the food,
-  read as `event.payload`, and no food keeps them `hungry`. Click `eat`: the person moves to `full`.
-  More in [Events](/mantaq/core-concepts/events/).
+  read as `event.payload`. With no food the handler returns `{}`, which keeps them `hungry`;
+  returning nothing does the same. Click `eat`: the person moves to `full`. More in
+  [Events](/mantaq/core-concepts/events/).
 </Step>
