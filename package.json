@@ -18,8 +18,7 @@
     "docs:dev": "vp run docs#dev",
     "prepare": "vp config",
     "mutation:core": "stryker run",
-    "mutation:sugar": "cd packages/sugar && stryker run",
-    "viz:compare": "vp run @mantaq/inspect#viz:compare"
+    "mutation:sugar": "cd packages/sugar && stryker run"
   },
   "devDependencies": {
     "@stryker-mutator/core": "catalog:",

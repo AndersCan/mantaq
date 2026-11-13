@@ -204,11 +204,3 @@ These sections apply to the [mantaq repo](https://github.com/AndersCan/mantaq), 
 ### Fixtures
 
 `src/fixtures/{checkout,auth,saga}.ts` copy the handlers of `packages/examples/*.test.ts` verbatim, with effects stubbed. The examples live in test files and cannot be imported, so the copies can drift from them. `credit.ts` (conditional handlers, far literals), `retry.ts` (context counter, `attempts > 10`) and `switchy.ts` (unsupported control flow) exist for the AST, loop and guidance tests.
-
-### Repo scripts
-
-```sh
-vp run viz:compare    # blind vs guided fuzzing report (Markdown, 30 seeds)
-```
-
-`export` options: `[outDir] --iterations N --no-fuzz --no-ast`.
