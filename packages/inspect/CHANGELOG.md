@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.36.0
+
+<sub>2026-11-13</sub>
+
+- _(minor)_
+  The live driver can try a step on a throwaway copy of the actor (`VizDriver.dryRun`) without changing the walk. Breaking: none.
+- _(minor)_
+  A file named `<machine file>.preview.ts` next to a machine draws the app's own screen for each state in a Screen tab on the live page, in a phone-width frame served by the dev server. Breaking: none; a file named `*.preview.ts` next to a machine is a preview, not a machine.
+- _(patch)_
+  On a live diagram, an arrow whose guard the current context does not meet is drawn blocked, with a lock and the reason, and sends nothing until the context allows it. Breaking: none.
+
 ## 0.35.0
 
 <sub>2026-11-12</sub>

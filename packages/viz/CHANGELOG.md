@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.26.0
+
+<sub>2026-11-13</sub>
+
+- _(minor)_
+  The live driver can try a step on a throwaway copy of the actor (`VizDriver.dryRun`) without changing the walk. Breaking: none.
+- _(minor)_
+  `ViewerOptions.screen` adds a first Screen tab to the live viewer, holding what the callback draws for the current state. While it is open, clicking a state walks there along the shortest walk fuzzing found. Breaking: none.
+- _(patch)_ On a phone, the payload form and its focused field stay above the on-screen keyboard. Breaking: none.
+- _(patch)_
+  On a live diagram, an arrow whose guard the current context does not meet is drawn blocked, with a lock and the reason, and sends nothing until the context allows it. Breaking: none.
+
 ## 0.25.0
 
 <sub>2026-11-12</sub>
