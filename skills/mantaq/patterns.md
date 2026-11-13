@@ -7,6 +7,8 @@ Proven recipes. Code is a sketch. Copy the shape, not the exact signatures: chec
 State enters "working", effect runs the async job, emits internal event, transition completes.
 
 ```ts
+import { withTimeout } from "@mantaq/sugar";
+
 const fillingForm = state("fillingForm")();
 const submitting = state("submitting")();
 const submitted = state("submitted")().final();
@@ -21,6 +23,7 @@ Actor({
   setup: (m) => {
     m.effect(submitting, {
       name: "startSubmitTimeout",
+      sends: [submittingDone],
       fn: (input) => withTimeout(800, { input, event: () => submittingDone.create() }),
     });
     m.on(submitting, {
