@@ -273,11 +273,18 @@ function createPool<T, const N extends string>(options: {
   key?: (item: T) => string;
   batch?: number;
   clock?: Clock;
-}): { actor: Actor; workers: ActorMap; events: PoolEvents<T, N> };
+}): {
+  actor: Actor;
+  workers: ActorMap;
+  events: PoolEvents<T, N>;
+  resize(count: number): void;
+};
 function poolEvents<T, const N extends string>(name: N): PoolEvents<T, N>;
 ```
 
-One inbox (`actor`: `allWorkersFree`, `workersBusy` or `workWaiting`) and `workers` workers `w1`..`wn` (`free` or `working`). The inbox hands items to free workers only. `run` resolves: the items are done. `run` rejects or throws: the items go back to the front. Send `events.ITEM_ARRIVED.create({ item })` to `actor`. Event ids are `${name}.ITEM_ARRIVED`, `ITEMS_ASSIGNED`, `ITEMS_FINISHED`, `ITEMS_FAILED`, `RUN_SUCCEEDED` and `RUN_FAILED`.
+One inbox (`actor`: `allWorkersFree`, `workersBusy` or `workWaiting`) and `workers` workers `w1`..`wn` (`free` or `working`). The inbox hands items to free workers only. `run` resolves: the items are done. `run` rejects or throws: the items go back to the front. Send `events.ITEM_ARRIVED.create({ item })` to `actor`. Event ids are `${name}.ITEM_ARRIVED`, `ITEMS_ASSIGNED`, `ITEMS_FINISHED`, `ITEMS_FAILED`, `RUN_SUCCEEDED`, `RUN_FAILED` and `WORKERS_RESIZED`.
+
+`resize(count)` keeps `count` workers (below 1 counts as 1, fractions round down). Growing adds free workers that take waiting items at once. Shrinking removes the highest ids: free workers at once, running ones after they report.
 
 `keep: "set"` skips an item whose `key` (default `JSON.stringify`) already waits. `batch` is the most items one worker takes (default 1, `Infinity` for all that wait). Waiting items are in memory and unbounded.
 
