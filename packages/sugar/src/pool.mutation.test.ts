@@ -477,19 +477,19 @@ describe("createPool details", () => {
       targets: {
         allWorkersFree: {
           ".ITEM_ARRIVED": ["workersBusy"],
-          ".WORKERS_RESIZED": ["allWorkersFree", "workersBusy", "workWaiting"],
+          ".WORKERS_RESIZED": ["allWorkersFree"],
         },
         workersBusy: {
           ".ITEM_ARRIVED": ["workersBusy", "workWaiting"],
           ".ITEMS_FINISHED": ["allWorkersFree", "workersBusy"],
           ".ITEMS_FAILED": ["workersBusy", "workWaiting"],
-          ".WORKERS_RESIZED": ["allWorkersFree", "workersBusy", "workWaiting"],
+          ".WORKERS_RESIZED": ["workersBusy"],
         },
         workWaiting: {
           ".ITEM_ARRIVED": ["workWaiting"],
           ".ITEMS_FINISHED": ["workWaiting", "workersBusy"],
           ".ITEMS_FAILED": ["workWaiting", "workersBusy"],
-          ".WORKERS_RESIZED": ["allWorkersFree", "workersBusy", "workWaiting"],
+          ".WORKERS_RESIZED": ["workWaiting", "workersBusy"],
         },
       },
       workerInputs: ["p.ITEMS_ASSIGNED"],

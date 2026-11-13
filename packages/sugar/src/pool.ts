@@ -175,6 +175,7 @@ function afterReport<T, N extends string>(
 
 /** The context that keeps `count` workers: free ones above it go now, new ones start free. */
 function resized<T>(current: InboxContext<T>, count: number): InboxContext<T> {
+  if (count === Number.POSITIVE_INFINITY) return current;
   const size = clampWorkers(count);
   const wanted = Array.from({ length: size }, (_, index) => workerId(index + 1));
   const kept = current.workers.filter((key) => indexOf(key) <= size || !current.free.includes(key));
@@ -289,10 +290,15 @@ function buildInbox<T, N extends string>(shared: Shared<T, N>) {
         },
       });
       /** Keep `count` workers; new free ones take waiting items at once. */
-      for (const from of [allWorkersFree, workersBusy, workWaiting]) {
+      const resizeFrom = [
+        { from: allWorkersFree, to: [allWorkersFree] },
+        { from: workersBusy, to: [workersBusy] },
+        { from: workWaiting, to: [workWaiting, workersBusy] },
+      ];
+      for (const { from, to } of resizeFrom) {
         m.on(from, {
           event: events.WORKERS_RESIZED,
-          to: [allWorkersFree, workersBusy, workWaiting],
+          to,
           handler: ({ payload }, { context }) => {
             const next = apply(shared, context, resized(context.get(), payload.count));
             if (next.waits) return { state: workWaiting, emit: next.emit };
@@ -390,15 +396,13 @@ export function createPool<T, const N extends string>(options: PoolOptions<T, N>
     onOutput(worker, (out) => inbox.send(out as never));
     return worker;
   });
-  /** Make the map hold exactly the workers the inbox lists. A leaving worker is killed after its report. */
+  /** Make the map hold exactly the workers the inbox lists. A leaving worker is killed once the inbox no longer lists it. */
   function reconcile(): void {
     const listed = inbox.snapshot().context.workers;
     for (const key of listed) if (!workers.has(key)) workers.spawn(key);
     for (const key of workers.keys()) {
       if (listed.includes(key)) continue;
-      queueMicrotask(() => {
-        if (!inbox.snapshot().context.workers.includes(key)) workers.kill(key);
-      });
+      workers.kill(key);
     }
   }
   reconcile();

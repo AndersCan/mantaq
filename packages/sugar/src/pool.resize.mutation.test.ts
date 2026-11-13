@@ -221,4 +221,65 @@ describe("resize property", () => {
       { seed: 20261113, numRuns: 100 },
     );
   });
+
+  test("declares only the resize moves that can happen", () => {
+    const { pool } = controlled(1);
+    const { targets } = (
+      pool.actor as unknown as { options: { targets: Record<string, Record<string, string[]>> } }
+    ).options;
+    expect({
+      allWorkersFree: targets["allWorkersFree"]?.["p.WORKERS_RESIZED"],
+      workersBusy: targets["workersBusy"]?.["p.WORKERS_RESIZED"],
+      workWaiting: [...(targets["workWaiting"]?.["p.WORKERS_RESIZED"] ?? [])].sort(),
+    }).toEqual({
+      allWorkersFree: ["allWorkersFree"],
+      workersBusy: ["workersBusy"],
+      workWaiting: ["workWaiting", "workersBusy"],
+    });
+  });
+
+  test("a resize with nothing running leaves the inbox allWorkersFree", async () => {
+    const { pool } = controlled(3);
+    pool.resize(5);
+    await turns();
+    expect(pool.actor.state.name).toBe("allWorkersFree");
+    pool.resize(1);
+    await turns();
+    expect(pool.actor.state.name).toBe("allWorkersFree");
+  });
+
+  test("shrinking while items wait keeps the inbox workWaiting", async () => {
+    const { pool, send } = controlled(2);
+    for (const item of ["a", "b", "c"]) send(item);
+    await turns();
+    pool.resize(1);
+    await turns();
+    expect(pool.actor.state.name).toBe("workWaiting");
+    pool.resize(2);
+    await turns();
+    expect(pool.actor.state.name).toBe("workWaiting");
+  });
+
+  test("the inbox lists workers in numeric order when a kept runner sits above a respawned id", async () => {
+    const { pool, live, send } = controlled(3);
+    for (const item of ["a", "b", "c"]) send(item);
+    await turns();
+    live[1]?.resolve(); // w2 free, w3 still runs
+    await turns();
+    pool.resize(1); // w2 leaves now, w3 stays until it reports
+    await turns();
+    pool.resize(3); // w2 comes back
+    await turns();
+    expect(pool.actor.snapshot().context.workers).toEqual(["w1", "w2", "w3"]);
+  });
+
+  test("resize(Infinity) does not stop the pool", async () => {
+    const { pool, live, send } = controlled(2);
+    pool.resize(Number.POSITIVE_INFINITY);
+    await turns();
+    expect(pool.actor.state.name).not.toBe("__error");
+    send("a");
+    await turns();
+    expect(live.map((run) => run.items)).toEqual([["a"]]);
+  });
 });
