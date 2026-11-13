@@ -29,6 +29,7 @@ import {
   asksForPayload,
 } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
+import { pathTo } from "../findings.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
@@ -92,7 +93,7 @@ interface ViewState {
   blockedFor: { live: VizLiveState; picked: ViewState["picked"] } | null;
 }
 
-type PanelTab = "step" | "context" | "path" | "details" | "controls";
+type PanelTab = "screen" | "step" | "context" | "path" | "details" | "controls";
 
 function effectiveMode(view: ViewState, machine: VizMachine): CoverageMode {
   const modes = availableModes(machine);
@@ -180,6 +181,8 @@ export interface ViewerOptions {
   changes?: ChangesOption;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
+  /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state. While it is open, clicking a state walks there. */
+  screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
 }
@@ -245,7 +248,8 @@ export function mountViewer(
       });
       const controls = controlsOf(doc, chrome);
       const footer = options.panelFooter;
-      fillPanel(panel, { doc, view, parts, details, controls, refresh, footer });
+      const screen = screenOf(options, view);
+      fillPanel(panel, { doc, view, parts, details, controls, screen, refresh, footer });
       if (inSystem) markSystemView(root, { machine, system, view, send, compose });
       else markDiagram(root, { machine, view, driver, send, compose, refresh });
     };
@@ -262,11 +266,7 @@ export function mountViewer(
       stepInto(view, driver, step);
       walked();
     };
-    const compose = (event: string | null, actor?: VizActorRef) => {
-      view.composing = event;
-      view.composingActor = event === null ? undefined : actor;
-      refresh();
-    };
+    const compose = composer(view, refresh);
     const take = (step: ExploreStep) => {
       if (driver !== undefined) return liveTake(machine, step, { send, compose, view });
       view.path = [...view.path, step];
@@ -281,19 +281,15 @@ export function mountViewer(
       rewindView(view, driver, length);
       walked();
     };
-    const showDetails = (selection: Selection, shown?: { findings: boolean }) => {
-      view.selection = selection;
-      view.tab = "details";
-      refresh();
-      if (shown?.findings === true)
-        panel.querySelector<HTMLElement>(".state-findings h4")?.focus({ preventScroll: true });
-    };
+    const showDetails = detailsShower({ view, panel, refresh });
     // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {
       if (openBlocked(machine, view, selection, compose)) return;
       const step = clickStep(machine, { path: view.path, selection, ...liveState(view) });
       if (step !== null) view.selection = selection;
-      return step === null ? showDetails(selection) : take(step);
+      if (step !== null) return take(step);
+      const walk = screenWalk({ machine, view, driver, selection });
+      return walk === null ? showDetails(selection) : play(walk, undefined, "screen");
     };
     const open = openIn(root, view, () => render());
     const live = driver === undefined ? null : { send, compose };
@@ -478,6 +474,60 @@ function rewindView(view: ViewState, driver: VizDriver | undefined, length: numb
   else view.path = view.path.slice(0, keep);
 }
 
+function composer(view: ViewState, refresh: () => void) {
+  return (event: string | null, actor?: VizActorRef) => {
+    view.composing = event;
+    view.composingActor = event === null ? undefined : actor;
+    refresh();
+  };
+}
+
+function detailsShower(context: { view: ViewState; panel: HTMLElement; refresh: () => void }) {
+  const { view, panel, refresh } = context;
+  return (selection: Selection, shown?: { findings: boolean }): void => {
+    view.selection = selection;
+    view.tab = "details";
+    refresh();
+    if (shown?.findings === true)
+      panel.querySelector<HTMLElement>(".state-findings h4")?.focus({ preventScroll: true });
+  };
+}
+
+function screenOf(options: ViewerOptions, view: ViewState): Node | undefined {
+  return view.live === null ? undefined : options.screen?.(view.live);
+}
+
+/** With Screen open, a click on any state walks the shortest known walk there; otherwise null. */
+function screenWalk(context: {
+  machine: VizMachine;
+  view: ViewState;
+  driver: VizDriver | undefined;
+  selection: Selection;
+}): VizStep[] | null {
+  const { machine, view, driver, selection } = context;
+  if (view.tab !== "screen" || driver === undefined || selection.kind !== "state") return null;
+  if (selection.id === view.live?.state) return null;
+  return walkTo({ machine, view, driver }, selection.id);
+}
+
+/** The shortest known walk to state `id`, cut at the first step that lands there; null when there is none. */
+function walkTo(
+  context: { machine: VizMachine; view: ViewState; driver: VizDriver },
+  id: string,
+): VizStep[] | null {
+  const { machine, view, driver } = context;
+  if (id === machine.initial) return [];
+  const steps = pathTo(machine, id);
+  if (steps === null) return null;
+  let live = driver.reset();
+  for (const [index, step] of steps.entries()) {
+    live = stepSafely(driver, { before: live, step });
+    if (live.state === id) return steps.slice(0, index + 1);
+  }
+  replayInto(view, driver, view.live?.steps ?? []);
+  return null;
+}
+
 function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {
   return {
     machineId: machine?.id ?? "",
@@ -496,7 +546,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     eventsOpen: false,
     picked: null,
     motion: false,
-    tab: "step",
+    tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
     notice: null,
     drilled: false,
@@ -555,12 +605,16 @@ function panelTabs(
     parts: ExploreParts;
     details: HTMLElement;
     controls: HTMLElement;
+    screen: Node | undefined;
     refresh: () => void;
   },
 ): HTMLElement {
   const { view, parts } = context;
   const changed = view.live === null ? 0 : changedLines(view.live, view.previous);
   const all: Array<Tab<PanelTab> | null> = [
+    context.screen === undefined
+      ? null
+      : { id: "screen", label: "Screen", content: html(doc, "div", {}, [context.screen]) },
     { id: "step", label: "Step", content: parts.step },
     parts.context === null
       ? null

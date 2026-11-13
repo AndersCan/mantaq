@@ -317,7 +317,8 @@ export function unreachableStates(machine: VizMachine): string[] {
   return machine.states.map((state) => state.id).filter((id) => !reached.has(id));
 }
 
-function pathTo(machine: VizMachine, id: string): VizStep[] | null {
+/** The shortest fuzz walk that reaches state `id`; [] for the initial state, null when none is known. */
+export function pathTo(machine: VizMachine, id: string): VizStep[] | null {
   if (machine.states.some((state) => state.id === id && state.initial)) return [];
   let best: VizStep[] | null = null;
   for (const sequence of machine.fuzz?.corpus ?? []) {
