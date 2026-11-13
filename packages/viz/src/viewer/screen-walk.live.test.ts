@@ -122,7 +122,7 @@ describe("Screen walk", () => {
     const root = mount();
     clickState(root, "c");
     expect(current(root)).toBe("c");
-    clickState(root, "idle"); // no walk lands; the driver is restored to the shown state
+    clickState(root, "idle"); // the initial state: walk of zero steps, driver back at idle
     clickState(root, "a"); // the next state of idle
     expect(current(root)).toBe("a");
   });
