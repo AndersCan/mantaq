@@ -216,8 +216,9 @@ export function payloadSamples(machine: VizMachine, event: string): VizJson[] {
 /** True when sending `event` should ask first: it declares a payload type, or fuzzing sent it data beyond `{}` (core turns a missing payload into `{}`). */
 export function asksForPayload(machine: VizMachine, event: string): boolean {
   const fields = machine.events.find((each) => each.id === event)?.payload ?? null;
-  if (fields !== null) return true;
-  return payloadSamples(machine, event).some((sample) => !isEmptyObject(sample));
+  const samples = payloadSamples(machine, event);
+  if (fields !== null) return fields.length > 0 || samples.length > 0;
+  return samples.some((sample) => !isEmptyObject(sample));
 }
 
 function isEmptyObject(value: VizJson): boolean {

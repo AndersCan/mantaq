@@ -38,6 +38,11 @@ describe("asksForPayload", () => {
     expect(asksForPayload(machineWith([], [{}]), "send")).toBe(true);
   });
 
+  // inspect: `event("ping")<{}>()` gives payload [] too; never sent, nothing to fill.
+  test("an empty declared type (payload []) with no samples sends at once", () => {
+    expect(asksForPayload(machineWith([], []), "send")).toBe(false);
+  });
+
   test("a no-data event (payload null) whose only sample is {} sends at once", () => {
     expect(asksForPayload(machineWith(null, [{}]), "send")).toBe(false);
   });
