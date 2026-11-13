@@ -63,7 +63,7 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 
 ## Rules
 
-- **Start from the example.** `patterns.md` has a complete machine: a state, an event, its handler and a timer effect, with its test in `testing.md`. Copy its shape; do not read the package's `.d.ts` files.
+- **Start from the example.** `patterns.md` has a complete machine: imports, states, events, a handler and a timer effect; `testing.md` shows how to test it. Copy its shape first, then check signatures against the installed types.
 - All timing through the injected clock. No real timers, `Date.now` or `Math.random` in effects.
 - Effects check `signal.aborted` before emitting, and hand the abort signal to any timer they create.
 - Declare payload types at boundaries. Bare `state("x")()` has payload `unknown`.

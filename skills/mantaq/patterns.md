@@ -1,14 +1,16 @@
 # Patterns
 
-Proven recipes. Code is a sketch. Copy the shape, not the exact signatures: check them against the installed types. Full working versions: [`packages/examples/`](https://github.com/AndersCan/mantaq/tree/main/packages/examples).
+Proven recipes. Code is a sketch. Start from the shape, then check signatures against the installed types. Full working versions: [`packages/examples/`](https://github.com/AndersCan/mantaq/tree/main/packages/examples).
 
 ## Async Work → Effect + Internal Event
 
 State enters "working", effect runs the async job, emits internal event, transition completes.
 
 ```ts
+import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { withTimeout } from "@mantaq/sugar";
 
+const submit = event("SUBMIT")();
 const fillingForm = state("fillingForm")();
 const submitting = state("submitting")();
 const submitted = state("submitted")().final();
@@ -21,6 +23,7 @@ Actor({
   initial: fillingForm,
   clock: VirtualClock(),
   setup: (m) => {
+    m.on(fillingForm, { event: submit, to: [submitting], handler: () => ({ state: submitting }) });
     m.effect(submitting, {
       name: "startSubmitTimeout",
       sends: [submittingDone],
