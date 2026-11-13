@@ -131,7 +131,6 @@ function arrange(
         return link.to === part.id ? [link.from] : [];
       }),
     );
-    partners.delete(part.id);
     const [only] = partners;
     const bigger =
       only !== undefined &&

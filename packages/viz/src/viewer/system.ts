@@ -130,10 +130,12 @@ interface Pair {
   links: SystemLink[];
 }
 
-/** One pair per `from>to`: its events are lines on one arrow. */
+/** One pair per `from>to`: its events are lines on one arrow. Parts drawn alone have none. */
 function pairsOf(system: MachineSystem): Pair[] {
   const pairs = new Map<string, Pair>();
+  const alone = new Set(system.parts.filter((part) => part.alone).map((part) => part.id));
   for (const link of system.links) {
+    if (alone.has(link.from)) continue;
     const key = `${link.from}>${link.to ?? "out"}`;
     const pair = pairs.get(key) ?? { key, from: link.from, to: link.to, links: [] };
     pair.links.push(link);
