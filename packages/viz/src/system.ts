@@ -1,11 +1,11 @@
 import { isAnyState, scopeOf } from "./schema.ts";
 import type { VizMachine } from "./schema.ts";
 
-/** One part of a machine: the root, a region, or an actor map (one child stands for all). */
+/** One part of a machine: the root, a region, an actor map (one child stands for all), or another machine the factory returned. */
 export interface SystemPart {
   /** "" = the root. Otherwise the region path or the map name. */
   id: string;
-  kind: "root" | "region" | "map";
+  kind: "root" | "region" | "map" | "actor";
   label: string;
   /** The part this one sits inside on the board: it talks only to that part, which has more states. null = on the board by itself. */
   within: string | null;
@@ -38,12 +38,17 @@ export interface MachineSystem {
   entries: SystemEntry[];
 }
 
+function kindOf(machine: VizMachine, id: string): SystemPart["kind"] {
+  if (machine.maps.includes(id)) return "map";
+  return machine.actors.includes(id) ? "actor" : "region";
+}
+
 function partsOf(machine: VizMachine): SystemPart[] {
   return [
     { id: "", kind: "root", label: machine.id, within: null, alone: false },
     ...machine.regions.map((id): SystemPart => ({
       id,
-      kind: machine.maps.includes(id) ? "map" : "region",
+      kind: kindOf(machine, id),
       label: id,
       within: null,
       alone: false,

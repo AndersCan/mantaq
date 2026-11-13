@@ -44,6 +44,7 @@ const door: VizMachine = {
   initial: "open",
   regions: [],
   maps: [],
+  actors: [],
   states: [
     { ...state("open", { initial: true }), doc: "The door stands open." },
     state("done", { final: true }),

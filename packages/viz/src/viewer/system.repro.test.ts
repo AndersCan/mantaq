@@ -47,6 +47,7 @@ const pool: VizMachine = {
   initial: "empty",
   regions: ["workers"],
   maps: ["workers"],
+  actors: [],
   states: [
     state("empty", true),
     state("holding"),
@@ -136,6 +137,7 @@ describe("system view: branches no other test pins", () => {
       id: "flow",
       regions: ["upload"],
       maps: [],
+      actors: [],
       states: [state("a", true), { ...state("b"), final: true }, state("upload.idle", true)],
       events: [event("DONE")],
       outputs: [],

@@ -143,7 +143,7 @@ console.log(JSON.stringify({ results, page, entryStatus, schemaVersion: doc.sche
     "plugin page carries a stylesheet",
   );
   check(out.entryStatus === 200, "plugin page serves the live entry");
-  check(out.schemaVersion === 16, "plugin serves a v16 document");
+  check(out.schemaVersion === 17, "plugin serves a v17 document");
 
   const site = join(app, "site");
   mkdirSync(join(site, "src", "pages"), { recursive: true });

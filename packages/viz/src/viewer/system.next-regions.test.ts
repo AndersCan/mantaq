@@ -39,6 +39,7 @@ const upload: VizMachine = {
   initial: "screen",
   regions: ["upload"],
   maps: [],
+  actors: [],
   states: [
     state("screen", true),
     state("done"),

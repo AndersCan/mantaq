@@ -52,6 +52,7 @@ const photoQueue: VizMachine = {
   initial: "showingQueue",
   regions: ["photos"],
   maps: ["photos"],
+  actors: [],
   states: [
     state("showingQueue", { initial: true }),
     state("photos.sendingPhoto", { initial: true }),

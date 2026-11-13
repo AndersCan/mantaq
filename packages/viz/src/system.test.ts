@@ -37,6 +37,7 @@ const base: VizMachine = {
   initial: null,
   regions: [],
   maps: [],
+  actors: [],
   states: [],
   events: [],
   outputs: [],
@@ -143,11 +144,32 @@ describe("systemOf", () => {
     expect(systemOf(machine).links[0]?.senders).toEqual(["upload.sending-uploadConfirmed"]);
   });
 
+  test("an actor part sends to any part that takes the event, a region only to its parent", () => {
+    const machine: VizMachine = {
+      ...base,
+      regions: ["inbox", "workers"],
+      maps: ["workers"],
+      actors: ["inbox"],
+      states: [state("open"), state("inbox.idle"), state("workers.free")],
+      partOutputs: { inbox: ["assign"] },
+      edges: [edge("workers.free", "assign")],
+    };
+    const system = systemOf(machine);
+    expect(system.parts.map((part) => [part.id, part.kind])).toEqual([
+      ["", "root"],
+      ["inbox", "actor"],
+      ["workers", "map"],
+    ]);
+    expect(system.links).toMatchObject([{ from: "inbox", to: "workers", event: "assign" }]);
+    expect(systemOf({ ...machine, actors: [] }).links).toMatchObject([{ from: "inbox", to: null }]);
+  });
+
   test("a map output links to the root and to a region that takes it", () => {
     const machine: VizMachine = {
       ...base,
       regions: ["log", "workers"],
       maps: ["workers"],
+      actors: [],
       states: [state("open"), state("log.on"), state("workers.free"), state("workers.working")],
       partOutputs: { workers: ["finished"] },
       edges: [edge("open", "finished"), edge("log.on", "finished")],
@@ -164,6 +186,7 @@ describe("systemOf", () => {
       outputs: ["go"],
       regions: ["log", "workers"],
       maps: ["workers"],
+      actors: [],
       states: [state("open"), state("log.on"), state("workers.free"), state("workers.working")],
       edges: [edge("workers.*", "go")],
     };
@@ -189,6 +212,7 @@ describe("entries", () => {
     ...base,
     regions: ["workers"],
     maps: ["workers"],
+    actors: [],
     states: [state("empty"), state("workers.free")],
     events: [
       { id: "ARRIVED", internal: false, doc: null, payload: null },

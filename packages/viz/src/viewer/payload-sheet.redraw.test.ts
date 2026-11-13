@@ -48,6 +48,7 @@ const checkout: VizMachine = {
   initial: "idle",
   regions: [],
   maps: [],
+  actors: [],
   states: [state("idle", { initial: true }), state("paying"), state("error", { final: true })],
   events: [
     { id: "submit", internal: false, doc: null, payload: null },

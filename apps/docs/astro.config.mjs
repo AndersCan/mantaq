@@ -29,6 +29,7 @@ export default defineConfig({
         "src/design/out-arrow.ts",
         "src/design/pool.ts",
         "src/pool/team-inbox.ts",
+        "src/pool/kitchen.ts",
         "src/conform/counter-model.ts",
         "src/tutorial/meal-01.ts",
         "src/tutorial/meal-02.ts",

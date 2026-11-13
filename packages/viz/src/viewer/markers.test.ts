@@ -41,6 +41,7 @@ const machine: VizMachine = {
   initial: "showingQueue",
   regions: ["photos"],
   maps: ["photos"],
+  actors: [],
   states: [
     state("showingQueue", { initial: true }),
     state("photos.sendingPhoto", { initial: true }),
@@ -356,6 +357,7 @@ describe("roving focus and picks", () => {
     const two: VizMachine = {
       ...machine,
       maps: ["photos", "docs"],
+      actors: [],
       regions: ["photos", "docs"],
       states: [...machine.states, state("docs.sendingPhoto", { initial: true })],
     };
@@ -396,6 +398,7 @@ describe("roving focus and picks", () => {
     const two: VizMachine = {
       ...machine,
       maps: ["photos", "docs"],
+      actors: [],
       regions: ["photos", "docs"],
       states: [...machine.states, state("docs.sendingPhoto", { initial: true })],
     };

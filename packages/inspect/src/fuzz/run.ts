@@ -255,14 +255,49 @@ export function regionActors(
   );
 }
 
+/**
+ * The other machines a factory returned next to its actor: own enumerable
+ * properties except `actor` that are actors, sorted by name. The root, a core
+ * region and a property named like a region path are skipped.
+ */
+export function otherActorsOf(
+  made: unknown,
+  root: AnyActor<unknown>,
+): Record<string, AnyActor<unknown>> {
+  if (typeof made !== "object" || made === null) return {};
+  const regions = regionActors(root);
+  const taken = (name: string, value: unknown): boolean =>
+    value === root || regions.some((each) => each.actor === value || each.path === name);
+  const names = Object.keys(made)
+    .filter((name) => name !== "actor")
+    .sort();
+  return Object.fromEntries(
+    names.flatMap((name) => {
+      const value: unknown = Reflect.get(made, name);
+      return isActor(value) && !taken(name, value) ? [[name, value]] : [];
+    }),
+  );
+}
+
+/** Region actors followed by the other machines the factory returned, each as a path and an actor. */
+export function withActors(
+  regions: Array<{ path: string; actor: AnyActor<unknown> }>,
+  actors: Readonly<Record<string, AnyActor<unknown>>>,
+): Array<{ path: string; actor: AnyActor<unknown> }> {
+  return [...regions, ...Object.entries(actors).map(([path, part]) => ({ path, actor: part }))];
+}
+
 /** The actor a step goes to; undefined when the step names a region or child that does not exist. */
 export function targetOf(
   root: AnyActor<unknown>,
   ref: VizActorRef | undefined,
   maps: Readonly<Record<string, ActorMapLike>> = {},
+  actors: Readonly<Record<string, AnyActor<unknown>>> = {},
 ): AnyActor<unknown> | undefined {
   if (ref === undefined) return root;
-  if ("region" in ref) return regionActors(root).find((each) => each.path === ref.region)?.actor;
+  if ("region" in ref) {
+    return regionActors(root).find((each) => each.path === ref.region)?.actor ?? actors[ref.region];
+  }
   const child = maps[ref.map]?.get(ref.key);
   return isActor(child) ? child : undefined;
 }
@@ -285,13 +320,15 @@ export function applyStep(
     clock: VirtualClock;
     internal: ReadonlySet<string>;
     maps?: Readonly<Record<string, ActorMapLike>>;
+    /** Other machines the factory returned, by name. */
+    actors?: Readonly<Record<string, AnyActor<unknown>>>;
     /** The payload for an event step that has none. Default: none. */
     emptyPayload?: (event: string) => object;
   },
 ): void {
   const { step } = context;
   if (step.kind === "advance") return context.clock.advance(step.ms);
-  const actor = targetOf(root, step.actor, context.maps);
+  const actor = targetOf(root, step.actor, context.maps, context.actors);
   if (actor === undefined) return;
   const internal = actor === root ? context.internal : internalOf(actor);
   // A live effect only emits while its state is active, and core rejects an
@@ -408,10 +445,11 @@ function recordChildren(context: {
 export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trace {
   const { actor, clock, made } = target.create();
   const maps = actorMapsOf(made).maps;
+  const actors = otherActorsOf(made, actor);
   const internal = new Set(eventCatalog(actor).internal);
   const visited = [actor.state.name];
-  const regions = regionActors(actor);
-  for (const region of regions) visited.push(`${region.path}.${region.actor.state.name}`);
+  const regions = withActors(regionActors(actor), actors);
+  visited.push(...regions.map((region) => `${region.path}.${region.actor.state.name}`));
   const recording = recordingPayloads();
   /** What the handler got, as plain data: a recording payload is `{}`. */
   const plain = (payload: unknown): unknown => (recording.isMade(payload) ? {} : payload);
@@ -475,7 +513,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     // user code the step runs outside them (a timer callback under
     // `clock.advance`) ends this run as an error, not the whole fuzz.
     const applied = Either.from(() => {
-      applyStep(actor, { step, clock, internal, maps, emptyPayload: recording.make });
+      applyStep(actor, { step, clock, internal, maps, actors, emptyPayload: recording.make });
       return true;
     });
     if (Either.isLeft(applied)) {
@@ -497,6 +535,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     index += 1;
   }
   for (const map of Object.values(maps)) map.dispose();
+  for (const part of Object.values(actors)) part.dispose();
   actor.dispose();
   const features = [...new Set([...featuresOf({ visited, observations, errors }), ...hits])].sort();
   const missingPayloads = recording.missing();

@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { actorMapsOf } from "./maps.ts";
 import type { ActorMapLike } from "./maps.ts";
-import { applyStep, eventCatalog, targetOf } from "./fuzz/run.ts";
+import { applyStep, eventCatalog, otherActorsOf, targetOf } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import type { AnyActor } from "@mantaq/core";
 
@@ -33,8 +33,12 @@ function dropOne(list: string[], item: string): boolean {
 function stepProblem(
   root: AnyActor<unknown>,
   step: VizStep,
-  maps: Readonly<Record<string, ActorMapLike>>,
+  parts: {
+    maps: Readonly<Record<string, ActorMapLike>>;
+    actors: Readonly<Record<string, AnyActor<unknown>>>;
+  },
 ): string | null {
+  const { maps, actors } = parts;
   if (step.kind !== "event") return null;
   const ref = step.actor;
   if (ref !== undefined && "map" in ref && maps[ref.map] === undefined) {
@@ -42,7 +46,7 @@ function stepProblem(
   }
   // A map child may not exist yet while the steps are only being checked.
   if (ref !== undefined && "map" in ref) return null;
-  const target = targetOf(root, ref);
+  const target = targetOf(root, ref, maps, actors);
   if (target === undefined) return `unknown region "${ref?.region}"`;
   const catalog = eventCatalog(target);
   if (catalog.inputs.includes(step.event) || catalog.internal.includes(step.event)) return null;
@@ -51,8 +55,15 @@ function stepProblem(
     : `unknown event "${step.event}" in region ${ref.region}`;
 }
 
-function release(actor: AnyActor<unknown>, maps: Readonly<Record<string, ActorMapLike>>): void {
-  for (const map of Object.values(maps)) map.dispose();
+function release(
+  actor: AnyActor<unknown>,
+  parts: {
+    maps: Readonly<Record<string, ActorMapLike>>;
+    actors: Readonly<Record<string, AnyActor<unknown>>>;
+  },
+): void {
+  for (const map of Object.values(parts.maps)) map.dispose();
+  for (const part of Object.values(parts.actors)) part.dispose();
   actor.dispose();
 }
 
@@ -66,13 +77,14 @@ function release(actor: AnyActor<unknown>, maps: Readonly<Record<string, ActorMa
 export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<string, VizStep[]> {
   const { actor, clock, made } = target.create();
   const maps = actorMapsOf(made).maps;
+  const actors = otherActorsOf(made, actor);
   const internal = new Set(eventCatalog(actor).internal);
   let produced: string[] = [];
   actor.on("transition", { fn: ({ event }) => void produced.push(event.type) });
   for (const step of run.steps) {
-    const problem = stepProblem(actor, step, maps);
+    const problem = stepProblem(actor, step, { maps, actors });
     if (problem !== null) {
-      release(actor, maps);
+      release(actor, { maps, actors });
       return Either.left(problem);
     }
   }
@@ -81,12 +93,12 @@ export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<strin
     const root = step.kind === "event" && step.actor === undefined;
     if (root && internal.has(step.event) && dropOne(produced, step.event)) continue;
     produced = [];
-    applyStep(actor, { step, clock, internal, maps });
+    applyStep(actor, { step, clock, internal, maps, actors });
     if (root && internal.has(step.event)) dropOne(produced, step.event);
     kept.push(step);
   }
   const ended = actor.state.name;
-  release(actor, maps);
+  release(actor, { maps, actors });
   return ended === run.end
     ? Either.right(kept)
     : Either.left(

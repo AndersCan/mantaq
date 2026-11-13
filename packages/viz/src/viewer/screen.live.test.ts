@@ -44,6 +44,7 @@ const chain: VizMachine = {
   initial: "idle",
   regions: [],
   maps: [],
+  actors: [],
   states: ids.map(state),
   events: [{ id: "go", internal: false, doc: null, payload: null }],
   outputs: [],

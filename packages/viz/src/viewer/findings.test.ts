@@ -43,6 +43,7 @@ const machine: VizMachine = {
   initial: "idle",
   regions: [],
   maps: [],
+  actors: [],
   states: [state("idle", { initial: true }), state("picked"), state("orphan")],
   events: [{ id: "pick", internal: false, doc: null, payload: null }],
   outputs: [],
