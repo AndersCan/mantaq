@@ -49,6 +49,37 @@ const DEV_FUZZ: FuzzSettings = { timeLimitMs: 2000 };
 
 export const TARGETS = "virtual:mantaq/targets";
 export const TARGETS_RESOLVED = `\0${TARGETS}`;
+const PREVIEWS = "virtual:mantaq/previews";
+const PREVIEWS_RESOLVED = `\0${PREVIEWS}`;
+
+/** `<stem>.preview.ts` beside a machine file, when it exists. */
+function previewFileOf(machineFile: string): string | undefined {
+  const file = `${machineFile.replace(/\.[^./\\]+$/, "")}.preview.ts`;
+  return existsSync(file) ? file : undefined;
+}
+
+/** Each machine id of the files that have a preview file, with that file. */
+function previewsOf(files: ReadonlyArray<string>): Map<string, string> {
+  const previews = new Map<string, string>();
+  for (const file of files) {
+    const preview = previewFileOf(file);
+    if (preview === undefined) continue;
+    const analysis = analyzeModule({ file, root: projectRoot(file) });
+    if (Either.isLeft(analysis)) continue;
+    for (const found of analysis[1].machines.filter((each) => each.call !== "instance")) {
+      previews.set(machineId(found.name), preview);
+    }
+  }
+  return previews;
+}
+
+/** Source of `virtual:mantaq/previews`: a lazy import of each preview file, by machine id. */
+function previewsSource(files: ReadonlyArray<string>): string {
+  const entries = [...previewsOf(files)].map(
+    ([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`,
+  );
+  return ["export const previews = {", ...entries, "};"].join("\n");
+}
 
 function createExpression(found: MachineExport, index: number): string {
   const callee = `m${index}[${JSON.stringify(found.name)}]`;
@@ -89,11 +120,14 @@ export function targetsSource(files: ReadonlyArray<string>): string {
     "export const targets = {",
     ...entries,
     "};",
+    `export const previewed = ${JSON.stringify([...previewsOf(files).keys()])};`,
   ].join("\n");
 }
 
 function machineFiles(root: string, patterns: ReadonlyArray<string>): string[] {
-  const files = patterns.flatMap((pattern) => globSync(pattern, { cwd: root }));
+  const files = patterns
+    .flatMap((pattern) => globSync(pattern, { cwd: root }))
+    .filter((file) => !file.endsWith(".preview.ts"));
   return [...new Set(files.map((file) => (isAbsolute(file) ? file : resolve(root, file))))].sort();
 }
 
@@ -206,6 +240,20 @@ function serveNotes(
   });
 }
 
+/** The frame page: the app's preview entry on an empty, inert body. */
+function servePreview(
+  server: ViteDevServer,
+  http: { request: IncomingMessage; response: ServerResponse },
+): void {
+  const { request, response } = http;
+  const frame = previewEntry();
+  const page = `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>mantaq screen</title></head><body style="margin:0" inert><script type="module" src="/@fs${frame}"></script></body></html>`;
+  void server.transformIndexHtml(request.url ?? "/", page).then((html) => {
+    response.setHeader("content-type", "text/html");
+    response.end(html);
+  });
+}
+
 function stylesheets(): string {
   return STYLESHEETS.map((id) => readFileSync(fileURLToPath(import.meta.resolve(id)), "utf8")).join(
     "\n",
@@ -275,14 +323,38 @@ function siteBuild(context: {
   };
 }
 
+function resolveVirtual(id: string): string | null {
+  if (id === TARGETS) return TARGETS_RESOLVED;
+  return id === PREVIEWS ? PREVIEWS_RESOLVED : null;
+}
+
+function loadVirtual(id: string, files: () => ReadonlyArray<string>): string | null {
+  if (id === TARGETS_RESOLVED) return targetsSource(files());
+  return id === PREVIEWS_RESOLVED ? previewsSource(files()) : null;
+}
+
+function invalidateVirtual(server: ViteDevServer): void {
+  for (const id of [TARGETS_RESOLVED, PREVIEWS_RESOLVED]) {
+    const module = server.moduleGraph.getModuleById(id);
+    if (module !== undefined) server.moduleGraph.invalidateModule(module);
+  }
+}
+
+function liveEntry(): string {
+  const name = import.meta.url.endsWith(".ts") ? "./live-entry.ts" : "./live-entry.mjs";
+  return fileURLToPath(import.meta.resolve(name));
+}
+
+function previewEntry(): string {
+  const name = import.meta.url.endsWith(".ts") ? "./preview-entry.ts" : "./preview-entry.mjs";
+  return fileURLToPath(import.meta.resolve(name));
+}
+
 export function mantaqViz(options: MantaqVizOptions): Plugin[] {
   const base = (options.base ?? "/__mantaq/").replace(/\/?$/, "/");
   const patterns = Array.isArray(options.machines) ? options.machines : [options.machines];
   const fuzz = options.fuzz ?? DEV_FUZZ;
-  const live = fileURLToPath(
-    import.meta.resolve(import.meta.url.endsWith(".ts") ? "./live-entry.ts" : "./live-entry.mjs"),
-  );
-  const viz = dirname(dirname(fileURLToPath(import.meta.resolve("@mantaq/viz/live"))));
+  const live = liveEntry();
   let root = process.cwd();
   const project: { configFile: string | undefined } = { configFile: undefined };
   const targets: Plugin = {
@@ -291,8 +363,8 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       root = config.root;
       project.configFile = config.configFile;
     },
-    resolveId: (id) => (id === TARGETS ? TARGETS_RESOLVED : null),
-    load: (id) => (id === TARGETS_RESOLVED ? targetsSource(machineFiles(root, patterns)) : null),
+    resolveId: resolveVirtual,
+    load: (id) => loadVirtual(id, () => machineFiles(root, patterns)),
   };
   const plugin: Plugin = {
     name: "mantaq-viz",
@@ -304,7 +376,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
           allow: [
             searchForWorkspaceRoot(config.root ?? process.cwd()),
             dirname(dirname(live)),
-            viz,
+            dirname(dirname(fileURLToPath(import.meta.resolve("@mantaq/viz/live")))),
           ],
         },
       },
@@ -345,8 +417,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
         }
         if (!/\.[cm]?[jt]sx?$/.test(path) && !/[\\/]__runs__[\\/][^\\/]+\.json$/.test(path)) return;
         cached = null;
-        const generated = server.moduleGraph.getModuleById(TARGETS_RESOLVED);
-        if (generated !== undefined) server.moduleGraph.invalidateModule(generated);
+        invalidateVirtual(server);
         server.environments.ssr.moduleGraph.invalidateAll();
         server.ws.send({ type: "custom", event: UPDATE_EVENT });
       });
@@ -369,6 +440,10 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
               response.end(String(error));
             },
           );
+          return;
+        }
+        if (path === `${base}preview`) {
+          servePreview(server, { request, response });
           return;
         }
         if (path !== base && path !== base.slice(0, -1)) {

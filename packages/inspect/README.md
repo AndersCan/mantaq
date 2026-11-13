@@ -107,6 +107,21 @@ const json = serializeViz(vizDocument([machine]));
 
 `machineBrief(machine)` turns a machine into a Markdown brief of its states, the events each takes and under which condition, entry effects and ignored events, for whoever builds the feature.
 
+## Screen preview
+
+Next to a machine file, add `<machine file>.preview.ts` (`door.ts` -> `door.preview.ts`). Its default export draws the app's own screen for a state; the live page then opens on a **Screen** tab showing it in a phone-width frame, and clicking a state walks there. Dev server only. `state` is `{ name, payload, context }` as the walk produced them; the frame takes no input.
+
+```ts
+// door.preview.ts
+import { html, render } from "lit-html";
+
+export default function preview(element: HTMLElement, state: { name: string }) {
+  render(html`<p>The door is ${state.name}</p>`, element);
+}
+```
+
+The function can use any framework; mantaq imports nothing from your app but this file. A throw leaves the frame blank, with the error in the frame's devtools console.
+
 ## Check the built site
 
 ```sh

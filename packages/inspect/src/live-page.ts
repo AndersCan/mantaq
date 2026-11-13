@@ -142,6 +142,51 @@ function mountNotes(
   }
 }
 
+/** The viewer's `screen` callback: a phone-width frame of the app's own preview page for the live state. */
+function screenFrame(
+  doc: Document,
+  context: { path: string; id: string },
+): NonNullable<ViewerOptions["screen"]> {
+  return (live) => {
+    const frame = doc.createElement("iframe");
+    const state = JSON.stringify({
+      name: live.state,
+
+      payload: live.payload,
+      context: live.context,
+    });
+    frame.src = `${context.path}?machine=${encodeURIComponent(context.id)}&state=${encodeURIComponent(state)}`;
+    frame.title = `Screen of ${context.id}: ${live.state}`;
+    frame.tabIndex = -1;
+    frame.style.cssText =
+      "display:block;width:min(100%,360px);height:640px;border:0;pointer-events:none";
+    return frame;
+  };
+}
+
+/** What a hot-updated `virtual:mantaq/targets` module hands the page: its targets and previewed machines. */
+export function takeTargets(module: Record<string, unknown>): {
+  targets: LiveTargets;
+  previewed: ReadonlyArray<string>;
+} {
+  return {
+    targets: module["targets"] as LiveTargets,
+    previewed: module["previewed"] as ReadonlyArray<string>,
+  };
+}
+
+/** `{ screen }` for a live machine that has a preview file, else nothing. */
+function screenOption(context: {
+  doc: Document;
+  preview: { path: string; machines: ReadonlyArray<string> } | undefined;
+  id: string;
+}): Pick<ViewerOptions, "screen"> {
+  const { doc, preview, id } = context;
+  return preview?.machines.includes(id) === true
+    ? { screen: screenFrame(doc, { path: preview.path, id }) }
+    : {};
+}
+
 /** Mount the document at `text`; machines with a target run live, the rest stay static walks. */
 export function mountDriven(
   root: HTMLElement,
@@ -154,6 +199,8 @@ export function mountDriven(
     notes?: string;
     /** Page without a dev server: right-clicking a state or arrow copies one note for the agent. `file` names the machine file in the block. `notes` wins when both are set. */
     copyNotes?: { file: string };
+    /** Dev server frame page and the machine ids that have a preview file; the viewer gets a Screen tab for those. */
+    preview?: { path: string; machines: ReadonlyArray<string> };
     /** Where the dev page keeps each machine's outline for "what changed"; unset = no marks. */
     seen?: SeenStorage;
     /** Where each machine's outputs go, shown on live steps. */
@@ -207,6 +254,7 @@ export function mountDriven(
     ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...routesOf(context),
     ...(driver === undefined ? {} : { driver }),
+    ...screenOption({ doc, preview: context.preview, id }),
     ...(context.diagramOnly === true ? { diagramOnly: true } : {}),
   });
   if (machine !== undefined) mountNotes(viewer, { machine, ...notesOf(context) });
@@ -301,7 +349,13 @@ function mountCompare(
 /** Fetch the document from `source` and mount it; call again to redraw, keeping the walk. */
 export async function mountLiveDriven(
   root: HTMLElement,
-  context: { source: string; targets: LiveTargets; notes?: string; seen?: SeenStorage },
+  context: {
+    source: string;
+    targets: LiveTargets;
+    notes?: string;
+    seen?: SeenStorage;
+    preview?: { path: string; machines: ReadonlyArray<string> };
+  },
 ): Promise<void> {
   const response = await fetch(context.source).catch(() => null);
   if (response === null || !response.ok) {
