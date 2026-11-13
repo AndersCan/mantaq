@@ -85,7 +85,7 @@ order.snapshot().payload; // { orderId: "ord_1" }
 
 ## Guards
 
-A plain `if` picks the `{ state }`; `{}` stays put.
+A plain `if` picks the `{ state }`; `{}`, or no return, stays put.
 
 ```ts
 const scanning = state("scanning")();
