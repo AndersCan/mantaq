@@ -63,12 +63,14 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 
 ## Rules
 
+- **Start from the example.** `patterns.md` has a complete machine: imports, states, events, a handler and a timer effect; `testing.md` shows how to test it. Copy its shape first, then check signatures against the installed types.
 - All timing through the injected clock. No real timers, `Date.now` or `Math.random` in effects.
 - Effects check `signal.aborted` before emitting, and hand the abort signal to any timer they create.
 - Declare payload types at boundaries. Bare `state("x")()` has payload `unknown`.
 - Declare every event an actor emits (`internal` / `outputs`), and handle each internal event in every state that can receive it.
 - Final states ignore all events.
 - Domain failures (declined card, timeout) are states and events: recoverable → non-final state with retry, terminal → final state. Never booleans in context.
+- **A timeout's length and outcome are the person's decisions.** Ask how long, and whether running out can be retried or ends the journey. Never guess either.
 - Handlers and effects should not throw for expected failures. A throw sends the actor to a terminal error state (`snapshot().error`, `on("error")`). Treat that as a bug signal, not control flow.
 - Read the current state from the handler's `state` argument, not `actor.state`.
 - **State names read without the notes.** Work in progress is a verb plus its object (`sendingRequest`, `addingMember`), waiting says what for (`waitingForAnswer`), and an outcome says how it ended (`joined`, `declined`, `expired`). A state names its object (`loadingPhotos`, `showingAlbums`, `couldNotLoadAlbums`), never a bare `ok`, `ready`, `idle`, `loading`, `error`, `open`, `closed` or `busy`. Never `done` or `approved` for a save that is still running.

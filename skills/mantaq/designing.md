@@ -20,7 +20,7 @@ Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the v
    - Empty folder: `npm create vite@latest . -- --template vanilla-ts`. Its tsconfig includes only `src`: add `vite.config.ts` to `include`, or step 6 skips the config and a mistyped `mantaqViz` option passes.
    - Bare `npm init` project (CommonJS, so Vite warns "ESM syntax in a file loaded as CommonJS"): `npm pkg set type=module`, `npm i -D vite typescript`, and a `tsconfig.json` with `"strict": true`, `"module": "ESNext"`, `"moduleResolution": "Bundler"`, `"include": ["src", "vite.config.ts"]`.
 2. Use the project's package manager.
-3. Install `@mantaq/core` and `-D @mantaq/inspect`, no versions. Check one core with `npm ls @mantaq/core`. Two versions: install core at the version `@mantaq/inspect` depends on.
+3. Install `@mantaq/core` and `-D @mantaq/inspect`, no versions. Check one core with `npm ls @mantaq/core`. Two versions: install core at the version `@mantaq/inspect` depends on. A timer or a promise effect (`withTimeout`, `withPromise`) also needs `@mantaq/sugar`.
 4. Vite config. None: create `vite.config.ts`:
 
    ```ts
