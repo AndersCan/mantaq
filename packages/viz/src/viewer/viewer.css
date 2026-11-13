@@ -190,6 +190,11 @@
     border-top: none;
     border-left: 1px solid var(--region-bg);
     padding: 0 0 0 16px;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    max-height: 100vh;
+    overflow: auto;
   }
 }
 
