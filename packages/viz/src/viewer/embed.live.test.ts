@@ -337,6 +337,52 @@ describe("live controls", () => {
     expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
+  test("an edge click on an event with no data sends at once when fuzzing only sent it {}", () => {
+    const toggle: VizMachine = {
+      ...checkout,
+      states: [state("off", { initial: true }), state("on")],
+      initial: "off",
+      events: [{ id: "flip", internal: false, doc: null, payload: null }],
+      edges: [edge("off", "flip", "on")],
+      fuzz: {
+        ...checkout.fuzz!,
+        corpus: [{ steps: [{ kind: "event", event: "flip", payload: {} }], discovered: [] }],
+      },
+    };
+    const log: VizStep[] = [];
+    const root = document.createElement("div");
+    const flipLive = (steps: VizStep[]): VizLiveState => ({
+      state: steps.length === 0 ? "off" : "on",
+      steps,
+      last: null,
+      after: [],
+      timers: [],
+      context: null,
+      payload: null,
+      regions: {},
+      children: [],
+      effectMode: "real",
+      waiting: [],
+    });
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [toggle] },
+      {
+        driver: {
+          reset: () => flipLive([]),
+          step: (step) => {
+            log.push(step);
+            return flipLive([...log]);
+          },
+        },
+      },
+    );
+    clickEdge(root, "off-flip-on");
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    expect(log).toHaveLength(1);
+    expect(log[0]?.kind === "event" && log[0].event).toBe("flip");
+  });
+
   test("a second click on the same event opens the form at what this walk sent last", () => {
     const toggle: VizMachine = {
       ...checkout,
