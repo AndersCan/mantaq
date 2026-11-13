@@ -151,6 +151,7 @@ function screenFrame(
     const frame = doc.createElement("iframe");
     const state = JSON.stringify({
       name: live.state,
+
       payload: live.payload,
       context: live.context,
     });
@@ -163,15 +164,25 @@ function screenFrame(
   };
 }
 
+/** What a hot-updated `virtual:mantaq/targets` module hands the page: its targets and previewed machines. */
+export function takeTargets(module: Record<string, unknown>): {
+  targets: LiveTargets;
+  previewed: ReadonlyArray<string>;
+} {
+  return {
+    targets: module["targets"] as LiveTargets,
+    previewed: module["previewed"] as ReadonlyArray<string>,
+  };
+}
+
 /** `{ screen }` for a live machine that has a preview file, else nothing. */
 function screenOption(context: {
   doc: Document;
   preview: { path: string; machines: ReadonlyArray<string> } | undefined;
   id: string;
-  live: boolean;
 }): Pick<ViewerOptions, "screen"> {
   const { doc, preview, id } = context;
-  return context.live && preview?.machines.includes(id) === true
+  return preview?.machines.includes(id) === true
     ? { screen: screenFrame(doc, { path: preview.path, id }) }
     : {};
 }
@@ -243,7 +254,7 @@ export function mountDriven(
     ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...routesOf(context),
     ...(driver === undefined ? {} : { driver }),
-    ...screenOption({ doc, preview: context.preview, id, live: driver !== undefined }),
+    ...screenOption({ doc, preview: context.preview, id }),
     ...(context.diagramOnly === true ? { diagramOnly: true } : {}),
   });
   if (machine !== undefined) mountNotes(viewer, { machine, ...notesOf(context) });

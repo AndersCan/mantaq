@@ -125,6 +125,7 @@ describe("mantaqViz previews", () => {
     expect(response.status).toBe(200);
     expect(html).toContain("/@vite/client");
     expect(html).toContain("preview-entry");
+    expect(html).toMatch(/<body[^>]*\sinert/);
   });
 
   test("a preview file is not inspected as a machine", async () => {

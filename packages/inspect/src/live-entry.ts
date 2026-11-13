@@ -4,12 +4,15 @@
  */
 import { UPDATE_EVENT } from "@mantaq/viz";
 import { previewed, targets } from "virtual:mantaq/targets";
-import { mountLiveDriven, readStorage } from "./live-page.ts";
+import { mountLiveDriven, readStorage, takeTargets } from "./live-page.ts";
 import type { LiveTargets } from "./live-page.ts";
 
 const root = document.querySelector<HTMLElement>("#app");
 const source = root?.dataset["src"];
-const current: { targets: LiveTargets } = { targets };
+const current: { targets: LiveTargets; previewed: ReadonlyArray<string> } = {
+  targets,
+  previewed,
+};
 
 if (root && source !== undefined) {
   const notes =
@@ -26,14 +29,14 @@ if (root && source !== undefined) {
       source,
       targets: current.targets,
       ...(notes === undefined ? {} : { notes }),
-      ...(preview === undefined ? {} : { preview: { path: preview, machines: previewed } }),
+      ...(preview === undefined ? {} : { preview: { path: preview, machines: current.previewed } }),
       ...(seen === undefined ? {} : { seen }),
     });
   };
   draw();
   import.meta.hot?.on(UPDATE_EVENT, draw);
   import.meta.hot?.accept("virtual:mantaq/targets", (module) => {
-    if (module !== undefined) current.targets = module["targets"];
+    if (module !== undefined) Object.assign(current, takeTargets(module));
     draw();
   });
 }

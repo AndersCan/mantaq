@@ -49,11 +49,11 @@ const DEV_FUZZ: FuzzSettings = { timeLimitMs: 2000 };
 
 export const TARGETS = "virtual:mantaq/targets";
 export const TARGETS_RESOLVED = `\0${TARGETS}`;
-export const PREVIEWS = "virtual:mantaq/previews";
-export const PREVIEWS_RESOLVED = `\0${PREVIEWS}`;
+const PREVIEWS = "virtual:mantaq/previews";
+const PREVIEWS_RESOLVED = `\0${PREVIEWS}`;
 
 /** `<stem>.preview.ts` beside a machine file, when it exists. */
-export function previewFileOf(machineFile: string): string | undefined {
+function previewFileOf(machineFile: string): string | undefined {
   const file = `${machineFile.replace(/\.[^./\\]+$/, "")}.preview.ts`;
   return existsSync(file) ? file : undefined;
 }
@@ -74,7 +74,7 @@ function previewsOf(files: ReadonlyArray<string>): Map<string, string> {
 }
 
 /** Source of `virtual:mantaq/previews`: a lazy import of each preview file, by machine id. */
-export function previewsSource(files: ReadonlyArray<string>): string {
+function previewsSource(files: ReadonlyArray<string>): string {
   const entries = [...previewsOf(files)].map(
     ([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`,
   );

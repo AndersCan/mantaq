@@ -5,7 +5,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { createAnswerActor } from "./fixtures/answer.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { inspectModule, vizDocument } from "./index.ts";
-import { mountDriven, mountLiveDriven, readStorage } from "./live-page.ts";
+import { mountDriven, mountLiveDriven, readStorage, takeTargets } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
 
 const file = join(import.meta.dirname, "fixtures", "checkout.ts");
@@ -68,6 +68,13 @@ describe("mountDriven", () => {
   });
 });
 
+describe("takeTargets", () => {
+  test("a hot-updated module brings the new previewed machines with its targets", () => {
+    const targets = {};
+    expect(takeTargets({ targets, previewed: ["door"] })).toEqual({ targets, previewed: ["door"] });
+  });
+});
+
 describe("mountDriven preview", () => {
   const create = () => {
     const clock = VirtualClock();
@@ -91,6 +98,16 @@ describe("mountDriven preview", () => {
     expect(src.pathname).toBe("/__mantaq/preview");
     expect(src.searchParams.get("machine")).toBe("checkout");
     expect(JSON.parse(src.searchParams.get("state") ?? "{}").name).toBe("basicInfo");
+  });
+
+  test("the frame carries the whole live state, a title, and stays out of the tab order", async () => {
+    const frame = await frameOf({ path: "/__mantaq/preview", machines: ["checkout"] });
+    const src = new URL(frame?.getAttribute("src") ?? "", "http://x");
+    const state = JSON.parse(src.searchParams.get("state") ?? "{}");
+    expect(Object.keys(state).sort()).toEqual(["context", "name", "payload"]);
+    expect(state.context).toBeDefined();
+    expect(frame?.title).toBe("Screen of checkout: basicInfo");
+    expect(frame?.tabIndex).toBe(-1);
   });
 
   test("no frame without a preview, or for a machine that has none", async () => {
