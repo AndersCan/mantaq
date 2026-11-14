@@ -9,9 +9,6 @@ test("fuzz drives the returned pool: its states and the cooks' states get hits",
   const hits = (id: string) => machine.states.find((each) => each.id === id)?.coverage?.hits ?? 0;
   expect(hits("orders.workersBusy")).toBeGreaterThan(0);
   expect(hits("cooks.working")).toBeGreaterThan(0);
-  // The pool's event types are not in this file, so fuzz has no payload samples for them; no other warning names the inbox.
-  const other = result.warnings
-    .filter((each) => each.includes("orders."))
-    .filter((each) => !each.includes("fuzz sent orders.") && !each.includes("fuzz never reached"));
-  expect(other).toEqual([]);
+  // The pool's event types are not in this file, so fuzz has no samples for them; the returned part's own page checks them.
+  expect(result.warnings.filter((each) => each.includes("orders."))).toEqual([]);
 }, 60_000);

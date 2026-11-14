@@ -37,7 +37,7 @@ Return your machine and the pool's two parts from one factory, and the diagram d
 </div>
 
 1. Press `ORDER_PLACED` twice, with a dish each time. `kitchen → orders` turns pink and both cooks fill: `orders` reads `workersBusy`.
-2. Press `WORKERS_RESIZED` with a count of `1`: `cooks ×2` stays, both filled. Under **Events and time**, advance 1000 ms: `cooks ×1`, and `orders` reads `allWorkersFree`.
+2. Under **Events and time**, advance 1000 ms: both cooks empty, and `orders` reads `allWorkersFree`.
 
 <Code code={kitchenSource} lang="ts" title="kitchen.ts" />
 
