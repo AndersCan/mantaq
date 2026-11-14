@@ -1274,15 +1274,7 @@ function liveResultSection(
           ...changedChildrenLines(doc, state),
           ...after.map((step, index) =>
             html(doc, "div", { "data-live-after": "" }, [
-              sameActor(step.actor, last.actor)
-                ? html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"])
-                : html(doc, "p", { class: "muted" }, [
-                    `Then ${partName(machine, step.actor)} took `,
-                    code(doc, step.event),
-                    step.outcome === "transition"
-                      ? `: ${localName(step.from)} → ${localName(step.to)}`
-                      : "",
-                  ]),
+              afterLine(doc, { machine, step, last }),
               ...stepLines(doc, {
                 machine,
                 step,
@@ -1335,17 +1327,81 @@ function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
   return "region" in actor ? actor.region : childWhoText(machine, actor);
 }
 
-/** `, then w1: free → working; w2: free → working`: the other parts that moved after the step; "" when none did. */
+/** Whether a part had no handler for a message another part sent it. */
+export function isDropped(step: VizLiveStep): boolean {
+  return step.message !== undefined && step.message.dropped !== null;
+}
+
+/** "waiter has no handler for DISH_READY in onBreak": why a part dropped a message. */
+export function dropReasonText(machine: VizMachine, step: VizLiveStep): string {
+  return `${partName(machine, step.actor)} has no handler for ${step.event} in ${localName(step.from)}`;
+}
+
+/** The sender as the row names it ("" is the machine itself); null when no part is known to have sent it. */
+function senderName(machine: VizMachine, step: VizLiveStep): string | null {
+  const sender = step.message?.sender ?? null;
+  return sender === "" ? machine.id : sender;
+}
+
+/** `orders → ` before a part's name when the step says who sent it; "" otherwise. */
+function fromSender(machine: VizMachine, step: VizLiveStep): string {
+  const sender = senderName(machine, step);
+  return sender === null ? "" : `${sender} → `;
+}
+
+/** The line above a later step: who sent it to whom, and where the receiver went; a dropped one says so and why. */
+function afterLine(
+  doc: Document,
+  context: { machine: VizMachine; step: VizLiveStep; last: VizLiveStep },
+): HTMLElement {
+  const { machine, step, last } = context;
+  const sender = senderName(machine, step);
+  const receiver = partName(machine, step.actor);
+  if (sender !== null && isDropped(step)) {
+    return html(doc, "p", { class: "muted", "data-live-dropped": "" }, [
+      "! Then ",
+      `${sender} sent `,
+      code(doc, step.event),
+      ` to ${receiver}: dropped. ${dropReasonText(machine, step)}.`,
+    ]);
+  }
+  if (sender !== null) {
+    return html(doc, "p", { class: "muted" }, [
+      `Then ${sender} sent `,
+      code(doc, step.event),
+      step.outcome === "transition"
+        ? ` to ${receiver}: ${localName(step.from)} → ${localName(step.to)}`
+        : ` to ${receiver}`,
+    ]);
+  }
+  if (sameActor(step.actor, last.actor)) {
+    return html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"]);
+  }
+  return html(doc, "p", { class: "muted" }, [
+    `Then ${receiver} took `,
+    code(doc, step.event),
+    step.outcome === "transition" ? `: ${localName(step.from)} → ${localName(step.to)}` : "",
+  ]);
+}
+
+/** `, then orders → w1: free → working; kitchen → waiter DISH_READY dropped`: what the other parts did after the step; "" when nothing. */
 function thenMoves(machine: VizMachine, later: ReadonlyArray<VizLiveStep>): string {
-  const moved = later.filter((each) => each.outcome === "transition");
-  if (moved.length === 0) return "";
-  const shown = moved
-    .slice(0, 3)
+  const dropped = later
+    .filter(isDropped)
     .map(
-      (each) => `${partName(machine, each.actor)}: ${localName(each.from)} → ${localName(each.to)}`,
+      (each) =>
+        `${fromSender(machine, each)}${partName(machine, each.actor)} ${each.event} dropped`,
     );
-  const more = moved.length > 3 ? ` and ${moved.length - 3} more` : "";
-  return `, then ${shown.join("; ")}${more}`;
+  const moved = later
+    .filter((each) => each.outcome === "transition")
+    .map(
+      (each) =>
+        `${fromSender(machine, each)}${partName(machine, each.actor)}: ${localName(each.from)} → ${localName(each.to)}`,
+    );
+  const items = [...dropped, ...moved];
+  if (items.length === 0) return "";
+  const more = items.length > 3 ? ` and ${items.length - 3} more` : "";
+  return `, then ${items.slice(0, 3).join("; ")}${more}`;
 }
 
 /** The Path entry for step `index`: what was sent, what the child did, which children it started or removed. */
@@ -1381,8 +1437,9 @@ function pathEntry(
     ].filter((part): part is string => part !== null);
     return parts.length === 0 ? "" : ` → ${parts.join("; ")}`;
   };
-  const text = head + move + suffix(true);
-  const full = head + move + suffix(false);
+  const mark = later.some(isDropped) ? "! " : "";
+  const text = mark + head + move + suffix(true);
+  const full = mark + head + move + suffix(false);
   return {
     text,
     title: full === text ? null : full,

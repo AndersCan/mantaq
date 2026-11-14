@@ -26,8 +26,8 @@ test("pool: a replayed link names w1 then w2 on the Path", async () => {
   );
   const first = pathTexts(root);
   await new Promise((r) => setTimeout(r, 20));
-  expect(first[1]).toContain("then w1: free → working");
-  expect(first[2]).toContain("then w2: free → working");
+  expect(first[1]).toContain("then teamInbox → w1: free → working");
+  expect(first[2]).toContain("then teamInbox → w2: free → working");
 });
 
 test("pool, real effects: a late move shown on a step stays on it after the next step", async () => {
@@ -46,7 +46,10 @@ test("pool, real effects: a late move shown on a step stays on it after the next
   root.querySelector<HTMLButtonElement>('[data-payload-send="team.ITEM_ARRIVED"]')?.click();
   const after = pathTexts(root);
   expect(after.length).toBe(3);
-  expect(after[1]).toBe(before);
+  // The driver may name a late move's sender after the row first showed; the move itself stays.
+  expect(after[1]).toContain("w1: working → free; ");
+  expect(after[1]).toContain("teamInbox: workersBusy → allWorkersFree");
+  expect(before).toContain("teamInbox: workersBusy → allWorkersFree");
 });
 
 test("pool: w1 finishes and takes the waiting item; the Path names both moves (plan Try it step 4)", () => {
@@ -79,5 +82,7 @@ test("pool: event ids containing a dot replay from a link", () => {
     },
   );
   expect(root.querySelectorAll("[data-live-cascade]")).toHaveLength(1);
-  expect(pathTexts(root)[1]).toBe("team.ITEM_ARRIVED {item a}, then w1: free → working");
+  expect(pathTexts(root)[1]).toBe(
+    "team.ITEM_ARRIVED {item a}, then teamInbox → w1: free → working",
+  );
 });

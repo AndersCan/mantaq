@@ -407,7 +407,14 @@ function detailsOf(
   const shown =
     system === null || chosen === null
       ? null
-      : systemDetails(doc, { machine, system, selection: chosen, live: view.live, open });
+      : systemDetails(doc, {
+          machine,
+          system,
+          selection: chosen,
+          live: view.live,
+          afters: view.afters,
+          open,
+        });
   return (
     shown ??
     renderPanel(doc, machine, {
@@ -949,7 +956,13 @@ function markSystemView(
   >,
 ): void {
   const { machine, system, view } = context;
-  markSystem(root, { machine, system, live: view.live, selection: view.systemSelection });
+  markSystem(root, {
+    machine,
+    system,
+    live: view.live,
+    selection: view.systemSelection,
+    afters: view.afters,
+  });
   const canvas = root.querySelector(".canvas");
   const doc = root.ownerDocument;
   canvas?.querySelector("[data-viz-key]")?.remove();
