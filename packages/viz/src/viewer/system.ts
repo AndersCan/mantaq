@@ -6,6 +6,7 @@ import type { VizActorRef, VizLiveState, VizLiveStep, VizMachine } from "../sche
 import { linksInside, systemOf } from "../system.ts";
 import type { MachineSystem, SystemEntry, SystemLink, SystemPart } from "../system.ts";
 import { localName } from "./compartments.ts";
+import { dropReasonText, isDropped } from "./explore.ts";
 import { activatable, html, svg } from "./dom.ts";
 import { polyline } from "./layout.ts";
 
@@ -596,14 +597,50 @@ function markDots(
 function tookKeys(system: MachineSystem, live: VizLiveState | null): Set<string> {
   if (live === null) return new Set();
   const entries: VizLiveStep[] = [...(live.last === null ? [] : [live.last]), ...live.after];
-  const took = entries.filter((entry) => entry.outcome !== "missing");
+  const took = entries.filter((entry) => entry.outcome !== "missing" && !isDropped(entry));
   return new Set(
     system.links
       .filter((link) =>
-        took.some((entry) => entry.event === link.event && actorPart(entry.actor) === link.to),
+        took.some(
+          (entry) =>
+            entry.event === link.event &&
+            actorPart(entry.actor) === link.to &&
+            (entry.message?.sender ?? link.from) === link.from,
+        ),
       )
       .map(linkKey),
   );
+}
+
+/** Dropped messages by the arrow that carried them: from the sender, with the event, to the receiver. A drop with no known sender has no arrow. */
+function droppedOf(
+  system: MachineSystem,
+  entries: ReadonlyArray<VizLiveStep>,
+): Map<string, VizLiveStep[]> {
+  const found = new Map<string, VizLiveStep[]>();
+  for (const entry of entries) {
+    const sender = entry.message?.sender;
+    if (!isDropped(entry)) continue;
+    for (const link of system.links) {
+      if (link.from !== sender || link.event !== entry.event) continue;
+      if (link.to !== actorPart(entry.actor)) continue;
+      found.set(linkKey(link), [...(found.get(linkKey(link)) ?? []), entry]);
+    }
+  }
+  return found;
+}
+
+const DROPPED_ARIA = ", dropped in this run";
+
+/** Puts `!` after the arrow's name and says so in its label, or takes both off. */
+function markDropped(group: Element, dropped: boolean): void {
+  const text = group.querySelector("text");
+  const doc = group.ownerDocument;
+  text?.querySelector(".drop-mark")?.remove();
+  if (dropped && text !== null) text.append(svg(doc, "tspan", { class: "drop-mark" }, [" !"]));
+  const name = (group.getAttribute("aria-label") ?? "").replace(DROPPED_ARIA, "");
+  group.setAttribute("aria-label", dropped ? name + DROPPED_ARIA : name);
+  group.classList.toggle("dropped", dropped);
 }
 
 /** Fills one part's chip, dots, name and selection mark. */
@@ -635,6 +672,23 @@ function canTake(machine: VizMachine, part: string, event: string, live: VizLive
   );
 }
 
+/** One arrow's pink, warning and teal marks. */
+function markLink(
+  group: Element,
+  marks: {
+    took: Set<string>;
+    dropped: Map<string, VizLiveStep[]>;
+    selection: SystemSelection | null;
+  },
+): void {
+  const key = group.getAttribute("data-link");
+  if (key === null) return;
+  group.classList.toggle("took", marks.took.has(key));
+  markDropped(group, marks.dropped.has(key));
+  const { selection } = marks;
+  group.classList.toggle("selected", selection?.kind === "link" && selection.id === key);
+}
+
 /** Fills chips and names from the driver, and sets the pink and teal marks. Runs after every step and selection. */
 export function markSystem(
   root: ParentNode,
@@ -643,19 +697,17 @@ export function markSystem(
     system: MachineSystem;
     live: VizLiveState | null;
     selection: SystemSelection | null;
+    /** What parts did after each step of the walk so far. */
+    afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
   },
 ): void {
   const { machine, system, live, selection } = context;
   const took = tookKeys(system, live);
+  const dropped = droppedOf(system, context.afters?.flat() ?? []);
   const groups = [...root.querySelectorAll("g.part, g.link")];
   const pairs = [...root.querySelectorAll("g.link-pair")];
   for (const part of system.parts) markPart(groups, part, { machine, live, selection });
-  for (const group of groups) {
-    const key = group.getAttribute("data-link");
-    if (key === null) continue;
-    group.classList.toggle("took", took.has(key));
-    group.classList.toggle("selected", selection?.kind === "link" && selection.id === key);
-  }
+  for (const group of groups) markLink(group, { took, dropped, selection });
   for (const entry of root.querySelectorAll("g.link-in")) {
     const part = entry.getAttribute("data-to") ?? "";
     for (const line of entry.querySelectorAll("g.entry")) {
@@ -723,6 +775,24 @@ function senderLine(machine: VizMachine, system: MachineSystem, link: SystemLink
   return `${labelOf(system, link.from)} sends ${link.event}.${on === "" ? "" : ` On: ${on}.`}`;
 }
 
+/** Why the latest message on this arrow was dropped; null when none was. */
+function droppedLine(
+  doc: Document,
+  context: {
+    machine: VizMachine;
+    system: MachineSystem;
+    id: string;
+    afters: ReadonlyArray<ReadonlyArray<VizLiveStep>> | undefined;
+  },
+): HTMLElement | null {
+  const latest = droppedOf(context.system, context.afters?.flat() ?? [])
+    .get(context.id)
+    ?.at(-1);
+  return latest === undefined
+    ? null
+    : html(doc, "p", { "data-link-dropped": "" }, [`${dropReasonText(context.machine, latest)}.`]);
+}
+
 /** Details tab of the system view: who sends the arrow, who takes it where, and ways into the diagram. */
 export function systemDetails(
   doc: Document,
@@ -731,6 +801,7 @@ export function systemDetails(
     system: MachineSystem;
     selection: SystemSelection;
     live: VizLiveState | null;
+    afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     open: (target: OpenTarget) => void;
   },
 ): HTMLElement | null {
@@ -760,6 +831,7 @@ export function systemDetails(
           `Nothing in ${machine.id} takes it; it leaves the machine.`,
         ])
       : html(doc, "p", { "data-link-receiver": "" }, [receiverLine(machine, system, link)]),
+    droppedLine(doc, { machine, system, id: selection.id, afters: context.afters }),
     openButton(doc, `Open ${labelOf(system, link.from)}`, {
       target: senderIn(machine, link),
       open,

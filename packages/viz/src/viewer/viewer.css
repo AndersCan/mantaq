@@ -554,6 +554,16 @@
   stroke-width: 2.5;
 }
 
+/* A dropped message: a warning mark after the arrow's name, not pink or teal. */
+.viz .drop-mark {
+  fill: var(--banner-fg);
+  font-weight: 700;
+}
+
+.viz [data-live-dropped] {
+  color: var(--banner-fg);
+}
+
 /* A clicked item stays teal even when it is also on the walk. */
 .viz .graph .selected path,
 .viz .graph .selected .frame {
