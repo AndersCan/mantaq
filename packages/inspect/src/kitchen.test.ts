@@ -85,6 +85,25 @@ describe("driving the returned machine", () => {
     expect(live.regions["orders"]).toBe("orders.allWorkersFree");
   });
 
+  test("the board is told when a cook leaves, without another step", async () => {
+    const driver = createDriver({ id: "kitchen", create: kitchen }, { effectMode: "real" });
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+    const seen: string[][] = [];
+    driver.listen?.((state) => seen.push(state.children.map((each) => each.key)));
+    driver.step(order);
+    driver.step(order);
+    await tick();
+    driver.step({
+      kind: "event",
+      event: "orders.WORKERS_RESIZED",
+      payload: { count: 1 },
+      actor: { region: "orders" },
+    });
+    driver.step({ kind: "advance", ms: 1000 });
+    await tick();
+    expect(seen.at(-1)).toEqual(["w1"]);
+  });
+
   test("reset disposes the inbox and starts a fresh one", () => {
     const driver = createDriver({ id: "kitchen", create: kitchen });
     driver.step(order);

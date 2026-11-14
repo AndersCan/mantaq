@@ -250,14 +250,20 @@ function watchRoot(actor: AnyActor<unknown>, record: (entry: VizLiveStep) => voi
   });
 }
 
-/** Wrap spawn and ensure so every new child is watched, and watch the ones already there. */
+/** Wrap spawn and ensure so every new child is watched, kill so a removed child redraws, and watch the ones already there. */
 function watchMaps(
   maps: Readonly<Record<string, ActorMapLike>>,
   watch: (name: string, key: string) => void,
+  changed: () => void,
 ): void {
   for (const [name, map] of Object.entries(maps)) {
     const spawn = map.spawn.bind(map);
     const ensure = map.ensure.bind(map);
+    const kill = map.kill.bind(map);
+    map.kill = (key) => {
+      kill(key);
+      changed();
+    };
     map.spawn = (key) => {
       spawn(key);
       watch(name, key);
@@ -499,7 +505,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       if (holding) holdEffects(child, held);
       watchChild(child, { root: actor, ref: { map: name, key }, prefix: name, record });
     };
-    watchMaps(maps, watch);
+    watchMaps(maps, watch, changed);
     flags.inside = false;
     return {
       actor,

@@ -71,11 +71,9 @@ function fuzzWarnings(
 ): string[] {
   const inPart = (id: string) => machine.actors.some((actor) => id.startsWith(`${actor}.`));
   const missed = unreached(machine).filter((name) => !inPart(name));
-  const partEvents = new Set([
-    ...machine.edges.filter((edge) => inPart(edge.from)).map((edge) => edge.event),
-    ...machine.actors.flatMap((actor) => machine.partOutputs[actor] ?? []),
-    ...machine.events.filter((each) => inPart(each.id)).map((each) => each.id),
-  ]);
+  const partEvents = new Set(
+    machine.events.filter((each) => inPart(each.id)).map((each) => each.id),
+  );
   const iterations = machine.fuzz?.iterations ?? 0;
   const never =
     missed.length === 0
