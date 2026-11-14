@@ -7,7 +7,6 @@ export default defineConfig({
       index: "src/index.ts",
       viewer: "src/viewer/embed.ts",
       page: "src/viewer/page.ts",
-      live: "src/viewer/live.ts",
     },
     dts: {
       generator: "tsgo",

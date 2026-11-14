@@ -33,7 +33,6 @@
     "./viewer.css": "./src/viewer/viewer.css",
     "./page.css": "./src/viewer/page.css",
     "./page": "./src/viewer/page.ts",
-    "./live": "./src/viewer/live.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -43,7 +42,6 @@
       "./viewer.css": "./src/viewer/viewer.css",
       "./page.css": "./src/viewer/page.css",
       "./page": "./dist/page.mjs",
-      "./live": "./dist/live.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"

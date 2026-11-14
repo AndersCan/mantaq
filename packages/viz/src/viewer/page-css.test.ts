@@ -8,8 +8,4 @@ describe("page.css", () => {
   it("embeds that import @mantaq/viz/page get no page chrome", () => {
     expect(importsPageCss("page.ts")).toBe(false);
   });
-
-  it.each(["live.ts"])("%s brings the page chrome itself", (name) => {
-    expect(importsPageCss(name)).toBe(true);
-  });
 });

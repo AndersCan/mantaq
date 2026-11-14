@@ -113,7 +113,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const results = {};
-for (const id of ["@mantaq/viz", "@mantaq/viz/viewer", "@mantaq/viz/page", "@mantaq/viz/live", "@mantaq/viz/viewer.css", "@mantaq/viz/page.css", "@mantaq/inspect"]) {
+for (const id of ["@mantaq/viz", "@mantaq/viz/viewer", "@mantaq/viz/page", "@mantaq/viz/viewer.css", "@mantaq/viz/page.css", "@mantaq/inspect"]) {
   results[id] = existsSync(fileURLToPath(import.meta.resolve(id)));
 }
 await import("@mantaq/viz/page");

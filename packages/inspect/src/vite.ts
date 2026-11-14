@@ -376,7 +376,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
           allow: [
             searchForWorkspaceRoot(config.root ?? process.cwd()),
             dirname(dirname(live)),
-            dirname(dirname(fileURLToPath(import.meta.resolve("@mantaq/viz/live")))),
+            dirname(dirname(fileURLToPath(import.meta.resolve("@mantaq/viz/viewer")))),
           ],
         },
       },
