@@ -5,7 +5,15 @@ description: Fail your test suite on design errors and assert which states and t
 
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 
-`@mantaq/inspect` fuzzes a machine and checks its structure. Two groups of helpers turn that into vitest assertions, so CI catches design errors without a separate command.
+## What
+
+Vitest helpers from `@mantaq/inspect` that fail a test on design errors and on states or transitions nobody reaches.
+
+## Why
+
+`@mantaq/inspect` fuzzes a machine and checks its structure. Without these helpers a design error shows only in the visualizer; with them CI catches it without a separate command.
+
+## How
 
 ```ts
 import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
@@ -29,7 +37,7 @@ checkout: fuzzing had no payload for 1 event the machine reads, so this check pr
 Pass `source` (payloads from the event types) or `payloads: { submitPayment: [...] }` with a real payload for each case.
 ```
 
-## Fail on design errors
+### Fail on design errors
 
 ```ts
 import { test } from "vitest";
@@ -58,13 +66,13 @@ Unreached edges and `onAny` routing warnings are not errors. They show in the vi
 
 The reachability check is static. It reads the graph, so it needs no fuzzing: pass `fuzz: false` to skip the fuzz run. When an edge has an unknown target, the check cannot tell and reports nothing.
 
-## On the diagram
+### On the diagram
 
 The same findings show on the diagram: a state with a finding carries a "!" mark. Click it to read the finding, then **Replay** to run the events that found it.
 
 <Machine src="src/content/docs/checkout-with-bugs.ts" />
 
-## Names
+### Names
 
 A state or event is reported when every word in its name is a generic status word, so it says how something went but not what: ok, ready, idle, loading, loaded, error, failed, failure, success, succeeded, done, finished, complete, completed, pending, busy, active, waiting, start, started, init, status, result, data, update, updated, change, changed, act, acted. `loading` is vague and `loadingPhotos` is not; `LOAD_FAILED` passes because it says what failed. A state or event with no `/** */` comment above its declaration is reported too.
 
@@ -74,7 +82,7 @@ These checks need the machine file, so they run on the docs site, with `inspectF
 
 Before: an event named LOADED. After: one named photosLoaded, with a comment saying the photos arrived.
 
-## Tell the fuzzer what to expect
+### Tell the fuzzer what to expect
 
 Some bugs are not crashes: the machine runs fine and holds the wrong data. Say what must never happen in a block next to the factory, named `<machine id>Expectations`. It is a partial object per state: list only the context keys you care about.
 
@@ -96,7 +104,7 @@ The diagram above is built from this block: `payment` carries a "!" for `payment
 - In a test, pass the block as `expectations` on the target: `expectNoDesignErrors({ ...target, expectations: checkoutWithBugsExpectations })`. The message lists the hit with an `after:` line of events.
 - Payloads for events come from `source` or `payloads`. Without them, an event whose handler reads its payload stops `expectNoDesignErrors`, `expectReached` and `expectAllStatesReached` with a message naming the event and the fields it read.
 
-## Assert what gets reached
+### Assert what gets reached
 
 Reaching is proof. A state or transition counts as reached when the fuzzer or one of your named `tests` runs visited it.
 
@@ -142,10 +150,10 @@ const target = {
 
 Naming a state or transition the machine does not declare also fails, with "does not exist". Omit `to` in a transition to accept any target.
 
-## Stable in CI
+### Stable in CI
 
 Runs are seeded, so the same machine gives the same result on every run. Pass `fuzz: { seed }` to change the seed.
 
-## Custom checks
+### Custom checks
 
 `designErrors`, `unreachableStates`, `missedReach` and `reachedStates` return the same data as lines or ids when you want your own assertion. They take the machine from `inspect(target).machine`.

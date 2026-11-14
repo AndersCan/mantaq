@@ -3,9 +3,23 @@ title: How the visualizer works
 description: Walking a machine's graph in the viewer, and what each node and edge style means.
 ---
 
-The visualizer draws a machine as a graph and lets you walk it. States are nodes, transitions are edges. It reads a viz document made from your machine; it does not run your handlers unless you use the live page.
+import Machine from "@mantaq/inspect/astro/Machine.astro";
 
-## Walking the graph
+## What
+
+The visualizer draws a machine as a graph and lets you walk it. States are nodes, transitions are edges.
+
+## Why
+
+Reading handlers shows what one state does. The graph shows every path, and walking it shows which step you can take next. The visualizer reads a viz document made from your machine; it does not run your handlers unless you use the live page.
+
+## How
+
+<Machine src="src/content/docs/checkout.ts" />
+
+The checkout machine: the thick border is the state the walk is on, and pulsing arrows are the steps you can take next.
+
+### Walking the graph
 
 The viewer keeps a cursor on one state, starting at the initial one. Pulsing edges are the steps you can take next. Take one by:
 
@@ -29,7 +43,7 @@ A static walk follows declarations: guards are not evaluated, so a path may not 
 
 An edge with an unknown target (dashed, orange) offers each target its handler explanation names. Without an explanation it cannot be taken.
 
-## Nodes
+### Nodes
 
 | Style                      | Meaning                                                                                                                     |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -43,7 +57,7 @@ An edge with an unknown target (dashed, orange) offers each target its handler e
 | Box labelled "one per key" | An actor map: its graph is drawn once for every child                                                                       |
 | Pill with a key (`p1`)     | One child of an actor map, on the state it is in; outlined when finished; dots and a count when a state holds more than fit |
 
-## Edges
+### Edges
 
 | Style                      | Meaning                                            |
 | -------------------------- | -------------------------------------------------- |
@@ -55,7 +69,7 @@ An edge with an unknown target (dashed, orange) offers each target its handler e
 | Green arrow                | Seen only while fuzzing, not declared              |
 | Pulsing dashed arrow       | A step you can take next                           |
 
-## Coverage
+### Coverage
 
 The **Coverage from** picker in the Controls tab dims elements with zero hits. With example tests, dimmed means no test exercises it. With fuzz runs, dimmed usually means a declared edge that no run reached, often because its guards never allow it. Fuzzing is not proof, so check the handler.
 

@@ -3,7 +3,15 @@ title: Testing Actors
 description: How to test the checkout machine using graph traversal patterns.
 ---
 
-States are nodes, transitions are edges, a test is a walk. Mantaq is deterministic: same inputs, same trace, no sleeps.
+## What
+
+Test an actor by walking its graph: send events, assert the state after each.
+
+## Why
+
+States are nodes, transitions are edges, a test is a walk. Mantaq is deterministic: same inputs give the same trace, so a test needs no sleeps and no fake timers.
+
+## How
 
 ```
 basicInfo → shippingAddress → payment → submitting → success (final)
@@ -11,7 +19,9 @@ basicInfo → shippingAddress → payment → submitting → success (final)
                                             error
 ```
 
-## The machine
+The checkout machine below has one happy path, a `back` edge and an error state; the sections walk each.
+
+### The machine
 
 ```ts
 import { Actor, VirtualClock, state, event } from "@mantaq/core";
@@ -84,7 +94,7 @@ function createCheckoutActor() {
 }
 ```
 
-## Happy path
+### Happy path
 
 ```ts
 const checkout = createCheckoutActor();
@@ -107,7 +117,7 @@ expect(checkout.snapshot().path[0]).toBe("success");
 expect(checkout.snapshot().done).toBe(true);
 ```
 
-## Assert side effects with VirtualClock
+### Assert side effects with VirtualClock
 
 `VirtualClock.advance(ms)` is synchronous, fires timers, drains queue. No fake timers, no sleeps.
 
@@ -154,7 +164,7 @@ clock.advance(800);
 expect(checkout.snapshot().path[0]).toBe("error");
 ```
 
-## Assert promise effects with settled
+### Assert promise effects with settled
 
 Promise effects emit in a microtask. `settled()` waits for them.
 

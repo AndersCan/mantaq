@@ -3,9 +3,17 @@ title: Testing with Test Harness
 description: Instrument actors, drive with events, assert coverage using @mantaq/test.
 ---
 
-`createTestHarness(actor)` instruments an actor, builds its graph, and records every state visit, transition, and effect.
+## What
 
-## Setup
+`createTestHarness(actor)` from `@mantaq/test` instruments an actor and records every state visit, transition and effect.
+
+## Why
+
+Asserting the final state says nothing about the path. The record lets a test assert what ran and gate CI on what no test reached.
+
+## How
+
+### Setup
 
 ```ts
 import { createTestHarness } from "@mantaq/test";
@@ -15,7 +23,7 @@ const harness = createTestHarness(createCheckoutActor());
 
 Use `harness.send()` instead of `actor.send()`. All sends are recorded.
 
-## Drive and assert
+### Drive and assert
 
 ```ts
 harness.send(submitBasicInfo.create());
@@ -28,7 +36,7 @@ harness.assertStateVisited("success");
 harness.assertAllStatesVisited();
 ```
 
-## Assertion methods
+### Assertion methods
 
 - `assertStateVisited(id)` / `assertStateNeverVisited(id)`
 - `assertTransitionVisited(from, eventId)` / `assertTransitionNeverVisited(from, eventId)`
@@ -36,7 +44,7 @@ harness.assertAllStatesVisited();
 - `assertAllStatesVisited()` / `assertAllTransitionsVisited()`
 - `assertContextNever(predicate)` fails if predicate matches current context
 
-## Query helpers
+### Query helpers
 
 Non-throwing, return booleans:
 
@@ -45,7 +53,7 @@ harness.wasStateVisited("payment");
 harness.wasTransitionVisited("payment", "submitPayment");
 ```
 
-## Coverage report
+### Coverage report
 
 ```ts
 const report = harness.coverage();
@@ -57,6 +65,6 @@ const report = harness.coverage();
 
 Use `report.percent` to gate CI. Use `uncovered` to find missing paths.
 
-## Reset
+### Reset
 
 `harness.reset()` clears history between test cases.
