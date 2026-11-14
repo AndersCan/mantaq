@@ -5,11 +5,15 @@ description: One parent machine, many short-lived request handlers. Handlers rep
 
 ## What
 
-One parent machine owns an `ActorMap` of short-lived request handlers, one per
-order. Each handler settles exactly once (answered or timed out) and reports
-back through declared outputs.
+One parent machine owns an `ActorMap` of short-lived request handlers, one per order. Each handler settles exactly once and reports back through declared outputs.
 
-## The request handler
+## Why
+
+Every request needs its own state, a deadline and a reply, and the parent must not keep finished handlers. Handlers settle once, answer or time out, and are removed automatically, so the parent only reads their outputs.
+
+## How
+
+### The request handler
 
 One short-lived machine per request. `idle` until told to work, then `pending`
 with its own timeout, then one final state: `answered` or `timedOut`.
@@ -77,7 +81,7 @@ function createRequestHandler(orderId: string, clock: Clock) {
 away. Emitted events that are not internal or input become outputs delivered
 to the wiring. That is the child-to-parent reporting mechanism.
 
-## The coordinator
+### The coordinator
 
 One parent owns an `ActorMap` of handlers keyed by order id. Routes answers
 to the right handler, collects settlements.
@@ -101,14 +105,14 @@ The `is()` guard narrows the child's output to the parent's declared input.
 Promises live at the boundary, never in the machine. The bridge maps
 `orderSettled` output to a resolver keyed by order id.
 
-## Auto-reap
+### Auto-reap
 
 `{ autoReap: true }` removes a handler the moment it reaches a final state.
 Answer arrives, handler final, done, removed. Timeout fires, same.
 
 Late answers are no-ops: the handler is gone. Settles exactly once.
 
-## Timeout
+### Timeout
 
 The handler owns its timeout. The `pending` effect arms it via
 `withTimeout`; leaving the state aborts it. Answer wins, timer cancelled.
@@ -116,7 +120,7 @@ Timeout wins, handler settles `timedOut`. No dangling timers.
 
 Each request has its own `timeoutMs`. Independent deadlines, one clock.
 
-## Await the result
+### Await the result
 
 `waitFor(orderId)` returns a promise that resolves when that request settles.
 
@@ -131,7 +135,7 @@ await requester.waitFor("ord_1"); // { orderId: "ord_1", status: "answered", res
 await requester.waitFor("ord_1"); // same, already settled
 ```
 
-## Testing
+### Testing
 
 Deterministic on one `VirtualClock`:
 

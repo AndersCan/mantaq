@@ -5,15 +5,15 @@ description: Split a checkout's setup across files with actorSpec, definePart an
 
 ## What
 
-`actorSpec`, `definePart`, and `withParts` slice one actor's `setup` into
-parts. Each part registers its own transitions and effects, in its own file,
-under its own name. The actor composes them with a single call.
+`actorSpec`, `definePart` and `withParts` slice one actor's `setup` into parts, each in its own file. Parts are not child actors: they share the actor's context and event loop.
 
-Parts are not child actors. They run in the same actor, share the same
-context, and dispatch through the same event loop. They reorganize `setup`,
-not behavior.
+## Why
 
-## 1. Declare the actor spec
+A `setup` body that grows past one screen is hard to read and review. Splitting it by concern (state-local handlers, cross-state handlers, effects) keeps each file short, and the actor composes them with one call. With a few states and transitions, keep `setup` inline.
+
+## How
+
+### 1. Declare the actor spec
 
 Options move out of `Actor({ ... })` into an `actorSpec` value. This becomes the
 type anchor every part references.
@@ -50,7 +50,7 @@ export const checkout = actorSpec({
 `actorSpec` narrows state and event arrays to their literals, no `as const`
 needed. Context stays mutable, part handlers read and write with no casts.
 
-## 2. Define parts
+### 2. Define parts
 
 `definePart` wraps a setup slice. The builder is the actor's own. Import
 the spec `type`-only as anchor, refs as values.
@@ -117,7 +117,7 @@ export const submittingPart = definePart<typeof checkout>((m) => {
 Cross-state handlers go in their own part too. Reach the actor through
 `opts.actor`, no closure needed.
 
-## 3. Compose
+### 3. Compose
 
 ```ts
 // checkout-actor.ts
@@ -132,7 +132,7 @@ export const checkoutActor = withParts(checkout, basicInfoPart, submittingPart);
 Pass `clock`, `regions`, or `internalBudget` through the spec the same way
 as `Actor({ ... })`.
 
-## 4. Mix with inline code
+### 4. Mix with inline code
 
 `use` registers a part inside a hand-written setup:
 
@@ -160,16 +160,10 @@ const actor = Actor({
 });
 ```
 
-## Rules
+### Rules
 
 - All parts share one `typeof <spec>` anchor. Wrong anchor = compile error.
 - Last handler wins for (state, event) pairs, regardless of registration source.
 - Effects append. Multiple effects run on state entry.
 - `onAny` handlers run alongside specific state handlers, not replacing them.
 - No runtime indirection. Parts write to the same transition/effect maps.
-
-## When to use
-
-Few states, a few transitions: keep inline. When the setup body grows past
-one screen, split by concern: state files for state-local handlers, a file
-for cross-state handlers, a file for effects.

@@ -5,9 +5,15 @@ description: State matching, grouping, and leaf detection
 
 ## What
 
-Four helpers that answer: where is the machine right now?
+`matches()`, `isIn()`, `activeLeaves()` and `tag()` answer where the machine is right now.
 
-## matches
+## Why
+
+Reading `snapshot().path` by hand breaks once a state has regions or several states mean the same thing to the UI, such as "busy". These helpers check a path, search the tree, list the active leaves and group states, so the checks stay one line each.
+
+## How
+
+### matches
 
 Dot-notation path check. Prefix match, top-level only.
 
@@ -29,7 +35,7 @@ fails. Use `isIn` for recursive search.
 
 Without sugar: `checkout.snapshot().path[0] === "payment"`.
 
-## isIn
+### isIn
 
 Recursive search. Is a state anywhere in the snapshot tree?
 
@@ -39,7 +45,7 @@ isIn(checkoutWithFraud.snapshot(), "cleared"); // true if "cleared" anywhere
 
 Checks the full path and all regions.
 
-## activeLeaves
+### activeLeaves
 
 All leaf states in the current path.
 
@@ -50,7 +56,7 @@ activeLeaves(checkoutWithFraud.snapshot()); // ["basicInfo.scanning"]
 
 Returns multiple leaves with parallel regions.
 
-## tag
+### tag
 
 Group states. Check membership.
 

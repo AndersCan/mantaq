@@ -7,10 +7,15 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 
 ## What
 
-`ActorMap` is a keyed registry of one actor type: same actor shape, many
-instances, keyed by id. `broadcast()` sends one event to every child.
+`ActorMap` is a keyed registry of one actor type, many instances keyed by id. `broadcast()` sends one event to every child.
 
-## ActorMap
+## Why
+
+Children that arrive at runtime, with an unknown count, need spawning, lookup, removal and fan-out. `ActorMap` does that for one actor shape. When the children are known at construction, use `regions` instead.
+
+## How
+
+### ActorMap
 
 ```ts
 const orders = createActorMap(createOrderWorker);
@@ -113,7 +118,7 @@ orders.send("ord_1", ship.create()); // worker ships, auto-removed
 orders.has("ord_1"); // false
 ```
 
-## See it
+### See it
 
 Each photo you add starts its own child: a marker with its key on the child's graph, and the log names every child that starts or is removed.
 
@@ -123,7 +128,7 @@ Each photo you add starts its own child: a marker with its key on the child's gr
 
 </div>
 
-## broadcast
+### broadcast
 
 Send an event to all children.
 
@@ -132,8 +137,3 @@ broadcast(orders, cancel.create());
 ```
 
 Without sugar: `for (const id of orders.keys()) orders.send(id, cancel.create())`.
-
-## When to use
-
-Use `ActorMap` when children arrive at runtime with unknown count. Use
-`regions` when the children are known at construction.
