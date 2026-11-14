@@ -282,10 +282,10 @@ function wrapSend(
     );
     const lastSender = last.get(type);
     const message: VizMessage = {
-      sender: lastSender !== undefined && lastSender !== part.prefix ? lastSender : null,
+      sender: lastSender ?? null,
       dropped: taken === undefined ? "noHandler" : null,
     };
-    if (message.sender === null) pending.push({ message, event: type });
+    pending.push({ message, event: type });
     if (taken !== undefined) {
       taken.message = message;
       return;
