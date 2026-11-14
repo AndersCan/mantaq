@@ -52,6 +52,7 @@ export default defineConfig({
         alt: "Mantaq",
         replacesTitle: true,
       },
+      components: { PageTitle: "./src/components/PageTitle.astro" },
       customCss: [
         "@fontsource-variable/space-grotesk/wght.css",
         "@fontsource-variable/ibm-plex-sans/wght.css",
