@@ -23,7 +23,7 @@ The panel groups the next steps:
 
 On the live page those events are the arrows you click. Effects do not run there: `submitting` shows `waiting for chargeCard`, and its answers (`paymentOk`, `paymentFail`, `paymentTimeout`) are the arrows out of it. Every event and the clock are also under **Events and time**. The initial state's effects run while the machine is built.
 
-A final state ends the walk. **Back** (or the left arrow), **Reset** and the path list undo steps. The standalone page keeps the walk in the URL (`?step=`), so a link opens the same path. `?machine=checkout&run=<name>` opens a recorded run by name; use it for links in docs and issues.
+A final state ends the walk. **Back** (or the left arrow), **Reset** and the path list undo steps. `?machine=checkout&run=<name>` opens a recorded run by name; use it for links in docs and issues.
 
 A static walk follows declarations: guards are not evaluated, so a path may not happen at runtime. On the live page (the Vite plugin), each step runs the real actor, so guards are evaluated.
 
