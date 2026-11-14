@@ -16,7 +16,7 @@ Waiting is part of the behaviour: food left on the stove burns. Treating time as
 ## How
 
 <Step n={8}>
-  Time is an event too: after 10 seconds in `cooking`, `withTimeout` sends `overcooked`, which moves
+  After 10 seconds in `cooking`, `cookTimer` uses `withTimeout` to send `overcooked`, which moves
   the person back to `hungry` with no plate. An event the machine sends itself is listed under
   `internal`.
 </Step>
