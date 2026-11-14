@@ -3,9 +3,17 @@ title: Context
 description: Data that survives transitions.
 ---
 
-## Define
+## What
 
-Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+Context is the data an actor keeps across transitions.
+
+## Why
+
+A payload belongs to one state. Form fields, ids and totals are needed by every state, so handlers read and write them through one shared handle instead of copying them from payload to payload.
+
+## How
+
+### Define
 
 ```ts
 import type { CheckoutContext } from "./checkout";
@@ -13,7 +21,9 @@ import type { CheckoutContext } from "./checkout";
 const initialContext: CheckoutContext = {};
 ```
 
-## Read and write
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+
+### Read and write
 
 - `get()` returns the live record; mutate it, then `set()`
 - Any `set()` triggers `change`, even with the same reference
@@ -44,12 +54,12 @@ const checkout = Actor({
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 ```
 
-## Read outside transitions
+### Read outside transitions
 
 ```ts
 checkout.context.basicInfo?.email; // "a@b.com"
 ```
 
-## Effects
+### Effects
 
 Effects get the same handle. Regions have their own context.

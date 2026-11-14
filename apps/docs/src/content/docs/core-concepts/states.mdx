@@ -5,9 +5,17 @@ description: Nodes in the state graph.
 
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 
-## Basic states
+## What
 
-Examples build on each other: paste them into one file, in order.
+A state is a node in the graph, optionally with a payload.
+
+## Why
+
+Naming each state makes "where is the machine now" a value you can match on, draw and test, instead of a set of boolean flags.
+
+## How
+
+### Basic states
 
 ```ts
 import { state } from "@mantaq/core";
@@ -18,7 +26,9 @@ basicInfo.name; // "basicInfo"
 basicInfo.isFinal; // false
 ```
 
-## Final states
+Examples build on each other: paste them into one file, in order.
+
+### Final states
 
 ```ts
 const success = state("success")().final();
@@ -27,7 +37,7 @@ success.isFinal; // true
 
 A final state fires `"done"`, sets `snapshot().done`, and stops the actor.
 
-## Payloads
+### Payloads
 
 ```ts
 import { Actor, event } from "@mantaq/core";
@@ -57,7 +67,7 @@ const payments = Actor({
 payments.send(paymentFail.create({ reason: "card declined" })); // logs "card declined"
 ```
 
-## Regions
+### Regions
 
 ```ts
 import { matches } from "@mantaq/sugar";
@@ -94,7 +104,7 @@ matches(checkout, "basicInfo.fraud.cleared"); // true
 
 Each region is its own actor.
 
-## Side by side
+### Side by side
 
 <div data-pagefind-ignore>
 
@@ -102,4 +112,4 @@ Each region is its own actor.
 
 </div>
 
-The parent does not pass events down. Send events on the region: `actor.regions.upload.send(...)`.
+The photo upload machine has seven states: `showingUploadScreen`, `showingUploadedPhoto`, `waitingForPhoto`, `sendingPhoto`, `photoSent`, `online` and `offline`. Five events move it: `photoPicked`, `uploadConfirmed`, `connectionLost`, `connectionRestored` and `photoUploaded`. The parent does not pass events down. Send events on the region: `actor.regions.upload.send(...)`.
