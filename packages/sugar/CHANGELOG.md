@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.0
+
+<sub>2026-11-14</sub>
+
+- _(minor)_
+  `pool.resize(count)` changes how many workers a pool runs while it runs. Growing adds free workers that take waiting items at once; shrinking lets running workers finish, then removes them. The inbox takes a new `WORKERS_RESIZED` event.
+
 ## 2.3.1
 
 <sub>2026-11-13</sub>
