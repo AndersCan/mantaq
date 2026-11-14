@@ -3,9 +3,17 @@ title: Machines in an application
 description: Build machines from factories that take ports and a clock, so the app and every test get their own.
 ---
 
-A machine in an app talks to the outside world: a payment provider, a timer. Don't import those from inside the machine. Pass them in.
+## What
 
-## A factory with ports and a clock
+Build a machine from a factory that takes its ports and a clock as options.
+
+## Why
+
+A machine in an app talks to the outside world: a payment provider, a timer. If the machine imports them, every test hits the real provider and waits on real time. Passed in, the app gets the real ones and each test gets a fake and a `VirtualClock`.
+
+## How
+
+### A factory with ports and a clock
 
 ```ts
 import { createCheckoutActor, chargeCard } from "./checkout";
@@ -16,7 +24,7 @@ export const checkout = createCheckoutActor({ chargeCard }).actor;
 
 `createCheckoutActor({ clock, chargeCard })` returns `{ actor, clock }`. Both options are optional: the port defaults to the real provider, the clock to a `VirtualClock`. The app builds one actor at module scope. Each test calls the factory again and gets a fresh actor with its own state.
 
-## Test with a fake port and a virtual clock
+### Test with a fake port and a virtual clock
 
 ```ts
 import { VirtualClock } from "@mantaq/core";
@@ -40,7 +48,7 @@ harness.assertStateVisited({ stateName: "success" });
 
 The fake is a plain function passed as an option. There is no `vi.mock`, no fake timers, no `as any` and no `waitFor`. `settled()` waits for the promise effect to emit.
 
-## A delay is `withTimeout` on the injected clock
+### A delay is `withTimeout` on the injected clock
 
 The `chargeCard` effect arms a timeout next to the promise:
 
@@ -66,7 +74,7 @@ slow.advance(800);
 slowHarness.assertStateVisited({ stateName: "error" });
 ```
 
-## Stay or self-transition
+### Stay or self-transition
 
 When an event arrives in a state with a running effect or timer, the handler picks one:
 
@@ -77,6 +85,6 @@ When an event arrives in a state with a running effect or timer, the handler pic
 
 Use `{}` to record data without disturbing the work. Use the self-transition to restart it, for example to reset a timer. Core pins both in `packages/core/src/reentry.test.ts`.
 
-## Export the factory
+### Export the factory
 
 The inspect Vite plugin draws and fuzzes what your file exports. A factory that takes a clock gives it a fresh actor per run and a `VirtualClock` to drive. A file that only exports a singleton is drawn but not fuzzed. See [what inspect needs from your file](https://github.com/AndersCan/mantaq/tree/main/packages/inspect#what-it-needs-from-your-file).

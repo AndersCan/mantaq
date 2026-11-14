@@ -12,6 +12,16 @@ import briefTestSource from "../../../conform/counter-brief.test.ts?raw";
 import brief from "../../../conform/counter-brief.md?raw";
 import failure from "../../../conform/counter-broken.txt?raw";
 
+## What
+
+Check an app that has no mantaq in it against a state machine you wrote as its model.
+
+## Why
+
+The app's tests pass or fail on its own examples. A model walked at random finds sequences nobody wrote, and the failure comes with the shortest one.
+
+## How
+
 <div data-pagefind-ignore>
 
 <Machine src="src/conform/counter-model.ts" diagramOnly />
@@ -34,13 +44,13 @@ npm install -D @mantaq/core @mantaq/test vitest
 npx vitest run
 ```
 
-## When the app and the model disagree
+### When the app and the model disagree
 
 Change `count < max` to `count <= max` in `counter.ts` and run again. The test fails with the shortest sequence it found:
 
 <Code code={failure} lang="text" />
 
-## Events with data
+### Events with data
 
 An event with data needs sample payloads; walks pick among them.
 
@@ -48,7 +58,7 @@ An event with data needs sample payloads; walks pick among them.
 payloads: { setCount: [{ count: 0 }, { count: 3 }] },
 ```
 
-## Async apps
+### Async apps
 
 Adapters may return promises. Write an async result the app waits for as a model event: the adapter makes it happen, then awaits the app. Pass a timeout to `test` for slow apps.
 
@@ -57,7 +67,7 @@ save: (app) => { app.save(); },
 saveFinished: async (app) => { backend.finish(); await app.saving; },
 ```
 
-## Hand the model to whoever builds it
+### Hand the model to whoever builds it
 
 `machineBrief` turns the model into Markdown that lists every state, the events it takes, where each goes and when, and what it ignores.
 

@@ -3,16 +3,30 @@ title: Property-Based Testing
 description: Prove checkout-machine invariants across generated inputs instead of single examples.
 ---
 
-Property tests assert an invariant over every generated input, not one path.
+## What
 
-## The runner
+Assert an invariant over every generated input with `runProperty` from `@mantaq/pbt`, not over one path.
+
+## Why
+
+An example test checks the inputs you thought of. A property test finds the input you did not, and a fixed seed makes the failure repeat.
+
+## How
+
+```ts
+import { fc, runProperty } from "@mantaq/pbt";
+
+runProperty(fc.integer({ min: 0, max: 10 }), (n) => n >= 0);
+```
+
+### The runner
 
 `runProperty(arb, predicate)` generates values, feeds each to the predicate, fails on first `false`. Import from `@mantaq/pbt`.
 
 - `fc` is fast-check's full API. `@mantaq/pbt` adds: `anyDuration`, `anySmallDuration`, `anyPayload`, `anyName`, `anyActorSnapshot`.
 - `MANTAQ_SEED` env var overrides the fixed default seed. Default `numRuns`: 100.
 
-## Deadline-exactness invariant
+### Deadline-exactness invariant
 
 Machine in `submitting` schedules `paymentTimeout` after `timeoutMs`. `VirtualClock.advance(ms)` is synchronous, fires timers, drains queue.
 
@@ -61,7 +75,7 @@ runProperty(
 
 `internal: [paymentTimeout]` marks it machine-internal so external sends cannot fake the deadline.
 
-## Back-navigation invariant
+### Back-navigation invariant
 
 From any pre-payment step, mashing `back` never reaches a final state.
 
@@ -105,7 +119,7 @@ runProperty(fc.integer({ min: 0, max: 10 }), (presses) => {
 });
 ```
 
-## Seeding and CI
+### Seeding and CI
 
 - Default seed is fixed. CI runs are deterministic, failures reproducible.
 - Set `MANTAQ_SEED=<n>` to explore new input regions or replay a counterexample.

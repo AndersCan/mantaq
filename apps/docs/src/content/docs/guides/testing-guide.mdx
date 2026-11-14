@@ -3,49 +3,57 @@ title: Testing with Test Harness
 description: Instrument actors, drive with events, assert coverage using @mantaq/test.
 ---
 
-`createTestHarness(actor)` instruments an actor, builds its graph, and records every state visit, transition, and effect.
+## What
 
-## Setup
+`createTestHarness(actor)` from `@mantaq/test` instruments an actor and records every state visit, transition and effect.
+
+## Why
+
+Asserting the final state says nothing about the path. The record lets a test assert what ran and gate CI on what no test reached.
+
+## How
+
+### Setup
 
 ```ts
 import { createTestHarness } from "@mantaq/test";
 
-const harness = createTestHarness(createCheckoutActor());
+const { actor } = createCheckoutActor({ chargeCard: async () => "ord_1" });
+const harness = createTestHarness(actor);
 ```
 
 Use `harness.send()` instead of `actor.send()`. All sends are recorded.
 
-## Drive and assert
+### Drive and assert
 
 ```ts
-harness.send(submitBasicInfo.create());
-harness.send(submitShipping.create());
-harness.send(submitPayment.create());
-harness.send(paymentOk.create());
+harness.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
+harness.send(submitShipping.create({ street: "1 Main", city: "Oslo", zip: "0150" }));
+harness.send(submitPayment.create({ cardNumber: "1111222233334444" }));
+await actor.settled();
 
-harness.assertStateVisited("basicInfo");
-harness.assertStateVisited("success");
-harness.assertAllStatesVisited();
+harness.assertStateVisited({ stateName: "basicInfo" });
+harness.assertStateVisited({ stateName: "success" });
 ```
 
-## Assertion methods
+### Assertion methods
 
-- `assertStateVisited(id)` / `assertStateNeverVisited(id)`
-- `assertTransitionVisited(from, eventId)` / `assertTransitionNeverVisited(from, eventId)`
-- `assertEffectRan(id)` / `assertEffectNeverRan(id)`
+- `assertStateVisited({ stateName })` / `assertStateNeverVisited({ stateName })`
+- `assertTransitionVisited({ from, event })` / `assertTransitionNeverVisited({ from, event })`
+- `assertEffectRan({ stateName, effectName })` / `assertEffectNeverRan({ stateName, effectName })`
 - `assertAllStatesVisited()` / `assertAllTransitionsVisited()`
-- `assertContextNever(predicate)` fails if predicate matches current context
+- `assertContextNever({ predicate })` fails if predicate matches current context
 
-## Query helpers
+### Query helpers
 
 Non-throwing, return booleans:
 
 ```ts
 harness.wasStateVisited("payment");
-harness.wasTransitionVisited("payment", "submitPayment");
+harness.wasTransitionVisited({ from: "payment", event: "submitPayment" });
 ```
 
-## Coverage report
+### Coverage report
 
 ```ts
 const report = harness.coverage();
@@ -57,6 +65,6 @@ const report = harness.coverage();
 
 Use `report.percent` to gate CI. Use `uncovered` to find missing paths.
 
-## Reset
+### Reset
 
 `harness.reset()` clears history between test cases.
