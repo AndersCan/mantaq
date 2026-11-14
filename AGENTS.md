@@ -122,6 +122,18 @@ Never a `major` bump file: a breaking change is `minor` (0.5 → 0.6). `vp run b
 
 New docs/viz UI blocks go on `apps/docs/src/pages/design.astro` first; mark `Approved` only when the maintainer says so on the PR.
 
+### Docs page format
+
+Every page under `apps/docs` has `author: ai` (default) or `author: human` in its frontmatter.
+
+- **`ai` pages** are What (one or two sentences), Why (a short paragraph on the problem it solves), How (diagram or code first, then short captions). Checklist before you finish:
+  - What, Why and How present, in that order.
+  - How starts with a diagram or code.
+  - Every item the diagram shows is named in the text.
+  - Every documented command was run.
+  - No filler words.
+- **`human` pages**: mechanical changes only (renames, code refactors, broken links, formatting). Never rewrite their text.
+
 ## Agent skills
 
 ### Issue tracker
