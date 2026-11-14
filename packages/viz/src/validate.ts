@@ -115,6 +115,15 @@ function checkReferences(reader: Reader, machine: VizMachine, path: string): voi
       });
     }
   });
+  machine.actors.forEach((name, index) => {
+    const path_ = `${path}.actors[${index}]`;
+    if (!machine.regions.includes(name)) {
+      report(reader, { path: path_, message: `${JSON.stringify(name)} is not in regions` });
+    }
+    if (machine.maps.includes(name)) {
+      report(reader, { path: path_, message: `${JSON.stringify(name)} is also in maps` });
+    }
+  });
   machine.edges.forEach((edge, index) => {
     if (!known(edge.from)) {
       report(reader, {
@@ -154,6 +163,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
     initial: readNullableString(reader, { record, key: "initial", path }),
     regions: readStrings(reader, { record, key: "regions", path }),
     maps: readStrings(reader, { record, key: "maps", path }),
+    actors: readStrings(reader, { record, key: "actors", path }),
     states: readList(reader, { record, key: "states", path }, (item, at) =>
       readState(reader, item, at),
     ),

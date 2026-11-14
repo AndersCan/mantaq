@@ -36,6 +36,7 @@ const lanes: VizMachine = {
   initial: "empty",
   regions: ["workers", "net"],
   maps: ["workers"],
+  actors: [],
   states: [
     state("empty", true),
     state("holding"),
@@ -158,6 +159,7 @@ describe("edge form focus", () => {
       initial: "shut",
       regions: [],
       maps: [],
+      actors: [],
       states: [state("shut", true), state("open")],
       events: [event("PEEK"), lanes.events.find((each) => each.id === "DROP")!],
       outputs: [],
@@ -194,6 +196,7 @@ describe("edge form focus with two forms", () => {
     initial: "shut",
     regions: [],
     maps: [],
+    actors: [],
     states: [state("shut", true), state("open")],
     events: [event("PEEK"), knock, lanes.events.find((each) => each.id === "DROP")!],
     outputs: [],

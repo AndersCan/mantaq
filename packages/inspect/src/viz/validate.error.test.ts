@@ -24,7 +24,7 @@ describe("validateViz rejects", () => {
 
   test("version 9 documents and a missing outputs list", () => {
     expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
-      "$.schemaVersion: expected 16, got 9",
+      "$.schemaVersion: expected 17, got 9",
     ]);
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["outputs"];
@@ -33,7 +33,7 @@ describe("validateViz rejects", () => {
 
   test("version 11 documents", () => {
     expect(issues({ schemaVersion: 11, machines: [] })).toEqual([
-      "$.schemaVersion: expected 16, got 11",
+      "$.schemaVersion: expected 17, got 11",
     ]);
   });
 
@@ -233,5 +233,31 @@ describe("validateViz region steps", () => {
     expect(issues(withStep({ kind: "event", event: "go", payload: null, actor: 3 }))).toEqual([
       "$.machines[0].runs[0].steps[0].actor: expected {region} or {map, key}",
     ]);
+  });
+});
+
+describe("validateViz refuses actors that cannot be parts", () => {
+  function withActors(actors: unknown, maps: string[] = []) {
+    const doc = valid() as { machines: Array<Record<string, unknown>> };
+    Object.assign(doc.machines[0]!, { actors, maps, regions: [] });
+    return doc;
+  }
+
+  test("a name that is not in regions", () => {
+    expect(issues(withActors(["orders"]))).toEqual([
+      '$.machines[0].actors[0]: "orders" is not in regions',
+    ]);
+  });
+
+  test("a name that is also a map", () => {
+    const doc = withActors(["orders"], ["orders"]);
+    Object.assign((doc.machines as Array<Record<string, unknown>>)[0]!, { regions: ["orders"] });
+    expect(issues(doc)).toEqual(['$.machines[0].actors[0]: "orders" is also in maps']);
+  });
+
+  test("a missing actors list", () => {
+    const doc = valid() as { machines: Array<Record<string, unknown>> };
+    delete doc.machines[0]?.["actors"];
+    expect(issues(doc)).toEqual(["$.machines[0].actors: expected string[]"]);
   });
 });

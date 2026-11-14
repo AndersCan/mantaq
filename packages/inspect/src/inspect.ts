@@ -69,7 +69,11 @@ function fuzzWarnings(
   machine: VizMachine,
   run: { stopped: FuzzStop; missing: ReadonlyArray<MissingPayload> },
 ): string[] {
-  const missed = unreached(machine);
+  const inPart = (id: string) => machine.actors.some((actor) => id.startsWith(`${actor}.`));
+  const missed = unreached(machine).filter((name) => !inPart(name));
+  const partEvents = new Set(
+    machine.events.filter((each) => inPart(each.id)).map((each) => each.id),
+  );
   const iterations = machine.fuzz?.iterations ?? 0;
   const never =
     missed.length === 0
@@ -77,10 +81,12 @@ function fuzzWarnings(
       : [
           `fuzz never reached: ${missed.join(", ")} (ran ${iterations} iterations, stopped: ${STOPPED[run.stopped]}). Raise fuzz.timeLimitMs / iterations or add a named run to \`tests\`.`,
         ];
-  const unsampled = run.missing.map(
-    ({ event, fields }) =>
-      `fuzz sent ${event} without a payload and the machine read ${fields.join(", ")}. Pass \`source\` (samples from the event types) or \`payloads\` with a sample for ${event}.`,
-  );
+  const unsampled = run.missing
+    .filter(({ event }) => !partEvents.has(event))
+    .map(
+      ({ event, fields }) =>
+        `fuzz sent ${event} without a payload and the machine read ${fields.join(", ")}. Pass \`source\` (samples from the event types) or \`payloads\` with a sample for ${event}.`,
+    );
   return [...never, ...unsampled];
 }
 

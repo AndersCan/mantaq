@@ -4,7 +4,7 @@ import type { AnyActor } from "@mantaq/core";
 import { actorMapsOf } from "./maps.ts";
 import type { ActorMapLike } from "./maps.ts";
 import { Either } from "@mantaq/utils";
-import { eventTypes, isActor, regionActors } from "./fuzz/run.ts";
+import { eventTypes, isActor, otherActorsOf, regionActors } from "./fuzz/run.ts";
 import {
   INITIAL_NODE_ID,
   buildGraph,
@@ -114,17 +114,21 @@ function probeChild(name: string, map: ActorMapLike): Either<string, MapChild> {
       `actor map ${name}: its children are not mantaq actors, so they are not drawn`,
     );
   }
-  const graph = buildGraph(child);
-  const found: MapChild = {
-    name,
-    graph,
-    initial: parseInitialName(child.options),
-    internal: parseInternalEventIds(child.options),
-    inputs: eventTypes(child.options, "inputs"),
-    outputs: eventTypes(child.options, "outputs"),
-  };
+  const found = partOf(name, child);
   cleanup();
   return Either.right(found);
+}
+
+/** What one actor looks like as a part drawn under its name. */
+function partOf(name: string, actor: AnyActor<unknown>): MapChild {
+  return {
+    name,
+    graph: buildGraph(actor),
+    initial: parseInitialName(actor.options),
+    internal: parseInternalEventIds(actor.options),
+    inputs: eventTypes(actor.options, "inputs"),
+    outputs: eventTypes(actor.options, "outputs"),
+  };
 }
 
 /** Why an actor map in `made` is not drawn, or what to update. */
@@ -167,7 +171,10 @@ export function toVizMachine(input: VizInput): VizMachine {
     const probed = probeChild(name, map);
     return Either.isRight(probed) ? [probed[1]] : [];
   });
-  const drawn = children.map(prefixedGraph);
+  const otherActors = Object.entries(otherActorsOf(input.made, input.actor)).map(([name, part]) =>
+    partOf(name, part),
+  );
+  const drawn = [...children, ...otherActors].map(prefixedGraph);
   const graph = {
     nodes: [...own.nodes, ...drawn.flatMap((each) => each.nodes)],
     edges: [...own.edges, ...drawn.flatMap((each) => each.edges)],
@@ -176,7 +183,7 @@ export function toVizMachine(input: VizInput): VizMachine {
   const internalIds = new Set([
     ...parseInternalEventIds(input.actor.options),
     ...regionActorList.flatMap((each) => [...parseInternalEventIds(each.actor.options)]),
-    ...children.flatMap((each) => [...each.internal]),
+    ...[...children, ...otherActors].flatMap((each) => [...each.internal]),
   ]);
   const initialEdge = graph.edges.find((edge) => edge.source === INITIAL_NODE_ID);
   const initial = initialEdge?.target ?? null;
@@ -186,11 +193,12 @@ export function toVizMachine(input: VizInput): VizMachine {
       const name = parseInitialName(each.actor.options);
       return name === undefined ? [] : [`${each.path}.${name}`];
     }),
-    ...children.flatMap((each) =>
+    ...[...children, ...otherActors].flatMap((each) =>
       each.initial === undefined ? [] : [`${each.name}.${each.initial}`],
     ),
   ]);
   const mapNames = new Set(children.map((each) => each.name));
+  const actorNames = new Set(otherActors.map((each) => each.name));
   const inMap = (id: string): boolean => mapNames.has(regionOf(id) ?? "");
 
   const effectEdges = graph.edges.filter((edge) => edgeKind(edge) === "effect");
@@ -205,7 +213,7 @@ export function toVizMachine(input: VizInput): VizMachine {
     .sort(byId);
   const declaredInputs = [
     ...eventTypes(input.actor.options, "inputs"),
-    ...children.flatMap((each) => each.inputs),
+    ...[...children, ...otherActors].flatMap((each) => each.inputs),
   ];
   const events: VizEvent[] = [
     ...new Set([
@@ -230,7 +238,7 @@ export function toVizMachine(input: VizInput): VizMachine {
   const partOutputs = Object.fromEntries(
     [
       ...regionActorList.map((each) => [each.path, eventTypes(each.actor.options, "outputs")]),
-      ...children.map((each) => [each.name, each.outputs]),
+      ...[...children, ...otherActors].map((each) => [each.name, each.outputs]),
     ]
       .filter(([, list]) => list.length > 0)
       .map(([name, list]) => [name, [...list].sort()]),
@@ -240,6 +248,7 @@ export function toVizMachine(input: VizInput): VizMachine {
     initial,
     regions,
     maps: [...mapNames].sort(),
+    actors: [...actorNames].sort(),
     states,
     events,
     outputs,

@@ -23,6 +23,7 @@ const machine: VizMachine = {
   initial: "a",
   regions: [],
   maps: [],
+  actors: [],
   states: [state("a", true), state("b")],
   events: [],
   outputs: [],

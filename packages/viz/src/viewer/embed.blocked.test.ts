@@ -61,6 +61,7 @@ const cart: VizMachine = {
   initial: "cart",
   regions: [],
   maps: [],
+  actors: [],
   states: [state("cart", true), state("payment")],
   events: [
     { id: "addItem", internal: false, doc: null, payload: null },
@@ -302,6 +303,7 @@ describe("a blocked arrow, more cases", () => {
       initial: "cart",
       regions: [],
       maps: [],
+      actors: [],
       states: [stateIn("cart", true), stateIn("payment")],
       events: [eventOf("pay")],
       outputs: [],
@@ -337,6 +339,7 @@ describe("a blocked arrow, more cases", () => {
       initial: "cart",
       regions: [],
       maps: [],
+      actors: [],
       states: [stateIn("cart", true), stateIn("payment")],
       events: [eventOf("pay")],
       outputs: [],
@@ -373,6 +376,7 @@ describe("a blocked arrow, more cases", () => {
       initial: "showingQueue",
       regions: ["photos"],
       maps: ["photos"],
+      actors: [],
       states: [
         stateIn("showingQueue", true),
         stateIn("photos.sending", true),

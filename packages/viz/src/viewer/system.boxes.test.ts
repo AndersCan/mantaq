@@ -37,6 +37,7 @@ const board: VizMachine = {
   initial: "empty",
   regions: ["cooks", "net"],
   maps: ["cooks"],
+  actors: [],
   states: [
     state("empty", true),
     state("holding"),

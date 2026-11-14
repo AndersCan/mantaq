@@ -4,6 +4,7 @@ exports[`determinism > auth snapshot 1`] = `
 "{
   "machines": [
     {
+      "actors": [],
       "context": null,
       "edges": [
         {
@@ -378,7 +379,7 @@ exports[`determinism > auth snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 16
+  "schemaVersion": 17
 }
 "
 `;
@@ -387,6 +388,7 @@ exports[`determinism > checkout snapshot 1`] = `
 "{
   "machines": [
     {
+      "actors": [],
       "context": null,
       "edges": [
         {
@@ -693,7 +695,7 @@ exports[`determinism > checkout snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 16
+  "schemaVersion": 17
 }
 "
 `;
@@ -702,6 +704,7 @@ exports[`determinism > saga snapshot 1`] = `
 "{
   "machines": [
     {
+      "actors": [],
       "context": null,
       "edges": [
         {
@@ -1294,7 +1297,7 @@ exports[`determinism > saga snapshot 1`] = `
       ]
     }
   ],
-  "schemaVersion": 16
+  "schemaVersion": 17
 }
 "
 `;

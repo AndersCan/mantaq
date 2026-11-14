@@ -2,7 +2,15 @@ import type { VizExpectation, VizFailedExpectation, VizFuzzError, VizStep } from
 import { mutate } from "./mutate.ts";
 import type { LiteralPool, MutationContext, Parent } from "./mutate.ts";
 import { createRng } from "./rng.ts";
-import { childEvents, eventCatalog, execute, mergeMissing, regionActors } from "./run.ts";
+import {
+  childEvents,
+  eventCatalog,
+  execute,
+  mergeMissing,
+  otherActorsOf,
+  regionActors,
+  withActors,
+} from "./run.ts";
 import type { FuzzTarget, MissingPayload, Trace } from "./run.ts";
 
 export interface FuzzOptions {
@@ -90,7 +98,8 @@ function mutationContext(target: FuzzTarget, options: FuzzOptions): MutationCont
   const created = target.create();
   const root = created.actor;
   const catalog = eventCatalog(root);
-  const regionEvents = regionActors(root).flatMap(({ path, actor }) => {
+  const parts = withActors(regionActors(root), otherActorsOf(created.made, root));
+  const regionEvents = parts.flatMap(({ path, actor }) => {
     const each = eventCatalog(actor);
     return [...each.inputs, ...each.internal]
       .sort()

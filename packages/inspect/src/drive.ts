@@ -16,9 +16,11 @@ import {
   contextText,
   eventCatalog,
   messageOf,
+  otherActorsOf,
   parsed,
   regionActors,
   targetOf,
+  withActors,
 } from "./fuzz/run.ts";
 import type { AnyActor, VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
@@ -248,14 +250,20 @@ function watchRoot(actor: AnyActor<unknown>, record: (entry: VizLiveStep) => voi
   });
 }
 
-/** Wrap spawn and ensure so every new child is watched, and watch the ones already there. */
+/** Wrap spawn and ensure so every new child is watched, kill so a removed child redraws, and watch the ones already there. */
 function watchMaps(
   maps: Readonly<Record<string, ActorMapLike>>,
   watch: (name: string, key: string) => void,
+  changed: () => void,
 ): void {
   for (const [name, map] of Object.entries(maps)) {
     const spawn = map.spawn.bind(map);
     const ensure = map.ensure.bind(map);
+    const kill = map.kill.bind(map);
+    map.kill = (key) => {
+      kill(key);
+      changed();
+    };
     map.spawn = (key) => {
       spawn(key);
       watch(name, key);
@@ -311,6 +319,17 @@ function watchChild(
   });
 }
 
+/** Record the other machines the factory returned, tagged like regions, and hold their effects when `held` is a list. */
+function watchActors(
+  actors: Readonly<Record<string, AnyActor<unknown>>>,
+  at: { root: AnyActor<unknown>; record: (e: VizLiveStep) => void; held: HeldEffect[] | null },
+): void {
+  for (const [name, part] of Object.entries(actors)) {
+    if (at.held !== null) holdEffects(part, at.held);
+    watchChild(part, { root: at.root, ref: { region: name }, prefix: name, record: at.record });
+  }
+}
+
 /** The log entry for an event nobody handled: ignored, or missing when its actor does not exist. */
 function unhandled(
   step: Extract<VizStep, { kind: "event" }>,
@@ -350,19 +369,20 @@ interface Stepping {
   steps: VizStep[];
   flags: { inside: boolean; segment: number; pending: number };
   maps: Record<string, ActorMapLike>;
+  actors: Record<string, AnyActor<unknown>>;
 }
 
 /** Apply one step to a session and return the log entry it produced. */
 function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
-  const { actor, clock, internal, log, steps, flags, maps } = at;
+  const { actor, clock, internal, log, steps, flags, maps, actors } = at;
   log.length = 0;
   flags.segment = 0;
   flags.inside = true;
   flags.pending = 1;
   const before = actor.state.name;
-  const target = step.kind === "event" ? targetOf(actor, step.actor, maps) : undefined;
+  const target = step.kind === "event" ? targetOf(actor, step.actor, maps, actors) : undefined;
   try {
-    applyStep(actor, { step, clock, internal, maps });
+    applyStep(actor, { step, clock, internal, maps, actors });
   } finally {
     flags.inside = false;
     flags.pending = 0;
@@ -380,7 +400,55 @@ function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
 
 /** The state name of every region, as one comparable string. */
 function regionsOf(at: Stepping): string {
-  return JSON.stringify(regionActors(at.actor).map((each) => [each.path, each.actor.state.name]));
+  return JSON.stringify([
+    ...regionActors(at.actor).map((each) => [each.path, each.actor.state.name]),
+    ...Object.entries(at.actors).map(([name, part]) => [name, part.state.name]),
+  ]);
+}
+
+/** What a running session looks like now: sweeps gone children and spent held effects first. */
+function liveView(session: Session, effectMode: "held" | "real"): VizLiveState {
+  const { actor, clock, steps, log, held, maps, actors, children, removed, watch } = session;
+  sweepRemoved({ maps, children, removed }, steps.length);
+  const waiting = held.filter((each) => !each.signal.aborted);
+  held.splice(0, held.length, ...waiting);
+  return {
+    state: actor.state.name,
+    regions: Object.fromEntries(
+      withActors(regionActors(actor), actors).map((each) => [
+        each.path,
+        `${each.path}.${each.actor.state.name}`,
+      ]),
+    ),
+    children: liveChildren({ maps, children, watch }),
+    removed: [...removed],
+    steps: [...steps],
+    last: log[0] ?? null,
+    after: log.slice(1),
+    timers: clock.pendingTimers().map((timer) => ({
+      id: String(timer.id),
+      ms: timer.ms,
+      deadline: timer.deadline,
+      eventName: timer.eventName ?? null,
+    })),
+    context: json(contextText(actor)),
+    payload: payloadOf(actor),
+    effectMode,
+    waiting: waiting.map((each) => each.name),
+  };
+}
+
+/** Dispose the maps and the other machines a session started; the root actor is the caller's. */
+function disposeParts(at: Stepping): void {
+  for (const map of Object.values(at.maps)) map.dispose();
+  for (const part of Object.values(at.actors)) part.dispose();
+}
+
+interface Session extends Stepping {
+  held: HeldEffect[];
+  children: Map<string, MapChild>;
+  removed: VizRemovedChild[];
+  watch: (name: string, key: string) => void;
 }
 
 /**
@@ -395,6 +463,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
   function start(from: FuzzTarget, quiet = false) {
     const { actor, clock, made } = from.create();
     const maps: Record<string, ActorMapLike> = actorMapsOf(made).maps;
+    const actors = otherActorsOf(made, actor);
     const internal = new Set(eventCatalog(actor).internal);
     const log: VizLiveStep[] = [];
     const steps: VizStep[] = [];
@@ -420,6 +489,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     watchRoot(actor, record);
     watchOutputs(actor, { log, changed });
     watchRegions(actor, record);
+    watchActors(actors, { root: actor, record, held: holding ? held : null });
 
     const children = new Map<string, MapChild>();
     const removed: VizRemovedChild[] = [];
@@ -435,37 +505,26 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       if (holding) holdEffects(child, held);
       watchChild(child, { root: actor, ref: { map: name, key }, prefix: name, record });
     };
-    watchMaps(maps, watch);
+    watchMaps(maps, watch, changed);
     flags.inside = false;
-    return { actor, clock, internal, log, steps, flags, held, maps, children, removed, watch };
+    return {
+      actor,
+      clock,
+      internal,
+      log,
+      steps,
+      flags,
+      held,
+      maps,
+      actors,
+      children,
+      removed,
+      watch,
+    };
   }
 
   function view(): VizLiveState {
-    const { actor, clock, steps, log, held, maps, children, removed, watch } = session;
-    sweepRemoved({ maps, children, removed }, steps.length);
-    const waiting = held.filter((each) => !each.signal.aborted);
-    held.splice(0, held.length, ...waiting);
-    return {
-      state: actor.state.name,
-      regions: Object.fromEntries(
-        regionActors(actor).map((each) => [each.path, `${each.path}.${each.actor.state.name}`]),
-      ),
-      children: liveChildren({ maps, children, watch }),
-      removed: [...removed],
-      steps: [...steps],
-      last: log[0] ?? null,
-      after: log.slice(1),
-      timers: clock.pendingTimers().map((timer) => ({
-        id: String(timer.id),
-        ms: timer.ms,
-        deadline: timer.deadline,
-        eventName: timer.eventName ?? null,
-      })),
-      context: json(contextText(actor)),
-      payload: payloadOf(actor),
-      effectMode,
-      waiting: waiting.map((each) => each.name),
-    };
+    return liveView(session, effectMode);
   }
 
   /** Replay the walk on a fresh quiet copy, then apply the candidate. Null when the copy drifted or threw. */
@@ -480,7 +539,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
         contextText(copy.actor) === contextText(live.actor);
       return same ? (stepOn(copy, candidate) ?? null) : null;
     });
-    for (const map of Object.values(copy.maps)) map.dispose();
+    disposeParts(copy);
     copy.actor.dispose();
     return Either.isRight(result) ? result[1] : null;
   }
@@ -491,7 +550,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     },
     reset() {
       session.flags.disposed = true;
-      for (const map of Object.values(session.maps)) map.dispose();
+      disposeParts(session);
       session.actor.dispose();
       session = start(target);
       return view();

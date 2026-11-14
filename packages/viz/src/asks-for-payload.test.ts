@@ -9,6 +9,7 @@ function machineWith(fields: VizField[] | null, samples: VizJson[]): VizMachine 
     initial: "a",
     regions: [],
     maps: [],
+    actors: [],
     states: [],
     events: [{ id: "send", internal: false, doc: null, payload: fields }],
     outputs: [],

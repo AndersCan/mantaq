@@ -38,6 +38,7 @@ const pool: VizMachine = {
   initial: "empty",
   regions: ["workers"],
   maps: ["workers"],
+  actors: [],
   states: [
     state("empty", true),
     state("holding"),

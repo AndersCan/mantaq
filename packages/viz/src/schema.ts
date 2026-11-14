@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 16;
+export const VIZ_SCHEMA_VERSION = 17;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -186,6 +186,8 @@ export interface VizMachine {
   regions: string[];
   /** Actor map names, sorted. Each one is also in `regions`; its states are those of one child. Empty = none. */
   maps: string[];
+  /** Names of other machines the factory returned next to the actor. Each one is also in `regions`, with its states; never in `maps`. Empty = none. */
+  actors: string[];
   states: VizState[];
   events: VizEvent[];
   /** Declared output event ids, sorted. Empty = none declared. */

@@ -48,6 +48,7 @@ const pool: VizMachine = {
   initial: "empty",
   regions: ["workers"],
   maps: ["workers"],
+  actors: [],
   states: [
     state("empty", true),
     state("holding"),
@@ -73,6 +74,7 @@ const checkout: VizMachine = {
   id: "checkout",
   regions: [],
   maps: [],
+  actors: [],
   states: [state("empty", true), state("holding")],
   partOutputs: {},
   outputs: [],

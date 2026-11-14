@@ -42,6 +42,7 @@ const photoUpload: VizMachine = {
   initial: "showingUploadScreen",
   regions: ["upload", "network"],
   maps: [],
+  actors: [],
   states: [
     state("showingUploadScreen", { initial: true }),
     state("showingUploadedPhoto", { final: true }),

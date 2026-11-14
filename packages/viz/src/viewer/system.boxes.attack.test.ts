@@ -39,6 +39,7 @@ const board: VizMachine = {
   initial: "empty",
   regions: ["cooks", "net"],
   maps: ["cooks"],
+  actors: [],
   states: [
     state("empty", true),
     state("holding"),
@@ -78,6 +79,7 @@ describe("boxes in boxes: attacked", () => {
       initial: "r",
       regions: ["a", "c"],
       maps: [],
+      actors: [],
       states: [
         state("r", true),
         state("a.x", true),
