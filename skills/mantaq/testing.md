@@ -131,6 +131,26 @@ Payloads come from `source` or `payloads: { event: [...] }`. If fuzzing sent an 
 
 With `@mantaq/test` 2.0 the `*` any-node (`m.onAny`) counts in coverage: it is one node, covered once its event fires from any state.
 
+## Messages Between Machines
+
+To check that no message between your machines was dropped in a run, step it with `createDriver` from `@mantaq/inspect/drive` and read `after[].message`: `sender` is the part that sent it (`""` is the machine itself, `null` is unknown), and `dropped` is `"noHandler"` when the receiver had no handler in its state, else `null`. Needs `@mantaq/inspect` 0.37 or later.
+
+```ts
+import { createDriver } from "@mantaq/inspect/drive";
+import { VirtualClock } from "@mantaq/core";
+
+const driver = createDriver({
+  id: "kitchen",
+  create: () => {
+    const clock = VirtualClock();
+    const made = createKitchen({ clock });
+    return { actor: made.actor, clock, made };
+  },
+});
+const live = driver.step({ kind: "event", event: "ORDER_PLACED", payload: { dish: "soup" } });
+expect(live.after.filter((entry) => entry.message?.dropped)).toEqual([]);
+```
+
 ## Test Design
 
 - Happy path + every failure arc. Each error state needs a test that reaches it.

@@ -219,6 +219,17 @@ export type VizStep =
  */
 export type VizLiveOutcome = "transition" | "stay" | "ignored" | "missing";
 
+/** Why a part did not take a message: it has no handler for it in its state. */
+export type VizDropReason = "noHandler";
+
+/** A message one part sent another during a step. The receiver is the step entry's `actor` (omitted = the machine), the event its `event`. */
+export interface VizMessage {
+  /** "" = the machine itself; else the region path, map name or returned machine's name, as `systemOf` names parts. null = no part is known to have sent it (app code or a timer). */
+  sender: string | null;
+  /** null = taken. */
+  dropped: VizDropReason | null;
+}
+
 export interface VizLiveStep {
   from: string;
   event: string;
@@ -233,6 +244,8 @@ export interface VizLiveStep {
   context: VizJson;
   /** Message of a handler that threw; null when none did. */
   error: string | null;
+  /** Set when a part's `send` delivered this event during a step and it was not the step itself. A dropped one has outcome `ignored`. */
+  message?: VizMessage;
 }
 
 /** Where the app takes one output: the machine it sends to, the event, and the line that does it. */
