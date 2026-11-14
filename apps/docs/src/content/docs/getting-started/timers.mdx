@@ -5,6 +5,16 @@ description: Time is an event too.
 
 import Step from "../../../components/Step.astro";
 
+## What
+
+A timer is an event the machine sends itself after a delay.
+
+## Why
+
+Waiting is part of the behaviour: food left on the stove burns. Treating time as an event keeps it in the diagram and testable.
+
+## How
+
 <Step n={8}>
   Time is an event too: after 10 seconds in `cooking`, `withTimeout` sends `overcooked`, which moves
   the person back to `hungry` with no plate. An event the machine sends itself is listed under

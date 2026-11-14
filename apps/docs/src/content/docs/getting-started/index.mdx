@@ -5,7 +5,17 @@ description: A state is where the person is now.
 
 import Step from "../../../components/Step.astro";
 
-<Step n={1}>A state is where the person is now. This one is `hungry`.</Step>
+## What
+
+A state is where the person is now. This tutorial models a meal; the first state is `hungry`.
+
+## Why
+
+A system that can be in many conditions at once turns into flags that disagree (`isHungry`, `isEating`, `isFull`). Naming each condition as one state means the machine is in exactly one of them.
+
+## How
+
+<Step n={1}>The meal starts in `hungry`.</Step>
 
 ```sh
 npm create vite@latest my-app -- --template vanilla-ts

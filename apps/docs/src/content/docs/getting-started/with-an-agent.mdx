@@ -3,20 +3,24 @@ title: Start with your coding agent
 description: From an empty Vite project to your machine in the live viewer, with one prompt.
 ---
 
-## You need
+## What
 
-- Node.js 22.12 or later
-- A Vite project
-- A coding agent
+One prompt takes an empty Vite project to your machine in the live viewer. A coding agent installs the packages, writes the machine and starts the dev server. You need Node.js 22.12 or later, a Vite project and a coding agent.
 
-No project yet:
+## Why
+
+Writing the first machine, the Vite plugin and the viewer wiring by hand is setup before you see anything work. The skill gives the agent the conventions, so you describe the flow and get a running machine.
+
+## How
+
+No Vite project yet:
 
 ```sh
 npm create vite@latest my-app -- --template vanilla-ts
 cd my-app && npm install
 ```
 
-## 1. Install the skill
+### 1. Install the skill
 
 ```sh
 npx skills add AndersCan/mantaq -y
@@ -24,7 +28,7 @@ npx skills add AndersCan/mantaq -y
 
 No skills support? Tell your agent to read https://anderscan.github.io/mantaq/llms.txt.
 
-## 2. Tell your agent what to model
+### 2. Tell your agent what to model
 
 ```text
 Use the mantaq skill. Model our checkout: the customer fills in basic info, then pays, and it ends in success. Set it up and open it in the live viewer.
@@ -32,7 +36,7 @@ Use the mantaq skill. Model our checkout: the customer fills in basic info, then
 
 Or describe your own flow in plain words.
 
-## 3. What you get
+### 3. What you get
 
 The agent installs `@mantaq/core` and `@mantaq/inspect` (and `@mantaq/sugar` when the flow has a timer), writes `src/checkout.machine.ts` and the Vite plugin, and starts the dev server. The viewer is at `/__mantaq/?machine=checkout` on the port the dev server prints.
 
