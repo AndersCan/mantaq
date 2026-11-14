@@ -1,6 +1,6 @@
 ---
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
-import { Card, CardGrid, Code, LinkButton } from "@astrojs/starlight/components";
+import { Badge, Card, CardGrid, Code, LinkButton } from "@astrojs/starlight/components";
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 import Step from "../components/Step.astro";
 
@@ -22,6 +22,7 @@ const headings = [
   { depth: 2, slug: "system-view", text: "System view" },
   { depth: 2, slug: "design-findings", text: "Design findings line" },
   { depth: 2, slug: "tutorial-step", text: "Tutorial step: start marker and self-transitions" },
+  { depth: 2, slug: "ai-page-label", text: "AI-written page label" },
   { depth: 2, slug: "phone-width", text: "Phone width" },
 ];
 ---
@@ -169,6 +170,22 @@ const headings = [
     serve first.
   </Step>
 
+  <h2 id="ai-page-label">AI-written page label</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: a page a coding agent wrote shows 🤖 before its title and a 🤖 badge after its name in the
+    sidebar. A page with <code>author: human</code> in its frontmatter shows neither. Default is
+    <code>ai</code>.
+  </p>
+  <div class="design-label">
+    <p class="design-label-caption">An <code>ai</code> page</p>
+    <p class="design-label-title">🤖 Guards</p>
+    <p class="design-label-side">Guards <Badge text="🤖" variant="note" /></p>
+    <p class="design-label-caption">An <code>author: human</code> page</p>
+    <p class="design-label-title">Guards</p>
+    <p class="design-label-side">Guards</p>
+  </div>
+
   <h2 id="phone-width">Phone width</h2>
   <p><strong>Awaiting approval</strong></p>
   <div class="design-phone">
@@ -183,5 +200,21 @@ const headings = [
     max-width: 22.5rem;
     border: 1px dashed var(--mq-hairline);
     padding: 0.75rem;
+  }
+  .design-label {
+    border: 1px dashed var(--mq-hairline);
+    padding: 0.75rem;
+    max-width: 22.5rem;
+  }
+  .design-label p {
+    margin: 0.25rem 0;
+  }
+  .design-label-title {
+    font-size: var(--sl-text-h1);
+    font-weight: 600;
+  }
+  .design-label-caption {
+    font-size: var(--sl-text-sm);
+    margin-top: 1rem !important;
   }
 </style>
