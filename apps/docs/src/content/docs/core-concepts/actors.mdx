@@ -3,9 +3,17 @@ title: Actors
 description: Core runtime unit.
 ---
 
-## Create
+## What
 
-Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+An actor is a running machine: you send it events and read its state.
+
+## Why
+
+Code outside the machine needs one handle to drive it, observe it and wait for it. The actor is that handle, so the transition logic stays in the machine and callers never touch its state directly.
+
+## How
+
+### Create
 
 ```ts
 import { createCheckoutActor } from "./checkout";
@@ -13,13 +21,15 @@ import { createCheckoutActor } from "./checkout";
 const { actor: checkout } = createCheckoutActor();
 ```
 
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+
 ```
 basicInfo -> shippingAddress -> payment -> submitting -> success
                   ^ (back) v                   v (back)
                                               error
 ```
 
-## Send events
+### Send events
 
 ```ts
 import { submitBasicInfo } from "./checkout";
@@ -27,7 +37,7 @@ import { submitBasicInfo } from "./checkout";
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
 ```
 
-## Check state
+### Check state
 
 ```ts
 import { matches } from "@mantaq/sugar";
@@ -36,7 +46,7 @@ checkout.snapshot().path[0]; // "shippingAddress"
 matches(checkout, "shippingAddress"); // true
 ```
 
-## Listen
+### Listen
 
 ```ts
 const unsub = checkout.on("change", {
@@ -47,7 +57,7 @@ unsub(); // stop listening
 
 Fires at once, then on every change.
 
-## Settled
+### Settled
 
 ```ts
 await checkout.settled();
@@ -55,14 +65,14 @@ await checkout.settled();
 
 Waits for internal events and effects.
 
-## Snapshot
+### Snapshot
 
 ```ts
 checkout.snapshot();
 // { path: ["shippingAddress"], context: { basicInfo: {...} }, regions: {} }
 ```
 
-## Options and setup
+### Options and setup
 
 See the [core reference](/mantaq/reference/core/).
 

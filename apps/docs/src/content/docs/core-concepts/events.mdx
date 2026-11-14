@@ -3,9 +3,17 @@ title: Events
 description: Messages that trigger transitions.
 ---
 
-## Declare
+## What
 
-Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+An event is a typed message that triggers a transition.
+
+## Why
+
+Typed events make the set of inputs explicit: the compiler rejects a send of an event the actor does not declare in `inputs`, and the diagram labels each arrow with its event.
+
+## How
+
+### Declare
 
 ```ts
 import { event } from "@mantaq/core";
@@ -15,23 +23,25 @@ const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }
 back.type; // "back"
 ```
 
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+
 Payload must be `object | void`.
 
-## Create instances
+### Create instances
 
 ```ts
 back.create(); // { type: "back" }
 submitBasicInfo.create({ email: "a@b.com", name: "A" });
 ```
 
-## Check identity
+### Check identity
 
 ```ts
 const someEvent: unknown = back.create();
 back.is(someEvent); // true (type guard)
 ```
 
-## Use in transitions
+### Use in transitions
 
 ```ts
 import { Actor, state } from "@mantaq/core";
@@ -83,7 +93,7 @@ order.send(ship.create());
 order.snapshot().payload; // { orderId: "ord_1" }
 ```
 
-## Guards
+### Guards
 
 A plain `if` picks the `{ state }`; `{}` stays put.
 
@@ -107,7 +117,7 @@ const fraudMonitor = Actor({
 });
 ```
 
-## Internal events
+### Internal events
 
 Declared in `internal`, emitted by effects. `send()`'s type does not accept them. Processed after the current transition.
 
@@ -116,7 +126,7 @@ const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
 ```
 
-## `onAny`
+### `onAny`
 
 A state handler runs first; `onAny` still runs and moves only if the state handler did not. A handler that does the same in every state is an `onAny`: the diagram draws it once, from `*`, not once per state.
 

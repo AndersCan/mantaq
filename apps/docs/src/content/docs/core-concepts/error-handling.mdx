@@ -3,7 +3,17 @@ title: Error Handling
 description: Errors as values, not exceptions.
 ---
 
-## `snapshot().error`
+## What
+
+Errors are values: `send()` never throws, and a failed machine ends in a terminal `__error` state.
+
+## Why
+
+A throw inside a handler or effect would leave the machine in an unknown state. Recording the error, the last good state and the trigger lets you log it, show it, or recreate the actor.
+
+## How
+
+### `snapshot().error`
 
 | Field     | Meaning                                                                      |
 | --------- | ---------------------------------------------------------------------------- |
@@ -15,9 +25,7 @@ description: Errors as values, not exceptions.
 
 `send()` never throws: the machine dies to a terminal `__error` state and `snapshot().done` is `true`. Only the constructor throws. Queued events are dropped and later sends do nothing; throwing subscribers are swallowed.
 
-## Catch and emit
-
-Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+### Catch and emit
 
 ```ts
 import { Actor } from "@mantaq/core";
@@ -48,7 +56,9 @@ const payments = Actor({
 });
 ```
 
-## `on("error")`
+Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
+
+### `on("error")`
 
 Replays to late subscribers.
 
@@ -64,7 +74,7 @@ checkout.on("error", {
 });
 ```
 
-## `recover()`
+### `recover()`
 
 Breaks determinism; effects do not restart.
 
@@ -72,7 +82,7 @@ Breaks determinism; effects do not restart.
 checkout.recover({ state: payment, context: { paymentInfo: { cardNumber: "..." } } });
 ```
 
-## Dead vs failed
+### Dead vs failed
 
 - **Dead:** `"__error"`. Recreate the actor.
 - **Failed:** a modelled `error` state. Render it normally.

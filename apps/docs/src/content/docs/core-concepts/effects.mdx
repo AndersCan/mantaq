@@ -3,7 +3,17 @@ title: Effects
 description: Side effects on state entry.
 ---
 
-## EffectInput
+## What
+
+An effect is code that runs when the actor enters a state.
+
+## Why
+
+Calls to a payment API or a timer do not belong in a transition handler. An effect runs them on entry, is aborted on exit, and reports back by emitting an internal event, so a late answer cannot move a machine that has already left the state.
+
+## How
+
+### EffectInput
 
 ```ts
 {
@@ -16,13 +26,13 @@ description: Side effects on state entry.
 }
 ```
 
-## Rules
+### Rules
 
 - Run on every entry, initial state included (`event.type` is `"__init"`)
 - Terminal states run entry effects too
 - Never throw: catch and emit an internal error event
 
-## Auto-abort
+### Auto-abort
 
 `signal` fires when the actor leaves the state; `emit` after that does nothing. Examples: [checkout machine](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts).
 
@@ -38,7 +48,7 @@ m.effect(submitting, {
 });
 ```
 
-## `sends`
+### `sends`
 
 ```ts
 m.effect(submitting, {
@@ -55,7 +65,7 @@ m.effect(submitting, {
 
 `emit` accepts only listed events; without `sends` it is untyped. The [diagram](/mantaq/core-concepts/diagrams/) reads `sends`.
 
-## Multiple effects
+### Multiple effects
 
 Effects on one state run in order.
 
@@ -84,6 +94,6 @@ m.effect(submitting, {
 });
 ```
 
-## Error handling
+### Error handling
 
 An uncaught error ends in `__error`: see [Error Handling](/mantaq/core-concepts/error-handling/).

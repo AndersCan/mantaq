@@ -5,6 +5,16 @@ description: The state graph drawn from the builder's declared targets.
 
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 
+## What
+
+The diagram is the state graph drawn from the machine's declared targets.
+
+## Why
+
+A hand-drawn diagram drifts from the code the day someone adds a transition. This one is built from each handler's `to` list, so it is always the machine you run.
+
+## How
+
 <div data-pagefind-ignore>
 
 <Machine src="src/content/docs/checkout.ts" />
@@ -13,11 +23,11 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 
 The docs' checkout machine ([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)), drawn at build time from each handler's `to` list. It cannot drift from the code.
 
-## Read it
+### Read it
 
 A box is a state, an arrow is one target of a `to` list labelled with its event. Every other mark is in the [visualizer guide](/mantaq/guides/visualizer/#nodes).
 
-## Walk it
+### Walk it
 
 The panel runs the real machine in your browser. Pulsing arrows are the steps you can take next.
 
@@ -25,7 +35,7 @@ The panel runs the real machine in your browser. Pulsing arrows are the steps yo
 2. Click `submitShipping` and press **Send**, then the same for `submitPayment`. Effects do not run here: in `submitting` the panel waits for `chargeCard` and offers what it reports.
 3. Click `paymentOk` and press **Send**. The walk ends in `success`.
 
-## Parts that talk
+### Parts that talk
 
 <div data-pagefind-ignore>
 
@@ -35,7 +45,7 @@ The panel runs the real machine in your browser. Pulsing arrows are the steps yo
 
 A machine whose regions or actor maps send each other events opens on this view. A box is a part, an arrow is an event one part sends and another takes, and the line under the name is where the part is now. A box for an actor map reads `name ×n`, with a count per state. Click an arrow to see who sends it and in which states it is taken, then **Open** to land on that arrow in the part's diagram. **← System** comes back.
 
-## Next
+### Next
 
 - Arrows fuzzing never reached: [Coverage](/mantaq/guides/visualizer/#coverage).
 - A guard that reads context: [Guards](/mantaq/getting-started/guards/).
