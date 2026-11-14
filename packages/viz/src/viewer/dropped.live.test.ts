@@ -190,6 +190,7 @@ describe("dropped message", () => {
     expect(text(root, "[data-live-dropped]")).toBe(
       "! Then kitchen sent DISH_READY to waiter: dropped.",
     );
+    expect(root.querySelector("[data-live-dropped]")?.classList.contains("muted")).toBe(false);
   });
 
   test("the mark stays after a later step and is gone after rewinding to before the drop", () => {
