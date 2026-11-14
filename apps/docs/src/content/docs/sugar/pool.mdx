@@ -8,25 +8,33 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 import poolSource from "../../../pool/team-inbox.ts?raw";
 import kitchenSource from "../../../pool/kitchen.ts?raw";
 
+## What
+
+`createPool` builds one inbox and `n` workers. Work waits in the inbox, a free worker takes it, and work that fails goes back to the front.
+
+## Why
+
+Hand-rolling a queue with workers means wiring the inbox, the idle and busy tracking and the retry yourself. The pool gives you all three, drawn as parts of your machine.
+
+## How
+
 <div data-pagefind-ignore>
 
 <Machine src="src/pool/team-inbox.ts" runEffects />
 
 </div>
 
-`createPool` builds one inbox and `n` workers. Work waits in the inbox, a free worker takes it, and work that fails goes back to the front.
-
-## Try it
+### Try it
 
 1. Open the run [Four items, three workers](?machine=teamInbox&run=Four%20items%2C%20three%20workers). Three workers take one item each; the fourth waits.
 
-## The code
+### The code
 
 <Code code={poolSource} lang="ts" title="team-inbox.ts" />
 
 `run` gets the items and resolves when they are done. If it rejects, the items go back to the front of the inbox. `keep: "set"` drops an arrival whose key already waits, and `batch: Infinity` hands a worker everything that waits: use both when a second request for the same thing adds nothing.
 
-## Send it work from your own machine
+### Send it work from your own machine
 
 Return your machine and the pool's two parts from one factory, and the diagram draws the arrow from yours into the inbox.
 
@@ -41,7 +49,7 @@ Return your machine and the pool's two parts from one factory, and the diagram d
 
 <Code code={kitchenSource} lang="ts" title="kitchen.ts" />
 
-## Limits
+### Limits
 
 - The queue lives in memory and is lost on restart.
 - It has no size limit.

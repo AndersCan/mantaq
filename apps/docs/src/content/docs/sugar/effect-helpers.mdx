@@ -5,13 +5,15 @@ description: Promise bridging and timeout helpers for effects
 
 ## What
 
-`withPromise()` bridges a promise to actor events. `withTimeout()` arms a
-timeout that fires an event. Both check `signal.aborted` before emitting, so
-promises resolving after state exit and timers firing after exit produce no
-side effects. Both use the actor's clock, so tests stay deterministic on
-`VirtualClock`.
+`withPromise()` bridges a promise to actor events. `withTimeout()` arms a timeout that fires an event.
 
-## withPromise
+## Why
+
+A promise that resolves after the machine left the state, or a timer that fires after exit, would send a stale event. Both helpers check `signal.aborted` before emitting, so late results do nothing, and both use the actor's clock, so tests stay deterministic on `VirtualClock`.
+
+## How
+
+### withPromise
 
 ```ts
 withPromise({
@@ -85,7 +87,7 @@ m.effect(submitting, {
 
 Annotating both handlers with the event union lets `Either.match` infer one result type.
 
-## withTimeout
+### withTimeout
 
 ```ts
 withTimeout(800, { input, event: () => paymentTimeout.create() });
@@ -107,7 +109,7 @@ m.effect(submitting, {
 });
 ```
 
-## VirtualClock testing
+### VirtualClock testing
 
 ```ts
 import { VirtualClock } from "@mantaq/core";

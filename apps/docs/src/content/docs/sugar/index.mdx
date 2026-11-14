@@ -5,20 +5,13 @@ description: Convenience helpers for common patterns
 
 ## What
 
-`@mantaq/sugar` wraps core primitives with convenience helpers. Every helper
-compiles to the same behavior you could write yourself.
+`@mantaq/sugar` wraps core primitives with convenience helpers. Every helper compiles to the same behavior you could write yourself.
 
-## Helpers
+## Why
 
-| Helper                                           | Purpose                     |
-| ------------------------------------------------ | --------------------------- |
-| `states()`, `events()`                           | Batch create states/events  |
-| `matches()`, `isIn()`, `activeLeaves()`, `tag()` | State matching and grouping |
-| `ActorMap`, `broadcast()`                        | Dynamic child management    |
-| `withPromise()`, `withTimeout()`                 | Effect helpers              |
-| `actorSpec`, `definePart`, `withParts`           | Split setup across files    |
+Core is sufficient for everything, but many states and events, frequent state checks, dynamic children or promise effects cost typing. Skip sugar when you have few states, few checks, no dynamic children, or your own effect patterns.
 
-## Install
+## How
 
 ```bash
 npm install @mantaq/sugar
@@ -30,15 +23,17 @@ Requires `@mantaq/core`. Single entry point:
 import { matches, states, events } from "@mantaq/sugar";
 ```
 
-## When to use
+### Helpers
 
-Use sugar when many states/events, frequent state checks, dynamic children,
-or promise effects. Skip when few states, minimal checks, no dynamic children,
-or custom effect patterns.
+| Helper                                           | Purpose                     |
+| ------------------------------------------------ | --------------------------- |
+| `states()`, `events()`                           | Batch create states/events  |
+| `matches()`, `isIn()`, `activeLeaves()`, `tag()` | State matching and grouping |
+| `ActorMap`, `broadcast()`                        | Dynamic child management    |
+| `withPromise()`, `withTimeout()`                 | Effect helpers              |
+| `actorSpec`, `definePart`, `withParts`           | Split setup across files    |
 
-Core is sufficient for everything. Sugar saves typing.
-
-## Pages
+### Pages
 
 - [Batch Creation](/mantaq/sugar/batch-creation/): `states()` and `events()`
 - [Matching](/mantaq/sugar/matching/): `matches()`, `isIn()`, `activeLeaves()`, `tag()`
@@ -46,3 +41,4 @@ Core is sufficient for everything. Sugar saves typing.
 - [Dynamic Children](/mantaq/sugar/dynamic-children/): `ActorMap` and `broadcast()`
 - [Effect Helpers](/mantaq/sugar/effect-helpers/): `withPromise()` and `withTimeout()`
 - [Request / Response](/mantaq/sugar/request-response/): short-lived request handlers
+- [Pool](/mantaq/sugar/pool/): `createPool`, an inbox with `n` workers
