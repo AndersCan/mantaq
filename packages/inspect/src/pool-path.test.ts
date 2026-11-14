@@ -46,10 +46,13 @@ test("pool, real effects: a late move shown on a step stays on it after the next
   root.querySelector<HTMLButtonElement>('[data-payload-send="team.ITEM_ARRIVED"]')?.click();
   const after = pathTexts(root);
   expect(after.length).toBe(3);
-  // The driver may name a late move's sender after the row first showed; the move itself stays.
-  expect(after[1]).toContain("w1: working → free; ");
-  expect(after[1]).toContain("teamInbox: workersBusy → allWorkersFree");
-  expect(before).toContain("teamInbox: workersBusy → allWorkersFree");
+  // The driver names the late move's sender only after the row first showed (driver follow-up).
+  expect(before).toBe(
+    "team.ITEM_ARRIVED {item a}, then teamInbox → w1: free → working; w1: working → free; teamInbox: workersBusy → allWorkersFree",
+  );
+  expect(after[1]).toBe(
+    "team.ITEM_ARRIVED {item a}, then teamInbox → w1: free → working; w1: working → free; workers → teamInbox: workersBusy → allWorkersFree",
+  );
 });
 
 test("pool: w1 finishes and takes the waiting item; the Path names both moves (plan Try it step 4)", () => {

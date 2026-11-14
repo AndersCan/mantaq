@@ -188,7 +188,7 @@ describe("dropped message", () => {
       "DISH_READY: kitchen to waiter, dropped in this run",
     );
     expect(text(root, "[data-live-dropped]")).toBe(
-      "! Then kitchen sent DISH_READY to waiter: dropped. waiter has no handler for DISH_READY in onBreak.",
+      "! Then kitchen sent DISH_READY to waiter: dropped.",
     );
   });
 
@@ -388,5 +388,49 @@ describe("dropped message among several arrows", () => {
     expect(pathTexts(root)[1]).toBe(
       "DISH_COOKED, then hall → p1: a → b; hall → p2: a → b; hall → p3: a → b and 1 more",
     );
+  });
+});
+
+describe("dropped row title", () => {
+  test("a dropped row that is not cut short has no title", () => {
+    const { root } = mount();
+    walk(root, 4);
+    const row = root.querySelectorAll<HTMLElement>("[data-rewind]")[4];
+    expect(row?.textContent?.startsWith("! ")).toBe(true);
+    expect(row?.hasAttribute("title")).toBe(false);
+  });
+});
+
+describe("a drop stays named, and its reason shows once", () => {
+  test("a drop after three moves is still named on the Path row", () => {
+    const moved = (part: string) =>
+      to(part, "DISH_READY", {
+        outcome: "transition",
+        from: `${part}.a`,
+        to: `${part}.b`,
+        message: { sender: "", dropped: null },
+      });
+    const root = mountHall([
+      [
+        moved("p1"),
+        moved("p2"),
+        moved("p3"),
+        to("waiter", "DISH_READY", {
+          outcome: "ignored",
+          from: "waiter.onBreak",
+          to: "waiter.onBreak",
+          message: { sender: "", dropped: "noHandler" },
+        }),
+      ],
+    ]);
+    send(root, "DISH_COOKED");
+    expect(pathTexts(root)[1]).toContain("hall → waiter DISH_READY dropped");
+  });
+
+  test("the Step tab says why a message was dropped once", () => {
+    const { root } = mount();
+    walk(root, 4);
+    const step = text(root, "[data-live-after]") ?? "";
+    expect(step.match(/no handler for DISH_READY/gi)).toHaveLength(1);
   });
 });

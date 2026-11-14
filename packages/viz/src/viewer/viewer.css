@@ -560,6 +560,10 @@
   font-weight: 700;
 }
 
+.viz [data-live-dropped] {
+  color: var(--banner-fg);
+}
+
 /* A clicked item stays teal even when it is also on the walk. */
 .viz .graph .selected path,
 .viz .graph .selected .frame {

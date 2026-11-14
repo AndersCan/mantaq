@@ -1358,11 +1358,11 @@ function afterLine(
   const sender = senderName(machine, step);
   const receiver = partName(machine, step.actor);
   if (sender !== null && isDropped(step)) {
-    return html(doc, "p", { class: "muted", "data-live-dropped": "" }, [
+    return html(doc, "p", { "data-live-dropped": "" }, [
       "! Then ",
       `${sender} sent `,
       code(doc, step.event),
-      ` to ${receiver}: dropped. ${dropReasonText(machine, step)}.`,
+      ` to ${receiver}: dropped.`,
     ]);
   }
   if (sender !== null) {
