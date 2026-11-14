@@ -17,7 +17,7 @@ Reading handlers shows what one state does. The graph shows every path, and walk
 
 <Machine src="src/content/docs/checkout.ts" />
 
-The checkout machine: the thick border is the state the walk is on, and pulsing arrows are the steps you can take next.
+The checkout machine: the thick border is the state the walk is on, pulsing arrows are the steps you can take next, the dashed box (`shippingAddress`) is the state a next step reaches, and the pill in `submitting` (`chargeCard`) is its effect.
 
 ### Walking the graph
 
@@ -52,6 +52,8 @@ An edge with an unknown target (dashed, orange) offers each target its handler e
 | Thick border               | The state the walk is on                                                                                                    |
 | Dot and arrow on the left  | The initial state                                                                                                           |
 | Dashed box `*`             | An `onAny` registration: any non-final state                                                                                |
+| Dashed box (no label)      | A state a next step reaches                                                                                                 |
+| Pill inside a state        | An effect the state runs on entry, by name (`chargeCard` in `submitting`)                                                   |
 | Dashed circle `?`          | An unknown target                                                                                                           |
 | Shaded rectangle           | A region: its own start arrow and current state                                                                             |
 | Box labelled "one per key" | An actor map: its graph is drawn once for every child                                                                       |
@@ -64,7 +66,6 @@ An edge with an unknown target (dashed, orange) offers each target its handler e
 | Solid arrow                | A transition on an input event                     |
 | Dotted arrow, italic label | A transition on an internal event                  |
 | Dotted self-loop           | The event is handled and the state does not change |
-| Faint self-loop            | Effects the state runs on entry, by name           |
 | Dashed orange arrow        | Undetermined target                                |
 | Green arrow                | Seen only while fuzzing, not declared              |
 | Pulsing dashed arrow       | A step you can take next                           |

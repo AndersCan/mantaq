@@ -11,7 +11,7 @@ Vitest helpers from `@mantaq/inspect` that fail a test on design errors and on s
 
 ## Why
 
-`@mantaq/inspect` fuzzes a machine and checks its structure. Without these helpers a design error shows only in the visualizer; with them CI catches it without a separate command.
+`@mantaq/inspect` fuzzes a machine and checks its structure. Without these helpers a design error shows only when you open the visualizer or call `designErrors()`; with them CI catches it without a separate command.
 
 ## How
 
@@ -25,7 +25,10 @@ Each helper takes an inspect target: an `id` and a `create` function that return
 const target = {
   id: "checkout",
   create: () => createCheckoutActor(),
-  source: { file: join(import.meta.dirname, "checkout.ts"), root: import.meta.dirname },
+  source: {
+    file: join(import.meta.dirname, "checkout.ts"),
+    root: import.meta.dirname,
+  },
 };
 ```
 
