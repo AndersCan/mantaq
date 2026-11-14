@@ -1,0 +1,21 @@
+---
+
+const { entry } = Astro.locals.starlightRoute;
+const ai = entry.data.author === "ai";
+---
+
+<h1 id="_top">
+  {ai && <><span role="img" aria-label="Written by a coding agent" title="Written by a coding agent">🤖</span>{" "}</>}{entry.data.title}
+</h1>
+
+<style>
+  @layer starlight.core {
+    h1 {
+      margin-top: 1rem;
+      font-size: var(--sl-text-h1);
+      line-height: var(--sl-line-height-headings);
+      font-weight: 600;
+      color: var(--sl-color-white);
+    }
+  }
+</style>
