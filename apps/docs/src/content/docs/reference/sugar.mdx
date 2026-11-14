@@ -3,6 +3,40 @@ title: "@mantaq/sugar"
 description: Convenience helpers.
 ---
 
+## What
+
+Shorter ways to write what `@mantaq/core` already does: state and event records, snapshot checks, parts, pools and effect helpers.
+
+## Why
+
+Machines repeat the same few moves: declare ten states, ask whether one is active, wire a promise into events. Each helper replaces one of those with a call, and none adds a concept the core lacks.
+
+## How
+
+```ts
+import { Actor } from "@mantaq/core";
+import { events, matches, states } from "@mantaq/sugar";
+
+const s = states("hungry", { name: "full", final: true });
+const e = events("eat");
+
+const meal = new Actor({
+  inputs: [e.eat],
+  states: [s.hungry, s.full],
+  initial: s.hungry,
+  setup: (m) => {
+    m.on(s.hungry, { event: e.eat, to: [s.full], handler: () => ({ state: s.full }) });
+  },
+});
+
+meal.send(e.eat.create());
+matches(meal, "full"); // true
+```
+
+`states` and `events` replace the `state(id)()` and `event(id)()` calls; `matches` replaces reading the snapshot path by hand.
+
+---
+
 ## `matches(actor, pattern)`
 
 ```ts

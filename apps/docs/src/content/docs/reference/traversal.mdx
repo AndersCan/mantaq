@@ -3,6 +3,32 @@ title: "@mantaq/traversal"
 description: Graph building, instrumentation, history, and graph algorithms.
 ---
 
+## What
+
+Turns an actor into a graph of states and transitions, records what a run visits, and answers path questions about the graph.
+
+## Why
+
+Diagrams, coverage and reachability checks all need the same graph. Building it once from the actor definition keeps them from disagreeing.
+
+## How
+
+```ts
+import { buildGraph, instrument, reachable, shortestPath } from "@mantaq/traversal";
+
+const graph = buildGraph(meal);
+reachable(graph, { fromId: "hungry", toId: "full" }); // true
+shortestPath(graph, { fromId: "hungry", toId: "full" }); // ["hungry", "full"]
+
+const wrapped = instrument(meal);
+wrapped.send(eat.create());
+wrapped.history.visitedStates().has("full"); // true
+```
+
+A new `meal` and `eat`, built as on the `@mantaq/core` page. `buildGraph` answers what can happen; `instrument` records what did.
+
+---
+
 ## `buildGraph(actor, options?)`
 
 ```ts
@@ -28,10 +54,13 @@ graph.edges.length; // number of transitions
 
 ---
 
-## `collectActiveStates(snapshot, prefix, activeSet)`
+## `collectActiveStates(snapshot, { prefix, activeSet })`
 
 ```ts
-function collectActiveStates(snapshot: Snapshot, prefix: string, activeSet: Set<string>): void;
+function collectActiveStates(
+  snapshot: Snapshot,
+  options: { prefix: string; activeSet: Set<string> },
+): void;
 ```
 
 Recursively walks snapshot tree, adds active state node IDs to set. Used internally by `buildGraph`.
@@ -80,18 +109,18 @@ Append-only log. Query by type or get derived sets.
 
 ## Graph algorithms
 
-### `reachable(graph, fromId, toId)`
+### `reachable(graph, { fromId, toId })`
 
 ```ts
-function reachable(graph: ActorGraph, fromId: string, toId: string): boolean;
+function reachable(graph: ActorGraph, endpoints: { fromId: string; toId: string }): boolean;
 ```
 
 BFS reachability check.
 
-### `allPaths(graph, fromId, toId)`
+### `allPaths(graph, { fromId, toId })`
 
 ```ts
-function allPaths(graph: ActorGraph, fromId: string, toId: string): string[][];
+function allPaths(graph: ActorGraph, endpoints: { fromId: string; toId: string }): string[][];
 ```
 
 All acyclic paths between two nodes. Returns arrays of node IDs.
@@ -104,21 +133,24 @@ function findCycles(graph: ActorGraph): string[][];
 
 All cycles as arrays of node IDs.
 
-### `unreachableNodes(graph, fromId)`
+### `unreachableNodes(graph, { fromId })`
 
 ```ts
-function unreachableNodes(graph: ActorGraph, fromId: string): string[];
+function unreachableNodes(graph: ActorGraph, options: { fromId: string }): string[];
 ```
 
 Node IDs not reachable from `fromId`.
 
-### `shortestPath(graph, fromId, toId)`
+### `shortestPath(graph, { fromId, toId })`
 
 ```ts
-function shortestPath(graph: ActorGraph, fromId: string, toId: string): string[] | null;
+function shortestPath(
+  graph: ActorGraph,
+  endpoints: { fromId: string; toId: string },
+): string[] | undefined;
 ```
 
-Shortest path by edge count. `null` if unreachable.
+Shortest path by edge count. `undefined` if unreachable.
 
 ---
 
