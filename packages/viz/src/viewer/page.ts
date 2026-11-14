@@ -1,8 +1,6 @@
 /**
- * The live page served by a dev server (`mountLive`). It keeps
- * `?machine=&step=` in the address bar so a walk can be shared.
+ * Options for a page that keeps `?machine=&step=&run=` in the address bar so a walk can be shared (`linkOptions`).
  */
-import { mountVizText, showIssues } from "./embed.ts";
 import type { ViewerOptions } from "./embed.ts";
 import "./viewer.css";
 
@@ -27,15 +25,4 @@ export function linkOptions(): ViewerOptions {
     steps: params.getAll("step"),
     onNavigate: rememberWalk,
   };
-}
-
-/** Fetch the document from `source` and mount it; call again to redraw, keeping the walk. */
-export async function mountLive(root: HTMLElement, source: string): Promise<void> {
-  const response = await fetch(source).catch(() => null);
-  if (response === null || !response.ok) {
-    const status = response === null ? "network error" : `HTTP ${response.status}`;
-    showIssues(root, { source, issues: [{ path: "$", message: status }] });
-    return;
-  }
-  mountVizText(root, { source, text: await response.text() }, linkOptions());
 }
