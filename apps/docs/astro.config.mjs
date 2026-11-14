@@ -28,6 +28,7 @@ export default defineConfig({
         "src/content/docs/photo-queue.ts",
         "src/design/out-arrow.ts",
         "src/design/pool.ts",
+        "src/design/dropped-message.ts",
         "src/pool/team-inbox.ts",
         "src/pool/kitchen.ts",
         "src/conform/counter-model.ts",
