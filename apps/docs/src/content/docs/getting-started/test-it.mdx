@@ -6,6 +6,16 @@ description: Test that food left on the stove for 10 seconds burns, on a virtual
 import { Code } from "@astrojs/starlight/components";
 import testSource from "../../../tutorial/meal.test.ts?raw";
 
+## What
+
+A test drives the machine on a virtual clock: food left on the stove for 10 seconds burns.
+
+## Why
+
+A timer that needs ten real seconds makes a slow, flaky test. A virtual clock turns time into a function call, so the test is instant and exact.
+
+## How
+
 <Code
   code={testSource
     .replace('"vite-plus/test"', '"vitest"')
@@ -15,7 +25,7 @@ import testSource from "../../../tutorial/meal.test.ts?raw";
   title="src/meal.test.ts"
 />
 
-A virtual clock makes time a plain function call: the food is still cooking at 9.999 seconds and burnt at 10. Burning after 10 seconds is a choice made for this stove; yours may need another time.
+The food is still cooking at 9.999 seconds and burnt at 10. Burning after 10 seconds is a choice made for this stove; yours may need another time.
 
 ```bash
 npx vitest run

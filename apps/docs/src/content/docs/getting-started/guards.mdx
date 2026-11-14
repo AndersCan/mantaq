@@ -5,6 +5,16 @@ description: A guard is a plain if in the handler.
 
 import Step from "../../../components/Step.astro";
 
+## What
+
+A guard decides whether an event may move the machine.
+
+## Why
+
+Some events are only valid under a condition: no plates, no meal. Putting the condition in the handler keeps the rule next to the transition it controls.
+
+## How
+
 <Step n={6}>
   A guard is a plain `if` in the handler: no plates, no `full`. With no plates, `eat` is blocked:
   click `serve` first.
