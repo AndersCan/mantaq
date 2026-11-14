@@ -3,7 +3,7 @@ import { docsLoader } from "@astrojs/starlight/loaders";
 import { docsSchema } from "@astrojs/starlight/schema";
 import { z } from "astro/zod";
 
-const aiBadge = { text: "🤖", variant: "note" } as const;
+const aiBadge = { text: "🤖", variant: "default", class: "ai-badge" } as const;
 
 export const collections = {
   docs: defineCollection({
