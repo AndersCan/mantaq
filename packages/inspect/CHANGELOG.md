@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.38.0
+
+<sub>2026-11-14</sub>
+
+- _(minor)_
+  A step the live driver reports now says who sent each message between parts, and marks one its receiver had no handler for as dropped (`message: { sender, dropped }` on `after` entries).
+- _(patch)_
+  Remove the unused `@mantaq/viz/live` page entry and `mountLive`; the Vite plugin page comes from `@mantaq/inspect`.
+
+  Breaking: the `@mantaq/viz/live` subpath export is removed — affects code importing `@mantaq/viz/live` directly (none known). Import `mountViewer` or `mountVizText` from `@mantaq/viz/viewer` instead.
+
 ## 0.37.0
 
 <sub>2026-11-14</sub>
