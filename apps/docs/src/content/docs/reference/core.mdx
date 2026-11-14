@@ -3,6 +3,40 @@ title: "@mantaq/core"
 description: Core API reference.
 ---
 
+## What
+
+The state machine runtime: `state`, `event`, `Actor`, the clocks and the snapshot types.
+
+## Why
+
+A machine that declares its states, events and transitions up front can be drawn, tested and checked by the compiler. The core stays small so everything else (sugar, traversal, test) builds on these few exports.
+
+## How
+
+```ts
+import { Actor, event, state } from "@mantaq/core";
+
+const hungry = state("hungry")();
+const full = state("full")();
+const eat = event("eat")();
+
+const meal = new Actor({
+  inputs: [eat],
+  states: [hungry, full],
+  initial: hungry,
+  setup: (m) => {
+    m.on(hungry, { event: eat, to: [full], handler: () => ({ state: full }) });
+  },
+});
+
+meal.send(eat.create());
+meal.snapshot().path; // ["full"]
+```
+
+Each entry below lists the signature, then what it does.
+
+---
+
 ## `state(id)`
 
 ```ts
@@ -104,10 +138,10 @@ class Actor<
 | `dispose()`            | `() => void`                                 | Stop: abort effect, clear queue + subscribers                                           |
 | `recover(target)`      | `(target: { state; context }) => void`       | Restart dead machine from caller-supplied state                                         |
 | `snapshot()`           | `() => Snapshot`                             | State tree                                                                              |
-| `on("change", fn)`     | `(fn) => () => void`                         | State or context changed (`(snap, prev) => void`)                                       |
-| `on("done", fn)`       | `(fn) => () => void`                         | Final or error state                                                                    |
-| `on("error", fn)`      | `(fn) => () => void`                         | Death signal, seeded to late subscribers (`(info) => void`)                             |
-| `on("output", fn)`     | `(fn) => () => void`                         | Emitted output event (`(event) => void`)                                                |
+| `on("change", { fn })` | `(options) => () => void`                    | State or context changed (`fn: (snap, prev) => void`)                                   |
+| `on("done", { fn })`   | `(options) => () => void`                    | Final or error state                                                                    |
+| `on("error", { fn })`  | `(options) => () => void`                    | Death signal, seeded to late subscribers (`fn: (info) => void`)                         |
+| `on("output", { fn })` | `(options) => () => void`                    | Emitted output event (`fn: (event) => void`)                                            |
 | `settled()`            | `() => Promise<void>`                        | Queue drained and current states' effects done; a left state's effect is not waited for |
 | `pendingEffectCount()` | `() => number`                               | In-flight effects not yet settled (introspection)                                       |
 
@@ -270,9 +304,12 @@ interface AnyActor<C = Record<string, unknown>> {
   };
   send(event: AnyEventRef | InternalEvent): void;
   snapshot(): Snapshot<C>;
-  on(event: "change", fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void): () => void;
-  on(event: "done", fn: () => void): () => void;
-  on(event: "error", fn: (info: ErrorInfo) => void): () => void;
+  on(
+    event: "change",
+    options: { fn: (snapshot: Snapshot<C>, prev: Snapshot<C>) => void },
+  ): () => void;
+  on(event: "done", options: { fn: () => void }): () => void;
+  on(event: "error", options: { fn: (info: ErrorInfo) => void }): () => void;
   settled(): Promise<void>;
 }
 ```

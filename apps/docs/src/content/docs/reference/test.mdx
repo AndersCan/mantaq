@@ -3,6 +3,30 @@ title: "@mantaq/test"
 description: Test harness and coverage assertions for actor behavior.
 ---
 
+## What
+
+A harness that wraps an actor, records every state, transition and effect a test drives through it, and asserts on that record.
+
+## Why
+
+A passing test says little about the transitions it never reached. The harness reports what the tests left uncovered, so a missing case shows up as a number.
+
+## How
+
+```ts
+import { createTestHarness } from "@mantaq/test";
+
+const harness = createTestHarness(meal);
+harness.send(eat.create());
+harness.assertStateVisited({ stateName: "full" });
+harness.assertTransitionVisited({ from: "hungry", event: "eat" });
+harness.coverage().percent.states; // 100
+```
+
+`meal` is the actor from the `@mantaq/core` page. Each assertion throws when it fails; `coverage()` lists what was never reached.
+
+---
+
 ## `createTestHarness(actor)`
 
 ```ts
@@ -14,7 +38,7 @@ Instruments actor for testing. Builds state graph, wraps `send` to record histor
 ```ts
 const harness = createTestHarness(checkout);
 harness.send(submitBasicInfo.create());
-harness.assertStateVisited("shippingAddress");
+harness.assertStateVisited({ stateName: "shippingAddress" });
 ```
 
 ---
@@ -49,17 +73,17 @@ interface TestHarness<C> {
 
   assertAllStatesVisited(): void;
   assertAllTransitionsVisited(): void;
-  assertStateVisited(stateName: string): void;
-  assertStateNeverVisited(stateName: string): void;
-  assertTransitionVisited(from: string, event: string): void;
-  assertTransitionNeverVisited(from: string, event: string): void;
-  assertContextNever(predicate: (context: unknown) => boolean): void;
-  assertEffectRan(stateName: string): void;
-  assertEffectNeverRan(stateName: string): void;
+  assertStateVisited(target: { stateName: string }): void;
+  assertStateNeverVisited(banned: { stateName: string }): void;
+  assertTransitionVisited(expected: { from: string; event: string }): void;
+  assertTransitionNeverVisited(banned: { from: string; event: string }): void;
+  assertContextNever(check: { predicate: (context: unknown) => boolean }): void;
+  assertEffectRan(expected: { stateName: string; effectName: string }): void;
+  assertEffectNeverRan(banned: { stateName: string; effectName: string }): void;
 
   wasStateVisited(stateName: string): boolean;
-  wasTransitionVisited(from: string, event: string): boolean;
-  wasEffectRun(stateName: string): boolean;
+  wasTransitionVisited(expected: { from: string; event: string }): boolean;
+  wasEffectRun(queried: { stateName: string; effectName: string }): boolean;
 
   coverage(): CoverageReport;
   reset(): void;
@@ -70,27 +94,27 @@ interface TestHarness<C> {
 
 All throw on failure.
 
-| Method                                      | What                                                  |
-| ------------------------------------------- | ----------------------------------------------------- |
-| `assertAllStatesVisited()`                  | Every graph node (non-`__initial__`) was hit          |
-| `assertAllTransitionsVisited()`             | Every graph edge (non-internal, non-undetermined) hit |
-| `assertStateVisited(name)`                  | Named state was entered at least once                 |
-| `assertStateNeverVisited(name)`             | Named state was never entered                         |
-| `assertTransitionVisited(from, event)`      | `(from, event)` pair fired                            |
-| `assertTransitionNeverVisited(from, event)` | Pair never fired                                      |
-| `assertContextNever(fn)`                    | Predicate does not match current context              |
-| `assertEffectRan(name)`                     | Effect for named state ran                            |
-| `assertEffectNeverRan(name)`                | Effect for named state never ran                      |
+| Method                                            | What                                                  |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| `assertAllStatesVisited()`                        | Every graph node (non-`__initial__`) was hit          |
+| `assertAllTransitionsVisited()`                   | Every graph edge (non-internal, non-undetermined) hit |
+| `assertStateVisited({ stateName })`               | Named state was entered at least once                 |
+| `assertStateNeverVisited({ stateName })`          | Named state was never entered                         |
+| `assertTransitionVisited({ from, event })`        | `(from, event)` pair fired                            |
+| `assertTransitionNeverVisited({ from, event })`   | Pair never fired                                      |
+| `assertContextNever({ predicate })`               | Predicate does not match current context              |
+| `assertEffectRan({ stateName, effectName })`      | Named effect of the state ran                         |
+| `assertEffectNeverRan({ stateName, effectName })` | Named effect never ran                                |
 
 ### Query methods
 
 Boolean checks, no throw.
 
-| Method                              | What              |
-| ----------------------------------- | ----------------- |
-| `wasStateVisited(name)`             | State entered?    |
-| `wasTransitionVisited(from, event)` | Transition fired? |
-| `wasEffectRun(name)`                | Effect ran?       |
+| Method                                    | What              |
+| ----------------------------------------- | ----------------- |
+| `wasStateVisited(name)`                   | State entered?    |
+| `wasTransitionVisited({ from, event })`   | Transition fired? |
+| `wasEffectRun({ stateName, effectName })` | Effect ran?       |
 
 ---
 
