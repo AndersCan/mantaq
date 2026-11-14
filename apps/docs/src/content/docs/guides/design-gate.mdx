@@ -60,7 +60,7 @@ The reachability check is static. It reads the graph, so it needs no fuzzing: pa
 
 ## On the diagram
 
-The same findings show on the diagram. A state with a finding carries a "!" mark: click it to read what the bug is, then press Replay to run the events that found it. This checkout has six planted bugs, listed by their headlines: "back in payment throws", `payment was reached with {"address":""}` (the shipping step accepts an empty address, found by the next section), "paymentDeclined is a dead end", "refunded can never be reached", "refunding can never be reached", and "cancelOrder is declared but no state handles it". Replay is on the findings a run reached; the two unreachable states have nothing to replay, and `cancelOrder` belongs to no state, so it has no mark and is listed at the top of the Details tab.
+The same findings show on the diagram: a state with a finding carries a "!" mark. Click it to read the finding, then **Replay** to run the events that found it.
 
 <Machine src="src/content/docs/checkout-with-bugs.ts" />
 
