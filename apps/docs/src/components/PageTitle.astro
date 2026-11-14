@@ -1,10 +1,12 @@
 ---
 
 const { entry } = Astro.locals.starlightRoute;
-const label = entry.data.author === "ai" ? "🤖 " : "";
+const ai = entry.data.author === "ai";
 ---
 
-<h1 id="_top">{label}{entry.data.title}</h1>
+<h1 id="_top">
+  {ai && <><span role="img" aria-label="Written by a coding agent" title="Written by a coding agent">🤖</span>{" "}</>}{entry.data.title}
+</h1>
 
 <style>
   @layer starlight.core {
