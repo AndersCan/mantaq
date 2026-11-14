@@ -15,9 +15,6 @@ Every request needs its own state, a deadline and a reply, and the parent must n
 
 ### The request handler
 
-One short-lived machine per request. `idle` until told to work, then `pending`
-with its own timeout, then one final state: `answered` or `timedOut`.
-
 ```ts
 const request = event("request")<{ orderId: string; timeoutMs: number }>();
 const answer = event("answer")<{ orderId: string; result: string }>();
@@ -76,6 +73,9 @@ function createRequestHandler(orderId: string, clock: Clock) {
   });
 }
 ```
+
+One short-lived machine per request. `idle` until told to work, then `pending`
+with its own timeout, then one final state: `answered` or `timedOut`.
 
 `requestSettled` is declared in **outputs**. The handler emits it and walks
 away. Emitted events that are not internal or input become outputs delivered

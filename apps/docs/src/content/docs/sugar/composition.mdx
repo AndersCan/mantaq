@@ -15,9 +15,6 @@ A `setup` body that grows past one screen is hard to read and review. Splitting 
 
 ### 1. Declare the actor spec
 
-Options move out of `Actor({ ... })` into an `actorSpec` value. This becomes the
-type anchor every part references.
-
 ```ts
 // checkout-spec.ts
 import { state, event } from "@mantaq/core";
@@ -46,6 +43,9 @@ export const checkout = actorSpec({
   context: initialContext,
 });
 ```
+
+Options move out of `Actor({ ... })` into an `actorSpec` value. This becomes the
+type anchor every part references.
 
 `actorSpec` narrows state and event arrays to their literals, no `as const`
 needed. Context stays mutable, part handlers read and write with no casts.

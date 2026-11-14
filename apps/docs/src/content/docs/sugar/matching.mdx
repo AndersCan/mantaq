@@ -15,12 +15,12 @@ Reading `snapshot().path` by hand breaks once a state has regions or several sta
 
 ### matches
 
-Dot-notation path check. Prefix match, top-level only.
-
 ```ts
 matches(checkout, "payment"); // top-level
 matches(checkout, "basicInfo"); // top-level
 ```
+
+Dot-notation path check. Prefix match, top-level only.
 
 With fraud region, the path includes region names:
 
