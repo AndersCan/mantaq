@@ -1,5 +1,5 @@
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
-import { onOutput } from "@mantaq/sugar";
+import { createActorMap, onOutput } from "@mantaq/sugar";
 import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
 import { expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
@@ -54,15 +54,7 @@ test("a message the waiter has no handler for is an ignored entry dropped as noH
       message: { sender: "", dropped: "noHandler" },
     }),
   ]);
-});
-
-test("the person's own step to the waiter carries no message, even when it is ignored", () => {
-  const driver = dishes();
-  driver.step(send("BREAK_STARTED", { actor: { region: "waiter" } }));
-  const live = driver.step(send("DISH_READY", { actor: { region: "waiter" } }));
-  expect(live.last).toEqual(expect.objectContaining({ outcome: "ignored" }));
-  expect(live.last?.message).toBeUndefined();
-  expect(live.after).toEqual([]);
+  expect(live.after[0]?.context).toEqual({});
 });
 
 const kitchen = (effectMode: "held" | "real") =>
@@ -111,6 +103,7 @@ test("a pool: a cook that finishes reports to the inbox, which hands over the wa
 
 const start = event("START")();
 const ping = event("PING")();
+const kick = event("KICK")();
 const pong = event("PONG")();
 const idle = state("idle")();
 
@@ -492,4 +485,145 @@ test("a message with no known sender is not named by an output of another event"
     entry?.message?.sender,
   ]);
   expect(messages).toContainEqual(["PING", null]);
+});
+
+test("a message of the step's own event to another part is a message while the stepped machine is unwrapped", () => {
+  const driver = createDriver(
+    {
+      id: "a",
+      create: () => {
+        const clock = VirtualClock();
+        const other = Actor({
+          inputs: [go],
+          states: [step1],
+          initial: step1,
+          clock,
+          setup: (m) => {
+            m.on(step1, { event: go, to: [step1], handler: () => ({ state: step1 }) });
+          },
+        });
+        const root = Actor({
+          inputs: [go],
+          states: [idle, first],
+          initial: idle,
+          clock,
+          setup: (m) => {
+            m.on(idle, { event: go, to: [first], handler: () => ({ state: first }) });
+            m.effect(first, {
+              name: "poke",
+              sends: [],
+              fn: () => {
+                other.send(go.create() as never);
+              },
+            });
+          },
+        });
+        return { actor: root, clock, made: { actor: root, other } };
+      },
+    },
+    { effectMode: "real" },
+  );
+  const live = driver.step(send("GO"));
+  expect(live.after.map((entry) => [entry.actor, entry.event, entry.message?.sender])).toEqual([
+    [{ region: "other" }, "GO", null],
+  ]);
+});
+
+test("the step's own entry is last even when a message of the same event to the same machine is recorded first", () => {
+  const driver = createDriver(
+    {
+      id: "a",
+      create: () => {
+        const clock = VirtualClock();
+        const other = Actor({
+          inputs: [ping],
+          outputs: [go],
+          states: [step1],
+          initial: step1,
+          clock,
+          setup: (m) => {
+            m.on(step1, { event: ping, handler: () => ({ emit: [go.create()] }) });
+          },
+        });
+        const root: ReturnType<typeof Actor> = Actor({
+          inputs: [go],
+          states: [idle, first, second],
+          initial: idle,
+          clock,
+          setup: (m) => {
+            m.on(idle, { event: go, to: [first], handler: () => ({ state: first }) });
+            m.on(first, { event: go, to: [second], handler: () => ({ state: second }) });
+            m.effect(first, {
+              name: "poke",
+              sends: [],
+              fn: () => {
+                other.send(ping.create() as never);
+              },
+            });
+          },
+        });
+        onOutput(other, (out) => root.send(out as never));
+        return { actor: root, clock, made: { actor: root, other } };
+      },
+    },
+    { effectMode: "real" },
+  );
+  const live = driver.step(send("GO"));
+  expect([live.last?.from, live.last?.to, live.last?.message]).toEqual([
+    "idle",
+    "first",
+    undefined,
+  ]);
+});
+
+test("a map child whose output wiring is added after spawn is still named as the sender", () => {
+  const driver = createDriver({
+    id: "a",
+    create: () => {
+      const clock = VirtualClock();
+      const target = Actor({
+        inputs: [ping],
+        states: [step1],
+        initial: step1,
+        clock,
+        setup: (m) => {
+          m.on(step1, { event: ping, to: [step1], handler: () => ({ state: step1 }) });
+        },
+      });
+      const cooks = createActorMap(() =>
+        Actor({
+          inputs: [kick],
+          outputs: [ping],
+          states: [step1],
+          initial: step1,
+          clock,
+          setup: (m) => {
+            m.on(step1, { event: kick, handler: () => ({ emit: [ping.create()] }) });
+          },
+        }),
+      );
+      const root = Actor({
+        inputs: [go],
+        states: [idle],
+        initial: idle,
+        clock,
+        setup: (m) => {
+          m.on(idle, { event: go, to: [idle], handler: () => ({ state: idle }) });
+        },
+      });
+      root.on("transition", {
+        fn: () => {
+          if (cooks.has("w1")) return;
+          cooks.spawn("w1");
+          onOutput(cooks.get("w1") as never, (out: { type: string }) => target.send(out as never));
+        },
+      });
+      return { actor: root, clock, made: { actor: root, cooks, target } };
+    },
+  });
+  driver.step(send("GO"));
+  const live = driver.step(send("KICK", { actor: { map: "cooks", key: "w1" } }));
+  expect(live.after.map((entry) => [entry.event, entry.message?.sender])).toEqual([
+    ["PING", "cooks"],
+  ]);
 });

@@ -232,8 +232,16 @@ interface Part {
   prefix?: string;
 }
 
+/** Messages whose sender is not known yet, and the last part heard to output each event this step. */
+interface Hearing {
+  pending: Arrival[];
+  last: Map<string, string>;
+}
+
 /** Name the sender of every waiting arrival of this event. */
-function noteOutput(pending: Arrival[], heard: { sender: string; event: string }): void {
+function noteOutput(heard: { sender: string; event: string }, at: Hearing): void {
+  at.last.set(heard.event, heard.sender);
+  const { pending } = at;
   const waiting = pending.splice(0, pending.length);
   for (const arrival of waiting) {
     if (arrival.event === heard.event) {
@@ -253,11 +261,12 @@ function wrapSend(
     root: AnyActor<unknown>;
     log: VizLiveStep[];
     flags: { own: { actor: AnyActor<unknown>; event: string } | null };
-    pending: Arrival[];
+    hearing: Hearing;
     record: (e: VizLiveStep) => void;
   },
 ): void {
-  const { root, log, flags, pending, record } = at;
+  const { root, log, flags, hearing, record } = at;
+  const { pending, last } = hearing;
   const send = actor.send.bind(actor);
   actor.send = (event) => {
     const type = event.type;
@@ -271,8 +280,12 @@ function wrapSend(
     const taken = log.find(
       (entry) => !known.has(entry) && entry.event === type && entry.message === undefined,
     );
-    const message: VizMessage = { sender: null, dropped: taken === undefined ? "noHandler" : null };
-    pending.push({ message, event: type });
+    const lastSender = last.get(type);
+    const message: VizMessage = {
+      sender: lastSender !== undefined && lastSender !== part.prefix ? lastSender : null,
+      dropped: taken === undefined ? "noHandler" : null,
+    };
+    if (message.sender === null) pending.push({ message, event: type });
     if (taken !== undefined) {
       taken.message = message;
       return;
@@ -463,16 +476,17 @@ interface Stepping {
     own: { actor: AnyActor<unknown>; event: string } | null;
   };
   /** Messages whose sender is not known yet. */
-  arrivals: Arrival[];
+  hearing: Hearing;
   maps: Record<string, ActorMapLike>;
   actors: Record<string, AnyActor<unknown>>;
 }
 
 /** Apply one step to a session and return the log entry it produced. */
 function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
-  const { actor, clock, internal, log, steps, flags, maps, actors, arrivals } = at;
+  const { actor, clock, internal, log, steps, flags, maps, actors, hearing } = at;
   log.length = 0;
-  arrivals.length = 0;
+  hearing.pending.length = 0;
+  hearing.last.clear();
   flags.segment = 0;
   flags.inside = true;
   flags.pending = 1;
@@ -490,7 +504,10 @@ function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
   steps.push(step);
   if (step.kind !== "event") return undefined;
   const own = log.findIndex(
-    (entry) => entry.event === step.event && sameActor(entry.actor, step.actor),
+    (entry) =>
+      entry.message === undefined &&
+      entry.event === step.event &&
+      sameActor(entry.actor, step.actor),
   );
   const [entry] = own === -1 ? [] : log.splice(own, 1);
   if (entry !== undefined) log.unshift(entry);
@@ -568,7 +585,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     const log: VizLiveStep[] = [];
     const steps: VizStep[] = [];
     const flags = newFlags(quiet);
-    const arrivals: Arrival[] = [];
+    const hearing: Hearing = { pending: [], last: new Map() };
     const held: HeldEffect[] = [];
     const holding = quiet || effectMode === "held";
     if (holding) holdEffects(actor, held);
@@ -588,9 +605,9 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     }
 
     const joined = (receiver: AnyActor<unknown>, part: Part): void => {
-      wrapSend(receiver, part, { root: actor, log, flags, pending: arrivals, record });
+      wrapSend(receiver, part, { root: actor, log, flags, hearing, record });
     };
-    const heard = (sender: string) => (event: string) => noteOutput(arrivals, { sender, event });
+    const heard = (sender: string) => (event: string) => noteOutput({ sender, event }, hearing);
 
     watchRoot(actor, record);
     watchOutputs(actor, { log, changed, heard: heard("") });
@@ -624,7 +641,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       log,
       steps,
       flags,
-      arrivals,
+      hearing,
       held,
       maps,
       actors,
