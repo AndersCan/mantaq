@@ -17,8 +17,6 @@ Naming each state makes "where is the machine now" a value you can match on, dra
 
 ### Basic states
 
-Examples build on each other: paste them into one file, in order.
-
 ```ts
 import { state } from "@mantaq/core";
 
@@ -27,6 +25,8 @@ const submitting = state("submitting")();
 basicInfo.name; // "basicInfo"
 basicInfo.isFinal; // false
 ```
+
+Examples build on each other: paste them into one file, in order.
 
 ### Final states
 
@@ -112,4 +112,4 @@ Each region is its own actor.
 
 </div>
 
-The parent does not pass events down. Send events on the region: `actor.regions.upload.send(...)`.
+The photo upload machine has seven states: `showingUploadScreen`, `showingUploadedPhoto`, `waitingForPhoto`, `sendingPhoto`, `photoSent`, `online` and `offline`. Five events move it: `photoPicked`, `uploadConfirmed`, `connectionLost`, `connectionRestored` and `photoUploaded`. The parent does not pass events down. Send events on the region: `actor.regions.upload.send(...)`.

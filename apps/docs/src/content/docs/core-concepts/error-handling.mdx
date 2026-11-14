@@ -15,6 +15,10 @@ A throw inside a handler or effect would leave the machine in an unknown state. 
 
 ### `snapshot().error`
 
+```ts
+checkout.snapshot().error; // { error, state, context, event, reason }
+```
+
 | Field     | Meaning                                                                      |
 | --------- | ---------------------------------------------------------------------------- |
 | `error`   | thrown value                                                                 |
@@ -23,7 +27,7 @@ A throw inside a handler or effect would leave the machine in an unknown state. 
 | `event`   | trigger                                                                      |
 | `reason`  | `transition`, `effect`, `unhandled`, `budget`, `output`, `internal`, `async` |
 
-`send()` never throws: the machine dies to a terminal `__error` state and `snapshot().done` is `true`. Only the constructor throws. Queued events are dropped and later sends do nothing; throwing subscribers are swallowed.
+After a failure `snapshot().done` is `true`. Only the constructor throws. Queued events are dropped and later sends do nothing; throwing subscribers are swallowed.
 
 ### Catch and emit
 

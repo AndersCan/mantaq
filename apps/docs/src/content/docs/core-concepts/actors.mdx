@@ -23,6 +23,8 @@ const { actor: checkout } = createCheckoutActor();
 
 Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.
 
+The checkout actor moves through `basicInfo`, `shippingAddress`, `payment`, `submitting` and `success`; `back` steps to the previous state, and `error` is reached from `submitting`.
+
 ```
 basicInfo -> shippingAddress -> payment -> submitting -> success
                   ^ (back) v                   v (back)

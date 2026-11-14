@@ -9,7 +9,7 @@ Context is the data an actor keeps across transitions.
 
 ## Why
 
-A transition forgets everything but the state name. Form fields, ids and totals have to survive the move from one state to the next, so handlers read and write them through one handle instead of passing them along by hand.
+A payload belongs to one state. Form fields, ids and totals are needed by every state, so handlers read and write them through one shared handle instead of copying them from payload to payload.
 
 ## How
 

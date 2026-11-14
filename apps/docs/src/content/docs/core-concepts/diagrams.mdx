@@ -21,7 +21,7 @@ A hand-drawn diagram drifts from the code the day someone adds a transition. Thi
 
 </div>
 
-The docs' checkout machine ([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)), drawn at build time from each handler's `to` list. It cannot drift from the code.
+The checkout machine's states are `basicInfo`, `shippingAddress`, `payment`, `submitting`, `success` and `error`; its events are `submitBasicInfo`, `submitShipping`, `submitPayment`, `back`, `paymentOk`, `paymentFail` and `paymentTimeout`. Source: ([`checkout.ts`](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts)), drawn at build time from each handler's `to` list.
 
 ### Read it
 
