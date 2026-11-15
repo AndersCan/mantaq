@@ -289,6 +289,13 @@ function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
     const gap = pathToPath(one.path, entry.line);
     if (gap < PATH_NODE_CLEAR) add("path-through-node", part, entry.part, gap);
   }
+  for (const region of rest.regions) {
+    const gap = Math.min(
+      pathToBox(one.path, region.titleBox),
+      boxToBox(one.arrow, region.titleBox),
+    );
+    if (gap < PATH_NODE_CLEAR) add("path-through-node", part, region.title, gap);
+  }
   const pathInset = insetOfPoints(one.path, rest.canvas);
   if (!(pathInset >= 0)) add("outside", part, "canvas", pathInset);
   const arrowInset = insetIn(one.arrow, rest.canvas);
@@ -375,6 +382,10 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
   }
   nodeOverlaps(shapes, add);
   for (const entry of shapes.entries) {
+    for (const region of shapes.regions) {
+      const gap = pathToBox(entry.line, region.titleBox);
+      if (gap < PATH_NODE_CLEAR) add("path-through-node", entry.part, region.title, gap);
+    }
     const inset = insetOfPoints(entry.line, shapes.canvas);
     if (!(inset >= 0)) add("outside", entry.part, "canvas", inset);
   }
