@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.38.1
+
+<sub>2026-11-15</sub>
+
+- _(patch)_
+  The system view names who sent each message to whom on the Path and Step tab (`orders → w1: free → working`), and marks a message its receiver had no handler for: the arrow gets a `!` after its name, the Path row starts with `!` and says `dropped`, and Details says why.
+
+  Breaking: none. Path row text for steps that move other parts now starts those moves with the sender.
+
+- _(patch)_
+  The Path tab has a Copy path button. A payload form now fills from what parts sent each other in the walk, so sending `ITEMS_FINISHED` by hand reports a real worker (`w1`), not `sample`. When a step changes nothing, the Step tab says so. Open receiver lands on the state the receiver is in now. The live driver records each message's payload.
+- _(patch)_
+  On the live viz, clicking an event sends it at once. The Context tab sets the values events are sent with, kept in `?value=`. The payload form is gone. Breaking: none
+- _(patch)_
+  A machine with an actor map is drawn as one diagram: its own states and one child's, with no system board. A line under the diagram counts each map's children by state; click a count to show a child. Child pills are gone, and the harness's `children()` returns children sorted by key. Breaking: the pool and actor-map DOM loses `g.child-marker`, `g.child-dot` and `[data-open-part-tab]` for maps, and the Step tab shows one child row per map, so scripts that scraped them break.
+
 ## 0.38.0
 
 <sub>2026-11-14</sub>
