@@ -17,7 +17,6 @@ import {
   LOOP_FIRST_SPAN,
   PORT_GAP,
   STUB,
-  labelSpots,
   textWidth,
 } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
@@ -367,66 +366,37 @@ describe("edge label boxes", () => {
   });
 });
 
-describe("labelSpots", () => {
-  const placed = placeMachine(
-    machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
-  ).edges[0];
-  const bent = [
-    { x: 0, y: 100 },
-    { x: 100, y: 100 },
-    { x: 200, y: 100 },
-  ];
+describe("level runs", () => {
+  const four = ["e1", "e2", "e3", "e4"].map((event) => edge({ from: "a", event, target: "b" }));
+  const loops = ["l1", "l2"].map((event) => edge({ from: "a", event, target: "a" }));
+  const laid = placeMachine(machineOf(["a", "b"], [...four, ...loops]));
+  const arrows = laid.edges.filter((placed) => placed.edge.to === "b");
 
-  test("starts at dagre's spot, then its mirror above the arrow", () => {
-    const { x, y, height } = placed?.label ?? { x: 0, y: 0, height: 0 };
-    const spots = placed === undefined ? [] : labelSpots(placed, bent);
-    expect(spots.slice(0, 2)).toEqual([
-      { x, y },
-      { x, y: y - 2 * (height / 2 + 8) },
-    ]);
+  test("every label sits 9px under the level run of its own arrow", () => {
+    expect(arrows).toHaveLength(4);
+    for (const placed of arrows) {
+      const { x, y, height } = placed.label;
+      const run = placed.points.find((point, index) => {
+        const next = placed.points[index + 1];
+        return next !== undefined && next.y === point.y && point.x <= x && x <= next.x;
+      });
+      expect(run?.y).toBe(y - height / 2 - 9);
+    }
   });
 
-  test("then offers a spot below and one above the arrow, nearest its middle first", () => {
-    const spots = placed === undefined ? [] : labelSpots(placed, bent);
-    const half = (placed?.label.height ?? 0) / 2;
-    expect(spots.slice(2, 4)).toEqual([
-      { x: 100, y: 100 + half + 9 },
-      { x: 100, y: 100 - half - 9 },
-    ]);
-  });
-});
-
-describe("labelSpots geometry", () => {
-  const placed = placeMachine(
-    machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
-  ).edges[0];
-  const width = placed?.label.width ?? 0;
-  const half = (placed?.label.height ?? 0) / 2;
-
-  test("measures the arrow only under the label, not along the whole segment", () => {
-    const long = [
-      { x: 0, y: 100 },
-      { x: 1000, y: 1100 },
-    ];
-    const spots = placed === undefined ? [] : labelSpots(placed, long);
-    expect(spots[2]).toEqual({ x: 500, y: 600 + width / 2 + half + 1 + 8 * Math.SQRT2 });
-  });
-
-  test("a steep arrow pushes the label away by at most a slope of 3", () => {
-    const steep = [
-      { x: 0, y: 0 },
-      { x: 10, y: 1000 },
-    ];
-    const spots = placed === undefined ? [] : labelSpots(placed, steep);
-    const clipped = (5 + width / 2 > 10 ? 10 : 5 + width / 2) * 100;
-    const top = (5 - width / 2 < 0 ? 0 : 5 - width / 2) * 100;
-    expect(spots[2]?.y).toBeCloseTo(clipped + half + 1 + 8 * Math.hypot(1, 3));
-    expect(spots[3]?.y).toBeCloseTo(top - half - 1 - 8 * Math.hypot(1, 3));
-  });
-
-  test("dagre puts the label below its arrow, 8px clear", () => {
-    const y = Number(placed?.path.split(/[ ,MCL]+/).filter(Boolean)[1]);
-    expect((placed?.label.y ?? 0) - half - y).toBe(8);
+  test("an arrow only slopes between columns: no sloped piece reaches a node or label column", () => {
+    const columns = laid.nodes.map((node) => [node.x - node.width / 2, node.x + node.width / 2]);
+    for (const placed of arrows) {
+      for (const [index, point] of placed.points.entries()) {
+        const next = placed.points[index + 1];
+        if (next === undefined || next.y === point.y) continue;
+        for (const [left, right] of columns) {
+          const lo = Math.min(point.x, next.x);
+          const hi = Math.max(point.x, next.x);
+          expect(hi <= (left ?? 0) || lo >= (right ?? 0)).toBe(true);
+        }
+      }
+    }
   });
 });
 
@@ -464,11 +434,11 @@ describe("ports", () => {
     expect((ys[2] ?? 0) - (ys[1] ?? 0)).toBe(PORT_GAP);
   });
 
-  test("each end leaves the box by a STUB-long horizontal piece", () => {
+  test("each end leaves the box by a horizontal piece at least STUB long", () => {
     for (const placed of laid.edges) {
       const [port, stub] = placed.points;
       expect(stub?.y).toBe(port?.y);
-      expect((stub?.x ?? 0) - (port?.x ?? 0)).toBe(STUB);
+      expect((stub?.x ?? 0) - (port?.x ?? 0)).toBeGreaterThanOrEqual(STUB);
     }
   });
 

@@ -23,17 +23,25 @@ function addStates(graph: ReturnType<typeof graphOf>, names: string[]): void {
 }
 
 describe("dagre behaviour the layout will rely on", () => {
-  test("places a labelpos r label box labeloffset below the edge point in LR", () => {
+  test("A5: a labelpos c edge's label sits on its route point, and label dummies of one rank are at least edgesep apart", () => {
     const graph = graphOf();
     addStates(graph, ["a", "b"]);
-    graph.setEdge("a", "b", { width: 60, height: 16, labelpos: "r", labeloffset: 8 }, "e");
+    for (const name of ["e1", "e2", "e3"])
+      graph.setEdge("a", "b", { width: 60, height: 40, labelpos: "c" }, name);
     layout(graph);
-    const edge = graph.edge("a", "b", "e");
-    const points: Point[] = edge.points ?? [];
-    const onPath = points.reduce((best: Point, point: Point) =>
-      Math.abs(point.x - (edge.x ?? 0)) < Math.abs(best.x - (edge.x ?? 0)) ? point : best,
-    );
-    expect(edge.y).toBeCloseTo(onPath.y + 8 + 16 / 2 + 0, 0);
+    const labels = ["e1", "e2", "e3"].map((name) => graph.edge("a", "b", name));
+    for (const label of labels) {
+      const onPath = (label.points ?? []).some(
+        (point: Point) =>
+          Math.abs(point.x - (label.x ?? 0)) < 0.5 && Math.abs(point.y - (label.y ?? 0)) < 0.5,
+      );
+      expect(onPath).toBe(true);
+    }
+    const ys = labels.map((label) => label.y ?? 0).sort((a, b) => a - b);
+    for (const [index, y] of ys.entries()) {
+      const before = ys[index - 1];
+      if (before !== undefined) expect(y - before - 40).toBeGreaterThanOrEqual(14);
+    }
   });
 
   test("keeps members LABEL_PAD inside a compound's border and non-members LABEL_PAD outside", () => {

@@ -111,4 +111,10 @@ describe("edgeLines", () => {
   test("an unconditional edge is the event alone", () => {
     expect(edgeLines(edgeWith([branch(["a"], "payment")]))).toEqual(["pay"]);
   });
+
+  test("a label is never more than two lines (layout leaves room for two)", () => {
+    const many = [branch(["a"], "x"), branch(["b"], "y"), branch(["c"], "z"), branch(["d"], null)];
+    expect(edgeLines(edgeWith(many)).length).toBeLessThanOrEqual(2);
+    expect(edgeLines(edgeWith(order6)).length).toBeLessThanOrEqual(2);
+  });
 });

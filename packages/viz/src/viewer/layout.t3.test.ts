@@ -198,7 +198,7 @@ describe("region titles have room of their own", () => {
     expect(overlapsOf(laid)).toEqual([]);
   });
 
-  test("an arrow into a start state's left side leaves by ENTRY_STUB, clear of the entry arrow", () => {
+  test("an arrow into a start state's left side leaves by at least ENTRY_STUB, clear of the entry arrow", () => {
     const back = ["e0", "e1", "e2", "e3", "e4"].map((event) => edge("a", event, "first"));
     const laid = placeMachine({
       ...machineOf(
@@ -215,7 +215,7 @@ describe("region titles have room of their own", () => {
     for (const placed of into) {
       const [stub, port] = placed.points.slice(-2);
       expect(port?.x).toBe(left);
-      expect((port?.x ?? 0) - (stub?.x ?? 0)).toBe(42);
+      expect((port?.x ?? 0) - (stub?.x ?? 0)).toBeGreaterThanOrEqual(42);
     }
   });
 
@@ -312,5 +312,196 @@ describe("the checker places nodes in the region the layout put them in", () => 
     const laid = placeMachine({ ...machineOf([state("a")], [], []), initial: "idle" });
     expect(laid.entries).toEqual([]);
     expect(overlapsOf(laid)).toEqual([]);
+  });
+});
+
+describe("a region's title row sits above every arrow that runs inside it", () => {
+  // Found by fast-check (seed 7) with the route-point member rule removed: e6 runs through the title of map a.b.
+  const machine = {
+    id: "gen",
+    initial: null,
+    regions: ["a", "a.b"],
+    maps: ["a.b"],
+    actors: [],
+    states: [
+      {
+        id: "a.b.VMwde73_",
+        label: "a.b.VMwde73_",
+        region: "a.b",
+        initial: false,
+        final: false,
+        effects: [],
+        coverage: null,
+        tested: null,
+        doc: null,
+      },
+      {
+        id: "SmWL6Y0CVM",
+        label: "SmWL6Y0CVM",
+        region: null,
+        initial: false,
+        final: false,
+        effects: [
+          {
+            name: "Auyydv5iIPFGk0q",
+            sends: null,
+          },
+          {
+            name: "pR_G6T_W",
+            sends: [],
+          },
+        ],
+        coverage: null,
+        tested: null,
+        doc: null,
+      },
+      {
+        id: "a.Vv2r0",
+        label: "a.Vv2r0",
+        region: "a",
+        initial: false,
+        final: false,
+        effects: [
+          {
+            name: "FcUMwdt8GqmDqMP",
+            sends: null,
+          },
+        ],
+        coverage: null,
+        tested: null,
+        doc: null,
+      },
+      {
+        id: "a.b.2m_43h",
+        label: "a.b.2m_43h",
+        region: "a.b",
+        initial: false,
+        final: false,
+        effects: [
+          {
+            name: "wDJ79YUO8PAYr",
+            sends: null,
+          },
+        ],
+        coverage: null,
+        tested: null,
+        doc: null,
+      },
+    ],
+    events: [],
+    outputs: [],
+    partOutputs: {},
+    context: null,
+    edges: [
+      {
+        id: "e0",
+        from: "SmWL6Y0CVM",
+        event: "AAA",
+        to: null,
+        kind: "transition",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+      {
+        id: "e1",
+        from: "a.b.VMwde73_",
+        event: "AAA",
+        to: "a.b.VMwde73_",
+        kind: "stay",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+      {
+        id: "e2",
+        from: "a.b.VMwde73_",
+        event: "AAA",
+        to: "a.b.2m_43h",
+        kind: "stay",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+      {
+        id: "e3",
+        from: "a.Vv2r0",
+        event: "AAA",
+        to: "SmWL6Y0CVM",
+        kind: "stay",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+      {
+        id: "e4",
+        from: "a.Vv2r0",
+        event: "AAA",
+        to: null,
+        kind: "transition",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+      {
+        id: "e5",
+        from: "SmWL6Y0CVM",
+        event: "AAA",
+        to: "a.b.VMwde73_",
+        kind: "stay",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+      {
+        id: "e6",
+        from: "a.b.2m_43h",
+        event: "AAA",
+        to: "SmWL6Y0CVM",
+        kind: "stay",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+    ],
+    fuzz: null,
+    runs: [],
+  } as unknown as VizMachine;
+
+  test("an arrow that leaves a map runs below the map's title row", () => {
+    const laid = placeMachine(machine);
+    expect(
+      overlapsOf(laid)
+        .filter((overlap) => overlap.rule !== "paths-alongside")
+        .map((overlap) => `${overlap.rule} ${overlap.a} ${overlap.b}`),
+    ).toEqual([]);
   });
 });
