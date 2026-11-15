@@ -116,8 +116,7 @@
   font-size: 1em;
 }
 
-/* Panel below the graph unless the viewer itself is wide: a docs column is
-   narrow even on a big screen, so this asks the container, not the viewport. */
+/* Panel always below the graph, so the graph keeps the full width. */
 .viz .viz-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -179,23 +178,6 @@
   border-top: 1px solid var(--region-bg);
   padding-top: 8px;
   min-width: 0;
-}
-
-@container (min-width: 1100px) {
-  .viz .viz-main {
-    grid-template-columns: minmax(0, 1fr) 360px;
-  }
-
-  .viz .panel {
-    border-top: none;
-    border-left: 1px solid var(--region-bg);
-    padding: 0 0 0 16px;
-    position: sticky;
-    top: 0;
-    align-self: start;
-    max-height: 100vh;
-    overflow: auto;
-  }
 }
 
 .viz .panel h2 {

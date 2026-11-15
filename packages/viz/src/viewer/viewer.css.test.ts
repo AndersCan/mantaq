@@ -86,14 +86,9 @@ test("a dropped message's Step line and arrow mark use the banner colour", () =>
   expect(bareRule(".viz .drop-mark")).toMatch(/fill:\s*var\(--banner-fg\)/);
 });
 
-test("the side panel sticks to the top in the wide layout only", () => {
-  const wide = css.slice(css.indexOf("@container (min-width: 1100px)"));
-  const block = wide.slice(0, wide.indexOf("\n}\n"));
-  const panel = block.split("}").find((b) => b.includes(".viz .panel {")) ?? "";
-  expect(panel).toMatch(/position:\s*sticky/);
-  expect(panel).toMatch(/top:\s*0/);
-  expect(panel).toMatch(/align-self:\s*start/);
-  expect(panel).toMatch(/max-height:\s*100vh/);
-  expect(panel).toMatch(/overflow:\s*auto/);
+test("the panel stays below the graph at every width", () => {
+  expect(css).not.toContain("@container");
+  const main = bare.split("}").find((b) => b.trim().startsWith(".viz .viz-main {")) ?? "";
+  expect(main).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   expect(rule(".viz .panel {")).not.toMatch(/sticky/);
 });
