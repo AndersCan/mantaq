@@ -43,7 +43,6 @@ test("pool, real effects: a late move shown on a step stays on it after the next
   await new Promise((r) => setTimeout(r, 20));
   const before = pathTexts(root)[1];
   root.querySelector<HTMLButtonElement>('[data-send="team.ITEM_ARRIVED"]')?.click();
-  root.querySelector<HTMLButtonElement>('[data-payload-send="team.ITEM_ARRIVED"]')?.click();
   const after = pathTexts(root);
   expect(after.length).toBe(3);
   // The driver names the late move's sender only after the row first showed (driver follow-up).

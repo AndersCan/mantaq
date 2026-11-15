@@ -22,7 +22,7 @@ export interface VizHarness {
   state(): Promise<string>;
   /** Effects waiting for an answer, with the events each reports. */
   waiting(): Promise<Array<{ effect: string; reports: string[] }>>;
-  /** Click what one person would click; an ignored event is a result, not an error. */
+  /** Click what one person would click; an ignored event is a result, not an error. A payload is typed into the Context tab's value boxes for this click only. */
   send(
     event: string,
     payload?: Record<string, VizJson>,
@@ -37,8 +37,6 @@ export interface VizHarness {
   ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>>;
   /** Every child of every actor map, by local state name: `[{ map: "photos", key: "p1", state: "sendingPhoto" }]`. */
   children(): Promise<Array<{ map: string; key: string; state: string }>>;
-  /** Open the form for `event` if it is not open, and say whether its Send button is inside the window. */
-  sendFits(event: string): Promise<Either<string, { inViewport: boolean }>>;
   findings(): VizFinding[];
   /** Click the finding's "!" mark, then its Replay button; left when the finding has no replay. */
   replay(finding: VizFinding): Promise<Either<string, { state: string }>>;
@@ -105,72 +103,22 @@ async function attributes(page: Page, selector: string, attribute: string): Prom
     .evaluateAll((nodes, name) => nodes.map((node) => node.getAttribute(name) ?? ""), attribute);
 }
 
-/** Fill the open payload form for `event`; returns a message when a key has no field. */
-async function fillForm(
+/** Type `values` into the Context tab's boxes (empty text clears one); returns a message when a key has no box. */
+async function setValues(
   page: Page,
-  event: string,
-  payload: Record<string, VizJson>,
+  values: Record<string, VizJson | undefined>,
 ): Promise<string | undefined> {
-  const form = page.locator(`[data-payload-form=${quoted(event)}]`);
-  const jsonBox = page.locator(`[data-payload-json=${quoted(event)}]:visible`);
-  if ((await jsonBox.count()) > 0) {
-    await jsonBox.fill(JSON.stringify(payload));
-    return undefined;
-  }
-  for (const [key, value] of Object.entries(payload)) {
-    const field = form.locator(`[data-field=${quoted(key)}]`);
-    if ((await field.count()) === 0) {
-      const names = await attributes(
-        page,
-        `[data-payload-form=${quoted(event)}] [data-field]`,
-        "data-field",
-      );
-      await page.click(`[data-payload-cancel=${quoted(event)}]`);
-      return `${event} has no field ${key}. Fields: ${names.join(", ")}.`;
+  await page.click('[data-tab="context"]');
+  for (const [key, value] of Object.entries(values)) {
+    const box = page.locator(`[data-value=${quoted(key)}]`);
+    if ((await box.count()) === 0) {
+      return `no value box for ${key}.`;
     }
-    const tag = await field.evaluate((node) => node.tagName.toLowerCase());
-    if (tag === "select") {
-      await field.selectOption(JSON.stringify(value));
-    } else if (tag === "div") {
-      await field.locator(`[data-choice=${quoted(JSON.stringify(value))}]`).click();
-    } else {
-      await field.fill(typeof value === "string" ? value : JSON.stringify(value));
-    }
+    const text =
+      value === undefined ? "" : typeof value === "string" ? value : JSON.stringify(value);
+    await box.fill(text);
+    await box.dispatchEvent("change");
   }
-  return undefined;
-}
-
-/** Click through the payload form (or custom JSON box); returns a message when it cannot. */
-async function sendWithPayload(
-  page: Page,
-  scope: string,
-  step: { event: string; payload: Record<string, VizJson> | undefined; asks: boolean },
-): Promise<string | undefined> {
-  const { event, payload, asks } = step;
-  const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
-  const sendButton = page.locator(`[data-payload-send=${quoted(event)}]`);
-  if (payload === undefined) {
-    await trigger.click();
-    if ((await page.locator(`[data-payload-form=${quoted(event)}]`).count()) > 0) {
-      await sendButton.click();
-    }
-    return undefined;
-  }
-  if (asks) {
-    await trigger.click();
-    const problem = await fillForm(page, event, payload);
-    if (problem === undefined) {
-      await sendButton.click();
-    }
-    return problem;
-  }
-  const custom = page.locator(`[data-send-custom=${quoted(event)}]`);
-  if ((await custom.count()) === 0) {
-    return `${event} takes no payload.`;
-  }
-  await custom.click();
-  await page.locator(`[data-payload-json=${quoted(event)}]`).fill(JSON.stringify(payload));
-  await sendButton.click();
   return undefined;
 }
 
@@ -262,16 +210,18 @@ function makeSend(
         `no button for ${event}: ${where}, which offers: ${[...new Set(offered)].join(", ")}.`,
       );
     }
-    const asks = ((await trigger.textContent()) ?? "").trim().endsWith("…");
-    const problem = await sendWithPayload(page, scope, { event, payload, asks });
+    const problem = payload === undefined ? undefined : await setValues(page, payload);
     if (problem !== undefined) {
       return Either.left(problem);
     }
-    const alert = page.locator(`[data-payload-form=${quoted(event)}] [role="alert"]:visible`);
-    if ((await alert.count()) > 0) {
-      const text = ((await alert.first().textContent()) ?? "").trim();
-      await page.click(`[data-payload-cancel=${quoted(event)}]`);
-      return Either.left(`${event} was not sent: ${text}`);
+    await page.click('[data-tab="step"]');
+    await trigger.click();
+    if (payload !== undefined) {
+      await setValues(
+        page,
+        Object.fromEntries(Object.keys(payload).map((key) => [key, undefined])),
+      );
+      await page.click('[data-tab="step"]');
     }
     const outcome =
       (await page.getAttribute(`${PANEL} [data-outcome]`, "data-outcome")) ?? "transition";
@@ -354,35 +304,6 @@ function describe(
     sendTo,
     regions: () => readRegions(page),
     children: () => readChildren(page),
-    sendFits: async (event) => {
-      if (lifecycle.isClosed()) {
-        return Either.left("harness is closed");
-      }
-      const send = page.locator(`[data-payload-send=${quoted(event)}]`);
-      if ((await send.count()) === 0) {
-        await page.click('[data-tab="step"]');
-        await openEvents(page);
-        const trigger = page.locator(`${PANEL} [data-send=${quoted(event)}]`).first();
-        if ((await trigger.count()) === 0) {
-          return Either.left(`no button for ${event}.`);
-        }
-        await trigger.click();
-      }
-      if ((await send.count()) === 0) {
-        return Either.left(`no open form for ${event}`);
-      }
-      return Either.right({
-        inViewport: await send.evaluate((node) => {
-          const rect = node.getBoundingClientRect();
-          return (
-            rect.top >= 0 &&
-            rect.left >= 0 &&
-            rect.bottom <= innerHeight &&
-            rect.right <= innerWidth
-          );
-        }),
-      });
-    },
     findings: () => machineFindings(machine),
     replay: async (finding) => {
       if (lifecycle.isClosed()) {

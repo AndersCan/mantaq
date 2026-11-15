@@ -76,9 +76,10 @@ const cart: VizMachine = {
 };
 
 /** items counts addItem steps; pay moves to payment only when items is not 0. */
-function fakeDriver() {
+function fakeDriver(opens: (step: VizStep) => boolean = () => false) {
   const sent: VizStep[] = [];
   let listens = 0;
+  let report: ((state: VizLiveState) => void) | undefined;
   const run = (steps: ReadonlyArray<VizStep>): { live: VizLiveState; last: VizLiveStep | null } => {
     let items = 0;
     let at = "cart";
@@ -87,7 +88,7 @@ function fakeDriver() {
       if (step.kind !== "event") continue;
       const from = at;
       if (step.event === "addItem") items += 1;
-      if (step.event === "pay" && items > 0) at = "payment";
+      if (step.event === "pay" && (items > 0 || opens(step))) at = "payment";
       last = {
         from,
         event: step.event,
@@ -125,12 +126,20 @@ function fakeDriver() {
       sent.push(step);
       return run(sent).live;
     },
+    listen: (callback) => {
+      report = callback;
+    },
     dryRun: (candidates) => {
       listens += 1;
       return candidates.map((candidate) => run([...sent, candidate]).last);
     },
   };
-  return { driver, sent, dryRuns: () => listens };
+  /** An effect result arrives later: an item is in the cart, nobody clicked. */
+  const arrive = () => {
+    sent.push({ kind: "event", event: "addItem", payload: null });
+    report?.(run(sent).live);
+  };
+  return { driver, sent, arrive, dryRuns: () => listens };
 }
 
 const clickEdge = (root: HTMLElement, id: string) =>
@@ -138,9 +147,9 @@ const clickEdge = (root: HTMLElement, id: string) =>
     .querySelector(`[data-edge-id="${id}"]`)
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-function mount(driver: VizDriver) {
+function mount(driver: VizDriver, machine: VizMachine = cart) {
   const root = document.createElement("div");
-  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [cart] }, { driver });
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
   return root;
 }
 
@@ -162,6 +171,54 @@ describe("a blocked arrow", () => {
     expect(note?.textContent).toBe("pay is blocked: items is 0");
     expect(note?.getAttribute("aria-label")).toBe("pay is blocked: items is 0");
     expect(root.querySelector(".graph .selected")).toBeNull();
+  });
+
+  test("follows a value set in the Context tab, so its lock matches what a click sends", () => {
+    const coupon = {
+      name: "coupon",
+      type: "string",
+      optional: false,
+      doc: null,
+      input: "text" as const,
+      choices: [],
+      sample: "none",
+    };
+    const withCoupon: VizMachine = {
+      ...cart,
+      events: cart.events.map((each) =>
+        each.id === "pay" ? { ...each, payload: [coupon] } : each,
+      ),
+    };
+    const { driver, sent } = fakeDriver(
+      (step) => step.kind === "event" && JSON.stringify(step.payload) === '{"coupon":"free"}',
+    );
+    const root = mount(driver, withCoupon);
+    const pay = () => root.querySelector('[data-edge-id="cart-pay-payment"]');
+    expect(pay()?.classList.contains("blocked")).toBe(true);
+    clickEdge(root, "cart-pay-payment");
+    expect(root.querySelector('[data-blocked-note="pay"]')).not.toBeNull();
+    expect(sent).toHaveLength(0);
+    const box = root.querySelector<HTMLInputElement>('[data-value="coupon"]');
+    if (box) box.value = "nope";
+    box?.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+    expect(pay()?.classList.contains("blocked")).toBe(true);
+    if (box) box.value = "free";
+    box?.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+    expect(pay()?.classList.contains("blocked")).toBe(false);
+    clickEdge(root, "cart-pay-payment");
+    expect(sent).toEqual([{ kind: "event", event: "pay", payload: { coupon: "free" } }]);
+  });
+
+  test("a note closes when a later state unblocks its arrow", () => {
+    const { driver, arrive } = fakeDriver();
+    const root = mount(driver);
+    clickEdge(root, "cart-pay-payment");
+    expect(root.querySelector("[data-blocked-note]")).not.toBeNull();
+    arrive();
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+    expect(root.querySelector("[data-composing]")).toBeNull();
   });
 
   test("Escape closes the note", () => {

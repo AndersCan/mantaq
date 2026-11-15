@@ -128,45 +128,20 @@
   position: relative;
 }
 
-/* The payload question, pinned to the bottom so Send stays on screen. */
+/* The blocked note, pinned to the bottom. */
 .viz .payload-sheet {
   position: sticky;
-  bottom: var(--viz-keyboard, 0px);
+  bottom: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  max-height: min(60vh, 26rem, calc(var(--viz-visible, 100vh) - 1rem));
+  max-height: min(60vh, 26rem);
   box-sizing: border-box;
   background: var(--state-bg);
   border: 1px solid var(--fg);
   border-top-width: 2px;
   border-radius: 6px 6px 0 0;
   box-shadow: 0 -4px 16px rgb(0 0 0 / 25%);
-}
-
-.viz .payload-sheet .explore-payload {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  margin: 0;
-  border-left: none;
-}
-
-.viz .payload-sheet .payload-head,
-.viz .payload-sheet .payload-actions {
-  flex: none;
-}
-
-.viz .payload-sheet .payload-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-}
-
-.viz .payload-sheet textarea {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: ui-monospace, monospace;
 }
 
 .viz .edge[data-composing] path {
@@ -748,25 +723,6 @@
   min-height: 0;
 }
 
-.viz .explore-payload {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 4px 0 8px;
-  padding: 6px 8px;
-  border-left: 3px solid var(--fg);
-}
-
-.viz .explore-payload p {
-  margin: 0;
-}
-
-.viz .explore-samples {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
 .viz .run-notice {
   background: var(--banner-bg);
   color: var(--banner-fg);
@@ -813,39 +769,6 @@
   vertical-align: top;
   padding: 2px 6px;
   border-bottom: 1px solid var(--state-border);
-}
-
-.viz .payload-title {
-  margin: 0;
-  font-size: 0.875rem;
-}
-
-.viz .segmented {
-  display: inline-flex;
-  flex-wrap: wrap;
-}
-
-.viz .segmented button {
-  border-radius: 0;
-}
-
-.viz .segmented button + button {
-  margin-left: -1px;
-}
-
-.viz .segmented button:first-child {
-  border-radius: 4px 0 0 4px;
-}
-
-.viz .segmented button:last-child {
-  border-radius: 0 4px 4px 0;
-}
-
-.viz .segmented button[aria-pressed="true"] {
-  background: var(--region-bg);
-  border-color: var(--fg);
-  font-weight: 600;
-  position: relative;
 }
 
 .viz .explore-events > summary {

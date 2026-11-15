@@ -49,10 +49,10 @@ test("says what is offered when an event is not", async () => {
   });
 }, 60_000);
 
-test("names the fields when one is wrong", async () => {
+test("names the field when it has no value box", async () => {
   await withViz(checkout, async (viz) => {
     const result = await viz.send("submitBasicInfo", { phone: "1" });
-    expect(Either.getLeft(result)).toBe("submitBasicInfo has no field phone. Fields: email, name.");
+    expect(Either.getLeft(result)).toBe("no value box for phone.");
   });
 }, 60_000);
 
@@ -106,26 +106,17 @@ test("an event the state ignores is a result, not an error", async () => {
   });
 }, 60_000);
 
-test("says why the form refused a payload", async () => {
-  await withViz(fixture("factories.ts"), "door", async (viz) => {
-    const result = await viz.send("open", { by: "key", tags: "[oops" });
-    expect(Either.getLeft(result)).toBe("open was not sent: Not sent: tags is not valid JSON.");
-  });
-}, 60_000);
-
-test("says when an event takes no payload", async () => {
+test("says when an event has no value box for a key", async () => {
   await withViz(fixture("harness-empty.ts"), async (viz) => {
     const result = await viz.send("ping", { some: 1 });
-    expect(Either.getLeft(result)).toBe("ping takes no payload.");
+    expect(Either.getLeft(result)).toBe("no value box for some.");
   });
 }, 60_000);
 
-test("fills a choice field and sends a payload with the custom box", async () => {
+test("sets a choice field in the Context tab and sends it", async () => {
   await withViz(fixture("fields.ts"), async (viz) => {
     const choice = await viz.send("choose", { validFor: "1h" });
     expect(Either.getRight(choice)).toEqual({ state: "idle", outcome: "stay" });
-    const custom = await viz.send("touch", { anything: 1 });
-    expect(Either.getRight(custom)).toEqual({ state: "idle", outcome: "stay" });
   });
 }, 60_000);
 

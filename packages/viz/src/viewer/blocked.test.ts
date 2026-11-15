@@ -163,10 +163,10 @@ describe("examplePayload", () => {
   } as unknown as VizMachine;
 
   test("uses the field example, not an earlier sent value", () => {
-    expect(examplePayload(machine, "pay")).toEqual({ email: "ana@example.com" });
+    expect(examplePayload(machine, "pay", {})).toEqual({ email: "ana@example.com" });
   });
 
   test("an event with no data sends null", () => {
-    expect(examplePayload(machine, "addItem")).toBeNull();
+    expect(examplePayload(machine, "addItem", {})).toBeNull();
   });
 });

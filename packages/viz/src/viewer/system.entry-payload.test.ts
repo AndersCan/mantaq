@@ -99,7 +99,7 @@ const snapshot = (steps: VizStep[]): VizLiveState => ({
 });
 
 describe("system view entry line on an event with data", () => {
-  test("opens the form, sends nothing, and Send reaches the region", () => {
+  test("sends to the region at once with the example", () => {
     const steps: VizStep[] = [];
     const driver: VizDriver = {
       reset: () => snapshot([]),
@@ -112,83 +112,14 @@ describe("system view entry line on an event with data", () => {
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [lanes] }, { driver });
     expect(root.querySelector("svg[data-system]")).not.toBeNull();
     root.querySelector('[data-entry-event="DROP"]')?.dispatchEvent(new Event("click"));
-    expect(steps).toEqual([]);
-    expect(
-      root.querySelector<HTMLInputElement>('.payload-sheet [data-payload-form="DROP"] input')
-        ?.value,
-    ).toBe("offline");
-    root.querySelector<HTMLButtonElement>('[data-payload-send="DROP"]')?.click();
+    expect(root.querySelector(".payload-sheet")).toBeNull();
     expect(steps).toEqual([
       { kind: "event", event: "DROP", payload: { reason: "offline" }, actor: { region: "net" } },
     ]);
   });
-  test("after Escape or Send from an entry line's form, focus is back on that entry line", () => {
-    const steps: VizStep[] = [];
-    const driver: VizDriver = {
-      reset: () => snapshot([]),
-      step: (step) => {
-        steps.push(step);
-        return snapshot([...steps]);
-      },
-    };
-    const root = document.createElement("div");
-    document.body.append(root);
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [lanes] }, { driver });
-    const line = () => root.querySelector<SVGGElement>('[data-entry-event="DROP"]');
-    line()?.focus();
-    line()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(document.activeElement?.closest(".payload-sheet")).not.toBeNull();
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    expect(root.querySelector(".payload-sheet")).toBeNull();
-    expect(document.activeElement?.getAttribute("data-entry-event")).toBe("DROP");
-    line()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    root.querySelector<HTMLButtonElement>('[data-payload-send="DROP"]')?.click();
-    expect(steps).toHaveLength(1);
-    expect(document.activeElement?.getAttribute("data-entry-event")).toBe("DROP");
-    root.remove();
-  });
 });
 
-describe("edge form focus", () => {
-  test("Escape gives focus back to the arrow the form came from, not the first arrow", () => {
-    const flat: VizMachine = {
-      ...lanes,
-      id: "door",
-      initial: "shut",
-      regions: [],
-      maps: [],
-      actors: [],
-      states: [state("shut", true), state("open")],
-      events: [event("PEEK"), lanes.events.find((each) => each.id === "DROP")!],
-      outputs: [],
-      partOutputs: {},
-      edges: [edge("shut", "PEEK", "shut"), edge("shut", "DROP", "open")],
-    };
-    const live = (steps: VizStep[]): VizLiveState => ({
-      ...snapshot(steps),
-      state: steps.length === 0 ? "shut" : "open",
-      regions: {},
-      children: [],
-    });
-    const driver: VizDriver = { reset: () => live([]), step: (step) => live([step]) };
-    const root = document.createElement("div");
-    document.body.append(root);
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [flat] }, { driver });
-    const arrow = root.querySelector<SVGGElement>('[data-edge-id="shut-DROP-open"]');
-    arrow?.focus();
-    arrow?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(document.activeElement?.closest(".payload-sheet")).not.toBeNull();
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("shut-DROP-open");
-    root.remove();
-  });
-});
-
-describe("edge form focus with two forms", () => {
+describe("focus when an arrow is pressed", () => {
   const knock = { ...lanes.events.find((each) => each.id === "DROP")!, id: "KNOCK" };
   const door: VizMachine = {
     ...lanes,
@@ -225,19 +156,6 @@ describe("edge form focus with two forms", () => {
     };
     return { root, press };
   };
-  test("a form opened from a second arrow while the first is open gives focus back to the second", () => {
-    const { root, press } = mount();
-    press("shut-KNOCK-shut");
-    press("shut-DROP-open");
-    expect(root.querySelector(".payload-sheet")?.getAttribute("aria-label")).toBe(
-      "Payload for DROP",
-    );
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("shut-DROP-open");
-    root.remove();
-  });
   test("sending another arrow while a form is open leaves focus on that arrow", () => {
     const { root, press } = mount();
     press("shut-KNOCK-shut");

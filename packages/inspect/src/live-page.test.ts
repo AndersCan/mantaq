@@ -132,8 +132,8 @@ describe("mountDriven targets", () => {
   });
 });
 
-describe("mountDriven filled forms", () => {
-  test("the answer form starts with the code the machine is waiting on", async () => {
+describe("mountDriven values", () => {
+  test("the answer events send the code the machine is waiting on and the value set in the Context tab", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
       load: async () => ({ createAnswerActor }),
@@ -153,18 +153,10 @@ describe("mountDriven filled forms", () => {
     });
     const click = (selector: string) => root.querySelector<HTMLButtonElement>(selector)?.click();
     click('[data-send="ask"]');
-    const code = root.querySelector<HTMLInputElement>('[data-field="code"]');
-    const album = root.querySelector<HTMLInputElement>('[data-field="album"]');
-    if (code) code.value = "c1";
-    if (album) album.value = "Trip";
-    click('[data-payload-send="ask"]');
+    const answer = root.querySelector<HTMLInputElement>('[data-value="answer"]');
+    if (answer) answer.value = "declined";
+    answer?.dispatchEvent(new Event("change", { bubbles: true }));
     click('[data-send="answered"]');
-    expect(root.querySelector<HTMLInputElement>('[data-field="code"]')?.value).toBe("c1");
-    const declined = [
-      ...root.querySelectorAll<HTMLButtonElement>('[data-field="answer"] button'),
-    ].find((each) => each.getAttribute("data-choice") === '"declined"');
-    declined?.click();
-    click('[data-payload-send="answered"]');
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
   });
 });

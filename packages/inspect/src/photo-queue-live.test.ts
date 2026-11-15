@@ -38,7 +38,6 @@ const clickEdge = (root: HTMLElement, id: string) =>
 
 function sendOnEdge(root: HTMLElement, id: string) {
   clickEdge(root, id);
-  root.querySelector<HTMLButtonElement>("[data-payload-send]")?.click();
 }
 
 function addThree(root: HTMLElement) {

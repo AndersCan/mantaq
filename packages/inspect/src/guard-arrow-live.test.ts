@@ -66,19 +66,7 @@ describe("Getting started step 6, live", () => {
     expect(edge(root, "hungry-eat-full")?.classList.contains("blocked")).toBe(false);
     expect(root.querySelector("[data-blocked-note]")).toBeNull();
     click(root, "hungry-eat-full");
-    expect(root.querySelector('[data-payload-form="eat"]')).not.toBeNull();
-  });
-
-  test("an empty food stays but is not blocked", async () => {
-    const root = await mount();
-    click(root, "hungry-serve-stay");
-    click(root, "hungry-eat-full");
-    const box = root.querySelector<HTMLTextAreaElement | HTMLInputElement>(
-      '[data-payload-form="eat"] textarea, [data-payload-form="eat"] input',
-    );
-    if (box) box.value = box instanceof HTMLTextAreaElement ? '{"food": ""}' : "";
-    root.querySelector<HTMLElement>('[data-payload-send="eat"]')?.click();
-    expect(root.textContent).toContain("stays");
-    expect(edge(root, "hungry-eat-full")?.classList.contains("blocked")).toBe(false);
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("full");
   });
 });

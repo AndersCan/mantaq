@@ -1,4 +1,15 @@
-import type { VizField, VizJson, VizLiveState, VizStep } from "../schema.ts";
+import { asksForPayload, payloadSamples } from "../moves.ts";
+import type {
+  VizField,
+  VizJson,
+  VizLiveState,
+  VizLiveStep,
+  VizMachine,
+  VizStep,
+} from "../schema.ts";
+
+/** Field name → the value the person set in the Context tab. */
+export type Values = Readonly<Record<string, VizJson>>;
 
 /** Values for an event's payload fields, copied from what this walk sent. */
 interface FillSource {
@@ -59,12 +70,19 @@ function sameShape(
   return undefined;
 }
 
-/** What a click sends for `event`: per field, the latest value this walk sent under that name, else the field's example (required fields), else the fuzzer's first payload's value. Without declared fields: the payload this walk last sent with `event`, else the fuzzer's first. undefined = nothing known. */
+/** What a click sends for `event`: per field, the value set in the Context tab, else the latest value this walk sent under that name, else the field's example (required fields), else the fuzzer's first payload's value. Without declared fields: the payload this walk last sent with `event`, else the fuzzer's first. undefined = nothing known. */
 export function knownPayload(
   fields: ReadonlyArray<VizField> | null,
-  context: { event: string; samples: ReadonlyArray<VizJson>; steps: ReadonlyArray<VizStep> },
+  context: {
+    event: string;
+    samples: ReadonlyArray<VizJson>;
+    steps: ReadonlyArray<VizStep>;
+    /** Values set in the Context tab; they win over everything else when they fit. */
+    set?: Values;
+  },
 ): { payload: VizJson } | undefined {
   const { event, samples, steps } = context;
+  const set = context.set ?? {};
   const [fuzzed] = samples;
   if (fields === null || fields.length === 0) {
     for (const step of steps.toReversed()) {
@@ -79,7 +97,7 @@ export function knownPayload(
   const typed = typedSource(fields, steps);
   const payload: Record<string, VizJson> = {};
   for (const field of fields) {
-    const value = knownValue(field, { typed, fuzzed });
+    const value = knownValue(field, { typed, fuzzed, set });
     if (value !== undefined) payload[field.name] = value;
   }
   return { payload };
@@ -87,8 +105,10 @@ export function knownPayload(
 
 function knownValue(
   field: VizField,
-  from: { typed: FillSource | null; fuzzed: VizJson | undefined },
+  from: { typed: FillSource | null; fuzzed: VizJson | undefined; set: Values },
 ): VizJson | undefined {
+  const chosen = from.set[field.name];
+  if (chosen !== undefined && fits(field, chosen)) return chosen;
   const sent = from.typed?.values.find((each) => each.field === field.name);
   if (sent !== undefined) return sent.value;
   if (!field.optional) return field.sample;
@@ -147,4 +167,115 @@ function isTypeDefault(field: VizField, value: VizJson): boolean {
   if (field.input === "text") return value === "sample";
   if (field.input === "number") return value === 1;
   return false;
+}
+
+/** The walk's steps, each followed by the messages parts sent after it that carried a payload. */
+function heardSteps(
+  steps: ReadonlyArray<VizStep>,
+  afters: ReadonlyArray<ReadonlyArray<VizLiveStep>>,
+): VizStep[] {
+  return steps.flatMap((step, index) => [
+    step,
+    ...(afters[index] ?? []).flatMap((entry): VizStep[] => {
+      const payload = entry.message?.payload;
+      return payload === undefined ? [] : [{ kind: "event", event: entry.event, payload }];
+    }),
+  ]);
+}
+
+/** The payload a click on `event` sends: null when it carries no data, else the set values, then what the walk sent or heard, then the examples. */
+export function payloadFor(
+  machine: VizMachine,
+  event: string,
+  from: {
+    set: Values;
+    live: VizLiveState | null;
+    afters: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
+  },
+): VizJson {
+  if (!asksForPayload(machine, event)) return null;
+  const { live } = from;
+  const known = knownPayload(machine.events.find((each) => each.id === event)?.payload ?? null, {
+    event,
+    samples: payloadSamples(machine, event),
+    steps: live === null ? [] : heardSteps(live.steps, from.afters),
+    set: from.set,
+  });
+  if (known === undefined) return null;
+  return live === null
+    ? known.payload
+    : freshKeys(known.payload, {
+        event,
+        state: { steps: live.steps, children: live.children, removed: live.removed },
+      });
+}
+
+/** One field per name across the machine's events, the first event's wins: the Context tab's rows. */
+export function valueFields(machine: VizMachine): VizField[] {
+  const byName = new Map<string, VizField>();
+  for (const event of machine.events) {
+    for (const field of event.payload ?? []) {
+      if (!byName.has(field.name)) byName.set(field.name, field);
+    }
+  }
+  return [...byName.values()];
+}
+
+/** What `field` is sent with when nothing is set: the latest value the walk sent or heard under that name, else the example; undefined = left out. */
+export function defaultValue(
+  field: VizField,
+  from: { live: VizLiveState | null; afters: ReadonlyArray<ReadonlyArray<VizLiveStep>> },
+): VizJson | undefined {
+  const steps = from.live === null ? [] : heardSteps(from.live.steps, from.afters);
+  const sent = typedSource([field], steps)?.values[0]?.value;
+  if (sent !== undefined) return sent;
+  return field.optional ? undefined : field.sample;
+}
+
+/** The text a field's input shows for `value`. */
+export function valueText(field: VizField, value: VizJson): string {
+  if (typeof value === "string" && field.input !== "json") return value;
+  if (typeof value === "number") return String(value);
+  return JSON.stringify(value) ?? "";
+}
+
+/** The value a person's text means for `field`; undefined when empty or not valid (then the default is sent). */
+export function parseValue(field: VizField, text: string): VizJson | undefined {
+  if (text.trim() === "") return undefined;
+  switch (field.input) {
+    case "text":
+      return text;
+    case "number": {
+      const number = Number(text);
+      return Number.isFinite(number) ? number : undefined;
+    }
+    case "choice":
+      return field.choices.find((choice) => valueText(field, choice) === text);
+    case "json":
+      try {
+        return JSON.parse(text) as VizJson;
+      } catch {
+        return undefined;
+      }
+  }
+}
+
+/** `name=<json>` per value, as kept in the address (`?value=`). */
+export function encodeValues(values: Values): string[] {
+  return Object.entries(values).map(([name, value]) => `${name}=${JSON.stringify(value)}`);
+}
+
+/** The inverse of `encodeValues`; entries with no name, no `=` or bad JSON are skipped. */
+export function decodeValues(encoded: ReadonlyArray<string>): Values {
+  const values: Record<string, VizJson> = {};
+  for (const entry of encoded) {
+    const at = entry.indexOf("=");
+    if (at <= 0) continue;
+    try {
+      values[entry.slice(0, at)] = JSON.parse(entry.slice(at + 1)) as VizJson;
+    } catch {
+      continue;
+    }
+  }
+  return values;
 }
