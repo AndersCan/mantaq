@@ -523,3 +523,18 @@ describe("overlapsOf: review repros r3", () => {
     expect(ofRule(layout, "path-through-node").map((overlap) => overlap.b)).toEqual(["node:A"]);
   });
 });
+
+describe("overlapsOf: review repro r2 alongside across a grid cell", () => {
+  test("paths-alongside: two upright paths 2px apart either side of a 3px cell edge", () => {
+    // x 200 and 202 fall in different 3px cells (66 and 67).
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", "M200,140 L200,260", labelAt(160, 200)),
+        placedEdge("f", "M202,140 L202,260", labelAt(240, 200)),
+      ],
+    });
+    expect(ofRule(layout, "paths-alongside")).toEqual([
+      { rule: "paths-alongside", a: "path:e", b: "path:f", gap: 0 },
+    ]);
+  });
+});
