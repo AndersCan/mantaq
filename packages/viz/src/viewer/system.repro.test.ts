@@ -160,7 +160,7 @@ describe("system view: branches no other test pins", () => {
     const root = mount([anyRoot]);
     arrow(root, "WORK_DONE")?.dispatchEvent(new Event("click"));
     const open = [...root.querySelectorAll<HTMLButtonElement>("[data-open-part]")].at(-1);
-    expect(open?.textContent).toBe("Open teamInbox at empty");
+    expect(open?.textContent).toBe("Open receiver: teamInbox");
     open?.click();
     expect(root.querySelector(".graph g.selected")?.getAttribute("data-edge-id")).toBe(
       "*-WORK_DONE-empty",

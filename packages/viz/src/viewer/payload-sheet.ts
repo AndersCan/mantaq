@@ -1,5 +1,5 @@
 import { movesFrom, payloadSamples } from "../moves.ts";
-import type { VizActorRef, VizLiveState, VizMachine, VizStep } from "../schema.ts";
+import type { VizActorRef, VizLiveState, VizLiveStep, VizMachine, VizStep } from "../schema.ts";
 import { html } from "./dom.ts";
 import { payloadForm } from "./explore.ts";
 
@@ -128,6 +128,20 @@ function actorState(live: VizLiveState, actor: VizActorRef | undefined): string 
   return child?.state ?? live.state;
 }
 
+/** The walk's steps, each followed by the messages parts sent after it that carried a payload. */
+function heardSteps(
+  steps: ReadonlyArray<VizStep>,
+  afters: ReadonlyArray<ReadonlyArray<VizLiveStep>>,
+): VizStep[] {
+  return steps.flatMap((step, index) => [
+    step,
+    ...(afters[index] ?? []).flatMap((entry): VizStep[] => {
+      const payload = entry.message?.payload;
+      return payload === undefined ? [] : [{ kind: "event", event: entry.event, payload }];
+    }),
+  ]);
+}
+
 /**
  * The payload form as a sheet pinned to the bottom of the viewer, so Send is
  * always on screen; the event's edge on the diagram is marked. Escape closes
@@ -138,6 +152,8 @@ export function showPayloadSheet(
   context: {
     machine: VizMachine;
     live: VizLiveState | null;
+    /** Entry i is what parts sent each other after step i; their payloads fill the form too. */
+    afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     composing: string | null;
     /** The region the open form sends to; none = the machine itself. */
     composingActor?: VizActorRef;
@@ -175,7 +191,7 @@ export function showPayloadSheet(
         event,
         samples: payloadSamples(machine, event),
         fields: machine.events.find((each) => each.id === event)?.payload ?? null,
-        live,
+        live: { ...live, heard: heardSteps(live.steps, context.afters ?? []) },
         send: (step) =>
           context.send(actor === undefined || step.kind !== "event" ? step : { ...step, actor }),
         close,

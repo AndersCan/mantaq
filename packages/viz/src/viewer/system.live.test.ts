@@ -205,7 +205,7 @@ describe("system view", () => {
     );
     expect(text(root, "[data-link-receiver]")).toBe("workers take it in: free.");
     const buttons = [...root.querySelectorAll("[data-open-part]")].map((each) => each.textContent);
-    expect(buttons).toEqual(["Open teamInbox", "Open workers at free"]);
+    expect(buttons).toEqual(["Open sender: teamInbox", "Open receiver: workers"]);
   });
 
   test("an out arrow says it leaves the machine and offers only the sender", () => {
@@ -239,12 +239,37 @@ describe("system view", () => {
     expect(root.querySelector("[data-system-back]")).toBeNull();
   });
 
+  test("Open draws only the opened part; the part buttons switch to the other", () => {
+    const root = mount([pool]);
+    arrow(root, "ITEMS_ASSIGNED")?.dispatchEvent(new Event("click"));
+    root.querySelectorAll<HTMLButtonElement>("[data-open-part]")[1]?.click();
+    const drawn = () =>
+      [...root.querySelectorAll(".graph g[data-node-id]")].map((g) =>
+        g.getAttribute("data-node-id"),
+      );
+    expect(drawn().every((id) => id?.startsWith("workers."))).toBe(true);
+    expect(root.querySelector('[data-open-part-tab="workers"]')?.getAttribute("aria-current")).toBe(
+      "page",
+    );
+    root.querySelector<HTMLButtonElement>('[data-open-part-tab=""]')?.click();
+    expect(drawn().length).toBeGreaterThan(0);
+    expect(drawn().some((id) => id?.startsWith("workers."))).toBe(false);
+  });
+
+  test("Step lists what another part sends apart from what comes from outside", () => {
+    const root = mount([pool]);
+    const group = (event: string) =>
+      root.querySelector(`[data-send="${event}"]`)?.closest("ul")?.getAttribute("data-group");
+    expect(group("ITEM_ARRIVED")).toBe("input");
+    expect(group("ITEMS_ASSIGNED")).toBe("parts");
+  });
+
   test("a diagram edge that sends to another part offers to open it", () => {
     const root = mount([pool]);
     arrow(root, "ITEMS_ASSIGNED")?.dispatchEvent(new Event("click"));
     root.querySelectorAll<HTMLButtonElement>("[data-open-part]")[0]?.click();
     expect(text(root, "[data-sends]")).toBe("Sends ITEMS_ASSIGNED to workers");
-    expect(text(root, "[data-open-part]")).toBe("Open workers at free");
+    expect(text(root, "[data-open-part]")).toBe("Open receiver: workers");
   });
 
   test("a state that takes the event through any-state reads as every state", () => {

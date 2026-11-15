@@ -30,6 +30,45 @@ const LABEL_HEIGHT = 16;
 const ENTRY_NODE = "entry";
 const ENTRY_TEXT = "from outside";
 
+/**
+ * The machine cut down to one part: its own states and the edges that leave them.
+ * Opening a part draws this, so two machines that talk are never drawn as one graph.
+ */
+export function partMachine(machine: VizMachine, part: string): VizMachine {
+  const states = statesOf(machine, part);
+  const ids = new Set(states.map((state) => state.id));
+  const edges = machine.edges.filter(
+    (edge) =>
+      ids.has(edge.from) ||
+      (isAnyState(edge.from) && scopeOf(edge.from) === part) ||
+      (edge.kind === "initial" && edge.to !== null && ids.has(edge.to)),
+  );
+  const only = (list: ReadonlyArray<string>) => list.filter((id) => id === part);
+  return {
+    ...machine,
+    initial: part === "" ? machine.initial : null,
+    regions: only(machine.regions),
+    maps: only(machine.maps),
+    actors: only(machine.actors),
+    states,
+    edges,
+  };
+}
+
+/** The part a state or edge of the diagram belongs to. */
+export function partOfTarget(machine: VizMachine, target: OpenTarget): string {
+  if (target === null) return "";
+  if (target.kind === "state") return scopeOf(target.id);
+  const edge = machine.edges.find((each) => each.id === target.id);
+  return edge === undefined ? "" : scopeOf(edge.kind === "initial" ? (edge.to ?? "") : edge.from);
+}
+
+/** The part that sends `event` to `part`, by label; null when `event` comes from outside the machine. */
+export function senderInto(system: MachineSystem, part: string, event: string): string | null {
+  const link = system.links.find((each) => each.to === part && each.event === event);
+  return link === undefined ? null : labelOf(system, link.from);
+}
+
 /** The system of a machine when it has arrows between parts, else null: the viewer then draws the diagram alone. */
 export function systemFor(machine: VizMachine): MachineSystem | null {
   const system = systemOf(machine);
@@ -728,7 +767,7 @@ export function markSystem(
   }
 }
 
-/** The edge in `part` that takes `event` in `state`, else that state: where "Open <part> at <state>" lands. */
+/** The edge in `part` that takes `event` in `state`, else that state: where "Open receiver" lands. */
 function handlerIn(machine: VizMachine, part: string, event: string, state: string): OpenTarget {
   const edge =
     machine.edges.find((each) => each.event === event && each.from === state) ??
@@ -793,6 +832,13 @@ function droppedLine(
     : html(doc, "p", { "data-link-dropped": "" }, [`${dropReasonText(context.machine, latest)}.`]);
 }
 
+/** The receiver's current state when it takes the arrow's event there; undefined otherwise or without a driver. */
+function handlingNow(link: SystemLink, live: VizLiveState | null): string | undefined {
+  if (live === null || link.to === null) return undefined;
+  const current = link.to === "" ? live.state : live.regions[link.to];
+  return current !== undefined && link.handledIn.includes(current) ? current : undefined;
+}
+
 /** Details tab of the system view: who sends the arrow, who takes it where, and ways into the diagram. */
 export function systemDetails(
   doc: Document,
@@ -822,7 +868,7 @@ export function systemDetails(
   }
   const link = system.links.find((each) => linkKey(each) === selection.id);
   if (link === undefined) return null;
-  const first = link.handledIn[0];
+  const first = handlingNow(link, context.live) ?? link.handledIn[0];
   return html(doc, "section", { class: "details", "data-selected-link": selection.id }, [
     html(doc, "h2", {}, [link.event]),
     html(doc, "p", { "data-link-sender": "" }, [senderLine(machine, system, link)]),
@@ -832,13 +878,13 @@ export function systemDetails(
         ])
       : html(doc, "p", { "data-link-receiver": "" }, [receiverLine(machine, system, link)]),
     droppedLine(doc, { machine, system, id: selection.id, afters: context.afters }),
-    openButton(doc, `Open ${labelOf(system, link.from)}`, {
+    openButton(doc, `Open sender: ${labelOf(system, link.from)}`, {
       target: senderIn(machine, link),
       open,
     }),
     link.to === null || first === undefined
       ? null
-      : openButton(doc, `Open ${labelOf(system, link.to)} at ${localName(first)}`, {
+      : openButton(doc, `Open receiver: ${labelOf(system, link.to)}`, {
           target: handlerIn(machine, link.to, link.event, first),
           open,
         }),
@@ -867,7 +913,7 @@ export function sendsLines(
       const to = labelOf(system, link.to);
       return [
         html(doc, "p", { "data-sends": link.event }, [`Sends ${link.event} to ${to}`]),
-        openButton(doc, `Open ${to} at ${localName(first)}`, {
+        openButton(doc, `Open receiver: ${to}`, {
           target: handlerIn(machine, link.to, link.event, first),
           open,
         }),

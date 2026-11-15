@@ -37,6 +37,8 @@ export interface ExploreContext {
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
+    /** The part that sends `event` into `part` ("" = the root); null or unset: it comes from outside. */
+    fromPart?: (part: string, event: string) => string | null;
     send: (step: VizStep) => void;
     previous?: VizJson;
     /** Replace the walk with these steps from a fresh actor. */
@@ -48,10 +50,14 @@ export interface ExploreContext {
   events: { open: boolean; onToggle: (open: boolean) => void };
 }
 
-const GROUP_TITLES: Record<MoveGroup, string> = {
+/** "parts": inputs another part of the machine sends; sending one by hand skips that part. */
+type SendGroup = MoveGroup | "parts";
+
+const GROUP_TITLES: Record<SendGroup, string> = {
   input: "Send an input",
   effect: "Effect reports back",
   internal: "Other internal events",
+  parts: "Sent by another part (by hand skips it)",
 };
 
 function code(doc: Document, text: string): HTMLElement {
@@ -160,6 +166,42 @@ function movesSection(
   );
 }
 
+/** The path as plain text: the machine, then one numbered line per entry, full text where the button shortens it. */
+function pathText(machine: string, list: Element): string {
+  const lines = [...list.querySelectorAll("li > button")].map(
+    (entry, index) => `${index}. ${entry.getAttribute("title") ?? entry.textContent ?? ""}`,
+  );
+  return [`${machine} path`, ...lines].join("\n");
+}
+
+/** "Copy path": puts the path on the clipboard and says whether it worked. */
+function copyPathButton(doc: Document, machine: string, list: Element): HTMLElement {
+  const copy = html(doc, "button", { type: "button", "data-copy-path": "" }, ["Copy path"]);
+  copy.addEventListener("click", () => {
+    const clipboard = doc.defaultView?.navigator.clipboard;
+    const done = (text: string) => {
+      copy.textContent = text;
+    };
+    if (clipboard === undefined) return done("Copy failed: select the path instead");
+    clipboard.writeText(pathText(machine, list)).then(
+      () => done("Copied"),
+      () => done("Copy failed: select the path instead"),
+    );
+  });
+  return copy;
+}
+
+/** The Path heading with its Copy button, then the list. */
+function pathBlock(doc: Document, machine: string, list: HTMLElement): HTMLElement {
+  return html(doc, "div", { class: "explore-path" }, [
+    html(doc, "div", { class: "explore-path-head" }, [
+      html(doc, "h3", {}, ["Path"]),
+      copyPathButton(doc, machine, list),
+    ]),
+    list,
+  ]);
+}
+
 function pathSection(doc: Document, context: ExploreContext): HTMLElement {
   const { machine, path } = context;
   const edges = new Map(machine.edges.map((edge) => [edge.id, edge]));
@@ -175,8 +217,9 @@ function pathSection(doc: Document, context: ExploreContext): HTMLElement {
       }),
     ]);
   });
-  return html(doc, "div", { class: "explore-path" }, [
-    html(doc, "h3", {}, ["Path"]),
+  return pathBlock(
+    doc,
+    machine.id,
     html(doc, "ol", {}, [
       html(doc, "li", { "aria-current": path.length === 0 ? "step" : null }, [
         button(doc, [`start in ${machine.initial ?? "?"}`], {
@@ -186,7 +229,7 @@ function pathSection(doc: Document, context: ExploreContext): HTMLElement {
       ]),
       ...items,
     ]),
-  ]);
+  );
 }
 
 /** An object prints `{name value, name value}` (strings raw, other values as JSON); anything else as JSON. */
@@ -287,6 +330,7 @@ interface LiveMoves {
   send: (step: VizStep) => void;
   final: boolean;
   compose: (event: string | null, actor?: VizActorRef) => void;
+  fromPart?: (part: string, event: string) => string | null;
 }
 
 /** One control per declared payload field: read its text, write a text into it, focus it. */
@@ -522,9 +566,16 @@ function isRecord(value: unknown): value is Record<string, VizJson> {
 /** What a payload form fills from: the machine now, and the steps of the walk. */
 type FillLive = Pick<VizLiveState, "state" | "payload" | "context"> & {
   steps?: ReadonlyArray<VizStep>;
+  /** The walk's steps with what parts sent each other after each one, in order: what "Last sent" fills from. */
+  heard?: ReadonlyArray<VizStep>;
   children?: VizLiveState["children"];
   removed?: VizLiveState["removed"];
 };
+
+/** What "Last sent" fills from: the walk with what parts sent each other, else the walk alone. */
+function fillSteps(live: FillLive | null | undefined): ReadonlyArray<VizStep> {
+  return live?.heard ?? live?.steps ?? [];
+}
 
 /** The form's start values: a key that already started a child gives way to the next free one. */
 function startValues(payload: VizJson, event: string, live: FillLive | null | undefined): VizJson {
@@ -547,7 +598,7 @@ function fieldsForm(
   },
 ): HTMLElement {
   const { event, fields, samples } = context;
-  const steps = context.live?.steps ?? [];
+  const steps = fillSteps(context.live);
   const controls = new Map(fields.map((field) => [field.name, fieldControl(doc, field)] as const));
   const known = knownPayload(fields, { event, samples, steps });
   const fresh = known === undefined ? undefined : startValues(known.payload, event, context.live);
@@ -644,7 +695,7 @@ export function payloadForm(
   const known = knownPayload(context.fields, {
     event,
     samples,
-    steps: context.live?.steps ?? [],
+    steps: fillSteps(context.live),
   });
   const box = html(doc, "textarea", {
     rows: "3",
@@ -815,7 +866,7 @@ function liveMovesSection(
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
   const events = offeredEvents(machine, compartment, [...handled]);
-  const groups: MoveGroup[] = ["input", "effect", "internal"];
+  const groups: SendGroup[] = ["input", "effect", "internal", "parts"];
   const item = (event: string) =>
     sendItem(doc, machine, {
       live,
@@ -826,8 +877,11 @@ function liveMovesSection(
       compartment,
       ...(child === undefined ? {} : { child }),
     });
-  const groupOf = (event: string): MoveGroup =>
-    moves.find((each) => each.edge.event === event)?.group ?? "input";
+  const groupOf = (event: string): SendGroup => {
+    const group = moves.find((each) => each.edge.event === event)?.group ?? "input";
+    const sender = live.fromPart?.(compartment, event) ?? null;
+    return group === "input" && sender !== null ? "parts" : group;
+  };
   return block(
     groups.flatMap((group) => {
       const members = events.filter((event) => groupOf(event) === group);
@@ -1169,6 +1223,21 @@ function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLive
   ]);
 }
 
+/** The last step left everything as it was: no move, same context, nothing sent, nothing after it, no child started or removed. */
+function noChange(
+  step: VizLiveStep,
+  at: { before: VizJson | undefined; state: VizLiveState },
+): boolean {
+  const { before, state } = at;
+  const stayed =
+    step.outcome === "stay" || (step.outcome === "transition" && step.from === step.to);
+  if (!stayed || before === undefined || step.sent.length > 0) return false;
+  if (state.after.length > 0) return false;
+  const n = state.steps.length;
+  if (startedAt(state, n).length > 0 || removedAt(state, n).length > 0) return false;
+  return JSON.stringify(before) === JSON.stringify(step.context);
+}
+
 function stepLines(
   doc: Document,
   context: {
@@ -1272,6 +1341,11 @@ function liveResultSection(
                 [`Handler threw: ${last.error}`],
               ),
           ...changedChildrenLines(doc, state),
+          noChange(last, { before: previous, state })
+            ? html(doc, "p", { class: "muted", "data-live-no-change": "" }, [
+                "Nothing changed: the handler kept the state and context, and sent nothing.",
+              ])
+            : null,
           ...after.map((step, index) =>
             html(doc, "div", { "data-live-after": "" }, [
               afterLine(doc, { machine, step, last }),
@@ -1469,8 +1543,9 @@ function livePathSection(
   live: NonNullable<ExploreContext["live"]>,
 ): HTMLElement {
   const { state } = live;
-  return html(doc, "div", { class: "explore-path" }, [
-    html(doc, "h3", {}, ["Path"]),
+  return pathBlock(
+    doc,
+    context.machine.id,
     html(doc, "ol", {}, [
       html(doc, "li", { "aria-current": state.steps.length === 0 ? "step" : null }, [
         button(doc, ["start"], {
@@ -1484,7 +1559,7 @@ function livePathSection(
         ]),
       ),
     ]),
-  ]);
+  );
 }
 
 function nowSection(
@@ -1548,7 +1623,13 @@ function liveParts(
 ): Array<HTMLElement | null> {
   const { live, final, events } = context;
   const { state } = live;
-  const moves: LiveMoves = { state, send: live.send, final, compose: live.compose };
+  const moves: LiveMoves = {
+    state,
+    send: live.send,
+    final,
+    compose: live.compose,
+    ...(live.fromPart === undefined ? {} : { fromPart: live.fromPart }),
+  };
   return [
     ...regionLines(doc, machine, state),
     liveResultSection(doc, {

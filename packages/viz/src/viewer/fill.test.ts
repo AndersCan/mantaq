@@ -450,3 +450,13 @@ describe("freshKeys", () => {
     expect(ask(null, state)).toBeNull();
   });
 });
+
+test("without declared fields, a payload another event carried with the example's keys fills the box", () => {
+  const steps: VizStep[] = [
+    { kind: "event", event: "ITEMS_ASSIGNED", payload: { worker: "w1", items: ["a"] } },
+    { kind: "event", event: "OTHER", payload: { worker: "w2" } },
+  ];
+  expect(
+    knownPayload(null, { event: "ITEMS_FINISHED", samples: [{ items: [], worker: "x" }], steps }),
+  ).toEqual({ payload: { worker: "w1", items: ["a"] } });
+});

@@ -99,6 +99,21 @@ export function fillSources(
   return ordered;
 }
 
+/** The latest payload this walk sent (or heard) whose keys are exactly the example's: another event carrying the same fields. */
+function sameShape(
+  steps: ReadonlyArray<VizStep>,
+  example: VizJson | undefined,
+): VizJson | undefined {
+  if (!isObject(example)) return undefined;
+  const keys = Object.keys(example).sort().join(",");
+  if (keys === "") return undefined;
+  for (const step of steps.toReversed()) {
+    if (step.kind !== "event" || !isObject(step.payload)) continue;
+    if (Object.keys(step.payload).sort().join(",") === keys) return step.payload;
+  }
+  return undefined;
+}
+
 /** What a click sends for `event`: per field, the latest value this walk sent under that name, else the field's example (required fields), else the fuzzer's first payload's value. Without declared fields: the payload this walk last sent with `event`, else the fuzzer's first. undefined = nothing known. */
 export function knownPayload(
   fields: ReadonlyArray<VizField> | null,
@@ -112,6 +127,8 @@ export function knownPayload(
         return { payload: step.payload };
       }
     }
+    const shaped = sameShape(steps, fuzzed);
+    if (shaped !== undefined) return { payload: shaped };
     return fuzzed === undefined ? undefined : { payload: fuzzed };
   }
   const typed = typedSource(fields, steps);
