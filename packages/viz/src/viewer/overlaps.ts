@@ -175,12 +175,11 @@ function insetIn(box: Box, outer: Box): number {
   );
 }
 
-/** Smallest `insetIn` over the points; NaN when any point is not a number. */
+/** Smallest `insetIn` over the points; NaN when any point is not a number (`Math.min` keeps NaN). */
 function insetOfPoints(points: ReadonlyArray<Point>, outer: Box): number {
   let least = Infinity;
   for (const point of points) {
     const inset = insetIn({ x: point.x, y: point.y, width: 0, height: 0 }, outer);
-    if (Number.isNaN(inset)) return inset;
     least = Math.min(least, inset);
   }
   return least;

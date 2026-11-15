@@ -278,6 +278,18 @@ describe("overlapsOf: review repros", () => {
     expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["path:e"]);
   });
 
+  test("outside: an arrowhead that sticks out while its path stays in", () => {
+    const layout = layoutOf({ edges: [placedEdge("e", "M2,170 L2,100", labelAt(200, 150))] });
+    expect(ofRule(layout, "outside")).toEqual([
+      { rule: "outside", a: "arrow:e", b: "canvas", gap: -2 },
+    ]);
+  });
+
+  test("outside: an entry arrow above the canvas", () => {
+    const layout = layoutOf({ entries: [{ from: { x: 20, y: -10 }, to: { x: 57, y: 100 } }] });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["entry:0"]);
+  });
+
   test("outside: a state past the canvas bottom", () => {
     const layout = layoutOf({ nodes: [node("A", 100), { ...node("B", 300), y: 190 }] });
     expect(ofRule(layout, "outside")).toEqual([
