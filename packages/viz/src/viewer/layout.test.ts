@@ -416,3 +416,53 @@ describe("labelSpots", () => {
     ]);
   });
 });
+
+describe("labelSpots geometry", () => {
+  const placed = layoutMachine(
+    machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
+  ).edges[0];
+  const width = placed?.label.width ?? 0;
+  const half = (placed?.label.height ?? 0) / 2;
+
+  test("measures the arrow only under the label, not along the whole segment", () => {
+    const long = [
+      { x: 0, y: 100 },
+      { x: 1000, y: 1100 },
+    ];
+    const spots = placed === undefined ? [] : labelSpots(placed, long);
+    expect(spots[2]).toEqual({ x: 500, y: 600 + width / 2 + half + 1 + 8 * Math.SQRT2 });
+  });
+
+  test("a steep arrow pushes the label away by at most a slope of 3", () => {
+    const steep = [
+      { x: 0, y: 0 },
+      { x: 10, y: 1000 },
+    ];
+    const spots = placed === undefined ? [] : labelSpots(placed, steep);
+    const clipped = (5 + width / 2 > 10 ? 10 : 5 + width / 2) * 100;
+    const top = (5 - width / 2 < 0 ? 0 : 5 - width / 2) * 100;
+    expect(spots[2]?.y).toBeCloseTo(clipped + half + 1 + 8 * Math.hypot(1, 3));
+    expect(spots[3]?.y).toBeCloseTo(top - half - 1 - 8 * Math.hypot(1, 3));
+  });
+
+  test("dagre puts the label below its arrow, 8px clear", () => {
+    const y = Number(placed?.path.split(/[ ,MCL]+/).filter(Boolean)[1]);
+    expect((placed?.label.y ?? 0) - half - y).toBe(8);
+  });
+});
+
+describe("layoutMachine speed", () => {
+  test("a 20-state, 55-arrow machine lays out in well under a second (it runs on every click)", () => {
+    let seed = 7;
+    const random = (): number => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const names = ["first", ...Array.from({ length: 19 }, (_, index) => `state${index + 1}`)];
+    const edges = Array.from({ length: 55 }, (_, index) => {
+      const from = Math.floor(random() * names.length);
+      const to = (from + 1 + Math.floor(random() * (names.length - 1))) % names.length;
+      return edge({ from: names[from] ?? "", event: `EVENT_${index}`, target: names[to] ?? "" });
+    });
+    const started = performance.now();
+    layoutMachine(machineOf(names, edges));
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+});

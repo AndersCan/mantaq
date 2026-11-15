@@ -334,16 +334,13 @@ export function labelOverlapsFor(layout: MachineLayout, edgeId: string): Overlap
   const one = shapes.edges.find((edge) => edge.id === edgeId);
   if (one === undefined) return found;
   labelOverlaps(one, shapes, (rule, a, b, gap) => found.push({ rule, a, b, gap }));
-  return found.concat(
-    shapes.edges.flatMap((other) => {
-      const own: Overlap[] = [];
-      if (other.id < edgeId)
-        labelOverlaps(other, shapes, (rule, a, b, gap) => {
-          if (b === `label:${edgeId}`) own.push({ rule, a, b, gap });
-        });
-      return own;
-    }),
-  );
+  for (const other of shapes.edges) {
+    if (other.id >= edgeId) continue;
+    const gap = boxToBox(other.label, one.label);
+    if (gap < LABEL_PAD)
+      found.push({ rule: "label-clear", a: `label:${other.id}`, b: `label:${edgeId}`, gap });
+  }
+  return found;
 }
 
 /**

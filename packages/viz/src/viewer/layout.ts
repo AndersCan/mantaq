@@ -422,6 +422,7 @@ function settleLabels(base: MachineLayout, graph: LayoutGraph): PlacedEdge[] {
   const unsettled = new Set(edges.map((placed) => `label:${placed.edge.id}`));
   for (const [index, placed] of edges.entries()) {
     unsettled.delete(`label:${placed.edge.id}`);
+    if (placed.edge.from === placed.edge.to) continue;
     const points = graph.edge(placed.edge.from, placed.target, placed.edge.id)?.points ?? [];
     for (const spot of labelSpots(placed, points)) {
       const moved = { ...placed, ...boxed(placed.edge, spot) };

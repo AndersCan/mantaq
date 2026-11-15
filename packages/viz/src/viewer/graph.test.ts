@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
 import type { VizMachine, VizState } from "../schema.ts";
+import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
+import { LOCK_SLOT, layoutMachine, textWidth } from "./layout.ts";
 
 function state(id: string, initial: boolean): VizState {
   return {
@@ -95,5 +97,48 @@ describe("renderGraph guard condition", () => {
     expect(edge?.querySelector(".edge-condition")?.textContent).toBe("ok");
     expect(edge?.querySelector("tspan")?.textContent).toBe("go");
     expect(edge?.getAttribute("aria-label")).toBe("idle on go to busy when ok");
+  });
+});
+
+describe("renderGraph transition label", () => {
+  const go: VizMachine = {
+    ...machine,
+    edges: [
+      {
+        id: "idle-submitWWW-busy",
+        from: "idle",
+        event: "submitWWW",
+        to: "busy",
+        kind: "transition",
+        origin: "declared",
+        emits: [],
+        contexts: [],
+        explanation: null,
+        doc: null,
+        coverage: null,
+        tested: null,
+      },
+    ],
+  };
+
+  test("draws the text right of the lock slot and the lock inside it", () => {
+    const root = document.createElement("div");
+    root.append(
+      renderGraph(document, go, {
+        select: () => undefined,
+        showDetails: () => undefined,
+        mode: "off",
+      }),
+    );
+    const placed = layoutMachine(go).edges[0];
+    const text = root.querySelector('[data-edge-id="idle-submitWWW-busy"] text');
+    expect(Number(text?.getAttribute("x"))).toBe(placed?.text.x);
+    expect(placed?.text.x).toBe((placed?.label.x ?? 0) + LOCK_SLOT / 2);
+    markExplore(root, { machine: go, path: [], blocked: new Map([["idle-submitWWW-busy", "no"]]) });
+    const lock = Number(root.querySelector(".blocked-lock rect")?.getAttribute("x"));
+    const textLeft = (placed?.text.x ?? 0) - textWidth("submitWWW") / 2;
+    const boxLeft = (placed?.label.x ?? 0) - (placed?.label.width ?? 0) / 2;
+    expect(lock).toBeGreaterThanOrEqual(boxLeft);
+    expect(lock + 8 + 4).toBeLessThanOrEqual(textLeft);
   });
 });
