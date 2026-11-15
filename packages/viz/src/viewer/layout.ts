@@ -1,6 +1,7 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
+import { ARROW_SIZE, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
 import type { Overlap } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
@@ -112,7 +113,7 @@ export function textWidth(text: string, fontSize = 12): number {
 
 /** Room left of a transition's label for its lock. */
 export const LOCK_SLOT = 12;
-export const LABEL_PAD = 8;
+export { LABEL_PAD, PATH_GAP };
 const CONDITION_FONT = 10.2;
 const CHIP_FONT = 11;
 const NODE_HEIGHT = 36;
@@ -121,12 +122,12 @@ const LABEL_HEIGHT = 16;
 /** Label to its own arrow, and to any other arrow: strictly farther, so the nearest arrow is always its own. */
 export const LABEL_OWN = 8;
 export const LABEL_FOREIGN = 14;
-export const PORT_GAP = 10;
+export const PORT_GAP = ARROW_SIZE + LABEL_PAD;
 export const STUB = 12;
 export const ENTRY_LENGTH = 28;
 const ENTRY_STUB = 42;
 export const LOOP_BASE = 16;
-export const LEG_GAP = 10;
+export const LEG_GAP = 2 * LABEL_PAD;
 export const LEG_INSET = 16;
 export const LOOP_FIRST_SPAN = 24;
 const TITLE_HEIGHT = 16;
@@ -134,10 +135,8 @@ const TITLE_HEIGHT = 16;
 const MARK_OVERHANG = 6;
 /** Room between a level run and its label, and between a column's widest item and the sloped part of a path: one more than `LABEL_PAD` so float error never trips the checker. */
 const LEVEL_CLEAR = LABEL_PAD + 1;
-/** Distance between the vertical lanes of sloped arrows in one rank gap: over twice the checker's `ALONGSIDE_GAP`. */
-export const LANE_GAP = 8;
 /** Two level pieces closer than this in y would run into each other if their lanes were in the wrong order. */
-const LANE_ROW_CLASH = 4;
+const LANE_ROW_CLASH = PATH_GAP;
 const LANE_TITLE_CLEAR = 5;
 /** The row a region reserves above its content for its title. */
 const TITLE_ROW = LABEL_PAD + TITLE_HEIGHT + LABEL_PAD;
@@ -287,7 +286,7 @@ function startIds(machine: VizMachine): string[] {
     .sort();
   const ids = new Set(machine.states.map((state) => state.id));
   const starts = machine.initial === null ? regionStarts : [machine.initial, ...regionStarts];
-  return starts.filter((id) => ids.has(id));
+  return [...new Set(starts)].filter((id) => ids.has(id));
 }
 
 /** `heights` raises a node's box to the room its ports need. */
@@ -1025,7 +1024,7 @@ export function freeLane(
 
 /**
  * Every sloped piece between two columns becomes level, then a vertical lane
- * of its own, then level: lanes are `LANE_GAP` apart, so steep arrows never
+ * of its own, then level: lanes are `PATH_GAP` apart, so steep arrows never
  * run alongside. A gap too narrow for its lanes reports how much to widen.
  */
 function lanesOf(
@@ -1050,16 +1049,17 @@ function lanesOf(
   const lanes = new Map<number, Map<number, number>>();
   const widen: Widen[] = [];
   for (const gap of gaps.values()) {
-    let x = gap.start - LANE_GAP;
+    let x = gap.start;
     for (const crossing of laneOrder(gap.crossings)) {
       const top = Math.min(crossing.yLeft, crossing.yRight);
       const bottom = Math.max(crossing.yLeft, crossing.yRight);
-      x = freeLane(x + LANE_GAP, top, bottom, titles);
+      x = freeLane(x + PATH_GAP, top, bottom, titles);
       const own = lanes.get(crossing.edge) ?? new Map<number, number>();
       own.set(crossing.from, x);
       lanes.set(crossing.edge, own);
     }
-    if (x > gap.end) widen.push({ at: (gap.start + gap.end) / 2, by: x - gap.end });
+    if (x > gap.end - PATH_GAP)
+      widen.push({ at: (gap.start + gap.end) / 2, by: x - gap.end + PATH_GAP });
   }
   const laned = edges.map((placed, edge) => {
     const own = lanes.get(edge);

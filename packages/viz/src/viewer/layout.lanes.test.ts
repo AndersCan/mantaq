@@ -1,6 +1,6 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { LANE_GAP, checkedLayout, freeLane, placeMachine } from "./layout.ts";
+import { PATH_GAP, checkedLayout, freeLane, placeMachine } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
@@ -89,7 +89,7 @@ describe("lanes in a rank gap", () => {
     expect(overlapsOf(placed)).toEqual([]);
   });
 
-  test("lanes of different arrows are at least LANE_GAP apart", () => {
+  test("lanes of different arrows are at least PATH_GAP apart", () => {
     const lanes = lanesIn(steep).sort((a, b) => a.x - b.x);
     expect(new Set(lanes.map((lane) => lane.id)).size).toBeGreaterThan(1);
     for (let index = 1; index < lanes.length; index++) {
@@ -97,7 +97,7 @@ describe("lanes in a rank gap", () => {
       const next = lanes[index];
       if (previous === undefined || next === undefined || previous.id === next.id) continue;
       if (next.x - previous.x < 1) continue;
-      expect(next.x - previous.x).toBeGreaterThanOrEqual(LANE_GAP);
+      expect(next.x - previous.x).toBeGreaterThanOrEqual(PATH_GAP);
     }
   });
 
@@ -113,7 +113,7 @@ describe("lanes in a rank gap", () => {
     expect(overlapsOf(placed)).toEqual([]);
     const xs = lanesIn(wide).map((lane) => lane.x);
     expect(xs.length).toBeGreaterThanOrEqual(24);
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThanOrEqual(23 * LANE_GAP);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThanOrEqual(23 * PATH_GAP);
   });
 });
 

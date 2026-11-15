@@ -498,10 +498,8 @@ describe("a region's title row sits above every arrow that runs inside it", () =
 
   test("an arrow that leaves a map runs below the map's title row", () => {
     const laid = placeMachine(machine);
-    expect(
-      overlapsOf(laid)
-        .filter((overlap) => overlap.rule !== "paths-alongside")
-        .map((overlap) => `${overlap.rule} ${overlap.a} ${overlap.b}`),
-    ).toEqual([]);
+    expect(overlapsOf(laid).map((overlap) => `${overlap.rule} ${overlap.a} ${overlap.b}`)).toEqual(
+      [],
+    );
   });
 });

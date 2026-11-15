@@ -275,6 +275,20 @@ describe("entry arrows", () => {
     expect((entry?.from.x ?? 0) - 6).toBeGreaterThan((region?.x ?? 0) - (region?.width ?? 0) / 2);
   });
 
+  test("a state that starts the machine and its region gets one entry", () => {
+    const machine = machineOf(
+      ["up.a", "up.b"],
+      [edge({ from: "up.a", event: "go", target: "up.b" })],
+    );
+    const states = machine.states.map((each) => ({
+      ...each,
+      region: "up",
+      initial: each.id === "up.a",
+    }));
+    const layout = placeMachine({ ...machine, initial: "up.a", states, regions: ["up"] });
+    expect(layout.entries).toHaveLength(1);
+  });
+
   test("a machine without regions has one", () => {
     expect(placeMachine(tight).entries).toHaveLength(1);
   });

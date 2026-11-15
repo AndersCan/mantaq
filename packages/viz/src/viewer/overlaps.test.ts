@@ -135,7 +135,7 @@ describe("overlapsOf", () => {
     ]);
   });
 
-  test("paths-alongside: 2px apart fails, 6px apart passes", () => {
+  test("paths-near: two lanes 8px apart fail, 12px apart pass", () => {
     const two = (y: number) =>
       layoutOf({
         edges: [
@@ -143,13 +143,13 @@ describe("overlapsOf", () => {
           placedEdge("f", `M140,${y} L260,${y}`, labelAt(200, 20)),
         ],
       });
-    expect(ofRule(two(102), "paths-alongside")).toEqual([
-      { rule: "paths-alongside", a: "path:e", b: "path:f", gap: 0 },
+    expect(ofRule(two(108), "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "path:f", gap: 8 },
     ]);
-    expect(ofRule(two(106), "paths-alongside")).toEqual([]);
+    expect(ofRule(two(112), "paths-near")).toEqual([]);
   });
 
-  test("arrowheads: two arrowheads sharing a spot", () => {
+  test("arrowheads: two arrows into one side 10px apart are 2px apart", () => {
     const two = (y: number) =>
       layoutOf({
         edges: [
@@ -157,10 +157,38 @@ describe("overlapsOf", () => {
           placedEdge("f", `M140,${y} L260,${y}`, labelAt(200, 20)),
         ],
       });
-    expect(ofRule(two(104), "arrowheads")).toEqual([
-      { rule: "arrowheads", a: "arrow:e", b: "arrow:f", gap: -4 },
+    expect(ofRule(two(104), "arrowheads")).toContainEqual({
+      rule: "arrowheads",
+      a: "arrow:e",
+      b: "arrow:f",
+      gap: -4,
+    });
+    expect(ofRule(two(110), "arrowheads")).toContainEqual({
+      rule: "arrowheads",
+      a: "arrow:e",
+      b: "arrow:f",
+      gap: 2,
+    });
+    expect(ofRule(two(116), "arrowheads")).toEqual([]);
+  });
+
+  test("arrowheads: a path 6px from another arrow's head", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", straight, labelAt(200, 60)),
+        placedEdge("f", "M266,170 L266,60", labelAt(200, 20)),
+      ],
+    });
+    expect(ofRule(layout, "arrowheads")).toEqual([
+      { rule: "arrowheads", a: "arrow:e", b: "path:f", gap: 6 },
     ]);
-    expect(ofRule(two(110), "arrowheads")).toEqual([]);
+  });
+
+  test("arrowheads: two identical entries", () => {
+    const entry = { from: { x: 20, y: 100 }, to: { x: 60, y: 100 } };
+    const layout = layoutOf({ entries: [entry, entry] });
+    expect(ofRule(layout, "arrowheads").length).toBeGreaterThan(0);
+    expect(ofRule(layoutOf({ entries: [entry] }), "arrowheads")).toEqual([]);
   });
 
   test("nodes: 8px between states passes, 7px fails", () => {
@@ -330,43 +358,6 @@ describe("overlapsOf: review repros", () => {
     ]);
   });
 
-  test("paths-alongside: two arrows from one state may share their first 12px", () => {
-    const layout = layoutOf({
-      edges: [
-        placedEdge("e", straight, labelAt(200, 60)),
-        placedEdge("f", "M140,102 L160,102 L200,160 L300,160 L300,118", labelAt(230, 185)),
-      ],
-    });
-    expect(ofRule(layout, "paths-alongside")).toEqual([]);
-  });
-
-  test("paths-alongside: unrelated states get no stub exemption", () => {
-    const layout = layoutOf({
-      edges: [
-        placedEdge("e", straight, labelAt(200, 60)),
-        { ...placedEdge("f", "M140,102 L160,102 L160,160", labelAt(330, 185), "D") },
-      ].map((placed) =>
-        placed.edge.id === "f" ? { ...placed, edge: { ...placed.edge, from: "C" } } : placed,
-      ),
-    });
-    expect(ofRule(layout, "paths-alongside")).toEqual([
-      { rule: "paths-alongside", a: "path:e", b: "path:f", gap: 0 },
-    ]);
-  });
-
-  test("paths-alongside: an arrow leaving the state another arrow enters shares its stub", () => {
-    const layout = layoutOf({
-      edges: [
-        placedEdge("e", straight, labelAt(200, 60)),
-        {
-          ...placedEdge("f", "M260,102 L240,102 L240,160", labelAt(330, 185), "C"),
-          edge: { ...placedEdge("f", "", labelAt(0, 0)).edge, from: "B", to: "C" },
-        },
-      ],
-    });
-    expect(ofRule(layout, "paths-alongside")).toEqual([]);
-  });
-
   test("overlaps sort by rule, then a, then b", () => {
     const layout = layoutOf({
       edges: [
@@ -379,21 +370,6 @@ describe("overlapsOf: review repros", () => {
     const bs = labelPairs.map((overlap) => overlap.b);
     expect(bs).toEqual([...bs].sort());
     expect(bs.length).toBeGreaterThan(1);
-  });
-
-  test("paths-alongside: two short touches apart are not one long run", () => {
-    const layout = layoutOf({
-      edges: [
-        placedEdge("e", straight, labelAt(200, 60)),
-        placedEdge(
-          "f",
-          "M180,160 L180,102 L186,102 L186,160 L220,160 L220,102 L226,102 L226,160",
-          labelAt(330, 185),
-          "C",
-        ),
-      ],
-    });
-    expect(ofRule(layout, "paths-alongside")).toEqual([]);
   });
 
   test("label-clear: the arrowhead box sits 4px back from the tip", () => {
@@ -524,17 +500,43 @@ describe("overlapsOf: review repros r3", () => {
   });
 });
 
-describe("overlapsOf: review repro r2 alongside across a grid cell", () => {
-  test("paths-alongside: two upright paths 2px apart either side of a 3px cell edge", () => {
-    // x 200 and 202 fall in different 3px cells (66 and 67).
+describe("overlapsOf: paths-near", () => {
+  test("a trunk's level pieces ending and starting 8px apart on one row", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", "M1200,140 L1298,140", labelAt(1250, 100)),
+        placedEdge("f", "M1306,140 L1400,140", labelAt(1350, 100)),
+      ],
+      width: 1500,
+    });
+    expect(ofRule(layout, "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "path:f", gap: 8 },
+    ]);
+  });
+
+  test("a right-angle crossing 5px from a corner fails, 20px from every corner passes", () => {
+    const crossing = (x: number) =>
+      layoutOf({
+        edges: [
+          placedEdge("e", "M140,100 L260,100", labelAt(200, 60)),
+          placedEdge("f", `M${x},170 L${x},60`, labelAt(330, 185)),
+        ],
+      });
+    expect(ofRule(crossing(145), "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "path:f", gap: 5 },
+    ]);
+    expect(ofRule(crossing(200), "paths-near")).toEqual([]);
+  });
+
+  test("two upright paths 2px apart", () => {
     const layout = layoutOf({
       edges: [
         placedEdge("e", "M200,140 L200,260", labelAt(160, 200)),
         placedEdge("f", "M202,140 L202,260", labelAt(240, 200)),
       ],
     });
-    expect(ofRule(layout, "paths-alongside")).toEqual([
-      { rule: "paths-alongside", a: "path:e", b: "path:f", gap: 0 },
+    expect(ofRule(layout, "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "path:f", gap: 2 },
     ]);
   });
 });

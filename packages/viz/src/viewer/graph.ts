@@ -7,6 +7,7 @@ import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { activatable, html, svg } from "./dom.ts";
 import { edgeCondition, edgeLines, edgeText } from "./labels.ts";
+import { ARROW_SIZE } from "./geometry.ts";
 import { layoutMachine } from "./layout.ts";
 import { Either } from "@mantaq/utils";
 import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
@@ -47,10 +48,11 @@ function defs(doc: Document): SVGDefsElement {
       {
         id: "viz-arrow",
         viewBox: "0 0 10 10",
-        refX: 9,
+        refX: 10,
         refY: 5,
-        markerWidth: 7,
-        markerHeight: 7,
+        markerWidth: ARROW_SIZE,
+        markerHeight: ARROW_SIZE,
+        markerUnits: "userSpaceOnUse",
         orient: "auto-start-reverse",
       },
       [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head" })],
@@ -61,10 +63,10 @@ function defs(doc: Document): SVGDefsElement {
       {
         id: "viz-arrow-loop",
         viewBox: "0 0 10 10",
-        refX: 9,
+        refX: 10,
         refY: 5,
-        markerWidth: 6,
-        markerHeight: 6,
+        markerWidth: ARROW_SIZE,
+        markerHeight: ARROW_SIZE,
         markerUnits: "userSpaceOnUse",
         orient: "auto-start-reverse",
       },
