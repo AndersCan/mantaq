@@ -94,6 +94,13 @@ describe("overlapsOf", () => {
     ]);
   });
 
+  test("label-clear: a label near the corner of a slanted arrow's bounding box, far from the arrow, passes", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M140,100 L260,160", labelAt(255, 88))],
+    });
+    expect(overlapsOf(layout).filter((each) => each.b === "path:e")).toEqual([]);
+  });
+
   test("label-clear: 8px between two labels passes, 7px fails", () => {
     const two = (x: number) =>
       layoutOf({

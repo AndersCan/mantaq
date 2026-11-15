@@ -126,7 +126,29 @@ function boxToBox(a: Box, b: Box): number {
   return dx < 0 && dy < 0 ? Math.max(dx, dy) : Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
 }
 
+const pathBounds = new WeakMap<ReadonlyArray<Point>, Box>();
+
+/** The smallest box around a route, remembered per route. */
+function boundsOfPath(path: ReadonlyArray<Point>): Box {
+  const known = pathBounds.get(path);
+  if (known !== undefined) return known;
+  const xs = path.map((point) => point.x);
+  const ys = path.map((point) => point.y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  const bounds = {
+    x: (left + Math.max(...xs)) / 2,
+    y: (top + Math.max(...ys)) / 2,
+    width: Math.max(...xs) - left,
+    height: Math.max(...ys) - top,
+  };
+  pathBounds.set(path, bounds);
+  return bounds;
+}
+
 function pathToBox(path: ReadonlyArray<Point>, box: Box): number {
+  const around = boxToBox(boundsOfPath(path), box);
+  if (around >= LABEL_PAD) return around;
   let best = Infinity;
   for (const point of path) best = Math.min(best, pointToBox(point, box));
   return best;
