@@ -132,8 +132,8 @@ describe("mountDriven targets", () => {
   });
 });
 
-describe("mountDriven filled forms", () => {
-  test("the answer form starts with the code the machine is waiting on", async () => {
+describe("mountDriven values", () => {
+  test("the answer events send the code the machine is waiting on and the value set in the Context tab", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
       load: async () => ({ createAnswerActor }),
@@ -153,18 +153,10 @@ describe("mountDriven filled forms", () => {
     });
     const click = (selector: string) => root.querySelector<HTMLButtonElement>(selector)?.click();
     click('[data-send="ask"]');
-    const code = root.querySelector<HTMLInputElement>('[data-field="code"]');
-    const album = root.querySelector<HTMLInputElement>('[data-field="album"]');
-    if (code) code.value = "c1";
-    if (album) album.value = "Trip";
-    click('[data-payload-send="ask"]');
+    const answer = root.querySelector<HTMLInputElement>('[data-value="answer"]');
+    if (answer) answer.value = "declined";
+    answer?.dispatchEvent(new Event("change", { bubbles: true }));
     click('[data-send="answered"]');
-    expect(root.querySelector<HTMLInputElement>('[data-field="code"]')?.value).toBe("c1");
-    const declined = [
-      ...root.querySelectorAll<HTMLButtonElement>('[data-field="answer"] button'),
-    ].find((each) => each.getAttribute("data-choice") === '"declined"');
-    declined?.click();
-    click('[data-payload-send="answered"]');
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
   });
 });
@@ -252,7 +244,6 @@ describe("mountDriven heading and walk ownership", () => {
     for (const send of first.querySelectorAll<HTMLElement>("[data-send]")) {
       if (current(first) !== start) break;
       send.click();
-      first.querySelector<HTMLElement>("[data-payload-send]")?.click();
     }
     expect(current(first)).not.toBe(start);
     const walk = new URLSearchParams(location.search);
@@ -319,6 +310,13 @@ describe("mountDriven runs by name", () => {
     expect(location.search).toBe("?machine=second");
   });
 
+  test("switching machine drops the values set for the old one", async () => {
+    history.replaceState(null, "", "?machine=checkout&value=email%3D%22a%40b.c%22");
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await withRuns(), targets: {} });
+    (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
+    expect(location.search).toBe("?machine=second");
+  });
   test("run= without machine opens the start with no notice", async () => {
     history.replaceState(null, "", "?run=gives%20basic%20info");
     const root = document.createElement("div");
@@ -465,7 +463,6 @@ describe("compare", () => {
       for (const send of column.querySelectorAll<HTMLElement>("[data-send]")) {
         if (current(column) !== start) break;
         send.click();
-        column.querySelector<HTMLElement>("[data-payload-send]")?.click();
       }
     };
     const startA = current(section(root, "a"));

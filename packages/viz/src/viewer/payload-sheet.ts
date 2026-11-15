@@ -1,7 +1,6 @@
-import { movesFrom, payloadSamples } from "../moves.ts";
-import type { VizActorRef, VizLiveState, VizLiveStep, VizMachine, VizStep } from "../schema.ts";
+import { movesFrom } from "../moves.ts";
+import type { VizActorRef, VizLiveState, VizMachine } from "../schema.ts";
 import { html } from "./dom.ts";
-import { payloadForm } from "./explore.ts";
 
 /** The diagram element the form points at: the event's edge from the current state, if drawn. */
 function anchorOf(
@@ -26,26 +25,20 @@ function blockedNote(
   return blocked?.get(anchor?.getAttribute("data-edge-id") ?? "") ?? null;
 }
 
-/** The sheet element: the blocked note when there is a reason, else the form. */
-function sheetFor(
-  doc: Document,
-  context: { event: string; reason: string | null; body: () => HTMLElement },
-): HTMLElement {
-  const { event, reason } = context;
+/** The sheet element: the sentence saying why the arrow is blocked. */
+function sheetFor(doc: Document, context: { event: string; reason: string }): HTMLElement {
   const sheet = html(doc, "section", {
     class: "payload-sheet",
     role: "dialog",
-    "aria-label": reason ?? `Payload for ${event}`,
-    "data-blocked-note": reason === null ? null : event,
+    "aria-label": context.reason,
+    "data-blocked-note": context.event,
   });
-  sheet.append(reason === null ? context.body() : html(doc, "p", {}, [reason]));
+  sheet.append(html(doc, "p", {}, [context.reason]));
   return sheet;
 }
 
-/** The first field takes focus; a note has none, so the sheet does, which lets Escape close it. */
+/** A note has no field, so the sheet takes focus, which lets Escape close it. */
 function focusSheet(sheet: HTMLElement): void {
-  const field = sheet.querySelector<HTMLElement>("textarea, input, select");
-  if (field !== null) return field.focus({ preventScroll: true });
   sheet.setAttribute("tabindex", "-1");
   sheet.focus({ preventScroll: true });
 }
@@ -59,44 +52,6 @@ function selectorOf(element: Element): string | null {
     if (value !== null) return `[${name}="${CSS.escape(value)}"]`;
   }
   return null;
-}
-
-/** Stops each sheet's keyboard tracking; called when the sheet goes. */
-const stopFollowing = new WeakMap<Element, () => void>();
-
-/**
- * Keeps the sheet and its focused field above the on-screen keyboard: sets
- * `--viz-keyboard` (the keyboard's height) and `--viz-visible` (the room left)
- * from the visual viewport. Returns the function that removes the listeners, or null without a visual viewport.
- */
-function followKeyboard(sheet: HTMLElement): (() => void) | null {
-  const view = sheet.ownerDocument.defaultView;
-  const viewport = view?.visualViewport;
-  if (!view || !viewport) return null;
-  const update = () => {
-    sheet.style.setProperty(
-      "--viz-keyboard",
-      `${Math.max(0, view.innerHeight - (viewport.height + viewport.offsetTop))}px`,
-    );
-    sheet.style.setProperty("--viz-visible", `${viewport.height}px`);
-    const active = sheet.ownerDocument.activeElement;
-    if (
-      active !== null &&
-      sheet.contains(active) &&
-      ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)
-    ) {
-      active.scrollIntoView({ block: "nearest" });
-    }
-  };
-  update();
-  viewport.addEventListener("resize", update);
-  viewport.addEventListener("scroll", update);
-  sheet.addEventListener("focusin", update);
-  return () => {
-    viewport.removeEventListener("resize", update);
-    viewport.removeEventListener("scroll", update);
-    sheet.removeEventListener("focusin", update);
-  };
 }
 
 /**
@@ -113,8 +68,6 @@ export function removeSheets(root: HTMLElement): {
   for (const old of root.querySelectorAll(".payload-sheet")) {
     opener = opener ?? openedFrom.get(old) ?? null;
     if (old.contains(active)) focusBack = opener;
-    stopFollowing.get(old)?.();
-    stopFollowing.delete(old);
     old.remove();
   }
   return { opener, focusBack };
@@ -128,38 +81,21 @@ function actorState(live: VizLiveState, actor: VizActorRef | undefined): string 
   return child?.state ?? live.state;
 }
 
-/** The walk's steps, each followed by the messages parts sent after it that carried a payload. */
-function heardSteps(
-  steps: ReadonlyArray<VizStep>,
-  afters: ReadonlyArray<ReadonlyArray<VizLiveStep>>,
-): VizStep[] {
-  return steps.flatMap((step, index) => [
-    step,
-    ...(afters[index] ?? []).flatMap((entry): VizStep[] => {
-      const payload = entry.message?.payload;
-      return payload === undefined ? [] : [{ kind: "event", event: entry.event, payload }];
-    }),
-  ]);
-}
-
 /**
- * The payload form as a sheet pinned to the bottom of the viewer, so Send is
- * always on screen; the event's edge on the diagram is marked. Escape closes
- * it. Replaces any earlier sheet; nothing is shown when no event is composing.
+ * The blocked note as a sheet pinned to the bottom of the viewer; the event's edge on the
+ * diagram is marked. Escape closes it. Replaces any earlier sheet; nothing is shown when no
+ * event is composing or its edge is not blocked.
  */
 export function showPayloadSheet(
   root: HTMLElement,
   context: {
     machine: VizMachine;
     live: VizLiveState | null;
-    /** Entry i is what parts sent each other after step i; their payloads fill the form too. */
-    afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     composing: string | null;
     /** The region the open form sends to; none = the machine itself. */
     composingActor?: VizActorRef;
-    /** Edge id → why its guard blocks it; the sheet then holds that sentence instead of the form. */
+    /** Edge id → why its guard blocks it. */
     blocked?: ReadonlyMap<string, string>;
-    send: (step: VizStep) => void;
     compose: (event: string | null) => void;
   },
 ): void {
@@ -181,28 +117,19 @@ export function showPayloadSheet(
     state: actorState(live, actor),
     event,
   });
-  anchor?.setAttribute("data-composing", "");
   const reason = blockedNote(anchor, context.blocked);
-  const sheet = sheetFor(doc, {
-    event,
-    reason,
-    body: () =>
-      payloadForm(doc, {
-        event,
-        samples: payloadSamples(machine, event),
-        fields: machine.events.find((each) => each.id === event)?.payload ?? null,
-        live: { ...live, heard: heardSteps(live.steps, context.afters ?? []) },
-        send: (step) =>
-          context.send(actor === undefined || step.kind !== "event" ? step : { ...step, actor }),
-        close,
-      }),
-  });
+  if (reason === null) {
+    if (focusBack !== null) {
+      root.querySelector<HTMLElement>(focusBack)?.focus({ preventScroll: true });
+    }
+    return;
+  }
+  anchor?.setAttribute("data-composing", "");
+  const sheet = sheetFor(doc, { event, reason });
   sheet.addEventListener("keydown", (key) => {
     if (key.key === "Escape") close();
   });
   if (opener !== null) openedFrom.set(sheet, opener);
   root.append(sheet);
-  const stop = followKeyboard(sheet);
-  if (stop !== null) stopFollowing.set(sheet, stop);
   focusSheet(sheet);
 }

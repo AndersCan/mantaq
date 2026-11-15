@@ -145,10 +145,6 @@ async function handlesAnEvent(root: PwLocator, page: PwPage): Promise<string | u
   const sends = await root.locator("[data-send]").count();
   for (let index = 0; index < sends; index += 1) {
     await root.locator("[data-send]").nth(index).click();
-    const payload = root.locator("[data-payload-send]");
-    if ((await payload.count()) > 0) {
-      await payload.first().click();
-    }
     await page.waitForTimeout(50);
     const after = await root.locator(".explore").first().getAttribute("data-current");
     const outcome = root.locator("[data-outcome]");

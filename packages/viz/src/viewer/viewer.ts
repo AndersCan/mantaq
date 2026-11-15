@@ -21,18 +21,14 @@ import type { Selection } from "./graph.ts";
 import { availableModes, modeLabel } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
-import {
-  decodeLiveSteps,
-  decodePath,
-  encodeLiveStep,
-  encodeStep,
-  asksForPayload,
-} from "../moves.ts";
+import { decodeLiveSteps, decodePath, encodeLiveStep, encodeStep } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
 import { pathTo } from "../findings.ts";
 import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
+import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
+import type { Values } from "./fill.ts";
 import { drawChildMarkers } from "./markers.ts";
 import { removeSheets, showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
@@ -70,9 +66,9 @@ interface ViewState {
   afters: VizLiveStep[][];
   /** Context before the last live step; undefined when no step ran. */
   previous: VizJson | undefined;
-  /** Live: the event whose payload form is open. */
+  /** Live: the event whose blocked note is open. */
   composing: string | null;
-  /** Live: the region the open payload form sends to; undefined = the machine itself. */
+  /** Live: the region the open blocked note is for; undefined = the machine itself. */
   composingActor: VizActorRef | undefined;
   /** The "Events and time" fold is open; it stays as the user left it across steps and Back. */
   eventsOpen: boolean;
@@ -94,8 +90,10 @@ interface ViewState {
   systemSelection: SystemSelection | null;
   /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
   blocked: Map<string, string>;
-  /** What `blocked` was computed for; it is recomputed when either changes. */
-  blockedFor: { live: VizLiveState; picked: ViewState["picked"] } | null;
+  /** Field name → the value set in the Context tab; events are sent with it (kept in `?value=`). */
+  values: Values;
+  /** What `blocked` was computed for; it is recomputed when any of it changes. */
+  blockedFor: { live: VizLiveState; picked: ViewState["picked"]; values: Values } | null;
 }
 
 type PanelTab = "screen" | "step" | "context" | "path" | "details" | "controls";
@@ -170,8 +168,15 @@ export interface ViewerOptions {
   driver?: VizDriver;
   /** Name of a run in the shown machine's `runs` to open on (from `?run=`). Wins over `steps`. Replays only with a `driver`. */
   run?: string;
-  /** Called after every walk or machine change, e.g. to keep the URL shareable. `run` is set when the walk is a run just played from the Runs list. */
-  onNavigate?: (where: { machine: string; steps: string[]; run?: string }) => void;
+  /** Values events are sent with, as `name=<json>` (from `?value=`); the Context tab sets them. */
+  values?: ReadonlyArray<string>;
+  /** Called after every walk, value or machine change, e.g. to keep the URL shareable. `run` is set when the walk is a run just played from the Runs list. */
+  onNavigate?: (where: {
+    machine: string;
+    steps: string[];
+    values: string[];
+    run?: string;
+  }) => void;
   /**
    * Content under the panel tabs for the selected state or edge (undefined: nothing selected).
    * Called on every panel refresh; may return the same node each time. The live page shows notes here.
@@ -240,7 +245,7 @@ export function mountViewer(
         path: view.path,
         take,
         rewind,
-        ...liveOf(view, { send, play, compose, routes: options.routes }, system),
+        ...liveOf(view, { send, play, sendEvent, setValue, routes: options.routes }, system),
       });
       const details = detailsOf(doc, {
         machine,
@@ -255,25 +260,25 @@ export function mountViewer(
       const footer = options.panelFooter;
       const screen = screenOf(options, view);
       fillPanel(panel, { doc, view, parts, details, controls, screen, refresh, footer });
-      if (inSystem) markSystemView(root, { machine, system, view, send, compose });
-      else markDiagram(root, { machine, view, driver, send, compose, refresh });
+      mark();
     };
+    const mark = () =>
+      inSystem
+        ? markSystemView(root, { machine, system, view })
+        : markDiagram(root, { machine, view, driver, compose, refresh });
     redraw = refresh;
     const walked = (run?: string) => {
-      view.notice = null;
-      root.querySelector("[data-run-missing]")?.remove();
-      const steps = walkedSteps(machine, view);
-      options.onNavigate?.({ machine: machine.id, steps, ...(run === undefined ? {} : { run }) });
+      noticeCleared(root, view);
+      navigated(options, { machine, view, run });
       refresh();
     };
-    const send = (step: VizStep) => {
-      if (driver === undefined) return;
-      stepInto(view, driver, step);
-      walked();
-    };
+    const setValue = valueSetter({ options, machine, view, mark });
+    const send = stepSender({ view, driver, walked });
+    const sendEvent = (event: string, actor?: VizActorRef) =>
+      send(eventStep(machine, view, event, actor));
     const compose = composer(view, refresh);
     const take = (step: ExploreStep) => {
-      if (driver !== undefined) return liveTake(machine, step, { send, compose, view });
+      if (driver !== undefined) return liveTake(machine, step, { sendEvent, view });
       view.path = [...view.path, step];
       walked();
     };
@@ -297,9 +302,9 @@ export function mountViewer(
       return walk === null ? showDetails(selection) : play(walk, undefined, "screen");
     };
     const open = openIn(root, view, { machine, render: () => render() });
-    const live = driver === undefined ? null : { send, compose };
+    const live = driver === undefined ? null : { sendEvent };
     const graph = inSystem
-      ? renderSystem(doc, machine, system, systemCallbacks({ root, machine, view, refresh, live }))
+      ? renderSystem(doc, machine, system, systemCallbacks({ root, view, refresh, live }))
       : renderGraph(doc, drawn(machine, view), {
           select,
           showDetails,
@@ -332,23 +337,18 @@ function chromeOf(
 /** The system view's clicks; the entry lines send only when a driver runs. */
 function systemCallbacks(context: {
   root: HTMLElement;
-  machine: VizMachine;
   view: ViewState;
   refresh: () => void;
-  live: Pick<LiveContext, "send" | "compose"> | null;
+  live: Pick<LiveContext, "sendEvent"> | null;
 }): SystemCallbacks {
-  const { root, machine, view, live } = context;
+  const { root, view, live } = context;
   const select = systemSelector(view, context.refresh);
   const narrow = root.clientWidth > 0 && root.clientWidth < 560;
   if (live === null) return { select, narrow };
   return {
     select,
     narrow,
-    send: ({ event, to }) =>
-      sendEvent(machine, event, {
-        actor: to === "" ? undefined : { region: to },
-        ...live,
-      }),
+    send: ({ event, to }) => live.sendEvent(event, to === "" ? undefined : { region: to }),
   };
 }
 
@@ -580,6 +580,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     openPart: "",
     systemSelection: null,
     blocked: new Map(),
+    values: decodeValues(options.values ?? []),
     blockedFor: null,
   };
 }
@@ -670,7 +671,7 @@ function panelTabs(
 /** The live driver's part of the panel context, and the fold's open state, which lives in the view. */
 function liveOf(
   view: ViewState,
-  handlers: Pick<LiveContext, "send" | "play" | "compose" | "routes">,
+  handlers: Pick<LiveContext, "send" | "play" | "sendEvent" | "setValue" | "routes">,
   system: MachineSystem | null,
 ): Pick<ExploreContext, "events"> & { live?: LiveContext } {
   const events = {
@@ -687,6 +688,7 @@ function liveOf(
       outcomes: view.outcomes,
       afters: view.afters,
       previous: view.previous,
+      values: view.values,
       ...handlers,
       ...(system === null
         ? {}
@@ -717,11 +719,11 @@ function actorOf(
   return region === "" ? undefined : { region };
 }
 
-/** A live click on an edge sends at once when the event has no payload; otherwise it opens the form, and nothing is sent until Send. */
+/** A live click on an edge sends its event at once, with the values set in the Context tab. */
 function liveTake(
   machine: VizMachine,
   step: ExploreStep,
-  handlers: Pick<LiveContext, "send" | "compose"> & { view: ViewState },
+  handlers: Pick<LiveContext, "sendEvent"> & { view: ViewState },
 ): void {
   const edge = machine.edges.find((each) => each.id === step.edge);
   if (edge === undefined) return;
@@ -730,23 +732,7 @@ function liveTake(
     picked: handlers.view.picked,
   });
   if (actor === "none") return;
-  sendEvent(machine, edge.event, { actor, ...handlers });
-}
-
-function sendEvent(
-  machine: VizMachine,
-  event: string,
-  handlers: Pick<LiveContext, "send" | "compose"> & {
-    actor: VizActorRef | undefined;
-  },
-): void {
-  const { actor } = handlers;
-  const withActor = actor ? { actor } : {};
-  if (!asksForPayload(machine, event)) {
-    handlers.send({ kind: "event", event, payload: null, ...withActor });
-    return;
-  }
-  handlers.compose(event, actor);
+  handlers.sendEvent(edge.event, actor);
 }
 
 /** An effect result that arrives later replaces the live state. */
@@ -762,6 +748,73 @@ function watchDriver(
     view.motion = true;
     context.redraw();
   });
+}
+
+/** Sets (or, with undefined, clears) a value: any open blocked note closes, the blocked arrows are worked out again and the host hears of it. Only the marks redraw, so the box being typed in keeps focus. */
+function valueSetter(context: {
+  options: ViewerOptions;
+  machine: VizMachine;
+  view: ViewState;
+  mark: () => void;
+}): (name: string, value: VizJson | undefined) => void {
+  const { options, machine, view, mark } = context;
+  return (name, value) => {
+    const { [name]: _gone, ...rest } = view.values;
+    view.values = value === undefined ? rest : { ...rest, [name]: value };
+    view.composing = null;
+    view.composingActor = undefined;
+    view.blockedFor = null;
+    navigated(options, { machine, view });
+    mark();
+  };
+}
+
+/** Sends a step to the driver and redraws; no driver, no step. */
+function stepSender(context: {
+  view: ViewState;
+  driver: VizDriver | undefined;
+  walked: () => void;
+}): (step: VizStep) => void {
+  const { view, driver, walked } = context;
+  return (step) => {
+    if (driver === undefined) return;
+    stepInto(view, driver, step);
+    walked();
+  };
+}
+
+function noticeCleared(root: HTMLElement, view: ViewState): void {
+  view.notice = null;
+  root.querySelector("[data-run-missing]")?.remove();
+}
+
+/** Tells the host where the walk and the values now are. */
+function navigated(
+  options: ViewerOptions,
+  now: { machine: VizMachine; view: ViewState; run?: string },
+): void {
+  const { machine, view, run } = now;
+  options.onNavigate?.({
+    machine: machine.id,
+    steps: walkedSteps(machine, view),
+    values: encodeValues(view.values),
+    ...(run === undefined ? {} : { run }),
+  });
+}
+
+/** The step a click on `event` sends: its payload comes from the values set in the Context tab. */
+function eventStep(
+  machine: VizMachine,
+  view: ViewState,
+  event: string,
+  actor: VizActorRef | undefined,
+): VizStep {
+  const payload = payloadFor(machine, event, {
+    set: view.values,
+    live: view.live,
+    afters: view.afters,
+  });
+  return { kind: "event", event, payload, ...(actor ? { actor } : {}) };
 }
 
 function walkedSteps(machine: VizMachine, view: ViewState): string[] {
@@ -951,7 +1004,7 @@ function headerOf(doc: Document, context: Chrome): HTMLElement {
             view.systemSelection = null;
             view.path = [];
             view.notice = null;
-            context.onNavigate?.({ machine: id, steps: [] });
+            context.onNavigate?.({ machine: id, steps: [], values: encodeValues(view.values) });
             render();
           },
         }),
@@ -986,13 +1039,10 @@ function controlsOf(doc: Document, context: Chrome): HTMLElement {
   ]);
 }
 
-/** The system view's marks, and the payload sheet, which a send from the Step tab opens as in the diagram. */
+/** The system view's marks. */
 function markSystemView(
   root: HTMLElement,
-  context: { machine: VizMachine; system: MachineSystem; view: ViewState } & Pick<
-    LiveContext,
-    "send" | "compose"
-  >,
+  context: { machine: VizMachine; system: MachineSystem; view: ViewState },
 ): void {
   const { machine, system, view } = context;
   markSystem(root, {
@@ -1007,7 +1057,15 @@ function markSystemView(
   canvas?.querySelector("[data-viz-key]")?.remove();
   const key = view.diagramOnly ? null : systemKey(doc, { machine, system, live: view.live });
   if (key !== null) canvas?.append(key);
-  showPayloadSheet(root, { ...context, ...view });
+}
+
+function sameBlocked(asked: NonNullable<ViewState["blockedFor"]>, view: ViewState): boolean {
+  return (
+    asked.live === view.live &&
+    asked.values === view.values &&
+    asked.picked?.map === view.picked?.map &&
+    asked.picked?.key === view.picked?.key
+  );
 }
 
 /** Recomputes the blocked arrows when the live state or the picked child changed; no `dryRun` blocks nothing. */
@@ -1018,15 +1076,12 @@ function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver |
     view.blockedFor = null;
     return;
   }
-  const same =
-    blockedFor?.live === live &&
-    blockedFor.picked?.map === view.picked?.map &&
-    blockedFor.picked?.key === view.picked?.key;
-  if (same) return;
-  view.blockedFor = { live, picked: view.picked };
+  if (blockedFor !== null && sameBlocked(blockedFor, view)) return;
+  view.blockedFor = { live, picked: view.picked, values: view.values };
   view.blocked = blockedEdges(machine, {
     live,
     currents: currentsOf(live, view.picked),
+    set: view.values,
     dryRun: (steps) => driver.dryRun?.(steps) ?? [],
     actorOf: (edge) => actorOf(machine, edge, { children: live.children, picked: view.picked }),
   });
@@ -1057,7 +1112,8 @@ function markDiagram(
     view: ViewState;
     driver: VizDriver | undefined;
     refresh: () => void;
-  } & Pick<LiveContext, "send" | "compose">,
+    compose: (event: string | null, actor?: VizActorRef) => void;
+  },
 ): void {
   const { machine, view } = context;
   updateBlocked(machine, view, context.driver);

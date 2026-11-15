@@ -418,7 +418,7 @@ describe("live actor map children", () => {
       children: [child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)],
     };
 
-    test("the Send button opens the form with the next free key", () => {
+    test("a repeated Send button click sends the next free key", () => {
       const keyed: VizMachine = {
         ...withPhotoAdded,
         events: [
@@ -453,24 +453,16 @@ describe("live actor map children", () => {
       };
       mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [keyed] }, { driver });
       clickSend(root, "photoAdded");
-      const form = () =>
-        root.querySelector<HTMLInputElement>('[data-payload-form="photoAdded"] input');
-      expect(form()?.value).toBe("p1");
-      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
       expect(sent).toEqual([{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }]);
       clickSend(root, "photoAdded");
-      expect(form()?.value).toBe("p2");
-      const typed = form();
-      if (typed) typed.value = "p1";
-      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
       expect(sent.at(-1)).toEqual({
         kind: "event",
         event: "photoAdded",
-        payload: { photoId: "p1" },
+        payload: { photoId: "p2" },
       });
     });
 
-    test("the form opens on the next key when the evidence is only in a removed child", () => {
+    test("a click sends the next key when the evidence is only in a removed child", () => {
       const keyed: VizMachine = {
         ...withPhotoAdded,
         events: [
@@ -509,14 +501,15 @@ describe("live actor map children", () => {
       };
       mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [keyed] }, { driver });
       clickSend(root, "photoAdded");
-      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
       clickSend(root, "photoAdded");
-      expect(
-        root.querySelector<HTMLInputElement>('[data-payload-form="photoAdded"] input')?.value,
-      ).toBe("p2");
+      expect(sent.at(-1)).toEqual({
+        kind: "event",
+        event: "photoAdded",
+        payload: { photoId: "p2" },
+      });
     });
 
-    test("the JSON box opens with the next free key when the event declares no fields", () => {
+    test("an event that declares no fields sends the next free key too", () => {
       const bare: VizMachine = {
         ...withPhotoAdded,
         events: [{ ...event("photoAdded"), payload: [] }, event("queueCleared")],
@@ -546,14 +539,14 @@ describe("live actor map children", () => {
         },
       };
       mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [bare] }, { driver });
-      const box = () => root.querySelector<HTMLTextAreaElement>('[data-payload-json="photoAdded"]');
       clickSend(root, "photoAdded");
-      const first = box();
-      if (first) first.value = '{"photoId":"p1"}';
-      root.querySelector<HTMLButtonElement>('[data-payload-send="photoAdded"]')?.click();
-      expect(sent).toHaveLength(1);
+      expect(sent).toEqual([{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }]);
       clickSend(root, "photoAdded");
-      expect(box()?.value).toBe('{"photoId":"p2"}');
+      expect(sent.at(-1)).toEqual({
+        kind: "event",
+        event: "photoAdded",
+        payload: { photoId: "p2" },
+      });
     });
 
     test("a step that starts a child says so", () => {
@@ -1055,7 +1048,7 @@ describe("live actor map children", () => {
     });
   });
 
-  test("a payload event for a child opens the sheet on the child's edge and sends to it", () => {
+  test("a payload event for a child sends to that child at once", () => {
     const withPayload: VizMachine = {
       ...photoQueue,
       events: photoQueue.events.map((each) =>
@@ -1084,14 +1077,7 @@ describe("live actor map children", () => {
     root
       .querySelector<HTMLButtonElement>('[data-actor="photos[p2]"] [data-send="retryPressed"]')
       ?.click();
-    expect(sent).toEqual([]);
-    expect(root.querySelector('.payload-sheet [data-payload-form="retryPressed"]')).not.toBeNull();
-    expect(
-      [...root.querySelectorAll("[data-composing]")].map((each) =>
-        each.getAttribute("data-edge-id"),
-      ),
-    ).toEqual(["photos.waitingForRetry-retryPressed-photos.sendingPhoto"]);
-    root.querySelector<HTMLButtonElement>('[data-payload-send="retryPressed"]')?.click();
+    expect(root.querySelector(".payload-sheet")).toBeNull();
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({
       kind: "event",
@@ -1100,7 +1086,7 @@ describe("live actor map children", () => {
     });
   });
 
-  test("a payload edge click opens the form for the child in its source, and Send reaches it", () => {
+  test("a payload edge click sends to the child in its source at once", () => {
     const withReason: VizMachine = {
       ...photoQueue,
       events: photoQueue.events.map((each) =>
@@ -1128,13 +1114,6 @@ describe("live actor map children", () => {
         '.graph g[data-edge-id="photos.sendingPhoto-uploadFailed-photos.waitingForRetry"]',
       )
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(sent).toEqual([]);
-    expect(
-      root.querySelector<HTMLInputElement>(
-        '.payload-sheet [data-payload-form="uploadFailed"] input',
-      )?.value,
-    ).toBe("offline");
-    root.querySelector<HTMLButtonElement>('[data-payload-send="uploadFailed"]')?.click();
     expect(sent).toEqual([
       {
         kind: "event",

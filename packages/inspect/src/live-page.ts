@@ -227,6 +227,7 @@ export function mountDriven(
     next.set("machine", machine);
     next.delete("step");
     next.delete("run");
+    next.delete("value");
     history.replaceState(null, "", `?${next.toString()}`);
     mountDriven(root, context);
   };

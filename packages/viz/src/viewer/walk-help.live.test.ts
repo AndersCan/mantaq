@@ -1,6 +1,13 @@
 // @vitest-environment happy-dom
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
-import type { VizDriver, VizLiveState, VizLiveStep, VizMachine, VizState } from "../schema.ts";
+import type {
+  VizDriver,
+  VizLiveState,
+  VizLiveStep,
+  VizMachine,
+  VizState,
+  VizStep,
+} from "../schema.ts";
 import { mountViewer } from "./embed.ts";
 import { expect, test } from "vite-plus/test";
 
@@ -106,12 +113,15 @@ function live(steps: number, after: VizLiveStep[]): VizLiveState {
   };
 }
 
-function mount(after: VizLiveStep[]) {
+function mount(after: VizLiveStep[], sent: VizStep[] = []) {
   const root = document.createElement("div");
   let n = 0;
   const driver: VizDriver = {
     reset: () => live((n = 0), []),
-    step: () => live(++n, after),
+    step: (each) => {
+      sent.push(each);
+      return live(++n, after);
+    },
   };
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] }, { driver });
   return root;
@@ -120,16 +130,16 @@ function mount(after: VizLiveStep[]) {
 const sendButton = (root: HTMLElement, event: string) =>
   root.querySelector<HTMLButtonElement>(`[data-send="${event}"]`);
 
-test("a payload form fills from what a part sent after the last step", () => {
+test("a click sends what a part sent after the last step", () => {
   const assigned = step({
     event: "ITEMS_ASSIGNED",
     message: { sender: "", dropped: null, payload: { worker: "w1" } },
   });
-  const root = mount([assigned]);
+  const sent: VizStep[] = [];
+  const root = mount([assigned], sent);
   sendButton(root, "ITEM_ARRIVED")?.click();
   sendButton(root, "ITEMS_FINISHED")?.click();
-  const input = root.querySelector<HTMLInputElement>('[data-payload-form="ITEMS_FINISHED"] input');
-  expect(input?.value).toBe("w1");
+  expect(sent.at(-1)).toMatchObject({ event: "ITEMS_FINISHED", payload: { worker: "w1" } });
 });
 
 test("a step that changed nothing says so in Step; one a part answered does not", () => {

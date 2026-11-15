@@ -3,7 +3,6 @@ import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type {
   VizDriver,
   VizEdge,
-  VizField,
   VizJson,
   VizLiveState,
   VizLiveStep,
@@ -153,12 +152,9 @@ function mount(
 
 const click = (root: HTMLElement, selector: string) =>
   root.querySelector<HTMLButtonElement>(selector)?.click();
-/** Opens the payload form of `submit`, optionally types JSON, then sends. */
-function sendSubmit(root: HTMLElement, json?: string) {
+/** Sends `submit` from the Step tab. */
+function sendSubmit(root: HTMLElement) {
   click(root, '[data-send="submit"]');
-  const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
-  if (box && json !== undefined) box.value = json;
-  click(root, '[data-payload-send="submit"]');
 }
 const current = (root: HTMLElement) => root.querySelector(".explore")?.getAttribute("data-current");
 
@@ -202,96 +198,6 @@ describe("live controls", () => {
     if (again) again.value = "250";
     click(root, "[data-advance]");
     expect(live.log).toEqual([[{ kind: "advance", ms: 250 }]]);
-  });
-
-  test("JSON payload is sent with the event", () => {
-    const { root, live } = mount();
-    sendSubmit(root, '{"amount":42}');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { amount: 42 } }]);
-    expect(root.querySelector("[data-live-context]")?.textContent).toBe('{\n  "amount": 42\n}');
-  });
-
-  test("invalid JSON sends nothing and keeps the form open", () => {
-    const { root, live } = mount();
-    sendSubmit(root, "{nope");
-    expect(live.log).toEqual([]);
-    expect(root.querySelector(".explore-payload [role=alert]")?.hasAttribute("hidden")).toBe(false);
-  });
-
-  test("an event with a payload asks for it, filled with the first sample, with no sample buttons", () => {
-    const { root, live } = mount();
-    click(root, '[data-send="submit"]');
-    expect(live.log).toEqual([]);
-    const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
-    expect(box?.value).toBe('{"amount":5}');
-    expect(
-      [...root.querySelectorAll("[data-payload-form] button")].map((b) => b.textContent),
-    ).toEqual(["Send submit", "Cancel"]);
-    box!.value = '{"amount":9}';
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { amount: 9 } }]);
-    expect(root.querySelector("[data-payload-form]")).toBeNull();
-  });
-
-  test("Send is the only primary button in the payload form", () => {
-    const { root } = mount();
-    click(root, '[data-send="submit"]');
-    const primary = [...root.querySelectorAll('[data-payload-form="submit"] button.primary')];
-    expect(primary.map((each) => each.getAttribute("data-payload-send"))).toEqual(["submit"]);
-  });
-
-  test("cancel closes the form without sending", () => {
-    const { root, live } = mount();
-    click(root, '[data-send="submit"]');
-    click(root, '[data-payload-cancel="submit"]');
-    expect(live.log).toEqual([]);
-    expect(root.querySelector("[data-payload-form]")).toBeNull();
-  });
-
-  test("an edge click on a data event opens the form at the known values and sends nothing", () => {
-    const { root, live } = mount();
-    clickEdge(root, "idle-submit-paying");
-    expect(live.log).toEqual([]);
-    expect(root.querySelector('.payload-sheet [data-payload-form="submit"]')).not.toBeNull();
-    expect(root.querySelector(".payload-sheet")?.getAttribute("aria-label")).toBe(
-      "Payload for submit",
-    );
-    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]')?.value).toBe(
-      '{"amount":5}',
-    );
-    const marked = [...root.querySelectorAll("[data-composing]")];
-    expect(marked.map((each) => each.getAttribute("data-edge-id"))).toEqual(["idle-submit-paying"]);
-  });
-
-  test("after Send or Escape from an edge's form, focus is back on that edge", () => {
-    const { root, live } = mount();
-    document.body.append(root);
-    const edge = () => root.querySelector<SVGGElement>('[data-edge-id="idle-submit-paying"]');
-    edge()?.focus();
-    edge()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(document.activeElement?.closest(".payload-sheet")).not.toBeNull();
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    expect(root.querySelector(".payload-sheet")).toBeNull();
-    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
-    edge()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log).toHaveLength(1);
-    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
-    root.remove();
-  });
-
-  test("Send from the edge's form logs exactly that payload; Cancel logs nothing", () => {
-    const { root, live } = mount();
-    clickEdge(root, "idle-submit-paying");
-    click(root, '[data-payload-cancel="submit"]');
-    expect(live.log).toEqual([]);
-    expect(root.querySelector(".payload-sheet")).toBeNull();
-    clickEdge(root, "idle-submit-paying");
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log).toEqual([[{ kind: "event", event: "submit", payload: { amount: 5 } }]]);
-    expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
   test("an edge click on an event with no payload still sends at once", () => {
@@ -384,73 +290,6 @@ describe("live controls", () => {
     expect(log[0]?.kind === "event" && log[0].event).toBe("flip");
   });
 
-  test("a second click on the same event opens the form at what this walk sent last", () => {
-    const toggle: VizMachine = {
-      ...checkout,
-      states: [state("off", { initial: true }), state("on")],
-      initial: "off",
-      events: [{ id: "flip", internal: false, doc: null, payload: null }],
-      edges: [edge("off", "flip", "on"), edge("on", "flip", "off")],
-      fuzz: {
-        ...checkout.fuzz!,
-        corpus: [{ steps: [{ kind: "event", event: "flip", payload: { n: 1 } }], discovered: [] }],
-      },
-    };
-    const log: VizStep[] = [];
-    const flip: VizDriver = {
-      reset: () => flipState([]),
-      step: (step) => {
-        log.push(step);
-        return flipState([...log]);
-      },
-    };
-    function flipState(steps: VizStep[]): VizLiveState {
-      return {
-        state: steps.length % 2 === 0 ? "off" : "on",
-        steps,
-        last: null,
-        after: [],
-        timers: [],
-        context: null,
-        payload: null,
-        regions: {},
-        children: [],
-        effectMode: "real",
-        waiting: [],
-      };
-    }
-    const root = document.createElement("div");
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [toggle] }, { driver: flip });
-    click(root, '[data-send="flip"]');
-    const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]');
-    if (box) box.value = '{"n": 42}';
-    click(root, '[data-payload-send="flip"]');
-    clickEdge(root, "on-flip-off");
-    expect(log).toHaveLength(1);
-    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]')?.value).toBe(
-      '{"n":42}',
-    );
-    click(root, '[data-payload-send="flip"]');
-    expect(log.at(-1)).toEqual({ kind: "event", event: "flip", payload: { n: 42 } });
-    click(root, '[data-send="flip"]');
-    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="flip"]')?.value).toBe(
-      '{"n":42}',
-    );
-  });
-
-  test("a value sent from the form is forgotten when Back undoes that send", () => {
-    const { root } = mount();
-    click(root, '[data-send="submit"]');
-    const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
-    if (box) box.value = '{"amount": 42}';
-    click(root, '[data-payload-send="submit"]');
-    click(root, '[data-explore-action="back"]');
-    clickEdge(root, "idle-submit-paying");
-    expect(root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]')?.value).toBe(
-      '{"amount":5}',
-    );
-  });
-
   test("clicks never scroll or rebuild the canvas", () => {
     const { root } = mount();
     const canvas = root.querySelector(".canvas");
@@ -469,18 +308,6 @@ describe("live controls", () => {
     vi.restoreAllMocks();
   });
 
-  test("the Send list opens the same sheet, and Escape closes it", () => {
-    const { root, live } = mount();
-    click(root, '[data-send="submit"]');
-    const sheet = root.querySelector(".payload-sheet");
-    expect(sheet).not.toBeNull();
-    expect(root.querySelector(".panel [data-payload-form]")).toBeNull();
-    sheet?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(root.querySelector(".payload-sheet")).toBeNull();
-    expect(root.querySelector("[data-composing]")).toBeNull();
-    expect(live.log).toEqual([]);
-  });
-
   test("back replays the log without the last step", () => {
     const { root } = mount();
     sendSubmit(root);
@@ -493,10 +320,10 @@ describe("live controls", () => {
   test("the URL steps round-trip to the same state", () => {
     const seen: string[][] = [];
     const first = mount({ onNavigate: (where) => seen.push(where.steps) });
-    sendSubmit(first.root, '{"amount":42}');
+    sendSubmit(first.root);
     click(first.root, "[data-advance-timer]");
     const steps = seen.at(-1) ?? [];
-    expect(steps).toEqual(['submit={"amount":42}', "@800"]);
+    expect(steps).toEqual(['submit={"amount":5}', "@800"]);
     const second = mount({ steps });
     expect(current(second.root)).toBe(current(first.root));
     expect(second.root.querySelector("[data-live-context]")?.textContent).toBe(
@@ -694,15 +521,15 @@ describe("context highlight", () => {
   test("nothing is marked before a step, the changed lines after", () => {
     const { root } = mount();
     expect(marked(root)).toEqual([]);
-    sendSubmit(root, '{"amount":42}');
-    expect(marked(root)).toEqual(['"amount": 42']);
+    sendSubmit(root);
+    expect(marked(root)).toEqual(['"amount": 5']);
   });
 
   test("Back highlights against the step before", () => {
-    const { root } = mount({ steps: ['submit={"amount":42}', "@800"] });
+    const { root } = mount({ steps: ['submit={"amount":5}', "@800"] });
     expect(marked(root)).toEqual([]);
     click(root, '[data-explore-action="back"]');
-    expect(marked(root)).toEqual(['"amount": 42']);
+    expect(marked(root)).toEqual(['"amount": 5']);
   });
 });
 
@@ -760,14 +587,26 @@ describe("field forms and the context table", () => {
     fuzz: null,
   };
 
-  function mountFields(machine: VizMachine = fieldsMachine, held: VizJson = null) {
+  function mountFields(
+    machine: VizMachine = fieldsMachine,
+    extra: Partial<Parameters<typeof mountViewer>[2]> = {},
+  ) {
     const root = document.createElement("div");
-    const live = driver(held);
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver: live });
+    const live = driver();
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver: live, ...extra },
+    );
     return { root, live };
   }
-  const field = (root: HTMLElement, name: string) =>
-    root.querySelector<HTMLInputElement & HTMLSelectElement>(`[data-field="${name}"]`);
+  const valueBox = (root: HTMLElement, name: string) =>
+    root.querySelector<HTMLInputElement>(`[data-value="${name}"]`);
+  const setBox = (root: HTMLElement, name: string, text: string) => {
+    const box = valueBox(root, name);
+    if (box) box.value = text;
+    box?.dispatchEvent(new Event("change", { bubbles: true }));
+  };
 
   test("the note is present when live and absent without a driver", () => {
     expect(mountFields().root.querySelector("[data-live-note]")).not.toBeNull();
@@ -779,190 +618,10 @@ describe("field forms and the context table", () => {
     expect(root.querySelector("[data-live-note]")).toBeNull();
   });
 
-  test("a form has one control per field, prefilled", () => {
-    const { root } = mountFields();
-    click(root, '[data-send="submit"]');
-    expect(root.querySelectorAll("[data-field]").length).toBe(3);
-    expect(pressedChoice(root, "validFor")).toBe('"10m"');
-    expect(field(root, "flags")?.value).toBe("");
-  });
-
-  test("optional fields left empty are left out; a typed json field is parsed", () => {
-    const { root, live } = mountFields();
-    click(root, '[data-send="submit"]');
-    const flags = field(root, "flags");
-    if (flags) flags.value = '{"a":false}';
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([
-      {
-        kind: "event",
-        event: "submit",
-        payload: { validFor: "10m", flags: { a: false } },
-      },
-    ]);
-  });
-
-  test("bad json in a json field sends nothing and names the field", () => {
-    const { root, live } = mountFields();
-    click(root, '[data-send="submit"]');
-    const flags = field(root, "flags");
-    if (flags) flags.value = "{";
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log).toEqual([]);
-    expect(root.querySelector(".explore-payload [role=alert]")?.textContent).toBe(
-      "Not sent: flags is not valid JSON.",
-    );
-  });
-
   test("an event with no payload fields and no samples sends at once", () => {
     const { root, live } = mountFields();
     click(root, '[data-send="ping"]');
     expect(live.log[0]).toEqual([{ kind: "event", event: "ping", payload: null }]);
-    expect(root.querySelector('[data-send-custom="ping"]')).not.toBeNull();
-  });
-
-  const choose = (root: HTMLElement, name: string, value: string) =>
-    field(root, name)
-      ?.querySelector<HTMLButtonElement>(`button[data-choice='${JSON.stringify(value)}']`)
-      ?.click();
-  const pressedChoice = (root: HTMLElement, name: string) =>
-    field(root, name)?.querySelector("[aria-pressed=true]")?.getAttribute("data-choice");
-  const alertText = (root: HTMLElement) =>
-    root.querySelector(".payload-actions [role=alert]")?.textContent;
-
-  test("a choice field of four or fewer options is a button row and sends the pressed one", () => {
-    const { root, live } = mountFields();
-    click(root, '[data-send="submit"]');
-    const row = field(root, "validFor");
-    expect(row?.tagName).toBe("DIV");
-    expect([...(row?.querySelectorAll("button") ?? [])].map((each) => each.textContent)).toEqual([
-      "10m",
-      "1h",
-    ]);
-    expect(pressedChoice(root, "validFor")).toBe('"10m"');
-    choose(root, "validFor", "1h");
-    expect(pressedChoice(root, "validFor")).toBe('"1h"');
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { validFor: "1h" } }]);
-  });
-
-  test("an optional choice starts on (not set) and is left out", () => {
-    const { root, live } = mountFields(optionalChoiceMachine, null);
-    click(root, '[data-send="submit"]');
-    expect(pressedChoice(root, "tag")).toBe("");
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { size: "s" } }]);
-    click(root, '[data-send="submit"]');
-    choose(root, "tag", "b");
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[1]?.at(-1)).toEqual({
-      kind: "event",
-      event: "submit",
-      payload: { tag: "b", size: "s" },
-    });
-  });
-
-  test("a choice field with exactly four options is a button row", () => {
-    const { root } = mountFields(sizedMachine(["a", "b", "c", "d"], false));
-    click(root, '[data-send="submit"]');
-    expect(field(root, "pick")?.tagName).toBe("DIV");
-  });
-
-  test("an optional choice with four choices has five options and is a select", () => {
-    const { root } = mountFields(sizedMachine(["a", "b", "c", "d"], true));
-    click(root, '[data-send="submit"]');
-    expect(field(root, "pick")?.tagName).toBe("SELECT");
-  });
-
-  test("a choice field of five options stays a select", () => {
-    const { root, live } = mountFields(optionalChoiceMachine, null);
-    click(root, '[data-send="submit"]');
-    const many = field(root, "size");
-    expect(many?.tagName).toBe("SELECT");
-    if (many) many.value = '"l"';
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log[0]).toEqual([{ kind: "event", event: "submit", payload: { size: "l" } }]);
-  });
-
-  test("the form heading is the event name and there is no JSON mode", () => {
-    const { root } = mountFields();
-    click(root, '[data-send="submit"]');
-    expect(root.querySelector(".payload-title")?.textContent).toBe("submit");
-    expect(root.querySelector("[data-payload-as-json]")).toBeNull();
-    expect(root.querySelector("[data-payload-json]")).toBeNull();
-  });
-
-  const choiceField = (name: string, optional: boolean, choices: string[]): VizField => ({
-    name,
-    type: choices.map((each) => JSON.stringify(each)).join(" | "),
-    optional,
-    doc: null,
-    input: "choice",
-    choices,
-    sample: choices[0] ?? "",
-  });
-  const sizedMachine = (choices: string[], optional: boolean): VizMachine => ({
-    ...fieldsMachine,
-    events: [
-      {
-        id: "submit",
-        internal: false,
-        doc: null,
-        payload: [choiceField("pick", optional, choices)],
-      },
-    ],
-  });
-  const optionalChoiceMachine: VizMachine = {
-    ...fieldsMachine,
-    events: [
-      {
-        id: "submit",
-        internal: false,
-        doc: null,
-        payload: [
-          choiceField("tag", true, ["a", "b"]),
-          choiceField("size", false, ["s", "m", "l", "xl", "xxl"]),
-        ],
-      },
-    ],
-  };
-
-  test("a bad field focuses it without scrolling", () => {
-    const { root } = mountFields();
-    document.body.append(root);
-    click(root, '[data-send="submit"]');
-    const flags = field(root, "flags");
-    if (flags) flags.value = "{oops";
-    const spy = vi.spyOn(HTMLElement.prototype, "focus");
-    click(root, '[data-payload-send="submit"]');
-    expect(spy).toHaveBeenCalledWith({ preventScroll: true });
-    spy.mockRestore();
-    root.remove();
-  });
-
-  test("a bad field value focuses that field", () => {
-    const { root, live } = mountFields();
-    document.body.append(root);
-    click(root, '[data-send="submit"]');
-    const flags = field(root, "flags");
-    if (flags) flags.value = "{oops";
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log).toEqual([]);
-    expect(document.activeElement).toBe(flags);
-    root.remove();
-  });
-
-  test("a missing required field puts the alert in the actions row and focuses the field", () => {
-    const { root, live } = mountFields(requiredMachine, null);
-    document.body.append(root);
-    click(root, '[data-send="submit"]');
-    const amount = field(root, "amount");
-    if (amount) amount.value = "";
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log).toEqual([]);
-    expect(alertText(root)).toBe("Not sent: amount is required.");
-    expect(document.activeElement).toBe(amount);
-    root.remove();
   });
 
   test("the Context tab lists each declared field with its meaning and value", () => {
@@ -1005,84 +664,83 @@ describe("field forms and the context table", () => {
     ],
   };
 
-  test("a number field sends a number and a required text field sends its string", () => {
-    const { root, live } = mountFields(requiredMachine);
+  test("the context table marks a field the last step changed", () => {
+    const { root } = mountFields(requiredMachine);
+    setBox(root, "amount", "7");
     click(root, '[data-send="submit"]');
-    const amount = field(root, "amount");
-    if (amount) amount.value = "7.5";
-    click(root, '[data-payload-send="submit"]');
+    const row = root.querySelector('[data-context-field="amount"]');
+    expect(row?.hasAttribute("data-context-changed")).toBe(true);
+    expect(row?.textContent).toContain("7");
+  });
+
+  test("an arrow click sends at once with the examples and opens no form", () => {
+    const { root, live } = mountFields(requiredMachine);
+    clickEdge(root, "idle-submit-paying");
     expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
+    ]);
+    expect(root.querySelector(".payload-sheet")).toBeNull();
+  });
+
+  test("a value set in the Context tab is sent by every later click, kept for onNavigate and across Back", () => {
+    const seen: string[][] = [];
+    const { root, live } = mountFields(requiredMachine, {
+      onNavigate: (where) => seen.push(where.values),
+    });
+    expect(valueBox(root, "amount")?.placeholder).toBe("1");
+    setBox(root, "amount", "7.5");
+    expect(seen.at(-1)).toEqual(["amount=7.5"]);
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } },
+    ]);
+    expect(seen.at(-1)).toEqual(["amount=7.5"]);
+    click(root, '[data-explore-action="back"]');
+    expect(valueBox(root, "amount")?.value).toBe("7.5");
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log.at(-1)).toEqual([
       { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } },
     ]);
   });
 
-  test("a required text field cleared sends an empty string", () => {
-    const { root, live } = mountFields(requiredMachine);
-    click(root, '[data-send="submit"]');
-    const label = field(root, "label");
-    if (label) label.value = "";
-    click(root, '[data-payload-send="submit"]');
+  test("values from the address are sent, and clearing the box sends the example again", () => {
+    const { root, live } = mountFields(requiredMachine, { values: ['label="from url"', "bad"] });
+    expect(valueBox(root, "label")?.value).toBe("from url");
+    setBox(root, "amount", "2");
+    setBox(root, "amount", "");
+    clickEdge(root, "idle-submit-paying");
     expect(live.log[0]).toEqual([
-      { kind: "event", event: "submit", payload: { amount: 1, label: "" } },
+      { kind: "event", event: "submit", payload: { amount: 1, label: "from url" } },
     ]);
   });
 
-  test("a cleared or non-numeric required number sends nothing and names the field", () => {
-    for (const value of ["", "abc"]) {
-      const { root, live } = mountFields(requiredMachine);
-      click(root, '[data-send="submit"]');
-      const amount = field(root, "amount");
-      if (amount) amount.value = value;
-      click(root, '[data-payload-send="submit"]');
-      expect(live.log).toEqual([]);
-      expect(root.querySelector(".explore-payload [role=alert]")?.textContent).toBe(
-        "Not sent: amount is required.",
-      );
-    }
+  test("text that is not a value empties the box, so the grey default is what is sent", () => {
+    const { root, live } = mountFields(requiredMachine);
+    setBox(root, "amount", "7");
+    setBox(root, "amount", "seven");
+    expect(valueBox(root, "amount")?.value).toBe("");
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
+    ]);
   });
 
-  test("a cleared required json field sends nothing and names the field", () => {
-    const jsonMachine: VizMachine = {
+  test("a name optional on one event and required on another shows the default the click sends", () => {
+    const label = requiredMachine.events[0]?.payload?.[1];
+    if (label === undefined) throw new Error("fixture");
+    const shared: VizMachine = {
       ...requiredMachine,
       events: [
-        {
-          id: "submit",
-          internal: false,
-          doc: null,
-          payload: [
-            {
-              name: "flags",
-              type: "{ a: boolean }",
-              optional: false,
-              doc: null,
-              input: "json",
-              choices: [],
-              sample: { a: true },
-            },
-          ],
-        },
+        { id: "draft", internal: false, doc: null, payload: [{ ...label, optional: true }] },
+        ...requiredMachine.events,
       ],
     };
-    const { root, live } = mountFields(jsonMachine);
-    click(root, '[data-send="submit"]');
-    const flags = field(root, "flags");
-    if (flags) flags.value = "";
-    click(root, '[data-payload-send="submit"]');
-    expect(live.log).toEqual([]);
-    expect(root.querySelector(".explore-payload [role=alert]")?.textContent).toBe(
-      "Not sent: flags is required.",
-    );
-  });
-
-  test("the context table marks a field the last step changed", () => {
-    const { root } = mountFields(requiredMachine);
-    click(root, '[data-send="submit"]');
-    const amount = field(root, "amount");
-    if (amount) amount.value = "7";
-    click(root, '[data-payload-send="submit"]');
-    const row = root.querySelector('[data-context-field="amount"]');
-    expect(row?.hasAttribute("data-context-changed")).toBe(true);
-    expect(row?.textContent).toContain("7");
+    const { root, live } = mountFields(shared);
+    expect(valueBox(root, "label")?.placeholder).toBe("hi");
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
+    ]);
   });
 
   test("a context without declared fields falls back to the JSON view", () => {
@@ -1189,13 +847,11 @@ describe("what ran", () => {
   test("Because shows the condition for a transition and a stay", () => {
     const move = mountWith(branching, stepped({}).live);
     click(move, '[data-send="submit"]');
-    click(move, '[data-payload-send="submit"]');
     expect(text(move, "outcome")).toBe("submit: idle → paying");
     expect(text(move, "because")).toBe("Because: payload.amount > 5");
 
     const stay = mountWith(branching, stepped({ to: "idle", outcome: "stay", context: {} }).live);
     click(stay, '[data-send="submit"]');
-    click(stay, '[data-payload-send="submit"]');
     expect(text(stay, "outcome")).toBe("submit: handled in idle, stays");
     expect(text(stay, "because")).toBe("Because: !(payload.amount > 5)");
   });
@@ -1206,7 +862,6 @@ describe("what ran", () => {
     };
     const send = (root: HTMLElement) => {
       click(root, '[data-send="submit"]');
-      click(root, '[data-payload-send="submit"]');
     };
     const routed = mountWith(branching, stepped({ sent: ["openAlbum"] }).live, routes);
     send(routed);
@@ -1257,7 +912,6 @@ describe("what ran", () => {
     };
     const root = mountWith(plain, stepped({}).live);
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(root.querySelector("[data-live-because]")).toBeNull();
   });
 
@@ -1267,7 +921,6 @@ describe("what ran", () => {
       stepped({ effects: ["charge"], context: { amount: 9, tag: "x" } }).live,
     );
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(text(root, "changed")).toBe("Changed: amount, tag");
     expect(text(root, "effects")).toBe("Effects started: charge");
   });
@@ -1276,7 +929,6 @@ describe("what ran", () => {
     const { live, push } = stepped({});
     const root = mountWith(branching, live);
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(root.querySelector("[data-live-after]")).toBeNull();
     push({
       state: "error",
@@ -1320,7 +972,6 @@ describe("what ran", () => {
   test("an ignored event says nothing ran", () => {
     const root = mountWith(branching, stepped({ to: "idle", outcome: "ignored" }).live);
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(text(root, "outcome")).toBe("No handler for submit in idle. Nothing ran.");
   });
 });

@@ -9,15 +9,16 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { knownPayload } from "./fill.ts";
+import type { Values } from "./fill.ts";
 
 /**
- * What a dry run sends for `event`: the form's example values, never the last value sent, so a
- * payload-only guard does not block the arrow. null when the event takes no data.
+ * What a dry run sends for `event`: the values set in the Context tab, else the examples, never
+ * the last value sent, so a payload-only guard does not block the arrow. null when the event takes no data.
  */
-export function examplePayload(machine: VizMachine, event: string): VizJson {
+export function examplePayload(machine: VizMachine, event: string, set: Values): VizJson {
   const fields = machine.events.find((each) => each.id === event)?.payload ?? null;
   const samples = payloadSamples(machine, event);
-  return knownPayload(fields, { event, samples, steps: [] })?.payload ?? null;
+  return knownPayload(fields, { event, samples, steps: [], set })?.payload ?? null;
 }
 
 /** The value at a dotted path in the live context; "not set" when there is none (the Context tab's word). */
@@ -70,6 +71,8 @@ export function blockedEdges(
   machine: VizMachine,
   from: {
     live: VizLiveState;
+    /** The values set in the Context tab. */
+    set: Values;
     currents: ReadonlyArray<string>;
     dryRun: (steps: ReadonlyArray<VizStep>) => Array<VizLiveStep | null>;
     actorOf: (edge: VizEdge) => VizActorRef | undefined | "none";
@@ -83,7 +86,7 @@ export function blockedEdges(
     const step: VizStep = {
       kind: "event",
       event: edge.event,
-      payload: examplePayload(machine, edge.event),
+      payload: examplePayload(machine, edge.event, from.set),
       ...(actor === undefined ? {} : { actor }),
     };
     const entry = asked.get(key) ?? { step, edges: [] };
