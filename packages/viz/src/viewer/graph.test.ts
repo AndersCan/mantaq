@@ -146,3 +146,24 @@ describe("renderGraph transition label", () => {
     expect(lock + 8 + 4).toBeLessThanOrEqual(textLeft);
   });
 });
+
+describe("renderGraph region title", () => {
+  test("starts inside the region's left edge so live text of any length stays anchored there", () => {
+    const pooled: VizMachine = {
+      ...machine,
+      regions: ["workers"],
+      maps: ["workers"],
+      states: [{ ...state("workers.working", true), region: "workers" }],
+    };
+    const graph = renderGraph(document, pooled, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    const rect = graph.querySelector("g.region > rect");
+    const text = graph.querySelector("g.region > text");
+    const left = Number(rect?.getAttribute("x"));
+    expect(Number(text?.getAttribute("x"))).toBe(left + 12);
+    expect(text?.getAttribute("text-anchor")).toBeNull();
+  });
+});

@@ -7,6 +7,7 @@ type Part =
   | `arrow:${string}`
   | `node:${string}`
   | `region:${string}`
+  | `title:${string}`
   | `entry:${string}`
   | "canvas";
 
@@ -46,6 +47,17 @@ const ARROW_SIZE = 8;
 
 function sub(a: Point, b: Point): Point {
   return { x: a.x - b.x, y: a.y - b.y };
+}
+
+const sampledPaths = new WeakMap<ReadonlyArray<Point>, Point[]>();
+
+/** `samplePolyline`, remembered per route: label repair re-checks the same routes for every candidate spot. */
+function sampledPath(points: ReadonlyArray<Point>): Point[] {
+  const known = sampledPaths.get(points);
+  if (known !== undefined) return known;
+  const sampled = samplePolyline(points);
+  sampledPaths.set(points, sampled);
+  return sampled;
 }
 
 function samplePolyline(points: ReadonlyArray<Point>): Point[] {
@@ -114,8 +126,32 @@ function boxToBox(a: Box, b: Box): number {
   return dx < 0 && dy < 0 ? Math.max(dx, dy) : Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
 }
 
+const pathBounds = new WeakMap<ReadonlyArray<Point>, Box>();
+
+/** The smallest box around a route, remembered per route. */
+function boundsOfPath(path: ReadonlyArray<Point>): Box {
+  const known = pathBounds.get(path);
+  if (known !== undefined) return known;
+  const xs = path.map((point) => point.x);
+  const ys = path.map((point) => point.y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  const bounds = {
+    x: (left + Math.max(...xs)) / 2,
+    y: (top + Math.max(...ys)) / 2,
+    width: Math.max(...xs) - left,
+    height: Math.max(...ys) - top,
+  };
+  pathBounds.set(path, bounds);
+  return bounds;
+}
+
 function pathToBox(path: ReadonlyArray<Point>, box: Box): number {
-  return Math.min(...path.map((point) => pointToBox(point, box)));
+  const around = boxToBox(boundsOfPath(path), box);
+  if (around >= LABEL_PAD) return around;
+  let best = Infinity;
+  for (const point of path) best = Math.min(best, pointToBox(point, box));
+  return best;
 }
 
 function pathToPath(a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): number {
@@ -195,7 +231,14 @@ interface Shapes {
   nodes: Array<{ id: string; part: Part; box: Box; owner: string | null }>;
   edges: Array<{ id: string; from: string; target: string; path: Point[]; label: Box; arrow: Box }>;
   entries: Array<{ part: Part; line: Point[] }>;
-  regions: Array<{ part: Part; name: string; box: Box; border: Point[] }>;
+  regions: Array<{
+    part: Part;
+    title: Part;
+    name: string;
+    box: Box;
+    titleBox: Box;
+    border: Point[];
+  }>;
   canvas: Box;
 }
 
@@ -216,7 +259,7 @@ function shapesOf(layout: MachineLayout): Shapes {
       owner: node.kind === "state" ? node.state.region : null,
     })),
     edges: layout.edges.map((placed) => {
-      const path = samplePolyline(pathPoints(placed.path));
+      const path = sampledPath(placed.points);
       return {
         id: placed.edge.id,
         from: placed.edge.from,
@@ -232,8 +275,10 @@ function shapesOf(layout: MachineLayout): Shapes {
     })),
     regions: layout.regions.map((region) => ({
       part: `region:${region.region}`,
+      title: `title:${region.region}`,
       name: region.region,
       box: region,
+      titleBox: region.title,
       border: borderPoints(region),
     })),
     canvas: {
@@ -259,7 +304,10 @@ function labelOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   }
   for (const node of rest.nodes) near(node.part, boxToBox(one.label, node.box));
   for (const entry of rest.entries) near(entry.part, pathToBox(entry.line, one.label));
-  for (const region of rest.regions) near(region.part, pathToBox(region.border, one.label));
+  for (const region of rest.regions) {
+    near(region.part, pathToBox(region.border, one.label));
+    near(region.title, boxToBox(one.label, region.titleBox));
+  }
   const inset = insetIn(one.label, rest.canvas);
   if (!(inset >= 0)) add("outside", part, "canvas", inset);
 }
@@ -275,6 +323,13 @@ function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   for (const entry of rest.entries) {
     const gap = pathToPath(one.path, entry.line);
     if (gap < PATH_NODE_CLEAR) add("path-through-node", part, entry.part, gap);
+  }
+  for (const region of rest.regions) {
+    const gap = Math.min(
+      pathToBox(one.path, region.titleBox),
+      boxToBox(one.arrow, region.titleBox),
+    );
+    if (gap < PATH_NODE_CLEAR) add("path-through-node", part, region.title, gap);
   }
   const pathInset = insetOfPoints(one.path, rest.canvas);
   if (!(pathInset >= 0)) add("outside", part, "canvas", pathInset);
@@ -323,6 +378,8 @@ function nodeOverlaps(shapes: Shapes, add: Add): void {
         ? insetIn(node.box, region.box)
         : boxToBox(node.box, region.box);
       if (gap < LABEL_PAD) add("region-edge", node.part, region.part, gap);
+      const titleGap = boxToBox(node.box, region.titleBox);
+      if (titleGap < LABEL_PAD) add("region-edge", node.part, region.title, titleGap);
     }
   }
 }
@@ -360,6 +417,10 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
   }
   nodeOverlaps(shapes, add);
   for (const entry of shapes.entries) {
+    for (const region of shapes.regions) {
+      const gap = pathToBox(entry.line, region.titleBox);
+      if (gap < PATH_NODE_CLEAR) add("path-through-node", entry.part, region.title, gap);
+    }
     const inset = insetOfPoints(entry.line, shapes.canvas);
     if (!(inset >= 0)) add("outside", entry.part, "canvas", inset);
   }

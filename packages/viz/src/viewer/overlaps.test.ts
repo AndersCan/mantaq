@@ -1,5 +1,5 @@
 import type { VizEdge, VizState } from "../schema.ts";
-import type { MachineLayout, PlacedEdge, PlacedState } from "./layout.ts";
+import type { MachineLayout, PlacedEdge, PlacedRegion, PlacedState } from "./layout.ts";
 import { labelOverlapsFor, overlapsOf, pathPoints } from "./overlaps.ts";
 import type { Overlap, Rule } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -46,6 +46,7 @@ function placedEdge(
     edge,
     target: to,
     path,
+    points: pathPoints(path),
     label: { ...label, width: 22, height: 16 },
     text: label,
     dotGap: 6,
@@ -54,15 +55,23 @@ function placedEdge(
 
 const straight = "M140,100 L260,100";
 
-function layoutOf(parts: Partial<MachineLayout>): MachineLayout {
+type Parts = Partial<Omit<MachineLayout, "regions">> & {
+  regions?: Array<Omit<PlacedRegion, "title">>;
+};
+
+function layoutOf(parts: Parts): MachineLayout {
+  const regions = (parts.regions ?? []).map((region) => ({
+    ...region,
+    title: { x: -1000, y: -1000, width: 0, height: 0 },
+  }));
   return {
     width: 400,
     height: 200,
     nodes: [node("A", 100), node("B", 300)],
     edges: [],
-    regions: [],
     entries: [],
     ...parts,
+    regions,
   };
 }
 
@@ -83,6 +92,13 @@ describe("overlapsOf", () => {
     expect(overlapsOf(layout)).toEqual([
       { rule: "label-clear", a: "label:e", b: "path:e", gap: 0 },
     ]);
+  });
+
+  test("label-clear: a label near the corner of a slanted arrow's bounding box, far from the arrow, passes", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M140,100 L260,160", labelAt(255, 88))],
+    });
+    expect(overlapsOf(layout).filter((each) => each.b === "path:e")).toEqual([]);
   });
 
   test("label-clear: 8px between two labels passes, 7px fails", () => {
