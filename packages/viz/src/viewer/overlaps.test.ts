@@ -489,3 +489,13 @@ describe("overlapsOf: review repros r2 rounding", () => {
     ]);
   });
 });
+
+describe("overlapsOf: review repros r3", () => {
+  test("path-through-node: a path that leaves its source straight down and comes back up through it", () => {
+    // Every turn before B is vertical, so the stub must be measured along y, not x.
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M100,118 L100,170 L100,60 L300,60 L300,82", labelAt(200, 30))],
+    });
+    expect(ofRule(layout, "path-through-node").map((overlap) => overlap.b)).toEqual(["node:A"]);
+  });
+});
