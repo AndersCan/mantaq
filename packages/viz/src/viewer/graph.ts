@@ -277,17 +277,17 @@ function edgeAria(edge: VizEdge, text: string): string {
 
 function edgeLabel(doc: Document, placed: PlacedEdge): SVGElement {
   const lines = edgeLines(placed.edge);
-  const top = placed.label.y + 4 - ((lines.length - 1) * LINE_HEIGHT) / 2;
+  const top = placed.text.y + 4 - ((lines.length - 1) * LINE_HEIGHT) / 2;
   return svg(
     doc,
     "text",
-    { x: placed.label.x, y: top, "text-anchor": "middle" },
+    { x: placed.text.x, y: top, "text-anchor": "middle" },
     lines.map((line, index) =>
       svg(
         doc,
         "tspan",
         {
-          x: placed.label.x,
+          x: placed.text.x,
           dy: index === 0 ? 0 : LINE_HEIGHT,
           class: index === 0 ? null : "edge-condition",
         },

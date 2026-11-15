@@ -6,9 +6,13 @@ import {
   dotGapFor,
   layoutMachine,
   pathLength,
-  separateLabels,
+  LOCK_SLOT,
+  labelSpots,
+  textWidth,
 } from "./layout.ts";
+import { overlapsOf } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
+import { readFileSync } from "node:fs";
 
 function state(name: string): VizState {
   return {
@@ -131,61 +135,23 @@ describe("pathLength", () => {
   });
 });
 
-describe("separateLabels", () => {
-  const size = { width: 60, height: 16 };
-
-  test("moves stacked labels apart and keeps a free label in place", () => {
-    const out = separateLabels([
-      { x: 0, y: 0, ...size },
-      { x: 5, y: 3, ...size },
-      { x: 2, y: -2, ...size },
-      { x: 500, y: 0, ...size },
-    ]);
-    expect(out[0]?.y).toBe(0);
-    expect(out[3]).toEqual({ x: 500, y: 0, ...size });
-    const ys = new Set(out.slice(0, 3).map((box) => box.y));
-    expect(ys.size).toBe(3);
-    for (const a of out.slice(0, 3)) {
-      for (const b of out.slice(0, 3)) {
-        if (a !== b) expect(Math.abs(a.y - b.y)).toBeGreaterThanOrEqual(16);
-      }
-    }
+describe("textWidth", () => {
+  test("measures wide letters at their real width", () => {
+    expect(textWidth("WWWWWWWWWW")).toBeGreaterThanOrEqual(113);
+    expect(textWidth("team.WORKERS_RESIZED")).toBeGreaterThanOrEqual(151);
   });
 
-  test("searches 0, +1, -1, +2 rows with a 2px gap", () => {
-    const out = separateLabels([
-      { x: 0, y: 100, ...size },
-      { x: 0, y: 100, ...size },
-      { x: 0, y: 100, ...size },
-      { x: 0, y: 100, ...size },
-    ]);
-    expect(out.map((box) => box.y)).toEqual([100, 118, 82, 136]);
+  test("scales with the font size and is zero for no text", () => {
+    expect(textWidth("")).toBe(0);
+    expect(textWidth("abc", 24)).toBe(textWidth("abc") * 2);
   });
 
-  test("keeps a label that only just clears the gap", () => {
-    const out = separateLabels([
-      { x: 0, y: 0, ...size },
-      { x: 0, y: 18, ...size },
-      { x: 0, y: 17, ...size },
-    ]);
-    expect(out[1]?.y).toBe(18);
-    expect(out[2]?.y).toBe(53);
+  test("an unlisted character counts as 15px", () => {
+    expect(textWidth("é")).toBe(Math.ceil(15 * 1.05));
   });
+});
 
-  test("does not move labels that are close in y but far apart in x", () => {
-    const out = separateLabels([
-      { x: 0, y: 0, ...size },
-      { x: 200, y: 4, ...size },
-    ]);
-    expect(out.map((box) => box.y)).toEqual([0, 4]);
-  });
-
-  test("keeps order and count", () => {
-    const input = [3, 1, 2].map((x) => ({ x, y: 0, ...size }));
-    expect(separateLabels(input).map((box) => box.x)).toEqual([3, 1, 2]);
-    expect(separateLabels([])).toEqual([]);
-  });
-
+describe("self-loops", () => {
   test("each self-loop label sits above its own loop, and the feet are apart", () => {
     const machine = machineOf(
       ["first"],
@@ -358,7 +324,7 @@ describe("map-child states", () => {
 });
 
 describe("two-line edge labels", () => {
-  test("guarded parallel edges keep their labels two lines apart", () => {
+  test("guarded parallel edges get a box two lines tall and stay clear of each other", () => {
     const analyzed = {
       status: "analyzed",
       location: { file: "a.ts", line: 1, column: 1 },
@@ -384,9 +350,136 @@ describe("two-line edge labels", () => {
           ],
         ),
       );
-    const spread = (layout: ReturnType<typeof pair>) =>
-      Math.abs((layout.edges[0]?.label.y ?? 0) - (layout.edges[1]?.label.y ?? 0));
-    expect(spread(pair(analyzed))).toBeGreaterThanOrEqual(32);
-    expect(spread(pair(null))).toBeLessThan(32);
+    const layout = pair(analyzed);
+    expect(layout.edges.map((placed) => placed.label.height)).toEqual([32, 32]);
+    expect(overlapsOf(layout)).toEqual([]);
+    expect(pair(null).edges.map((placed) => placed.label.height)).toEqual([16, 16]);
+  });
+});
+
+describe("edge label boxes", () => {
+  const stay: VizEdge = { ...edge({ from: "first", event: "ping", target: "b" }), kind: "stay" };
+  const placed = layoutMachine(
+    machineOf(
+      ["first", "b"],
+      [edge({ from: "first", event: "team.WORKERS_RESIZED", target: "b" }), stay],
+    ),
+  ).edges;
+
+  test("a transition's box is its text width plus padding plus the lock slot", () => {
+    const box = placed[0]?.label;
+    expect(box?.width).toBe(textWidth("team.WORKERS_RESIZED") + 8 + LOCK_SLOT);
+    expect(box?.height).toBe(16);
+  });
+
+  test("the text is centred right of the box centre by half the lock slot, only for transitions", () => {
+    expect((placed[0]?.text.x ?? 0) - (placed[0]?.label.x ?? 0)).toBe(LOCK_SLOT / 2);
+    expect(placed[1]?.text.x).toBe(placed[1]?.label.x);
+    expect(placed[1]?.label.width).toBe(textWidth("ping") + 8);
+  });
+
+  test("a label sits beside its own arrow, not on it", () => {
+    expect(
+      overlapsOf(
+        layoutMachine(
+          machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
+        ),
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("labelSpots", () => {
+  const placed = layoutMachine(
+    machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
+  ).edges[0];
+  const bent = [
+    { x: 0, y: 100 },
+    { x: 100, y: 100 },
+    { x: 200, y: 100 },
+  ];
+
+  test("starts at dagre's spot, then its mirror above the arrow", () => {
+    const { x, y, height } = placed?.label ?? { x: 0, y: 0, height: 0 };
+    const spots = placed === undefined ? [] : labelSpots(placed, bent);
+    expect(spots.slice(0, 2)).toEqual([
+      { x, y },
+      { x, y: y - 2 * (height / 2 + 8) },
+    ]);
+  });
+
+  test("then offers a spot below and one above the arrow, nearest its middle first", () => {
+    const spots = placed === undefined ? [] : labelSpots(placed, bent);
+    const half = (placed?.label.height ?? 0) / 2;
+    expect(spots.slice(2, 4)).toEqual([
+      { x: 100, y: 100 + half + 9 },
+      { x: 100, y: 100 - half - 9 },
+    ]);
+  });
+});
+
+describe("labelSpots geometry", () => {
+  const placed = layoutMachine(
+    machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
+  ).edges[0];
+  const width = placed?.label.width ?? 0;
+  const half = (placed?.label.height ?? 0) / 2;
+
+  test("measures the arrow only under the label, not along the whole segment", () => {
+    const long = [
+      { x: 0, y: 100 },
+      { x: 1000, y: 1100 },
+    ];
+    const spots = placed === undefined ? [] : labelSpots(placed, long);
+    expect(spots[2]).toEqual({ x: 500, y: 600 + width / 2 + half + 1 + 8 * Math.SQRT2 });
+  });
+
+  test("a steep arrow pushes the label away by at most a slope of 3", () => {
+    const steep = [
+      { x: 0, y: 0 },
+      { x: 10, y: 1000 },
+    ];
+    const spots = placed === undefined ? [] : labelSpots(placed, steep);
+    const clipped = (5 + width / 2 > 10 ? 10 : 5 + width / 2) * 100;
+    const top = (5 - width / 2 < 0 ? 0 : 5 - width / 2) * 100;
+    expect(spots[2]?.y).toBeCloseTo(clipped + half + 1 + 8 * Math.hypot(1, 3));
+    expect(spots[3]?.y).toBeCloseTo(top - half - 1 - 8 * Math.hypot(1, 3));
+  });
+
+  test("dagre puts the label below its arrow, 8px clear", () => {
+    const y = Number(placed?.path.split(/[ ,MCL]+/).filter(Boolean)[1]);
+    expect((placed?.label.y ?? 0) - half - y).toBe(8);
+  });
+});
+
+describe("layoutMachine speed", () => {
+  test("a 20-state, 55-arrow machine lays out in well under a second (it runs on every click)", () => {
+    let seed = 7;
+    const random = (): number => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const names = ["first", ...Array.from({ length: 19 }, (_, index) => `state${index + 1}`)];
+    const edges = Array.from({ length: 55 }, (_, index) => {
+      const from = Math.floor(random() * names.length);
+      const to = (from + 1 + Math.floor(random() * (names.length - 1))) % names.length;
+      return edge({ from: names[from] ?? "", event: `EVENT_${index}`, target: names[to] ?? "" });
+    });
+    const started = performance.now();
+    layoutMachine(machineOf(names, edges));
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe("settleLabels and self-loops", () => {
+  test("a self-loop label stays just above its apex even when it touches a settled label", () => {
+    const file = new URL("./reference/team-inbox.json", import.meta.url);
+    const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
+    const loops = layoutMachine(machine).edges.filter(
+      (placed) => placed.edge.from === placed.edge.to,
+    );
+    expect(loops.length).toBeGreaterThan(0);
+    for (const placed of loops) {
+      const [base, lift] = [...placed.path.matchAll(/,(-?[\d.]+)/g)].map((m) => Number(m[1]));
+      const apex = (base ?? 0) - 0.75 * ((base ?? 0) - (lift ?? 0));
+      expect(placed.label.y).toBeCloseTo(apex - 16 / 2 - 2, 0);
+    }
   });
 });

@@ -1,6 +1,6 @@
 import type { VizEdge, VizState } from "../schema.ts";
 import type { MachineLayout, PlacedEdge, PlacedState } from "./layout.ts";
-import { overlapsOf, pathPoints } from "./overlaps.ts";
+import { labelOverlapsFor, overlapsOf, pathPoints } from "./overlaps.ts";
 import type { Overlap, Rule } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -42,7 +42,14 @@ function placedEdge(
     coverage: null,
     tested: null,
   };
-  return { edge, target: to, path, label, dotGap: 6 };
+  return {
+    edge,
+    target: to,
+    path,
+    label: { ...label, width: 22, height: 16 },
+    text: label,
+    dotGap: 6,
+  };
 }
 
 const straight = "M140,100 L260,100";
@@ -401,6 +408,7 @@ describe("overlapsOf: label size and order", () => {
     });
     const conditional: PlacedEdge = {
       ...base,
+      label: { ...base.label, height: 32 },
       edge: {
         ...base.edge,
         explanation: {
@@ -497,5 +505,34 @@ describe("overlapsOf: review repros r3", () => {
       edges: [placedEdge("e", "M100,118 L100,170 L100,60 L300,60 L300,82", labelAt(200, 30))],
     });
     expect(ofRule(layout, "path-through-node").map((overlap) => overlap.b)).toEqual(["node:A"]);
+  });
+});
+
+describe("labelOverlapsFor", () => {
+  test("reports a clash with a label whose edge id sorts before this one", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("a", "M140,180 L260,180", labelAt(200, 40)),
+        placedEdge("b", "M140,190 L260,190", labelAt(204, 40)),
+      ],
+    });
+    expect(labelOverlapsFor(layout, "b").map((overlap) => [overlap.a, overlap.b])).toContainEqual([
+      "label:a",
+      "label:b",
+    ]);
+  });
+});
+
+describe("labelOverlapsFor padding", () => {
+  test("a lower-id label 4px away (inside the 8px pad, not touching) is still a clash", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("a", "M140,180 L260,180", labelAt(200, 40)),
+        placedEdge("b", "M140,190 L260,190", labelAt(226, 40)),
+      ],
+    });
+    expect(
+      labelOverlapsFor(layout, "b").map((overlap) => [overlap.a, overlap.b, overlap.gap]),
+    ).toContainEqual(["label:a", "label:b", 4]);
   });
 });

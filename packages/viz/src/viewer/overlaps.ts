@@ -1,7 +1,5 @@
 import type { Point } from "@dagrejs/dagre";
-import { edgeLines } from "./labels.ts";
-import { CHAR_WIDTH } from "./layout.ts";
-import type { MachineLayout, PlacedEdge } from "./layout.ts";
+import type { MachineLayout } from "./layout.ts";
 
 type Part =
   | `label:${string}`
@@ -45,9 +43,6 @@ const ALONGSIDE_GAP = 3;
 const ALONGSIDE_RUN = 12;
 const MARK_OVERHANG = 6;
 const ARROW_SIZE = 8;
-/** Per-character width and label height the layout uses today. */
-const LABEL_LINE_HEIGHT = 16;
-const LABEL_SLACK = 8;
 
 function sub(a: Point, b: Point): Point {
   return { x: a.x - b.x, y: a.y - b.y };
@@ -143,16 +138,6 @@ function borderPoints(box: Box): Point[] {
   return samplePolyline(corners);
 }
 
-function labelBox(placed: PlacedEdge): Box {
-  const lines = edgeLines(placed.edge);
-  return {
-    x: placed.label.x,
-    y: placed.label.y,
-    width: Math.max(...lines.map((line) => line.length)) * CHAR_WIDTH + LABEL_SLACK,
-    height: LABEL_LINE_HEIGHT * lines.length,
-  };
-}
-
 function arrowBox(path: ReadonlyArray<Point>): Box {
   const last = path.at(-1) ?? { x: 0, y: 0 };
   const before =
@@ -237,7 +222,7 @@ function shapesOf(layout: MachineLayout): Shapes {
         from: placed.edge.from,
         target: placed.target,
         path,
-        label: labelBox(placed),
+        label: placed.label,
         arrow: arrowBox(path),
       };
     }),
@@ -340,6 +325,22 @@ function nodeOverlaps(shapes: Shapes, add: Add): void {
       if (gap < LABEL_PAD) add("region-edge", node.part, region.part, gap);
     }
   }
+}
+
+/** The overlaps that involve one edge's label. */
+export function labelOverlapsFor(layout: MachineLayout, edgeId: string): Overlap[] {
+  const found: Overlap[] = [];
+  const shapes = shapesOf(layout);
+  const one = shapes.edges.find((edge) => edge.id === edgeId);
+  if (one === undefined) return found;
+  labelOverlaps(one, shapes, (rule, a, b, gap) => found.push({ rule, a, b, gap }));
+  for (const other of shapes.edges) {
+    if (other.id >= edgeId) continue;
+    const gap = boxToBox(other.label, one.label);
+    if (gap < LABEL_PAD)
+      found.push({ rule: "label-clear", a: `label:${other.id}`, b: `label:${edgeId}`, gap });
+  }
+  return found;
 }
 
 /**
