@@ -127,6 +127,12 @@ describe("freeLane", () => {
   test("keeps a lane that is clear of the title in x or in y", () => {
     expect(freeLane(10, 0, 100, [title])).toBe(10);
     expect(freeLane(100, 60, 200, [title])).toBe(100);
+    expect(freeLane(100, -100, 0, [title])).toBe(100);
+  });
+
+  test("clears two titles side by side whatever order they come in", () => {
+    const next = { ...title, x: 140 };
+    expect(freeLane(90, 0, 100, [next, title])).toBe(140 + 20 + 5);
   });
 });
 

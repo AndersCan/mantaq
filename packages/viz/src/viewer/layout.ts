@@ -753,8 +753,6 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
  * Layered layout (dagre, left to right). Pure: same machine in, same
  * coordinates out. The initial edge is drawn as an entry arrow, not a graph edge.
  */
-const MAX_WIDEN_PASSES = 4;
-
 export function placeMachine(machine: VizMachine): MachineLayout {
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
@@ -763,7 +761,7 @@ export function placeMachine(machine: VizMachine): MachineLayout {
   );
   for (const region of regions) fitRegion(region, geo, context);
   let built = assemble(machine, specs, geo, regions);
-  for (let pass = 0; pass < MAX_WIDEN_PASSES && built.widen.length > 0; pass++) {
+  if (built.widen.length > 0) {
     for (const { at, by } of [...built.widen].sort((a, b) => b.at - a.at))
       insertSpace(geo, "x", at, by);
     built = assemble(machine, specs, geo, regions);
