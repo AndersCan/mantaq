@@ -429,9 +429,7 @@ export function renderGraph(
 ): SVGSVGElement | HTMLElement {
   const layout = layoutMachine(machine);
   if (Either.isLeft(layout)) {
-    return html(doc, "p", { class: "load-error", role: "alert" }, [
-      `Cannot draw ${machine.id} without overlapping labels (${layout[0].length} found).`,
-    ]);
+    return html(doc, "p", { class: "load-error", role: "alert" }, [`Cannot draw ${machine.id}.`]);
   }
   const placed = layout[1];
   const findings = new Map<string, VizFinding[]>();
