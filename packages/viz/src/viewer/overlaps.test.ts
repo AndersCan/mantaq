@@ -317,6 +317,47 @@ describe("overlapsOf: review repros", () => {
     expect(ofRule(layout, "paths-alongside")).toEqual([]);
   });
 
+  test("paths-alongside: unrelated states get no stub exemption", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", straight, labelAt(200, 60)),
+        { ...placedEdge("f", "M140,102 L160,102 L160,160", labelAt(330, 185), "D") },
+      ].map((placed) =>
+        placed.edge.id === "f" ? { ...placed, edge: { ...placed.edge, from: "C" } } : placed,
+      ),
+    });
+    expect(ofRule(layout, "paths-alongside")).toEqual([
+      { rule: "paths-alongside", a: "path:e", b: "path:f", gap: 0 },
+    ]);
+  });
+
+  test("paths-alongside: an arrow leaving the state another arrow enters shares its stub", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", straight, labelAt(200, 60)),
+        {
+          ...placedEdge("f", "M260,102 L240,102 L240,160", labelAt(330, 185), "C"),
+          edge: { ...placedEdge("f", "", labelAt(0, 0)).edge, from: "B", to: "C" },
+        },
+      ],
+    });
+    expect(ofRule(layout, "paths-alongside")).toEqual([]);
+  });
+
+  test("overlaps sort by rule, then a, then b", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", straight, labelAt(200, 100)),
+        placedEdge("g", "M140,160 L260,160", labelAt(200, 100)),
+        placedEdge("f", "M140,40 L260,40", labelAt(200, 100)),
+      ],
+    });
+    const labelPairs = ofRule(layout, "label-clear").filter((overlap) => overlap.a === "label:e");
+    const bs = labelPairs.map((overlap) => overlap.b);
+    expect(bs).toEqual([...bs].sort());
+    expect(bs.length).toBeGreaterThan(1);
+  });
+
   test("paths-alongside: two short touches apart are not one long run", () => {
     const layout = layoutOf({
       edges: [
@@ -397,5 +438,54 @@ describe("overlapsOf: label size and order", () => {
     });
     const pairs = ofRule(layout, "label-clear").filter((overlap) => overlap.b.startsWith("label:"));
     expect(pairs).toEqual([{ rule: "label-clear", a: "label:a", b: "label:b", gap: -12 }]);
+  });
+});
+
+describe("overlapsOf: review repros r2", () => {
+  test("path-through-node: a path that leaves its own source straight down passes", () => {
+    // Leaves A's bottom edge vertically, so its first 12px are measured along y.
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M100,118 L100,170 L300,170 L300,118", labelAt(200, 40))],
+    });
+    expect(ofRule(layout, "path-through-node")).toEqual([]);
+  });
+
+  test("outside: a label with a NaN coordinate", () => {
+    const layout = layoutOf({ edges: [placedEdge("e", straight, labelAt(Number.NaN, 40))] });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["label:e"]);
+  });
+
+  test("outside: a path whose last point is NaN, and its arrowhead", () => {
+    const layout = layoutOf({ edges: [placedEdge("e", "M140,100 L260,NaN", labelAt(200, 40))] });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["arrow:e", "path:e"]);
+  });
+
+  test("outside: an entry arrow with a NaN coordinate", () => {
+    const layout = layoutOf({
+      entries: [{ from: { x: Number.NaN, y: 100 }, to: { x: 57, y: 100 } }],
+    });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["entry:0"]);
+  });
+});
+
+describe("overlapsOf: review repros r2 NaN mid-path", () => {
+  test("outside: a path whose first point is NaN", () => {
+    const layout = layoutOf({ edges: [placedEdge("e", "M140,NaN L260,100", labelAt(200, 40))] });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["path:e"]);
+  });
+  test("outside: a path with a NaN bend", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M140,100 L200,NaN L260,100", labelAt(200, 40))],
+    });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["path:e"]);
+  });
+});
+
+describe("overlapsOf: review repros r2 rounding", () => {
+  test("gaps are rounded to 0.1px", () => {
+    const layout = layoutOf({ nodes: [node("A", 39.66), node("B", 300)] });
+    expect(ofRule(layout, "outside")).toEqual([
+      { rule: "outside", a: "node:A", b: "canvas", gap: -0.3 },
+    ]);
   });
 });

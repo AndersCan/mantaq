@@ -60,7 +60,7 @@ function samplePolyline(points: ReadonlyArray<Point>): Point[] {
     const to = points[index];
     if (from === undefined || to === undefined) continue;
     const length = Math.hypot(to.x - from.x, to.y - from.y);
-    const steps = Math.max(1, Math.ceil(length / SAMPLE_STEP));
+    const steps = Math.max(1, Math.ceil(length / SAMPLE_STEP)) || 1;
     for (let step = 0; step < steps; step++) {
       out.push({
         x: from.x + ((to.x - from.x) * step) / steps,
