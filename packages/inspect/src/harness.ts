@@ -35,7 +35,7 @@ export interface VizHarness {
     event: string,
     payload?: Record<string, VizJson>,
   ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>>;
-  /** Every child of every actor map, by local state name: `[{ map: "photos", key: "p1", state: "sendingPhoto" }]`. */
+  /** Every child of every actor map, sorted by map then key, by local state name: `[{ map: "photos", key: "p1", state: "sendingPhoto" }]`. */
   children(): Promise<Array<{ map: string; key: string; state: string }>>;
   findings(): VizFinding[];
   /** Click the finding's "!" mark, then its Replay button; left when the finding has no replay. */
@@ -139,20 +139,43 @@ async function readRegions(page: Page): Promise<Record<string, string>> {
 }
 
 /** Every child row of the Step tab: map, key and local state name. */
+async function readCounts(page: Page): Promise<Array<{ map: string; id: string; keys: string[] }>> {
+  return page.locator("[data-pool-count] button[data-keys]").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      map: node.closest("[data-pool-count]")?.getAttribute("data-pool-count") ?? "",
+      id: node.getAttribute("data-count-state") ?? "",
+      keys: JSON.parse(node.getAttribute("data-keys") ?? "[]") as string[],
+    })),
+  );
+}
+
 async function readChildren(
   page: Page,
 ): Promise<Array<{ map: string; key: string; state: string }>> {
-  await page.click('[data-tab="step"]');
-  return page.locator(`${PANEL} [data-child-key]`).evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const id = node.getAttribute("data-child-state") ?? "";
-      return {
-        map: node.getAttribute("data-child-map") ?? "",
-        key: node.getAttribute("data-child-key") ?? "",
-        state: id.slice(id.lastIndexOf(".") + 1),
-      };
-    }),
+  const counts = await readCounts(page);
+  return counts
+    .flatMap(({ map, id, keys }) =>
+      keys.map((key) => ({ map, key, state: id.slice(id.lastIndexOf(".") + 1) })),
+    )
+    .sort(
+      (a, b) => a.map.localeCompare(b.map) || a.key.localeCompare(b.key, "en", { numeric: true }),
+    );
+}
+
+/** Click the count holding `key` until the Step tab shows that child; false when none holds it. */
+async function walkTo(page: Page, actor: { map: string; key: string }): Promise<boolean> {
+  const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
+  const holding = (await readCounts(page)).find(
+    (count) => count.map === actor.map && count.keys.includes(actor.key),
   );
+  if (holding === undefined) return false;
+  const button = page.locator(
+    `[data-pool-count=${quoted(actor.map)}] button[data-count-state=${quoted(holding.id)}]`,
+  );
+  for (let n = 0; n < holding.keys.length && (await page.locator(row).count()) === 0; n++) {
+    await button.click();
+  }
+  return (await page.locator(row).count()) > 0;
 }
 
 /** Why the region or map child `actor` is not on the Step tab; undefined when it is (or for the machine itself). */
@@ -162,8 +185,7 @@ async function missingActor(
 ): Promise<string | undefined> {
   const { id, actor, path } = context;
   if ("map" in actor) {
-    const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
-    if ((await page.locator(row).count()) > 0) return undefined;
+    if (await walkTo(page, actor)) return undefined;
     const keys = (await readChildren(page))
       .filter((child) => child.map === actor.map)
       .map((child) => child.key);

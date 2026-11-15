@@ -46,30 +46,30 @@ function addThree(root: HTMLElement) {
   sendOnEdge(root, "showingQueue-photoAdded-stay");
 }
 
-const markers = (root: HTMLElement) => [...root.querySelectorAll("g.child-marker")];
+const counts = (root: HTMLElement) => [...root.querySelectorAll("[data-pool-count] button")];
 
 describe("the docs photo queue on the live page", () => {
   test("three clicks on photoAdded start p1, p2, p3", async () => {
     const root = await mounted();
     addThree(root);
-    expect(markers(root).map((each) => each.getAttribute("data-marker-key"))).toEqual([
-      "p1",
-      "p2",
-      "p3",
+    expect(counts(root).map((each) => each.getAttribute("data-keys"))).toEqual([
+      '["p1","p2","p3"]',
     ]);
-    expect(markers(root).map((each) => each.getAttribute("data-marker-state"))).toEqual([
-      "photos.sendingPhoto",
-      "photos.sendingPhoto",
+    expect(counts(root).map((each) => each.getAttribute("data-count-state"))).toEqual([
       "photos.sendingPhoto",
     ]);
+    expect(root.querySelector("[data-pool-count]")?.textContent).toBe("3 photos: 3 sendingPhoto");
   });
 
   test("uploadConfirmed goes to p1", async () => {
     const root = await mounted();
     addThree(root);
     sendOnEdge(root, "photos.sendingPhoto-uploadConfirmed-photoSent");
-    const p1 = root.querySelector('g.child-marker[data-marker-key="p1"]');
-    expect(p1?.getAttribute("data-marker-state")).toBe("photos.photoSent");
+    expect(
+      counts(root)
+        .find((each) => each.getAttribute("data-keys") === '["p1"]')
+        ?.getAttribute("data-count-state"),
+    ).toBe("photos.photoSent");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
       "uploadConfirmed: p1 sendingPhoto → photoSent",
     );
@@ -80,6 +80,6 @@ describe("the docs photo queue on the live page", () => {
     addThree(root);
     sendOnEdge(root, "showingQueue-queueCleared-showingEmptyQueue");
     expect(root.querySelector("[data-live-removed]")?.textContent).toBe("p1, p2, p3 removed");
-    expect(markers(root)).toEqual([]);
+    expect(counts(root)).toEqual([]);
   });
 });

@@ -427,7 +427,7 @@ describe("a blocked arrow, more cases", () => {
     root.remove();
   });
 
-  test("picking another map child tries its arrows again", () => {
+  test("walking to another map child tries its arrows again", () => {
     const machine: VizMachine = {
       id: "queue",
       initial: "showingQueue",
@@ -478,7 +478,7 @@ describe("a blocked arrow, more cases", () => {
     const arrow = () => root.querySelector('[data-edge-id="photos.sending-confirm-photos.sent"]');
     expect(arrow()?.classList.contains("blocked")).toBe(true);
     root
-      .querySelector('g.child-marker[data-marker-key="p2"]')
+      .querySelector('[data-pool-count] button[data-count-state="photos.sending"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(arrow()?.classList.contains("blocked")).toBe(false);
   });

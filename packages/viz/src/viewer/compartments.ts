@@ -1,5 +1,5 @@
 import { scopeOf } from "../schema.ts";
-import type { VizActorRef, VizLiveState, VizMachine } from "../schema.ts";
+import type { VizActorRef, VizLiveChild, VizLiveState, VizMachine } from "../schema.ts";
 
 /** Sorted unique events of the handlers that live in one compartment ("" = the machine itself, else a region path). */
 function eventsOf(machine: VizMachine, compartment: string): string[] {
@@ -48,16 +48,33 @@ export function regionPaths(state: VizLiveState): string[] {
   return Object.keys(state.regions).sort();
 }
 
-/** Every state the actor is in: the machine's own, each region's, then each map child's. */
+export function compareKeys(a: string, b: string): number {
+  return a.localeCompare(b, "en", { numeric: true });
+}
+
+/** The child a map's diagram shows: the picked one while it exists, else the lowest key. */
+export function walkedChild(
+  state: VizLiveState,
+  map: string,
+  picked: { map: string; key: string } | null,
+): VizLiveChild | undefined {
+  const children = state.children.filter((child) => child.map === map);
+  return (
+    children.find((child) => picked?.map === map && child.key === picked.key) ??
+    [...children].sort((a, b) => compareKeys(a.key, b.key))[0]
+  );
+}
+
+/** Every state the actor is in: the machine's own, each region's, then the walked child of each map. */
 export function currentsOf(
   state: VizLiveState,
   picked: { map: string; key: string } | null = null,
 ): string[] {
-  const only = state.children.filter((c) => c.map === picked?.map && c.key === picked.key);
+  const maps = [...new Set(state.children.map((child) => child.map))];
   return [
     state.state,
     ...regionPaths(state).map((path) => state.regions[path] ?? ""),
-    ...(only.length > 0 ? only : state.children).map((child) => child.state),
+    ...maps.map((map) => walkedChild(state, map, picked)?.state ?? ""),
   ];
 }
 

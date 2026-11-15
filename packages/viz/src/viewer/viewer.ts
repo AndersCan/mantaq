@@ -1,7 +1,6 @@
 import type {
   VizDocument,
   VizActorRef,
-  VizLiveChild,
   VizDriver,
   VizEdge,
   VizJson,
@@ -12,7 +11,7 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { scopeOf } from "../schema.ts";
-import { currentsOf } from "./compartments.ts";
+import { currentsOf, walkedChild } from "./compartments.ts";
 import { html } from "./dom.ts";
 import { changesSection } from "./changes.ts";
 import type { ChangesOption } from "./changes.ts";
@@ -29,7 +28,7 @@ import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
-import { drawChildMarkers } from "./markers.ts";
+import { countLines } from "./pool-count.ts";
 import { removeSheets, showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
 import {
@@ -75,7 +74,6 @@ interface ViewState {
   /** Live: the child a click in the child graph goes to; null = the one that started first. */
   picked: { map: string; key: string } | null;
   /** True only right after a step or an effect result: markers slide and new ones grow in. */
-  motion: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
   /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
@@ -214,7 +212,7 @@ export function mountViewer(
   // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   let redraw: () => void = () => undefined;
-  listenOnRoot(root, { back: () => back(), unpick: () => unpickIn(view, redraw) });
+  listenOnRoot(root, { back: () => back() });
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
@@ -565,7 +563,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     composingActor: undefined,
     eventsOpen: false,
     picked: null,
-    motion: false,
     tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
     notice: null,
@@ -681,6 +678,7 @@ function liveOf(
       outcomes: view.outcomes,
       afters: view.afters,
       previous: view.previous,
+      picked: view.picked,
       values: view.values,
       ...handlers,
       ...(system === null
@@ -690,23 +688,15 @@ function liveOf(
   };
 }
 
-/** Who an edge click sends to: the picked child, else the one that started first; "none" = no such child in the edge's source state. */
+/** Who an edge click sends to: the walked child; "none" = the map has no child. */
 function actorOf(
   machine: VizMachine,
   edge: VizEdge,
-  live: { children: ReadonlyArray<VizLiveChild>; picked: { map: string; key: string } | null },
+  live: { state: VizLiveState | null; picked: { map: string; key: string } | null },
 ): VizActorRef | undefined | "none" {
   const region = scopeOf(edge.from);
   if (machine.maps.includes(region)) {
-    const { picked } = live;
-    const inSource = live.children.filter((child) => child.state === edge.from);
-    const target =
-      picked === null
-        ? inSource.reduce<VizLiveChild | undefined>(
-            (first, each) => (first === undefined || each.since < first.since ? each : first),
-            undefined,
-          )
-        : inSource.find((each) => each.map === picked.map && each.key === picked.key);
+    const target = live.state === null ? undefined : walkedChild(live.state, region, live.picked);
     return target === undefined ? "none" : { map: target.map, key: target.key };
   }
   return region === "" ? undefined : { region };
@@ -720,10 +710,7 @@ function liveTake(
 ): void {
   const edge = machine.edges.find((each) => each.id === step.edge);
   if (edge === undefined) return;
-  const actor = actorOf(machine, edge, {
-    children: handlers.view.live?.children ?? [],
-    picked: handlers.view.picked,
-  });
+  const actor = actorOf(machine, edge, { state: handlers.view.live, picked: handlers.view.picked });
   if (actor === "none") return;
   handlers.sendEvent(edge.event, actor);
 }
@@ -738,7 +725,6 @@ function watchDriver(
     if (view.afters.length > 0 && view.afters.length === state.steps.length) {
       view.afters[view.afters.length - 1] = state.after;
     }
-    view.motion = true;
     context.redraw();
   });
 }
@@ -825,7 +811,6 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
     view.outcomes.push(view.live.last);
     view.afters.push(view.live.after);
   }
-  view.motion = true;
   view.composing = null;
 }
 
@@ -900,20 +885,11 @@ function dropGonePick(view: ViewState): void {
   if (picked !== null && there !== true) view.picked = null;
 }
 
-function unpickIn(view: ViewState, redraw: () => void): void {
-  if (view.picked === null) return;
-  view.picked = null;
-  redraw();
-}
-
 /** Listeners that outlive each render: ArrowLeft steps back, and the button label follows fullscreen. */
-function listenOnRoot(root: HTMLElement, keys: { back: () => void; unpick: () => void }): void {
+function listenOnRoot(root: HTMLElement, keys: { back: () => void }): void {
   root.addEventListener("keydown", (event) => {
     if (!("key" in event) || isTextControl(event.target)) return;
     if (event.key === "ArrowLeft") keys.back();
-    const inDialog =
-      event.target instanceof Element && event.target.closest('[role="dialog"]') !== null;
-    if (event.key === "Escape" && !inDialog) keys.unpick();
   });
   root.addEventListener("fullscreenchange", () => {
     const toggle = root.querySelector<HTMLButtonElement>(".fullscreen-toggle");
@@ -1076,7 +1052,7 @@ function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver |
     currents: currentsOf(live, view.picked),
     set: view.values,
     dryRun: (steps) => driver.dryRun?.(steps) ?? [],
-    actorOf: (edge) => actorOf(machine, edge, { children: live.children, picked: view.picked }),
+    actorOf: (edge) => actorOf(machine, edge, { state: live, picked: view.picked }),
   });
 }
 
@@ -1090,9 +1066,7 @@ function openBlocked(
   if (selection.kind !== "edge" || !view.blocked.has(selection.id)) return false;
   const edge = machine.edges.find((each) => each.id === selection.id);
   const actor =
-    edge === undefined
-      ? "none"
-      : actorOf(machine, edge, { children: view.live?.children ?? [], picked: view.picked });
+    edge === undefined ? "none" : actorOf(machine, edge, { state: view.live, picked: view.picked });
   if (edge !== undefined && actor !== "none") compose(edge.event, actor);
   return true;
 }
@@ -1112,21 +1086,37 @@ function markDiagram(
   updateBlocked(machine, view, context.driver);
   markExplore(root, { machine, path: view.path, blocked: view.blocked, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>("svg");
-  if (view.live !== null && graph !== null) {
-    drawChildMarkers(graph, {
-      machine,
-      children: view.live.children,
-      picked: view.picked,
-      motion: view.motion,
-      onPick: (child) => {
-        view.picked = child;
-        context.refresh();
-      },
-    });
-    view.motion = false;
-  }
+  if (graph !== null) markPools(root, { machine, view, refresh: context.refresh });
   markSelection(root, view.selection);
   showPayloadSheet(root, { ...context, ...view });
+}
+
+/** The count lines under the diagram, and each map frame titled with the child it shows. */
+function markPools(
+  root: HTMLElement,
+  context: { machine: VizMachine; view: ViewState; refresh: () => void },
+): void {
+  const { machine, view, refresh } = context;
+  const { live } = view;
+  const canvas = root.querySelector(".canvas");
+  canvas?.querySelectorAll("[data-pool-count]").forEach((line) => line.remove());
+  if (live === null || canvas === null) return;
+  canvas.append(
+    ...countLines(root.ownerDocument, {
+      machine,
+      live,
+      picked: view.picked,
+      onWalk: (child) => {
+        view.picked = child;
+        refresh();
+      },
+    }),
+  );
+  for (const map of machine.maps) {
+    const title = root.querySelector(`.graph g.region[data-map="${map}"] > text`);
+    if (title !== null)
+      title.textContent = `${map}: ${walkedChild(live, map, view.picked)?.key ?? "none"}`;
+  }
 }
 
 function markSelection(root: HTMLElement, selection: Selection | null): void {

@@ -26,6 +26,13 @@ test("drives the children of the docs photo queue", async () => {
       { map: "photos", key: "p1", state: "photoSent" },
       { map: "photos", key: "p2", state: "sendingPhoto" },
     ]);
+    await viz.send("photoAdded", { photoId: "p3" });
+    await viz.sendTo({ map: "photos", key: "p3" }, "uploadConfirmed");
+    expect((await viz.children()).map((child) => `${child.key} ${child.state}`)).toEqual([
+      "p1 photoSent",
+      "p2 sendingPhoto",
+      "p3 photoSent",
+    ]);
     await viz.send("queueCleared");
     expect(await viz.children()).toEqual([]);
     expect(await viz.state()).toBe("showingEmptyQueue");
