@@ -513,7 +513,7 @@ function actorPart(actor: VizActorRef | undefined): string {
   return "region" in actor ? actor.region : actor.map;
 }
 
-/** The chip under a part's name: its state, or a map's children counted by state. null = no driver. */
+/** The chip under a part's name: its state. null = no driver. */
 function chipOf(
   part: SystemPart,
   live: VizLiveState | null,
