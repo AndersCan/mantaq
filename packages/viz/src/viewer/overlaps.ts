@@ -394,22 +394,6 @@ function nodeOverlaps(shapes: Shapes, add: Add): void {
   }
 }
 
-/** The overlaps that involve one edge's label. */
-export function labelOverlapsFor(layout: MachineLayout, edgeId: string): Overlap[] {
-  const found: Overlap[] = [];
-  const shapes = shapesOf(layout);
-  const one = shapes.edges.find((edge) => edge.id === edgeId);
-  if (one === undefined) return found;
-  labelOverlaps(one, shapes, (rule, a, b, gap) => found.push({ rule, a, b, gap }));
-  for (const other of shapes.edges) {
-    if (other.id >= edgeId) continue;
-    const gap = boxToBox(other.label, one.label);
-    if (gap < LABEL_PAD)
-      found.push({ rule: "label-clear", a: `label:${other.id}`, b: `label:${edgeId}`, gap });
-  }
-  return found;
-}
-
 /**
  * Every overlap in a layout, as plain data. Pure, never mutates, sorted by
  * (rule, a, b). Works on today's `MachineLayout`: Béziers are sampled and a

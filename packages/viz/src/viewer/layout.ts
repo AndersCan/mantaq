@@ -1,7 +1,6 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
-import { labelOverlapsFor } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
@@ -131,6 +130,8 @@ export const LOOP_FIRST_SPAN = 24;
 const TITLE_HEIGHT = 16;
 /** A state's finding mark sticks out this far above and right of its box. */
 const MARK_OVERHANG = 6;
+/** Room between a level run and its label, and between a column's widest item and the sloped part of a path: one more than `LABEL_PAD` so float error never trips the checker. */
+const LEVEL_CLEAR = LABEL_PAD + 1;
 /** The row a region reserves above its content for its title. */
 const TITLE_ROW = LABEL_PAD + TITLE_HEIGHT + LABEL_PAD;
 const UNKNOWN_SIZE = 28;
@@ -350,7 +351,12 @@ function graphOf(machine: VizMachine, specs: ReadonlyMap<string, Spec>): LayoutG
   }
   for (const edge of machine.edges) {
     if (!isDrawn(edge) || isLoop(edge)) continue;
-    const label: EdgeLabel = { ...labelSize(edge), labelpos: "r", labeloffset: LABEL_PAD };
+    const size = labelSize(edge);
+    const label: EdgeLabel = {
+      width: size.width,
+      height: 2 * (size.height + LEVEL_CLEAR),
+      labelpos: "c",
+    };
     graph.setEdge(edge.from, targetOf(edge), label, edge.id);
   }
   return graph;
@@ -404,7 +410,10 @@ function routesOf(
   for (const edge of machine.edges) {
     if (!isDrawn(edge) || isLoop(edge)) continue;
     const placed = graph.edge(edge.from, targetOf(edge), edge.id);
-    labels.set(edge.id, { x: placed.x ?? 0, y: placed.y ?? 0 });
+    labels.set(edge.id, {
+      x: placed.x ?? 0,
+      y: (placed.y ?? 0) + LEVEL_CLEAR + labelSize(edge).height / 2,
+    });
     routes.set(
       edge.id,
       (placed.points ?? []).map((point: Point) => ({ x: point.x, y: point.y })),
@@ -489,12 +498,25 @@ function contentOf(region: string, geo: Geo, context: Context): Sides | null {
     });
     found.push({ ...sides, top: sides.top - MARK_OVERHANG, right: sides.right + MARK_OVERHANG });
   }
+  const dagreBox = geo.regions.get(region);
+  const inside = (point: Point): boolean =>
+    dagreBox !== undefined &&
+    point.x > dagreBox.left &&
+    point.x < dagreBox.right &&
+    point.y > dagreBox.top &&
+    point.y < dagreBox.bottom;
   for (const edge of context.machine.edges) {
     const centre = geo.labels.get(edge.id);
-    const ends = [edge.from, targetOf(edge)];
-    if (centre === undefined || !ends.every((id) => within(region, context.owners.get(id))))
-      continue;
-    found.push(sidesOf({ ...centre, ...labelSize(edge) }));
+    if (centre === undefined) continue;
+    const size = labelSize(edge);
+    if (inside({ x: centre.x, y: centre.y - LEVEL_CLEAR - size.height / 2 }))
+      found.push(sidesOf({ ...centre, ...size }));
+  }
+  for (const route of geo.routes.values()) {
+    for (const point of route.slice(1, -1)) {
+      if (inside(point))
+        found.push({ left: point.x, right: point.x, top: point.y, bottom: point.y });
+    }
   }
   for (const [other, sides] of geo.regions) {
     if (other.startsWith(`${region}.`)) found.push(sides);
@@ -675,27 +697,6 @@ function assignPorts(
   return { ports, need, entryY };
 }
 
-/** In edge order, moves a label to the first spot that clears everything already settled. */
-function settleLabels(base: MachineLayout): PlacedEdge[] {
-  const edges = [...base.edges];
-  const unsettled = new Set(edges.map((placed) => `label:${placed.edge.id}`));
-  for (const [index, placed] of edges.entries()) {
-    unsettled.delete(`label:${placed.edge.id}`);
-    if (isLoop(placed.edge)) continue;
-    for (const spot of labelSpots(placed, placed.points)) {
-      const moved = { ...placed, ...boxed(placed.edge, spot) };
-      const trial = { ...base, edges: edges.map((each, at) => (at === index ? moved : each)) };
-      const clash = labelOverlapsFor(trial, placed.edge.id).some(
-        (overlap) => !unsettled.has(overlap.a) && !unsettled.has(overlap.b),
-      );
-      if (clash) continue;
-      edges[index] = moved;
-      break;
-    }
-  }
-  return edges;
-}
-
 /** Runs dagre until every node's box is tall enough for its ports (at most 3 passes). */
 function laidOut(machine: VizMachine): { graph: LayoutGraph; specs: Map<string, Spec>; geo: Geo } {
   const starts = new Set(startIds(machine));
@@ -757,6 +758,7 @@ export function placeMachine(machine: VizMachine): MachineLayout {
   const starts = startIds(machine);
   const { ports, entryY } = assignPorts(endsOf(machine, geo.routes), boxes, new Set(starts));
   const nodes = placeNodes(machine, specs, boxes);
+  const columns = columnsOf(specs, geo, machine);
   const edges = machine.edges.filter(isDrawn).map((edge) => {
     if (isLoop(edge)) {
       const at = boxes.get(edge.from);
@@ -764,10 +766,10 @@ export function placeMachine(machine: VizMachine): MachineLayout {
       if (at !== undefined && loop !== undefined) return loopPlaced(edge, loop, at);
     }
     const route = geo.routes.get(edge.id) ?? [];
-    const points = portRoute(edge, route, ports, new Set(starts));
+    const points = levelRoute(edge, route, ports, columns);
     return placedOf(edge, points, geo.labels.get(edge.id) ?? { x: 0, y: 0 }, pathLength(points));
   });
-  const placed: MachineLayout = {
+  return {
     width: geo.width,
     height: geo.height,
     nodes,
@@ -793,7 +795,6 @@ export function placeMachine(machine: VizMachine): MachineLayout {
       return { from: { x: left - ENTRY_LENGTH, y }, to: { x: left, y } };
     }),
   };
-  return { ...placed, edges: settleLabels(placed) };
 }
 
 export function pathLength(points: ReadonlyArray<Point>): number {
@@ -850,94 +851,76 @@ function placeNodes(
   return [...states, ...anys, ...unknowns];
 }
 
-/** The route with its ends moved to ports on the box sides, each leaving by a stub. */
-function portRoute(
+interface Column {
+  left: number;
+  right: number;
+}
+
+interface Columns {
+  at: (x: number) => Column;
+  ofNode: (id: string) => Column;
+}
+
+/**
+ * dagre puts every item of one rank at one x, so a rank is a column. Its
+ * extent is the widest node footprint (with the finding mark) or label in it;
+ * every route point is a label's, so it adds none.
+ */
+function columnsOf(specs: ReadonlyMap<string, Spec>, geo: Geo, machine: VizMachine): Columns {
+  const columns = new Map<number, Column>();
+  const key = (x: number): number => Math.round(2 * x);
+  const grow = (x: number, half: number): void => {
+    const column = columns.get(key(x)) ?? { left: x, right: x };
+    column.left = Math.min(column.left, x - half);
+    column.right = Math.max(column.right, x + half);
+    columns.set(key(x), column);
+  };
+  for (const [id, spec] of specs) {
+    const centre = geo.nodes.get(id);
+    if (centre !== undefined) grow(centre.x, (spec.entry + spec.inner) / 2 + MARK_OVERHANG);
+  }
+  for (const edge of machine.edges) {
+    const centre = geo.labels.get(edge.id);
+    if (centre !== undefined) grow(centre.x, labelSize(edge).width / 2);
+  }
+  const at = (x: number): Column => columns.get(key(x)) ?? { left: x, right: x };
+  return { at, ofNode: (id) => at(geo.nodes.get(id)?.x ?? 0) };
+}
+
+/**
+ * The route from port to port, level wherever it is inside a column: it
+ * leaves each end and crosses each interior column at its own height, and
+ * slopes only between columns, `LEVEL_CLEAR` outside the widest item.
+ */
+function levelRoute(
   edge: VizEdge,
   route: ReadonlyArray<Point>,
   ports: ReadonlyMap<string, Port>,
-  starts: ReadonlySet<string>,
+  columns: Columns,
 ): Point[] {
   const first = ports.get(portKey(edge.id, true));
   const last = ports.get(portKey(edge.id, false));
   if (first === undefined || last === undefined) return [...route];
-  const stub = (port: Port, node: string): number =>
-    port.side * (port.side === -1 && starts.has(node) ? ENTRY_STUB : STUB);
-  return [
+  const clear = (port: Port, node: string): number => {
+    const column = columns.ofNode(node);
+    return port.side === 1 ? column.right + LEVEL_CLEAR : column.left - LEVEL_CLEAR;
+  };
+  const points: Point[] = [
     { x: first.x, y: first.y },
-    { x: first.x + stub(first, edge.from), y: first.y },
-    ...route.slice(1, -1),
-    { x: last.x + stub(last, targetOf(edge)), y: last.y },
-    { x: last.x, y: last.y },
+    { x: clear(first, edge.from), y: first.y },
   ];
-}
-
-const MAX_SLOPE = 3;
-
-/** Highest and lowest y of the arrow between two x values, and its steepest |dy/dx| there (capped). */
-function arrowSpan(
-  points: ReadonlyArray<Point>,
-  from: number,
-  to: number,
-): { top: number; bottom: number; slope: number } {
-  const ys: number[] = [];
-  let slope = 0;
-  for (const [index, end] of points.entries()) {
-    const start = points[index - 1];
-    if (start === undefined) continue;
-    const dx = end.x - start.x;
-    if (Math.abs(dx) < 1 || Math.max(start.x, end.x) < from || Math.min(start.x, end.x) > to)
-      continue;
-    const at = (x: number): number => start.y + ((end.y - start.y) * (x - start.x)) / dx;
-    const low = Math.max(from, Math.min(start.x, end.x));
-    const high = Math.min(to, Math.max(start.x, end.x));
-    ys.push(at(low), at(high));
-    slope = Math.max(slope, Math.abs((end.y - start.y) / dx));
+  for (const point of route.slice(1, -1)) {
+    const column = columns.at(point.x);
+    const across = [
+      { x: column.left - LEVEL_CLEAR, y: point.y },
+      { x: column.right + LEVEL_CLEAR, y: point.y },
+    ];
+    const from = points.at(-1)?.x ?? point.x;
+    points.push(...(from <= point.x ? across : across.reverse()));
   }
-  return { top: Math.min(...ys), bottom: Math.max(...ys), slope: Math.min(slope, MAX_SLOPE) };
+  points.push({ x: clear(last, targetOf(edge)), y: last.y }, { x: last.x, y: last.y });
+  return points;
 }
-
-/** Points along the arrow, bends and quarter marks of each segment, ordered from its middle outwards. */
-function anchors(points: ReadonlyArray<Point>): Point[] {
-  const found: Array<{ point: Point; along: number }> = [];
-  const total = pathLength(points);
-  let walked = 0;
-  for (const [index, end] of points.entries()) {
-    const start = points[index - 1];
-    if (start === undefined) continue;
-    const length = Math.hypot(end.x - start.x, end.y - start.y);
-    for (const part of [0.25, 0.5, 0.75]) {
-      found.push({
-        point: { x: start.x + (end.x - start.x) * part, y: start.y + (end.y - start.y) * part },
-        along: walked + length * part,
-      });
-    }
-    walked += length;
-    if (index < points.length - 1) found.push({ point: end, along: walked });
-  }
-  return found
-    .sort((a, b) => Math.abs(a.along - total / 2) - Math.abs(b.along - total / 2))
-    .map(({ point }) => point);
-}
-
-/**
- * Candidate centres for a label, best first: dagre's spot, its mirror above
- * the arrow, then beside points along the arrow, middle outwards.
- */
-export function labelSpots(placed: PlacedEdge, points: ReadonlyArray<Point>): Point[] {
-  const { x, y, width, height } = placed.label;
-  const spots: Point[] = [
-    { x, y },
-    { x, y: y - 2 * (height / 2 + LABEL_PAD) },
-  ];
-  for (const point of anchors(points)) {
-    const span = arrowSpan(points, point.x - width / 2, point.x + width / 2);
-    const away = height / 2 + 1 + LABEL_PAD * Math.hypot(1, span.slope);
-    if (span.top > span.bottom) continue;
-    spots.push({ x: point.x, y: span.bottom + away }, { x: point.x, y: span.top - away });
-  }
-  return spots;
-}
-
 /** The layout, or the error when dagre or a missing node spec stops it. Overlaps are measured by `overlapsOf`, not refused here. */
 export function layoutMachine(machine: VizMachine): Either<unknown, MachineLayout> {
   return Either.from(() => placeMachine(machine));

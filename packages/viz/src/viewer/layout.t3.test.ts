@@ -198,7 +198,7 @@ describe("region titles have room of their own", () => {
     expect(overlapsOf(laid)).toEqual([]);
   });
 
-  test("an arrow into a start state's left side leaves by ENTRY_STUB, clear of the entry arrow", () => {
+  test("an arrow into a start state's left side leaves by at least ENTRY_STUB, clear of the entry arrow", () => {
     const back = ["e0", "e1", "e2", "e3", "e4"].map((event) => edge("a", event, "first"));
     const laid = placeMachine({
       ...machineOf(
@@ -215,7 +215,7 @@ describe("region titles have room of their own", () => {
     for (const placed of into) {
       const [stub, port] = placed.points.slice(-2);
       expect(port?.x).toBe(left);
-      expect((port?.x ?? 0) - (stub?.x ?? 0)).toBe(42);
+      expect((port?.x ?? 0) - (stub?.x ?? 0)).toBeGreaterThanOrEqual(42);
     }
   });
 
