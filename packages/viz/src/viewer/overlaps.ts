@@ -7,6 +7,7 @@ type Part =
   | `arrow:${string}`
   | `node:${string}`
   | `region:${string}`
+  | `title:${string}`
   | `entry:${string}`
   | "canvas";
 
@@ -195,7 +196,14 @@ interface Shapes {
   nodes: Array<{ id: string; part: Part; box: Box; owner: string | null }>;
   edges: Array<{ id: string; from: string; target: string; path: Point[]; label: Box; arrow: Box }>;
   entries: Array<{ part: Part; line: Point[] }>;
-  regions: Array<{ part: Part; name: string; box: Box; border: Point[] }>;
+  regions: Array<{
+    part: Part;
+    title: Part;
+    name: string;
+    box: Box;
+    titleBox: Box;
+    border: Point[];
+  }>;
   canvas: Box;
 }
 
@@ -216,7 +224,7 @@ function shapesOf(layout: MachineLayout): Shapes {
       owner: node.kind === "state" ? node.state.region : null,
     })),
     edges: layout.edges.map((placed) => {
-      const path = samplePolyline(pathPoints(placed.path));
+      const path = samplePolyline(placed.points);
       return {
         id: placed.edge.id,
         from: placed.edge.from,
@@ -232,8 +240,10 @@ function shapesOf(layout: MachineLayout): Shapes {
     })),
     regions: layout.regions.map((region) => ({
       part: `region:${region.region}`,
+      title: `title:${region.region}`,
       name: region.region,
       box: region,
+      titleBox: region.title,
       border: borderPoints(region),
     })),
     canvas: {
@@ -259,7 +269,10 @@ function labelOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   }
   for (const node of rest.nodes) near(node.part, boxToBox(one.label, node.box));
   for (const entry of rest.entries) near(entry.part, pathToBox(entry.line, one.label));
-  for (const region of rest.regions) near(region.part, pathToBox(region.border, one.label));
+  for (const region of rest.regions) {
+    near(region.part, pathToBox(region.border, one.label));
+    near(region.title, boxToBox(one.label, region.titleBox));
+  }
   const inset = insetIn(one.label, rest.canvas);
   if (!(inset >= 0)) add("outside", part, "canvas", inset);
 }
@@ -323,6 +336,8 @@ function nodeOverlaps(shapes: Shapes, add: Add): void {
         ? insetIn(node.box, region.box)
         : boxToBox(node.box, region.box);
       if (gap < LABEL_PAD) add("region-edge", node.part, region.part, gap);
+      const titleGap = boxToBox(node.box, region.titleBox);
+      if (titleGap < LABEL_PAD) add("region-edge", node.part, region.title, titleGap);
     }
   }
 }

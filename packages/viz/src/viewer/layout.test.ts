@@ -6,7 +6,17 @@ import {
   dotGapFor,
   layoutMachine,
   pathLength,
+  ENTRY_LENGTH,
+  LABEL_FOREIGN,
+  LABEL_OWN,
+  LABEL_PAD,
+  LEG_GAP,
+  LEG_INSET,
   LOCK_SLOT,
+  LOOP_BASE,
+  LOOP_FIRST_SPAN,
+  PORT_GAP,
+  STUB,
   labelSpots,
   textWidth,
 } from "./layout.ts";
@@ -152,103 +162,71 @@ describe("textWidth", () => {
 });
 
 describe("self-loops", () => {
-  test("each self-loop label sits above its own loop, and the feet are apart", () => {
-    const machine = machineOf(
-      ["first"],
-      ["alpha", "beta"].map((event) => edge({ from: "first", event, target: "first" })),
-    );
-    const edges = layoutMachine(machine).edges;
-    for (const placed of edges) {
-      const [base, lift] = [...placed.path.matchAll(/,(-?[\d.]+)/g)].map((m) => Number(m[1]));
-      const loopTop = (base ?? 0) - 0.75 * ((base ?? 0) - (lift ?? 0));
-      expect(placed.label.y + 8).toBeLessThanOrEqual(loopTop);
+  const events = ["alpha", "beta", "gamma"];
+  const looped = machineOf(
+    ["first"],
+    events.map((event) => edge({ from: "first", event, target: "first" })),
+  );
+  const laid = layoutMachine(looped);
+  const box = laid.nodes[0];
+  const top = (box?.y ?? 0) - (box?.height ?? 0) / 2;
+
+  test("loop k is a rectangle: span and bar height follow the formulas", () => {
+    const widths = events.map((event) => textWidth(event) + 8 + LOCK_SLOT);
+    const spans = [LOOP_FIRST_SPAN];
+    const rises = [LOOP_BASE];
+    for (const width of widths.slice(0, -1)) {
+      spans.push(Math.max((spans.at(-1) ?? 0) + 2 * LEG_GAP, width + 2 * LABEL_FOREIGN));
+      rises.push((rises.at(-1) ?? 0) + LABEL_OWN + 16 + LABEL_FOREIGN);
     }
-    const starts = edges.map((placed) => Number(/^M(-?[\d.]+)/.exec(placed.path)?.[1]));
-    const ends = edges.map((placed) => Number(/(-?[\d.]+),-?[\d.]+$/.exec(placed.path)?.[1]));
-    expect(starts[1]).toBeLessThan(starts[0] ?? 0);
-    expect(ends[1]).toBeGreaterThan(ends[0] ?? 0);
+    for (const [index, placed] of laid.edges.entries()) {
+      const cx = box?.x ?? 0;
+      const span = spans[index] ?? 0;
+      const bar = top - (rises[index] ?? 0);
+      expect(placed.points).toEqual([
+        { x: cx - span / 2, y: top },
+        { x: cx - span / 2, y: bar },
+        { x: cx + span / 2, y: bar },
+        { x: cx + span / 2, y: top },
+      ]);
+      expect(placed.label.x).toBe(cx);
+      expect(placed.label.y).toBe(bar - LABEL_OWN - 8);
+    }
   });
 
-  test("the outer loops clear the inner labels, and the arrowheads land apart", () => {
-    const events = ["alpha", "beta", "gamma"];
-    const machine = machineOf(
-      ["first"],
-      events.map((event) => edge({ from: "first", event, target: "first" })),
+  test("the box is as wide as the outer loop plus the inset on both sides", () => {
+    const outer = laid.edges.at(-1)?.points;
+    const span = (outer?.[3]?.x ?? 0) - (outer?.[0]?.x ?? 0);
+    expect(box?.width).toBeGreaterThanOrEqual(span + 2 * LEG_INSET);
+  });
+
+  test("the outermost label stays inside the canvas", () => {
+    const outer = laid.edges.at(-1);
+    expect((outer?.label.y ?? 0) - 8).toBeGreaterThanOrEqual(0);
+  });
+
+  test("the 4 loops of workersBusy nest, and none enters workers.working", () => {
+    const file = new URL("./reference/team-inbox.json", import.meta.url);
+    const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
+    const pool = layoutMachine(machine);
+    const loops = pool.edges.filter(
+      (placed) => placed.edge.from === "workersBusy" && placed.edge.to === "workersBusy",
     );
-    const laid = layoutMachine(machine);
-    const edges = laid.edges;
-    const node = laid.nodes[0];
-    const curveOf = (path: string) => {
-      const [p0, p1, p2, p3] = [...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => ({
-        x: Number(m[1]),
-        y: Number(m[2]),
-      }));
-      return [p0, p1, p2, p3] as const;
-    };
-    const at = (u: number, a: number, b: number, c: number, d: number) =>
-      (1 - u) ** 3 * a + 3 * (1 - u) ** 2 * u * b + 3 * (1 - u) * u ** 2 * c + u ** 3 * d;
-    for (let nth = 1; nth < edges.length; nth++) {
-      const inner = edges[nth - 1];
-      const outer = edges[nth];
-      const [p0, p1, p2, p3] = curveOf(outer?.path ?? "");
-      const [i0, , , i3] = curveOf(inner?.path ?? "");
-      if (!p0 || !p1 || !p2 || !p3 || !i0 || !i3 || !node) throw new Error("bad path");
-      // every foot stays on the state's box
-      expect(p0.x).toBeGreaterThanOrEqual(node.x - node.width / 2);
-      expect(p3.x).toBeLessThanOrEqual(node.x + node.width / 2);
-      // arrowheads (6 wide) do not touch on either side
-      expect(p3.x - i3.x).toBeGreaterThanOrEqual(6);
-      expect(i0.x - p0.x).toBeGreaterThanOrEqual(6);
-      // the outer curve, where it passes the inner label's height, is left of the label's text
-      const labelWidth = (events[nth - 1]?.length ?? 0) * 7 + 8;
-      const labelTop = (inner?.label.y ?? 0) - 8;
-      let leftX = Number.NaN;
-      for (let step = 0; step <= 400; step++) {
-        const u = step / 400;
-        if (at(u, p0.y, p1.y, p2.y, p3.y) <= labelTop) {
-          leftX = at(u, p0.x, p1.x, p2.x, p3.x);
-          break;
-        }
+    expect(loops).toHaveLength(4);
+    const spans = loops.map((placed) => (placed.points[3]?.x ?? 0) - (placed.points[0]?.x ?? 0));
+    for (const [index, span] of spans.slice(1).entries()) {
+      expect(span - (spans[index] ?? 0)).toBeGreaterThanOrEqual(2 * LEG_GAP);
+    }
+    const working = pool.nodes.find((node) => node.id === "workers.working");
+    if (working === undefined) throw new Error("no workers.working");
+    for (const placed of loops) {
+      for (const point of placed.points) {
+        const inside =
+          Math.abs(point.x - working.x) < working.width / 2 &&
+          Math.abs(point.y - working.y) < working.height / 2;
+        expect(inside).toBe(false);
       }
-      expect(leftX).toBeLessThan((inner?.label.x ?? 0) - labelWidth / 2);
     }
-  });
-
-  test("outgoing edges do not shrink the foot spread of the loops", () => {
-    const loops = ["alpha", "beta"].map((event) => edge({ from: "first", event, target: "first" }));
-    const outgoing = ["x", "y", "z"].map((event, index) =>
-      edge({ from: "first", event, target: `t${index}` }),
-    );
-    const machine = machineOf(["first", "t0", "t1", "t2"], [...loops, ...outgoing]);
-    const starts = layoutMachine(machine)
-      .edges.filter((placed) => placed.edge.to === placed.edge.from)
-      .map((placed) => Number(/^M(-?[\d.]+)/.exec(placed.path)?.[1]));
-    expect((starts[0] ?? 0) - (starts[1] ?? 0)).toBeGreaterThanOrEqual(6);
-  });
-
-  test("the outermost loop label stays inside the layout", () => {
-    const machine = machineOf(
-      ["first"],
-      ["alpha", "beta", "gamma"].map((event) => edge({ from: "first", event, target: "first" })),
-    );
-    for (const placed of layoutMachine(machine).edges) {
-      expect(placed.label.y - 8).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  test("the top margin keeps 64 for one loop and grows for three", () => {
-    const topOf = (count: number) => {
-      const events = ["alpha", "beta", "gamma"].slice(0, count);
-      const machine = machineOf(
-        ["first"],
-        events.map((event) => edge({ from: "first", event, target: "first" })),
-      );
-      const node = layoutMachine(machine).nodes[0];
-      return (node?.y ?? 0) - (node?.height ?? 0) / 2;
-    };
-    expect(topOf(0)).toBe(64);
-    expect(topOf(1)).toBe(64);
-    expect(topOf(3)).toBeGreaterThan(64);
   });
 
   test("labels of parallel edges get distinct rows", () => {
@@ -468,18 +446,148 @@ describe("layoutMachine speed", () => {
   });
 });
 
-describe("settleLabels and self-loops", () => {
-  test("a self-loop label stays just above its apex even when it touches a settled label", () => {
-    const file = new URL("./reference/team-inbox.json", import.meta.url);
-    const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
-    const loops = layoutMachine(machine).edges.filter(
-      (placed) => placed.edge.from === placed.edge.to,
-    );
-    expect(loops.length).toBeGreaterThan(0);
-    for (const placed of loops) {
-      const [base, lift] = [...placed.path.matchAll(/,(-?[\d.]+)/g)].map((m) => Number(m[1]));
-      const apex = (base ?? 0) - 0.75 * ((base ?? 0) - (lift ?? 0));
-      expect(placed.label.y).toBeCloseTo(apex - 16 / 2 - 2, 0);
+describe("ports", () => {
+  const fan = machineOf(
+    ["first", "b", "c", "d"],
+    ["b", "c", "d"].map((target) => edge({ from: "first", event: `to${target}`, target })),
+  );
+  const laid = layoutMachine(fan);
+  const first = laid.nodes.find((node) => node.id === "first");
+
+  test("ends sit on the box side, PORT_GAP apart, centred on the box middle", () => {
+    const starts = laid.edges.map((placed) => placed.points[0]);
+    const right = (first?.x ?? 0) + (first?.width ?? 0) / 2;
+    for (const point of starts) expect(point?.x).toBe(right);
+    const ys = starts.map((point) => point?.y ?? 0).sort((a, b) => a - b);
+    expect(ys[1]).toBe(first?.y);
+    expect((ys[1] ?? 0) - (ys[0] ?? 0)).toBe(PORT_GAP);
+    expect((ys[2] ?? 0) - (ys[1] ?? 0)).toBe(PORT_GAP);
+  });
+
+  test("each end leaves the box by a STUB-long horizontal piece", () => {
+    for (const placed of laid.edges) {
+      const [port, stub] = placed.points;
+      expect(stub?.y).toBe(port?.y);
+      expect((stub?.x ?? 0) - (port?.x ?? 0)).toBe(STUB);
     }
+  });
+
+  test("a box grows to the height its busiest side needs", () => {
+    const many = machineOf(
+      ["first", "b"],
+      ["a", "b", "c", "d", "e", "f"].map((event) => edge({ from: "first", event, target: "b" })),
+    );
+    const node = layoutMachine(many).nodes.find((each) => each.id === "first");
+    expect(node?.height).toBe(PORT_GAP * 7);
+  });
+
+  test("the entry arrow takes the middle slot of the start state's left side", () => {
+    const back = machineOf(
+      ["first", "b"],
+      [
+        edge({ from: "b", event: "x", target: "first" }),
+        edge({ from: "b", event: "y", target: "first" }),
+      ],
+    );
+    const placed = layoutMachine(back);
+    const start = placed.nodes.find((node) => node.id === "first");
+    const entry = placed.entries[0];
+    expect(entry?.to.x).toBe((start?.x ?? 0) - (start?.width ?? 0) / 2);
+    expect((entry?.to.x ?? 0) - (entry?.from.x ?? 0)).toBe(ENTRY_LENGTH);
+    const ends = placed.edges.map((each) => each.points.at(-1)?.y ?? 0);
+    expect(ends.some((y) => y < (entry?.to.y ?? 0))).toBe(true);
+    expect(ends.some((y) => y > (entry?.to.y ?? 0))).toBe(true);
+  });
+});
+
+describe("region boxes", () => {
+  const nothing = { x: 0, y: 0, width: 0, height: 0 };
+  function inRegion(): VizMachine {
+    const base = machineOf(
+      ["a", "r.b", "r.c"],
+      [
+        edge({ from: "a", event: "go", target: "r.b" }),
+        edge({ from: "r.b", event: "go", target: "r.c" }),
+      ],
+    );
+    const states = base.states.map((each) =>
+      each.id.startsWith("r.") ? { ...each, region: "r" } : each,
+    );
+    return { ...base, states, regions: ["r"] };
+  }
+  const laid = layoutMachine(inRegion());
+  const region = laid.regions[0];
+  const sides = (b: { x: number; y: number; width: number; height: number }) => ({
+    left: b.x - b.width / 2,
+    right: b.x + b.width / 2,
+    top: b.y - b.height / 2,
+    bottom: b.y + b.height / 2,
+  });
+
+  test("every member is at least LABEL_PAD inside, the title above them", () => {
+    const outer = sides(region ?? nothing);
+    const title = sides(region?.title ?? nothing);
+    for (const id of ["r.b", "r.c"]) {
+      const member = sides(laid.nodes.find((each) => each.id === id) ?? nothing);
+      expect(member.left - outer.left).toBeGreaterThanOrEqual(LABEL_PAD);
+      expect(outer.bottom - member.bottom).toBeGreaterThanOrEqual(LABEL_PAD);
+      expect(member.top - title.bottom).toBeGreaterThanOrEqual(LABEL_PAD);
+    }
+    expect(title.top - outer.top).toBe(LABEL_PAD);
+    expect(title.left - outer.left).toBe(LABEL_PAD);
+  });
+
+  test("a state outside is at least LABEL_PAD from the region", () => {
+    const outer = sides(region ?? nothing);
+    const a = sides(laid.nodes.find((each) => each.id === "a") ?? nothing);
+    expect(outer.left - a.right).toBeGreaterThanOrEqual(LABEL_PAD);
+  });
+
+  test("a title wider than the content makes the region title width + 2 * LABEL_PAD wide", () => {
+    const long = "r".repeat(40);
+    const single = machineOf(["r.b"], []);
+    const states = single.states.map((each) => ({ ...each, region: long }));
+    const wide = layoutMachine({ ...single, states, regions: [long] }).regions[0];
+    expect(wide?.width).toBe(textWidth(long) + 8 + 2 * LABEL_PAD);
+  });
+
+  test("a nested region sits LABEL_PAD inside its parent, below the parent's title row", () => {
+    const base = machineOf(
+      ["r.s.a", "r.s.b"],
+      [edge({ from: "r.s.a", event: "go", target: "r.s.b" })],
+    );
+    const states = base.states.map((each) => ({
+      ...each,
+      region: "r.s",
+      initial: each.id === "r.s.a",
+    }));
+    const placed = layoutMachine({ ...base, initial: null, states, regions: ["r", "r.s"] });
+    const parentRegion = placed.regions.find((each) => each.region === "r");
+    const parent = sides(parentRegion ?? nothing);
+    const child = sides(placed.regions.find((each) => each.region === "r.s") ?? nothing);
+    const title = sides(parentRegion?.title ?? nothing);
+    expect(child.left - parent.left).toBeGreaterThanOrEqual(LABEL_PAD);
+    expect(parent.right - child.right).toBeGreaterThanOrEqual(LABEL_PAD);
+    expect(parent.bottom - child.bottom).toBeGreaterThanOrEqual(LABEL_PAD);
+    expect(child.top - title.bottom).toBeGreaterThanOrEqual(LABEL_PAD);
+  });
+});
+
+describe("space inserted for region titles", () => {
+  test("a state beyond a region keeps its distance when a long title widens the region", () => {
+    const long = "r".repeat(40);
+    const base = machineOf(
+      ["first", `${long}.b`, "after"],
+      [
+        edge({ from: "first", event: "go", target: `${long}.b` }),
+        edge({ from: `${long}.b`, event: "out", target: "after" }),
+      ],
+    );
+    const states = base.states.map((each) =>
+      each.id.startsWith(long) ? { ...each, region: long, label: "b" } : each,
+    );
+    const laid = layoutMachine({ ...base, states, regions: [long] });
+    expect(overlapsOf(laid)).toEqual([]);
+    expect(laid.regions[0]?.width).toBe(textWidth(long) + 8 + 2 * LABEL_PAD);
   });
 });

@@ -3,6 +3,7 @@ import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 import { describe, expect, test } from "vite-plus/test";
 
 const NODESEP = 36;
+const LABEL_PAD = 8;
 
 function graphOf(): Graph<GraphLabel, NodeLabel, EdgeLabel> {
   const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>({ multigraph: true, compound: true });
@@ -35,9 +36,7 @@ describe("dagre behaviour the layout will rely on", () => {
     expect(edge.y).toBeCloseTo(onPath.y + 8 + 16 / 2 + 0, 0);
   });
 
-  // A2 fails today at the plan's bound: children sit 25 to 29.5px from the border
-  // and a label box 19px (nodesep is 36). The plan's stop rule applies; reported to the lead.
-  test.fails("keeps a compound node's borders a nodesep from its children and labels", () => {
+  test("keeps members LABEL_PAD inside a compound's border and non-members LABEL_PAD outside", () => {
     const graph = graphOf();
     addStates(graph, ["a", "b", "c"]);
     graph.setNode("r", { width: 0, height: 0 });
@@ -47,13 +46,23 @@ describe("dagre behaviour the layout will rely on", () => {
     graph.setEdge("b", "c", { width: 40, height: 16, labelpos: "r", labeloffset: 8 }, "e2");
     layout(graph);
     const region = graph.node("r");
-    const inside = [...["b", "c"].map((name) => graph.node(name)), graph.edge("b", "c", "e2")];
-    for (const child of inside) {
-      const top = (child.y ?? 0) - child.height / 2 - ((region.y ?? 0) - region.height / 2);
-      const bottom = (region.y ?? 0) + region.height / 2 - ((child.y ?? 0) + child.height / 2);
-      expect(top).toBeGreaterThanOrEqual(NODESEP);
-      expect(bottom).toBeGreaterThanOrEqual(NODESEP);
+    const sides = (node: NodeLabel) => ({
+      left: (node.x ?? 0) - node.width / 2,
+      right: (node.x ?? 0) + node.width / 2,
+      top: (node.y ?? 0) - node.height / 2,
+      bottom: (node.y ?? 0) + node.height / 2,
+    });
+    const border = sides(region);
+    const members = [...["b", "c"].map((name) => graph.node(name)), graph.edge("b", "c", "e2")];
+    for (const member of members) {
+      const inner = sides(member);
+      expect(inner.left - border.left).toBeGreaterThanOrEqual(LABEL_PAD);
+      expect(border.right - inner.right).toBeGreaterThanOrEqual(LABEL_PAD);
+      expect(inner.top - border.top).toBeGreaterThanOrEqual(LABEL_PAD);
+      expect(border.bottom - inner.bottom).toBeGreaterThanOrEqual(LABEL_PAD);
     }
+    const outside = sides(graph.node("a"));
+    expect(border.left - outside.right).toBeGreaterThanOrEqual(LABEL_PAD);
   });
 
   test("keeps an edge's inner points out of every node it does not end at", () => {

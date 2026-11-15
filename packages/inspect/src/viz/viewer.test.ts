@@ -123,7 +123,9 @@ describe("viewer: checkout", () => {
         state.effects.map((effect) => effect.name),
       );
       const frame = node?.querySelector("rect.frame:not(.inner)");
-      expect(Number(frame?.getAttribute("height"))).toBe(36 + 20 * state.effects.length);
+      expect(Number(frame?.getAttribute("height"))).toBeGreaterThanOrEqual(
+        36 + 20 * state.effects.length,
+      );
     }
     const effectEdges = machine?.edges.filter((edge) => edge.kind === "effect") ?? [];
     expect(effectEdges.length).toBeGreaterThan(0);

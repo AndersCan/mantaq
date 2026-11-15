@@ -9,8 +9,7 @@ function reference(name: string): VizMachine {
   return JSON.parse(readFileSync(file, "utf8")) as VizMachine;
 }
 
-// `it.fails` while the layout still overlaps; each layout task flips its machines to `test`.
-test.fails("teamInbox (the pool) has no overlaps", () => {
+test("teamInbox (the pool) has no overlaps", () => {
   expect(overlapLines(overlapsOf(layoutMachine(reference("team-inbox"))))).toEqual([]);
 });
 
