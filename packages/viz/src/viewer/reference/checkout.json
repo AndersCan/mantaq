@@ -1,0 +1,285 @@
+{
+  "id": "checkout",
+  "initial": "basicInfo",
+  "regions": [],
+  "maps": [],
+  "actors": [],
+  "states": [
+    {
+      "id": "basicInfo",
+      "label": "basicInfo",
+      "region": null,
+      "initial": true,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "error",
+      "label": "error",
+      "region": null,
+      "initial": false,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "payment",
+      "label": "payment",
+      "region": null,
+      "initial": false,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "shippingAddress",
+      "label": "shippingAddress",
+      "region": null,
+      "initial": false,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "submitting",
+      "label": "submitting",
+      "region": null,
+      "initial": false,
+      "final": false,
+      "effects": [
+        {
+          "name": "chargeCard",
+          "sends": ["paymentOk", "paymentFail", "paymentTimeout"]
+        }
+      ],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "success",
+      "label": "success",
+      "region": null,
+      "initial": false,
+      "final": true,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    }
+  ],
+  "events": [
+    {
+      "id": "back",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "paymentFail",
+      "internal": true,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "paymentOk",
+      "internal": true,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "paymentTimeout",
+      "internal": true,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "submitBasicInfo",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "submitPayment",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "submitShipping",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    }
+  ],
+  "outputs": [],
+  "partOutputs": {},
+  "context": null,
+  "edges": [
+    {
+      "id": "__initial__->basicInfo",
+      "from": "__initial__",
+      "event": "",
+      "to": "basicInfo",
+      "kind": "initial",
+      "origin": "probe",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "basicInfo-submitBasicInfo-shippingAddress",
+      "from": "basicInfo",
+      "event": "submitBasicInfo",
+      "to": "shippingAddress",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "error-back-payment",
+      "from": "error",
+      "event": "back",
+      "to": "payment",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "payment-back-shippingAddress",
+      "from": "payment",
+      "event": "back",
+      "to": "shippingAddress",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "payment-submitPayment-submitting",
+      "from": "payment",
+      "event": "submitPayment",
+      "to": "submitting",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "shippingAddress-back-basicInfo",
+      "from": "shippingAddress",
+      "event": "back",
+      "to": "basicInfo",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "shippingAddress-submitShipping-payment",
+      "from": "shippingAddress",
+      "event": "submitShipping",
+      "to": "payment",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "submitting-effect:submitting-submitting",
+      "from": "submitting",
+      "event": "effect:submitting",
+      "to": "submitting",
+      "kind": "effect",
+      "origin": "probe",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "submitting-paymentFail-error",
+      "from": "submitting",
+      "event": "paymentFail",
+      "to": "error",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "submitting-paymentOk-success",
+      "from": "submitting",
+      "event": "paymentOk",
+      "to": "success",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "submitting-paymentTimeout-error",
+      "from": "submitting",
+      "event": "paymentTimeout",
+      "to": "error",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": ["default"],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    }
+  ],
+  "fuzz": null,
+  "runs": []
+}
