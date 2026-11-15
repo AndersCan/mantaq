@@ -1,6 +1,8 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
+import { overlapsOf } from "./overlaps.ts";
+import type { Overlap } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
@@ -132,6 +134,11 @@ const TITLE_HEIGHT = 16;
 const MARK_OVERHANG = 6;
 /** Room between a level run and its label, and between a column's widest item and the sloped part of a path: one more than `LABEL_PAD` so float error never trips the checker. */
 const LEVEL_CLEAR = LABEL_PAD + 1;
+/** Distance between the vertical lanes of sloped arrows in one rank gap: over twice the checker's `ALONGSIDE_GAP`. */
+export const LANE_GAP = 8;
+/** Two level pieces closer than this in y would run into each other if their lanes were in the wrong order. */
+const LANE_ROW_CLASH = 4;
+const LANE_TITLE_CLEAR = 5;
 /** The row a region reserves above its content for its title. */
 const TITLE_ROW = LABEL_PAD + TITLE_HEIGHT + LABEL_PAD;
 const UNKNOWN_SIZE = 28;
@@ -288,16 +295,16 @@ function specsOf(machine: VizMachine, heights: ReadonlyMap<string, number>): Map
   const starts = new Set(startIds(machine));
   const specs = new Map<string, Spec>();
   const tall = (id: string, height: number): number => Math.max(height, heights.get(id) ?? 0);
+  const loopsAt = (id: string): Loop[] =>
+    loopsOf(machine.edges.filter((edge) => isDrawn(edge) && isLoop(edge) && edge.from === id));
   for (const state of machine.states) {
-    const loops = loopsOf(
-      machine.edges.filter((edge) => isDrawn(edge) && isLoop(edge) && edge.from === state.id),
-    );
+    const loops = loopsAt(state.id);
     const size = { width: stateWidth(state), height: tall(state.id, stateHeight(state)) };
     specs.set(state.id, specOf(state.id, size, loops, starts.has(state.id) ? ENTRY_STUB : 0));
   }
   for (const id of anyIds(machine)) {
     const size = { width: textWidth(ANY_LABEL) + 24, height: tall(id, NODE_HEIGHT) };
-    specs.set(id, specOf(id, size, [], 0));
+    specs.set(id, specOf(id, size, loopsAt(id), 0));
   }
   for (const edge of machine.edges) {
     if (!isDrawn(edge) || edge.to !== null) continue;
@@ -746,6 +753,8 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
  * Layered layout (dagre, left to right). Pure: same machine in, same
  * coordinates out. The initial edge is drawn as an entry arrow, not a graph edge.
  */
+const MAX_WIDEN_PASSES = 4;
+
 export function placeMachine(machine: VizMachine): MachineLayout {
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
@@ -753,12 +762,41 @@ export function placeMachine(machine: VizMachine): MachineLayout {
     (a, b) => b.split(".").length - a.split(".").length || a.localeCompare(b),
   );
   for (const region of regions) fitRegion(region, geo, context);
+  let built = assemble(machine, specs, geo, regions);
+  for (let pass = 0; pass < MAX_WIDEN_PASSES && built.widen.length > 0; pass++) {
+    for (const { at, by } of [...built.widen].sort((a, b) => b.at - a.at))
+      insertSpace(geo, "x", at, by);
+    built = assemble(machine, specs, geo, regions);
+  }
+  return built.layout;
+}
+
+function assemble(
+  machine: VizMachine,
+  specs: ReadonlyMap<string, Spec>,
+  geo: Geo,
+  regions: ReadonlyArray<string>,
+): { layout: MachineLayout; widen: Widen[] } {
   const boxes = new Map<string, LabelBox>();
   for (const [id, spec] of specs) boxes.set(id, boxOf(spec, geo.nodes.get(id) ?? { x: 0, y: 0 }));
   const starts = startIds(machine);
   const { ports, entryY } = assignPorts(endsOf(machine, geo.routes), boxes, new Set(starts));
   const nodes = placeNodes(machine, specs, boxes);
   const columns = columnsOf(specs, geo, machine);
+  const placedRegions = regions
+    .map((region) => {
+      const sides = geo.regions.get(region) ?? { left: 0, right: 0, top: 0, bottom: 0 };
+      const tw = textWidth(regionTitle(machine, region)) + 8;
+      return {
+        region,
+        x: (sides.left + sides.right) / 2,
+        y: (sides.top + sides.bottom) / 2,
+        width: sides.right - sides.left,
+        height: sides.bottom - sides.top,
+        title: titleOf(sides, tw),
+      };
+    })
+    .sort((a, b) => machine.regions.indexOf(a.region) - machine.regions.indexOf(b.region));
   const edges = machine.edges.filter(isDrawn).map((edge) => {
     if (isLoop(edge)) {
       const at = boxes.get(edge.from);
@@ -769,31 +807,25 @@ export function placeMachine(machine: VizMachine): MachineLayout {
     const points = levelRoute(edge, route, ports, columns);
     return placedOf(edge, points, geo.labels.get(edge.id) ?? { x: 0, y: 0 }, pathLength(points));
   });
-  return {
-    width: geo.width,
-    height: geo.height,
-    nodes,
+  const laned = lanesOf(
     edges,
-    regions: regions
-      .map((region) => {
-        const sides = geo.regions.get(region) ?? { left: 0, right: 0, top: 0, bottom: 0 };
-        const tw = textWidth(regionTitle(machine, region)) + 8;
-        return {
-          region,
-          x: (sides.left + sides.right) / 2,
-          y: (sides.top + sides.bottom) / 2,
-          width: sides.right - sides.left,
-          height: sides.bottom - sides.top,
-          title: titleOf(sides, tw),
-        };
-      })
-      .sort((a, b) => machine.regions.indexOf(a.region) - machine.regions.indexOf(b.region)),
-    entries: starts.map((id) => {
-      const at = boxes.get(id) ?? { x: 0, y: 0, width: 0, height: 0 };
-      const left = at.x - at.width / 2;
-      const y = entryY.get(id) ?? at.y;
-      return { from: { x: left - ENTRY_LENGTH, y }, to: { x: left, y } };
-    }),
+    placedRegions.map((region) => region.title),
+  );
+  return {
+    widen: laned.widen,
+    layout: {
+      width: geo.width,
+      height: geo.height,
+      nodes,
+      edges: laned.edges,
+      regions: placedRegions,
+      entries: starts.map((id) => {
+        const at = boxes.get(id) ?? { x: 0, y: 0, width: 0, height: 0 };
+        const left = at.x - at.width / 2;
+        const y = entryY.get(id) ?? at.y;
+        return { from: { x: left - ENTRY_LENGTH, y }, to: { x: left, y } };
+      }),
+    },
   };
 }
 
@@ -921,7 +953,128 @@ function levelRoute(
   points.push({ x: clear(last, targetOf(edge)), y: last.y }, { x: last.x, y: last.y });
   return points;
 }
-/** The layout, or the error when dagre or a missing node spec stops it. Overlaps are measured by `overlapsOf`, not refused here. */
+/** The layout unless it overlaps itself: then the overlaps. */
+export function checkedLayout(placed: MachineLayout): Either<Overlap[], MachineLayout> {
+  const overlaps = overlapsOf(placed);
+  return overlaps.length === 0 ? Either.right(placed) : Either.left(overlaps);
+}
+
+/** The layout, or the error when dagre or a missing node spec stops it, or the overlaps when it still overlaps. */
 export function layoutMachine(machine: VizMachine): Either<unknown, MachineLayout> {
-  return Either.from(() => placeMachine(machine));
+  const placed = Either.from(() => placeMachine(machine));
+  return Either.isLeft(placed) ? placed : checkedLayout(placed[1]);
+}
+
+interface Widen {
+  /** x in the middle of the gap. */
+  at: number;
+  by: number;
+}
+
+interface Gap {
+  start: number;
+  end: number;
+  crossings: Crossing[];
+}
+
+interface Crossing {
+  edge: number;
+  from: number;
+  yLeft: number;
+  yRight: number;
+  id: string;
+}
+
+function byMiddle(a: Crossing, b: Crossing): number {
+  return (a.yLeft + a.yRight) / 2 - (b.yLeft + b.yRight) / 2 || a.id.localeCompare(b.id);
+}
+
+/** Left to right: a crossing waits for any whose left end is level with its right end, so their level pieces never share a row. */
+function laneOrder(crossings: ReadonlyArray<Crossing>): Crossing[] {
+  const left = new Set(crossings);
+  const order: Crossing[] = [];
+  while (left.size > 0) {
+    const waiting = [...left];
+    const ready = waiting.filter((a) =>
+      waiting.every((b) => b === a || Math.abs(a.yRight - b.yLeft) >= LANE_ROW_CLASH),
+    );
+    const next = [...(ready.length > 0 ? ready : waiting)].sort(byMiddle)[0];
+    if (next === undefined) break;
+    order.push(next);
+    left.delete(next);
+  }
+  return order;
+}
+
+/** The first x at or after `from` where a vertical lane from `top` to `bottom` clears every region title. */
+export function freeLane(
+  from: number,
+  top: number,
+  bottom: number,
+  titles: ReadonlyArray<LabelBox>,
+): number {
+  let x = from;
+  for (const title of [...titles].sort((a, b) => a.x - b.x)) {
+    const meets =
+      title.y + title.height / 2 + LANE_TITLE_CLEAR > top &&
+      title.y - title.height / 2 - LANE_TITLE_CLEAR < bottom;
+    const left = title.x - title.width / 2 - LANE_TITLE_CLEAR;
+    const right = title.x + title.width / 2 + LANE_TITLE_CLEAR;
+    if (meets && x > left && x < right) x = right;
+  }
+  return x;
+}
+
+/**
+ * Every sloped piece between two columns becomes level, then a vertical lane
+ * of its own, then level: lanes are `LANE_GAP` apart, so steep arrows never
+ * run alongside. A gap too narrow for its lanes reports how much to widen.
+ */
+function lanesOf(
+  edges: ReadonlyArray<PlacedEdge>,
+  titles: ReadonlyArray<LabelBox>,
+): { edges: PlacedEdge[]; widen: Widen[] } {
+  const gaps = new Map<string, Gap>();
+  edges.forEach((placed, edge) => {
+    if (isLoop(placed.edge)) return;
+    for (let from = 1; from < placed.points.length; from++) {
+      const a = placed.points[from - 1];
+      const b = placed.points[from];
+      if (a === undefined || b === undefined) continue;
+      if (Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 0.5) continue;
+      const [left, right] = a.x < b.x ? [a, b] : [b, a];
+      const key = `${left.x.toFixed(1)}|${right.x.toFixed(1)}`;
+      const gap: Gap = gaps.get(key) ?? { start: left.x, end: right.x, crossings: [] };
+      gap.crossings.push({ edge, from, yLeft: left.y, yRight: right.y, id: placed.edge.id });
+      gaps.set(key, gap);
+    }
+  });
+  const lanes = new Map<number, Map<number, number>>();
+  const widen: Widen[] = [];
+  for (const gap of gaps.values()) {
+    let x = gap.start - LANE_GAP;
+    for (const crossing of laneOrder(gap.crossings)) {
+      const top = Math.min(crossing.yLeft, crossing.yRight);
+      const bottom = Math.max(crossing.yLeft, crossing.yRight);
+      x = freeLane(x + LANE_GAP, top, bottom, titles);
+      const own = lanes.get(crossing.edge) ?? new Map<number, number>();
+      own.set(crossing.from, x);
+      lanes.set(crossing.edge, own);
+    }
+    if (x > gap.end) widen.push({ at: (gap.start + gap.end) / 2, by: x - gap.end });
+  }
+  const laned = edges.map((placed, edge) => {
+    const own = lanes.get(edge);
+    if (own === undefined) return placed;
+    const points: Point[] = [];
+    placed.points.forEach((point, index) => {
+      const lane = own.get(index);
+      const previous = placed.points[index - 1];
+      if (lane !== undefined && previous !== undefined)
+        points.push({ x: lane, y: previous.y }, { x: lane, y: point.y });
+      points.push(point);
+    });
+    return { ...placed, points, path: polyline(points) };
+  });
+  return { edges: laned, widen };
 }
