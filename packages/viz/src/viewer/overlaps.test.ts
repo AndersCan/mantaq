@@ -522,3 +522,17 @@ describe("labelOverlapsFor", () => {
     ]);
   });
 });
+
+describe("labelOverlapsFor padding", () => {
+  test("a lower-id label 4px away (inside the 8px pad, not touching) is still a clash", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("a", "M140,180 L260,180", labelAt(200, 40)),
+        placedEdge("b", "M140,190 L260,190", labelAt(226, 40)),
+      ],
+    });
+    expect(
+      labelOverlapsFor(layout, "b").map((overlap) => [overlap.a, overlap.b, overlap.gap]),
+    ).toContainEqual(["label:a", "label:b", 4]);
+  });
+});

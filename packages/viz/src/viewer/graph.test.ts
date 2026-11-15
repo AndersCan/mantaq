@@ -133,6 +133,10 @@ describe("renderGraph transition label", () => {
     const placed = layoutMachine(go).edges[0];
     const text = root.querySelector('[data-edge-id="idle-submitWWW-busy"] text');
     expect(Number(text?.getAttribute("x"))).toBe(placed?.text.x);
+    const spans = [...(text?.querySelectorAll("tspan") ?? [])];
+    expect(spans.length).toBeGreaterThan(0);
+    for (const span of spans) expect(Number(span.getAttribute("x"))).toBe(placed?.text.x);
+    expect(Number(text?.getAttribute("y"))).toBe((placed?.text.y ?? 0) + 4);
     expect(placed?.text.x).toBe((placed?.label.x ?? 0) + LOCK_SLOT / 2);
     markExplore(root, { machine: go, path: [], blocked: new Map([["idle-submitWWW-busy", "no"]]) });
     const lock = Number(root.querySelector(".blocked-lock rect")?.getAttribute("x"));

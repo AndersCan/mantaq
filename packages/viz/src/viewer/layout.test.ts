@@ -12,6 +12,7 @@ import {
 } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
+import { readFileSync } from "node:fs";
 
 function state(name: string): VizState {
   return {
@@ -464,5 +465,21 @@ describe("layoutMachine speed", () => {
     const started = performance.now();
     layoutMachine(machineOf(names, edges));
     expect(performance.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe("settleLabels and self-loops", () => {
+  test("a self-loop label stays just above its apex even when it touches a settled label", () => {
+    const file = new URL("./reference/team-inbox.json", import.meta.url);
+    const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
+    const loops = layoutMachine(machine).edges.filter(
+      (placed) => placed.edge.from === placed.edge.to,
+    );
+    expect(loops.length).toBeGreaterThan(0);
+    for (const placed of loops) {
+      const [base, lift] = [...placed.path.matchAll(/,(-?[\d.]+)/g)].map((m) => Number(m[1]));
+      const apex = (base ?? 0) - 0.75 * ((base ?? 0) - (lift ?? 0));
+      expect(placed.label.y).toBeCloseTo(apex - 16 / 2 - 2, 0);
+    }
   });
 });
