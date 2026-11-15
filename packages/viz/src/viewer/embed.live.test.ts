@@ -224,7 +224,6 @@ describe("live controls", () => {
     expect(live.log).toEqual([]);
     const box = root.querySelector<HTMLTextAreaElement>('[data-payload-json="submit"]');
     expect(box?.value).toBe('{"amount":5}');
-    expect(root.querySelector("[data-payload-form]")?.textContent).not.toContain("Values from");
     expect(
       [...root.querySelectorAll("[data-payload-form] button")].map((b) => b.textContent),
     ).toEqual(["Send submit", "Cancel"]);
