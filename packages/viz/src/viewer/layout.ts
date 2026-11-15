@@ -354,7 +354,7 @@ function graphOf(machine: VizMachine, specs: ReadonlyMap<string, Spec>): LayoutG
     const size = labelSize(edge);
     const label: EdgeLabel = {
       width: size.width,
-      height: 2 * (size.height + LEVEL_CLEAR),
+      height: size.height,
       labelpos: "c",
     };
     graph.setEdge(edge.from, targetOf(edge), label, edge.id);

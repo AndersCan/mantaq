@@ -24,7 +24,7 @@ describe("layout guarantee on generated machines", () => {
     );
   }, 30_000);
 
-  // Fails today: 26 of 300 machines still overlap. Flip to `test` when the layout fixes them.
+  // Fails today: 21 of 300 machines still overlap. Flip to `test` when the layout fixes them.
   test.fails("P1: layoutMachine is Right and the checker finds nothing", () => {
     fc.assert(
       fc.property(machineArbitrary, (machine) => {
