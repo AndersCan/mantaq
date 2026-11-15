@@ -278,7 +278,9 @@ function startIds(machine: VizMachine): string[] {
     .filter((state) => state.initial && state.region !== null)
     .map((state) => state.id)
     .sort();
-  return machine.initial === null ? regionStarts : [machine.initial, ...regionStarts];
+  const ids = new Set(machine.states.map((state) => state.id));
+  const starts = machine.initial === null ? regionStarts : [machine.initial, ...regionStarts];
+  return starts.filter((id) => ids.has(id));
 }
 
 /** `heights` raises a node's box to the room its ports need. */
