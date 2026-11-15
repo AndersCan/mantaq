@@ -356,9 +356,8 @@ function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   if (!(arrowInset >= 0)) add("outside", `arrow:${one.id}`, "canvas", arrowInset);
 }
 
-/** Shortest distance between two segments; 0 when they touch or cross. */
+/** Shortest distance between two segments that do not cross. */
 function segmentGap(a1: Point, a2: Point, b1: Point, b2: Point): number {
-  if (segmentsCross(a1, a2, b1, b2)) return 0;
   return Math.min(
     pointToSegment(a1, b1, b2),
     pointToSegment(a2, b1, b2),

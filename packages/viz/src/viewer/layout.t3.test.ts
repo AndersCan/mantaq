@@ -1,6 +1,7 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { LABEL_PAD, placeMachine, textWidth } from "./layout.ts";
+import { LABEL_PAD } from "./geometry.ts";
+import { placeMachine, textWidth } from "./layout.ts";
 import type { MachineLayout } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";

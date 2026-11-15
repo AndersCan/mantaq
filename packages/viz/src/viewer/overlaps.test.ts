@@ -540,3 +540,82 @@ describe("overlapsOf: paths-near", () => {
     ]);
   });
 });
+
+describe("overlapsOf: review repros (arrows 8px)", () => {
+  test("paths-near: an arrow 6px from an entry line", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M10,166 L58,166", labelAt(300, 180))],
+      entries: [{ from: { x: 10, y: 160 }, to: { x: 56, y: 160 } }],
+    });
+    expect(ofRule(layout, "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "entry:0", gap: 6 },
+    ]);
+  });
+
+  test("arrowheads: an entry dot 4px from another arrow", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M0,140 L0,190", labelAt(300, 180))],
+      entries: [{ from: { x: 10, y: 160 }, to: { x: 56, y: 160 } }],
+    });
+    expect(ofRule(layout, "arrowheads")).toEqual([
+      { rule: "arrowheads", a: "entry:0", b: "path:e", gap: 4 },
+    ]);
+  });
+
+  test("arrowheads: an entry's head 6px from another arrow", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M62,130 L62,190", labelAt(300, 180))],
+      entries: [{ from: { x: 10, y: 160 }, to: { x: 56, y: 160 } }],
+    });
+    expect(ofRule(layout, "arrowheads")).toEqual([
+      { rule: "arrowheads", a: "entry:0", b: "path:e", gap: 6 },
+    ]);
+  });
+
+  test("arrowheads: an arrow's head 6px from an entry line", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M32,130 L32,154", labelAt(300, 180))],
+      entries: [{ from: { x: 10, y: 160 }, to: { x: 56, y: 160 } }],
+    });
+    expect(ofRule(layout, "arrowheads")).toEqual([
+      { rule: "arrowheads", a: "arrow:e", b: "entry:0", gap: 6 },
+    ]);
+  });
+
+  test.each([
+    ["the other arrow's start", "M140,100 L260,100", "M200,105 L200,60"],
+    ["the other arrow's end", "M140,100 L260,100", "M200,60 L200,105"],
+    ["the first arrow's end", "M140,100 L205,100", "M200,60 L200,160"],
+  ])("paths-near: a crossing 5px from %s", (_, one, other) => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", one, labelAt(200, 40)), placedEdge("f", other, labelAt(330, 185))],
+    });
+    expect(ofRule(layout, "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "path:f", gap: 5 },
+    ]);
+  });
+
+  test.each([
+    ["the other arrow's end", "M140,100 L260,100", "M200,160 L200,105"],
+    ["the first arrow's end", "M140,100 L195,100", "M200,60 L200,160"],
+  ])("paths-near: %s 5px short of a line", (_, one, other) => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", one, labelAt(200, 40)), placedEdge("f", other, labelAt(330, 185))],
+    });
+    expect(ofRule(layout, "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "path:f", gap: 5 },
+    ]);
+  });
+
+  test("paths-near: a route with a repeated point is still measured", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", "M140,100 L200,100 L200,100 L260,100", labelAt(200, 60)),
+        placedEdge("f", "M140,106 L260,106", labelAt(330, 185)),
+      ],
+    });
+    expect(ofRule(layout, "paths-near")).toEqual([
+      { rule: "paths-near", a: "path:e", b: "path:f", gap: 6 },
+    ]);
+  });
+});

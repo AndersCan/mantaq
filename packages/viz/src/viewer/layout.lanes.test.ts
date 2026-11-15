@@ -1,6 +1,7 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { PATH_GAP, checkedLayout, freeLane, placeMachine } from "./layout.ts";
+import { PATH_GAP } from "./geometry.ts";
+import { checkedLayout, freeLane, placeMachine } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";

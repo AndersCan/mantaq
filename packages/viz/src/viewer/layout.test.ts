@@ -10,7 +10,6 @@ import {
   ENTRY_LENGTH,
   LABEL_FOREIGN,
   LABEL_OWN,
-  LABEL_PAD,
   LEG_GAP,
   LEG_INSET,
   LOCK_SLOT,
@@ -20,6 +19,7 @@ import {
   STUB,
   textWidth,
 } from "./layout.ts";
+import { LABEL_PAD } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";

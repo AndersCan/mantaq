@@ -113,7 +113,6 @@ export function textWidth(text: string, fontSize = 12): number {
 
 /** Room left of a transition's label for its lock. */
 export const LOCK_SLOT = 12;
-export { LABEL_PAD, PATH_GAP };
 const CONDITION_FONT = 10.2;
 const CHIP_FONT = 11;
 const NODE_HEIGHT = 36;
