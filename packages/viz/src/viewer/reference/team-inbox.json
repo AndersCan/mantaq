@@ -1,0 +1,460 @@
+{
+  "id": "teamInbox",
+  "initial": "allWorkersFree",
+  "regions": [
+    "workers"
+  ],
+  "maps": [
+    "workers"
+  ],
+  "actors": [],
+  "states": [
+    {
+      "id": "allWorkersFree",
+      "label": "allWorkersFree",
+      "region": null,
+      "initial": true,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "workWaiting",
+      "label": "workWaiting",
+      "region": null,
+      "initial": false,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "workers.free",
+      "label": "free",
+      "region": "workers",
+      "initial": true,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "workers.working",
+      "label": "working",
+      "region": "workers",
+      "initial": false,
+      "final": false,
+      "effects": [
+        {
+          "name": "runItems",
+          "sends": [
+            "team.RUN_SUCCEEDED",
+            "team.RUN_FAILED"
+          ]
+        }
+      ],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    },
+    {
+      "id": "workersBusy",
+      "label": "workersBusy",
+      "region": null,
+      "initial": false,
+      "final": false,
+      "effects": [],
+      "coverage": null,
+      "tested": null,
+      "doc": null
+    }
+  ],
+  "events": [
+    {
+      "id": "team.ITEMS_ASSIGNED",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "team.ITEMS_FAILED",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "team.ITEMS_FINISHED",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "team.ITEM_ARRIVED",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "team.RUN_FAILED",
+      "internal": true,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "team.RUN_SUCCEEDED",
+      "internal": true,
+      "doc": null,
+      "payload": null
+    },
+    {
+      "id": "team.WORKERS_RESIZED",
+      "internal": false,
+      "doc": null,
+      "payload": null
+    }
+  ],
+  "outputs": [
+    "team.ITEMS_ASSIGNED"
+  ],
+  "partOutputs": {
+    "workers": [
+      "team.ITEMS_FAILED",
+      "team.ITEMS_FINISHED"
+    ]
+  },
+  "context": null,
+  "edges": [
+    {
+      "id": "__initial__->allWorkersFree",
+      "from": "__initial__",
+      "event": "",
+      "to": "allWorkersFree",
+      "kind": "initial",
+      "origin": "probe",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "allWorkersFree-team.ITEM_ARRIVED-workersBusy",
+      "from": "allWorkersFree",
+      "event": "team.ITEM_ARRIVED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [
+        "team.ITEMS_ASSIGNED"
+      ],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "allWorkersFree-team.WORKERS_RESIZED-allWorkersFree",
+      "from": "allWorkersFree",
+      "event": "team.WORKERS_RESIZED",
+      "to": "allWorkersFree",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workWaiting-team.ITEMS_FAILED-workWaiting",
+      "from": "workWaiting",
+      "event": "team.ITEMS_FAILED",
+      "to": "workWaiting",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workWaiting-team.ITEMS_FAILED-workersBusy",
+      "from": "workWaiting",
+      "event": "team.ITEMS_FAILED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workWaiting-team.ITEMS_FINISHED-workWaiting",
+      "from": "workWaiting",
+      "event": "team.ITEMS_FINISHED",
+      "to": "workWaiting",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workWaiting-team.ITEMS_FINISHED-workersBusy",
+      "from": "workWaiting",
+      "event": "team.ITEMS_FINISHED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workWaiting-team.ITEM_ARRIVED-workWaiting",
+      "from": "workWaiting",
+      "event": "team.ITEM_ARRIVED",
+      "to": "workWaiting",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [
+        "team.ITEMS_ASSIGNED"
+      ],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workWaiting-team.WORKERS_RESIZED-workWaiting",
+      "from": "workWaiting",
+      "event": "team.WORKERS_RESIZED",
+      "to": "workWaiting",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workWaiting-team.WORKERS_RESIZED-workersBusy",
+      "from": "workWaiting",
+      "event": "team.WORKERS_RESIZED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workers.free-team.ITEMS_ASSIGNED-working",
+      "from": "workers.free",
+      "event": "team.ITEMS_ASSIGNED",
+      "to": "workers.working",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workers.working-effect:working-working",
+      "from": "workers.working",
+      "event": "effect:working",
+      "to": "workers.working",
+      "kind": "effect",
+      "origin": "probe",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workers.working-team.RUN_FAILED-free",
+      "from": "workers.working",
+      "event": "team.RUN_FAILED",
+      "to": "workers.free",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [
+        "team.ITEMS_FAILED"
+      ],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workers.working-team.RUN_SUCCEEDED-free",
+      "from": "workers.working",
+      "event": "team.RUN_SUCCEEDED",
+      "to": "workers.free",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [
+        "team.ITEMS_FINISHED"
+      ],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workersBusy-team.ITEMS_FAILED-workWaiting",
+      "from": "workersBusy",
+      "event": "team.ITEMS_FAILED",
+      "to": "workWaiting",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workersBusy-team.ITEMS_FAILED-workersBusy",
+      "from": "workersBusy",
+      "event": "team.ITEMS_FAILED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workersBusy-team.ITEMS_FINISHED-allWorkersFree",
+      "from": "workersBusy",
+      "event": "team.ITEMS_FINISHED",
+      "to": "allWorkersFree",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workersBusy-team.ITEMS_FINISHED-workersBusy",
+      "from": "workersBusy",
+      "event": "team.ITEMS_FINISHED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workersBusy-team.ITEM_ARRIVED-workWaiting",
+      "from": "workersBusy",
+      "event": "team.ITEM_ARRIVED",
+      "to": "workWaiting",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workersBusy-team.ITEM_ARRIVED-workersBusy",
+      "from": "workersBusy",
+      "event": "team.ITEM_ARRIVED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [
+        "team.ITEMS_ASSIGNED"
+      ],
+      "contexts": [
+        "default"
+      ],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    },
+    {
+      "id": "workersBusy-team.WORKERS_RESIZED-workersBusy",
+      "from": "workersBusy",
+      "event": "team.WORKERS_RESIZED",
+      "to": "workersBusy",
+      "kind": "transition",
+      "origin": "declared",
+      "emits": [],
+      "contexts": [],
+      "explanation": null,
+      "doc": null,
+      "coverage": null,
+      "tested": null
+    }
+  ],
+  "fuzz": null,
+  "runs": []
+}
