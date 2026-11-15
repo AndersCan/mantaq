@@ -22,7 +22,7 @@ export interface VizHarness {
   state(): Promise<string>;
   /** Effects waiting for an answer, with the events each reports. */
   waiting(): Promise<Array<{ effect: string; reports: string[] }>>;
-  /** Click what one person would click; an ignored event is a result, not an error. A payload is typed into the Context tab's value boxes for this click only. */
+  /** Click what one person would click; an ignored event is a result, not an error. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
   send(
     event: string,
     payload?: Record<string, VizJson>,

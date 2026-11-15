@@ -97,7 +97,7 @@ export function knownPayload(
   const typed = typedSource(fields, steps);
   const payload: Record<string, VizJson> = {};
   for (const field of fields) {
-    const value = knownValue(field, { typed, fuzzed, set });
+    const value = knownValue(field, { typed, set });
     if (value !== undefined) payload[field.name] = value;
   }
   return { payload };
@@ -105,7 +105,7 @@ export function knownPayload(
 
 function knownValue(
   field: VizField,
-  from: { typed: FillSource | null; fuzzed: VizJson | undefined; set: Values },
+  from: { typed: FillSource | null; set: Values },
 ): VizJson | undefined {
   const chosen = from.set[field.name];
   if (chosen !== undefined && fits(field, chosen)) return chosen;
@@ -206,7 +206,8 @@ export function valueFields(machine: VizMachine): VizField[] {
   const byName = new Map<string, VizField>();
   for (const event of machine.events) {
     for (const field of event.payload ?? []) {
-      if (byName.get(field.name)?.optional !== false) byName.set(field.name, field);
+      const seen = byName.get(field.name);
+      if (seen === undefined || (seen.optional && !field.optional)) byName.set(field.name, field);
     }
   }
   return [...byName.values()];

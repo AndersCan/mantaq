@@ -680,7 +680,6 @@ describe("field forms and the context table", () => {
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
     expect(root.querySelector(".payload-sheet")).toBeNull();
-    expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
   test("a value set in the Context tab is sent by every later click, kept for onNavigate and across Back", () => {

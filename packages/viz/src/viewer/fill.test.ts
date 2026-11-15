@@ -335,3 +335,13 @@ test("an optional field with nothing set or heard is left out, as its empty box 
   expect(defaultValue(note, from)).toBeUndefined();
   expect(payloadFor(machine, "submit", from)).toEqual({});
 });
+
+test("of two events that both leave a field name optional, the first supplies the row", () => {
+  const first: VizField = { ...field("code", "text"), optional: true };
+  const second: VizField = { ...field("code", "number"), optional: true };
+  const events = [
+    { id: "a", payload: [first] },
+    { id: "b", payload: [second] },
+  ];
+  expect(valueFields({ events } as never)).toEqual([first]);
+});
