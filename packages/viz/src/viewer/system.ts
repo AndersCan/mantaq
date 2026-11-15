@@ -69,8 +69,9 @@ export function senderInto(system: MachineSystem, part: string, event: string): 
   return link === undefined ? null : labelOf(system, link.from);
 }
 
-/** The system of a machine when it has arrows between parts, else null: the viewer then draws the diagram alone. */
+/** The system of a machine when it has arrows between parts, else null: the viewer then draws the diagram alone. A machine with an actor map is drawn as one diagram: its own states and one child. */
 export function systemFor(machine: VizMachine): MachineSystem | null {
+  if (machine.maps.length > 0) return null;
   const system = systemOf(machine);
   return linksInside(system) ? system : null;
 }
@@ -92,53 +93,9 @@ function statesOf(machine: VizMachine, part: string): VizMachine["states"] {
   return machine.states.filter((state) => (state.region ?? "") === part);
 }
 
-const MAX_DOTS = 6;
-const DOT_GAP = 16;
-
-/** The two states a map's child dots tell apart, in document order; null when the child machine has any other number of non-final states. */
-function dotStatesOf(machine: VizMachine, part: SystemPart): [string, string] | null {
-  if (part.kind !== "map") return null;
-  const open = statesOf(machine, part.id).filter((state) => !state.final);
-  const [first, second, ...rest] = open;
-  if (first === undefined || second === undefined || rest.length > 0) return null;
-  return [first.id, second.id];
-}
-
-/** The dots a map draws: its two states and its children sorted by key; null when it draws the count text instead (other shape, no children, over the limit, or a child outside the two states). */
-function dotsOf(
-  machine: VizMachine,
-  context: { part: SystemPart; live: VizLiveState | null },
-): { states: [string, string]; children: VizLiveState["children"] } | null {
-  const { part, live } = context;
-  const states = dotStatesOf(machine, part);
-  if (states === null || live === null) return null;
-  const children = live.children
-    .filter((child) => child.map === part.id)
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-  if (children.length === 0 || children.length > MAX_DOTS) return null;
-  if (children.some((child) => !states.includes(child.state))) return null;
-  return { states, children };
-}
-
-/** The key item for child dots, `○ free  ● working`, or null when no map draws dots right now. */
-export function dotKey(
-  machine: VizMachine,
-  context: { system: MachineSystem; live: VizLiveState | null },
-): string | null {
-  for (const part of context.system.parts) {
-    const drawn = dotsOf(machine, { part, live: context.live });
-    if (drawn === null) continue;
-    return `○ ${localName(drawn.states[0])}  ● ${localName(drawn.states[1])}`;
-  }
-  return null;
-}
-
-/** Widest the chip can read: a map lists every state with a two-digit count. */
+/** Widest the chip can read. */
 function chipWidth(machine: VizMachine, part: SystemPart): number {
   const states = statesOf(machine, part.id).map((state) => state.label);
-  if (part.kind === "map") {
-    return Math.min(40, states.map((label) => `${label} 99`).join(" · ").length);
-  }
   return Math.max(0, ...states.map((label) => label.length));
 }
 
@@ -334,9 +291,9 @@ function endText(machine: VizMachine): string {
 function partGroup(
   doc: Document,
   part: SystemPart,
-  context: { at: NodeLabel; dots: boolean; callbacks: SystemCallbacks },
+  context: { at: NodeLabel; callbacks: SystemCallbacks },
 ) {
-  const { at, dots, callbacks } = context;
+  const { at, callbacks } = context;
   const x = at.x ?? 0;
   const y = at.y ?? 0;
   const group = svg(doc, "g", { class: "state part", "data-part": part.id }, [
@@ -350,7 +307,6 @@ function partGroup(
     }),
     svg(doc, "text", { class: "part-label", x, y: y - 4, "text-anchor": "middle" }, [part.label]),
     svg(doc, "text", { class: "part-chip", x, y: y + 14, "text-anchor": "middle" }),
-    dots ? svg(doc, "g", { class: "part-dots", transform: `translate(${x} ${y + 11})` }) : null,
   ]);
   activatable(group, () => callbacks.select({ kind: "part", id: part.id }));
   return group;
@@ -545,7 +501,6 @@ export function renderSystem(
       ...system.parts.map((part) =>
         partGroup(doc, part, {
           at: row.placed.find((each) => each.part === part)?.at ?? graph.node(`part:${part.id}`),
-          dots: dotStatesOf(machine, part) !== null,
           callbacks,
         }),
       ),
@@ -565,71 +520,11 @@ function chipOf(
   live: VizLiveState | null,
 ): { text: string; label: string; name: string } {
   if (live === null) {
-    return {
-      text: "",
-      label: part.kind === "map" ? `${part.label} ×n` : part.label,
-      name: part.label,
-    };
+    return { text: "", label: part.label, name: part.label };
   }
-  if (part.kind !== "map") {
-    const id = part.id === "" ? live.state : live.regions[part.id];
-    const text = id === undefined ? "" : localName(id);
-    return { text, label: part.label, name: text === "" ? part.label : `${part.label}: ${text}` };
-  }
-  const children = live.children.filter((child) => child.map === part.id);
-  const counts = statesOf(machine, part.id)
-    .map((state) => ({
-      name: state.label,
-      n: children.filter((child) => child.state === state.id).length,
-    }))
-    .filter((count) => count.n > 0)
-    .map((count) => `${count.name} ${count.n}`);
-  const label = `${part.label} ×${children.length}`;
-  if (children.length === 0)
-    return { text: "none running", label, name: `${part.label}, none running` };
-  return {
-    text: counts.join(" · "),
-    label,
-    name: `${part.label}, ${children.length} running: ${counts.join(", ")}`,
-  };
-}
-
-/** Replaces the dots in `group` with one per child, sorted by key; false (and no dots) when the part does not draw them. */
-function markDots(
-  group: Element,
-  context: { machine: VizMachine; part: SystemPart; live: VizLiveState | null },
-): boolean {
-  const { machine, part, live } = context;
-  const holder = group.querySelector("g.part-dots");
-  if (holder === null) return false;
-  const drawn = dotsOf(machine, { part, live });
-  if (drawn === null) {
-    holder.replaceChildren();
-    return false;
-  }
-  const { states, children } = drawn;
-  const doc = holder.ownerDocument;
-  holder.replaceChildren(
-    ...children.map((child, index) => {
-      const state = localName(child.state);
-      const cx = (index - (children.length - 1) / 2) * DOT_GAP;
-      return svg(
-        doc,
-        "g",
-        {
-          class: "child-dot",
-          "data-child": child.key,
-          "data-state": state,
-          "data-mark": child.state === states[0] ? "first" : "second",
-        },
-        [
-          svg(doc, "circle", { cx, cy: 0, r: 5 }),
-          svg(doc, "title", {}, [`${child.key}, ${state}`]),
-        ],
-      );
-    }),
-  );
-  return true;
+  const id = part.id === "" ? live.state : live.regions[part.id];
+  const text = id === undefined ? "" : localName(id);
+  return { text, label: part.label, name: text === "" ? part.label : `${part.label}: ${text}` };
 }
 
 /** Arrows whose receiver took their event in the last step or in what followed it. */
@@ -682,7 +577,7 @@ function markDropped(group: Element, dropped: boolean): void {
   group.classList.toggle("dropped", dropped);
 }
 
-/** Fills one part's chip, dots, name and selection mark. */
+/** Fills one part's chip, name and selection mark. */
 function markPart(
   groups: ReadonlyArray<Element>,
   part: SystemPart,
@@ -697,8 +592,7 @@ function markPart(
   const label = group.querySelector(".part-label");
   const line = group.querySelector(".part-chip");
   if (label !== null) label.textContent = chip.label;
-  const dotted = markDots(group, { machine, part, live });
-  if (line !== null) line.textContent = dotted ? "" : chip.text;
+  if (line !== null) line.textContent = chip.text;
   group.setAttribute("aria-label", chip.name);
   group.classList.toggle("selected", selection?.kind === "part" && selection.id === part.id);
 }
@@ -802,7 +696,7 @@ function receiverLine(machine: VizMachine, system: MachineSystem, link: SystemLi
     (each) => each.event === link.event && isAnyState(each.from) && scopeOf(each.from) === part.id,
   );
   const where = anyState ? "in every state" : `in: ${link.handledIn.map(localName).join(", ")}`;
-  return `${part.label} ${part.kind === "map" ? "take" : "takes"} it ${where}.`;
+  return `${part.label} takes it ${where}.`;
 }
 
 function senderLine(machine: VizMachine, system: MachineSystem, link: SystemLink): string {

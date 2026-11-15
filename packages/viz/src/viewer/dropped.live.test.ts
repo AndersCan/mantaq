@@ -267,7 +267,7 @@ const hall: VizMachine = {
   ...kitchen,
   id: "hall",
   regions: ["waiter", "runner", "cooks"],
-  maps: ["cooks"],
+  maps: [],
   states: [
     state("cooking", true),
     state("waiter.serving", true),
@@ -343,20 +343,6 @@ describe("dropped message among several arrows", () => {
     ]);
     send(root, "DISH_COOKED");
     expect(marked(root)).toEqual([">DISH_READY>waiter"]);
-  });
-
-  test("a message the cooks sent that the waiter took lights only the cooks' arrow", () => {
-    const root = mountHall([
-      [
-        to("waiter", "DISH_READY", {
-          outcome: "stay",
-          message: { sender: "cooks", dropped: null },
-        }),
-      ],
-    ]);
-    send(root, "DISH_COOKED");
-    expect(link(root, "cooks", "DISH_READY", "waiter")?.classList.contains("took")).toBe(true);
-    expect(link(root, "", "DISH_READY", "waiter")?.classList.contains("took")).toBe(false);
   });
 
   test("Details names the reason of the latest drop on the arrow", () => {

@@ -46,7 +46,7 @@ const pool: VizMachine = {
   id: "teamInbox",
   initial: "empty",
   regions: ["workers"],
-  maps: ["workers"],
+  maps: [],
   actors: [],
   states: [
     state("empty", true),

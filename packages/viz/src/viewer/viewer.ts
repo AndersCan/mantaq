@@ -33,7 +33,6 @@ import { drawChildMarkers } from "./markers.ts";
 import { removeSheets, showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
 import {
-  dotKey,
   markSystem,
   partMachine,
   partOfTarget,
@@ -45,6 +44,7 @@ import {
   systemPrefix,
 } from "./system.ts";
 import type { OpenTarget, SystemCallbacks, SystemSelection } from "./system.ts";
+import { systemOf } from "../system.ts";
 import type { MachineSystem } from "../system.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
@@ -229,6 +229,7 @@ export function mountViewer(
     }
     const mode = effectiveMode(view, machine);
     const system = systemFor(machine);
+    const parts = systemOf(machine);
     const inSystem = system !== null && !view.drilled;
     root.classList.toggle("coverage-on", mode !== "off");
     root.classList.toggle("diagram-only", view.diagramOnly);
@@ -240,12 +241,12 @@ export function mountViewer(
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     const refresh = () => {
       dropGonePick(view);
-      const parts = explorePanel(doc, {
+      const stepTab = explorePanel(doc, {
         machine,
         path: view.path,
         take,
         rewind,
-        ...liveOf(view, { send, play, sendEvent, setValue, routes: options.routes }, system),
+        ...liveOf(view, { send, play, sendEvent, setValue, routes: options.routes }, parts),
       });
       const details = detailsOf(doc, {
         machine,
@@ -259,7 +260,7 @@ export function mountViewer(
       const controls = controlsOf(doc, chrome);
       const footer = options.panelFooter;
       const screen = screenOf(options, view);
-      fillPanel(panel, { doc, view, parts, details, controls, screen, refresh, footer });
+      fillPanel(panel, { doc, view, parts: stepTab, details, controls, screen, refresh, footer });
       mark();
     };
     const mark = () =>
@@ -352,19 +353,11 @@ function systemCallbacks(context: {
   };
 }
 
-/** The line under the system diagram: the prefix its event names share, and what the child dots mean when a driver draws them. */
-function systemKey(
-  doc: Document,
-  context: { machine: VizMachine; system: MachineSystem | null; live: VizLiveState | null },
-): HTMLElement | null {
-  const { machine, system, live } = context;
+/** The line under the system diagram: the prefix its event names share. */
+function systemKey(doc: Document, system: MachineSystem | null): HTMLElement | null {
   if (system === null) return null;
   const prefix = systemPrefix(system);
-  const dotItem = dotKey(machine, { system, live });
-  return keyLine(doc, [
-    ...(prefix === "" ? [] : [`events: ${prefix}*`]),
-    ...(dotItem === null ? [] : [dotItem]),
-  ]);
+  return keyLine(doc, prefix === "" ? [] : [`events: ${prefix}*`]);
 }
 
 /** A click on an arrow or box in the system view: its details show, nothing is walked. */
@@ -975,7 +968,7 @@ function backToSystem(doc: Document, context: Chrome): HTMLElement | null {
       doc,
       "button",
       { type: "button", "data-open-part-tab": part.id, "aria-current": shown ? "page" : null },
-      [part.kind === "map" ? `${part.label} (each)` : part.label],
+      [part.label],
     );
     each.addEventListener("click", () => {
       if (shown) return;
@@ -1055,7 +1048,7 @@ function markSystemView(
   const canvas = root.querySelector(".canvas");
   const doc = root.ownerDocument;
   canvas?.querySelector("[data-viz-key]")?.remove();
-  const key = view.diagramOnly ? null : systemKey(doc, { machine, system, live: view.live });
+  const key = view.diagramOnly ? null : systemKey(doc, system);
   if (key !== null) canvas?.append(key);
 }
 

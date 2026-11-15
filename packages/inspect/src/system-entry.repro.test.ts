@@ -28,7 +28,7 @@ test("the network part, drawn alone, takes connectionLost from its panel", () =>
   expect(root.querySelector('g[data-part="network"] .part-chip')?.textContent).toBe("offline");
 });
 
-test("the pool pill sends team.ITEM_ARRIVED to the root and a worker starts", () => {
+test("a pool is drawn as one diagram, with no system board", () => {
   const create = () => {
     const clock = VirtualClock();
     const made = createPool<string, "team">({
@@ -46,9 +46,6 @@ test("the pool pill sends team.ITEM_ARRIVED to the root and a worker starts", ()
     { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
     { driver: createDriver({ id: "teamInbox", create }) },
   );
-  root.querySelector('[data-entry-event="team.ITEM_ARRIVED"]')?.dispatchEvent(new Event("click"));
-  const dots = [...root.querySelectorAll('g[data-part="workers"] g.child-dot')].map(
-    (dot) => `${dot.getAttribute("data-child")}:${dot.getAttribute("data-state")}`,
-  );
-  expect(dots).toEqual(["w1:working", "w2:free", "w3:free"]);
+  expect(root.querySelector("svg[data-system]")).toBeNull();
+  expect(root.querySelector('.graph g.region[data-map="workers"]')).not.toBeNull();
 });

@@ -3,7 +3,6 @@ import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type {
   VizDriver,
   VizEdge,
-  VizLiveChild,
   VizLiveState,
   VizLiveStep,
   VizMachine,
@@ -47,7 +46,7 @@ const pool: VizMachine = {
   id: "teamInbox",
   initial: "empty",
   regions: ["workers"],
-  maps: ["workers"],
+  maps: [],
   actors: [],
   states: [
     state("empty", true),
@@ -55,7 +54,12 @@ const pool: VizMachine = {
     state("workers.free", true),
     state("workers.working"),
   ],
-  events: [event("ITEM_ARRIVED"), event("ITEMS_ASSIGNED"), event("WORK_DONE"), event("FINISH")],
+  events: [
+    event("ITEM_ARRIVED"),
+    event("ITEMS_ASSIGNED"),
+    event("WORK_DONE"),
+    { ...event("FINISH"), internal: true },
+  ],
   outputs: ["ITEMS_ASSIGNED", "LOST"],
   partOutputs: { workers: ["WORK_DONE"] },
   context: null,
@@ -82,12 +86,6 @@ const checkout: VizMachine = {
 };
 
 function snapshot(arrived: number): VizLiveState {
-  const children: VizLiveChild[] = ["w1", "w2", "w3"].map((key, index) => ({
-    map: "workers",
-    key,
-    state: index < arrived ? "workers.working" : "workers.free",
-    since: 0,
-  }));
   const step = (partial: Partial<VizLiveStep>): VizLiveStep => ({
     from: "empty",
     event: "ITEM_ARRIVED",
@@ -101,8 +99,8 @@ function snapshot(arrived: number): VizLiveState {
   });
   return {
     state: arrived > 0 ? "holding" : "empty",
-    regions: {},
-    children,
+    regions: { workers: arrived > 0 ? "workers.working" : "workers.free" },
+    children: [],
     steps: Array.from({ length: arrived }, (): VizStep => ({
       kind: "event",
       event: "ITEM_ARRIVED",
@@ -116,7 +114,7 @@ function snapshot(arrived: number): VizLiveState {
               from: "workers.free",
               to: "workers.working",
               event: "ITEMS_ASSIGNED",
-              actor: { map: "workers", key: "w1" },
+              actor: { region: "workers" },
             }),
           ]
         : [],
@@ -143,10 +141,6 @@ function mount(machines: VizMachine[], live = true, steps: VizStep[] = []) {
 }
 
 const text = (root: HTMLElement, selector: string) => root.querySelector(selector)?.textContent;
-const dots = (root: HTMLElement) =>
-  [...root.querySelectorAll("g.child-dot")].map(
-    (dot) => `${dot.getAttribute("data-child")}:${dot.getAttribute("data-state")}`,
-  );
 const arrow = (root: HTMLElement, event: string) =>
   root.querySelector<SVGGElement>(`g.link[data-event="${event}"]`);
 
@@ -155,11 +149,11 @@ describe("system view", () => {
     const root = mount([pool]);
     expect(root.querySelector("svg[data-system]")).not.toBeNull();
     expect(root.querySelector("svg.graph:not([data-system])")).toBeNull();
-    expect(text(root, 'g[data-part="workers"] .part-label')).toBe("workers ×3");
-    expect(dots(root)).toEqual(["w1:free", "w2:free", "w3:free"]);
+    expect(text(root, 'g[data-part="workers"] .part-label')).toBe("workers");
+    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("free");
     expect(text(root, 'g[data-part=""] .part-chip')).toBe("empty");
     expect(root.querySelector('g[data-part="workers"]')?.getAttribute("aria-label")).toBe(
-      "workers, 3 running: free 3",
+      "workers: free",
     );
   });
 
@@ -167,15 +161,11 @@ describe("system view", () => {
     const root = mount([pool]);
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(false);
     root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
-    expect(dots(root)).toEqual(["w1:working", "w2:free", "w3:free"]);
-    expect(root.querySelector('g.child-dot[data-child="w1"] title')?.textContent).toBe(
-      "w1, working",
-    );
-    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("");
+    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("working");
     expect(text(root, 'g[data-part=""] .part-chip')).toBe("holding");
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("took")).toBe(true);
     expect(arrow(root, "WORK_DONE")?.classList.contains("took")).toBe(false);
-    expect(text(root, "[data-live-cascade]")).toContain("then w1: free → working");
+    expect(text(root, "[data-live-cascade]")).toContain("then workers: free → working");
   });
 
   test("an output nobody takes ends at an out mark", () => {
@@ -183,10 +173,15 @@ describe("system view", () => {
     expect(root.querySelector("g[data-link-out]")?.textContent).toContain("out of teamInbox");
   });
 
-  test("without a driver the box reads ×n and has no chip", () => {
-    const root = mount([pool], false);
-    expect(text(root, 'g[data-part="workers"] .part-label')).toBe("workers ×n");
-    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("");
+  test("a machine with an actor map is drawn as one diagram, with no board", () => {
+    const mapped: VizMachine = { ...pool, maps: ["workers"] };
+    const root = mount([mapped]);
+    expect(root.querySelector('.graph g.region[data-map="workers"]')).not.toBeNull();
+    expect(root.querySelector("svg[data-system]")).toBeNull();
+    expect(root.querySelector("[data-part]")).toBeNull();
+    expect(root.querySelector("[data-system-back]")).toBeNull();
+    expect(root.querySelector("[data-open-part-tab]")).toBeNull();
+    expect(mount([pool]).querySelector("svg[data-system]")).not.toBeNull();
   });
 
   test("a machine without linked parts shows only the diagram", () => {
@@ -203,7 +198,7 @@ describe("system view", () => {
     expect(text(root, "[data-link-sender]")).toBe(
       "teamInbox sends ITEMS_ASSIGNED. On: ITEM_ARRIVED.",
     );
-    expect(text(root, "[data-link-receiver]")).toBe("workers take it in: free.");
+    expect(text(root, "[data-link-receiver]")).toBe("workers takes it in: free.");
     const buttons = [...root.querySelectorAll("[data-open-part]")].map((each) => each.textContent);
     expect(buttons).toEqual(["Open sender: teamInbox", "Open receiver: workers"]);
   });
@@ -220,7 +215,7 @@ describe("system view", () => {
   test("clicking a box shows its state", () => {
     const root = mount([pool]);
     root.querySelector('g[data-part="workers"]')?.dispatchEvent(new Event("click"));
-    expect(text(root, "[data-part-state]")).toBe("free 3");
+    expect(text(root, "[data-part-state]")).toBe("free");
   });
 
   test("Open lands on the handling edge without walking, and ← System comes back", () => {
@@ -282,7 +277,7 @@ describe("system view", () => {
     };
     const root = mount([anyPool]);
     arrow(root, "ITEMS_ASSIGNED")?.dispatchEvent(new Event("click"));
-    expect(text(root, "[data-link-receiver]")).toBe("workers take it in every state.");
+    expect(text(root, "[data-link-receiver]")).toBe("workers takes it in every state.");
   });
 
   test("a step the receiver never ran does not turn the arrow pink", () => {
@@ -313,7 +308,7 @@ describe("system view", () => {
           last: {
             ...(live.last as VizLiveStep),
             event: "ITEMS_ASSIGNED",
-            actor: { map: "workers", key: "w1" },
+            actor: { region: "workers" },
           },
           after: [],
         };
@@ -358,73 +353,6 @@ describe("system view", () => {
     expect(root.querySelector("svg[data-system]")).not.toBeNull();
     expect(arrow(root, "ITEMS_ASSIGNED")?.classList.contains("selected")).toBe(false);
   });
-
-  test("the first state is an open ring and the second a filled dot", () => {
-    const root = mount([pool]);
-    root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
-    const marks = [...root.querySelectorAll("g.child-dot")].map((dot) =>
-      dot.getAttribute("data-mark"),
-    );
-    expect(marks).toEqual(["second", "first", "first"]);
-  });
-
-  test("a child machine without two non-final states keeps the count text and no key item", () => {
-    const three: VizMachine = {
-      ...pool,
-      states: [...pool.states, state("workers.stuck")],
-    };
-    const root = mount([three]);
-    expect(root.querySelector("g.child-dot")).toBeNull();
-    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("free 3");
-    expect(root.querySelector("[data-viz-key]")).toBeNull();
-  });
-
-  test("six children get dots; seven fall back to the count text", () => {
-    const withChildren = (count: number) => {
-      const root = document.createElement("div");
-      const live = (): VizLiveState => ({
-        ...snapshot(0),
-        children: Array.from({ length: count }, (_, index) => ({
-          map: "workers",
-          key: `w${index}`,
-          state: "workers.free",
-          since: 0,
-        })),
-      });
-      mountViewer(
-        root,
-        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] },
-        { driver: { reset: live, step: live } },
-      );
-      return root;
-    };
-    expect(withChildren(6).querySelectorAll("g.child-dot")).toHaveLength(6);
-    const seven = withChildren(7);
-    expect(seven.querySelector("g.child-dot")).toBeNull();
-    expect(text(seven, 'g[data-part="workers"] .part-chip')).toBe("free 7");
-  });
-
-  test("no driver: no dots and no dot key", () => {
-    const root = document.createElement("div");
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] });
-    expect(root.querySelector("g.child-dot")).toBeNull();
-    expect(root.querySelector("[data-viz-key]")).toBeNull();
-    expect(text(root, 'g[data-part="workers"] .part-label')).toBe("workers ×n");
-  });
-
-  test("a map with no children reads none running", () => {
-    const root = document.createElement("div");
-    const driver: VizDriver = {
-      reset: () => ({ ...snapshot(0), children: [] }),
-      step: () => snapshot(1),
-    };
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] }, { driver });
-    expect(text(root, 'g[data-part="workers"] .part-label')).toBe("workers ×0");
-    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("none running");
-    expect(root.querySelector('g[data-part="workers"]')?.getAttribute("aria-label")).toBe(
-      "workers, none running",
-    );
-  });
 });
 
 describe("pool view arrows", () => {
@@ -458,17 +386,6 @@ describe("pool view arrows", () => {
       ?.dispatchEvent(new Event("click"));
     expect(assigned?.classList.contains("took")).toBe(true);
     expect(text(root, 'g[data-part=""] .part-chip')).toBe("holding");
-  });
-
-  const workerStates = (root: HTMLElement) =>
-    root.querySelector('g[data-part="workers"]')?.getAttribute("aria-label");
-
-  test("clicking the pill turns a worker dot to working", () => {
-    const root = mount([pool]);
-    const before = workerStates(root);
-    root.querySelector("g.link-start")?.dispatchEvent(new Event("click"));
-    expect(workerStates(root)).not.toBe(before);
-    expect(workerStates(root)).toContain("working");
   });
 
   test.each(["Enter", " "])("key %j on the pill sends and keeps focus", (key) => {
@@ -513,7 +430,7 @@ describe("pool view arrows", () => {
 
   test("a shared prefix is written once in the key and kept in ids", () => {
     const root = mount([team]);
-    expect(text(root, "[data-viz-key]")).toBe("events: team.*   ○ free  ● working");
+    expect(text(root, "[data-viz-key]")).toBe("events: team.*");
     const line = root.querySelector('g.link[data-event="team.ITEMS_ASSIGNED"]');
     expect(line?.textContent).toBe("ITEMS_ASSIGNED");
     expect(line?.getAttribute("aria-label")).toContain("team.ITEMS_ASSIGNED");
@@ -521,7 +438,7 @@ describe("pool view arrows", () => {
 
   test("mixed prefixes show full names and no key", () => {
     const root = mount([pool]);
-    expect(text(root, "[data-viz-key]")).toBe("○ free  ● working");
+    expect(root.querySelector("[data-viz-key]")).toBeNull();
     expect(arrow(root, "ITEMS_ASSIGNED")?.textContent).toBe("ITEMS_ASSIGNED");
     const mixed: VizMachine = {
       ...team,
@@ -529,7 +446,7 @@ describe("pool view arrows", () => {
       outputs: ["team.ITEMS_ASSIGNED", "OTHER.X"],
     };
     const again = mount([mixed]);
-    expect(again.querySelector("[data-viz-key]")?.textContent).toBe("○ free  ● working");
+    expect(again.querySelector("[data-viz-key]")).toBeNull();
     expect(again.querySelector('g.link[data-event="team.ITEMS_ASSIGNED"]')?.textContent).toBe(
       "team.ITEMS_ASSIGNED",
     );
@@ -761,7 +678,7 @@ describe("pool view arrows: every branch", () => {
       "ITEM_ARRIVED",
     );
     expect(arrow(root, "team.ITEMS_ASSIGNED")?.textContent).toBe("team.ITEMS_ASSIGNED");
-    expect(text(root, ".viz-key")).toBe("○ free  ● working");
+    expect(root.querySelector(".viz-key")).toBeNull();
   });
 
   test("an event a link brings to one part is still an entry of another part", () => {
@@ -795,104 +712,5 @@ describe("pool view arrows: every branch", () => {
     const height = (machine: VizMachine) =>
       Number(mount([machine]).querySelector("svg")?.getAttribute("viewBox")?.split(" ")[3]);
     expect(height(stacked) - height(pool)).toBeGreaterThanOrEqual(16);
-  });
-});
-
-describe("child dots: the key and the marks match what is drawn", () => {
-  const withChildren = (machine: VizMachine, states: string[]) => {
-    const root = document.createElement("div");
-    const live = (): VizLiveState => ({
-      ...snapshot(0),
-      children: states.map((at, index) => ({
-        map: "workers",
-        key: `w${index}`,
-        state: at,
-        since: 0,
-      })),
-    });
-    mountViewer(
-      root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
-      { driver: { reset: live, step: live } },
-    );
-    return root;
-  };
-
-  test("seven children: count text and no dot key", () => {
-    const root = withChildren(
-      pool,
-      Array.from({ length: 7 }, () => "workers.free"),
-    );
-    expect(root.querySelector("g.child-dot")).toBeNull();
-    expect(text(root, "[data-viz-key]")).toBe(undefined);
-  });
-
-  test("no children: no dot key", () => {
-    const root = withChildren(pool, []);
-    expect(text(root, 'g[data-part="workers"] .part-chip')).toBe("none running");
-    expect(text(root, "[data-viz-key]")).toBe(undefined);
-  });
-
-  test("a child in a final state is not drawn as the second state", () => {
-    const withDone: VizMachine = {
-      ...pool,
-      states: [...pool.states, { ...state("workers.done"), final: true }],
-    };
-    const root = withChildren(withDone, ["workers.free", "workers.done"]);
-    expect(root.querySelector('g.child-dot[data-child="w1"]')?.getAttribute("data-mark")).not.toBe(
-      "second",
-    );
-  });
-
-  test("dots are drawn sorted by key, one circle each at distinct positions", () => {
-    const root = withChildren(pool, ["workers.free", "workers.working", "workers.free"]);
-    const keys = (r: HTMLElement) => [...r.querySelectorAll("g.child-dot")];
-    const unsorted = document.createElement("div");
-    const live = (): VizLiveState => ({
-      ...snapshot(0),
-      children: ["w3", "w1", "w2"].map((key) => ({
-        map: "workers",
-        key,
-        state: "workers.free",
-        since: 0,
-      })),
-    });
-    mountViewer(
-      unsorted,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [pool] },
-      { driver: { reset: live, step: live } },
-    );
-    expect(dots(unsorted)).toEqual(["w1:free", "w2:free", "w3:free"]);
-    const cx = keys(root).map((dot) => dot.querySelector("circle")?.getAttribute("cx"));
-    expect(cx).toEqual(["-16", "0", "16"]);
-    expect(text(root, "[data-viz-key]")).toContain("○ free  ● working");
-  });
-
-  test("a child in a final state draws the count text and no dot key", () => {
-    const withDone: VizMachine = {
-      ...pool,
-      states: [...pool.states, { ...state("workers.done"), final: true }],
-    };
-    const root = withChildren(withDone, ["workers.free", "workers.done"]);
-    expect(root.querySelector("g.child-dot")).toBeNull();
-    expect(text(root, "[data-viz-key]")).toBe(undefined);
-  });
-
-  test("a child machine with one non-final state draws no dots", () => {
-    const one: VizMachine = {
-      ...pool,
-      states: pool.states.filter((s) => s.id !== "workers.working"),
-    };
-    const root = withChildren(one, ["workers.free"]);
-    expect(root.querySelector("g.child-dot")).toBeNull();
-  });
-  test("a child machine with a final state still draws dots for its two other states", () => {
-    const withDone: VizMachine = {
-      ...pool,
-      states: [...pool.states, { ...state("workers.done"), final: true }],
-    };
-    const root = withChildren(withDone, ["workers.free", "workers.working"]);
-    expect(dots(root)).toEqual(["w0:free", "w1:working"]);
-    expect(text(root, "[data-viz-key]")).toContain("○ free  ● working");
   });
 });

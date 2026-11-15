@@ -1,4 +1,4 @@
-/** A pool for the design page: one inbox and three workers, to show a `×n` box in the system view. */
+/** A pool for the design page: one inbox and three workers, to show the pool view. */
 import { VirtualClock } from "@mantaq/core";
 import { createPool } from "@mantaq/sugar";
 
