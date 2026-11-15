@@ -17,7 +17,7 @@ import { describe, expect, test } from "vite-plus/test";
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
   return {
     id,
-    label: id,
+    label: id.slice(id.lastIndexOf(".") + 1),
     region: id.includes(".") ? id.slice(0, id.lastIndexOf(".")) : null,
     initial: flags.initial ?? false,
     final: flags.final ?? false,
@@ -142,16 +142,16 @@ describe("live actor map children", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
     const fold = root.querySelector("details[data-events]");
     const rows = [...(fold?.querySelectorAll("[data-child-key]") ?? [])];
-    expect(rows.map((row) => row.getAttribute("data-child-key"))).toEqual(["p1", "p2"]);
-    expect(root.querySelectorAll("[data-child-key]")).toHaveLength(2);
+    expect(rows.map((row) => row.getAttribute("data-child-key"))).toEqual(["p1"]);
+    expect(root.querySelectorAll("[data-child-key]")).toHaveLength(1);
     expect(rows[0]?.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
-    const retry = root.querySelector('[data-actor="photos[p2]"] [data-send-item="retryPressed"]');
-    expect(retry?.querySelector("[data-ignored]")).toBeNull();
+    const retry = root.querySelector('[data-actor="photos[p1]"] [data-send-item="retryPressed"]');
+    expect(retry?.querySelector("[data-ignored]")).not.toBeNull();
     expect(
       root.querySelector(
-        '[data-actor="photos[p2]"] [data-send-item="uploadConfirmed"] [data-ignored]',
+        '[data-actor="photos[p1]"] [data-send-item="uploadConfirmed"] [data-ignored]',
       ),
-    ).not.toBeNull();
+    ).toBeNull();
     root
       .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]')
       ?.click();
@@ -177,22 +177,21 @@ describe("live actor map children", () => {
     expect(root.querySelector(".explore-map")).toBeNull();
   });
 
-  test("every child's state is marked on the diagram", () => {
-    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
+  test("only the walked child's state is marked on the diagram", () => {
+    const { root } = mount([child("p2", "waitingForRetry"), child("p1", "sendingPhoto")]);
     const current = [...root.querySelectorAll(".graph g.current")].map((each) =>
       each.getAttribute("data-node-id"),
     );
-    expect(current.sort()).toEqual([
-      "photos.sendingPhoto",
-      "photos.waitingForRetry",
-      "showingQueue",
-    ]);
+    expect(current.sort()).toEqual(["photos.sendingPhoto", "showingQueue"]);
   });
 
-  test("the compartment is labelled and tagged as an actor map", () => {
-    const { root } = mount([]);
-    const group = root.querySelector('.graph g.region[data-map="photos"]');
-    expect(group?.querySelector("text")?.textContent).toBe("photos: one per key");
+  test("the frame names the walked child, or none", () => {
+    const title = (root: HTMLElement) =>
+      root.querySelector('.graph g.region[data-map="photos"] > text')?.textContent;
+    expect(title(mount([child("p10", "sendingPhoto"), child("p2", "sendingPhoto")]).root)).toBe(
+      "photos: p2",
+    );
+    expect(title(mount([]).root)).toBe("photos: none");
   });
 
   const edgeGroup = (root: HTMLElement) =>
@@ -204,8 +203,56 @@ describe("live actor map children", () => {
   const sentTo = (key: string) => [
     { kind: "event", event: "uploadConfirmed", payload: null, actor: { map: "photos", key } },
   ];
-  const marker = (root: HTMLElement, key: string) =>
-    root.querySelector<SVGGElement>(`g.child-marker[data-marker-key="${key}"]`);
+  const line = (root: HTMLElement) => root.querySelector("[data-pool-count]")?.textContent;
+  const count = (root: HTMLElement, state: string) =>
+    root.querySelector<HTMLButtonElement>(
+      `[data-pool-count] button[data-count-state$=".${state}"]`,
+    );
+  const walkedKey = (root: HTMLElement) =>
+    root.querySelector("[data-child-key]")?.getAttribute("data-child-key");
+
+  test("the line counts the children by state in the machine's order", () => {
+    expect(line(mount([child("p1", "waitingForRetry"), child("p2", "sendingPhoto")]).root)).toBe(
+      "2 photos: 1 sendingPhoto, 1 waitingForRetry",
+    );
+    expect(line(mount([child("p1", "sendingPhoto")]).root)).toBe("1 photo: 1 sendingPhoto");
+    expect(line(mount([]).root)).toBe("0 photos: ");
+    expect(count(mount([]).root, "sendingPhoto")).toBeNull();
+  });
+
+  test("the line is not drawn without a driver", () => {
+    const root = document.createElement("div");
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] });
+    expect(root.querySelector("[data-pool-count]")).toBeNull();
+  });
+
+  test("a click on a count walks a child in that state and presses it", () => {
+    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
+    expect(count(root, "sendingPhoto")?.getAttribute("aria-pressed")).toBe("true");
+    expect(count(root, "waitingForRetry")?.getAttribute("aria-pressed")).toBe("false");
+    click(count(root, "waitingForRetry"));
+    expect(walkedKey(root)).toBe("p2");
+    expect(count(root, "waitingForRetry")?.getAttribute("aria-pressed")).toBe("true");
+    expect(count(root, "sendingPhoto")?.getAttribute("aria-pressed")).toBe("false");
+    expect(root.querySelector('.graph g.region[data-map="photos"] > text')?.textContent).toBe(
+      "photos: p2",
+    );
+  });
+
+  test("a second click on the same count walks the next key and wraps", () => {
+    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
+    click(count(root, "sendingPhoto"));
+    expect(walkedKey(root)).toBe("p2");
+    click(count(root, "sendingPhoto"));
+    expect(walkedKey(root)).toBe("p1");
+  });
+
+  test("the counts keep their keys as JSON", () => {
+    const { root } = mount([child("a b", "sendingPhoto"), child('q"', "sendingPhoto")]);
+    expect(count(root, "sendingPhoto")?.getAttribute("data-keys")).toBe(
+      JSON.stringify(["a b", 'q"']),
+    );
+  });
 
   test("an arrow goes to the only child in its source", () => {
     const one = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
@@ -213,29 +260,24 @@ describe("live actor map children", () => {
     expect(one.sent).toEqual(sentTo("p1"));
   });
 
-  test("an arrow with two children in its state goes to the first started", () => {
-    const two = mount([child("p2", "sendingPhoto", 2), child("p1", "sendingPhoto", 1)]);
+  test("an arrow goes to the walked child, the lowest key until a count is clicked", () => {
+    const two = mount([child("p2", "sendingPhoto", 1), child("p1", "sendingPhoto", 2)]);
     click(edgeGroup(two.root));
     expect(two.sent).toEqual(sentTo("p1"));
+    click(count(two.root, "sendingPhoto"));
+    click(edgeGroup(two.root));
+    expect(two.sent.at(-1)).toEqual(sentTo("p2")[0]);
   });
 
-  test("an arrow with no child in its state does nothing", () => {
+  test("an arrow with no walked child in its state does nothing", () => {
     const none = mount([child("p1", "waitingForRetry")]);
     click(edgeGroup(none.root));
     expect(none.sent).toEqual([]);
   });
 
-  test("a picked child takes the arrow", () => {
-    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
-    click(marker(two.root, "p2"));
-    expect(marker(two.root, "p2")?.getAttribute("aria-pressed")).toBe("true");
-    click(edgeGroup(two.root));
-    expect(two.sent).toEqual(sentTo("p2"));
-  });
-
-  test("with a child picked, another child's arrow is not next and its click shows details", () => {
+  test("with a child walked, another child's arrow is not next and its click shows details", () => {
     const two = mount([child("p1", "sendingPhoto", 1), child("p2", "waitingForRetry", 2)]);
-    click(marker(two.root, "p2"));
+    click(count(two.root, "waitingForRetry"));
     click(edgeGroup(two.root));
     expect(two.sent).toEqual([]);
     expect(two.root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe(
@@ -243,30 +285,7 @@ describe("live actor map children", () => {
     );
   });
 
-  test("children that started together go to the first in array order", () => {
-    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 1)]);
-    click(edgeGroup(two.root));
-    expect(two.sent).toEqual(sentTo("p1"));
-  });
-
-  test("Esc drops the pick", () => {
-    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
-    click(marker(two.root, "p2"));
-    two.root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(marker(two.root, "p2")?.getAttribute("aria-pressed")).toBe("false");
-    click(edgeGroup(two.root));
-    expect(two.sent).toEqual(sentTo("p1"));
-  });
-
-  test("a click on a marker again drops the pick", () => {
-    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
-    click(marker(two.root, "p2"));
-    click(marker(two.root, "p2"));
-    click(edgeGroup(two.root));
-    expect(two.sent).toEqual(sentTo("p1"));
-  });
-
-  test("a pick drops when the child is gone", () => {
+  test("a walked child that is gone falls back to the lowest key", () => {
     let kids = [child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)];
     const root = document.createElement("div");
     const sent: VizStep[] = [];
@@ -279,55 +298,18 @@ describe("live actor map children", () => {
       },
     };
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] }, { driver });
-    click(marker(root, "p2"));
-    click(root.querySelector('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]'));
-    expect(marker(root, "p2")).toBeNull();
-    const before = sent.length;
+    click(count(root, "sendingPhoto"));
+    expect(walkedKey(root)).toBe("p2");
+    click(root.querySelector('[data-actor="photos[p2]"] [data-send="uploadConfirmed"]'));
+    expect(walkedKey(root)).toBe("p1");
+    expect(line(root)).toBe("1 photo: 1 sendingPhoto");
     click(edgeGroup(root));
-    expect(sent).toHaveLength(before + 1);
     expect(sent.at(-1)).toMatchObject({ actor: { key: "p1" } });
   });
 
-  test("a marker click does not select the state", () => {
-    const one = mount([child("p1", "sendingPhoto", 1)]);
-    click(marker(one.root, "p1"));
-    expect(one.root.querySelector(".graph g.selected")).toBeNull();
-  });
-
-  test("Esc inside a dialog keeps the pick", () => {
-    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
-    click(marker(two.root, "p2"));
-    const dialog = document.createElement("div");
-    dialog.setAttribute("role", "dialog");
-    two.root.append(dialog);
-    dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(marker(two.root, "p2")?.getAttribute("aria-pressed")).toBe("true");
-  });
-
-  test("markers slide only after a step", () => {
-    const one = mount([child("p1", "sendingPhoto", 1)]);
-    const layer = () => one.root.querySelector(".child-markers");
-    expect(layer()?.classList.contains("still")).toBe(true);
-    click(edgeGroup(one.root));
-    expect(layer()?.classList.contains("still")).toBe(false);
-    click(marker(one.root, "p1"));
-    expect(layer()?.classList.contains("still")).toBe(true);
-  });
-
-  test("markers slide when an effect result arrives", () => {
-    const root = document.createElement("div");
-    let notify: (state: VizLiveState) => void = () => undefined;
-    const driver: VizDriver = {
-      reset: () => live([child("p1", "sendingPhoto", 1)]),
-      step: (step) => live([child("p1", "sendingPhoto", 1)], [step]),
-      listen: (callback) => {
-        notify = callback;
-      },
-    };
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] }, { driver });
-    notify(live([child("p1", "photoSent", 1)]));
-    expect(root.querySelector(".child-markers")?.classList.contains("still")).toBe(false);
-    expect(marker(root, "p1")?.getAttribute("data-marker-state")).toBe("photos.photoSent");
+  test("no button is drawn inside the diagram", () => {
+    const { root } = mount([child("p1", "sendingPhoto")]);
+    expect(root.querySelector(".graph [aria-pressed]")).toBeNull();
   });
 
   test("a child move reads the key and the move", () => {
@@ -1074,6 +1056,7 @@ describe("live actor map children", () => {
       [child("p1", "sendingPhoto"), child("p2", "waitingForRetry")],
       withPayload,
     );
+    click(count(root, "waitingForRetry"));
     root
       .querySelector<HTMLButtonElement>('[data-actor="photos[p2]"] [data-send="retryPressed"]')
       ?.click();
@@ -1123,4 +1106,18 @@ describe("live actor map children", () => {
       },
     ]);
   });
+});
+
+test("a count keeps focus after a click, so Enter walks the next child", () => {
+  const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
+  document.body.append(root);
+  const button = () =>
+    root.querySelector<HTMLButtonElement>(
+      '[data-pool-count] button[data-count-state="photos.sendingPhoto"]',
+    );
+  button()?.focus();
+  button()?.click();
+  expect(root.querySelector("[data-child-key]")?.getAttribute("data-child-key")).toBe("p2");
+  expect(document.activeElement).toBe(button());
+  root.remove();
 });

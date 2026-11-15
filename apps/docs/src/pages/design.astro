@@ -149,6 +149,16 @@ const headings = [
   </p>
   <Machine src="src/design/dropped-message.ts" />
 
+  <h2 id="pool-view">Pool view</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: a count line under the diagram, one per actor map, like <code>2 workers: 1 free, 1
+    working</code>. Each count is a button; click it to show a child in that state, click again for
+    the next. The pressed count holds the child shown, and the map's frame is titled with it
+    (<code>workers: w1</code>). Send an item and read the line change.
+  </p>
+  <Machine src="src/design/pool.ts" />
+
   <h2 id="design-findings">Design findings line</h2>
   <p><strong>Awaiting approval</strong></p>
   <Machine src="src/content/docs/checkout-with-bugs.ts" />

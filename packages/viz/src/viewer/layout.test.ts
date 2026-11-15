@@ -347,18 +347,6 @@ describe("map-child states", () => {
     return placed?.kind === "state" ? placed : undefined;
   };
 
-  test("reserve a marker row and a minimum width", () => {
-    const states = base.states.map((each) =>
-      each.id === "first" ? each : { ...each, region: "photos" },
-    );
-    const map = layoutMachine({ ...base, states, regions: ["photos"], maps: ["photos"] });
-    const child = map.nodes.find((node) => node.kind === "state" && node.id === "photos.sending");
-    expect(child?.height).toBe(56);
-    expect(child?.width).toBeGreaterThanOrEqual(168);
-    const root = map.nodes.find((node) => node.kind === "state" && node.id === "first");
-    expect(root?.height).toBe(36);
-  });
-
   test("a region that is not a map keeps the plain size", () => {
     const states = base.states.map((each) =>
       each.id === "first" ? each : { ...each, region: "photos" },

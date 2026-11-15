@@ -1,6 +1,13 @@
 import { movesFrom, stateAfter } from "../moves.ts";
 import { coveredByAny } from "../schema.ts";
-import { actorOf, actorText, localName, offeredEvents, regionPaths } from "./compartments.ts";
+import {
+  actorOf,
+  actorText,
+  localName,
+  offeredEvents,
+  regionPaths,
+  walkedChild,
+} from "./compartments.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
 import type {
   VizActorRef,
@@ -41,6 +48,8 @@ export interface ExploreContext {
     fromPart?: (part: string, event: string) => string | null;
     send: (step: VizStep) => void;
     previous?: VizJson;
+    /** The child a count click walks; the Step tab shows that child of each map. */
+    picked?: { map: string; key: string } | null;
     /** Replace the walk with these steps from a fresh actor. */
     play: (steps: ReadonlyArray<VizStep>, run?: string) => void;
     /** Send an event at once, with the values set in the Context tab. */
@@ -333,6 +342,7 @@ interface LiveMoves {
   state: VizLiveState;
   send: (step: VizStep) => void;
   final: boolean;
+  picked?: { map: string; key: string } | null;
   sendEvent: (event: string, actor?: VizActorRef) => void;
   fromPart?: (part: string, event: string) => string | null;
 }
@@ -507,7 +517,7 @@ function regionLines(doc: Document, machine: VizMachine, state: VizLiveState): H
   });
 }
 
-/** One section per actor map: its children, where each is now, and what each handles. */
+/** One section per actor map: its walked child, where it is now, and what it handles. */
 function childrenSections(
   doc: Document,
   machine: VizMachine,
@@ -515,8 +525,8 @@ function childrenSections(
 ): Array<HTMLElement | null> {
   const { state } = live;
   return machine.maps.map((map) => {
-    const children = state.children.filter((child) => child.map === map);
-    const rows = children.map((child) => {
+    const walked = walkedChild(state, map, live.picked ?? null);
+    const rows = (walked === undefined ? [] : [walked]).map((child) => {
       const info = machine.states.find((each) => each.id === child.state);
       const final = info?.final === true;
       const moves = liveMovesSection(doc, machine, {
@@ -1239,6 +1249,7 @@ function liveParts(
     state,
     send: live.send,
     final,
+    picked: live.picked ?? null,
     sendEvent: live.sendEvent,
     ...(live.fromPart === undefined ? {} : { fromPart: live.fromPart }),
   };
