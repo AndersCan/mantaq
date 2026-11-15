@@ -361,15 +361,19 @@ function pairOverlaps(one: PlacedLabel, other: PlacedLabel, rest: Shapes, add: A
   }
 }
 
-const grids = new WeakMap<ReadonlyArray<Point>, Map<string, Point[]>>();
+const grids = new WeakMap<ReadonlyArray<Point>, Map<number, Point[]>>();
+
+function cellKey(column: number, row: number): number {
+  return column * 100003 + row;
+}
 
 /** Points bucketed in `ALONGSIDE_GAP` cells, built once per path. */
-function gridOf(points: ReadonlyArray<Point>): Map<string, Point[]> {
+function gridOf(points: ReadonlyArray<Point>): Map<number, Point[]> {
   const known = grids.get(points);
   if (known !== undefined) return known;
-  const cells = new Map<string, Point[]>();
+  const cells = new Map<number, Point[]>();
   for (const point of points) {
-    const key = `${Math.floor(point.x / ALONGSIDE_GAP)},${Math.floor(point.y / ALONGSIDE_GAP)}`;
+    const key = cellKey(Math.floor(point.x / ALONGSIDE_GAP), Math.floor(point.y / ALONGSIDE_GAP));
     const cell = cells.get(key);
     if (cell === undefined) cells.set(key, [point]);
     else cell.push(point);
@@ -380,13 +384,14 @@ function gridOf(points: ReadonlyArray<Point>): Map<string, Point[]> {
 
 /** Length of the longest stretch of `path` within `ALONGSIDE_GAP` of `other`. */
 function longestRun(path: ReadonlyArray<Point>, other: ReadonlyArray<Point>): number {
+  if (boxToBox(boundsOfPath(path), boundsOfPath(other)) >= ALONGSIDE_GAP) return 0;
   const cells = gridOf(other);
   const nearOther = (point: Point): boolean => {
     const column = Math.floor(point.x / ALONGSIDE_GAP);
     const row = Math.floor(point.y / ALONGSIDE_GAP);
     for (let x = column - 1; x <= column + 1; x++)
       for (let y = row - 1; y <= row + 1; y++)
-        for (const each of cells.get(`${x},${y}`) ?? [])
+        for (const each of cells.get(cellKey(x, y)) ?? [])
           if (Math.hypot(point.x - each.x, point.y - each.y) < ALONGSIDE_GAP) return true;
     return false;
   };
