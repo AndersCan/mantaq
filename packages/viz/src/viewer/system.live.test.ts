@@ -184,6 +184,13 @@ describe("system view", () => {
     expect(mount([pool]).querySelector("svg[data-system]")).not.toBeNull();
   });
 
+  test("a machine with an actor map still lists what another part sends under its own group", () => {
+    const root = mount([{ ...pool, maps: ["workers"] }]);
+    root.querySelector<HTMLButtonElement>('[data-send="ITEM_ARRIVED"]')?.click();
+    expect(root.querySelector('ul[data-group="parts"] [data-send="WORK_DONE"]')).not.toBeNull();
+    expect(root.querySelector('ul[data-group="input"] [data-send="WORK_DONE"]')).toBeNull();
+  });
+
   test("a machine without linked parts shows only the diagram", () => {
     const root = mount([checkout]);
     expect(root.querySelector("svg[data-system]")).toBeNull();

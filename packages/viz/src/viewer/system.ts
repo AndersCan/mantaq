@@ -515,7 +515,6 @@ function actorPart(actor: VizActorRef | undefined): string {
 
 /** The chip under a part's name: its state, or a map's children counted by state. null = no driver. */
 function chipOf(
-  machine: VizMachine,
   part: SystemPart,
   live: VizLiveState | null,
 ): { text: string; label: string; name: string } {
@@ -581,14 +580,14 @@ function markDropped(group: Element, dropped: boolean): void {
 function markPart(
   groups: ReadonlyArray<Element>,
   part: SystemPart,
-  context: { machine: VizMachine; live: VizLiveState | null; selection: SystemSelection | null },
+  context: { live: VizLiveState | null; selection: SystemSelection | null },
 ): void {
-  const { machine, live, selection } = context;
+  const { live, selection } = context;
   const group = groups.find(
     (each) => each.classList.contains("part") && each.getAttribute("data-part") === part.id,
   );
   if (group === undefined) return;
-  const chip = chipOf(machine, part, live);
+  const chip = chipOf(part, live);
   const label = group.querySelector(".part-label");
   const line = group.querySelector(".part-chip");
   if (label !== null) label.textContent = chip.label;
@@ -639,7 +638,7 @@ export function markSystem(
   const dropped = droppedOf(system, context.afters?.flat() ?? []);
   const groups = [...root.querySelectorAll("g.part, g.link")];
   const pairs = [...root.querySelectorAll("g.link-pair")];
-  for (const part of system.parts) markPart(groups, part, { machine, live, selection });
+  for (const part of system.parts) markPart(groups, part, { live, selection });
   for (const group of groups) markLink(group, { took, dropped, selection });
   for (const entry of root.querySelectorAll("g.link-in")) {
     const part = entry.getAttribute("data-to") ?? "";
@@ -749,7 +748,7 @@ export function systemDetails(
   if (selection.kind === "part") {
     const part = partOf(system, selection.id);
     if (part === undefined) return null;
-    const chip = chipOf(machine, part, context.live);
+    const chip = chipOf(part, context.live);
     const start = statesOf(machine, part.id).find((state) => state.initial);
     return html(doc, "section", { class: "details", "data-selected-part": part.id }, [
       html(doc, "h2", {}, [part.label]),
