@@ -47,6 +47,25 @@ describe("knownPayload", () => {
     expect(result).toEqual({ payload: { cardNumber: "9" } });
   });
 
+  test("a sent value that does not fit its field is skipped for an older one that does", () => {
+    const answer = field("answer", "choice", ["accepted", "declined"]);
+    const code = field("code", "text");
+    const steps = [
+      step("ask", { code: "c1", answer: "declined" }),
+      step("ask", { code: "", answer: "maybe" }),
+    ];
+    expect(knownPayload([code, answer], { ...base, steps })).toEqual({
+      payload: { code: "c1", answer: "declined" },
+    });
+  });
+
+  test("a json field takes whatever was sent", () => {
+    const data = field("data", "json");
+    expect(knownPayload([data], { ...base, steps: [step("other", { data: [1, "x"] })] })).toEqual({
+      payload: { data: [1, "x"] },
+    });
+  });
+
   test("an optional field with nothing known is left out", () => {
     const optional: VizField = { ...card, optional: true };
     expect(knownPayload([optional], base)).toEqual({ payload: {} });

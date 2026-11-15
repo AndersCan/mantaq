@@ -501,13 +501,13 @@ function isRecord(value: unknown): value is Record<string, VizJson> {
 /** What a payload form fills from: the machine now, and the steps of the walk. */
 type FillLive = Pick<VizLiveState, "state" | "payload" | "context"> & {
   steps?: ReadonlyArray<VizStep>;
-  /** The walk's steps with what parts sent each other after each one, in order: what "Last sent" fills from. */
+  /** The walk's steps with what parts sent each other after each one, in order: what a payload form fills from. */
   heard?: ReadonlyArray<VizStep>;
   children?: VizLiveState["children"];
   removed?: VizLiveState["removed"];
 };
 
-/** What "Last sent" fills from: the walk with what parts sent each other, else the walk alone. */
+/** What a payload form fills from: the walk with what parts sent each other, else the walk alone. */
 function fillSteps(live: FillLive | null | undefined): ReadonlyArray<VizStep> {
   return live?.heard ?? live?.steps ?? [];
 }
