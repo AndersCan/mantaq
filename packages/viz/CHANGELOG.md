@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.29.0
+
+<sub>2026-11-15</sub>
+
+- _(minor)_
+  The system view names who sent each message to whom on the Path and Step tab (`orders → w1: free → working`), and marks a message its receiver had no handler for: the arrow gets a `!` after its name, the Path row starts with `!` and says `dropped`, and Details says why.
+
+  Breaking: none. Path row text for steps that move other parts now starts those moves with the sender.
+
+- _(minor)_
+  On the live viz, clicking an event sends it at once. The Context tab sets the values events are sent with, kept in `?value=`. The payload form is gone. Breaking: none
+- _(minor)_
+  A machine with an actor map is drawn as one diagram: its own states and one child's, with no system board. A line under the diagram counts each map's children by state; click a count to show a child. Child pills are gone, and the harness's `children()` returns children sorted by key. Breaking: the pool and actor-map DOM loses `g.child-marker`, `g.child-dot` and `[data-open-part-tab]` for maps, and the Step tab shows one child row per map, so scripts that scraped them break.
+- _(patch)_
+  The Path tab has a Copy path button. A payload form now fills from what parts sent each other in the walk, so sending `ITEMS_FINISHED` by hand reports a real worker (`w1`), not `sample`. When a step changes nothing, the Step tab says so. Open receiver lands on the state the receiver is in now. The live driver records each message's payload.
+- _(patch)_
+  Opening a part of a machine draws only that part, with buttons to switch to the other parts. The Open buttons say "Open sender" and "Open receiver". Under Events and time, events that another part sends get their own heading. In Details, edges are titled `from —event→ to`, and the analysis and coverage rows sit in a closed fold.
+- _(patch)_ The panel always sits below the graph, so the graph keeps the full width on a wide screen.
+- _(patch)_ The payload form no longer offers a Values from row or sample buttons; it fills from what the walk sent.
+
 ## 0.28.0
 
 <sub>2026-11-14</sub>
