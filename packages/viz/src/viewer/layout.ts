@@ -2,6 +2,7 @@ import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
 import { labelOverlapsFor } from "./overlaps.ts";
+import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -276,7 +277,9 @@ function startIds(machine: VizMachine): string[] {
     .filter((state) => state.initial && state.region !== null)
     .map((state) => state.id)
     .sort();
-  return machine.initial === null ? regionStarts : [machine.initial, ...regionStarts];
+  const ids = new Set(machine.states.map((state) => state.id));
+  const starts = machine.initial === null ? regionStarts : [machine.initial, ...regionStarts];
+  return starts.filter((id) => ids.has(id));
 }
 
 /** `heights` raises a node's box to the room its ports need. */
@@ -742,7 +745,7 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
  * Layered layout (dagre, left to right). Pure: same machine in, same
  * coordinates out. The initial edge is drawn as an entry arrow, not a graph edge.
  */
-export function layoutMachine(machine: VizMachine): MachineLayout {
+export function placeMachine(machine: VizMachine): MachineLayout {
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
   const regions = [...machine.regions].sort(
@@ -933,4 +936,9 @@ export function labelSpots(placed: PlacedEdge, points: ReadonlyArray<Point>): Po
     spots.push({ x: point.x, y: span.bottom + away }, { x: point.x, y: span.top - away });
   }
   return spots;
+}
+
+/** The layout, or the error when dagre or a missing node spec stops it. Overlaps are measured by `overlapsOf`, not refused here. */
+export function layoutMachine(machine: VizMachine): Either<unknown, MachineLayout> {
+  return Either.from(() => placeMachine(machine));
 }

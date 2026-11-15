@@ -1,0 +1,7108 @@
+[
+  {
+    "id": "gen",
+    "initial": "a._mHp",
+    "regions": ["a"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a._mHp",
+        "label": "a._mHp",
+        "region": "a",
+        "initial": true,
+        "final": false,
+        "effects": [
+          {
+            "name": "aFc",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.lwsM.Z",
+        "label": "a.lwsM.Z",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "P.BRwnuVF",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.mWDH1",
+        "label": "a.mWDH1",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.ImJgj",
+        "label": "a.ImJgj",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "lM0awCWWvbMDAT9n",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.Rxm",
+        "label": "a.Rxm",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "pHZ3uf7",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.lwsM.Z",
+        "event": "ImDgzaLnwR4nY",
+        "to": "a.ImJgj",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.Rxm",
+        "event": "bf3suVUMtcC",
+        "to": "a.Rxm",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.mWDH1",
+        "event": "kWN.mWwzDwgmFuB",
+        "to": "a.mWDH1",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.ImJgj",
+        "event": "viv7pYH",
+        "to": "a._mHp",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a._mHp",
+        "event": "_Ca",
+        "to": "a._mHp",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "*",
+        "event": "8QygFhSfqmuIroMg",
+        "to": "a.ImJgj",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["Mw9qA"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(Mw9qA)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.ImJgj",
+        "event": "Wk_mlPApk_",
+        "to": "a.mWDH1",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.lwsM.Z",
+        "event": "EwbXTrwWHSQm0",
+        "to": "a.ImJgj",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "a.ImJgj",
+        "event": "KvZxoCWxH",
+        "to": "a.lwsM.Z",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e9",
+        "from": "a._mHp",
+        "event": "G5gX9MPe8aQMR",
+        "to": "a.mWDH1",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["Mw9qA"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(Mw9qA)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b"],
+    "maps": ["a.b"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.b.yqWdQM",
+        "label": "a.b.yqWdQM",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "hSdj",
+            "sends": null
+          },
+          {
+            "name": "oa3Y",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.mQ",
+        "label": "a.b.mQ",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "9SUuMfcl4RcxMHG2",
+            "sends": null
+          },
+          {
+            "name": "RwvM",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.b.mQ",
+        "event": "1anIlcE",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.b.mQ",
+        "event": "hi9QwXM6L",
+        "to": "a.b.yqWdQM",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ewxw"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ewxw)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.b.mQ",
+        "event": "P4_0",
+        "to": "a.b.yqWdQM",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.b.mQ",
+        "event": "n1Pj1Tw9PigK1n",
+        "to": "a.b.mQ",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.b.mQ",
+        "event": "Pdxw6suAAp",
+        "to": "a.b.yqWdQM",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.b.yqWdQM",
+        "event": "cH26NX",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.b.yqWdQM",
+        "event": "K.Zcgp24wHeFck",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.b.mQ",
+        "event": "WOWb75WRbwpKs",
+        "to": "a.b.mQ",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "a.b.mQ",
+        "event": "7GmL",
+        "to": "a.b.yqWdQM",
+        "kind": "stay",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ewxw"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ewxw)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e9",
+        "from": "a.b.yqWdQM",
+        "event": "jXgGB_qr_",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b"],
+    "maps": ["a", "a.b"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.b.NWZOFAq4F",
+        "label": "a.b.NWZOFAq4F",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.NAbSI",
+        "label": "a.NAbSI",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "M.lgmO",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "N1k",
+        "label": "N1k",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "*",
+        "event": "3tsLEHNMJNLz",
+        "to": "N1k",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["vRMftH"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(vRMftH)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.NAbSI",
+        "event": "nwM14fdsms13",
+        "to": "a.NAbSI",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.NAbSI",
+        "event": "B_8ugWmMg3wvFV",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.NAbSI",
+        "event": "PNLjVSM3vd",
+        "to": "N1k",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["vRMftH"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(vRMftH)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.NAbSI",
+        "event": "djjOmgGgUMOFJ5jw",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.NAbSI",
+        "event": "kHg9BSGhc2w5rbcb",
+        "to": "a.b.NWZOFAq4F",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.NAbSI",
+        "event": "ztipcgaP2",
+        "to": "a.NAbSI",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "N1k",
+        "event": "VHjWM1PJeHrLmlw",
+        "to": "N1k",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "a.b.NWZOFAq4F",
+        "event": "BCStF",
+        "to": "a.b.NWZOFAq4F",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["vRMftH"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(vRMftH)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": [],
+    "maps": [],
+    "actors": [],
+    "states": [
+      {
+        "id": "Wb",
+        "label": "Wb",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "tGFYm",
+            "sends": null
+          },
+          {
+            "name": "UqeqfUnii1kea44",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "cQKpFPm",
+        "label": "cQKpFPm",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "7DBmmxPm3m",
+            "sends": null
+          },
+          {
+            "name": "83CmO",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "KguORg",
+        "label": "KguORg",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "4",
+        "label": "4",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "2jMWbWIpW3uW",
+        "label": "2jMWbWIpW3uW",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "RIs75V5",
+            "sends": null
+          },
+          {
+            "name": "v_wPwwYwUl41HMeP",
+            "sends": []
+          },
+          {
+            "name": "bHxJgmvbFt",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "r",
+        "label": "r",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "VIIgV",
+            "sends": null
+          },
+          {
+            "name": "iBYrU.RX1aMfmlyF",
+            "sends": []
+          },
+          {
+            "name": "0w0YYkv51H",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "1m3E",
+        "label": "1m3E",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "LT0MEkgXLMQZ",
+        "label": "LT0MEkgXLMQZ",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "SIu",
+            "sends": null
+          },
+          {
+            "name": "NelpmW8Y",
+            "sends": []
+          },
+          {
+            "name": "QGRINqxz_hOWu",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "y9BLd",
+        "label": "y9BLd",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "cQKpFPm",
+        "event": "0csWMw",
+        "to": "y9BLd",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "cQKpFPm",
+        "event": "uQVBxxcHjEr",
+        "to": "y9BLd",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "cQKpFPm",
+        "event": "0HWUC",
+        "to": "y9BLd",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "r",
+        "event": "om56MO7zaZ55Y",
+        "to": "1m3E",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "1m3E",
+        "event": "mgKbYDlkYaN",
+        "to": "cQKpFPm",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "r",
+        "event": "ST0Uvmnyy",
+        "to": "Wb",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["UMhMMM"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(UMhMMM)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "r",
+        "event": "ZTOmW4gi2xJX",
+        "to": "Wb",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "cQKpFPm",
+        "event": "9Tnh0",
+        "to": "cQKpFPm",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "LT0MEkgXLMQZ",
+        "event": "aRLDO7eDUggQ",
+        "to": "LT0MEkgXLMQZ",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "a.b.wzN61p5QCm9",
+    "regions": ["a", "a.b"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.b.wzN61p5QCm9",
+        "label": "a.b.wzN61p5QCm9",
+        "region": "a.b",
+        "initial": true,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.YeDNd5kW",
+        "label": "a.b.YeDNd5kW",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "W8d",
+            "sends": null
+          },
+          {
+            "name": "kI3LCHOG6x_rPZIG",
+            "sends": []
+          },
+          {
+            "name": "Mmz3BVJttwz6",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.LlI0t",
+        "label": "a.b.LlI0t",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "aGmwlbIT",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.mD.xflMYoGaw",
+        "label": "a.b.mD.xflMYoGaw",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.w69N",
+        "label": "a.w69N",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "cyJNSXV2V",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.hXyURtBa",
+        "label": "a.b.hXyURtBa",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "gPk.7AY7J.Dikc",
+            "sends": null
+          },
+          {
+            "name": "ATM8Q4",
+            "sends": []
+          },
+          {
+            "name": "IVNAsMuAD7oW3WSZ",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.G.MxHm.J_Xu",
+        "label": "a.b.G.MxHm.J_Xu",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "959i.1.nrk.hMDf",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.UjVweIAMW7cA",
+        "label": "a.b.UjVweIAMW7cA",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "mhwcxy",
+            "sends": null
+          },
+          {
+            "name": "mxWmPaa8",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "*",
+        "event": "A4Md",
+        "to": "a.b.wzN61p5QCm9",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["68L"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(68L)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.b.LlI0t",
+        "event": "3kJBJQ.Mm7v",
+        "to": "a.b.wzN61p5QCm9",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "*",
+        "event": "uOYh0X9",
+        "to": "a.b.YeDNd5kW",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["68L"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(68L)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b"],
+    "maps": ["a.b"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.MROaAOtx7W",
+        "label": "a.MROaAOtx7W",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "eK7..7",
+            "sends": null
+          },
+          {
+            "name": "C1mMwAJGf",
+            "sends": []
+          },
+          {
+            "name": "cGwclDWWSow",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "SVBAZ9",
+        "label": "SVBAZ9",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "YbLBluIVafS",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "H3H2JRqa",
+        "label": "H3H2JRqa",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "mBvUUhlZ6wtx_",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.pEYphdaEWJD",
+        "label": "a.pEYphdaEWJD",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "ICoLxa",
+            "sends": null
+          },
+          {
+            "name": "7Gzm83",
+            "sends": []
+          },
+          {
+            "name": "9ptmbJMGw2vI",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.r0dYi5",
+        "label": "a.b.r0dYi5",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "wbDEYL8RuW",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.A4vS",
+        "label": "a.A4vS",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "WICaw",
+            "sends": null
+          },
+          {
+            "name": "wa_j8faRja",
+            "sends": []
+          },
+          {
+            "name": "YVIPh1IRCSMYo",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.MX8fVDwjPAm",
+        "label": "a.b.MX8fVDwjPAm",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.D3C",
+        "label": "a.D3C",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "Zqh4b3",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.MROaAOtx7W",
+        "event": "JNNlKvEEQwUb",
+        "to": "a.pEYphdaEWJD",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.MROaAOtx7W",
+        "event": "GshaNs59",
+        "to": "a.pEYphdaEWJD",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.MROaAOtx7W",
+        "event": "wVYvmsXMZDKJF",
+        "to": "a.pEYphdaEWJD",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.A4vS",
+        "event": "sjMLtM",
+        "to": "a.b.MX8fVDwjPAm",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "H3H2JRqa",
+        "event": "3gzJPmOX4q8S",
+        "to": "SVBAZ9",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.pEYphdaEWJD",
+        "event": "hcqM",
+        "to": "a.pEYphdaEWJD",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["M6Vfm5om3KZV"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(M6Vfm5om3KZV)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.b.MX8fVDwjPAm",
+        "event": "6FxZMMuRwMM",
+        "to": "a.b.r0dYi5",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.D3C",
+        "event": "MCPb.qcvhPrBj",
+        "to": "a.D3C",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "a.MROaAOtx7W",
+        "event": "WcyO2Zsdkigpm",
+        "to": "a.pEYphdaEWJD",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e9",
+        "from": "a.pEYphdaEWJD",
+        "event": "BIWmJ.bJv87WuyWW",
+        "to": "a.MROaAOtx7W",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["M6Vfm5om3KZV"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(M6Vfm5om3KZV)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "D8mW",
+    "regions": ["a"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "D8mW",
+        "label": "D8mW",
+        "region": null,
+        "initial": true,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.wwrVW1.x329D",
+        "label": "a.wwrVW1.x329D",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "Owm107fBNbihZF",
+            "sends": null
+          },
+          {
+            "name": "shMayEvEXTFMCm",
+            "sends": []
+          },
+          {
+            "name": "W1OXM2iZKm9",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.OloMv",
+        "label": "a.OloMv",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "fvr.l.Ge",
+            "sends": null
+          },
+          {
+            "name": "dWXiB",
+            "sends": []
+          },
+          {
+            "name": "Mrf1",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.ek",
+        "label": "a.ek",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "En6hMwtDYl",
+            "sends": null
+          },
+          {
+            "name": "wUs5cIXM",
+            "sends": []
+          },
+          {
+            "name": "TTHVMdeWfw",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.OloMv",
+        "event": "QwwDu",
+        "to": "D8mW",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.ek",
+        "event": "7QKcyPIA3NA",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.OloMv",
+        "event": "x7MmxG",
+        "to": "a.ek",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.ek",
+        "event": "UMEF.vBrw9e",
+        "to": "a.OloMv",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ZRZOS0BMW"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ZRZOS0BMW)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.OloMv",
+        "event": "e0WbYQ9JWLTsU3",
+        "to": "D8mW",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.wwrVW1.x329D",
+        "event": "IAJhkEMY",
+        "to": "a.wwrVW1.x329D",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.OloMv",
+        "event": "WWmUvHRSQ",
+        "to": "D8mW",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.OloMv",
+        "event": "acWZ1Uo",
+        "to": "D8mW",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ZRZOS0BMW"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ZRZOS0BMW)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "a.b.4",
+    "regions": ["a", "a.b"],
+    "maps": [],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.b.4",
+        "label": "a.b.4",
+        "region": "a.b",
+        "initial": true,
+        "final": false,
+        "effects": [
+          {
+            "name": "Ji_4PoS",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.9pt.n",
+        "label": "a.9pt.n",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "bgMzQ4Nfab",
+            "sends": null
+          },
+          {
+            "name": "af_XBj1IX",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.tSezOSXL",
+        "label": "a.tSezOSXL",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "oYMrLM8dVwNwA",
+            "sends": null
+          },
+          {
+            "name": "qC6w9zMF4H",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.sHv3jAjEVByA",
+        "label": "a.b.sHv3jAjEVByA",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "2gkYgx32H_Lo13",
+            "sends": null
+          },
+          {
+            "name": "MUlXqwJUOk",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.tSezOSXL",
+        "event": "d5xXlRD9a_",
+        "to": "a.9pt.n",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.9pt.n",
+        "event": "tcD1pywwE",
+        "to": "a.b.sHv3jAjEVByA",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.9pt.n",
+        "event": "YBrm.kjso1WNa",
+        "to": "a.tSezOSXL",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.tSezOSXL",
+        "event": "UwurMEMHz8waa3",
+        "to": "a.9pt.n",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.tSezOSXL",
+        "event": "nw4GuUG6",
+        "to": "a.b.4",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["HcD3miymgXl5l2U"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(HcD3miymgXl5l2U)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.9pt.n",
+        "event": "mwlIkGsAgGALIk",
+        "to": "a.9pt.n",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.b.sHv3jAjEVByA",
+        "event": "GKHKKu.x",
+        "to": "a.b.sHv3jAjEVByA",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.mShIBMFQv",
+        "label": "a.mShIBMFQv",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "qoWa6",
+        "label": "qoWa6",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "sEf6",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a",
+        "label": "a",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "_MWz5c",
+            "sends": null
+          },
+          {
+            "name": "t4admswO5pm66DFM",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.eQ",
+        "label": "a.eQ",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.uRHo8P7EHj",
+        "label": "a.uRHo8P7EHj",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "XG6wqrJ",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "Wv90lmi9WvV0",
+        "label": "Wv90lmi9WvV0",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "4cBID",
+            "sends": null
+          },
+          {
+            "name": "Dmdc_panm30otmg",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.yfMrxkpw7Ew2",
+        "label": "a.yfMrxkpw7Ew2",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "cmq5EDI1mOm",
+            "sends": null
+          },
+          {
+            "name": "MOWCB",
+            "sends": []
+          },
+          {
+            "name": "Nw5xTSmOy8soWy",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.YystPc",
+        "label": "a.YystPc",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "slm2m_JhK",
+            "sends": null
+          },
+          {
+            "name": "0TmeWGkv",
+            "sends": []
+          },
+          {
+            "name": "wgwmME",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.lU",
+        "label": "a.lU",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "ArmgwMmTBpdfg",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.eQ",
+        "event": "MN7gZ1i6xv",
+        "to": "a",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "Wv90lmi9WvV0",
+        "event": "mMYIw1Ns",
+        "to": "a.eQ",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.lU",
+        "event": "ArxU",
+        "to": "a.eQ",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.lU",
+        "event": "6w1hwHDkVc",
+        "to": "a.lU",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["USr"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(USr)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "*",
+        "event": "dkrS.WJJ",
+        "to": "a.YystPc",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["USr"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(USr)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.yfMrxkpw7Ew2",
+        "event": "h7OEXp",
+        "to": "a.yfMrxkpw7Ew2",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b"],
+    "maps": ["a.b"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.b.gm",
+        "label": "a.b.gm",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "PsjWxW9",
+            "sends": null
+          },
+          {
+            "name": "0YtHMrmWo",
+            "sends": []
+          },
+          {
+            "name": "BnwNY",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.YeobWL",
+        "label": "a.YeobWL",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "8fVjMB8rZqo",
+            "sends": null
+          },
+          {
+            "name": "HLRmgwSEC5y_dBW",
+            "sends": []
+          },
+          {
+            "name": "5ijU_ZW3Z9",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.omy",
+        "label": "a.omy",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "uPZeSwm1sGJb",
+            "sends": null
+          },
+          {
+            "name": "ydr5DPGTDkWK.Xmw",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "1I7d.r",
+        "label": "1I7d.r",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "0cWLMu",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.vyC8J8XWRNt",
+        "label": "a.b.vyC8J8XWRNt",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "gjW7YktKW",
+            "sends": null
+          },
+          {
+            "name": "A7ynAmlcWwWLHwdD",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.Xtlu",
+        "label": "a.b.Xtlu",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "fmJewMWz",
+            "sends": null
+          },
+          {
+            "name": "Wuxef4tuiWfMMFw",
+            "sends": []
+          },
+          {
+            "name": "F9Y",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.4SDMbOm",
+        "label": "a.b.4SDMbOm",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "GfGrjqVAK1zJMY1",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.qn3H.pj7cp",
+        "label": "a.qn3H.pj7cp",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.1ZFF",
+        "label": "a.b.1ZFF",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.3pyOMsSWInj",
+        "label": "a.3pyOMsSWInj",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "TMDkX3Y8BZc",
+            "sends": null
+          },
+          {
+            "name": "LFFLzg2o",
+            "sends": []
+          },
+          {
+            "name": "vxZsYmirM.IOwDag",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.wI3mPhYWM",
+        "label": "a.wI3mPhYWM",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.b.1ZFF",
+        "event": "ehyW",
+        "to": "a.b.vyC8J8XWRNt",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["JHS2.cSp"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(JHS2.cSp)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.omy",
+        "event": "Pxw",
+        "to": "a.b.4SDMbOm",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.b.4SDMbOm",
+        "event": "Xoxl_NVjnMYbRO",
+        "to": "a.qn3H.pj7cp",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.b.vyC8J8XWRNt",
+        "event": "HXVfaW0DmngmK383",
+        "to": "a.qn3H.pj7cp",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["JHS2.cSp"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(JHS2.cSp)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.YeobWL",
+        "event": "8mDs6eBrmPV1ouaL",
+        "to": "a.b.Xtlu",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.b.vyC8J8XWRNt",
+        "event": "Oq4",
+        "to": "a.b.vyC8J8XWRNt",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.YeobWL",
+        "event": "DYqVhU3m6",
+        "to": "a.3pyOMsSWInj",
+        "kind": "stay",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["JHS2.cSp"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(JHS2.cSp)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.b.1ZFF",
+        "event": "NQl",
+        "to": "a.b.vyC8J8XWRNt",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "a.YeobWL",
+        "event": "OCXg",
+        "to": "a.3pyOMsSWInj",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.mGxkTMqnl",
+        "label": "a.mGxkTMqnl",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "6fV_se8skws",
+            "sends": null
+          },
+          {
+            "name": "mwu0AqSywmc",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.CW_WJ.O0O",
+        "label": "a.CW_WJ.O0O",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "yFllylYiJ",
+            "sends": null
+          },
+          {
+            "name": "NgmprM4G",
+            "sends": []
+          },
+          {
+            "name": "fmzjYoDyTTfLmVhM",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.3fymJmwwG",
+        "label": "a.3fymJmwwG",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "aW_nkOHWry",
+            "sends": null
+          },
+          {
+            "name": "yWwA",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.3fymJmwwG",
+        "event": "hwdNbO1zbiQE_w",
+        "to": "a.CW_WJ.O0O",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.3fymJmwwG",
+        "event": "cGWz5SyiLcV",
+        "to": "a.CW_WJ.O0O",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.CW_WJ.O0O",
+        "event": "UnAaM2V",
+        "to": "a.3fymJmwwG",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": [],
+    "maps": [],
+    "actors": [],
+    "states": [
+      {
+        "id": "enCuDn.j0M",
+        "label": "enCuDn.j0M",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "QO9Et97TLr",
+            "sends": null
+          },
+          {
+            "name": "Nju",
+            "sends": []
+          },
+          {
+            "name": "rWx5",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "EAK",
+        "label": "EAK",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "*",
+        "event": "wWYCnMJnLwkg",
+        "to": "EAK",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ZIVJwM"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ZIVJwM)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "enCuDn.j0M",
+        "event": "sIBAv2WK",
+        "to": "EAK",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "EAK",
+        "event": "kg5O",
+        "to": "EAK",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "enCuDn.j0M",
+        "event": "0NMmmxH",
+        "to": "EAK",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ZIVJwM"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ZIVJwM)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "EAK",
+        "event": "WewLl1",
+        "to": "enCuDn.j0M",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "*",
+        "event": "0X7a9.w",
+        "to": "enCuDn.j0M",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ZIVJwM"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ZIVJwM)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "*",
+        "event": "W5J4bnnZdB8",
+        "to": "enCuDn.j0M",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ZIVJwM"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ZIVJwM)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "EAK",
+        "event": "MKq4C5kY",
+        "to": "enCuDn.j0M",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "EAK",
+        "event": "2c36MvQmrIm1y8",
+        "to": "enCuDn.j0M",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "c.PoCW_81Lj",
+    "regions": ["a", "a.b", "c"],
+    "maps": ["c"],
+    "actors": [],
+    "states": [
+      {
+        "id": "c.PoCW_81Lj",
+        "label": "c.PoCW_81Lj",
+        "region": "c",
+        "initial": true,
+        "final": false,
+        "effects": [
+          {
+            "name": "kIk",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "c.4tw",
+        "label": "c.4tw",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "a1inLwAr6zsWj",
+            "sends": null
+          },
+          {
+            "name": "WSNmRdxNUMf",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.w2FmBQHHMD",
+        "label": "a.w2FmBQHHMD",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.Yb4ytF2Am",
+        "label": "a.Yb4ytF2Am",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "NKnRc6RZ_W.Wz",
+            "sends": null
+          },
+          {
+            "name": "uCMRmcS",
+            "sends": []
+          },
+          {
+            "name": "YmyrfvD6BKFMmCr",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "nP.1",
+        "label": "nP.1",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.MJ5lmsz4dc",
+        "label": "a.MJ5lmsz4dc",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "c.RRO",
+        "label": "c.RRO",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "8vnX_7ELI1R4K",
+            "sends": null
+          },
+          {
+            "name": "KbASTb4PRg",
+            "sends": []
+          },
+          {
+            "name": "spq",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "JmRPM",
+        "label": "JmRPM",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "po7Lzxm",
+            "sends": null
+          },
+          {
+            "name": "6NkOEnN2",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.EImg",
+        "label": "a.b.EImg",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "Mu0rmw.WR_OZpXMO",
+            "sends": null
+          },
+          {
+            "name": "CVQ",
+            "sends": []
+          },
+          {
+            "name": "VpFH",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.HZMW",
+        "label": "a.HZMW",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "Y7db",
+            "sends": null
+          },
+          {
+            "name": "ymEquVMzUUQo",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "Hsn_LA",
+        "label": "Hsn_LA",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "_AAuQWoBB",
+            "sends": null
+          },
+          {
+            "name": "0pOJnRIWmG",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.Yb4ytF2Am",
+        "event": "4DkGKYG9o9reyM",
+        "to": "c.RRO",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.b.EImg",
+        "event": "5glSpCtn",
+        "to": "a.b.EImg",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.MJ5lmsz4dc",
+        "event": "APbSqPo8aMws",
+        "to": "a.b.EImg",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.Yb4ytF2Am",
+        "event": "7wZH2PkonlS",
+        "to": "a.Yb4ytF2Am",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.w2FmBQHHMD",
+        "event": "m3DuWEXwN7Jl",
+        "to": "a.w2FmBQHHMD",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["DKIv"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(DKIv)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.Yb4ytF2Am",
+        "event": "wzcMWl_ug",
+        "to": "c.RRO",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "a.8nzj",
+    "regions": ["a"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.8nzj",
+        "label": "a.8nzj",
+        "region": "a",
+        "initial": true,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "cxr3lBKEWmT3",
+        "label": "cxr3lBKEWmT3",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "3fe_11yCK",
+            "sends": null
+          },
+          {
+            "name": "kJ.w2PcFWHFp",
+            "sends": []
+          },
+          {
+            "name": "hXJsV1vMwMsNB5W2",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.dEM",
+        "label": "a.dEM",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "OpU.pWdNs",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "M8OmR",
+        "label": "M8OmR",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "3JoJBWhW4RqUz.v",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.HFYA",
+        "label": "a.HFYA",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "SlqAJ",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "M8OmR",
+        "event": "Nh",
+        "to": "a.8nzj",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.dEM",
+        "event": "tkJ3CM4",
+        "to": "a.dEM",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.dEM",
+        "event": "iw5",
+        "to": "M8OmR",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.dEM",
+        "event": "tMwWcLMQBf",
+        "to": "a.dEM",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.dEM",
+        "event": "ketEcXmO7m",
+        "to": "M8OmR",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "cxr3lBKEWmT3",
+        "event": "CKbzcl",
+        "to": "cxr3lBKEWmT3",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "M8OmR",
+        "event": "M0cUOW",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.dEM",
+        "event": "PHBlhYCHWVv",
+        "to": "M8OmR",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["uLb_tO1"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(uLb_tO1)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "iD",
+    "regions": [],
+    "maps": [],
+    "actors": [],
+    "states": [
+      {
+        "id": "iD",
+        "label": "iD",
+        "region": null,
+        "initial": true,
+        "final": false,
+        "effects": [
+          {
+            "name": "rMYBugwU",
+            "sends": null
+          },
+          {
+            "name": "jWMnpU",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "MOys_RUV",
+        "label": "MOys_RUV",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "IwW",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "G",
+        "label": "G",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "yc0WvDOQMrduk",
+            "sends": null
+          },
+          {
+            "name": "PM2mns4wRuWAm",
+            "sends": []
+          },
+          {
+            "name": "4bqJAWBdK",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "we8",
+        "label": "we8",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "4Df1tUnuXLm",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "U0ZSmEWI",
+        "label": "U0ZSmEWI",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "EwmxH8o9wv0R",
+        "label": "EwmxH8o9wv0R",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "MOBw95OR",
+            "sends": null
+          },
+          {
+            "name": "Cmfjm8.Y",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "wEws5",
+        "label": "wEws5",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "Mwm",
+            "sends": null
+          },
+          {
+            "name": "I1mGx",
+            "sends": []
+          },
+          {
+            "name": "6O94AKOqGfe",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "5Mh",
+        "label": "5Mh",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "odmW",
+        "label": "odmW",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "jMfB71Wj2",
+            "sends": null
+          },
+          {
+            "name": "gvbJOV",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "fjGMK4",
+        "label": "fjGMK4",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "EwmxH8o9wv0R",
+        "event": "Wxwt1kgFVGnZu",
+        "to": "wEws5",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "wEws5",
+        "event": "v.JWpccyFE",
+        "to": "wEws5",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "we8",
+        "event": "pOUzvIY87MQ.pRw",
+        "to": "we8",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "5Mh",
+        "event": "E5o3L",
+        "to": "iD",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "5Mh",
+        "event": "4DG5jwuVZzG2mkd1",
+        "to": "iD",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "5Mh",
+        "event": "mWmRWAtD1W1.lG8l",
+        "to": "iD",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b", "c"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "c.nybsEmdgVwp1",
+        "label": "c.nybsEmdgVwp1",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "YV2ewyoyDL1mBSD",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.YKPzQW7",
+        "label": "a.b.YKPzQW7",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.b.YKPzQW7",
+        "event": "fDHQp",
+        "to": "c.nybsEmdgVwp1",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "c.nybsEmdgVwp1",
+        "event": "14cQeGLaAwX",
+        "to": "a.b.YKPzQW7",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "c.nybsEmdgVwp1",
+        "event": "Svnm_MHm",
+        "to": "a.b.YKPzQW7",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "c.nybsEmdgVwp1",
+        "event": "9cVM66gcby",
+        "to": "a.b.YKPzQW7",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.b.YKPzQW7",
+        "event": "PWmqUgLSB",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.b.YKPzQW7",
+        "event": "_PjsEF.ct_MdWf",
+        "to": "a.b.YKPzQW7",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.b.YKPzQW7",
+        "event": "Y_2mrdA",
+        "to": "a.b.YKPzQW7",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "c.nybsEmdgVwp1",
+        "event": "ieMRmWmB",
+        "to": "c.nybsEmdgVwp1",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["S6WMBTVC5Y3m"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(S6WMBTVC5Y3m)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "c.nybsEmdgVwp1",
+        "event": "vyzuTQr",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "a.FHTWFFwNglq",
+    "regions": ["a"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.FHTWFFwNglq",
+        "label": "a.FHTWFFwNglq",
+        "region": "a",
+        "initial": true,
+        "final": false,
+        "effects": [
+          {
+            "name": "zGiDgE",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.YFwww4CMEFA",
+        "label": "a.YFwww4CMEFA",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "7oTWrj",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "fYT",
+        "label": "fYT",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "AFequ8sGaR_6A705",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.HtWfM",
+        "label": "a.HtWfM",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.Zuwbm5bxS",
+        "label": "a.Zuwbm5bxS",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "A7vBDmMbgsPpSjWn",
+            "sends": null
+          },
+          {
+            "name": "7i99ziR6Elo8UP",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.M",
+        "label": "a.M",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.FHTWFFwNglq",
+        "event": "VTdySDq",
+        "to": "a.FHTWFFwNglq",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "fYT",
+        "event": "Cu2m0WLTI",
+        "to": "a.Zuwbm5bxS",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.M",
+        "event": "4X9AqaLv7R7",
+        "to": "a.M",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "fYT",
+        "event": "lfwFHZY._dj",
+        "to": "a.Zuwbm5bxS",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.Zuwbm5bxS",
+        "event": "7zVWW",
+        "to": "fYT",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.YFwww4CMEFA",
+        "event": "BYJ",
+        "to": "a.YFwww4CMEFA",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "fYT",
+        "event": "95gM1gK",
+        "to": "a.Zuwbm5bxS",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.FHTWFFwNglq",
+        "event": "SWgh",
+        "to": "a.HtWfM",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "fYT",
+        "event": "Y94bIwk3Eo_mwJ",
+        "to": "a.Zuwbm5bxS",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e9",
+        "from": "a.YFwww4CMEFA",
+        "event": "X85OOlNu",
+        "to": "a.YFwww4CMEFA",
+        "kind": "stay",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["3mEi.xr"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(3mEi.xr)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "c"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.OpzrZuqS3rWD",
+        "label": "a.OpzrZuqS3rWD",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "c.aIMRZOXxB",
+        "label": "c.aIMRZOXxB",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "6EDui9",
+            "sends": null
+          },
+          {
+            "name": "bwI8aQN1n_JSYw",
+            "sends": []
+          },
+          {
+            "name": "H9SsX.QmO",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.OpzrZuqS3rWD",
+        "event": "sm7wWV",
+        "to": "c.aIMRZOXxB",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.OpzrZuqS3rWD",
+        "event": "BAp",
+        "to": "a.OpzrZuqS3rWD",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.OpzrZuqS3rWD",
+        "event": "JMROgW4W6UWj",
+        "to": "a.OpzrZuqS3rWD",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.OpzrZuqS3rWD",
+        "event": "Ifrw1LMo0N",
+        "to": "c.aIMRZOXxB",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.OpzrZuqS3rWD",
+        "event": "nRblF6",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.OpzrZuqS3rWD",
+        "event": "rHPw6BkW3",
+        "to": "c.aIMRZOXxB",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "*",
+        "event": "wZI51Tmyy20iC",
+        "to": "a.OpzrZuqS3rWD",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["y8rem45"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(y8rem45)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a"],
+    "maps": [],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.jhuw3",
+        "label": "a.jhuw3",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "IMMLq",
+            "sends": null
+          },
+          {
+            "name": "mRafw",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "5JGFDmvRmuqi",
+        "label": "5JGFDmvRmuqi",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.Q5q3jUG5",
+        "label": "a.Q5q3jUG5",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "XwZwSW",
+            "sends": null
+          },
+          {
+            "name": "ZpR9m",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "5JGFDmvRmuqi",
+        "event": "vxvmD6w.W",
+        "to": "5JGFDmvRmuqi",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.Q5q3jUG5",
+        "event": "GPhFEz.qlj",
+        "to": "a.jhuw3",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.Q5q3jUG5",
+        "event": "FlLk8",
+        "to": "a.Q5q3jUG5",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.Q5q3jUG5",
+        "event": "gLMwTLK4mbB2a",
+        "to": "a.Q5q3jUG5",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "5JGFDmvRmuqi",
+        "event": "mDX",
+        "to": "5JGFDmvRmuqi",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "5JGFDmvRmuqi",
+        "event": "hCaWm3WuwqUT6XoG",
+        "to": "5JGFDmvRmuqi",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["MqSNkkjM"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(MqSNkkjM)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.Q5q3jUG5",
+        "event": "KQdTcU1W_qvnOYw",
+        "to": "a.jhuw3",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.Q5q3jUG5",
+        "event": "DoB",
+        "to": "a.jhuw3",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b", "c"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.b.wqbmsi",
+        "label": "a.b.wqbmsi",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "1n1NENP89oVV",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "bY",
+        "label": "bY",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "LYzjAnKVmGFa",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "A0X97B1lMX3m",
+        "label": "A0X97B1lMX3m",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "awvDpXGXr",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "c.p7w1AVURMC",
+        "label": "c.p7w1AVURMC",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "LfWEutOwwY",
+            "sends": null
+          },
+          {
+            "name": "HmwR.pISXmxAMX",
+            "sends": []
+          },
+          {
+            "name": "_d9wAswwsZ",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.KOS4B",
+        "label": "a.KOS4B",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "8m14yRqNWgow",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "c.Wak",
+        "label": "c.Wak",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "PixVcBBszM",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.2LZW0s5zsC",
+        "label": "a.2LZW0s5zsC",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.VKTdEmM77",
+        "label": "a.VKTdEmM77",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "b0LPr96OoMP7L7n",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "c.Wak",
+        "event": "ayWYW6bwxmA4Mo",
+        "to": "A0X97B1lMX3m",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.KOS4B",
+        "event": "rpDP",
+        "to": "a.2LZW0s5zsC",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["rYqUuAmjUoWYkjo"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(rYqUuAmjUoWYkjo)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "c.Wak",
+        "event": "wncJvOwsU",
+        "to": "A0X97B1lMX3m",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "c.Wak",
+        "event": "powTNW3q7AXQdzza",
+        "to": "a.2LZW0s5zsC",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["rYqUuAmjUoWYkjo"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(rYqUuAmjUoWYkjo)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "*",
+        "event": "ttciqhvrlM0sq_Cn",
+        "to": "A0X97B1lMX3m",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["rYqUuAmjUoWYkjo"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(rYqUuAmjUoWYkjo)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "c.p7w1AVURMC",
+        "event": "vwG6fq0zC",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "c.Wak",
+        "event": "5hYahk1iM_o1m0",
+        "to": "A0X97B1lMX3m",
+        "kind": "stay",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["rYqUuAmjUoWYkjo"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(rYqUuAmjUoWYkjo)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "c.Wak",
+        "event": "hUH7r",
+        "to": "A0X97B1lMX3m",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "c.Wak",
+        "event": "5bT",
+        "to": "A0X97B1lMX3m",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e9",
+        "from": "c.Wak",
+        "event": "nsqBWwSzYDpQBMIq",
+        "to": "A0X97B1lMX3m",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": [],
+    "maps": [],
+    "actors": [],
+    "states": [
+      {
+        "id": "Gnx0SztkdqZ",
+        "label": "Gnx0SztkdqZ",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "PqLe6wRk50dxn",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "BUcuMuyzTeA",
+        "label": "BUcuMuyzTeA",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "4An",
+        "label": "4An",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "m2.e",
+            "sends": null
+          },
+          {
+            "name": "rpOdWgtlbakVwwo",
+            "sends": []
+          },
+          {
+            "name": "gfJM86wh1Lxz2F",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "yw",
+        "label": "yw",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "8VQeGztkWiU",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "9ww",
+        "label": "9ww",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "_Jmw33",
+            "sends": null
+          },
+          {
+            "name": "jHz25WSc9tMBfpCg",
+            "sends": []
+          },
+          {
+            "name": "1UM8ZYpw7fI4b",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "_VgMmgK6Lk",
+        "label": "_VgMmgK6Lk",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "mIzPv8POK",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "Z",
+        "label": "Z",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "TfA0JDmN4xq",
+            "sends": null
+          },
+          {
+            "name": "2W85",
+            "sends": []
+          },
+          {
+            "name": "1mQN4fL47",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "nj.fWaA",
+        "label": "nj.fWaA",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "lBWwb",
+            "sends": null
+          },
+          {
+            "name": "sYxSg",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "L.AI",
+        "label": "L.AI",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "5BJRZeLl",
+            "sends": null
+          },
+          {
+            "name": "9qWUB52Ocn8KQ",
+            "sends": []
+          },
+          {
+            "name": "2SumiYSPkMq",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "wKtW9d4X7B",
+        "label": "wKtW9d4X7B",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "MXav.M_nW.zww",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "K",
+        "label": "K",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "5hMkJwV7VCY",
+            "sends": null
+          },
+          {
+            "name": "L_wH",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "_VgMmgK6Lk",
+        "event": "GzhvLWMomvrw",
+        "to": "L.AI",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "_VgMmgK6Lk",
+        "event": "Qe5AJ.E2vYtzMz",
+        "to": "L.AI",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "_VgMmgK6Lk",
+        "event": "nh.tKePMMi0.V3WO",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "_VgMmgK6Lk",
+        "event": "CnnrRo7ohNwy4MvI",
+        "to": "L.AI",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "wKtW9d4X7B",
+        "event": "Mp5pA_",
+        "to": "K",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "BUcuMuyzTeA",
+        "event": "mhJ",
+        "to": "Z",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "BUcuMuyzTeA",
+        "event": "TwR_ME.s0SLVmuu",
+        "to": "L.AI",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["8WLOfMHMNr"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(8WLOfMHMNr)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.8",
+        "label": "a.8",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "wIXnFKIkTQ6fAi_",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.Y",
+        "label": "a.b.Y",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "LN4uhbd9OI0e",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.lFB7D",
+        "label": "a.lFB7D",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "TwY",
+            "sends": null
+          },
+          {
+            "name": "WElFW9h",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.h7xTQ4LT",
+        "label": "a.h7xTQ4LT",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "yMwb_TU",
+            "sends": null
+          },
+          {
+            "name": "Z6HMtu",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "Pd6K3",
+        "label": "Pd6K3",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "Pf2WB_wLt2XH1Om",
+            "sends": null
+          },
+          {
+            "name": "7b2j",
+            "sends": []
+          },
+          {
+            "name": "8F7QM1H1",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.b.Y",
+        "event": "mKM",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "*",
+        "event": "1KOO1w0A4k",
+        "to": "a.h7xTQ4LT",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["neqyIKolbmfwi.G"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(neqyIKolbmfwi.G)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "*",
+        "event": "2oOL",
+        "to": "a.lFB7D",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["neqyIKolbmfwi.G"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(neqyIKolbmfwi.G)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["c"],
+    "maps": ["c"],
+    "actors": [],
+    "states": [
+      {
+        "id": "c.4WZnaW0N5",
+        "label": "c.4WZnaW0N5",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "c.9dEGm4jE",
+        "label": "c.9dEGm4jE",
+        "region": "c",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "E62w",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "c.4WZnaW0N5",
+        "event": "tLmcm1WQ.udJYr",
+        "to": "c.4WZnaW0N5",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "c.4WZnaW0N5",
+        "event": "CPCwC",
+        "to": "c.9dEGm4jE",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "c.4WZnaW0N5",
+        "event": "g_eWoz",
+        "to": "c.9dEGm4jE",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "c.9dEGm4jE",
+        "event": "M4K",
+        "to": "c.9dEGm4jE",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["tmyFb6M"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(tmyFb6M)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "c.9dEGm4jE",
+        "event": "KWzVm",
+        "to": "c.4WZnaW0N5",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["tmyFb6M"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(tmyFb6M)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "*",
+        "event": "LW1",
+        "to": "c.4WZnaW0N5",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["tmyFb6M"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(tmyFb6M)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "c.9dEGm4jE",
+        "event": "ocv.n",
+        "to": "c.9dEGm4jE",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "c.4WZnaW0N5",
+        "event": "VIWIvEzr0",
+        "to": "c.9dEGm4jE",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": "trdGTWC_J5",
+    "regions": ["a"],
+    "maps": [],
+    "actors": [],
+    "states": [
+      {
+        "id": "trdGTWC_J5",
+        "label": "trdGTWC_J5",
+        "region": null,
+        "initial": true,
+        "final": false,
+        "effects": [
+          {
+            "name": "h3WCgf",
+            "sends": null
+          },
+          {
+            "name": "t4OQMyqqMOUh4g",
+            "sends": []
+          },
+          {
+            "name": "S_lMEEqoTiG5rL",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.CtY",
+        "label": "a.CtY",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "uJBqn4hWboyqY",
+            "sends": null
+          },
+          {
+            "name": "l2.l9ywZAWRZhROp",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.255I2tB",
+        "label": "a.255I2tB",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "mcHW0QT8",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.IMG6H",
+        "label": "a.IMG6H",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "ahFvpKbzGU",
+            "sends": null
+          },
+          {
+            "name": "CGogamNWf.Tud",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.dYf5",
+        "label": "a.dYf5",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "a.IMG6H",
+        "event": "Hw0q_",
+        "to": "a.dYf5",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.255I2tB",
+        "event": "iFWq",
+        "to": "a.IMG6H",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.IMG6H",
+        "event": "tp9i.it2mEyN5",
+        "to": "a.dYf5",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.IMG6H",
+        "event": "ACt02T",
+        "to": "a.dYf5",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b"],
+    "maps": ["a"],
+    "actors": [],
+    "states": [
+      {
+        "id": "a.b.6BqaWVdW.t9",
+        "label": "a.b.6BqaWVdW.t9",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "QEOmH14W3",
+            "sends": null
+          },
+          {
+            "name": "nnKmU",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "LMRm",
+        "label": "LMRm",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "epbF.Is6NU1eezC",
+            "sends": null
+          },
+          {
+            "name": "U7VwSwY",
+            "sends": []
+          },
+          {
+            "name": "Yk4KWbM",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.RAGQbO0mI",
+        "label": "a.b.RAGQbO0mI",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "6ziFqJ",
+            "sends": null
+          },
+          {
+            "name": "FIjMOUmk",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.EydG",
+        "label": "a.EydG",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.8wN6wdw",
+        "label": "a.8wN6wdw",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "WRxn6fXT43MgTzvq",
+            "sends": null
+          },
+          {
+            "name": "o7KWq7WgW7t",
+            "sends": []
+          },
+          {
+            "name": "WG5Rnd",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "N",
+        "label": "N",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "WeOKYowWOatEw",
+            "sends": null
+          },
+          {
+            "name": "RAIw2J_",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a_nwg",
+        "label": "a_nwg",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "mOdw3b",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.D",
+        "label": "a.b.D",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "j4SBOmdFQXiJPKM",
+            "sends": null
+          },
+          {
+            "name": "mrMA",
+            "sends": []
+          },
+          {
+            "name": "3Efcmm",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "*",
+        "event": "ZrkWD4R3d",
+        "to": "LMRm",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["4yq.mM5daBly"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(4yq.mM5daBly)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.b.6BqaWVdW.t9",
+        "event": "jUmZ9fsmywMi6",
+        "to": "LMRm",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["4yq.mM5daBly"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(4yq.mM5daBly)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.b.RAGQbO0mI",
+        "event": "KFbVW",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.b.6BqaWVdW.t9",
+        "event": "BR40LxGSpobM4Nk",
+        "to": "LMRm",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.b.RAGQbO0mI",
+        "event": "FS.CN",
+        "to": "a.b.RAGQbO0mI",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "*",
+        "event": "IsswJgyg28",
+        "to": "a.EydG",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["4yq.mM5daBly"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(4yq.mM5daBly)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "N",
+        "event": "xcw",
+        "to": "N",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  },
+  {
+    "id": "gen",
+    "initial": null,
+    "regions": ["a", "a.b"],
+    "maps": ["a.b"],
+    "actors": [],
+    "states": [
+      {
+        "id": "vcuzEOF9",
+        "label": "vcuzEOF9",
+        "region": null,
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "qQfCL",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.4jEthK76",
+        "label": "a.4jEthK76",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "ENmWRU1Li0JwAwe",
+            "sends": null
+          },
+          {
+            "name": "Em_NpStkRWmF",
+            "sends": []
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.pzFxnM7n9YM",
+        "label": "a.pzFxnM7n9YM",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "Od1RKfzaieMd",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.MwMVl66jnLg",
+        "label": "a.MwMVl66jnLg",
+        "region": "a",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "kCoC1w96ALBcQw",
+            "sends": null
+          },
+          {
+            "name": "iJWiYCW",
+            "sends": []
+          },
+          {
+            "name": "ODqRj",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.m",
+        "label": "a.b.m",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "tMDfc",
+            "sends": null
+          },
+          {
+            "name": "IeqhNc9",
+            "sends": []
+          },
+          {
+            "name": "vYri",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      },
+      {
+        "id": "a.b.soh8Y372tW",
+        "label": "a.b.soh8Y372tW",
+        "region": "a.b",
+        "initial": false,
+        "final": false,
+        "effects": [
+          {
+            "name": "jqsftvDkKez62MY",
+            "sends": null
+          }
+        ],
+        "coverage": null,
+        "tested": null,
+        "doc": null
+      }
+    ],
+    "events": [],
+    "outputs": [],
+    "partOutputs": {},
+    "context": null,
+    "edges": [
+      {
+        "id": "e0",
+        "from": "vcuzEOF9",
+        "event": "VJ69wJO_tnp3m.R",
+        "to": "vcuzEOF9",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e1",
+        "from": "a.MwMVl66jnLg",
+        "event": "F6SP",
+        "to": "a.MwMVl66jnLg",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": {
+          "status": "analyzed",
+          "location": {
+            "file": "a.ts",
+            "line": 1,
+            "column": 1
+          },
+          "registration": "on",
+          "branches": [
+            {
+              "conditions": ["ZeY4xY8T"],
+              "target": {
+                "kind": "stay"
+              }
+            },
+            {
+              "conditions": ["!(ZeY4xY8T)"],
+              "target": {
+                "kind": "stay"
+              }
+            }
+          ],
+          "payloadReads": [],
+          "contextReads": [],
+          "contextWrites": [],
+          "readsActorState": false,
+          "comparisons": [],
+          "literals": []
+        },
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e2",
+        "from": "a.b.soh8Y372tW",
+        "event": "WAmni",
+        "to": "vcuzEOF9",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e3",
+        "from": "a.b.m",
+        "event": "BMS",
+        "to": "a.MwMVl66jnLg",
+        "kind": "transition",
+        "origin": "fuzz",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e4",
+        "from": "a.b.m",
+        "event": "vMn",
+        "to": "a.b.m",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e5",
+        "from": "a.MwMVl66jnLg",
+        "event": "JPdKmtv",
+        "to": "vcuzEOF9",
+        "kind": "stay",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e6",
+        "from": "a.b.soh8Y372tW",
+        "event": "o7Y.FmE",
+        "to": "a.4jEthK76",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e7",
+        "from": "a.MwMVl66jnLg",
+        "event": "wwiF",
+        "to": null,
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      },
+      {
+        "id": "e8",
+        "from": "a.b.soh8Y372tW",
+        "event": "Fw5sw",
+        "to": "a.MwMVl66jnLg",
+        "kind": "transition",
+        "origin": "declared",
+        "emits": [],
+        "contexts": [],
+        "explanation": null,
+        "doc": null,
+        "coverage": null,
+        "tested": null
+      }
+    ],
+    "fuzz": null,
+    "runs": []
+  }
+]

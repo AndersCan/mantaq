@@ -1,0 +1,3 @@
+---
+"@mantaq/viz": minor
+---

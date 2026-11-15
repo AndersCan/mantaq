@@ -3,7 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
-import { LOCK_SLOT, layoutMachine, textWidth } from "./layout.ts";
+import { LOCK_SLOT, placeMachine, textWidth } from "./layout.ts";
 
 function state(id: string, initial: boolean): VizState {
   return {
@@ -130,7 +130,7 @@ describe("renderGraph transition label", () => {
         mode: "off",
       }),
     );
-    const placed = layoutMachine(go).edges[0];
+    const placed = placeMachine(go).edges[0];
     const text = root.querySelector('[data-edge-id="idle-submitWWW-busy"] text');
     expect(Number(text?.getAttribute("x"))).toBe(placed?.text.x);
     const spans = [...(text?.querySelectorAll("tspan") ?? [])];

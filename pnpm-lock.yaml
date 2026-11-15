@@ -531,6 +531,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2
+      fast-check:
+        specifier: 'catalog:'
+        version: 4.9.0
       happy-dom:
         specifier: 'catalog:'
         version: 21.0.4
