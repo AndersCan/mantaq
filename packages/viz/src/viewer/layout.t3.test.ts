@@ -278,3 +278,39 @@ describe("regions grow past dagre's border on every side without touching neighb
     expect(overlapsOf(laid)).toEqual([]);
   });
 });
+
+describe("the checker places nodes in the region the layout put them in", () => {
+  test("an unknown target inside a region is not a region-edge overlap", () => {
+    const lost: VizEdge = { ...edge("r.b", "lost", "x"), id: "lost", to: null };
+    const laid = placeMachine(
+      machineOf([state("a"), state("r.b", "r")], [edge("a", "go", "r.b"), lost], ["r"]),
+    );
+    expect(overlapsOf(laid).filter((each) => each.rule === "region-edge")).toEqual([]);
+  });
+
+  test("a region's `*` is not a region-edge overlap", () => {
+    const laid = placeMachine(
+      machineOf(
+        [state("a"), state("r.b", "r"), state("r.c", "r")],
+        [edge("a", "go", "r.b"), edge("r.*", "reset", "r.c")],
+        ["r"],
+      ),
+    );
+    expect(laid.nodes.some((each) => each.kind === "any")).toBe(true);
+    expect(overlapsOf(laid).filter((each) => each.rule === "region-edge")).toEqual([]);
+  });
+
+  test("an unknown target of a region's `*` is inside that region too", () => {
+    const lost: VizEdge = { ...edge("r.*", "lost", "x"), id: "lost", to: null };
+    const laid = placeMachine(
+      machineOf([state("a"), state("r.b", "r")], [edge("a", "go", "r.b"), lost], ["r"]),
+    );
+    expect(overlapsOf(laid).filter((each) => each.rule === "region-edge")).toEqual([]);
+  });
+
+  test("a start id with no state draws no entry arrow", () => {
+    const laid = placeMachine({ ...machineOf([state("a")], [], []), initial: "idle" });
+    expect(laid.entries).toEqual([]);
+    expect(overlapsOf(laid)).toEqual([]);
+  });
+});

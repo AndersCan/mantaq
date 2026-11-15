@@ -8,7 +8,7 @@ import fc from "fast-check";
 import { describe, expect, test } from "vite-plus/test";
 
 const examples = (counterexamples as VizMachine[]).map((machine) => [machine] as [VizMachine]);
-const run = { seed: 0x700, numRuns: 300, endOnFailure: false, examples };
+const run = { seed: 0x700, numRuns: 300, examples };
 
 describe("layout guarantee on generated machines", () => {
   // Fails today: 26 of 300 machines still overlap. Flip to `test` when the layout fixes them.
