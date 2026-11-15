@@ -1107,3 +1107,17 @@ describe("live actor map children", () => {
     ]);
   });
 });
+
+test("a count keeps focus after a click, so Enter walks the next child", () => {
+  const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
+  document.body.append(root);
+  const button = () =>
+    root.querySelector<HTMLButtonElement>(
+      '[data-pool-count] button[data-count-state="photos.sendingPhoto"]',
+    );
+  button()?.focus();
+  button()?.click();
+  expect(root.querySelector("[data-child-key]")?.getAttribute("data-child-key")).toBe("p2");
+  expect(document.activeElement).toBe(button());
+  root.remove();
+});

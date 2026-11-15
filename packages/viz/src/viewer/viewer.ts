@@ -71,9 +71,8 @@ interface ViewState {
   composingActor: VizActorRef | undefined;
   /** The "Events and time" fold is open; it stays as the user left it across steps and Back. */
   eventsOpen: boolean;
-  /** Live: the child a click in the child graph goes to; null = the one that started first. */
+  /** Live: the child a click in the child graph goes to; null = the lowest key. */
   picked: { map: string; key: string } | null;
-  /** True only right after a step or an effect result: markers slide and new ones grow in. */
   /** The panel tab shown. */
   tab: PanelTab;
   /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
@@ -1091,6 +1090,13 @@ function markDiagram(
   showPayloadSheet(root, { ...context, ...view });
 }
 
+function focusedCountState(root: HTMLElement): string | undefined {
+  const focused = root.ownerDocument.activeElement;
+  return focused instanceof HTMLElement && focused.closest("[data-pool-count]") !== null
+    ? focused.dataset.countState
+    : undefined;
+}
+
 /** The count lines under the diagram, and each map frame titled with the child it shows. */
 function markPools(
   root: HTMLElement,
@@ -1099,6 +1105,7 @@ function markPools(
   const { machine, view, refresh } = context;
   const { live } = view;
   const canvas = root.querySelector(".canvas");
+  const focusedState = focusedCountState(root);
   canvas?.querySelectorAll("[data-pool-count]").forEach((line) => line.remove());
   if (live === null || canvas === null) return;
   canvas.append(
@@ -1112,6 +1119,10 @@ function markPools(
       },
     }),
   );
+  if (focusedState !== undefined)
+    canvas
+      .querySelector<HTMLElement>(`[data-pool-count] button[data-count-state="${focusedState}"]`)
+      ?.focus();
   for (const map of machine.maps) {
     const title = root.querySelector(`.graph g.region[data-map="${map}"] > text`);
     if (title !== null)

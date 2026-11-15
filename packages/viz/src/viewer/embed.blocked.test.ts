@@ -483,3 +483,56 @@ describe("a blocked arrow, more cases", () => {
     expect(arrow()?.classList.contains("blocked")).toBe(false);
   });
 });
+
+test("a blocked arrow of the walked child, not the lowest key, opens its note", () => {
+  const machine: VizMachine = {
+    id: "queue",
+    initial: "showingQueue",
+    regions: ["photos"],
+    maps: ["photos"],
+    actors: [],
+    states: [
+      stateIn("showingQueue", true),
+      stateIn("photos.sending", true),
+      stateIn("photos.sent"),
+    ],
+    events: [eventOf("confirm")],
+    outputs: [],
+    partOutputs: {},
+    context: null,
+    edges: [
+      guardedEdge("photos.sending", "confirm", "photos.sent", [
+        { path: "quota", operator: "!==", literal: 0 },
+      ]),
+    ],
+    runs: [],
+    fuzz: null,
+  };
+  const state0 = liveState({
+    state: "showingQueue",
+    context: { quota: 0 },
+    children: [
+      { map: "photos", key: "p1", state: "photos.sent", since: 0 },
+      { map: "photos", key: "p2", state: "photos.sending", since: 1 },
+    ],
+  });
+  const sent: VizStep[] = [];
+  const driver: VizDriver = {
+    reset: () => state0,
+    step: (step) => {
+      sent.push(step);
+      return state0;
+    },
+    dryRun: (steps) => steps.map(stayedStep),
+  };
+  const root = document.createElement("div");
+  document.body.append(root);
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
+  root
+    .querySelector('[data-pool-count] button[data-count-state="photos.sending"]')
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  clickEdge(root, "photos.sending-confirm-photos.sent");
+  expect(sent).toHaveLength(0);
+  expect(root.querySelector('[data-blocked-note="confirm"]')).not.toBeNull();
+  root.remove();
+});

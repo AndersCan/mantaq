@@ -564,11 +564,6 @@
   text-decoration: underline;
 }
 
-.viz .pool-count button[aria-pressed="true"] {
-  outline: 2px solid var(--select);
-  border-radius: 3px;
-}
-
 .viz .explore {
   background: var(--region-bg);
   border-radius: 6px;
