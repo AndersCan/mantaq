@@ -3,6 +3,7 @@ import { coveredByAny, isAnyState } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState, VizStep } from "../schema.ts";
 import { machineFindings } from "../findings.ts";
 import type { VizFinding } from "../findings.ts";
+import { localName } from "./compartments.ts";
 import { activatable, html } from "./dom.ts";
 import { renderExplanation } from "./explanation.ts";
 import type { Selection } from "./graph.ts";
@@ -20,6 +21,14 @@ function list(doc: Document, rows: ReadonlyArray<Row>): HTMLDListElement {
       html(doc, "dd", { "data-field": label }, [value]),
     ]),
   );
+}
+
+/** Analysis and coverage rows, folded: they explain the tool, not the machine. */
+function debugFold(doc: Document, rows: ReadonlyArray<Row>): HTMLElement {
+  return html(doc, "details", { class: "details-debug", "data-debug": "" }, [
+    html(doc, "summary", {}, ["Analysis and coverage"]),
+    list(doc, rows),
+  ]);
 }
 
 function joined(values: ReadonlyArray<string>): string {
@@ -136,6 +145,13 @@ function edgeList(
   );
 }
 
+/** `free —ITEMS_ASSIGNED→ working`: the edge as the diagram draws it. */
+function edgeTitle(edge: VizEdge): string {
+  const from = isAnyState(edge.from) ? "any state" : localName(edge.from);
+  const to = edge.to === null ? "?" : localName(edge.to);
+  return edge.kind === "initial" ? `start → ${to}` : `${from} —${edge.event}→ ${to}`;
+}
+
 function edgePanel(
   doc: Document,
   edge: VizEdge,
@@ -144,7 +160,7 @@ function edgePanel(
   const { machine, replay } = context;
   const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
-    html(doc, "h2", {}, [`Edge ${edge.id}`]),
+    html(doc, "h2", {}, [edgeTitle(edge)]),
     machineWide(doc, machine, replay),
     routingNote(doc, edge, machine),
     predictionNote(doc, edge, machine),
@@ -157,9 +173,12 @@ function edgePanel(
       ],
       ["target", targetText(edge)],
       ["doc", edge.doc ?? "none"],
+      ["emits", joined(edge.emits)],
+    ]),
+    debugFold(doc, [
+      ["id", edge.id],
       ["kind", edge.kind],
       ["origin", ORIGIN_LABELS[edge.origin]],
-      ["emits", joined(edge.emits)],
       ["contexts", joined(edge.contexts)],
       [runLabel(machine), hitsText(edge.coverage)],
       ["test hits", hitsText(edge.tested)],
@@ -313,10 +332,12 @@ function statePanel(
           ),
         ),
       ],
-      [machine.fuzz === null ? "run visits" : "fuzz visits", hitsText(state.coverage)],
-      ["test visits", hitsText(state.tested)],
       ["outgoing", edgeList(doc, outgoing, select)],
       ["incoming", edgeList(doc, incoming, select)],
+    ]),
+    debugFold(doc, [
+      [machine.fuzz === null ? "run visits" : "fuzz visits", hitsText(state.coverage)],
+      ["test visits", hitsText(state.tested)],
     ]),
   ]);
 }

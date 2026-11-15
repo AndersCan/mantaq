@@ -39,7 +39,10 @@ import { keyLine } from "./key.ts";
 import {
   dotKey,
   markSystem,
+  partMachine,
+  partOfTarget,
   renderSystem,
+  senderInto,
   sendsLines,
   systemDetails,
   systemFor,
@@ -85,6 +88,8 @@ interface ViewState {
   notice: string | null;
   /** A machine whose parts talk opens on the system view; true once the reader opened a part in the diagram. */
   drilled: boolean;
+  /** The part the diagram draws while drilled: "" = the root, else a region or map. */
+  openPart: string;
   /** The clicked arrow or box in the system view; kept while the diagram is open. */
   systemSelection: SystemSelection | null;
   /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
@@ -235,7 +240,7 @@ export function mountViewer(
         path: view.path,
         take,
         rewind,
-        ...liveOf(view, { send, play, compose, routes: options.routes }),
+        ...liveOf(view, { send, play, compose, routes: options.routes }, system),
       });
       const details = detailsOf(doc, {
         machine,
@@ -291,14 +296,16 @@ export function mountViewer(
       const walk = screenWalk({ machine, view, driver, selection });
       return walk === null ? showDetails(selection) : play(walk, undefined, "screen");
     };
-    const open = openIn(root, view, () => render());
+    const open = openIn(root, view, { machine, render: () => render() });
     const live = driver === undefined ? null : { send, compose };
     const graph = inSystem
-      ? renderSystem(doc, machine, system, {
-          ...systemCallbacks({ machine, view, refresh, live }),
-          narrow: root.clientWidth > 0 && root.clientWidth < 560,
-        })
-      : renderGraph(doc, machine, { select, showDetails, mode, bare: view.diagramOnly });
+      ? renderSystem(doc, machine, system, systemCallbacks({ root, machine, view, refresh, live }))
+      : renderGraph(doc, drawn(machine, view), {
+          select,
+          showDetails,
+          mode,
+          bare: view.diagramOnly,
+        });
     const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
     root.append(...layoutOf(doc, { chrome, graph, panel, changes }));
@@ -324,16 +331,19 @@ function chromeOf(
 
 /** The system view's clicks; the entry lines send only when a driver runs. */
 function systemCallbacks(context: {
+  root: HTMLElement;
   machine: VizMachine;
   view: ViewState;
   refresh: () => void;
   live: Pick<LiveContext, "send" | "compose"> | null;
 }): SystemCallbacks {
-  const { machine, view, live } = context;
+  const { root, machine, view, live } = context;
   const select = systemSelector(view, context.refresh);
-  if (live === null) return { select };
+  const narrow = root.clientWidth > 0 && root.clientWidth < 560;
+  if (live === null) return { select, narrow };
   return {
     select,
+    narrow,
     send: ({ event, to }) =>
       sendEvent(machine, event, {
         actor: to === "" ? undefined : { region: to },
@@ -369,14 +379,21 @@ function systemSelector(
   };
 }
 
+/** What the diagram draws: only the opened part once a system's part is open, else the whole machine. */
+function drawn(machine: VizMachine, view: ViewState): VizMachine {
+  return view.drilled ? partMachine(machine, view.openPart) : machine;
+}
+
 /** Open: the diagram, on the target, without walking (a click on the diagram would walk). */
 function openIn(
   root: HTMLElement,
   view: ViewState,
-  render: () => void,
+  context: { machine: VizMachine; render: () => void },
 ): (target: OpenTarget) => void {
+  const { machine, render } = context;
   return (target) => {
     view.drilled = true;
+    view.openPart = partOfTarget(machine, target);
     view.selection = target;
     view.tab = "details";
     render();
@@ -560,6 +577,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     diagramOnly: options.diagramOnly ?? false,
     notice: null,
     drilled: false,
+    openPart: "",
     systemSelection: null,
     blocked: new Map(),
     blockedFor: null,
@@ -653,6 +671,7 @@ function panelTabs(
 function liveOf(
   view: ViewState,
   handlers: Pick<LiveContext, "send" | "play" | "compose" | "routes">,
+  system: MachineSystem | null,
 ): Pick<ExploreContext, "events"> & { live?: LiveContext } {
   const events = {
     open: view.eventsOpen,
@@ -669,6 +688,9 @@ function liveOf(
       afters: view.afters,
       previous: view.previous,
       ...handlers,
+      ...(system === null
+        ? {}
+        : { fromPart: (part: string, event: string) => senderInto(system, part, event) }),
     },
   };
 }
@@ -881,10 +903,11 @@ interface Chrome {
   setDiagramOnly: (on: boolean) => void;
 }
 
-/** "← System": back from a part's diagram to the system view, the system selection kept. Only after Open. */
+/** "← System" and one button per part: back to the system view, or another part's diagram. Only after Open. */
 function backToSystem(doc: Document, context: Chrome): HTMLElement | null {
   const { view, machine } = context;
-  if (!view.drilled || systemFor(machine) === null) return null;
+  const system = systemFor(machine);
+  if (!view.drilled || system === null) return null;
   const button = html(doc, "button", { type: "button", "data-system-back": "" }, ["← System"]);
   button.addEventListener("click", () => {
     view.drilled = false;
@@ -893,7 +916,23 @@ function backToSystem(doc: Document, context: Chrome): HTMLElement | null {
       .querySelector<HTMLElement>(".graph .selected[tabindex]")
       ?.focus({ preventScroll: true });
   });
-  return button;
+  const parts = system.parts.map((part) => {
+    const shown = part.id === view.openPart;
+    const each = html(
+      doc,
+      "button",
+      { type: "button", "data-open-part-tab": part.id, "aria-current": shown ? "page" : null },
+      [part.kind === "map" ? `${part.label} (each)` : part.label],
+    );
+    each.addEventListener("click", () => {
+      if (shown) return;
+      view.openPart = part.id;
+      view.selection = null;
+      context.render();
+    });
+    return each;
+  });
+  return html(doc, "nav", { class: "part-nav", "aria-label": "parts" }, [button, ...parts]);
 }
 
 function headerOf(doc: Document, context: Chrome): HTMLElement {

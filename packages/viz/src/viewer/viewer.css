@@ -956,3 +956,22 @@
   font-size: 12px;
   white-space: pre;
 }
+
+/* After Open: back to the board, or another part's diagram. The open part reads as current. */
+.viz .part-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.viz .part-nav [aria-current="page"] {
+  font-weight: 600;
+  border-color: var(--fg);
+}
+
+.viz .details-debug summary {
+  color: var(--muted);
+  cursor: pointer;
+  margin-top: 8px;
+}

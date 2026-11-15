@@ -37,6 +37,8 @@ export interface ExploreContext {
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
+    /** The part that sends `event` into `part` ("" = the root); null or unset: it comes from outside. */
+    fromPart?: (part: string, event: string) => string | null;
     send: (step: VizStep) => void;
     previous?: VizJson;
     /** Replace the walk with these steps from a fresh actor. */
@@ -48,10 +50,14 @@ export interface ExploreContext {
   events: { open: boolean; onToggle: (open: boolean) => void };
 }
 
-const GROUP_TITLES: Record<MoveGroup, string> = {
+/** "parts": inputs another part of the machine sends; sending one by hand skips that part. */
+type SendGroup = MoveGroup | "parts";
+
+const GROUP_TITLES: Record<SendGroup, string> = {
   input: "Send an input",
   effect: "Effect reports back",
   internal: "Other internal events",
+  parts: "Sent by another part (by hand skips it)",
 };
 
 function code(doc: Document, text: string): HTMLElement {
@@ -287,6 +293,7 @@ interface LiveMoves {
   send: (step: VizStep) => void;
   final: boolean;
   compose: (event: string | null, actor?: VizActorRef) => void;
+  fromPart?: (part: string, event: string) => string | null;
 }
 
 /** One control per declared payload field: read its text, write a text into it, focus it. */
@@ -815,7 +822,7 @@ function liveMovesSection(
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
   const events = offeredEvents(machine, compartment, [...handled]);
-  const groups: MoveGroup[] = ["input", "effect", "internal"];
+  const groups: SendGroup[] = ["input", "effect", "internal", "parts"];
   const item = (event: string) =>
     sendItem(doc, machine, {
       live,
@@ -826,8 +833,11 @@ function liveMovesSection(
       compartment,
       ...(child === undefined ? {} : { child }),
     });
-  const groupOf = (event: string): MoveGroup =>
-    moves.find((each) => each.edge.event === event)?.group ?? "input";
+  const groupOf = (event: string): SendGroup => {
+    const group = moves.find((each) => each.edge.event === event)?.group ?? "input";
+    const sender = live.fromPart?.(compartment, event) ?? null;
+    return group === "input" && sender !== null ? "parts" : group;
+  };
   return block(
     groups.flatMap((group) => {
       const members = events.filter((event) => groupOf(event) === group);
@@ -1548,7 +1558,13 @@ function liveParts(
 ): Array<HTMLElement | null> {
   const { live, final, events } = context;
   const { state } = live;
-  const moves: LiveMoves = { state, send: live.send, final, compose: live.compose };
+  const moves: LiveMoves = {
+    state,
+    send: live.send,
+    final,
+    compose: live.compose,
+    ...(live.fromPart === undefined ? {} : { fromPart: live.fromPart }),
+  };
   return [
     ...regionLines(doc, machine, state),
     liveResultSection(doc, {
