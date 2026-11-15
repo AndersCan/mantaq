@@ -36,7 +36,7 @@ Hand-rolling a queue with workers means wiring the inbox, the idle and busy trac
 
 ### Send it work from your own machine
 
-Return your machine and the pool's two parts from one factory, and the diagram draws the arrow from yours into the inbox.
+Return your machine and the pool's two parts from one factory, and the diagram draws them together: your machine's states, the inbox's states and one cook.
 
 <div data-pagefind-ignore>
 
@@ -44,8 +44,8 @@ Return your machine and the pool's two parts from one factory, and the diagram d
 
 </div>
 
-1. Press `ORDER_PLACED` twice, with a dish each time. `kitchen → orders` turns pink and both cooks fill: `orders` reads `workersBusy`.
-2. Under **Events and time**, press `orders.WORKERS_RESIZED` **with payload** `{"count": 1}`: `cooks ×2` stays, both filled. Advance 1000 ms: `cooks ×1`, and `orders` reads `allWorkersFree`.
+1. Press `ORDER_PLACED` twice, with a dish each time. `orders` reads `workersBusy`; both cooks are working.
+2. Under **Events and time**, press `orders.WORKERS_RESIZED` **with payload** `{"count": 1}`: both cooks stay working. Advance 1000 ms: one cook is left, and `orders` reads `allWorkersFree`.
 
 <Code code={kitchenSource} lang="ts" title="kitchen.ts" />
 

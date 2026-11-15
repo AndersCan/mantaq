@@ -35,7 +35,7 @@ const lanes: VizMachine = {
   id: "teamInbox",
   initial: "empty",
   regions: ["workers", "net"],
-  maps: ["workers"],
+  maps: [],
   actors: [],
   states: [
     state("empty", true),
