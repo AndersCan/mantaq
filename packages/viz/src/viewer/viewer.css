@@ -975,3 +975,10 @@
   cursor: pointer;
   margin-top: 8px;
 }
+
+.viz .explore-path-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}

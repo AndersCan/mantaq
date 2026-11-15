@@ -33,15 +33,19 @@ function json(text: string | null): VizJson {
 
 /** The current state's payload as JSON, or null when there is none or it is not serializable (functions, cycles). */
 function payloadOf(actor: AnyActor<unknown>): VizJson {
-  const payload = actor.snapshot().payload;
-  if (payload === undefined) return null;
+  return jsonOf(actor.snapshot().payload) ?? null;
+}
+
+/** `value` as JSON; undefined when it is undefined or not serializable (functions, cycles). */
+function jsonOf(payload: unknown): VizJson | undefined {
+  if (payload === undefined) return undefined;
   const text = Either.from(() =>
     JSON.stringify(payload, (_key, value: unknown) => {
       if (typeof value === "function") throw new Error("function in payload");
       return value;
     }),
   );
-  return Either.isRight(text) && text[1] !== undefined ? json(text[1]) : null;
+  return Either.isRight(text) && text[1] !== undefined ? json(text[1]) : undefined;
 }
 
 /** Each timer callback starts a new top-level dispatch; report it so follow-ups are only matched within one dispatch. */
@@ -281,9 +285,11 @@ function wrapSend(
       (entry) => !known.has(entry) && entry.event === type && entry.message === undefined,
     );
     const lastSender = last.get(type);
+    const payload = "payload" in event ? jsonOf(event.payload) : undefined;
     const message: VizMessage = {
       sender: lastSender ?? null,
       dropped: taken === undefined ? "noHandler" : null,
+      ...(payload === undefined ? {} : { payload }),
     };
     pending.push({ message, event: type });
     if (taken !== undefined) {

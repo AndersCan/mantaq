@@ -832,6 +832,13 @@ function droppedLine(
     : html(doc, "p", { "data-link-dropped": "" }, [`${dropReasonText(context.machine, latest)}.`]);
 }
 
+/** The receiver's current state when it takes the arrow's event there; undefined otherwise or without a driver. */
+function handlingNow(link: SystemLink, live: VizLiveState | null): string | undefined {
+  if (live === null || link.to === null) return undefined;
+  const current = link.to === "" ? live.state : live.regions[link.to];
+  return current !== undefined && link.handledIn.includes(current) ? current : undefined;
+}
+
 /** Details tab of the system view: who sends the arrow, who takes it where, and ways into the diagram. */
 export function systemDetails(
   doc: Document,
@@ -861,7 +868,7 @@ export function systemDetails(
   }
   const link = system.links.find((each) => linkKey(each) === selection.id);
   if (link === undefined) return null;
-  const first = link.handledIn[0];
+  const first = handlingNow(link, context.live) ?? link.handledIn[0];
   return html(doc, "section", { class: "details", "data-selected-link": selection.id }, [
     html(doc, "h2", {}, [link.event]),
     html(doc, "p", { "data-link-sender": "" }, [senderLine(machine, system, link)]),

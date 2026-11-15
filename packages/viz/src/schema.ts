@@ -228,6 +228,8 @@ export interface VizMessage {
   sender: string | null;
   /** null = taken. */
   dropped: VizDropReason | null;
+  /** What the message carried, as JSON; omitted when it had none or it is not serializable. */
+  payload?: VizJson;
 }
 
 export interface VizLiveStep {

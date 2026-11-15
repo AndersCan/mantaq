@@ -74,17 +74,18 @@ const order = send("ORDER_PLACED", { payload: { dish: "soup" } });
 test("a pool: waiting orders are taken, and each message names its sender", () => {
   const driver = kitchen("held");
   const first = driver.step(order);
+  const dish = { items: ["soup"], worker: "w1" };
   expect(first.after.map((entry) => [entry.actor, entry.message])).toEqual([
-    [{ region: "orders" }, { sender: "", dropped: null }],
+    [{ region: "orders" }, { sender: "", dropped: null, payload: { item: "soup" } }],
     [
       { map: "cooks", key: "w1" },
-      { sender: "orders", dropped: null },
+      { sender: "orders", dropped: null, payload: dish },
     ],
   ]);
   driver.step(order);
   const third = driver.step(order);
   expect(third.after.map((entry) => [entry.to, entry.message])).toEqual([
-    ["orders.workWaiting", { sender: "", dropped: null }],
+    ["orders.workWaiting", { sender: "", dropped: null, payload: { item: "soup" } }],
   ]);
 });
 
@@ -95,9 +96,12 @@ test("a pool: a cook that finishes reports to the inbox, which hands over the wa
   expect(live.after.map((entry) => [entry.actor, entry.message])).toEqual([
     [
       { map: "cooks", key: "w1" },
-      { sender: "orders", dropped: null },
+      { sender: "orders", dropped: null, payload: { items: ["soup"], worker: "w1" } },
     ],
-    [{ region: "orders" }, { sender: "cooks", dropped: null }],
+    [
+      { region: "orders" },
+      { sender: "cooks", dropped: null, payload: { items: ["soup"], worker: "w1" } },
+    ],
   ]);
 });
 
