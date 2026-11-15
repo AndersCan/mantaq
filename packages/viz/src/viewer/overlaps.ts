@@ -49,17 +49,6 @@ function sub(a: Point, b: Point): Point {
   return { x: a.x - b.x, y: a.y - b.y };
 }
 
-const sampledPaths = new WeakMap<ReadonlyArray<Point>, Point[]>();
-
-/** `samplePolyline`, remembered per route: label repair re-checks the same routes for every candidate spot. */
-function sampledPath(points: ReadonlyArray<Point>): Point[] {
-  const known = sampledPaths.get(points);
-  if (known !== undefined) return known;
-  const sampled = samplePolyline(points);
-  sampledPaths.set(points, sampled);
-  return sampled;
-}
-
 function samplePolyline(points: ReadonlyArray<Point>): Point[] {
   const out: Point[] = [];
   for (let index = 1; index < points.length; index++) {
@@ -127,9 +116,7 @@ function boxToBox(a: Box, b: Box): number {
 }
 
 function pathToBox(path: ReadonlyArray<Point>, box: Box): number {
-  let best = Infinity;
-  for (const point of path) best = Math.min(best, pointToBox(point, box));
-  return best;
+  return Math.min(...path.map((point) => pointToBox(point, box)));
 }
 
 function pathToPath(a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): number {
@@ -237,7 +224,7 @@ function shapesOf(layout: MachineLayout): Shapes {
       owner: node.kind === "state" ? node.state.region : null,
     })),
     edges: layout.edges.map((placed) => {
-      const path = sampledPath(placed.points);
+      const path = samplePolyline(placed.points);
       return {
         id: placed.edge.id,
         from: placed.edge.from,
