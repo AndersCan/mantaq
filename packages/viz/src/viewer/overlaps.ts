@@ -175,13 +175,36 @@ function insetIn(box: Box, outer: Box): number {
   );
 }
 
+/** Smallest `insetIn` over the points; NaN when any point is not a number. */
+function insetOfPoints(points: ReadonlyArray<Point>, outer: Box): number {
+  let least = Infinity;
+  for (const point of points) {
+    const inset = insetIn({ x: point.x, y: point.y, width: 0, height: 0 }, outer);
+    if (Number.isNaN(inset)) return inset;
+    least = Math.min(least, inset);
+  }
+  return least;
+}
+
 function regionContains(region: string, owner: string | null): boolean {
   return owner !== null && (owner === region || owner.startsWith(`${region}.`));
 }
 
-/** Samples within `STUB` of a node box, dropped from a path that ends there. */
-function beyondStubs(path: ReadonlyArray<Point>, ends: ReadonlyArray<Box>): Point[] {
-  return path.filter((point) => ends.every((end) => pointToBox(point, end) > STUB));
+/** The path without its first and last `STUB` px, measured along the path. */
+function beyondStubs(path: ReadonlyArray<Point>): Point[] {
+  const along: number[] = [0];
+  for (let index = 1; index < path.length; index++) {
+    const from = path[index - 1];
+    const to = path[index];
+    const step =
+      from === undefined || to === undefined ? 0 : Math.hypot(to.x - from.x, to.y - from.y);
+    along.push((along[index - 1] ?? 0) + step);
+  }
+  const total = along.at(-1) ?? 0;
+  return path.filter((_, index) => {
+    const at = along[index] ?? 0;
+    return at > STUB && total - at > STUB;
+  });
 }
 
 interface Shapes {
@@ -254,14 +277,14 @@ function labelOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   for (const entry of rest.entries) near(entry.part, pathToBox(entry.line, one.label));
   for (const region of rest.regions) near(region.part, pathToBox(region.border, one.label));
   const inset = insetIn(one.label, rest.canvas);
-  if (inset < 0) add("outside", part, "canvas", inset);
+  if (!(inset >= 0)) add("outside", part, "canvas", inset);
 }
 
 function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   const part: Part = `path:${one.id}`;
   for (const node of rest.nodes) {
     const own = node.id === one.from || node.id === one.target;
-    const path = own ? beyondStubs(one.path, [node.box]) : one.path;
+    const path = own ? beyondStubs(one.path) : one.path;
     const gap = pathToBox(path, node.box);
     if (gap < PATH_NODE_CLEAR) add("path-through-node", part, node.part, gap);
   }
@@ -269,18 +292,23 @@ function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
     const gap = pathToPath(one.path, entry.line);
     if (gap < PATH_NODE_CLEAR) add("path-through-node", part, entry.part, gap);
   }
-  for (const other of rest.edges.filter((each) => each.id > one.id)) {
-    const arrowGap = boxToBox(one.arrow, other.arrow);
-    if (arrowGap < 0) add("arrowheads", `arrow:${one.id}`, `arrow:${other.id}`, arrowGap);
-    const shared = rest.nodes
-      .filter(
-        (node) =>
-          [one.from, one.target].includes(node.id) && [other.from, other.target].includes(node.id),
-      )
-      .map((node) => node.box);
-    if (longestRun(beyondStubs(one.path, shared), other.path) > ALONGSIDE_RUN) {
-      add("paths-alongside", part, `path:${other.id}`, 0);
-    }
+  const pathInset = insetOfPoints(one.path, rest.canvas);
+  if (!(pathInset >= 0)) add("outside", part, "canvas", pathInset);
+  const arrowInset = insetIn(one.arrow, rest.canvas);
+  if (!(arrowInset >= 0)) add("outside", `arrow:${one.id}`, "canvas", arrowInset);
+  for (const other of rest.edges.filter((each) => each.id > one.id))
+    pairOverlaps(one, other, rest, add);
+}
+
+function pairOverlaps(one: PlacedLabel, other: PlacedLabel, rest: Shapes, add: Add): void {
+  const arrowGap = boxToBox(one.arrow, other.arrow);
+  if (arrowGap < 0) add("arrowheads", `arrow:${one.id}`, `arrow:${other.id}`, arrowGap);
+  const shared = rest.nodes.some(
+    (node) =>
+      [one.from, one.target].includes(node.id) && [other.from, other.target].includes(node.id),
+  );
+  if (longestRun(shared ? beyondStubs(one.path) : one.path, other.path) > ALONGSIDE_RUN) {
+    add("paths-alongside", `path:${one.id}`, `path:${other.id}`, 0);
   }
 }
 
@@ -305,7 +333,7 @@ function nodeOverlaps(shapes: Shapes, add: Add): void {
       if (gap < LABEL_PAD) add("nodes", node.part, other.part, gap);
     }
     const inset = insetIn(node.box, shapes.canvas);
-    if (inset < 0) add("outside", node.part, "canvas", inset);
+    if (!(inset >= 0)) add("outside", node.part, "canvas", inset);
     for (const region of shapes.regions) {
       const gap = regionContains(region.name, node.owner)
         ? insetIn(node.box, region.box)
@@ -331,6 +359,10 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
     pathOverlaps(edge, shapes, add);
   }
   nodeOverlaps(shapes, add);
+  for (const entry of shapes.entries) {
+    const inset = insetOfPoints(entry.line, shapes.canvas);
+    if (!(inset >= 0)) add("outside", entry.part, "canvas", inset);
+  }
   return found.sort(
     (x, y) => x.rule.localeCompare(y.rule) || x.a.localeCompare(y.a) || x.b.localeCompare(y.b),
   );

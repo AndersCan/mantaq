@@ -35,7 +35,9 @@ describe("dagre behaviour the layout will rely on", () => {
     expect(edge.y).toBeCloseTo(onPath.y + 8 + 16 / 2 + 0, 0);
   });
 
-  test("keeps a compound node's borders half a nodesep from its children", () => {
+  // A2 fails today at the plan's bound: children sit 25 to 29.5px from the border
+  // and a label box 19px (nodesep is 36). The plan's stop rule applies; reported to the lead.
+  test.fails("keeps a compound node's borders a nodesep from its children and labels", () => {
     const graph = graphOf();
     addStates(graph, ["a", "b", "c"]);
     graph.setNode("r", { width: 0, height: 0 });
@@ -45,12 +47,12 @@ describe("dagre behaviour the layout will rely on", () => {
     graph.setEdge("b", "c", { width: 40, height: 16, labelpos: "r", labeloffset: 8 }, "e2");
     layout(graph);
     const region = graph.node("r");
-    for (const name of ["b", "c"]) {
-      const child = graph.node(name);
+    const inside = [...["b", "c"].map((name) => graph.node(name)), graph.edge("b", "c", "e2")];
+    for (const child of inside) {
       const top = (child.y ?? 0) - child.height / 2 - ((region.y ?? 0) - region.height / 2);
       const bottom = (region.y ?? 0) + region.height / 2 - ((child.y ?? 0) + child.height / 2);
-      expect(top).toBeGreaterThanOrEqual(NODESEP / 2);
-      expect(bottom).toBeGreaterThanOrEqual(NODESEP / 2);
+      expect(top).toBeGreaterThanOrEqual(NODESEP);
+      expect(bottom).toBeGreaterThanOrEqual(NODESEP);
     }
   });
 

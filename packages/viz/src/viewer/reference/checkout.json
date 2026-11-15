@@ -58,11 +58,7 @@
       "effects": [
         {
           "name": "chargeCard",
-          "sends": [
-            "paymentOk",
-            "paymentFail",
-            "paymentTimeout"
-          ]
+          "sends": ["paymentOk", "paymentFail", "paymentTimeout"]
         }
       ],
       "coverage": null,
@@ -151,9 +147,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -167,9 +161,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -183,9 +175,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -199,9 +189,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -215,9 +203,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -231,9 +217,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -261,9 +245,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -277,9 +259,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -293,9 +273,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,

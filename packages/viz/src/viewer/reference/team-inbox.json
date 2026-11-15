@@ -1,12 +1,8 @@
 {
   "id": "teamInbox",
   "initial": "allWorkersFree",
-  "regions": [
-    "workers"
-  ],
-  "maps": [
-    "workers"
-  ],
+  "regions": ["workers"],
+  "maps": ["workers"],
   "actors": [],
   "states": [
     {
@@ -51,10 +47,7 @@
       "effects": [
         {
           "name": "runItems",
-          "sends": [
-            "team.RUN_SUCCEEDED",
-            "team.RUN_FAILED"
-          ]
+          "sends": ["team.RUN_SUCCEEDED", "team.RUN_FAILED"]
         }
       ],
       "coverage": null,
@@ -117,14 +110,9 @@
       "payload": null
     }
   ],
-  "outputs": [
-    "team.ITEMS_ASSIGNED"
-  ],
+  "outputs": ["team.ITEMS_ASSIGNED"],
   "partOutputs": {
-    "workers": [
-      "team.ITEMS_FAILED",
-      "team.ITEMS_FINISHED"
-    ]
+    "workers": ["team.ITEMS_FAILED", "team.ITEMS_FINISHED"]
   },
   "context": null,
   "edges": [
@@ -149,12 +137,8 @@
       "to": "workersBusy",
       "kind": "transition",
       "origin": "declared",
-      "emits": [
-        "team.ITEMS_ASSIGNED"
-      ],
-      "contexts": [
-        "default"
-      ],
+      "emits": ["team.ITEMS_ASSIGNED"],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -168,9 +152,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -198,9 +180,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -228,9 +208,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -243,12 +221,8 @@
       "to": "workWaiting",
       "kind": "transition",
       "origin": "declared",
-      "emits": [
-        "team.ITEMS_ASSIGNED"
-      ],
-      "contexts": [
-        "default"
-      ],
+      "emits": ["team.ITEMS_ASSIGNED"],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -290,9 +264,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -319,12 +291,8 @@
       "to": "workers.free",
       "kind": "transition",
       "origin": "declared",
-      "emits": [
-        "team.ITEMS_FAILED"
-      ],
-      "contexts": [
-        "default"
-      ],
+      "emits": ["team.ITEMS_FAILED"],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -337,12 +305,8 @@
       "to": "workers.free",
       "kind": "transition",
       "origin": "declared",
-      "emits": [
-        "team.ITEMS_FINISHED"
-      ],
-      "contexts": [
-        "default"
-      ],
+      "emits": ["team.ITEMS_FINISHED"],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -370,9 +334,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -386,9 +348,7 @@
       "kind": "transition",
       "origin": "declared",
       "emits": [],
-      "contexts": [
-        "default"
-      ],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,
@@ -429,12 +389,8 @@
       "to": "workersBusy",
       "kind": "transition",
       "origin": "declared",
-      "emits": [
-        "team.ITEMS_ASSIGNED"
-      ],
-      "contexts": [
-        "default"
-      ],
+      "emits": ["team.ITEMS_ASSIGNED"],
+      "contexts": ["default"],
       "explanation": null,
       "doc": null,
       "coverage": null,

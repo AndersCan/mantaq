@@ -210,8 +210,8 @@ describe("overlapsOf", () => {
 
   test("path-through-node: a path 2px from an entry arrow", () => {
     const layout = layoutOf({
-      entries: [{ from: { x: 20, y: 100 }, to: { x: 57, y: 100 } }],
-      edges: [placedEdge("e", "M20,102 L260,102", labelAt(200, 60))],
+      entries: [{ from: { x: 120, y: 100 }, to: { x: 150, y: 100 } }],
+      edges: [placedEdge("e", "M140,102 L260,102", labelAt(200, 60))],
     });
     expect(ofRule(layout, "path-through-node")).toEqual([
       { rule: "path-through-node", a: "path:e", b: "entry:0", gap: 2 },
@@ -250,5 +250,140 @@ describe("pathPoints", () => {
     expect(points).toHaveLength(51);
     expect(points.at(-1)).toEqual({ x: 10, y: 0 });
     expect(points[25]).toEqual({ x: 5, y: 7.5 });
+  });
+});
+
+describe("overlapsOf: review repros", () => {
+  test("path-through-node: a path that runs back through its own source state mid-path", () => {
+    // Starts on A's right edge, goes left through A's middle, then around to B's bottom.
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", "M140,100 L60,100 L40,100 L40,170 L300,170 L300,118", labelAt(200, 40)),
+      ],
+    });
+    expect(ofRule(layout, "path-through-node")).toEqual([
+      { rule: "path-through-node", a: "path:e", b: "node:A", gap: 0 },
+    ]);
+  });
+
+  test("outside: a non-finite coordinate is never a clean layout", () => {
+    const layout = layoutOf({ nodes: [node("A", 100), node("B", Number.NaN)] });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["node:B"]);
+  });
+
+  test("outside: a path that rises above the canvas", () => {
+    const layout = layoutOf({
+      edges: [placedEdge("e", "M140,100 L200,-20 L260,100", labelAt(200, 150))],
+    });
+    expect(ofRule(layout, "outside").map((overlap) => overlap.a)).toEqual(["path:e"]);
+  });
+
+  test("outside: a state past the canvas bottom", () => {
+    const layout = layoutOf({ nodes: [node("A", 100), { ...node("B", 300), y: 190 }] });
+    expect(ofRule(layout, "outside")).toEqual([
+      { rule: "outside", a: "node:B", b: "canvas", gap: -8 },
+    ]);
+  });
+
+  test("region-edge: a region named like the start of another is not its parent", () => {
+    const layout = layoutOf({
+      nodes: [node("A", 100, "workers"), node("B", 300)],
+      regions: [{ region: "work", x: 100, y: 100, width: 140, height: 120 }],
+    });
+    expect(ofRule(layout, "region-edge")).toEqual([
+      { rule: "region-edge", a: "node:A", b: "region:work", gap: -78 },
+    ]);
+  });
+
+  test("paths-alongside: two arrows from one state may share their first 12px", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", straight, labelAt(200, 60)),
+        placedEdge("f", "M140,102 L160,102 L200,160 L300,160 L300,118", labelAt(230, 185)),
+      ],
+    });
+    expect(ofRule(layout, "paths-alongside")).toEqual([]);
+  });
+
+  test("paths-alongside: two short touches apart are not one long run", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", straight, labelAt(200, 60)),
+        placedEdge(
+          "f",
+          "M180,160 L180,102 L186,102 L186,160 L220,160 L220,102 L226,102 L226,160",
+          labelAt(330, 185),
+          "C",
+        ),
+      ],
+    });
+    expect(ofRule(layout, "paths-alongside")).toEqual([]);
+  });
+
+  test("label-clear: the arrowhead box sits 4px back from the tip", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("g", "M140,160 L260,160", labelAt(150, 120)),
+        placedEdge("f", "M140,30 L260,30", labelAt(277, 160)),
+      ],
+    });
+    expect(ofRule(layout, "label-clear").filter((overlap) => overlap.b === "arrow:g")).toEqual([
+      { rule: "label-clear", a: "label:f", b: "arrow:g", gap: 6 },
+    ]);
+  });
+
+  test("pathPoints: a Bézier with unequal control heights", () => {
+    const point = pathPoints("M0,0 C0,10 10,20 10,0")[10];
+    expect(point?.x).toBeCloseTo(1.04);
+    expect(point?.y).toBeCloseTo(5.76);
+  });
+});
+
+describe("overlapsOf: label size and order", () => {
+  test("label-clear: a two-line condition label is two lines tall", () => {
+    const base = placedEdge("e", straight, labelAt(200, 60));
+    const branch = (state: string, conditions: string[]) => ({
+      target: { kind: "state" as const, state },
+      conditions,
+    });
+    const conditional: PlacedEdge = {
+      ...base,
+      edge: {
+        ...base.edge,
+        explanation: {
+          status: "analyzed",
+          location: { file: "a.ts", line: 1, column: 1 },
+          registration: "on",
+          branches: [branch("B", ["ready"]), branch("C", [])],
+          payloadReads: [],
+          contextReads: [],
+          contextWrites: [],
+          readsActorState: false,
+          comparisons: [],
+          literals: [],
+        },
+      },
+    };
+    const other = placedEdge("f", "M140,160 L260,160", labelAt(200, 92));
+    const layout = layoutOf({ edges: [conditional, other] });
+    // Two lines: 32px tall, bottom 76. The other label (16px) at 92 starts at 84: 8px apart, clear.
+    expect(ofRule(layout, "label-clear").filter((o) => o.b === "label:f")).toEqual([]);
+    const closer = layoutOf({
+      edges: [conditional, placedEdge("f", "M140,160 L260,160", labelAt(200, 90))],
+    });
+    expect(ofRule(closer, "label-clear").filter((o) => o.b === "label:f")).toEqual([
+      { rule: "label-clear", a: "label:e", b: "label:f", gap: 6 },
+    ]);
+  });
+
+  test("label-clear: two labels are reported once, in id order", () => {
+    const layout = layoutOf({
+      edges: [
+        placedEdge("b", "M140,160 L260,160", labelAt(200, 60)),
+        placedEdge("a", straight, labelAt(210, 60)),
+      ],
+    });
+    const pairs = ofRule(layout, "label-clear").filter((overlap) => overlap.b.startsWith("label:"));
+    expect(pairs).toEqual([{ rule: "label-clear", a: "label:a", b: "label:b", gap: -12 }]);
   });
 });
