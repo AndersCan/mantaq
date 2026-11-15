@@ -27,7 +27,7 @@ import { html, svg } from "./dom.ts";
 import { defaultValue, parseValue, valueFields, valueText } from "./fill.ts";
 import type { Values } from "./fill.ts";
 import type { Selection } from "./graph.ts";
-import { CHAR_WIDTH } from "./layout.ts";
+import { LOCK_SLOT, textWidth } from "./layout.ts";
 
 export interface ExploreContext {
   machine: VizMachine;
@@ -1429,11 +1429,7 @@ function markBlocked(element: SVGGElement, reason: string | undefined): void {
   const text = element.querySelector("text");
   const first = text?.querySelector("tspan");
   if (text === null || text === undefined || first === null || first === undefined) return;
-  const left =
-    Number(text.getAttribute("x")) -
-    ((first.textContent ?? "").length * CHAR_WIDTH) / 2 -
-    LOCK_WIDTH -
-    4;
+  const left = Number(text.getAttribute("x")) - textWidth(first.textContent ?? "") / 2 - LOCK_SLOT;
   const top = Number(first.getAttribute("y") ?? text.getAttribute("y")) - LOCK_HEIGHT + 2;
   element.append(
     svg(doc, "g", { class: "blocked-lock", "aria-hidden": "true" }, [

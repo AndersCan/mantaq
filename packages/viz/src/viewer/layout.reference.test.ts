@@ -14,10 +14,10 @@ test.fails("teamInbox (the pool) has no overlaps", () => {
   expect(overlapLines(overlapsOf(layoutMachine(reference("team-inbox"))))).toEqual([]);
 });
 
-test.fails("checkout has no overlaps", () => {
+test("checkout has no overlaps", () => {
   expect(overlapLines(overlapsOf(layoutMachine(reference("checkout"))))).toEqual([]);
 });
 
-test.fails("the docs home checkout has no overlaps", () => {
+test("the docs home checkout has no overlaps", () => {
   expect(overlapLines(overlapsOf(layoutMachine(reference("docs-checkout"))))).toEqual([]);
 });

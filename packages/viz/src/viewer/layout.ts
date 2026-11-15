@@ -1,6 +1,7 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
+import { labelOverlapsFor } from "./overlaps.ts";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -41,7 +42,10 @@ export interface PlacedEdge {
   target: string;
   /** SVG path data. */
   path: string;
-  label: Point;
+  /** The reserved label box (centre and size); includes the lock slot on its left for transitions. */
+  label: LabelBox;
+  /** Centre of the text lines: the label centre, shifted right by half the lock slot for transitions. */
+  text: Point;
   /** Gap between the dots of a dotted edge: grows with the edge so dots never merge into a line. */
   dotGap: number;
 }
@@ -64,7 +68,47 @@ export interface MachineLayout {
   entries: Array<{ from: Point; to: Point }>;
 }
 
-export const CHAR_WIDTH = 7;
+const WIDTH_TABLE: ReadonlyArray<readonly [number, string]> = [
+  [3.5, "i "],
+  [4, "!',.:;jl"],
+  [4.5, "[]f"],
+  [5, "()/t|"],
+  [5.5, "-Ir"],
+  [6, "\\{}"],
+  [6.5, "z"],
+  [7, '"Jaksv'],
+  [7.5, "12356789$*+<=>?^_`cehnouxy~"],
+  [8, "04Fbdgpq"],
+  [8.5, "ELPSTZ"],
+  [9, "#ABCDRUVXY"],
+  [9.5, "GHKNOQ"],
+  [10, "&"],
+  [10.5, "w"],
+  [11, "m"],
+  [11.5, "M"],
+  [12, "%W"],
+  [12.5, "@"],
+];
+const ADVANCES = new Map(
+  WIDTH_TABLE.flatMap(([advance, chars]) => [...chars].map((c) => [c, advance] as const)),
+);
+const UNLISTED_ADVANCE = 15;
+
+/**
+ * Width in px of `text`: the widest advance of the fonts the viewer may use,
+ * per character (measured at 12px), scaled to `fontSize`, with 5% slack.
+ */
+export function textWidth(text: string, fontSize = 12): number {
+  let sum = 0;
+  for (const char of text) sum += ADVANCES.get(char) ?? UNLISTED_ADVANCE;
+  return Math.ceil(((sum * fontSize) / 12) * 1.05);
+}
+
+/** Room left of a transition's label for its lock. */
+export const LOCK_SLOT = 12;
+const LABEL_PAD = 8;
+const CONDITION_FONT = 10.2;
+const CHIP_FONT = 11;
 const NODE_HEIGHT = 36;
 const CHIP_ROW_HEIGHT = 20;
 const LABEL_HEIGHT = 16;
@@ -72,6 +116,8 @@ const UNKNOWN_SIZE = 28;
 /** Shortest drawn edge between two nodes, and the closest two nodes may sit. */
 export const MIN_EDGE_LENGTH = 72;
 export const NODE_SEPARATION = 36;
+/** Room between ranks: wide enough that arrows into one state fan out gently and labels fit beside them. */
+const RANK_SEPARATION = 100;
 const MIN_DOT_GAP = 3;
 const MAX_DOT_GAP = 12;
 const DOT_GAP_PER_LENGTH = 1 / 24;
@@ -93,9 +139,9 @@ const HINT_WIDTH = 14;
 
 function stateWidth(state: VizState): number {
   const chips = state.effects.map(
-    (effect) => effect.name.length * CHAR_WIDTH + 24 + (effect.sends === null ? HINT_WIDTH : 0),
+    (effect) => textWidth(effect.name, CHIP_FONT) + 24 + (effect.sends === null ? HINT_WIDTH : 0),
   );
-  return Math.max(80, state.label.length * CHAR_WIDTH + 24, ...chips);
+  return Math.max(80, textWidth(state.label) + 24, ...chips);
 }
 
 function stateHeight(state: VizState): number {
@@ -128,7 +174,7 @@ function addStates(graph: LayoutGraph, machine: VizMachine): void {
 
 function addAnyNodes(graph: LayoutGraph, machine: VizMachine): void {
   for (const id of anyIds(machine)) {
-    graph.setNode(id, { width: ANY_LABEL.length * CHAR_WIDTH + 24, height: NODE_HEIGHT });
+    graph.setNode(id, { width: textWidth(ANY_LABEL) + 24, height: NODE_HEIGHT });
     const region = scopeOf(id);
     if (region !== "" && machine.regions.includes(region)) {
       graph.setParent(id, regionNodeId(region));
@@ -138,8 +184,11 @@ function addAnyNodes(graph: LayoutGraph, machine: VizMachine): void {
 
 function labelSize(edge: VizEdge): { width: number; height: number } {
   const lines = edgeLines(edge);
+  const widest = Math.max(
+    ...lines.map((line, index) => textWidth(line, index === 0 ? 12 : CONDITION_FONT)),
+  );
   return {
-    width: Math.max(...lines.map((line) => line.length)) * CHAR_WIDTH + 8,
+    width: widest + 8 + (edge.kind === "transition" ? LOCK_SLOT : 0),
     height: LABEL_HEIGHT * lines.length,
   };
 }
@@ -155,7 +204,8 @@ function addEdges(graph: LayoutGraph, machine: VizMachine): void {
     }
     const label: EdgeLabel = {
       ...labelSize(edge),
-      labelpos: "c",
+      labelpos: "r",
+      labeloffset: LABEL_PAD,
     };
     graph.setEdge(edge.from, target, label, edge.id);
   }
@@ -237,50 +287,11 @@ export function dotGapFor(length: number): number {
   return Math.min(MAX_DOT_GAP, Math.max(MIN_DOT_GAP, length * DOT_GAP_PER_LENGTH));
 }
 
-export interface LabelBox {
+interface LabelBox {
   x: number;
   y: number;
   width: number;
   height: number;
-}
-
-const LABEL_GAP = 2;
-
-function collides(a: LabelBox, b: LabelBox): boolean {
-  return (
-    Math.abs(a.x - b.x) < (a.width + b.width) / 2 + LABEL_GAP &&
-    Math.abs(a.y - b.y) < (a.height + b.height) / 2 + LABEL_GAP
-  );
-}
-
-/**
- * Moves each label vertically (0, +1, -1, +2, -2 steps) to the first spot that
- * clears every label placed before it. Pure and order-stable.
- */
-export function separateLabels(boxes: ReadonlyArray<LabelBox>): LabelBox[] {
-  const placed: LabelBox[] = [];
-  for (const labelBox of boxes) {
-    let candidate = labelBox;
-    for (let step = 1; placed.some((other) => collides(candidate, other)); step++) {
-      const shift = (LABEL_HEIGHT + LABEL_GAP) * Math.ceil(step / 2);
-      candidate = { ...labelBox, y: labelBox.y + (step % 2 === 1 ? shift : -shift) };
-    }
-    placed.push(candidate);
-  }
-  return placed;
-}
-
-function avoidLabelCollisions(edges: PlacedEdge[]): PlacedEdge[] {
-  const moved = separateLabels(
-    edges.map((placed) => ({
-      ...placed.label,
-      ...labelSize(placed.edge),
-    })),
-  );
-  return edges.map((placed, index) => ({
-    ...placed,
-    label: { x: placed.label.x, y: moved[index]?.y ?? placed.label.y },
-  }));
 }
 
 function loopCounts(machine: VizMachine): Map<string, number> {
@@ -299,6 +310,15 @@ function loopHeadroom(machine: VizMachine): number {
   return Math.max(MIN_LOOP_MARGIN, Math.ceil(outerRise * 0.75 + LABEL_HEIGHT + 6));
 }
 
+function boxed(edge: VizEdge, centre: Point): Pick<PlacedEdge, "label" | "text"> {
+  const size = labelSize(edge);
+  const shift = edge.kind === "transition" ? LOCK_SLOT / 2 : 0;
+  return {
+    label: { x: centre.x, y: centre.y, ...size },
+    text: { x: centre.x + shift, y: centre.y },
+  };
+}
+
 function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
   const counts = loopCounts(machine);
   const loopsSeen = new Map<string, number>();
@@ -308,11 +328,13 @@ function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
       if (edge.to === edge.from) {
         const nth = loopsSeen.get(edge.from) ?? 0;
         loopsSeen.set(edge.from, nth + 1);
+        const loop = selfLoop(graph.node(edge.from), nth, counts.get(edge.from) ?? 1);
         return {
           edge,
           target: edge.from,
           dotGap: dotGapFor(MIN_EDGE_LENGTH),
-          ...selfLoop(graph.node(edge.from), nth, counts.get(edge.from) ?? 1),
+          path: loop.path,
+          ...boxed(edge, loop.label),
         };
       }
       const target = edge.to ?? unknownNodeId(edge);
@@ -321,10 +343,98 @@ function placeEdges(graph: LayoutGraph, machine: VizMachine): PlacedEdge[] {
         edge,
         target,
         path: polyline(label.points ?? []),
-        label: { x: label.x ?? 0, y: label.y ?? 0 },
+        ...boxed(edge, { x: label.x ?? 0, y: label.y ?? 0 }),
         dotGap: dotGapFor(pathLength(label.points ?? [])),
       };
     });
+}
+
+const MAX_SLOPE = 3;
+
+/** Highest and lowest y of the arrow between two x values, and its steepest |dy/dx| there (capped). */
+function arrowSpan(
+  points: ReadonlyArray<Point>,
+  from: number,
+  to: number,
+): { top: number; bottom: number; slope: number } {
+  const ys: number[] = [];
+  let slope = 0;
+  for (const [index, end] of points.entries()) {
+    const start = points[index - 1];
+    if (start === undefined) continue;
+    const dx = end.x - start.x;
+    if (Math.abs(dx) < 1 || Math.max(start.x, end.x) < from || Math.min(start.x, end.x) > to)
+      continue;
+    const at = (x: number): number => start.y + ((end.y - start.y) * (x - start.x)) / dx;
+    const low = Math.max(from, Math.min(start.x, end.x));
+    const high = Math.min(to, Math.max(start.x, end.x));
+    ys.push(at(low), at(high));
+    slope = Math.max(slope, Math.abs((end.y - start.y) / dx));
+  }
+  return { top: Math.min(...ys), bottom: Math.max(...ys), slope: Math.min(slope, MAX_SLOPE) };
+}
+
+/** Points along the arrow, bends and quarter marks of each segment, ordered from its middle outwards. */
+function anchors(points: ReadonlyArray<Point>): Point[] {
+  const found: Array<{ point: Point; along: number }> = [];
+  const total = pathLength(points);
+  let walked = 0;
+  for (const [index, end] of points.entries()) {
+    const start = points[index - 1];
+    if (start === undefined) continue;
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    for (const part of [0.25, 0.5, 0.75]) {
+      found.push({
+        point: { x: start.x + (end.x - start.x) * part, y: start.y + (end.y - start.y) * part },
+        along: walked + length * part,
+      });
+    }
+    walked += length;
+    if (index < points.length - 1) found.push({ point: end, along: walked });
+  }
+  return found
+    .sort((a, b) => Math.abs(a.along - total / 2) - Math.abs(b.along - total / 2))
+    .map(({ point }) => point);
+}
+
+/**
+ * Candidate centres for a label, best first: dagre's spot, its mirror above
+ * the arrow, then beside points along the arrow, middle outwards.
+ */
+export function labelSpots(placed: PlacedEdge, points: ReadonlyArray<Point>): Point[] {
+  const { x, y, width, height } = placed.label;
+  const spots: Point[] = [
+    { x, y },
+    { x, y: y - 2 * (height / 2 + LABEL_PAD) },
+  ];
+  for (const point of anchors(points)) {
+    const span = arrowSpan(points, point.x - width / 2, point.x + width / 2);
+    const away = height / 2 + 1 + LABEL_PAD * Math.hypot(1, span.slope);
+    if (span.top > span.bottom) continue;
+    spots.push({ x: point.x, y: span.bottom + away }, { x: point.x, y: span.top - away });
+  }
+  return spots;
+}
+
+/** In edge order, moves a label to the first spot that clears everything already settled. */
+function settleLabels(base: MachineLayout, graph: LayoutGraph): PlacedEdge[] {
+  const edges = [...base.edges];
+  const unsettled = new Set(edges.map((placed) => `label:${placed.edge.id}`));
+  for (const [index, placed] of edges.entries()) {
+    unsettled.delete(`label:${placed.edge.id}`);
+    const points = graph.edge(placed.edge.from, placed.target, placed.edge.id)?.points ?? [];
+    for (const spot of labelSpots(placed, points)) {
+      const moved = { ...placed, ...boxed(placed.edge, spot) };
+      const trial = { ...base, edges: edges.map((each, at) => (at === index ? moved : each)) };
+      const clash = labelOverlapsFor(trial, placed.edge.id).some(
+        (overlap) => !unsettled.has(overlap.a) && !unsettled.has(overlap.b),
+      );
+      if (clash) continue;
+      edges[index] = moved;
+      break;
+    }
+  }
+  return edges;
 }
 
 function placeEntries(graph: LayoutGraph, machine: VizMachine): MachineLayout["entries"] {
@@ -352,8 +462,8 @@ export function layoutMachine(machine: VizMachine): MachineLayout {
   graph.setGraph({
     rankdir: "LR",
     nodesep: NODE_SEPARATION,
-    ranksep: MIN_EDGE_LENGTH,
-    edgesep: 14,
+    ranksep: RANK_SEPARATION,
+    edgesep: 14 + 3 * LABEL_PAD,
     marginx: 48,
     // Room above the top rank for hand-drawn self-loops.
     marginy: loopHeadroom(machine),
@@ -364,15 +474,16 @@ export function layoutMachine(machine: VizMachine): MachineLayout {
   addEdges(graph, machine);
   layout(graph);
   const size = graph.graph();
-  return {
+  const placed: MachineLayout = {
     width: size.width ?? 0,
     height: size.height ?? 0,
     nodes: placeNodes(graph, machine),
-    edges: avoidLabelCollisions(placeEdges(graph, machine)),
+    edges: placeEdges(graph, machine),
     regions: machine.regions.map((region) => ({
       region,
       ...box(graph.node(regionNodeId(region))),
     })),
     entries: placeEntries(graph, machine),
   };
+  return { ...placed, edges: settleLabels(placed, graph) };
 }

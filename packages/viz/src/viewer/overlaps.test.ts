@@ -42,7 +42,14 @@ function placedEdge(
     coverage: null,
     tested: null,
   };
-  return { edge, target: to, path, label, dotGap: 6 };
+  return {
+    edge,
+    target: to,
+    path,
+    label: { ...label, width: 22, height: 16 },
+    text: label,
+    dotGap: 6,
+  };
 }
 
 const straight = "M140,100 L260,100";
@@ -401,6 +408,7 @@ describe("overlapsOf: label size and order", () => {
     });
     const conditional: PlacedEdge = {
       ...base,
+      label: { ...base.label, height: 32 },
       edge: {
         ...base.edge,
         explanation: {
