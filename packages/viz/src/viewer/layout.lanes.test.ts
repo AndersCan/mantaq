@@ -1,7 +1,7 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { PATH_GAP } from "./geometry.ts";
-import { checkedLayout, freeLane, placeMachine } from "./layout.ts";
+import { checkedLayout, freeLane, lanePoints, laneOrder, placeMachine } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
@@ -163,3 +163,137 @@ describe("an any-state self-loop", () => {
     expect(Either.isRight(checkedLayout(placed))).toBe(true);
   });
 });
+
+describe("laneOrder", () => {
+  const gap = { start: 626, end: 686 };
+  const cross = (id: string, yLeft: number, yRight: number) => ({
+    edge: 0,
+    from: 1,
+    yLeft,
+    yRight,
+    id,
+  });
+  const order = (
+    crossings: ReturnType<typeof cross>[],
+    titles: Parameters<typeof laneOrder>[2] = [],
+    level: number[] = [],
+  ) =>
+    laneOrder({ ...gap, crossings }, level, titles).map(
+      (piece) => `${piece.crossing.id} ${piece.yLeft}→${piece.yRight}`,
+    );
+
+  test("two arrows that swap rows: the lowest on the cycle jogs through a free row", () => {
+    expect(
+      order([
+        cross("e0", 224.5, 296.5),
+        cross("e4", 286, 230.5),
+        cross("e5", 162.5, 214.5),
+        cross("e6", 105.5, 182.5),
+      ]),
+    ).toEqual([
+      "e6 105.5→182.5",
+      "e4 286→258.25",
+      "e0 224.5→296.5",
+      "e5 162.5→214.5",
+      "e4 258.25→230.5",
+    ]);
+  });
+
+  test("a swapping pair alone", () => {
+    expect(order([cross("e0", 40, 144), cross("e4", 148, 50)])).toEqual([
+      "e0 40→97",
+      "e4 148→50",
+      "e0 97→144",
+    ]);
+  });
+
+  test("no free row between: the jog takes the outer row, the smaller y on a tie", () => {
+    expect(order([cross("a", 100, 112), cross("b", 114, 98)])).toEqual([
+      "a 100→86",
+      "b 114→98",
+      "a 86→112",
+    ]);
+  });
+
+  test("a level piece in the gap blocks its row for the jog", () => {
+    expect(order([cross("e0", 40, 144), cross("e4", 148, 50)], [], [97])).toEqual([
+      "e0 40→73.5",
+      "e4 148→50",
+      "e0 73.5→144",
+    ]);
+  });
+
+  test("a row inside a title's band is skipped for the next free one", () => {
+    const title = { x: 656, y: 97, width: 40, height: 16 };
+    expect(order([cross("e0", 40, 144), cross("e4", 148, 50)], [title])).toEqual([
+      "e0 40→28",
+      "e4 148→50",
+      "e0 28→144",
+    ]);
+  });
+
+  test("no cycle: one piece per crossing, in today's order", () => {
+    expect(order([cross("a", 100, 100.5), cross("b", 200, 150)])).toEqual([
+      "a 100→100.5",
+      "b 200→150",
+    ]);
+  });
+
+  test("a title beside the gap does not block its row", () => {
+    const title = { x: 900, y: 97, width: 40, height: 16 };
+    expect(order([cross("e0", 40, 144), cross("e4", 148, 50)], [title])[0]).toBe("e0 40→97");
+  });
+
+  test("two cycles in one gap jog at rows PATH_GAP apart", () => {
+    const pieces = laneOrder(
+      {
+        ...gap,
+        crossings: [
+          cross("a", 100, 112),
+          cross("b", 114, 98),
+          { ...cross("c", 102, 110), edge: 1 },
+          { ...cross("d", 116, 96), edge: 1 },
+        ],
+      },
+      [],
+      [],
+    );
+    const jogs = ["a", "c"].flatMap((id) => {
+      const own = pieces.filter((piece) => piece.crossing.id === id);
+      return own.length === 2 ? [own[0]?.yRight ?? 0] : [];
+    });
+    expect(jogs.length).toBe(2);
+    expect(Math.abs((jogs[0] ?? 0) - (jogs[1] ?? 0))).toBeGreaterThanOrEqual(PATH_GAP);
+  });
+});
+
+describe("lanePoints", () => {
+  const first = { crossing: cross0(), yLeft: 10, yRight: 50 };
+  const second = { crossing: cross0(), yLeft: 50, yRight: 90 };
+  const lanes = [
+    { x: 1, piece: first },
+    { x: 2, piece: second },
+  ];
+
+  test("rightward walks the pieces left to right, each from its left row", () => {
+    expect(lanePoints(lanes, true)).toEqual([
+      { x: 1, y: 10 },
+      { x: 1, y: 50 },
+      { x: 2, y: 50 },
+      { x: 2, y: 90 },
+    ]);
+  });
+
+  test("leftward walks them right to left, each from its right row", () => {
+    expect(lanePoints(lanes, false)).toEqual([
+      { x: 2, y: 90 },
+      { x: 2, y: 50 },
+      { x: 1, y: 50 },
+      { x: 1, y: 10 },
+    ]);
+  });
+});
+
+function cross0() {
+  return { edge: 0, from: 1, yLeft: 0, yRight: 0, id: "e" };
+}

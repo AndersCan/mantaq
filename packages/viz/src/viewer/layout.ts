@@ -967,7 +967,7 @@ interface Widen {
   by: number;
 }
 
-interface Gap {
+export interface Gap {
   start: number;
   end: number;
   crossings: Crossing[];
@@ -981,23 +981,100 @@ interface Crossing {
   id: string;
 }
 
-function byMiddle(a: Crossing, b: Crossing): number {
-  return (a.yLeft + a.yRight) / 2 - (b.yLeft + b.yRight) / 2 || a.id.localeCompare(b.id);
+export interface Piece {
+  crossing: Crossing;
+  yLeft: number;
+  yRight: number;
 }
 
-/** Left to right: a crossing waits for any whose left end is level with its right end, so their level pieces never share a row. */
-function laneOrder(crossings: ReadonlyArray<Crossing>): Crossing[] {
-  const left = new Set(crossings);
-  const order: Crossing[] = [];
-  while (left.size > 0) {
-    const waiting = [...left];
+function byMiddle(a: Piece, b: Piece): number {
+  return (
+    (a.yLeft + a.yRight) / 2 - (b.yLeft + b.yRight) / 2 ||
+    a.crossing.id.localeCompare(b.crossing.id) ||
+    a.yLeft - b.yLeft
+  );
+}
+
+/** A row at least `PATH_GAP` from every row in the gap and clear of the titles over it, nearest the piece's middle. */
+function jogRow(
+  rows: ReadonlyArray<number>,
+  piece: Piece,
+  gap: { start: number; end: number },
+  titles: ReadonlyArray<LabelBox>,
+): number {
+  const sorted = [...rows].sort((a, b) => a - b);
+  const low = sorted[0] ?? piece.yLeft;
+  const high = sorted.at(-1) ?? piece.yRight;
+  const candidates = [low - PATH_GAP, high + PATH_GAP];
+  for (let i = 1; i < sorted.length; i++) {
+    const above = sorted[i - 1] ?? low;
+    const below = sorted[i] ?? high;
+    if (below - above >= 2 * PATH_GAP) candidates.push((above + below) / 2);
+  }
+  const clear = (y: number): boolean =>
+    titles.every(
+      (t) =>
+        t.x + t.width / 2 < gap.start ||
+        t.x - t.width / 2 > gap.end ||
+        Math.abs(y - t.y) >= t.height / 2 + LANE_TITLE_CLEAR,
+    );
+  const free = candidates.filter(clear);
+  const middle = (piece.yLeft + piece.yRight) / 2;
+  const nearest = [...(free.length > 0 ? free : candidates)].sort(
+    (a, b) => Math.abs(a - middle) - Math.abs(b - middle) || a - b,
+  )[0];
+  return nearest ?? low - PATH_GAP;
+}
+
+/** The pieces `a` waits for: those whose left row is level with `a`'s right row. */
+function blockers(a: Piece, waiting: ReadonlyArray<Piece>): Piece[] {
+  return waiting.filter((b) => b !== a && Math.abs(a.yRight - b.yLeft) < LANE_ROW_CLASH);
+}
+
+/** Follow the lowest blocker from the lowest piece until one repeats: the lowest piece on that cycle. */
+function inCycle(waiting: ReadonlyArray<Piece>): Piece | undefined {
+  const seen: Piece[] = [];
+  let at = [...waiting].sort(byMiddle)[0];
+  while (at !== undefined && !seen.includes(at)) {
+    seen.push(at);
+    at = blockers(at, waiting).sort(byMiddle)[0];
+  }
+  return at === undefined ? undefined : seen.slice(seen.indexOf(at)).sort(byMiddle)[0];
+}
+
+/**
+ * Left to right: a piece waits for any whose left end is level with its right
+ * end, so their level pieces never share a row. When every piece waits (two
+ * arrows swap rows), the lowest on a cycle splits at a free row: its first
+ * part goes now, its second part waits.
+ */
+export function laneOrder(
+  gap: Gap,
+  levelRows: ReadonlyArray<number>,
+  titles: ReadonlyArray<LabelBox>,
+): Piece[] {
+  let waiting: Piece[] = gap.crossings.map((crossing) => ({
+    crossing,
+    yLeft: crossing.yLeft,
+    yRight: crossing.yRight,
+  }));
+  let rows = [...levelRows, ...gap.crossings.flatMap((c) => [c.yLeft, c.yRight])];
+  const order: Piece[] = [];
+  while (waiting.length > 0) {
     const ready = waiting.filter((a) =>
       waiting.every((b) => b === a || Math.abs(a.yRight - b.yLeft) >= LANE_ROW_CLASH),
     );
-    const next = [...(ready.length > 0 ? ready : waiting)].sort(byMiddle)[0];
+    const next = ready.length > 0 ? [...ready].sort(byMiddle)[0] : inCycle(waiting);
     if (next === undefined) break;
-    order.push(next);
-    left.delete(next);
+    if (ready.length > 0) {
+      order.push(next);
+      waiting = waiting.filter((p) => p !== next);
+      continue;
+    }
+    const row = jogRow(rows, next, gap, titles);
+    rows = [...rows, row];
+    order.push({ ...next, yRight: row });
+    waiting = waiting.map((p) => (p === next ? { ...next, yLeft: row } : p));
   }
   return order;
 }
@@ -1021,6 +1098,24 @@ export function freeLane(
   return x;
 }
 
+/** The vertical pieces of one sloped segment, in the order the path walks them. */
+export function lanePoints(
+  lanes: ReadonlyArray<{ x: number; piece: Piece }>,
+  rightward: boolean,
+): Point[] {
+  return (rightward ? lanes : [...lanes].reverse()).flatMap(({ x, piece }) =>
+    rightward
+      ? [
+          { x, y: piece.yLeft },
+          { x, y: piece.yRight },
+        ]
+      : [
+          { x, y: piece.yRight },
+          { x, y: piece.yLeft },
+        ],
+  );
+}
+
 /**
  * Every sloped piece between two columns becomes level, then a vertical lane
  * of its own, then level: lanes are `PATH_GAP` apart, so steep arrows never
@@ -1031,30 +1126,36 @@ function lanesOf(
   titles: ReadonlyArray<LabelBox>,
 ): { edges: PlacedEdge[]; widen: Widen[] } {
   const gaps = new Map<string, Gap>();
+  const level = new Map<string, number[]>();
   edges.forEach((placed, edge) => {
     if (isLoop(placed.edge)) return;
     for (let from = 1; from < placed.points.length; from++) {
       const a = placed.points[from - 1];
       const b = placed.points[from];
       if (a === undefined || b === undefined) continue;
-      if (Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 0.5) continue;
+      if (Math.abs(a.x - b.x) < 1) continue;
       const [left, right] = a.x < b.x ? [a, b] : [b, a];
       const key = `${left.x.toFixed(1)}|${right.x.toFixed(1)}`;
+      if (Math.abs(a.y - b.y) < 0.5) {
+        level.set(key, [...(level.get(key) ?? []), a.y]);
+        continue;
+      }
       const gap: Gap = gaps.get(key) ?? { start: left.x, end: right.x, crossings: [] };
       gap.crossings.push({ edge, from, yLeft: left.y, yRight: right.y, id: placed.edge.id });
       gaps.set(key, gap);
     }
   });
-  const lanes = new Map<number, Map<number, number>>();
+  const lanes = new Map<number, Map<number, Array<{ x: number; piece: Piece }>>>();
   const widen: Widen[] = [];
-  for (const gap of gaps.values()) {
+  for (const [key, gap] of gaps) {
     let x = gap.start;
-    for (const crossing of laneOrder(gap.crossings)) {
-      const top = Math.min(crossing.yLeft, crossing.yRight);
-      const bottom = Math.max(crossing.yLeft, crossing.yRight);
+    for (const piece of laneOrder(gap, level.get(key) ?? [], titles)) {
+      const top = Math.min(piece.yLeft, piece.yRight);
+      const bottom = Math.max(piece.yLeft, piece.yRight);
       x = freeLane(x + PATH_GAP, top, bottom, titles);
-      const own = lanes.get(crossing.edge) ?? new Map<number, number>();
-      own.set(crossing.from, x);
+      const crossing = piece.crossing;
+      const own = lanes.get(crossing.edge) ?? new Map<number, Array<{ x: number; piece: Piece }>>();
+      own.set(crossing.from, [...(own.get(crossing.from) ?? []), { x, piece }]);
       lanes.set(crossing.edge, own);
     }
     if (x > gap.end - PATH_GAP)
@@ -1065,10 +1166,11 @@ function lanesOf(
     if (own === undefined) return placed;
     const points: Point[] = [];
     placed.points.forEach((point, index) => {
-      const lane = own.get(index);
+      const list = own.get(index);
       const previous = placed.points[index - 1];
-      if (lane !== undefined && previous !== undefined)
-        points.push({ x: lane, y: previous.y }, { x: lane, y: point.y });
+      if (list !== undefined && previous !== undefined) {
+        points.push(...lanePoints(list, previous.x < point.x));
+      }
       points.push(point);
     });
     return { ...placed, points, path: polyline(points) };
