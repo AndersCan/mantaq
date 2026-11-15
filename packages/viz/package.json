@@ -59,6 +59,7 @@
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
+    "fast-check": "catalog:",
     "happy-dom": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

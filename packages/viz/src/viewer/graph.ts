@@ -5,9 +5,10 @@ import { movesFrom } from "../moves.ts";
 import type { VizCoverage, VizEdge, VizMachine } from "../schema.ts";
 import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
-import { activatable, svg } from "./dom.ts";
+import { activatable, html, svg } from "./dom.ts";
 import { edgeCondition, edgeLines, edgeText } from "./labels.ts";
 import { layoutMachine } from "./layout.ts";
+import { Either } from "@mantaq/utils";
 import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
 
@@ -425,8 +426,14 @@ export function renderGraph(
   doc: Document,
   machine: VizMachine,
   callbacks: GraphCallbacks,
-): SVGSVGElement {
-  const placed = layoutMachine(machine);
+): SVGSVGElement | HTMLElement {
+  const layout = layoutMachine(machine);
+  if (Either.isLeft(layout)) {
+    return html(doc, "p", { class: "load-error", role: "alert" }, [
+      `Cannot draw ${machine.id} without overlapping labels (${layout[0].length} found).`,
+    ]);
+  }
+  const placed = layout[1];
   const findings = new Map<string, VizFinding[]>();
   for (const finding of machineFindings(machine)) {
     if (finding.state === null || finding.note) continue;

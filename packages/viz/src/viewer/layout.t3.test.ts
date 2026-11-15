@@ -1,6 +1,6 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { LABEL_PAD, layoutMachine, textWidth } from "./layout.ts";
+import { LABEL_PAD, placeMachine, textWidth } from "./layout.ts";
 import type { MachineLayout } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -99,7 +99,7 @@ describe("region titles have room of their own", () => {
 
   test("a long title widens its region and the state beyond moves right with it", () => {
     const long = "r".repeat(80);
-    const laid = layoutMachine(
+    const laid = placeMachine(
       machineOf(
         [{ ...state(`${long}.b`, long), label: "b" }, state("after")],
         [edge(`${long}.b`, "out", "after")],
@@ -116,13 +116,13 @@ describe("region titles have room of their own", () => {
   });
 
   test("a region at the top keeps the top margin: its title row is inserted, not drawn over the margin", () => {
-    const laid = layoutMachine(machineOf([state("r.b", "r")], [], ["r"]));
+    const laid = placeMachine(machineOf([state("r.b", "r")], [], ["r"]));
     const region = sides(laid.regions[0] ?? { x: 0, y: 0, width: 0, height: 0 });
     expect(region.top).toBeGreaterThanOrEqual(32);
   });
 
   test("a region with no members is a title row clear of every state", () => {
-    const laid = layoutMachine(
+    const laid = placeMachine(
       machineOf([state("first"), state("b")], [edge("first", "go", "b")], ["r"]),
     );
     const region = laid.regions[0];
@@ -133,7 +133,7 @@ describe("region titles have room of their own", () => {
 
   test("a map region's title reads 'one per key' and sets the width", () => {
     const pool = { ...machineOf([state("p.b", "p")], [], ["p"]), maps: ["p"] };
-    const region = layoutMachine(pool).regions[0];
+    const region = placeMachine(pool).regions[0];
     expect(region?.width).toBe(textWidth("p: one per key") + 8 + 2 * LABEL_PAD);
   });
 
@@ -188,7 +188,7 @@ describe("region titles have room of their own", () => {
   });
 
   test("a loop label wider than its state stays inside the state's region", () => {
-    const laid = layoutMachine(
+    const laid = placeMachine(
       machineOf(
         [state("a"), { ...state("r.b", "r"), initial: true }],
         [edge("a", "go", "r.b"), edge("r.b", "again", "r.b"), edge("r.b", "WWWWWWWWWWWWWW", "r.b")],
@@ -200,7 +200,7 @@ describe("region titles have room of their own", () => {
 
   test("an arrow into a start state's left side leaves by ENTRY_STUB, clear of the entry arrow", () => {
     const back = ["e0", "e1", "e2", "e3", "e4"].map((event) => edge("a", event, "first"));
-    const laid = layoutMachine({
+    const laid = placeMachine({
       ...machineOf(
         [{ ...state("first"), initial: true }, state("a"), state("b")],
         [...back, edge("first", "go", "b")],
@@ -221,7 +221,7 @@ describe("region titles have room of their own", () => {
 
   test("an unknown target of a region member is drawn inside that region", () => {
     const lost: VizEdge = { ...edge("r.b", "lost", "x"), id: "lost", to: null };
-    const laid = layoutMachine(
+    const laid = placeMachine(
       machineOf([state("a"), state("r.b", "r")], [edge("a", "go", "r.b"), lost], ["r"]),
     );
     const region = sides(laid.regions[0] ?? { x: 0, y: 0, width: 0, height: 0 });
@@ -249,7 +249,7 @@ describe("regions grow past dagre's border on every side without touching neighb
     ],
     ["r"],
   );
-  const laid = layoutMachine(machine);
+  const laid = placeMachine(machine);
   const region = sides(laid.regions[0] ?? { x: 0, y: 0, width: 0, height: 0 });
   const boxOf = (id: string) =>
     sides(laid.nodes.find((each) => each.id === id) ?? { x: 0, y: 0, width: 0, height: 0 });

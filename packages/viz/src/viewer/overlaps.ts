@@ -1,4 +1,5 @@
 import type { Point } from "@dagrejs/dagre";
+import { scopeOf } from "../schema.ts";
 import type { MachineLayout } from "./layout.ts";
 
 type Part =
@@ -244,6 +245,15 @@ interface Shapes {
 
 type Add = (rule: Rule, a: Part, b: Part, gap: number) => void;
 
+/** The region a node sits in, as `ownersOf` in layout.ts decides it: a state's own, a `*`'s scope, an unknown's source. */
+function ownerOf(layout: MachineLayout, node: MachineLayout["nodes"][number]): string | null {
+  if (node.kind === "state") return node.state.region;
+  if (node.kind === "any") return scopeOf(node.id) || null;
+  const source = layout.edges.find((placed) => placed.target === node.id)?.edge.from;
+  const from = layout.nodes.find((each) => each.id === source);
+  return from === undefined || from.kind === "unknown" ? null : ownerOf(layout, from);
+}
+
 function shapesOf(layout: MachineLayout): Shapes {
   const grown = (kind: string) => (kind === "state" ? MARK_OVERHANG : 0);
   return {
@@ -256,7 +266,7 @@ function shapesOf(layout: MachineLayout): Shapes {
         width: node.width + grown(node.kind),
         height: node.height + grown(node.kind),
       },
-      owner: node.kind === "state" ? node.state.region : null,
+      owner: ownerOf(layout, node),
     })),
     edges: layout.edges.map((placed) => {
       const path = sampledPath(placed.points);

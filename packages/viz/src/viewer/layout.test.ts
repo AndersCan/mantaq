@@ -4,7 +4,7 @@ import {
   MIN_EDGE_LENGTH,
   NODE_SEPARATION,
   dotGapFor,
-  layoutMachine,
+  placeMachine,
   pathLength,
   ENTRY_LENGTH,
   LABEL_FOREIGN,
@@ -85,8 +85,8 @@ function parsePoints(path: string): Array<{ x: number; y: number }> {
   }));
 }
 
-describe("layoutMachine spacing", () => {
-  const placed = layoutMachine(tight);
+describe("placeMachine spacing", () => {
+  const placed = placeMachine(tight);
 
   test("keeps every edge between two nodes at least the minimum length", () => {
     const nodes = new Map(placed.nodes.map((node) => [node.id, node]));
@@ -124,7 +124,7 @@ describe("dotGapFor", () => {
   });
 
   test("gives every placed edge a gap inside the bounds", () => {
-    const gaps = layoutMachine(tight).edges.map((placed) => placed.dotGap);
+    const gaps = placeMachine(tight).edges.map((placed) => placed.dotGap);
     expect(gaps.every((gap) => gap >= 3 && gap <= 12)).toBe(true);
   });
 });
@@ -167,7 +167,7 @@ describe("self-loops", () => {
     ["first"],
     events.map((event) => edge({ from: "first", event, target: "first" })),
   );
-  const laid = layoutMachine(looped);
+  const laid = placeMachine(looped);
   const box = laid.nodes[0];
   const top = (box?.y ?? 0) - (box?.height ?? 0) / 2;
 
@@ -208,7 +208,7 @@ describe("self-loops", () => {
   test("the 4 loops of workersBusy nest, and none enters workers.working", () => {
     const file = new URL("./reference/team-inbox.json", import.meta.url);
     const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
-    const pool = layoutMachine(machine);
+    const pool = placeMachine(machine);
     const loops = pool.edges.filter(
       (placed) => placed.edge.from === "workersBusy" && placed.edge.to === "workersBusy",
     );
@@ -238,7 +238,7 @@ describe("self-loops", () => {
         edge({ from: "first", event: "gamma", target: "b" }),
       ],
     );
-    const rows = layoutMachine(machine).edges.map((placed) => Math.round(placed.label.y));
+    const rows = placeMachine(machine).edges.map((placed) => Math.round(placed.label.y));
     expect(new Set(rows).size).toBe(3);
   });
 });
@@ -254,7 +254,7 @@ describe("entry arrows", () => {
         ? { ...each, region: each.id.slice(0, each.id.indexOf(".")), initial: each.id !== "up.b" }
         : each,
     );
-    const layout = layoutMachine({ ...machine, states, regions: ["up", "net"] });
+    const layout = placeMachine({ ...machine, states, regions: ["up", "net"] });
     expect(layout.entries).toHaveLength(3);
   });
 
@@ -268,14 +268,14 @@ describe("entry arrows", () => {
       region: "up",
       initial: each.id === "up.a",
     }));
-    const layout = layoutMachine({ ...machine, initial: null, states, regions: ["up"] });
+    const layout = placeMachine({ ...machine, initial: null, states, regions: ["up"] });
     const region = layout.regions[0];
     const entry = layout.entries[0];
     expect((entry?.from.x ?? 0) - 6).toBeGreaterThan((region?.x ?? 0) - (region?.width ?? 0) / 2);
   });
 
   test("a machine without regions has one", () => {
-    expect(layoutMachine(tight).entries).toHaveLength(1);
+    expect(placeMachine(tight).entries).toHaveLength(1);
   });
 });
 
@@ -285,7 +285,7 @@ describe("map-child states", () => {
     [edge({ from: "first", event: "go", target: "photos.sending" })],
   );
   const size = (machine: VizMachine, id: string) => {
-    const placed = layoutMachine(machine).nodes.find(
+    const placed = placeMachine(machine).nodes.find(
       (node) => node.kind === "state" && node.id === id,
     );
     return placed?.kind === "state" ? placed : undefined;
@@ -319,7 +319,7 @@ describe("two-line edge labels", () => {
       literals: [],
     } as VizEdge["explanation"];
     const pair = (explanation: VizEdge["explanation"]) =>
-      layoutMachine(
+      placeMachine(
         machineOf(
           ["first", "b"],
           [
@@ -337,7 +337,7 @@ describe("two-line edge labels", () => {
 
 describe("edge label boxes", () => {
   const stay: VizEdge = { ...edge({ from: "first", event: "ping", target: "b" }), kind: "stay" };
-  const placed = layoutMachine(
+  const placed = placeMachine(
     machineOf(
       ["first", "b"],
       [edge({ from: "first", event: "team.WORKERS_RESIZED", target: "b" }), stay],
@@ -359,7 +359,7 @@ describe("edge label boxes", () => {
   test("a label sits beside its own arrow, not on it", () => {
     expect(
       overlapsOf(
-        layoutMachine(
+        placeMachine(
           machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
         ),
       ),
@@ -368,7 +368,7 @@ describe("edge label boxes", () => {
 });
 
 describe("labelSpots", () => {
-  const placed = layoutMachine(
+  const placed = placeMachine(
     machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
   ).edges[0];
   const bent = [
@@ -397,7 +397,7 @@ describe("labelSpots", () => {
 });
 
 describe("labelSpots geometry", () => {
-  const placed = layoutMachine(
+  const placed = placeMachine(
     machineOf(["first", "b"], [edge({ from: "first", event: "go", target: "b" })]),
   ).edges[0];
   const width = placed?.label.width ?? 0;
@@ -430,7 +430,7 @@ describe("labelSpots geometry", () => {
   });
 });
 
-describe("layoutMachine speed", () => {
+describe("placeMachine speed", () => {
   test("a 20-state, 55-arrow machine lays out in well under a second (it runs on every click)", () => {
     let seed = 7;
     const random = (): number => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -441,7 +441,7 @@ describe("layoutMachine speed", () => {
       return edge({ from: names[from] ?? "", event: `EVENT_${index}`, target: names[to] ?? "" });
     });
     const started = performance.now();
-    layoutMachine(machineOf(names, edges));
+    placeMachine(machineOf(names, edges));
     expect(performance.now() - started).toBeLessThan(1000);
   });
 });
@@ -451,7 +451,7 @@ describe("ports", () => {
     ["first", "b", "c", "d"],
     ["b", "c", "d"].map((target) => edge({ from: "first", event: `to${target}`, target })),
   );
-  const laid = layoutMachine(fan);
+  const laid = placeMachine(fan);
   const first = laid.nodes.find((node) => node.id === "first");
 
   test("ends sit on the box side, PORT_GAP apart, centred on the box middle", () => {
@@ -477,7 +477,7 @@ describe("ports", () => {
       ["first", "b"],
       ["a", "b", "c", "d", "e", "f"].map((event) => edge({ from: "first", event, target: "b" })),
     );
-    const node = layoutMachine(many).nodes.find((each) => each.id === "first");
+    const node = placeMachine(many).nodes.find((each) => each.id === "first");
     expect(node?.height).toBe(PORT_GAP * 7);
   });
 
@@ -489,7 +489,7 @@ describe("ports", () => {
         edge({ from: "b", event: "y", target: "first" }),
       ],
     );
-    const placed = layoutMachine(back);
+    const placed = placeMachine(back);
     const start = placed.nodes.find((node) => node.id === "first");
     const entry = placed.entries[0];
     expect(entry?.to.x).toBe((start?.x ?? 0) - (start?.width ?? 0) / 2);
@@ -515,7 +515,7 @@ describe("region boxes", () => {
     );
     return { ...base, states, regions: ["r"] };
   }
-  const laid = layoutMachine(inRegion());
+  const laid = placeMachine(inRegion());
   const region = laid.regions[0];
   const sides = (b: { x: number; y: number; width: number; height: number }) => ({
     left: b.x - b.width / 2,
@@ -547,7 +547,7 @@ describe("region boxes", () => {
     const long = "r".repeat(40);
     const single = machineOf(["r.b"], []);
     const states = single.states.map((each) => ({ ...each, region: long }));
-    const wide = layoutMachine({ ...single, states, regions: [long] }).regions[0];
+    const wide = placeMachine({ ...single, states, regions: [long] }).regions[0];
     expect(wide?.width).toBe(textWidth(long) + 8 + 2 * LABEL_PAD);
   });
 
@@ -561,7 +561,7 @@ describe("region boxes", () => {
       region: "r.s",
       initial: each.id === "r.s.a",
     }));
-    const placed = layoutMachine({ ...base, initial: null, states, regions: ["r", "r.s"] });
+    const placed = placeMachine({ ...base, initial: null, states, regions: ["r", "r.s"] });
     const parentRegion = placed.regions.find((each) => each.region === "r");
     const parent = sides(parentRegion ?? nothing);
     const child = sides(placed.regions.find((each) => each.region === "r.s") ?? nothing);
@@ -586,7 +586,7 @@ describe("space inserted for region titles", () => {
     const states = base.states.map((each) =>
       each.id.startsWith(long) ? { ...each, region: long, label: "b" } : each,
     );
-    const laid = layoutMachine({ ...base, states, regions: [long] });
+    const laid = placeMachine({ ...base, states, regions: [long] });
     expect(overlapsOf(laid)).toEqual([]);
     expect(laid.regions[0]?.width).toBe(textWidth(long) + 8 + 2 * LABEL_PAD);
   });

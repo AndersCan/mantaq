@@ -1,7 +1,9 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
-import { labelOverlapsFor } from "./overlaps.ts";
+import { labelOverlapsFor, overlapsOf } from "./overlaps.ts";
+import type { Overlap } from "./overlaps.ts";
+import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
 
@@ -741,8 +743,9 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
 /**
  * Layered layout (dagre, left to right). Pure: same machine in, same
  * coordinates out. The initial edge is drawn as an entry arrow, not a graph edge.
+ * Unchecked: `layoutMachine` is the one that refuses an overlapping result.
  */
-export function layoutMachine(machine: VizMachine): MachineLayout {
+export function placeMachine(machine: VizMachine): MachineLayout {
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
   const regions = [...machine.regions].sort(
@@ -933,4 +936,11 @@ export function labelSpots(placed: PlacedEdge, points: ReadonlyArray<Point>): Po
     spots.push({ x: point.x, y: span.bottom + away }, { x: point.x, y: span.top - away });
   }
   return spots;
+}
+
+/** The layout, or the overlaps it still has: a diagram that covers itself is never returned. */
+export function layoutMachine(machine: VizMachine): Either<Overlap[], MachineLayout> {
+  const placed = placeMachine(machine);
+  const overlaps = overlapsOf(placed);
+  return overlaps.length === 0 ? Either.right(placed) : Either.left(overlaps);
 }

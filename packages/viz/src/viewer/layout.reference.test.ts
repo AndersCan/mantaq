@@ -1,5 +1,5 @@
 import type { VizMachine } from "../schema.ts";
-import { layoutMachine } from "./layout.ts";
+import { layoutMachine, placeMachine } from "./layout.ts";
 import { overlapLines, overlapsOf } from "./overlaps.ts";
 import { readFileSync } from "node:fs";
 import { expect, test } from "vite-plus/test";
@@ -10,13 +10,16 @@ function reference(name: string): VizMachine {
 }
 
 test("teamInbox (the pool) has no overlaps", () => {
-  expect(overlapLines(overlapsOf(layoutMachine(reference("team-inbox"))))).toEqual([]);
+  expect(layoutMachine(reference("team-inbox"))[0]).toBeUndefined();
+  expect(overlapLines(overlapsOf(placeMachine(reference("team-inbox"))))).toEqual([]);
 });
 
 test("checkout has no overlaps", () => {
-  expect(overlapLines(overlapsOf(layoutMachine(reference("checkout"))))).toEqual([]);
+  expect(layoutMachine(reference("checkout"))[0]).toBeUndefined();
+  expect(overlapLines(overlapsOf(placeMachine(reference("checkout"))))).toEqual([]);
 });
 
 test("the docs home checkout has no overlaps", () => {
-  expect(overlapLines(overlapsOf(layoutMachine(reference("docs-checkout"))))).toEqual([]);
+  expect(layoutMachine(reference("docs-checkout"))[0]).toBeUndefined();
+  expect(overlapLines(overlapsOf(placeMachine(reference("docs-checkout"))))).toEqual([]);
 });
