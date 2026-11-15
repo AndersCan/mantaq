@@ -680,7 +680,7 @@ describe("field forms and the context table", () => {
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
     expect(root.querySelector(".payload-sheet")).toBeNull();
-    expect(root.querySelector("[data-payload-form]")).toBeNull();
+    expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
   test("a value set in the Context tab is sent by every later click, kept for onNavigate and across Back", () => {
@@ -712,6 +712,35 @@ describe("field forms and the context table", () => {
     clickEdge(root, "idle-submit-paying");
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "from url" } },
+    ]);
+  });
+
+  test("text that is not a value empties the box, so the grey default is what is sent", () => {
+    const { root, live } = mountFields(requiredMachine);
+    setBox(root, "amount", "7");
+    setBox(root, "amount", "seven");
+    expect(valueBox(root, "amount")?.value).toBe("");
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
+    ]);
+  });
+
+  test("a name optional on one event and required on another shows the default the click sends", () => {
+    const label = requiredMachine.events[0]?.payload?.[1];
+    if (label === undefined) throw new Error("fixture");
+    const shared: VizMachine = {
+      ...requiredMachine,
+      events: [
+        { id: "draft", internal: false, doc: null, payload: [{ ...label, optional: true }] },
+        ...requiredMachine.events,
+      ],
+    };
+    const { root, live } = mountFields(shared);
+    expect(valueBox(root, "label")?.placeholder).toBe("hi");
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log[0]).toEqual([
+      { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
   });
 
@@ -819,13 +848,11 @@ describe("what ran", () => {
   test("Because shows the condition for a transition and a stay", () => {
     const move = mountWith(branching, stepped({}).live);
     click(move, '[data-send="submit"]');
-    click(move, '[data-payload-send="submit"]');
     expect(text(move, "outcome")).toBe("submit: idle → paying");
     expect(text(move, "because")).toBe("Because: payload.amount > 5");
 
     const stay = mountWith(branching, stepped({ to: "idle", outcome: "stay", context: {} }).live);
     click(stay, '[data-send="submit"]');
-    click(stay, '[data-payload-send="submit"]');
     expect(text(stay, "outcome")).toBe("submit: handled in idle, stays");
     expect(text(stay, "because")).toBe("Because: !(payload.amount > 5)");
   });
@@ -836,7 +863,6 @@ describe("what ran", () => {
     };
     const send = (root: HTMLElement) => {
       click(root, '[data-send="submit"]');
-      click(root, '[data-payload-send="submit"]');
     };
     const routed = mountWith(branching, stepped({ sent: ["openAlbum"] }).live, routes);
     send(routed);
@@ -887,7 +913,6 @@ describe("what ran", () => {
     };
     const root = mountWith(plain, stepped({}).live);
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(root.querySelector("[data-live-because]")).toBeNull();
   });
 
@@ -897,7 +922,6 @@ describe("what ran", () => {
       stepped({ effects: ["charge"], context: { amount: 9, tag: "x" } }).live,
     );
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(text(root, "changed")).toBe("Changed: amount, tag");
     expect(text(root, "effects")).toBe("Effects started: charge");
   });
@@ -906,7 +930,6 @@ describe("what ran", () => {
     const { live, push } = stepped({});
     const root = mountWith(branching, live);
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(root.querySelector("[data-live-after]")).toBeNull();
     push({
       state: "error",
@@ -950,7 +973,6 @@ describe("what ran", () => {
   test("an ignored event says nothing ran", () => {
     const root = mountWith(branching, stepped({ to: "idle", outcome: "ignored" }).live);
     click(root, '[data-send="submit"]');
-    click(root, '[data-payload-send="submit"]');
     expect(text(root, "outcome")).toBe("No handler for submit in idle. Nothing ran.");
   });
 });

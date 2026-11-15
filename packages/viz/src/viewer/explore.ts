@@ -672,9 +672,11 @@ function valuesList(
       placeholder: shown === undefined ? "" : valueText(field, shown),
     });
     input.value = set === undefined ? "" : valueText(field, set);
-    input.addEventListener("change", () =>
-      live.setValue(field.name, parseValue(field, input.value)),
-    );
+    input.addEventListener("change", () => {
+      const value = parseValue(field, input.value);
+      if (value === undefined) input.value = "";
+      live.setValue(field.name, value);
+    });
     return html(doc, "label", { class: "explore-field" }, [
       html(doc, "span", {}, [
         html(doc, "strong", {}, [field.name]),

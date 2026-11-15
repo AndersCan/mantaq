@@ -112,8 +112,6 @@ function knownValue(
   const sent = from.typed?.values.find((each) => each.field === field.name);
   if (sent !== undefined) return sent.value;
   if (!field.optional) return field.sample;
-  const fuzz = isObject(from.fuzzed) ? from.fuzzed[field.name] : undefined;
-  if (fuzz !== undefined && fits(field, fuzz) && !isTypeDefault(field, fuzz)) return fuzz;
   return undefined;
 }
 
@@ -162,13 +160,6 @@ export function freshKeys(
   return fresh;
 }
 
-/** What the fuzzer makes up for a bare string or number: it says nothing the field's example does not say better. */
-function isTypeDefault(field: VizField, value: VizJson): boolean {
-  if (field.input === "text") return value === "sample";
-  if (field.input === "number") return value === 1;
-  return false;
-}
-
 /** The walk's steps, each followed by the messages parts sent after it that carried a payload. */
 function heardSteps(
   steps: ReadonlyArray<VizStep>,
@@ -210,12 +201,12 @@ export function payloadFor(
       });
 }
 
-/** One field per name across the machine's events, the first event's wins: the Context tab's rows. */
+/** One field per name across the machine's events, the first event that requires it wins, else the first: the Context tab's rows. */
 export function valueFields(machine: VizMachine): VizField[] {
   const byName = new Map<string, VizField>();
   for (const event of machine.events) {
     for (const field of event.payload ?? []) {
-      if (!byName.has(field.name)) byName.set(field.name, field);
+      if (byName.get(field.name)?.optional !== false) byName.set(field.name, field);
     }
   }
   return [...byName.values()];

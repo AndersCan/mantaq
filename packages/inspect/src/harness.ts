@@ -216,13 +216,6 @@ function makeSend(
     }
     await page.click('[data-tab="step"]');
     await trigger.click();
-    if (payload !== undefined) {
-      await setValues(
-        page,
-        Object.fromEntries(Object.keys(payload).map((key) => [key, undefined])),
-      );
-      await page.click('[data-tab="step"]');
-    }
     const outcome =
       (await page.getAttribute(`${PANEL} [data-outcome]`, "data-outcome")) ?? "transition";
     return Either.right({ state: await state(), outcome: outcome as VizLiveOutcome });

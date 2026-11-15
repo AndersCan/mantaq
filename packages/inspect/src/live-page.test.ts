@@ -244,7 +244,6 @@ describe("mountDriven heading and walk ownership", () => {
     for (const send of first.querySelectorAll<HTMLElement>("[data-send]")) {
       if (current(first) !== start) break;
       send.click();
-      first.querySelector<HTMLElement>("[data-payload-send]")?.click();
     }
     expect(current(first)).not.toBe(start);
     const walk = new URLSearchParams(location.search);
@@ -311,6 +310,13 @@ describe("mountDriven runs by name", () => {
     expect(location.search).toBe("?machine=second");
   });
 
+  test("switching machine drops the values set for the old one", async () => {
+    history.replaceState(null, "", "?machine=checkout&value=email%3D%22a%40b.c%22");
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await withRuns(), targets: {} });
+    (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
+    expect(location.search).toBe("?machine=second");
+  });
   test("run= without machine opens the start with no notice", async () => {
     history.replaceState(null, "", "?run=gives%20basic%20info");
     const root = document.createElement("div");
@@ -457,7 +463,6 @@ describe("compare", () => {
       for (const send of column.querySelectorAll<HTMLElement>("[data-send]")) {
         if (current(column) !== start) break;
         send.click();
-        column.querySelector<HTMLElement>("[data-payload-send]")?.click();
       }
     };
     const startA = current(section(root, "a"));

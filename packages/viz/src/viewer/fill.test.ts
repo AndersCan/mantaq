@@ -32,11 +32,9 @@ describe("knownPayload", () => {
     });
   });
 
-  test("an optional field has no example, so the fuzzer's value fills it", () => {
+  test("an optional field has no example, so it is left out even when the fuzzer made a value", () => {
     const note: VizField = { ...field("note", "text"), optional: true };
-    expect(knownPayload([note], { ...base, samples: [{ note: "hi" }] })).toEqual({
-      payload: { note: "hi" },
-    });
+    expect(knownPayload([note], { ...base, samples: [{ note: "hi" }] })).toEqual({ payload: {} });
   });
 
   test("a fuzz value that is only the type's default loses to the example", () => {
@@ -298,6 +296,21 @@ describe("values set in the Context tab", () => {
     expect(valueText(code, "hi")).toBe("hi");
     expect(valueText(count, 3)).toBe("3");
     expect(valueText(flags, { a: 1 })).toBe('{"a":1}');
+    expect(valueText(flags, "hi")).toBe('"hi"');
+    expect(parseValue(code, "   ")).toBeUndefined();
+    expect(parseValue(flags, " ")).toBeUndefined();
+  });
+
+  test("of two events with one field name, the one that requires it supplies the row", () => {
+    const optional: VizField = { ...field("code", "text"), optional: true };
+    const required = field("code", "text");
+    const other = field("code", "text");
+    const events = [
+      { id: "a", payload: [optional] },
+      { id: "b", payload: [required] },
+      { id: "c", payload: [{ ...other, sample: "later" }] },
+    ];
+    expect(valueFields({ ...answering, events } as never)).toEqual([required]);
   });
 
   test("values round-trip through the address; entries with no name, no = or bad JSON are skipped", () => {
@@ -307,4 +320,18 @@ describe("values set in the Context tab", () => {
     expect(decodeValues(encodeValues(values))).toEqual(values);
     expect(decodeValues(['a="x=y"'])).toEqual({ a: "x=y" });
   });
+});
+
+test("an optional field with nothing set or heard is left out, as its empty box shows", () => {
+  const note: VizField = { ...field("note", "text"), optional: true };
+  const machine = {
+    events: [{ id: "submit", internal: false, doc: null, payload: [note] }],
+    fuzz: {
+      corpus: [{ steps: [{ kind: "event", event: "submit", payload: { note: "x" } }] }],
+      errors: [],
+    },
+  } as unknown as VizMachine;
+  const from = { set: {}, live: null, afters: [] };
+  expect(defaultValue(note, from)).toBeUndefined();
+  expect(payloadFor(machine, "submit", from)).toEqual({});
 });
