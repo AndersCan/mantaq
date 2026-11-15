@@ -1,6 +1,6 @@
 /**
  * Ask, then answer: the answer only counts when its code is the one the
- * machine is waiting on. Meant for the live page's "Values from" form.
+ * machine is waiting on.
  */
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 

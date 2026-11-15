@@ -17,8 +17,7 @@ import type {
 } from "../schema.ts";
 import { changedKeys, contextLines } from "./context-diff.ts";
 import { html, svg } from "./dom.ts";
-import { fillChoices, freshKeys, knownPayload } from "./fill.ts";
-import type { FillChoice } from "./fill.ts";
+import { freshKeys, knownPayload } from "./fill.ts";
 import type { Selection } from "./graph.ts";
 import { CHAR_WIDTH } from "./layout.ts";
 
@@ -482,70 +481,6 @@ function filledText(field: VizField, value: VizJson): string {
   return JSON.stringify(value) ?? "";
 }
 
-/** Whether every control holds what pressing the choice would put there: its value, else the field's reset value. */
-function choiceHolds(
-  doc: Document,
-  context: {
-    choice: FillChoice;
-    fields: ReadonlyArray<VizField>;
-    controls: ReadonlyMap<string, FieldControl>;
-  },
-): boolean {
-  const { choice, fields, controls } = context;
-  return fields.every((field) => {
-    const given = choice.values.find((each) => each.field === field.name);
-    const wanted =
-      given === undefined ? fieldControl(doc, field).read() : filledText(field, given.value);
-    return controls.get(field.name)?.read() === wanted;
-  });
-}
-
-/** "Values from": a row of buttons that fill the controls from what this walk sent, a fuzzed payload, the type's examples or the context. */
-function fillRow(
-  doc: Document,
-  context: {
-    fields: ReadonlyArray<VizField>;
-    controls: ReadonlyMap<string, FieldControl>;
-    choices: ReadonlyArray<FillChoice>;
-  },
-): { node: HTMLElement; sync: () => void } {
-  const { fields, controls, choices } = context;
-  const row = html(doc, "div", {
-    class: "segmented",
-    role: "group",
-    "aria-label": "Values from",
-  });
-  const buttons = choices.map((choice) =>
-    button(doc, [choice.label], {
-      attrs: {
-        "data-fill-from": choice.label,
-        "aria-pressed": "false",
-        ...(choice.title === null ? {} : { title: choice.title }),
-      },
-      onClick: () => {
-        for (const field of fields) {
-          controls.get(field.name)?.write(fieldControl(doc, field).read());
-        }
-        for (const { field: name, value } of choice.values) {
-          const field = fields.find((each) => each.name === name);
-          if (field !== undefined) controls.get(name)?.write(filledText(field, value));
-        }
-        press(choice);
-      },
-    }),
-  );
-  const press = (pressed: FillChoice | undefined) => {
-    choices.forEach((choice, index) => {
-      buttons[index]?.setAttribute("aria-pressed", String(choice === pressed));
-    });
-  };
-  row.append(...buttons);
-  return {
-    node: row,
-    sync: () => press(choices.find((choice) => choiceHolds(doc, { choice, fields, controls }))),
-  };
-}
-
 function fieldRow(doc: Document, field: VizField, control: FieldControl | null): HTMLElement {
   const grouped = control?.node.tagName === "DIV";
   return html(doc, grouped ? "div" : "label", { class: "explore-field" }, [
@@ -607,9 +542,6 @@ function fieldsForm(
     const value = startAt[field.name];
     if (value !== undefined) controls.get(field.name)?.write(filledText(field, value));
   }
-  const choices = fillChoices(fields, { live: context.live, samples, steps });
-  const fill = choices.length === 0 ? null : fillRow(doc, { fields, controls, choices });
-  fill?.sync();
   const problem = html(doc, "p", {
     class: "explore-warning",
     role: "alert",
@@ -637,16 +569,9 @@ function fieldsForm(
     }
     context.send({ kind: "event", event, payload: read.payload });
   };
-  const resync = (changed: Event) => {
-    if (changed.target instanceof Element && changed.target.closest("[data-fill-from]")) return;
-    fill?.sync();
-  };
-  form.addEventListener("input", resync);
-  form.addEventListener("click", resync);
   form.append(
     html(doc, "div", { class: "payload-head" }, [
       html(doc, "h3", { class: "payload-title" }, [code(doc, event)]),
-      fill?.node ?? null,
     ]),
     html(doc, "div", { class: "payload-body" }, fieldLabels),
     html(doc, "div", { class: "payload-actions" }, [
@@ -667,8 +592,8 @@ function fieldsForm(
 }
 
 /**
- * Asks for the payload before sending: filled with the first fuzz sample,
- * editable, with the other samples one click away. Nothing is sent until Send.
+ * Asks for the payload before sending: filled with what is known, editable.
+ * Nothing is sent until Send.
  */
 export function payloadForm(
   doc: Document,
@@ -719,27 +644,7 @@ export function payloadForm(
     html(doc, "div", { class: "payload-head" }, [
       html(doc, "h3", { class: "payload-title" }, [code(doc, event)]),
     ]),
-    html(doc, "div", { class: "payload-body" }, [
-      samples.length === 0
-        ? null
-        : html(
-            doc,
-            "div",
-            { class: "explore-samples" },
-            samples.map((sample, index) =>
-              button(doc, [`sample ${index + 1}`], {
-                onClick: () => {
-                  box.value = JSON.stringify(sample);
-                },
-                attrs: {
-                  "data-sample": String(index),
-                  title: JSON.stringify(sample),
-                },
-              }),
-            ),
-          ),
-      box,
-    ]),
+    html(doc, "div", { class: "payload-body" }, [box]),
     html(doc, "div", { class: "payload-actions" }, [
       problem,
       html(doc, "div", { class: "explore-samples" }, [
