@@ -167,7 +167,7 @@ function movesSection(
 }
 
 /** The path as plain text: the machine, then one numbered line per entry, full text where the button shortens it. */
-export function pathText(machine: string, list: Element): string {
+function pathText(machine: string, list: Element): string {
   const lines = [...list.querySelectorAll("li > button")].map(
     (entry, index) => `${index}. ${entry.getAttribute("title") ?? entry.textContent ?? ""}`,
   );
