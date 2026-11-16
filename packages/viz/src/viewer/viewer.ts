@@ -41,7 +41,6 @@ interface ViewState {
   path: ExploreStep[];
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
-  /** Entry i is the driver's `last` for `live.steps[i]`. */
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
   afters: VizLiveStep[][];
   /** Context before the last live step; undefined when no step ran. */

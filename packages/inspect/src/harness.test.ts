@@ -93,6 +93,13 @@ test("an event the state ignores is a result, not an error", async () => {
   });
 }, 60_000);
 
+test("an empty payload on a machine without value boxes still sends", async () => {
+  await withViz(fixture("harness-empty.ts"), async (viz) => {
+    const result = await viz.send("ping", {});
+    expect(Either.getLeft(result)).toBeUndefined();
+  });
+}, 60_000);
+
 test("says when an event has no value box for a key", async () => {
   await withViz(fixture("harness-empty.ts"), async (viz) => {
     const result = await viz.send("ping", { some: 1 });
