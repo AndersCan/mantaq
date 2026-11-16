@@ -1,13 +1,6 @@
 import { movesFrom, stateAfter } from "../moves.ts";
 import { coveredByAny } from "../schema.ts";
-import {
-  actorOf,
-  actorText,
-  localName,
-  offeredEvents,
-  regionPaths,
-  walkedChild,
-} from "./compartments.ts";
+import { actorOf, actorText, localName, offeredEvents, regionPaths } from "./compartments.ts";
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
 import type {
   VizActorRef,
@@ -42,7 +35,7 @@ export interface ExploreContext {
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
     previous?: VizJson;
-    /** The followed child; the Step tab shows it for each map. */
+    /** The followed child; its row in the Step tab is marked. */
     picked?: { map: string; key: string } | null;
     /** The last Send press; its line leads the Step tab. */
     sent?: { event: string; actor?: VizActorRef } | null;
@@ -357,37 +350,40 @@ function childrenSections(
 ): Array<HTMLElement | null> {
   const { state } = live;
   return machine.maps.map((map) => {
-    const walked = walkedChild(state, map, live.picked ?? null);
-    const rows = (walked === undefined ? [] : [walked]).map((child) => {
-      const info = machine.states.find((each) => each.id === child.state);
-      const final = info?.final === true;
-      const moves = liveMovesSection(doc, machine, {
-        ...live,
-        current: child.state,
-        compartment: map,
-        final,
-        child: { map, key: child.key },
+    const followed = live.picked?.map === map ? live.picked.key : null;
+    const rows = state.children
+      .filter((child) => child.map === map)
+      .map((child) => {
+        const info = machine.states.find((each) => each.id === child.state);
+        const final = info?.final === true;
+        const moves = liveMovesSection(doc, machine, {
+          ...live,
+          current: child.state,
+          compartment: map,
+          final,
+          child: { map, key: child.key },
+        });
+        return html(
+          doc,
+          "li",
+          {
+            class: "explore-child",
+            "data-child-map": map,
+            "data-child-key": child.key,
+            "data-child-state": child.state,
+            ...(child.key === followed ? { "data-followed": "" } : {}),
+          },
+          [
+            html(doc, "p", { class: "explore-now explore-child-now" }, [
+              code(doc, child.key),
+              ": in ",
+              html(doc, "strong", {}, [localName(child.state)]),
+              final ? " (final)" : "",
+            ]),
+            moves,
+          ],
+        );
       });
-      return html(
-        doc,
-        "li",
-        {
-          class: "explore-child",
-          "data-child-map": map,
-          "data-child-key": child.key,
-          "data-child-state": child.state,
-        },
-        [
-          html(doc, "p", { class: "explore-now explore-child-now" }, [
-            code(doc, child.key),
-            ": in ",
-            html(doc, "strong", {}, [localName(child.state)]),
-            final ? " (final)" : "",
-          ]),
-          moves,
-        ],
-      );
-    });
     if (rows.length === 0) return null;
     return html(doc, "section", { class: "explore-map", "data-map": map }, [
       html(doc, "ul", { class: "explore-children" }, rows),

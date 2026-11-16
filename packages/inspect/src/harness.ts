@@ -162,15 +162,9 @@ async function readChildren(
     );
 }
 
-/** Follow `actor` by clicking its chip until the Step tab shows that child; false when no chip is drawn for it. */
+/** Whether the Step tab lists the child `actor`. */
 async function walkTo(page: Page, actor: { map: string; key: string }): Promise<boolean> {
   const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
-  if ((await page.locator(row).count()) === 0) {
-    const chip = page.locator(
-      `.graph g.child-marker[data-marker-map=${quoted(actor.map)}][data-marker-key=${quoted(actor.key)}]`,
-    );
-    if ((await chip.count()) > 0) await chip.first().click();
-  }
   return (await page.locator(row).count()) > 0;
 }
 

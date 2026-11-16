@@ -31,7 +31,7 @@ function child(key: string, state: string): VizLiveChild {
 }
 
 function context(children: VizLiveChild[], over: Partial<MarkerContext> = {}): MarkerContext {
-  return { machine, children, picked: null, motion: false, onPick: () => undefined, ...over };
+  return { machine, children, picked: null, onPick: () => undefined, ...over };
 }
 
 const markers = (root: SVGSVGElement) =>
@@ -101,9 +101,13 @@ describe("drawChildMarkers", () => {
     const root = board([168, 168]);
     drawChildMarkers(root, context([child("w1", "s0")]));
     const before = markers(root)[0];
-    drawChildMarkers(root, context([child("w1", "s1")], { motion: true }));
+    drawChildMarkers(root, context([child("w1", "s1")]));
     expect(markers(root)).toEqual([before]);
     expect(before?.dataset.markerState).toBe("p.s1");
+    const fresh = board([168, 168]);
+    drawChildMarkers(fresh, context([child("w1", "s1")]));
+    expect(before?.style.transform).toBe(markers(fresh)[0]?.style.transform);
+    expect(before?.style.transform).not.toBe("");
   });
 
   test("a child that is gone loses its chip", () => {
@@ -232,14 +236,5 @@ describe("drawChildMarkers branches", () => {
     expect(picked).toEqual(["w1"]);
     expect(space.defaultPrevented).toBe(true);
     expect(markers(root)[0]?.classList.contains("final")).toBe(true);
-  });
-
-  test("the layer is still unless the draw follows a move", () => {
-    const root = board([168]);
-    drawChildMarkers(root, context([child("w1", "s0")]));
-    const layer = root.querySelector("g.child-markers");
-    expect(layer?.classList.contains("still")).toBe(true);
-    drawChildMarkers(root, context([child("w1", "s0")], { motion: true }));
-    expect(layer?.classList.contains("still")).toBe(false);
   });
 });

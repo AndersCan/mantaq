@@ -47,8 +47,6 @@ interface ViewState {
   previous: VizJson | undefined;
   /** Live: the followed child, set by a chip click; null = the lowest key. */
   picked: { map: string; key: string } | null;
-  /** True after a step or an effect result until the diagram is drawn: chips slide. */
-  motion: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
   /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
@@ -178,7 +176,6 @@ export function mountViewer(
     redraw = refresh;
     const walked = (sent?: ViewState["sent"]) => {
       view.sent = sent ?? null;
-      view.motion = true;
       noticeCleared(root, view);
       navigated(options, { machine, view });
       refresh();
@@ -365,7 +362,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     afters: [],
     previous: undefined,
     picked: null,
-    motion: false,
     tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
     sent: null,
@@ -495,7 +491,6 @@ function watchDriver(
 ): void {
   context.driver?.listen?.((state) => {
     view.live = state;
-    view.motion = true;
     if (view.afters.length > 0 && view.afters.length === state.steps.length) {
       view.afters[view.afters.length - 1] = state.after;
     }
@@ -702,15 +697,14 @@ function markDiagram(
       machine,
       children: view.live.children,
       picked: view.picked,
-      motion: view.motion,
       onPick: (child) => {
         view.picked = child;
+        view.selection = null;
         view.tab = "step";
         context.pick();
       },
     });
   }
-  view.motion = false;
   markSelection(root, view.selection);
 }
 
