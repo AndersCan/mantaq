@@ -680,4 +680,14 @@ describe("node-inside", () => {
       { rule: "node-inside", a: "node:A", b: "node:A", gap: 6 },
     ]);
   });
+
+  test("a worker row 2px under the name box is an overlap", () => {
+    const layout = stateWith({ y: 76 }, []);
+    const [first] = layout.nodes;
+    if (first?.kind !== "state") throw new Error("not a state");
+    const workers = { x: 100, y: 93, width: 64, height: 14 };
+    expect(ofRule({ ...layout, nodes: [{ ...first, workers }] }, "node-inside")).toEqual([
+      { rule: "node-inside", a: "node:A", b: "node:A", gap: 2 },
+    ]);
+  });
 });
