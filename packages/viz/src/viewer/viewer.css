@@ -39,8 +39,7 @@
   font-size: 1em;
 }
 
-/* One button look: a bordered button in the text colour. Send is the one
-   filled button. Component rules below (tabs) still win. */
+/* One button look: a bordered button in the text colour. Component rules below (tabs) still win. */
 .viz button {
   font: inherit;
   font-size: 1em;
@@ -324,7 +323,6 @@
 
 .viz .selected path,
 .viz .selected .frame {
-  stroke: var(--select);
   stroke-width: 2.5;
 }
 
@@ -345,10 +343,6 @@
 /* Explore: the walk over the drawn graph. */
 .viz .current .frame {
   stroke: var(--accent);
-  stroke-width: 2.5;
-}
-
-.viz .current .frame {
   stroke-width: 3.5;
 }
 
@@ -408,14 +402,6 @@
 
 .viz .explore li {
   margin: 3px 0;
-}
-
-.viz .explore li > button + button {
-  margin-left: 6px;
-}
-
-.viz .explore button {
-  cursor: pointer;
 }
 
 .viz .explore-controls {

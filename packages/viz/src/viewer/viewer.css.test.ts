@@ -20,7 +20,7 @@ const listed = (selector: string) =>
   ) ?? "";
 
 test("a clicked item is teal and stays teal over the walk colours", () => {
-  expect(listed(".viz .selected .frame")).toMatch(/stroke:\s*var\(--select\)/);
+  expect(listed(".viz .graph .selected .frame")).toMatch(/stroke:\s*var\(--select\)/);
   const override = css.lastIndexOf(".viz .graph .selected path");
   expect(override).toBeGreaterThan(css.indexOf(".viz .edge.sent path"));
   expect(override).toBeGreaterThan(css.indexOf(".viz .current .frame"));

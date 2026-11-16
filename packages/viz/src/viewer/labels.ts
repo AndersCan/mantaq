@@ -14,11 +14,6 @@ const FLIP: ReadonlyArray<readonly [string, string]> = [
   [">", "<="],
 ];
 
-/** Text drawn on an edge: the event it carries. */
-export function edgeText(edge: VizEdge): string {
-  return edge.event;
-}
-
 /** `!(a === b)` becomes `a !== b` when the inside is one comparison; anything else is kept. */
 function tidy(condition: string): string {
   const plain = condition.replaceAll("event.payload.", "").replaceAll("context.get().", "");
@@ -66,8 +61,8 @@ export function edgeCondition(edge: VizEdge): string | null {
 /** The lines drawn on an edge: the event, then its condition cut to fit. */
 export function edgeLines(edge: VizEdge): string[] {
   const condition = edgeCondition(edge);
-  if (condition === null) return [edgeText(edge)];
+  if (condition === null) return [edge.event];
   const cut =
     condition.length > MAX_CONDITION ? `${condition.slice(0, MAX_CONDITION - 1)}…` : condition;
-  return [edgeText(edge), cut];
+  return [edge.event, cut];
 }

@@ -69,9 +69,7 @@ type ChildRef = { map: string; key: string };
 
 /** The key, with the map name only when the machine has more than one map. */
 function childWho(doc: Document, machine: VizMachine, ref: ChildRef): Array<Node | string> {
-  return machine.maps.length > 1
-    ? [code(doc, ref.map), " ", code(doc, ref.key)]
-    : [code(doc, ref.key)];
+  return [code(doc, childWhoText(machine, ref))];
 }
 
 export function childWhoText(machine: VizMachine, ref: ChildRef): string {
@@ -429,7 +427,6 @@ function liveParts(
   machine: VizMachine,
   context: {
     live: NonNullable<ExploreContext["live"]>;
-    current: string;
     final: boolean;
   },
 ): Array<HTMLElement | null> {
@@ -465,7 +462,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       "data-done": final ? "" : null,
     },
     [
-      ...liveParts(doc, machine, { live, current, final }),
+      ...liveParts(doc, machine, { live, final }),
       html(doc, "div", { class: "explore-controls" }, [
         button(doc, ["Back"], {
           onClick: () => context.rewind(length - 1),

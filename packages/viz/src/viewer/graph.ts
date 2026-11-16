@@ -1,7 +1,7 @@
 import { isAnyState } from "../schema.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
 import { activatable, html, svg } from "./dom.ts";
-import { edgeCondition, edgeLines, edgeText } from "./labels.ts";
+import { edgeCondition, edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
 import { HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
 import { Either } from "@mantaq/utils";
@@ -223,7 +223,7 @@ function edgeGroup(
 ): SVGGElement {
   const { edge } = placed;
   const internal = context.machine.events.find((event) => event.id === edge.event)?.internal;
-  const text = edgeText(edge);
+  const text = edge.event;
   const group = svg(
     doc,
     "g",
@@ -267,7 +267,7 @@ function helpGroup(doc: Document, placed: PlacedEdge, details: (id: string) => v
     {
       class: "edge-help",
       "data-details-edge": placed.edge.id,
-      "aria-label": `Details of ${edgeAria(placed.edge, edgeText(placed.edge))}`,
+      "aria-label": `Details of ${edgeAria(placed.edge, placed.edge.event)}`,
     },
     [
       svg(doc, "circle", { class: "hit", cx, cy, r: 10 }),
