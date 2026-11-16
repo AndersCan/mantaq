@@ -255,6 +255,7 @@ function edgeGroup(
       "aria-label": edgeAria(edge, text),
     },
     [
+      svg(doc, "path", { class: "hit", d: placed.path, "aria-hidden": "true" }),
       svg(doc, "path", {
         d: placed.path,
         "marker-end":

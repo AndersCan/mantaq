@@ -89,7 +89,9 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
     let current = "idle";
     let deadline: number | null = null;
     let context: VizLiveState["context"] = null;
+    let last: VizLiveStep | null = null;
     for (const step of steps) {
+      const from = current;
       if (step.kind === "advance") now += step.ms;
       else if (step.event === "nope") throw new Error("unknown event nope");
       else if (step.event === "submit" && current === "idle") {
@@ -98,11 +100,23 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
         context = step.payload;
       }
       if (current === "paying" && deadline !== null && now >= deadline) current = "error";
+      if (step.kind === "event" && step.event === "submit" && from === "idle") {
+        last = {
+          from,
+          event: step.event,
+          to: current,
+          outcome: "transition",
+          effects: [],
+          sent: [],
+          context,
+          error: null,
+        };
+      }
     }
     return {
       state: current,
       steps,
-      last: null,
+      last,
       after: [],
       timers:
         current === "paying" && deadline !== null
@@ -311,6 +325,28 @@ describe("live controls", () => {
     expect(current(root)).toBe("paying");
     expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
     expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("after a Details send, the Details say what was sent, with its values", () => {
+    const { root } = mount();
+    const detailsSent = () => root.querySelector("[data-details-sent]")?.textContent;
+    clickEdge(root, "idle-submit-paying");
+    expect(detailsSent()).toBeUndefined();
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(detailsSent()).toBe(`Sent submit with {"amount":5}: idle → paying`);
+    expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect(detailsSent()).toBeUndefined();
+  });
+
+  test("a Send from the Step tab shows its values and no Details line", () => {
+    const { root } = mount();
+    sendSubmit(root);
+    expect(root.querySelector("[data-live-sent-event]")?.textContent).toBe(
+      `Sent submit with {"amount":5}`,
+    );
+    clickEdge(root, "idle-submit-paying");
+    expect(root.querySelector("[data-details-sent]")).toBeNull();
   });
 
   test("after a Details send, focus is on the selected arrow", () => {

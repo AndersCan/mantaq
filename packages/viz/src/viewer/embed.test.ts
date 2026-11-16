@@ -89,14 +89,14 @@ describe("mountVizText", () => {
       ],
     };
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
-    const paths = root.querySelectorAll<SVGPathElement>(".graph g.edge path");
+    const paths = root.querySelectorAll<SVGPathElement>(".graph g.edge path:not(.hit)");
     expect(paths.length).toBe(2);
     for (const path of paths) {
       expect(path.getAttribute("style")).toMatch(/^--viz-dot-gap: \d+(\.\d)?$/);
       expect(path.getAttribute("style")).not.toContain("stroke-dasharray");
     }
     const plain = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
+    expect(plain.querySelector(".graph g.edge path:not(.hit)")?.hasAttribute("style")).toBe(false);
   });
 
   test("a self-loop uses the loop arrowhead", () => {
@@ -110,7 +110,7 @@ describe("mountVizText", () => {
     };
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
     const markerOf = (id: string) =>
-      root.querySelector(`[data-edge-id="${id}"] path`)?.getAttribute("marker-end");
+      root.querySelector(`[data-edge-id="${id}"] path:not(.hit)`)?.getAttribute("marker-end");
     expect(markerOf("open-stay-open")).toBe("url(#viz-arrow-loop)");
     expect(markerOf("open-go-done")).toBe("url(#viz-arrow)");
     const loopMarker = root.querySelector("#viz-arrow-loop");
@@ -448,6 +448,15 @@ describe("walking: the selected arrow's Send", () => {
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
     expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
     expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("after a walking Send, the Details say where it went", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    root
+      .querySelector('[data-edge-id="open-go-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(root.querySelector("[data-details-sent]")?.textContent).toBe("Sent go: open → done");
   });
 
   test("after a walking Send, focus is on the selected arrow", () => {

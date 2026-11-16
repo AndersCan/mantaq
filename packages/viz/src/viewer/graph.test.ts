@@ -250,3 +250,36 @@ describe("renderGraph worker row", () => {
     expect(graph.querySelector('[data-node-id="idle"] rect.worker-row')).toBeNull();
   });
 });
+
+describe("arrow hit area", () => {
+  test("every arrow has one transparent hit path with the drawn path's d", () => {
+    const withEdge = {
+      ...machine,
+      edges: [
+        {
+          id: "idle-go-busy",
+          from: "idle",
+          event: "go",
+          to: "busy",
+          kind: "transition",
+          origin: "declared",
+          emits: [],
+          contexts: [],
+          explanation: null,
+          doc: null,
+          coverage: null,
+          tested: null,
+        },
+      ],
+    } as VizMachine;
+    const doc = renderGraph(document, withEdge, { select: () => undefined });
+    const groups = [...doc.querySelectorAll("g[data-edge-id]")];
+    expect(groups.length).toBeGreaterThan(0);
+    for (const group of groups) {
+      const hits = group.querySelectorAll("path.hit");
+      expect(hits).toHaveLength(1);
+      const drawn = group.querySelector("path:not(.hit)");
+      expect(hits[0]?.getAttribute("d")).toBe(drawn?.getAttribute("d"));
+    }
+  });
+});

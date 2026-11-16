@@ -25,8 +25,8 @@ import {
   stateAfter,
 } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
-import { button, code, explorePanel, markExplore } from "./explore.ts";
-import type { ExploreContext, ExploreParts } from "./explore.ts";
+import { button, code, explorePanel, markExplore, outcomeText, sentEventLine } from "./explore.ts";
+import type { ExploreContext, ExploreParts, SentEvent } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
@@ -52,7 +52,7 @@ interface ViewState {
   /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
   diagramOnly: boolean;
   /** The event the last Send press sent and to whom; cleared by any other step. */
-  sent: { event: string; actor?: VizActorRef } | null;
+  sent: SentEvent | null;
   /** Why the requested run did not open; cleared by the next walk. */
   notice: string | null;
   /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
@@ -182,11 +182,18 @@ export function mountViewer(
     };
     const setValue = valueSetter({ options, machine, view, mark });
     const send = stepSender({ view, driver, walked });
-    const sendEvent = (event: string, actor?: VizActorRef) =>
-      send(eventStep(machine, view, event, actor), { event, ...(actor ? { actor } : {}) });
-    const take = (step: ExploreStep) => {
+    const sendEvent = (event: string, actor?: VizActorRef, edge?: string) => {
+      const step = eventStep(machine, view, event, actor);
+      send(step, {
+        event,
+        ...(actor ? { actor } : {}),
+        payload: step.payload,
+        ...(edge === undefined ? {} : { edge }),
+      });
+    };
+    const take = (step: ExploreStep, sent?: ViewState["sent"]) => {
       view.path = [...view.path, step];
-      walked();
+      walked(sent);
     };
     const rewind = (length: number) => {
       rewindView(view, driver, length);
@@ -246,8 +253,8 @@ function sendFor(
     driver: VizDriver | undefined;
   },
   handlers: {
-    sendEvent: (event: string, actor?: VizActorRef) => void;
-    take: (step: ExploreStep) => void;
+    sendEvent: (event: string, actor?: VizActorRef, edge?: string) => void;
+    take: (step: ExploreStep, sent?: ViewState["sent"]) => void;
   },
 ): (edge: VizEdge) => HTMLElement | null {
   const { doc, machine, view } = from;
@@ -264,16 +271,55 @@ function sendFor(
     const sendable = currentsOf(view.live, view.picked).some((current) =>
       movesFrom(machine, current).some((move) => move.edge.id === edge.id),
     );
-    if (!sendable) return null;
+    if (!sendable) return sentHere(doc, { machine, view, edge }, null);
     const to = actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
-    return button(doc, ["Send ", code(doc, edge.event), ...to], {
+    const sendButton = button(doc, ["Send ", code(doc, edge.event), ...to], {
       onClick: () => {
-        handlers.sendEvent(edge.event, actor);
+        handlers.sendEvent(edge.event, actor, edge.id);
         focusEdge(from.root, edge.id);
       },
       attrs: { "data-send-edge": edge.id },
     });
+    return sentHere(doc, { machine, view, edge }, sendButton);
   };
+}
+
+/** After a Send from this arrow's Details: what was sent and where it went, then the button when it can still be pressed. */
+function sentHere(
+  doc: Document,
+  from: { machine: VizMachine; view: ViewState; edge: VizEdge },
+  sendButton: HTMLElement | null,
+): HTMLElement | null {
+  const { machine, view, edge } = from;
+  const { sent } = view;
+  if (sent?.edge !== edge.id) return sendButton;
+  const outcome = sentOutcome(doc, machine, view);
+  if (outcome === null) return sendButton;
+  const line = html(doc, "p", { "data-details-sent": "" }, [
+    ...sentEventLine(doc, sent),
+    ...outcome,
+  ]);
+  return html(doc, "div", {}, [line, sendButton]);
+}
+
+/** Where the last Send went: the driver's outcome live, `from → to` walking. */
+function sentOutcome(
+  doc: Document,
+  machine: VizMachine,
+  view: ViewState,
+): Array<Node | string> | null {
+  const { last } = view.live ?? {};
+  if (last !== undefined) {
+    if (last === null) return null;
+    const text = outcomeText(doc, machine, last);
+    // A move's text opens with the event and who ran it, which the sent line already names.
+    const moved = last.outcome === "transition" || last.outcome === "stay";
+    const tail = moved ? [": ", ...text.slice(-1)] : [": ", ...text];
+    return last.error === null ? tail : [...tail, `. It threw: ${last.error}`];
+  }
+  const to = view.path.at(-1)?.to;
+  const before = stateAfter(machine, view.path.slice(0, -1));
+  return to === undefined || before === null ? null : [`: ${before} → ${to}`];
 }
 
 /** The Send button goes once pressed; focus moves to the selected arrow so keyboard users keep their place. */
@@ -289,27 +335,36 @@ function walkingSend(
     machine: VizMachine;
     view: ViewState;
     edge: VizEdge;
-    take: (step: ExploreStep) => void;
+    take: (step: ExploreStep, sent?: ViewState["sent"]) => void;
   },
 ): HTMLElement | null {
   const { machine, view, edge } = context;
   const current = stateAfter(machine, view.path);
   if (current === null) return null;
   const move = movesFrom(machine, current).find((each) => each.edge.id === edge.id);
-  if (move === undefined || move.targets.length === 0) return null;
+  if (move === undefined || move.targets.length === 0) {
+    return sentHere(doc, { machine, view, edge }, null);
+  }
   const several = move.targets.length > 1;
-  return html(
+  return sentHere(
     doc,
-    "div",
-    {},
-    move.targets.map((to) =>
-      button(doc, ["Send ", code(doc, edge.event), ...(several ? [` → ${to}`] : [])], {
-        onClick: () => {
-          context.take({ edge: edge.id, to });
-          focusEdge(context.root, edge.id);
-        },
-        attrs: { "data-send-edge": edge.id, "data-target": to },
-      }),
+    { machine, view, edge },
+    html(
+      doc,
+      "div",
+      {},
+      move.targets.map((to) =>
+        button(doc, ["Send ", code(doc, edge.event), ...(several ? [` → ${to}`] : [])], {
+          onClick: () => {
+            context.take(
+              { edge: edge.id, to },
+              { event: edge.event, payload: null, edge: edge.id },
+            );
+            focusEdge(context.root, edge.id);
+          },
+          attrs: { "data-send-edge": edge.id, "data-target": to },
+        }),
+      ),
     ),
   );
 }
@@ -550,7 +605,7 @@ function eventStep(
   view: ViewState,
   event: string,
   actor: VizActorRef | undefined,
-): VizStep {
+): Extract<VizStep, { kind: "event" }> {
   const payload = payloadFor(machine, event, {
     set: view.values,
     live: view.live,

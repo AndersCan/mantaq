@@ -80,3 +80,13 @@ test("a child chip never slides: no child-marker rule has a transition", () => {
   expect(rules.length).toBeGreaterThan(0);
   for (const block of rules) expect(block).not.toMatch(/transition/);
 });
+
+test("an arrow's hit path is a wide transparent stroke that takes the pointer", () => {
+  const css = readFileSync(new URL("./viewer.css", import.meta.url), "utf8");
+  const rule = /\.viz \.graph \.edge path\.hit \{([^}]*)\}/.exec(css)?.[1] ?? "";
+  expect(rule).toContain("stroke: transparent");
+  expect(rule).toContain("pointer-events: stroke");
+  // Dashed and dotted arrows: without this the hit path takes their dashes and misses in the gaps.
+  expect(rule).toContain("stroke-dasharray: none");
+  expect(Number(/stroke-width: (\d+)/.exec(rule)?.[1])).toBeGreaterThanOrEqual(10);
+});
