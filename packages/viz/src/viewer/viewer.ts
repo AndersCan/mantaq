@@ -47,7 +47,6 @@ interface ViewState {
   previous: VizJson | undefined;
   /** Live: the followed child, set by a chip click; null = the lowest key. */
   picked: { map: string; key: string } | null;
-  /** True after a step or an effect result until the diagram is drawn: chips slide. */
   /** The panel tab shown. */
   tab: PanelTab;
   /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */

@@ -287,7 +287,14 @@ describe("live actor map children", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
     expect(root.querySelectorAll("li.explore-child")).toHaveLength(2);
     click(root.querySelector('[data-actor="photos[p2]"] [data-send="uploadConfirmed"]'));
-    expect(sent).toHaveLength(1);
+    expect(sent).toEqual([
+      {
+        kind: "event",
+        event: "uploadConfirmed",
+        payload: null,
+        actor: { map: "photos", key: "p2" },
+      },
+    ]);
   });
 
   test("the frame title stays one per key without a driver", () => {
@@ -786,4 +793,26 @@ test("each map's children are chips on that map's own states", () => {
     );
   expect(listed("photos")).toEqual(["p1@photos.sendingPhoto"]);
   expect(listed("uploads")).toEqual(["u1@uploads.queued"]);
+});
+
+test("each map's Step section lists only its own children; the followed mark stays in its map", () => {
+  const machine: VizMachine = {
+    ...photoQueue,
+    regions: ["photos", "uploads"],
+    maps: ["photos", "uploads"],
+    states: [...photoQueue.states, state("uploads.queued", { initial: true })],
+  };
+  const upload: VizLiveChild = { map: "uploads", key: "p1", state: "uploads.queued", since: 0 };
+  const { root } = mount([child("p1", "sendingPhoto"), upload], machine);
+  const rows = (map: string) =>
+    Array.from(root.querySelectorAll(`.explore-map[data-map="${map}"] li.explore-child`)).map(
+      (row) => `${row.getAttribute("data-child-key")}@${row.getAttribute("data-child-state")}`,
+    );
+  expect(rows("photos")).toEqual(["p1@photos.sendingPhoto"]);
+  expect(rows("uploads")).toEqual(["p1@uploads.queued"]);
+  root
+    .querySelector('.graph g.child-marker[data-marker-map="photos"][data-marker-key="p1"]')
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const followed = Array.from(root.querySelectorAll("li.explore-child[data-followed]"));
+  expect(followed.map((row) => row.getAttribute("data-child-map"))).toEqual(["photos"]);
 });

@@ -104,6 +104,10 @@ describe("drawChildMarkers", () => {
     drawChildMarkers(root, context([child("w1", "s1")]));
     expect(markers(root)).toEqual([before]);
     expect(before?.dataset.markerState).toBe("p.s1");
+    const fresh = board([168, 168]);
+    drawChildMarkers(fresh, context([child("w1", "s1")]));
+    expect(before?.style.transform).toBe(markers(fresh)[0]?.style.transform);
+    expect(before?.style.transform).not.toBe("");
   });
 
   test("a child that is gone loses its chip", () => {
