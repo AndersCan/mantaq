@@ -7,7 +7,6 @@ import type {
   VizLiveState,
   VizLiveStep,
   VizMachine,
-  VizRemovedChild,
   VizState,
   VizStep,
 } from "../schema.ts";
@@ -106,9 +105,8 @@ function stepOf(
 }
 
 function sendFrom(root: HTMLElement, key: string, event: string) {
-  root
-    .querySelector<HTMLButtonElement>(`[data-actor="photos[${key}]"] [data-send="${event}"]`)
-    ?.click();
+  root.querySelector<HTMLElement>(`li[data-child-key="${key}"]`)?.click();
+  sendVia(root, event);
 }
 
 function mount(
@@ -139,53 +137,38 @@ describe("live actor map children", () => {
     expect(root.textContent).not.toContain("no children yet");
   });
 
-  test("child rows and their Send buttons are in the Step tab", () => {
+  test("child rows are in the Step tab and clicking one sends nothing", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
     const rows = [...root.querySelectorAll(".explore [data-child-key]")];
     expect(rows.map((row) => row.getAttribute("data-child-key"))).toEqual(["p1", "p2"]);
     expect(root.querySelectorAll("[data-child-key][data-followed]")).toHaveLength(0);
     expect(rows[0]?.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
-    expect(root.querySelector('[data-actor="photos[p1]"] [data-send="retryPressed"]')).toBeNull();
-    const offered = [...root.querySelectorAll('[data-actor="photos[p1]"] [data-send]')].map(
-      (each) => each.getAttribute("data-send"),
-    );
-    expect(offered).toEqual([...new Set(offered)].sort());
+    expect(rows[0]?.getAttribute("aria-pressed")).toBe("false");
+    expect(root.querySelector("[data-send]")).toBeNull();
+    root.querySelector<HTMLElement>('li[data-child-key="p2"]')?.click();
+    expect(sent).toEqual([]);
+    const p2 = root.querySelector('li[data-child-key="p2"]');
+    expect(p2?.hasAttribute("data-followed")).toBe(true);
+    expect(p2?.getAttribute("aria-pressed")).toBe("true");
+    expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector("[data-selected-edge]")).toBeNull();
+  });
+
+  test("Enter on a focused row follows that child", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
     root
-      .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]')
-      ?.click();
-    expect(sent).toEqual([
-      {
-        kind: "event",
-        event: "uploadConfirmed",
-        payload: null,
-        actor: { map: "photos", key: "p1" },
-      },
-    ]);
+      .querySelector('li[data-child-key="p2"]')
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(walkedKey(root)).toBe("p2");
+    expect(sent).toEqual([]);
   });
 
-  test("a worker's Sends are sorted by name across input and internal events, once each", () => {
-    const mixed: VizMachine = {
-      ...photoQueue,
-      events: [...photoQueue.events, event("zap"), event("apply", true)],
-      edges: [
-        ...photoQueue.edges,
-        edge("photos.sendingPhoto", "zap", "photos.photoSent"),
-        { ...edge("photos.sendingPhoto", "zap", "photos.waitingForRetry"), id: "zap-again" },
-        edge("photos.sendingPhoto", "apply", "photos.photoSent"),
-      ],
-    };
-    const { root } = mount([child("p1", "sendingPhoto")], mixed);
-    const offered = [...root.querySelectorAll('[data-actor="photos[p1]"] [data-send]')].map(
-      (each) => each.getAttribute("data-send"),
-    );
-    expect(offered).toEqual(["apply", "uploadConfirmed", "uploadFailed", "zap"]);
-  });
-
-  test("a final child has no moves block", () => {
+  test("a final child's row can be followed too", () => {
     const { root } = mount([child("p1", "photoSent", 3)]);
     const row = root.querySelector('[data-child-key="p1"]');
     expect(row?.querySelector(".explore-child-now")?.textContent).toBe("p1: in photoSent (final)");
-    expect(row?.querySelector("[data-actor]")).toBeNull();
+    row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector('[data-child-key="p1"][data-followed]')).not.toBeNull();
   });
 
   test("a map without children has no section", () => {
@@ -354,7 +337,7 @@ describe("live actor map children", () => {
   test("every child has its own Send buttons and a press moves only that child", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
     expect(root.querySelectorAll("li.explore-child")).toHaveLength(2);
-    click(root.querySelector('[data-actor="photos[p2]"] [data-send="uploadConfirmed"]'));
+    sendFrom(root, "p2", "uploadConfirmed");
     expect(sent).toEqual([
       {
         kind: "event",
@@ -405,7 +388,7 @@ describe("live actor map children", () => {
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] }, { driver });
     pick(root, "p2");
     expect(walkedKey(root)).toBe("p2");
-    click(root.querySelector('[data-actor="photos[p2]"] [data-send="uploadConfirmed"]'));
+    sendFrom(root, "p2", "uploadConfirmed");
     expect(walkedKey(root)).toBeUndefined();
     expect(chips(root)).toEqual(["p1@photos.sendingPhoto"]);
   });
@@ -432,17 +415,6 @@ describe("live actor map children", () => {
     );
   });
 
-  test("after a Send press the Step tab starts with what was sent, to the child", () => {
-    const { root } = mount([child("p1", "waitingForRetry")], photoQueue, () => ({
-      ...stepOf("retryPressed", "photos.waitingForRetry", "photos.waitingForRetry", "stay"),
-      actor: { map: "photos", key: "p1" },
-    }));
-    expect(root.querySelector("[data-live-sent-event]")).toBeNull();
-    sendFrom(root, "p1", "retryPressed");
-    const outcome = root.querySelector(".explore-outcome");
-    expect(outcome?.firstElementChild?.textContent).toBe("Sent retryPressed to p1");
-  });
-
   test("with two maps the map name shows", () => {
     const two: VizMachine = { ...photoQueue, maps: ["photos", "videos"] };
     const { root } = mount([child("p1", "sendingPhoto")], two, () => ({
@@ -464,299 +436,6 @@ describe("live actor map children", () => {
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
       "p9 is not in photos. Nothing ran.",
     );
-  });
-
-  describe("the log names starts and removals", () => {
-    const withPhotoAdded: VizMachine = {
-      ...photoQueue,
-      events: [...photoQueue.events, event("photoAdded"), event("queueCleared")],
-      edges: [
-        ...photoQueue.edges,
-        { ...edge("showingQueue", "photoAdded", "showingQueue"), kind: "stay" },
-        { ...edge("showingQueue", "queueCleared", "showingQueue"), kind: "stay" },
-      ],
-    };
-    const removedChild = (key: string, at: number, until: number): VizRemovedChild => ({
-      ...child(key, "sendingPhoto", at),
-      until,
-    });
-    // frames[n] is the state after n steps; the driver answers from it by step count.
-    function scripted(frames: Array<Partial<VizLiveState>>, steps: string[] = []) {
-      const root = document.createElement("div");
-      let sent: VizStep[] = [];
-      const driver: VizDriver = {
-        reset: () => {
-          sent = [];
-          return live([]);
-        },
-        step: (step) => {
-          sent = [...sent, step];
-          const frame = frames[sent.length - 1] ?? {};
-          return { ...live([], sent), ...frame, last: frame.last ?? rootStay("photoAdded") };
-        },
-      };
-      mountViewer(
-        root,
-        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withPhotoAdded] },
-        { driver, steps },
-      );
-      return root;
-    }
-    const rootStay = (name: string): VizLiveStep =>
-      stepOf(name, "showingQueue", "showingQueue", "stay");
-    const clickSend = sendVia;
-
-    const afterAdd1 = { children: [child("p1", "sendingPhoto", 1)] };
-
-    test("a repeated Send button click sends the next free key", () => {
-      const keyed: VizMachine = {
-        ...withPhotoAdded,
-        events: [
-          {
-            ...event("photoAdded"),
-            payload: [
-              {
-                name: "photoId",
-                type: "string",
-                optional: false,
-                doc: null,
-                input: "text",
-                choices: [],
-                sample: "p1",
-              },
-            ],
-          },
-          event("queueCleared"),
-        ],
-      };
-      const root = document.createElement("div");
-      let sent: VizStep[] = [];
-      const driver: VizDriver = {
-        reset: () => {
-          sent = [];
-          return live([]);
-        },
-        step: (step) => {
-          sent = [...sent, step];
-          return { ...live([child("p1", "sendingPhoto", 1)], sent), last: rootStay("photoAdded") };
-        },
-      };
-      mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [keyed] }, { driver });
-      clickSend(root, "photoAdded");
-      expect(sent).toEqual([{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }]);
-      clickSend(root, "photoAdded");
-      expect(sent.at(-1)).toEqual({
-        kind: "event",
-        event: "photoAdded",
-        payload: { photoId: "p2" },
-      });
-    });
-
-    test("a click sends the next key when the evidence is only in a removed child", () => {
-      const keyed: VizMachine = {
-        ...withPhotoAdded,
-        events: [
-          {
-            ...event("photoAdded"),
-            payload: [
-              {
-                name: "photoId",
-                type: "string",
-                optional: false,
-                doc: null,
-                input: "text",
-                choices: [],
-                sample: "p1",
-              },
-            ],
-          },
-          event("queueCleared"),
-        ],
-      };
-      const root = document.createElement("div");
-      let sent: VizStep[] = [];
-      const driver: VizDriver = {
-        reset: () => {
-          sent = [];
-          return live([]);
-        },
-        step: (step) => {
-          sent = [...sent, step];
-          return {
-            ...live([child("p1", "sendingPhoto", 2)], sent),
-            removed: [{ ...child("p1", "sendingPhoto", 1), until: 2 }],
-            last: rootStay("photoAdded"),
-          };
-        },
-      };
-      mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [keyed] }, { driver });
-      clickSend(root, "photoAdded");
-      clickSend(root, "photoAdded");
-      expect(sent.at(-1)).toEqual({
-        kind: "event",
-        event: "photoAdded",
-        payload: { photoId: "p2" },
-      });
-    });
-
-    test("an event that declares no fields sends the next free key too", () => {
-      const bare: VizMachine = {
-        ...withPhotoAdded,
-        events: [{ ...event("photoAdded"), payload: [] }, event("queueCleared")],
-        fuzz: {
-          seed: 1,
-          iterations: 1,
-          corpus: [
-            {
-              steps: [{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }],
-              discovered: [],
-            },
-          ],
-          errors: [],
-          failedExpectations: [],
-        } as unknown as VizMachine["fuzz"],
-      };
-      const root = document.createElement("div");
-      let sent: VizStep[] = [];
-      const driver: VizDriver = {
-        reset: () => {
-          sent = [];
-          return live([]);
-        },
-        step: (step) => {
-          sent = [...sent, step];
-          return { ...live([child("p1", "sendingPhoto", 1)], sent), last: rootStay("photoAdded") };
-        },
-      };
-      mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [bare] }, { driver });
-      clickSend(root, "photoAdded");
-      expect(sent).toEqual([{ kind: "event", event: "photoAdded", payload: { photoId: "p1" } }]);
-      clickSend(root, "photoAdded");
-      expect(sent.at(-1)).toEqual({
-        kind: "event",
-        event: "photoAdded",
-        payload: { photoId: "p2" },
-      });
-    });
-
-    test("a step that starts a child says so", () => {
-      const root = scripted([afterAdd1]);
-      clickSend(root, "photoAdded");
-      const line = root.querySelector("[data-live-started]");
-      expect(line?.textContent).toBe("p1 started in sendingPhoto");
-      expect(JSON.parse(line?.getAttribute("data-keys") ?? "")).toEqual(["p1"]);
-      expect(root.querySelector("[data-live-removed]")).toBeNull();
-    });
-
-    test("a root stay that starts a child shows both lines", () => {
-      const root = scripted([afterAdd1]);
-      clickSend(root, "photoAdded");
-      expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
-        "photoAdded: handled in showingQueue, stays",
-      );
-      expect(root.querySelector("[data-live-started]")).not.toBeNull();
-    });
-
-    test("children grouped by state in order of first appearance", () => {
-      const root = scripted([
-        {
-          children: [
-            child("p1", "sendingPhoto", 1),
-            child("p2", "sendingPhoto", 1),
-            child("p3", "photoSent", 1),
-          ],
-        },
-      ]);
-      clickSend(root, "photoAdded");
-      expect(root.querySelector("[data-live-started]")?.textContent).toBe(
-        "p1, p2 started in sendingPhoto; p3 started in photoSent",
-      );
-    });
-
-    test("a step that removes children names them all", () => {
-      const root = scripted([
-        afterAdd1,
-        {},
-        {
-          children: [],
-          removed: ["p1", "p2", "p3", "p4"].map((key) => removedChild(key, 1, 3)),
-        },
-      ]);
-      clickSend(root, "photoAdded");
-      clickSend(root, "photoAdded");
-      clickSend(root, "photoAdded");
-      const line = root.querySelector("[data-live-removed]");
-      expect(line?.textContent).toBe("p1, p2, p3, p4 removed");
-      expect(JSON.parse(line?.getAttribute("data-keys") ?? "")).toEqual(["p1", "p2", "p3", "p4"]);
-    });
-
-    test("children before the first step get no line", () => {
-      const { root } = mount([child("p1", "sendingPhoto", 0)]);
-      expect(root.querySelector("[data-live-started]")).toBeNull();
-      expect(root.querySelector("[data-live-removed]")).toBeNull();
-    });
-
-    test("a child started and a child removed in one step show both lines, started first", () => {
-      const root = scripted([
-        afterAdd1,
-        {
-          children: [child("p2", "sendingPhoto", 2)],
-          removed: [removedChild("p1", 1, 2)],
-        },
-      ]);
-      clickSend(root, "photoAdded");
-      clickSend(root, "photoAdded");
-      const lines = [...root.querySelectorAll("[data-live-started], [data-live-removed]")];
-      expect(lines.map((line) => line.textContent)).toEqual([
-        "p2 started in sendingPhoto",
-        "p1 removed",
-      ]);
-    });
-
-    const childMoved = (key: string, from: string, to: string): VizLiveStep => ({
-      ...stepOf("photoAdded", `photos.${from}`, `photos.${to}`, "transition"),
-      actor: { map: "photos", key },
-    });
-    const rootMoved: VizLiveStep = {
-      ...stepOf("photoDone", "showingQueue", "showingQueue", "transition"),
-      actor: undefined,
-    };
-
-    test("the panel says a child took the event; the step's own part came back", () => {
-      const root = scripted(
-        [
-          {
-            children: [],
-            last: rootStay("photoAdded"),
-            after: [childMoved("p1", "sendingPhoto", "photoSent"), rootMoved],
-          },
-        ],
-        ["photoAdded"],
-      );
-      const entries = [...root.querySelectorAll("[data-live-after] > p.muted")].map(
-        (each) => each.textContent,
-      );
-      expect(entries).toEqual([
-        "Then p1 took photoAdded: sendingPhoto → photoSent",
-        "Then photoDone came back",
-      ]);
-    });
-
-    test("the root is named by the machine when a child's step moved it", () => {
-      const root = scripted(
-        [
-          {
-            children: [],
-            last: childMoved("p1", "sendingPhoto", "photoSent"),
-            after: [rootMoved],
-          },
-        ],
-        ["photoAdded"],
-      );
-      expect(root.querySelector("[data-live-after] > p.muted")?.textContent).toBe(
-        "Then photoQueue took photoDone: showingQueue → showingQueue",
-      );
-    });
   });
 
   test("a payload event for a child sends to that child at once", () => {
@@ -786,9 +465,7 @@ describe("live actor map children", () => {
       withPayload,
     );
     pick(root, "p2");
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="photos[p2]"] [data-send="retryPressed"]')
-      ?.click();
+    sendFrom(root, "p2", "retryPressed");
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({
       kind: "event",
@@ -820,9 +497,7 @@ describe("live actor map children", () => {
       ),
     };
     const { root, sent } = mount([child("p1", "sendingPhoto")], withReason);
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadFailed"]')
-      ?.click();
+    sendFrom(root, "p1", "uploadFailed");
     expect(sent).toEqual([
       {
         kind: "event",

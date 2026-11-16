@@ -691,7 +691,7 @@ describe("field forms and the context table", () => {
     const { root, live } = mountFields(requiredMachine, {
       onNavigate: (where) => seen.push(where.values),
     });
-    expect(valueBox(root, "amount")?.placeholder).toBe("1");
+    expect(valueBox(root, "amount")?.value).toBe("1");
     setBox(root, "amount", "7.5");
     expect(seen.at(-1)).toEqual(["amount=7.5"]);
     sendSubmit(root);
@@ -722,11 +722,29 @@ describe("field forms and the context table", () => {
     const { root, live } = mountFields(requiredMachine);
     setBox(root, "amount", "7");
     setBox(root, "amount", "seven");
-    expect(valueBox(root, "amount")?.value).toBe("");
+    expect(valueBox(root, "amount")?.value).toBe("1");
     sendSubmit(root);
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
+  });
+
+  test("an untouched box shows the value the last Send used", () => {
+    const { root } = mountFields(requiredMachine);
+    setBox(root, "label", "x");
+    sendSubmit(root);
+    setBox(root, "label", "");
+    expect(valueBox(root, "label")?.value).toBe("x");
+  });
+
+  test("typing the shown default sets no value", () => {
+    const seen: string[][] = [];
+    const { root } = mountFields(requiredMachine, {
+      onNavigate: (where) => seen.push(where.values),
+    });
+    setBox(root, "amount", "1");
+    expect(seen.at(-1) ?? []).toEqual([]);
+    expect(valueBox(root, "amount")?.value).toBe("1");
   });
 
   test("a name optional on one event and required on another shows the default the click sends", () => {
@@ -740,7 +758,7 @@ describe("field forms and the context table", () => {
       ],
     };
     const { root, live } = mountFields(shared);
-    expect(valueBox(root, "label")?.placeholder).toBe("hi");
+    expect(valueBox(root, "label")?.value).toBe("hi");
     sendSubmit(root);
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
@@ -1213,7 +1231,8 @@ describe("live effect reports", () => {
         ),
       };
       const root = mountFetcher({ mode: "held", machine });
-      expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching (final)");
+      expect(root.querySelector(".explore-now")).toBeNull();
+      expect(root.querySelector(".explore")?.hasAttribute("data-done")).toBe(true);
       expect(root.querySelector(".explore-time")).toBeNull();
     });
 

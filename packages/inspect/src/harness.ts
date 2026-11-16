@@ -95,12 +95,6 @@ function pickMachine(
   return Either.left(`no machine "${wanted}" in ${name}. Found: ${ids.join(", ")}.`);
 }
 
-async function attributes(page: Page, selector: string, attribute: string): Promise<string[]> {
-  return page
-    .locator(selector)
-    .evaluateAll((nodes, name) => nodes.map((node) => node.getAttribute(name) ?? ""), attribute);
-}
-
 /** Type `values` into the Context tab's boxes (empty text clears one); returns a message when a key has no box. */
 async function setValues(
   page: Page,
@@ -208,31 +202,42 @@ async function outcomeOf(
   return Either.right({ state: await state(), outcome: outcome as VizLiveOutcome });
 }
 
-/** Press the Send button in a worker's row on the Step tab. */
+/** Follow the worker's row on the Step tab, then press the arrow's Send in Details. */
 async function pressRow(
   page: Page,
   context: {
+    machine: VizMachine;
     actor: { map: string; key: string };
     event: string;
     payload: Record<string, VizJson> | undefined;
     state: () => Promise<string>;
   },
 ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
-  const { actor, event, payload, state } = context;
+  const { machine, actor, event, payload, state } = context;
   await page.click('[data-tab="step"]');
-  const scope = `${PANEL} [data-actor=${quoted(actorPath(actor))}]`;
-  const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
-  if ((await trigger.count()) === 0) {
-    const offered = await attributes(page, `${scope} [data-send]`, "data-send");
+  const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
+  await page.click(row);
+  const fullState = (await page.getAttribute(row, "data-child-state")) ?? "";
+  const edges = movesFrom(machine, fullState)
+    .map((move) => move.edge)
+    .filter((each) => scopeOf(each.from) === actor.map);
+  const edge = edges.find((each) => each.event === event);
+  if (edge === undefined) {
+    const offered = [...new Set(edges.map((each) => each.event))].sort();
     return Either.left(
-      `no button for ${event}: ${actorPath(actor)} is in ${await rowState(page, actor)}, which offers: ${[...new Set(offered)].join(", ")}.`,
+      `no button for ${event}: ${actorPath(actor)} is in ${await rowState(page, actor)}, which offers: ${offered.join(", ")}.`,
     );
   }
   const problem = payload === undefined ? undefined : await setValues(page, payload);
   if (problem !== undefined) {
     return Either.left(problem);
   }
-  await page.click('[data-tab="step"]');
+  await page.locator(`.graph g[data-edge-id=${quoted(edge.id)}]`).dispatchEvent("click");
+  const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
+  if ((await trigger.count()) === 0) {
+    const note = await page.locator("[data-blocked-note]").first().textContent();
+    return Either.left(note ?? `${event} is blocked.`);
+  }
   await trigger.click();
   return outcomeOf(page, state);
 }
@@ -251,7 +256,7 @@ function makeSend(
     const path = actorPath(actor);
     const missing = await missingActor(page, { machine, actor, path });
     if (missing !== undefined) return Either.left(missing);
-    if ("map" in actor) return pressRow(page, { actor, event, payload, state });
+    if ("map" in actor) return pressRow(page, { machine, actor, event, payload, state });
     const currents = await page
       .locator(".graph g.current[data-node-id]")
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));

@@ -174,7 +174,6 @@ test("submitPayment waits in submitting with its three reports", async () => {
     expect(await state("submitPayment")).toBe("submitting");
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(await viz.state()).toBe("submitting");
-    expect(await viz.text()).toContain("In submitting");
     expect(await state("paymentFail")).toBe("error");
     expect(await state("back")).toBe("payment");
     expect(await state("submitPayment")).toBe("submitting");
