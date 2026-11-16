@@ -566,6 +566,7 @@ function childrenSections(
           "data-child-map": map,
           "data-child-key": child.key,
           "data-child-state": child.state,
+          hidden: moves === null ? "" : null,
         },
         [moves],
       );

@@ -170,6 +170,11 @@ describe("live actor map children", () => {
     const row = root.querySelector('[data-child-key="p1"]');
     expect(root.querySelector(".explore-child-now")?.textContent).toBe("p1: in photoSent (final)");
     expect(row?.querySelector("[data-actor]")).toBeNull();
+    // A final child has nothing left to send: the Events fold shows no empty bullet for it.
+    const empty = [...root.querySelectorAll<HTMLElement>(".explore li")].filter(
+      (li) => li.childNodes.length === 0 && !li.hidden,
+    );
+    expect(empty).toEqual([]);
   });
 
   test("a map without children has no section", () => {
