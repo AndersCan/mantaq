@@ -505,7 +505,7 @@ function watchDriver(
   });
 }
 
-/** Sets (or, with undefined, clears) a value: any open blocked note closes, the blocked arrows are worked out again and the host hears of it. Only the marks redraw, so the box being typed in keeps focus. */
+/** Sets (or, with undefined, clears) a value: the blocked arrows are worked out again and the host hears of it. Only the marks redraw, so the box being typed in keeps focus. */
 function valueSetter(context: {
   options: ViewerOptions;
   machine: VizMachine;

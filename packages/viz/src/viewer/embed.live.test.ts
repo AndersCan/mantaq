@@ -301,6 +301,27 @@ describe("live controls", () => {
     }
   });
 
+  test("no arrow link in a state's Details sends", () => {
+    const { root, live } = mount();
+    const before = current(root);
+    root
+      .querySelector(`.graph [data-node-id="${before}"]`)
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const links = [...root.querySelectorAll<HTMLElement>("[data-edge-link]")].map((link) =>
+      link.getAttribute("data-edge-link"),
+    );
+    expect(links.length).toBeGreaterThan(0);
+    for (const id of links) {
+      root
+        .querySelector(`.graph [data-node-id="${before}"]`)
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      root.querySelector<HTMLElement>(`[data-edge-link="${id}"]`)?.click();
+      expect(current(root)).toBe(before);
+      expect(live.log).toHaveLength(0);
+      expect(root.querySelector(`[data-selected-edge="${id}"]`)).not.toBeNull();
+    }
+  });
+
   test("clicks never scroll or rebuild the canvas", () => {
     const { root } = mount();
     const canvas = root.querySelector(".canvas");

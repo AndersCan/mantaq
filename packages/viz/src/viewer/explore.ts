@@ -1346,7 +1346,7 @@ export function markExplore(
 const LOCK_WIDTH = 8;
 const LOCK_HEIGHT = 10;
 
-/** A blocked arrow: grey lock left of the label's first line, and `aria-disabled`; the reason is in the note a click opens. */
+/** A blocked arrow: grey lock left of the label's first line, and `aria-disabled`. */
 function markBlocked(element: SVGGElement, reason: string | undefined): void {
   element.classList.toggle("blocked", reason !== undefined);
   element.querySelector(":scope > .blocked-lock")?.remove();
