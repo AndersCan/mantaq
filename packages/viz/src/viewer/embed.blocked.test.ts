@@ -145,9 +145,10 @@ function fakeDriver(opens: (step: VizStep) => boolean = () => false) {
 
 const sendEvent = sendVia;
 
+/** The `?` beside an arrow: opens its Details without sending. */
 const clickEdge = (root: HTMLElement, id: string) =>
   root
-    .querySelector(`[data-edge-id="${id}"]`)
+    .querySelector(`[data-details-edge="${id}"]`)
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
 function mount(driver: VizDriver, machine: VizMachine = cart) {
@@ -168,6 +169,16 @@ describe("a blocked arrow", () => {
     clickEdge(root, "cart-pay-payment");
     expect(sent).toHaveLength(0);
     expect(root.querySelector(".graph .selected")).not.toBeNull();
+  });
+
+  test("a click on a blocked arrow opens Details with the blocked line and sends nothing", () => {
+    const { driver, sent } = fakeDriver();
+    const root = mount(driver);
+    root
+      .querySelector('[data-edge-id="cart-pay-payment"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(sent).toHaveLength(0);
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toContain("is blocked:");
   });
 
   test("follows a value set in the Context tab, so its lock matches what a send does", () => {

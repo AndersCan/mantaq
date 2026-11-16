@@ -3,7 +3,7 @@ import type { VizEdge, VizMachine } from "../schema.ts";
 import { activatable, html, svg } from "./dom.ts";
 import { edgeCondition, edgeLines, edgeText } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
-import { layoutMachine } from "./layout.ts";
+import { HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
 import { Either } from "@mantaq/utils";
 import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
@@ -12,6 +12,8 @@ export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: stri
 
 export interface GraphCallbacks {
   select(selection: Selection): void;
+  /** Opens an arrow's Details without sending. Absent: no `?` is drawn (diagram-only). */
+  details?: (edgeId: string) => void;
 }
 
 function sourceText(from: string): string {
@@ -270,6 +272,29 @@ function edgeGroup(
   return group;
 }
 
+/** The `?` beside an arrow's label: opens its Details, never sends. */
+function helpGroup(doc: Document, placed: PlacedEdge, details: (id: string) => void): SVGGElement {
+  const lines = edgeLines(placed.edge);
+  const cx = placed.text.x + textWidth(lines[0] ?? "", 12) / 2 + 2 + HELP_SLOT / 2;
+  const cy = placed.text.y - ((lines.length - 1) * LINE_HEIGHT) / 2;
+  const group = svg(
+    doc,
+    "g",
+    {
+      class: "edge-help",
+      "data-details-edge": placed.edge.id,
+      "aria-label": `Details of ${edgeAria(placed.edge, edgeText(placed.edge))}`,
+    },
+    [
+      svg(doc, "circle", { class: "hit", cx, cy, r: 10 }),
+      svg(doc, "circle", { class: "ring", cx, cy, r: 5.5 }),
+      svg(doc, "text", { x: cx, y: cy + 3, "text-anchor": "middle" }, ["?"]),
+    ],
+  );
+  activatable(group, () => details(placed.edge.id));
+  return group;
+}
+
 function entryArrow(doc: Document, entry: { from: Point; to: Point }): SVGGElement {
   return svg(doc, "g", { class: "entry", "aria-hidden": "true" }, [
     svg(doc, "circle", { cx: entry.from.x, cy: entry.from.y, r: 6 }),
@@ -327,7 +352,10 @@ export function renderGraph(
       ...placed.regions.map((region) =>
         regionGroup(doc, region, machine.maps.includes(region.region)),
       ),
-      ...placed.edges.map((edge) => edgeGroup(doc, edge, { machine, callbacks })),
+      ...placed.edges.flatMap((edge) => [
+        edgeGroup(doc, edge, { machine, callbacks }),
+        ...(callbacks.details === undefined ? [] : [helpGroup(doc, edge, callbacks.details)]),
+      ]),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
       ...placed.nodes.map((node) => nodeGroup(doc, node, callbacks)),
     ],

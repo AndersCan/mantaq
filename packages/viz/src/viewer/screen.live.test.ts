@@ -213,10 +213,10 @@ describe("Screen tab", () => {
     expect(note(root)).toBeUndefined();
   });
 
-  test("an arrow click with Screen open opens Details", () => {
+  test("an arrow's ? with Screen open opens Details", () => {
     const root = mount();
     root
-      .querySelector('[data-edge-id="idle-go-a"]')
+      .querySelector('[data-details-edge="idle-go-a"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(screenShown(root)).toBe(false);
     expect(root.querySelector("[data-tab-panel=details]")?.hasAttribute("hidden")).toBe(false);

@@ -12,6 +12,7 @@ import {
   LABEL_OWN,
   LEG_GAP,
   LEG_INSET,
+  HELP_SLOT,
   LOCK_SLOT,
   LOOP_BASE,
   LOOP_FIRST_SPAN,
@@ -174,7 +175,7 @@ describe("self-loops", () => {
   const top = (box?.y ?? 0) - (box?.height ?? 0) / 2;
 
   test("loop k is a rectangle: span and bar height follow the formulas", () => {
-    const widths = events.map((event) => textWidth(event) + 8 + LOCK_SLOT);
+    const widths = events.map((event) => textWidth(event) + 8 + LOCK_SLOT + HELP_SLOT);
     const spans = [LOOP_FIRST_SPAN];
     const rises = [LOOP_BASE];
     for (const width of widths.slice(0, -1)) {
@@ -401,14 +402,14 @@ describe("edge label boxes", () => {
 
   test("a transition's box is its text width plus padding plus the lock slot", () => {
     const box = placed[0]?.label;
-    expect(box?.width).toBe(textWidth("team.WORKERS_RESIZED") + 8 + LOCK_SLOT);
+    expect(box?.width).toBe(textWidth("team.WORKERS_RESIZED") + 8 + LOCK_SLOT + HELP_SLOT);
     expect(box?.height).toBe(16);
   });
 
-  test("the text is centred right of the box centre by half the lock slot, only for transitions", () => {
-    expect((placed[0]?.text.x ?? 0) - (placed[0]?.label.x ?? 0)).toBe(LOCK_SLOT / 2);
-    expect(placed[1]?.text.x).toBe(placed[1]?.label.x);
-    expect(placed[1]?.label.width).toBe(textWidth("ping") + 8);
+  test("the text sits right of the box centre by the lock slot less the help slot, halved", () => {
+    expect((placed[0]?.text.x ?? 0) - (placed[0]?.label.x ?? 0)).toBe((LOCK_SLOT - HELP_SLOT) / 2);
+    expect((placed[1]?.text.x ?? 0) - (placed[1]?.label.x ?? 0)).toBe(-HELP_SLOT / 2);
+    expect(placed[1]?.label.width).toBe(textWidth("ping") + 8 + HELP_SLOT);
   });
 
   test("a label sits beside its own arrow, not on it", () => {

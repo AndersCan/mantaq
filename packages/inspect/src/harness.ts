@@ -217,14 +217,14 @@ async function pressRow(page: Page, actor: { map: string; key: string }): Promis
   return (await page.getAttribute(row, "data-child-state")) ?? "";
 }
 
-/** Selects each arrow in turn and presses the first Send that is offered; else the first reason given. */
+/** Opens each arrow's Details in turn and presses the first Send that is offered; else the first reason given. */
 async function pressFirstSend(
   page: Page,
   from: { edges: VizEdge[]; event: string; state: () => Promise<string> },
 ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
   let note: string | null = null;
   for (const edge of from.edges) {
-    await page.locator(`.graph g[data-edge-id=${quoted(edge.id)}]`).dispatchEvent("click");
+    await page.locator(`.graph g[data-details-edge=${quoted(edge.id)}]`).dispatchEvent("click");
     const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
     if ((await trigger.count()) > 0) {
       await trigger.click();

@@ -188,6 +188,10 @@ describe("live actor map children", () => {
     root.querySelector<SVGGElement>(
       '.graph g[data-edge-id="photos.sendingPhoto-uploadConfirmed-photos.photoSent"]',
     );
+  const helpOf = (root: HTMLElement) =>
+    root.querySelector(
+      '[data-details-edge="photos.sendingPhoto-uploadConfirmed-photos.photoSent"]',
+    );
   const click = (element: Element | null | undefined) =>
     element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   const title = (root: HTMLElement) =>
@@ -212,7 +216,7 @@ describe("live actor map children", () => {
 
   test("a child arrow's Details sends to the walked child", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
-    click(edgeGroup(root));
+    click(helpOf(root));
     const button = root.querySelector<HTMLButtonElement>("[data-send-edge]");
     expect(button?.textContent).toBe("Send uploadConfirmed to p1");
     button?.click();
@@ -237,7 +241,7 @@ describe("live actor map children", () => {
         ...stepOf("uploadConfirmed", "photos.sendingPhoto", "photos.waitingForRetry", outcome),
         actor: { map: "photos", key: "p1" },
       }));
-      click(edgeGroup(root));
+      click(helpOf(root));
       root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
       expect(root.querySelector("[data-details-sent]")?.textContent).toMatch(text);
     },
@@ -248,7 +252,7 @@ describe("live actor map children", () => {
       ...stepOf("uploadConfirmed", "photos.sendingPhoto", "photos.waitingForRetry", "stay"),
       actor: { map: "photos", key: "p1" },
     }));
-    click(edgeGroup(root));
+    click(helpOf(root));
     root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
     expect(root.querySelector("[data-details-sent]")).not.toBeNull();
     root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
@@ -257,7 +261,7 @@ describe("live actor map children", () => {
 
   test("a Details send the driver gives no outcome for shows no Details line", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto")]);
-    click(edgeGroup(root));
+    click(helpOf(root));
     root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
     expect(sent).toHaveLength(1);
     expect(root.querySelector("[data-details-sent]")).toBeNull();
@@ -270,7 +274,7 @@ describe("live actor map children", () => {
       error: "upload failed",
       actor: { map: "photos", key: "p1" },
     }));
-    click(edgeGroup(root));
+    click(helpOf(root));
     root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
     expect(root.querySelector("[data-details-sent]")?.parentElement?.textContent).toContain(
       "upload failed",
@@ -279,7 +283,7 @@ describe("live actor map children", () => {
 
   test("a child arrow with no child in its source has no Send button", () => {
     const { root } = mount([child("p1", "waitingForRetry")]);
-    click(edgeGroup(root));
+    click(helpOf(root));
     expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
@@ -287,7 +291,7 @@ describe("live actor map children", () => {
   test("a picked child in another state says so", () => {
     const two = mount([child("p1", "sendingPhoto", 1), child("p2", "waitingForRetry", 2)]);
     pick(two.root, "p2");
-    click(edgeGroup(two.root));
+    click(helpOf(two.root));
     expect(two.root.querySelector("[data-blocked-note]")?.textContent).toBe(
       "uploadConfirmed can't be sent: p2 is in waitingForRetry, this arrow leaves sendingPhoto.",
     );
@@ -296,7 +300,7 @@ describe("live actor map children", () => {
   test("an arrow another part sends names it, has no Send and no lock", () => {
     const fed: VizMachine = { ...photoQueue, partOutputs: { other: ["uploadConfirmed"] } };
     const by = mount([child("p1", "sendingPhoto", 1)], fed);
-    click(edgeGroup(by.root));
+    click(helpOf(by.root));
     expect(by.root.querySelector("[data-blocked-note]")?.textContent).toBe(
       "uploadConfirmed is sent by other, not by hand.",
     );
@@ -310,7 +314,7 @@ describe("live actor map children", () => {
       partOutputs: { other: ["uploadConfirmed"], third: ["uploadConfirmed"] },
     };
     const by = mount([child("p1", "sendingPhoto", 1)], fed);
-    click(edgeGroup(by.root));
+    click(helpOf(by.root));
     expect(by.root.querySelector("[data-blocked-note]")?.textContent).toBe(
       "uploadConfirmed is sent by other and third, not by hand.",
     );
@@ -318,7 +322,7 @@ describe("live actor map children", () => {
 
   test("a map with no child has no Send button on its arrows", () => {
     const { root } = mount([]);
-    click(edgeGroup(root));
+    click(helpOf(root));
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
 
@@ -389,16 +393,34 @@ describe("live actor map children", () => {
     expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
   });
 
+  test("a click on a worker arrow sends to the followed child", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto", 1), child("p2", "sendingPhoto", 2)]);
+    pick(root, "p2");
+    click(edgeGroup(root));
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ actor: { map: "photos", key: "p2" } });
+  });
+
+  test("a click on an arrow another part sends shows who sends it and sends nothing", () => {
+    const fed: VizMachine = { ...photoQueue, partOutputs: { other: ["uploadConfirmed"] } };
+    const by = mount([child("p1", "sendingPhoto", 1)], fed);
+    click(edgeGroup(by.root));
+    expect(by.sent).toEqual([]);
+    expect(by.root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "uploadConfirmed is sent by other, not by hand.",
+    );
+  });
+
   test("an arrow with no walked child in its state does nothing", () => {
     const none = mount([child("p1", "waitingForRetry")]);
-    click(edgeGroup(none.root));
+    click(helpOf(none.root));
     expect(none.sent).toEqual([]);
   });
 
   test("with a child walked, another child's arrow is not next and its click shows details", () => {
     const two = mount([child("p1", "sendingPhoto", 1), child("p2", "waitingForRetry", 2)]);
     pick(two.root, "p2");
-    click(edgeGroup(two.root));
+    click(helpOf(two.root));
     expect(two.sent).toEqual([]);
     expect(two.root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe(
       "true",

@@ -11,3 +11,8 @@ test("the visualizer page names the effect chip, not a faint self-loop", () => {
   expect(page).not.toMatch(/Faint self-loop/);
   expect(page).toMatch(/chargeCard/);
 });
+
+test("the page says a click on an arrow sends and a ? opens Details", () => {
+  expect(page).toMatch(/`\?` beside a label/);
+  expect(page).not.toMatch(/it never takes a step/);
+});
