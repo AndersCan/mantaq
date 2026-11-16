@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.40.0
+
+<sub>2026-11-16</sub>
+
+- _(minor)_
+  [user]: The Controls tab, finding marks on states, coverage dimming, Full screen, the help link, hover highlights and the left-arrow key are gone; the Details tab keeps the selected arrow's Send button and its rows, and design findings stay in the gate and `mantaq-check` output.
+  [user]: `<Machine>` no longer prints a design-findings line above the diagram; `failOnFindings` still fails the build.
+- _(minor)_
+  [user]: The Path tab (step list, Runs, Copy path), the context table, region lines, 'waiting for' and 'Nothing changed' are gone; Back and Reset undo steps, the Context tab holds the values events are sent with. `panelFooter` and `onNavigate`'s `run` are removed; `?run=` links still open a recorded run.
+- _(minor)_
+  [user]: On the live page, selecting a state with the Screen tab open shows that state's screen, reached on a throwaway copy; the machine stays where it is and a line says so. Drivers may implement dryWalk(steps).
+- _(patch)_
+  [user]: The Step tab lists every child of an actor map with its own Send buttons; clicking a chip marks that child's row and clears the diagram selection. Chips no longer slide across the diagram: they show on their new state at once.
+
 ## 0.39.0
 
 <sub>2026-11-16</sub>
