@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.41.0
+
+<sub>2026-11-16</sub>
+
+- _(minor)_
+  [user]: Machine files that export an instance, or run on a clock the page cannot advance, show the diagram and Details with no Send.
+- _(minor)_
+  [user]: `mantaq-check-site` presses the next arrows' Send; a live machine with no next arrow reports "is live but offers no event to send".
+- _(minor)_ [user]: `<Machine>` and the dev page no longer print a 'Viz:' title.
+- _(patch)_ [user]: the Context tab asks for the fields of a pool's events, so the resize arrow can send its count.
+- _(patch)_
+  [user]: Worker rows in the Step tab now pick the worker to follow instead of sending; use the arrow's Send in Details. The row Send buttons (`[data-actor] [data-send]`), the "started", "removed" and "sent" lines (`[data-live-started]`, `[data-live-removed]`, `[data-live-sent-event]`, `.explore-now`) and the Context box placeholder are gone; Context boxes show the value Send will use.
+- _(patch)_
+  [user]: Select any arrow in the visualizer and Details either shows Send or says in one line why it can't be sent: the walk is in another state, another part sends the event, or the guard would take the walk somewhere else.
+  [user]: An arrow whose guard would land in a different state than the one drawn is now locked and says where it goes. A machine whose example values always take one branch now shows locks on the other branches; change the value in Context to try them.
+
 ## 0.40.0
 
 <sub>2026-11-16</sub>

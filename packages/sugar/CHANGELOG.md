@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.1
+
+<sub>2026-11-16</sub>
+
+- _(patch)_ Export the InboxContext type so a pool's inferred types can be named.
+
 ## 2.4.0
 
 <sub>2026-11-14</sub>
