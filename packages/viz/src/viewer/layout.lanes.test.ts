@@ -355,9 +355,9 @@ describe("a split arrow's path", () => {
     const e4 = placed.edges.find((placedEdge) => placedEdge.edge.id === "e4");
     expect(e4?.points).toEqual(
       expect.arrayContaining([
-        { x: 650, y: 285 },
-        { x: 650, y: 257.75 },
-        { x: 686, y: 257.75 },
+        { x: 254, y: 284.5 },
+        { x: 674, y: 284.5 },
+        { x: 674, y: 230.5 },
         { x: 686, y: 230.5 },
       ]),
     );

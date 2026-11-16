@@ -119,10 +119,11 @@ export function textWidth(text: string, fontSize = 12): number {
 export const LOCK_SLOT = 12;
 const CONDITION_FONT = 10.2;
 const CHIP_FONT = 11;
-/** Tall enough that the name keeps `LABEL_PAD` clear under a docs page's line box (about 21px at 12px). */
-const NODE_HEIGHT = 40;
+const NODE_HEIGHT = 36;
 const CHIP_HEIGHT = 16;
 const LABEL_HEIGHT = 16;
+/** A state name's box: tall enough for the docs font's glyphs (16.25), which edge labels never need. */
+const NAME_HEIGHT = 18;
 /** Label to its own arrow, and to any other arrow: strictly farther, so the nearest arrow is always its own. */
 export const LABEL_OWN = 8;
 export const LABEL_FOREIGN = 14;
@@ -185,7 +186,7 @@ function stateHeight(state: VizState): number {
     frame +
     Math.max(
       NODE_HEIGHT,
-      2 * LABEL_PAD + LABEL_HEIGHT + state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
+      2 * LABEL_PAD + NAME_HEIGHT + state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
     )
   );
 }
@@ -196,13 +197,13 @@ function insideOf(state: VizState, box: LabelBox): { label: LabelBox; chips: Lab
   const top = box.y - box.height / 2 + frame;
   const label = {
     x: box.x,
-    y: state.effects.length === 0 ? box.y : top + LABEL_PAD + LABEL_HEIGHT / 2,
+    y: state.effects.length === 0 ? box.y : top + LABEL_PAD + NAME_HEIGHT / 2,
     width: textWidth(state.label),
-    height: LABEL_HEIGHT,
+    height: NAME_HEIGHT,
   };
   const chips = state.effects.map((_, index) => ({
     x: box.x,
-    y: top + 2 * LABEL_PAD + LABEL_HEIGHT + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
+    y: top + 2 * LABEL_PAD + NAME_HEIGHT + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
     width: box.width - 2 * (LABEL_PAD + frame),
     height: CHIP_HEIGHT,
   }));
