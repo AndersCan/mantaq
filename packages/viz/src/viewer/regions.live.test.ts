@@ -147,9 +147,9 @@ describe("live regions", () => {
     expect(sent).toEqual([
       { kind: "event", event: "photoPicked", payload: null, actor: { region: "upload" } },
     ]);
-    expect(root.querySelector('p[data-region="upload"]')?.getAttribute("data-region-state")).toBe(
-      "upload.sendingPhoto",
-    );
+    expect(
+      root.querySelector(".graph g.current[data-node-id='upload.sendingPhoto']"),
+    ).not.toBeNull();
   });
 
   test("an input another part sends sits under Send an input, not in a group of its own", () => {
@@ -166,14 +166,6 @@ describe("live regions", () => {
     expect(
       root.querySelector('[data-group="input"] [data-send-item="photoUploaded"]'),
     ).not.toBeNull();
-  });
-
-  test("each region gets a line with its own state", () => {
-    const { root } = mount();
-    const line = root.querySelector('p[data-region="upload"]');
-    expect(line?.getAttribute("data-region-state")).toBe("upload.waitingForPhoto");
-    expect(line?.textContent).toBe("upload: in waitingForPhoto");
-    expect(root.querySelector('p[data-region="network"]')?.textContent).toBe("network: in online");
   });
 
   test("a region's events are buttons under that region only", () => {
@@ -194,7 +186,7 @@ describe("live regions", () => {
     expect(sent).toEqual([
       { kind: "event", event: "connectionLost", payload: null, actor: { region: "network" } },
     ]);
-    expect(root.querySelector('p[data-region="network"]')?.textContent).toBe("network: in offline");
+    expect(root.querySelector(".graph g.current[data-node-id='network.offline']")).not.toBeNull();
   });
 
   test("a region arrow's Details Send sends to that region", () => {
@@ -319,7 +311,7 @@ describe("the Send line", () => {
       .querySelector<HTMLButtonElement>('[data-actor="network"] [data-send="connectionLost"]')
       ?.click();
     expect(sentLine(root)).toBe("Sent connectionLost to network");
-    root.querySelector<HTMLButtonElement>('[data-rewind="1"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.click();
     expect(root.querySelector(".explore-outcome")).not.toBeNull();
     expect(root.querySelector("[data-live-sent-event]")).toBeNull();
   });

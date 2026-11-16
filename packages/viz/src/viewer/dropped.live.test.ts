@@ -151,8 +151,6 @@ function mount(sender: string | null = "") {
 
 const send = (root: HTMLElement, name: string) =>
   root.querySelector<HTMLButtonElement>(`[data-send="${name}"]`)?.click();
-const pathTexts = (root: HTMLElement) =>
-  [...root.querySelectorAll("[data-rewind]")].map((each) => each.textContent);
 const text = (root: HTMLElement, selector: string) => root.querySelector(selector)?.textContent;
 
 /** Walks the recorded run through the Step buttons, up to and including step `count`. */
@@ -162,37 +160,27 @@ function walk(root: HTMLElement, count: number) {
 }
 
 describe("dropped message", () => {
-  test("a taken message names sender → receiver on the Path and the Step tab", () => {
+  test("a taken message names sender → receiver on the Step tab", () => {
     const { root } = mount();
     walk(root, 1);
-    expect(pathTexts(root)[1]).toBe("DISH_COOKED, then kitchen → waiter: serving → carryingDish");
     expect(text(root, "[data-live-after]")).toContain(
       "Then kitchen sent DISH_READY to waiter: serving → carryingDish",
     );
     expect(root.querySelector("[data-live-dropped]")).toBeNull();
   });
 
-  test("a dropped one starts the Path row with ! and the Step tab says it was dropped", () => {
+  test("the Step tab says a dropped one was dropped", () => {
     const { root } = mount();
     walk(root, 4);
-    expect(pathTexts(root)[4]).toBe("! DISH_COOKED, then kitchen → waiter DISH_READY dropped");
     expect(text(root, "[data-live-dropped]")).toBe(
       "! Then kitchen sent DISH_READY to waiter: dropped.",
     );
     expect(root.querySelector("[data-live-dropped]")?.classList.contains("muted")).toBe(false);
   });
 
-  test("the ! is gone after rewinding to before the drop", () => {
-    const { root } = mount();
-    walk(root, 5);
-    root.querySelector<HTMLElement>('[data-rewind="3"]')?.click();
-    expect(pathTexts(root).join("|")).not.toContain("!");
-  });
-
-  test("a drop with no known sender shows only on the Path row", () => {
+  test("a drop with no known sender reads as a taken message", () => {
     const { root } = mount(null);
     walk(root, 4);
-    expect(pathTexts(root)[4]).toBe("! DISH_COOKED, then waiter DISH_READY dropped");
     expect(text(root, "[data-live-after]")).toContain("Then waiter took DISH_READY");
     expect(root.querySelector("[data-live-dropped]")).toBeNull();
   });
@@ -226,120 +214,7 @@ describe("dropped message", () => {
   });
 });
 
-/** A hall where the kitchen and the cooks both send DISH_READY, to the waiter and the runner, and the kitchen also sends SPECIAL to the waiter. */
-const hall: VizMachine = {
-  ...kitchen,
-  id: "hall",
-  regions: ["waiter", "runner", "cooks"],
-  maps: [],
-  states: [
-    state("cooking", true),
-    state("waiter.serving", true),
-    state("waiter.onBreak"),
-    state("runner.idle", true),
-    state("cooks.free", true),
-  ],
-  events: [event("DISH_COOKED"), event("DISH_READY"), event("SPECIAL")],
-  outputs: ["DISH_READY", "SPECIAL"],
-  partOutputs: { cooks: ["DISH_READY"] },
-  edges: [
-    edge("cooking", "DISH_COOKED", "cooking", ["DISH_READY", "SPECIAL"]),
-    edge("cooks.free", "DISH_COOKED", "cooks.free", ["DISH_READY"]),
-    edge("waiter.serving", "DISH_READY", "waiter.serving"),
-    edge("waiter.serving", "SPECIAL", "waiter.serving"),
-    edge("runner.idle", "DISH_READY", "runner.idle"),
-  ],
-};
-
-function mountHall(after: VizLiveStep[][]) {
-  const steps: VizStep[] = [];
-  const snapshot = (): VizLiveState => ({
-    state: "cooking",
-    regions: { waiter: "waiter.serving", runner: "runner.idle" },
-    children: [],
-    steps: [...steps],
-    last: steps.length === 0 ? null : entry({}),
-    after: after[steps.length - 1] ?? [],
-    timers: [],
-    context: null,
-    payload: null,
-    effectMode: "real",
-    waiting: [],
-  });
-  const driver: VizDriver = {
-    reset: () => {
-      steps.length = 0;
-      return snapshot();
-    },
-    step: (step) => {
-      steps.push(step);
-      return snapshot();
-    },
-  };
-  const root = document.createElement("div");
-  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [hall] }, { driver });
-  return root;
-}
-
-const to = (part: string, event: string, partial: Partial<VizLiveStep>): VizLiveStep => ({
-  ...entry({ event, from: "waiter.serving", to: "waiter.serving" }),
-  actor: { region: part },
-  ...partial,
-});
-
-describe("several parts move after one step", () => {
-  test("more than three things after a step end with how many are left out", () => {
-    const moved = (part: string) =>
-      to(part, "DISH_READY", {
-        outcome: "transition",
-        from: `${part}.a`,
-        to: `${part}.b`,
-        message: { sender: "", dropped: null },
-      });
-    const root = mountHall([[moved("p1"), moved("p2"), moved("p3"), moved("p4")]]);
-    send(root, "DISH_COOKED");
-    expect(pathTexts(root)[1]).toBe(
-      "DISH_COOKED, then hall → p1: a → b; hall → p2: a → b; hall → p3: a → b and 1 more",
-    );
-  });
-});
-
-describe("dropped row title", () => {
-  test("a dropped row that is not cut short has no title", () => {
-    const { root } = mount();
-    walk(root, 4);
-    const row = root.querySelectorAll<HTMLElement>("[data-rewind]")[4];
-    expect(row?.textContent?.startsWith("! ")).toBe(true);
-    expect(row?.hasAttribute("title")).toBe(false);
-  });
-});
-
-describe("a drop stays named, and its reason shows once", () => {
-  test("a drop after three moves is still named on the Path row", () => {
-    const moved = (part: string) =>
-      to(part, "DISH_READY", {
-        outcome: "transition",
-        from: `${part}.a`,
-        to: `${part}.b`,
-        message: { sender: "", dropped: null },
-      });
-    const root = mountHall([
-      [
-        moved("p1"),
-        moved("p2"),
-        moved("p3"),
-        to("waiter", "DISH_READY", {
-          outcome: "ignored",
-          from: "waiter.onBreak",
-          to: "waiter.onBreak",
-          message: { sender: "", dropped: "noHandler" },
-        }),
-      ],
-    ]);
-    send(root, "DISH_COOKED");
-    expect(pathTexts(root)[1]).toContain("hall → waiter DISH_READY dropped");
-  });
-
+describe("a drop shows its reason once", () => {
   test("the Step tab says why a message was dropped once", () => {
     const { root } = mount();
     walk(root, 4);

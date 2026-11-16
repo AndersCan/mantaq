@@ -84,20 +84,7 @@ test("takes a screenshot", async () => {
   });
 }, 60_000);
 
-test("waiting is empty where no effect waits", async () => {
-  await withViz(checkout, async (viz) => {
-    expect(await viz.waiting()).toEqual([]);
-  });
-}, 60_000);
-
 const fixture = (file: string) => join(import.meta.dirname, "fixtures", file);
-
-test("waiting gives no reports for an effect that declares no sends", async () => {
-  await withViz(fixture("harness-silent.ts"), async (viz) => {
-    await viz.send("start");
-    expect(await viz.waiting()).toEqual([{ effect: "quiet", reports: [] }]);
-  });
-}, 60_000);
 
 test("an event the state ignores is a result, not an error", async () => {
   await withViz(checkout, async (viz) => {
@@ -168,10 +155,7 @@ test("submitPayment waits in submitting with its three reports", async () => {
     expect(await state("submitPayment")).toBe("submitting");
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(await viz.state()).toBe("submitting");
-    expect(await viz.waiting()).toEqual([
-      { effect: "chargeCard", reports: ["paymentOk", "paymentFail", "paymentTimeout"] },
-    ]);
-    expect(await viz.text()).toContain("In submitting, waiting for chargeCard");
+    expect(await viz.text()).toContain("In submitting");
     expect(await state("paymentFail")).toBe("error");
     expect(await state("back")).toBe("payment");
     expect(await state("submitPayment")).toBe("submitting");

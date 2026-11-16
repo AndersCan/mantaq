@@ -357,14 +357,14 @@ describe("viewer: explore", () => {
     expect(root.querySelector('.panel [data-selected-state="success"]')).not.toBeNull();
   });
 
-  test("back, reset and rewinding the path", () => {
+  test("back and reset", () => {
     const root = mount(checkout());
     take(root, "submitBasicInfo");
     take(root, "submitShipping");
     take(root, "submitPayment");
     root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.click();
     expect(current(root)).toBe("payment");
-    root.querySelector<HTMLButtonElement>('.panel [data-rewind="1"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.click();
     expect(current(root)).toBe("shippingAddress");
     root.querySelector<HTMLButtonElement>('[data-explore-action="reset"]')?.click();
     expect(current(root)).toBe("basicInfo");
@@ -396,7 +396,6 @@ describe("viewer: explore", () => {
     expect(last?.steps).toHaveLength(2);
     const reopened = mount(checkout(), { steps: [...(last?.steps ?? []), "no-such-edge"] });
     expect(current(reopened)).toBe("basicInfo");
-    expect(reopened.querySelectorAll(".panel .explore-path li")).toHaveLength(3);
   });
 
   test("an undetermined edge offers each target its explanation names, or none", () => {

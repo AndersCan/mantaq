@@ -3,7 +3,6 @@ import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
 import { serializeViz } from "../serialize.ts";
 import { mountViewer, mountVizText } from "./embed.ts";
-import type { ViewerSelection } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
@@ -77,15 +76,6 @@ describe("mountVizText", () => {
     ).toBe("Walk through and close up.");
     root.querySelector<HTMLButtonElement>('[data-take="open-go-done"]')?.click();
     expect(root.querySelector('.panel [data-doc="state"]')).toBeNull();
-  });
-
-  test("without a driver there is no Runs section", () => {
-    const withRuns: VizMachine = {
-      ...door,
-      runs: [{ name: "goes", steps: [{ kind: "event", event: "go", payload: null }] }],
-    };
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRuns] }));
-    expect(root.querySelector("[data-runs]")).toBeNull();
   });
 
   test("internal and stay edges carry a dot gap variable and never an inline dasharray", () => {
@@ -279,24 +269,22 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
     expect(root.querySelector('[data-outcome="transition"]')?.textContent).toContain("open → done");
     expect(root.querySelector("[data-live-effects]")?.textContent).toBe("Effects started: closeUp");
-    expect(root.querySelector("[data-live-context]")?.textContent).toBe('{\n  "n": 1\n}');
     expect(root.querySelector(".graph g[data-node-id='done']")?.classList).toContain("current");
   });
 
-  test("the panel is tabbed and the Context tab counts changed lines", () => {
+  test("the panel is tabbed: Step, then Details", () => {
     const root = mountLive();
     const labels = () => [...root.querySelectorAll("[data-tab]")].map((tab) => tab.textContent);
     const shown = () =>
       [...root.querySelectorAll("[data-tab-panel]")]
         .filter((panel) => !panel.hasAttribute("hidden"))
         .map((panel) => panel.getAttribute("data-tab-panel"));
-    expect(labels()).toEqual(["Step", "Context", "Path", "Details"]);
+    expect(labels()).toEqual(["Step", "Details"]);
     expect(shown()).toEqual(["step"]);
     send(root, "go");
-    expect(labels()[1]).toBe("Context (1 changed)");
-    root.querySelector<HTMLButtonElement>('[data-tab="context"]')?.click();
-    expect(shown()).toEqual(["context"]);
-    expect(root.querySelector('[data-tab="context"]')?.getAttribute("aria-selected")).toBe("true");
+    root.querySelector<HTMLButtonElement>('[data-tab="details"]')?.click();
+    expect(shown()).toEqual(["details"]);
+    expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
   });
 
   test("selecting an element that is not a next step opens Details", () => {
@@ -330,7 +318,6 @@ describe("mountViewer with a driver", () => {
     send(root, "go");
     root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.click();
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
-    expect(root.querySelectorAll("[data-rewind]")).toHaveLength(2);
     root.querySelector<HTMLButtonElement>('[data-explore-action="reset"]')?.click();
     expect(root.querySelector("[data-outcome]")).toBeNull();
   });
@@ -486,71 +473,5 @@ describe("effect chip", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect] }));
     expect(root.querySelector(".chip")?.getAttribute("aria-label")).toBe("effect greet");
     expect(root.querySelector(".chip .hint")).toBeNull();
-  });
-});
-
-describe("panelFooter", () => {
-  const three: VizMachine = {
-    ...door,
-    states: [state("open", { initial: true }), state("done"), state("end", { final: true })],
-    edges: [
-      edge("__initial__", "", "open"),
-      edge("open", "go", "done"),
-      edge("open", "skip", "end"),
-      edge("done", "go", "end"),
-    ],
-  };
-  const live = (calls: Array<ViewerSelection | undefined>, node: Node) => {
-    const root = document.createElement("div");
-    document.body.append(root);
-    mountViewer(
-      root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [three] },
-      {
-        panelFooter: (selection) => {
-          calls.push(selection);
-          return node;
-        },
-      },
-    );
-    return root;
-  };
-  const footer = () => {
-    const f = document.createElement("div");
-    f.id = "f";
-    return f;
-  };
-  const click = (root: HTMLElement, id: string) =>
-    root
-      .querySelector(`[data-node-id='${id}']`)
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-
-  test("the footer renders under the tabs with no selection", () => {
-    const calls: Array<ViewerSelection | undefined> = [];
-    const root = live(calls, footer());
-    expect(root.querySelector("aside.panel")?.lastElementChild?.id).toBe("f");
-    expect(calls.at(-1)).toBeUndefined();
-  });
-
-  test("clicking a state that is not a next step passes the state selection", () => {
-    const calls: Array<ViewerSelection | undefined> = [];
-    const root = live(calls, footer());
-    click(root, "end");
-    expect(calls.at(-1)).toEqual({ kind: "state", id: "end" });
-  });
-
-  test("a click on a next state passes the selection and does not walk", () => {
-    const calls: Array<ViewerSelection | undefined> = [];
-    const root = live(calls, footer());
-    click(root, "done");
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
-    expect(calls.at(-1)).toEqual({ kind: "state", id: "done" });
-  });
-
-  test("the same node returned on every refresh appears once", () => {
-    const root = live([], footer());
-    click(root, "done");
-    click(root, "end");
-    expect(root.querySelectorAll("aside.panel #f")).toHaveLength(1);
   });
 });

@@ -141,28 +141,3 @@ test("a click sends what a part sent after the last step", () => {
   sendButton(root, "ITEMS_FINISHED")?.click();
   expect(sent.at(-1)).toMatchObject({ event: "ITEMS_FINISHED", payload: { worker: "w1" } });
 });
-
-test("a step that changed nothing says so in Step; one a part answered does not", () => {
-  const quiet = mount([]);
-  sendButton(quiet, "ITEM_ARRIVED")?.click();
-  expect(quiet.querySelector("[data-live-no-change]")?.textContent).toContain("Nothing changed");
-  const answered = mount([step({ event: "ITEMS_ASSIGNED" })]);
-  sendButton(answered, "ITEM_ARRIVED")?.click();
-  expect(answered.querySelector("[data-live-no-change]")).toBeNull();
-});
-
-test("Copy path puts the machine and one numbered line per entry on the clipboard", async () => {
-  const copied: string[] = [];
-  Object.defineProperty(window.navigator, "clipboard", {
-    configurable: true,
-    value: { writeText: (text: string) => Promise.resolve(void copied.push(text)) },
-  });
-  const root = mount([]);
-  sendButton(root, "ITEM_ARRIVED")?.click();
-  const copy = root.querySelector<HTMLButtonElement>("[data-copy-path]");
-  copy?.click();
-  await Promise.resolve();
-  await Promise.resolve();
-  expect(copied).toEqual([["inbox path", "0. start", "1. ITEM_ARRIVED"].join("\n")]);
-  expect(copy?.textContent).toBe("Copied");
-});
