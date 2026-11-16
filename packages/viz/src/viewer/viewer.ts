@@ -93,6 +93,7 @@ export function mountViewer(
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
   let redraw: () => void = () => undefined;
+  listenFullscreen(root);
   watchDriver(view, { driver, redraw: () => redraw() });
   function showControls(): void {
     view.diagramOnly = false;
@@ -186,7 +187,7 @@ export function mountViewer(
       refresh();
     };
     const graph = renderGraph(doc, machine, { select: showDetails });
-    root.append(...layoutOf(doc, { view, showControls, graph, panel }));
+    root.append(...layoutOf(doc, { view, showControls, graph, panel, root }));
     follow(true);
   }
 
@@ -296,6 +297,33 @@ function focusEdge(root: HTMLElement, id: string): void {
   edges.find((each) => each.getAttribute("data-edge-id") === id)?.focus({ preventScroll: true });
 }
 
+function setFullscreenLabel(button: HTMLButtonElement, active: boolean): void {
+  button.textContent = active ? "Exit full screen" : "Full screen";
+  button.setAttribute("aria-pressed", String(active));
+}
+
+/** Added once: the button label follows fullscreen across renders. */
+function listenFullscreen(root: HTMLElement): void {
+  root.addEventListener("fullscreenchange", () => {
+    const toggle = root.querySelector<HTMLButtonElement>(".fullscreen-toggle");
+    if (toggle !== null) setFullscreenLabel(toggle, root.ownerDocument.fullscreenElement === root);
+  });
+}
+
+/** Null where the browser cannot fullscreen an element (no API, or blocked by the host page). */
+function fullscreenButton(doc: Document, root: HTMLElement): HTMLButtonElement | null {
+  if (!doc.fullscreenEnabled || typeof root.requestFullscreen !== "function") return null;
+  const button = html(doc, "button", { type: "button", class: "fullscreen-toggle" });
+  setFullscreenLabel(button, doc.fullscreenElement === root);
+  button.addEventListener("click", () => {
+    const request =
+      doc.fullscreenElement === root ? doc.exitFullscreen() : root.requestFullscreen();
+    // A refused request leaves the viewer as it was.
+    request.catch(() => undefined);
+  });
+  return button;
+}
+
 /** Everything the viewer draws under its root: the controls and panel, or with Diagram only just the canvas. */
 function layoutOf(
   doc: Document,
@@ -304,12 +332,15 @@ function layoutOf(
     showControls: () => void;
     graph: Node;
     panel: HTMLElement;
+    root: HTMLElement;
   },
 ): HTMLElement[] {
   const { view } = context;
   const canvas = html(doc, "div", { class: "canvas" }, [context.graph]);
+  const fullscreen = fullscreenButton(doc, context.root);
   if (!view.diagramOnly) {
     return [
+      ...(fullscreen === null ? [] : [html(doc, "div", { class: "viz-bar" }, [fullscreen])]),
       ...noticeOf(doc, view),
       html(doc, "div", { class: "viz-main" }, [canvas, context.panel]),
     ];
@@ -317,7 +348,10 @@ function layoutOf(
   const show = html(doc, "button", { type: "button", class: "show-controls" }, ["Show controls"]);
   show.setAttribute("data-show-controls", "");
   show.addEventListener("click", () => context.showControls());
-  return [show, html(doc, "div", { class: "viz-main" }, [canvas])];
+  return [
+    html(doc, "div", { class: "viz-bar" }, fullscreen === null ? [show] : [show, fullscreen]),
+    html(doc, "div", { class: "viz-main" }, [canvas]),
+  ];
 }
 
 function rewindView(view: ViewState, driver: VizDriver | undefined, length: number): void {
