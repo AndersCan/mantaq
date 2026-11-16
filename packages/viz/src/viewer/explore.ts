@@ -126,8 +126,6 @@ function childrenSections(
     const rows = state.children
       .filter((child) => child.map === map)
       .map((child) => {
-        const info = machine.states.find((each) => each.id === child.state);
-        const final = info?.final === true;
         const li = html(
           doc,
           "li",
@@ -143,7 +141,6 @@ function childrenSections(
               code(doc, child.key),
               ": in ",
               html(doc, "strong", {}, [localName(child.state)]),
-              final ? " (final)" : "",
             ]),
           ],
         );

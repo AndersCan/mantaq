@@ -1,10 +1,9 @@
-import type { VizLiveChild, VizMachine } from "../schema.ts";
+import type { VizLiveChild } from "../schema.ts";
 import { compareKeys, localName } from "./compartments.ts";
 import { svg } from "./dom.ts";
 import { textWidth } from "./layout.ts";
 
 export interface MarkerContext {
-  machine: VizMachine;
   children: ReadonlyArray<VizLiveChild>;
   picked: { map: string; key: string } | null;
   onPick(child: { map: string; key: string }): void;
@@ -202,7 +201,6 @@ function drawMarker(live: Live, layer: SVGGElement, item: Item): void {
   const { context } = live;
   const doc = layer.ownerDocument;
   const id = idOf(item.child);
-  const final = context.machine.states.some((each) => each.id === item.state && each.final);
   const existing = live.elements.get(id);
   const marker =
     existing instanceof SVGGElement ? existing : svg(doc, "g", { role: "button", tabindex: "0" });
@@ -213,10 +211,7 @@ function drawMarker(live: Live, layer: SVGGElement, item: Item): void {
   }
   live.kept.set(marker, item);
   const named = item.child.key === "" ? '""' : item.child.key;
-  marker.setAttribute(
-    "class",
-    ["child-marker", item.dot && "dot", final && "final"].filter(Boolean).join(" "),
-  );
+  marker.setAttribute("class", ["child-marker", item.dot && "dot"].filter(Boolean).join(" "));
   marker.setAttribute("data-marker-map", item.child.map);
   marker.setAttribute("data-marker-key", item.child.key);
   marker.setAttribute("data-marker-state", item.state);
