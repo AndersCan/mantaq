@@ -88,7 +88,7 @@ export function mountViewer(
 ): void {
   const doc = root.ownerDocument;
   const first = viz.machines.find((machine) => machine.id === options.machine) ?? viz.machines[0];
-  const view = initialView(first, options);
+  const view = initialView(options);
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
   let redraw: () => void = () => undefined;
@@ -327,7 +327,7 @@ function previewOf(
   return of.driver?.dryWalk?.(steps).find((entry) => entry.state === of.id) ?? null;
 }
 
-function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {
+function initialView(options: ViewerOptions): ViewState {
   return {
     selection: null,
     live: null,
