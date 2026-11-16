@@ -12,10 +12,8 @@
   --accent: var(--mq-pink);
   --select: var(--mq-select);
   --unknown: var(--mq-unknown);
-  --fuzz: var(--mq-fuzz);
   --banner-bg: var(--mq-banner-bg);
   --banner-fg: var(--mq-banner-fg);
-  --added: var(--mq-added);
   color-scheme: inherit;
   margin-block: 1.5rem;
   padding: 1rem;

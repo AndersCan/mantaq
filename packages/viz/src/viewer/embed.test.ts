@@ -5,6 +5,8 @@ import { serializeViz } from "../serialize.ts";
 import { mountViewer, mountVizText } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
 import { sendVia } from "./send-via.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
   return {
@@ -149,6 +151,39 @@ describe("mountVizText", () => {
     ).toBe("open-go-done");
     click('[data-node-id="done"]');
     expect(root.querySelector(".details [data-doc]")).toBeNull();
+  });
+
+  test("a state's links are the drawn arrows, never an effect", () => {
+    const file = join(import.meta.dirname, "reference", "docs-checkout.json");
+    const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    root
+      .querySelector('[data-node-id="submitting"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const links = [...root.querySelectorAll(".details [data-edge-link]")];
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      const id = link.getAttribute("data-edge-link") ?? "";
+      expect(root.querySelector(`.graph g[data-edge-id="${id}"]`)).not.toBeNull();
+      expect(link.textContent).not.toContain("effect:");
+    }
+  });
+
+  test("the start state's incoming links leave out the start arrow", () => {
+    const file = join(import.meta.dirname, "reference", "docs-checkout.json");
+    const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    root
+      .querySelector('[data-node-id="basicInfo"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const ids = [...root.querySelectorAll(".details [data-edge-link]")].map((link) =>
+      link.getAttribute("data-edge-link"),
+    );
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids).not.toContain("__initial__->basicInfo");
+    for (const id of ids) {
+      expect(root.querySelector(`.graph g[data-edge-id="${id}"]`)).not.toBeNull();
+    }
   });
 
   test("draws a valid document", () => {

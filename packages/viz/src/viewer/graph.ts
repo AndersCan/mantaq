@@ -244,7 +244,6 @@ function edgeGroup(
       class: classes({
         edge: true,
         stay: edge.kind === "stay",
-        fuzz: edge.origin === "fuzz",
         undetermined: edge.to === null,
         internal: internal === true,
       }),

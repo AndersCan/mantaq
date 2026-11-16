@@ -24,7 +24,6 @@ describe("Getting started step 6", () => {
     });
     const eat = graph.querySelector('g.edge[data-edge-id="hungry-eat-full"]');
     expect(eat?.querySelector(".edge-condition")?.textContent).toBe('food !== "" && plates !== 0');
-    expect(graph.querySelectorAll("g.edge.fuzz")).toHaveLength(0);
   });
 });
 
