@@ -66,10 +66,12 @@ describe("mountDriven", () => {
     expect(modeOf()).toBe("held");
   });
 
-  test("without a target the viewer is the static walk", async () => {
+  test("without a target the viewer shows the diagram and Details only", async () => {
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: await documentText(), targets: {} });
-    expect(root.querySelector("[data-send]")).toBeNull();
+    expect(root.querySelector(".explore")).toBeNull();
+    expect(root.querySelector("[data-send], [data-send-edge]")).toBeNull();
+    expect(root.querySelector("[data-tab=details]")).not.toBeNull();
   });
 
   test("an invalid document lists its issues", () => {
@@ -146,7 +148,7 @@ describe("mountDriven preview", () => {
 });
 
 describe("mountDriven targets", () => {
-  test("a target on a real clock stays a static walk instead of throwing", async () => {
+  test("a target on a real clock shows the diagram and Details instead of throwing", async () => {
     const root = document.createElement("div");
     const create = () => ({
       actor: createCheckoutActor(VirtualClock()),
@@ -157,7 +159,8 @@ describe("mountDriven targets", () => {
       text: await documentText(),
       targets: { checkout: create },
     });
-    expect(root.querySelector("[data-send]")).toBeNull();
+    expect(root.querySelector(".explore")).toBeNull();
+    expect(root.querySelector("[data-send], [data-send-edge]")).toBeNull();
   });
 });
 

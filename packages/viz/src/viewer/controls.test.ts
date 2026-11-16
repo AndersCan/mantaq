@@ -66,25 +66,25 @@ describe("diagramOnly", () => {
     expect(root.querySelector("[data-show-controls]")?.textContent).toBe("Show controls");
   });
 
-  test("Show controls brings the header and the Step tab back, with focus on the tab", () => {
+  test("Show controls brings the header and the Details tab back, with focus on the tab", () => {
     const root = mount({ diagramOnly: true });
     root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
     expect(root.classList.contains("diagram-only")).toBe(false);
     expect(root.querySelector(".viz-header")).not.toBeNull();
     expect(root.querySelector("[data-show-controls]")).toBeNull();
-    expect(tabIds(root)).toEqual(["step", "details"]);
+    expect(tabIds(root)).toEqual(["details"]);
     const shown = root.querySelector('[role="tab"][aria-selected="true"]');
-    expect(shown?.textContent).toBe("Step");
+    expect(shown?.textContent).toBe("Details");
     expect(document.activeElement).toBe(shown);
   });
 
-  test("Show controls after a click on the canvas still opens the Step tab", () => {
+  test("Show controls after a click on the canvas still opens the Details tab", () => {
     const root = mount({ diagramOnly: true });
     root
       .querySelector('[data-node-id="open"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
-    expect(root.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Step");
+    expect(root.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Details");
   });
 
   test("a mount without the option has no Show controls button and no Controls or Diagram only", () => {

@@ -270,7 +270,7 @@ async function launch(): Promise<Either<string, Browser>> {
 
 async function drawPanel(page: Page, id: string, problems: string[]): Promise<string | undefined> {
   try {
-    await page.waitForSelector(".explore[data-current]", { timeout: 10_000 });
+    await page.waitForSelector(".viz .graph", { timeout: 10_000 });
   } catch {
     return `${id} did not draw a panel. Page problems: ${problems.length === 0 ? "none" : problems.join("; ")}.`;
   }

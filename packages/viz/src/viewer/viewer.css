@@ -350,7 +350,6 @@
 }
 
 /* Explore: the walk over the drawn graph. */
-.viz .taken path,
 .viz .current .frame {
   stroke: var(--accent);
   stroke-width: 2.5;

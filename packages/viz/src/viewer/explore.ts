@@ -1,7 +1,7 @@
-import { movesFrom, stateAfter } from "../moves.ts";
+import { movesFrom } from "../moves.ts";
 import { coveredByAny } from "../schema.ts";
 import { actorOf, actorText, localName, offeredEvents, regionPaths } from "./compartments.ts";
-import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
+import type { Move, MoveGroup } from "../moves.ts";
 import type {
   VizActorRef,
   VizJson,
@@ -22,8 +22,6 @@ import { LOCK_SLOT, textWidth } from "./layout.ts";
 
 export interface ExploreContext {
   machine: VizMachine;
-  path: ReadonlyArray<ExploreStep>;
-  take: (step: ExploreStep) => void;
   /** Keep the first `length` steps. */
   rewind: (length: number) => void;
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
@@ -85,80 +83,6 @@ function docNote(doc: Document, note: { text: string | null; scope: string }): H
   return note.text === null
     ? null
     : html(doc, "p", { class: "doc", "data-doc": note.scope }, [note.text]);
-}
-
-function targetText(move: Move, target: string, current: string): string {
-  return target === current && move.edge.kind === "stay" ? "stays" : `→ ${target}`;
-}
-
-function moveItem(
-  doc: Document,
-  move: Move,
-  context: { current: string; take: (step: ExploreStep) => void },
-): HTMLLIElement {
-  const { edge } = move;
-  const via =
-    edge.from === context.current ? null : html(doc, "span", { class: "muted" }, [" (any state)"]);
-  if (move.targets.length === 0) {
-    return html(doc, "li", { "data-move": edge.id }, [
-      code(doc, edge.event),
-      via,
-      html(doc, "span", { class: "muted" }, [" → ? target depends on payload or context"]),
-      docNote(doc, { text: edge.doc, scope: "edge" }),
-    ]);
-  }
-  return html(doc, "li", { "data-move": edge.id }, [
-    ...move.targets.map((target) =>
-      button(
-        doc,
-        [
-          "Send ",
-          code(doc, edge.event),
-          ` ${targetText(move, target, context.current)}`,
-          ...(via ? [via] : []),
-        ],
-        {
-          onClick: () => context.take({ edge: edge.id, to: target }),
-          attrs: { "data-take": edge.id, "data-target": target },
-        },
-      ),
-    ),
-    docNote(doc, { text: edge.doc, scope: "edge" }),
-  ]);
-}
-
-function movesSection(
-  doc: Document,
-  moves: ReadonlyArray<Move>,
-  context: {
-    current: string;
-    final: boolean;
-    take: (step: ExploreStep) => void;
-  },
-): HTMLElement | null {
-  if (context.final) return null;
-  if (moves.length === 0) {
-    return html(doc, "p", { class: "explore-end" }, [`No handler in ${context.current}: stuck.`]);
-  }
-  const groups: MoveGroup[] = ["input", "effect", "internal"];
-  return html(
-    doc,
-    "div",
-    { class: "explore-moves" },
-    groups.flatMap((group) => {
-      const inGroup = moves.filter((move) => move.group === group);
-      if (inGroup.length === 0) return [];
-      return [
-        html(doc, "h3", {}, [GROUP_TITLES[group]]),
-        html(
-          doc,
-          "ul",
-          { "data-group": group },
-          inGroup.map((move) => moveItem(doc, move, context)),
-        ),
-      ];
-    }),
-  );
 }
 
 type ChildRef = { map: string; key: string };
@@ -790,8 +714,8 @@ function nowSection(
 }
 
 export interface ExploreParts {
-  /** Where the walk is and what can happen next. */
-  step: HTMLElement;
+  /** Where the walk is and what can happen next; null without a driver. */
+  step: HTMLElement | null;
   /** Live only: the values events send; null when the machine's events carry no fields. */
   context: HTMLElement | null;
 }
@@ -831,30 +755,24 @@ function liveParts(
 
 /** The walk, split for the panel's tabs. */
 export function explorePanel(doc: Document, context: ExploreContext): ExploreParts {
-  const { machine, path, live } = context;
-  const current = live?.state.state ?? stateAfter(machine, path) ?? "";
+  const { machine, live } = context;
+  if (live === undefined) return { step: null, context: null };
+  const current = live.state.state;
   const final = machine.states.find((state) => state.id === current)?.final === true;
-  const length = live?.state.steps.length ?? path.length;
+  const length = live.state.steps.length;
   const step = html(
     doc,
     "section",
     {
       class: "explore",
       "data-current": current,
-      ...(live ? { "data-live-note": "", "data-effect-mode": live.state.effectMode } : {}),
+      "data-live-note": "",
+      "data-effect-mode": live.state.effectMode,
       "data-done": final ? "" : null,
     },
     [
       ...nowSection(doc, machine, { current, final }),
-      ...(live
-        ? liveParts(doc, machine, { live, current, final })
-        : [
-            movesSection(doc, movesFrom(machine, current), {
-              current,
-              final,
-              take: context.take,
-            }),
-          ]),
+      ...liveParts(doc, machine, { live, current, final }),
       html(doc, "div", { class: "explore-controls" }, [
         button(doc, ["Back"], {
           onClick: () => context.rewind(length - 1),
@@ -871,44 +789,31 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
   );
   return {
     step,
-    context: live ? valuesList(doc, { machine, live }) : null,
+    context: valuesList(doc, { machine, live }),
   };
 }
 
-/** Every state the actor is in now: live, the machine's and each region's; walking, where the path ends. */
-function currentsIn(
-  machine: VizMachine,
-  context: { path: ReadonlyArray<ExploreStep>; currents?: string[] },
-): string[] {
-  if (context.currents !== undefined) return context.currents;
-  const walked = stateAfter(machine, context.path);
-  return walked === null ? [] : [walked];
-}
-
-/** Mark the walk on the drawn graph: current state, path taken, possible next steps. */
+/** Mark the walk on the drawn graph: current state and possible next steps. */
 export function markExplore(
   root: HTMLElement,
   context: {
     machine: VizMachine;
-    path: ReadonlyArray<ExploreStep>;
     currents?: string[];
     /** Edge id → why its guard blocks it; these are not next steps and reach nothing. */
     blocked?: ReadonlyMap<string, string>;
   },
 ): void {
-  const { machine, path } = context;
+  const { machine } = context;
   const blocked = context.blocked ?? new Map<string, string>();
-  const currents = currentsIn(machine, context);
+  const currents = context.currents ?? [];
   const moves = currents.flatMap((current) => movesFrom(machine, current));
   const open = moves.filter((move) => !blocked.has(move.edge.id));
   const next = new Set(open.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
   const reachable = new Set(
     open.flatMap((move) => move.targets).filter((to) => !currents.includes(to)),
   );
-  const taken = new Set(path.map((step) => step.edge));
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
-    element.classList.toggle("taken", taken.has(id));
     element.classList.toggle("next", next.has(id));
     markBlocked(element, blocked.get(id));
   }

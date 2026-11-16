@@ -95,7 +95,7 @@ function screenOption(context: {
     : {};
 }
 
-/** Mount the document at `text`; machines with a target run live, the rest stay static walks. */
+/** Mount the document at `text`; machines with a target run live, the rest show the diagram and Details only. */
 export function mountDriven(
   root: HTMLElement,
   context: {

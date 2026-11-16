@@ -66,18 +66,6 @@ function mount(text: string): HTMLElement {
 }
 
 describe("mountVizText", () => {
-  test("the panel shows the doc of the current state and of each next step", () => {
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    expect(root.querySelector('.panel [data-doc="state"]')?.textContent).toBe(
-      "The door stands open.",
-    );
-    expect(
-      root.querySelector('.panel [data-move="open-go-done"] [data-doc="edge"]')?.textContent,
-    ).toBe("Walk through and close up.");
-    root.querySelector<HTMLButtonElement>('[data-take="open-go-done"]')?.click();
-    expect(root.querySelector('.panel [data-doc="state"]')).toBeNull();
-  });
-
   test("internal and stay edges carry a dot gap variable and never an inline dasharray", () => {
     const machine: VizMachine = {
       ...door,
@@ -120,32 +108,22 @@ describe("mountVizText", () => {
     expect(loopMarker?.querySelector("path")?.getAttribute("class")).toContain("arrow-head-loop");
   });
 
-  test("a walk without a driver lists its moves at once, in no fold", () => {
+  test("without a driver the panel is the Details tab only, with no Send", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    expect(root.querySelector(".panel details")).toBeNull();
-    expect(root.querySelectorAll(".panel [data-take]").length).toBeGreaterThan(0);
+    const ids = [...root.querySelectorAll("[data-tab]")].map((tab) => tab.getAttribute("data-tab"));
+    expect(ids).toEqual(["details"]);
+    expect(root.querySelector(".explore")).toBeNull();
+    expect(root.querySelectorAll(".graph .current, .graph .next")).toHaveLength(0);
+    root
+      .querySelector('[data-edge-id="open-go-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
 
-  test("no diagram click takes a step", () => {
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    const before = root.querySelector(".explore")?.getAttribute("data-current");
-    const targets = [...root.querySelectorAll(".graph [data-edge-id], .graph [data-node-id]")];
-    expect(targets.length).toBeGreaterThan(0);
-    for (const target of targets) {
-      target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe(before);
-      expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
-    }
-  });
-
-  test("draws a valid document and walks it to Done", () => {
+  test("draws a valid document", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelectorAll(".graph g[data-node-id]")).toHaveLength(2);
-    root.querySelector<HTMLButtonElement>('[data-take="open-go-done"]')?.click();
-    expect(root.querySelector(".panel section.explore[data-done]")?.textContent).toContain(
-      "In done (final)",
-    );
-    expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(0);
   });
 });
 
@@ -375,99 +353,6 @@ describe("mountViewer with a driver", () => {
       );
     expect(mount).not.toThrow();
     expect(root.querySelector("[data-live-error]")?.textContent).toBe("Handler threw: x");
-  });
-});
-
-describe("walking: the selected arrow's Send", () => {
-  test("an arrow whose target depends on the payload has no button", () => {
-    const dynamic: VizMachine = {
-      ...door,
-      edges: [...door.edges, { ...edge("open", "dyn", "done"), to: null }],
-    };
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [dynamic] }));
-    root
-      .querySelector('[data-edge-id="open-dyn-done"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
-    expect(root.querySelector("[data-send-edge]")).toBeNull();
-    expect(root.querySelector("[data-selected-edge] > div:empty")).toBeNull();
-  });
-
-  test("an arrow with several targets has a Send per target, each taking its own step", () => {
-    const push: VizEdge = {
-      ...edge("open", "push", "ajar"),
-      to: null,
-      explanation: {
-        status: "analyzed",
-        location: { file: "door.ts", line: 1, column: 1 },
-        registration: "on",
-        branches: [
-          { conditions: ["hard"], target: { kind: "state", state: "done" } },
-          { conditions: ["!(hard)"], target: { kind: "state", state: "ajar" } },
-        ],
-        payloadReads: [],
-        contextReads: [],
-        contextWrites: [],
-        readsActorState: false,
-        comparisons: [],
-        literals: [],
-      },
-    };
-    const pushy: VizMachine = {
-      ...door,
-      states: [...door.states, state("ajar", { final: true })],
-      events: [...door.events, { id: "push", internal: false, doc: null, payload: null }],
-      edges: [...door.edges, push],
-    };
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [pushy] }));
-    root
-      .querySelector('[data-edge-id="open-push-ajar"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    const sends = [...root.querySelectorAll<HTMLButtonElement>("[data-send-edge]")];
-    expect(sends.map((each) => each.textContent)).toEqual(["Send push → ajar", "Send push → done"]);
-    sends[1]?.click();
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
-  });
-
-  test("Step tab buttons start with Send", () => {
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    expect(root.querySelector('.panel [data-move="open-go-done"] button')?.textContent).toMatch(
-      /^Send go/,
-    );
-  });
-
-  test("a click selects, then Send takes the step", () => {
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    root
-      .querySelector('[data-edge-id="open-go-done"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
-    const send = root.querySelector<HTMLButtonElement>("[data-send-edge]");
-    expect(send?.textContent).toBe("Send go");
-    send?.click();
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
-    expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
-    expect(root.querySelector("[data-send-edge]")).toBeNull();
-  });
-
-  test("after a walking Send, the Details say where it went", () => {
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    root
-      .querySelector('[data-edge-id="open-go-done"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
-    expect(root.querySelector("[data-details-sent]")?.textContent).toBe("Sent go: open → done");
-  });
-
-  test("after a walking Send, focus is on the selected arrow", () => {
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    document.body.append(root);
-    root
-      .querySelector('[data-edge-id="open-go-done"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
-    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("open-go-done");
-    root.remove();
   });
 });
 
