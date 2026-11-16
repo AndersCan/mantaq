@@ -145,7 +145,6 @@ async function handlesAnEvent(root: PwLocator, page: PwPage): Promise<string | u
   for (let index = 0; index < count; index += 1) {
     await arrows.nth(index).dispatchEvent("click");
     const send = root.locator("[data-send-edge]");
-    if ((await send.count()) === 0) continue;
     await send.first().click();
     await page.waitForTimeout(50);
     const after = await root.locator(".explore").first().getAttribute("data-current");

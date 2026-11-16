@@ -222,14 +222,3 @@ test("fills a choice field shown as a row of buttons", async () => {
     expect(Either.getRight(answered)).toEqual({ state: "declined", outcome: "transition" });
   });
 }, 60_000);
-
-test("the events a state offers are listed in sorted order", async () => {
-  const meal = join(import.meta.dirname, "../../../apps/docs/src/tutorial/meal-06.ts");
-  await withViz(meal, async (viz) => {
-    await viz.send("serve");
-    const left = Either.getLeft(await viz.send("nothing")) ?? "";
-    const names = (left.split("which offers: ")[1] ?? "").replace(/\.$/, "").split(", ");
-    expect(names.length).toBeGreaterThan(1);
-    expect(names).toEqual([...names].sort());
-  });
-}, 60_000);

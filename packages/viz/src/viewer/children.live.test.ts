@@ -46,7 +46,7 @@ function edge(from: string, event: string, to: string): VizEdge {
   };
 }
 
-const event = (id: string) => ({ id, internal: false, doc: null, payload: null });
+const event = (id: string, internal = false) => ({ id, internal, doc: null, payload: null });
 
 const photoQueue: VizMachine = {
   id: "photoQueue",
@@ -161,6 +161,24 @@ describe("live actor map children", () => {
         actor: { map: "photos", key: "p1" },
       },
     ]);
+  });
+
+  test("a worker's Sends are sorted by name across input and internal events, once each", () => {
+    const mixed: VizMachine = {
+      ...photoQueue,
+      events: [...photoQueue.events, event("zap"), event("apply", true)],
+      edges: [
+        ...photoQueue.edges,
+        edge("photos.sendingPhoto", "zap", "photos.photoSent"),
+        { ...edge("photos.sendingPhoto", "zap", "photos.waitingForRetry"), id: "zap-again" },
+        edge("photos.sendingPhoto", "apply", "photos.photoSent"),
+      ],
+    };
+    const { root } = mount([child("p1", "sendingPhoto")], mixed);
+    const offered = [...root.querySelectorAll('[data-actor="photos[p1]"] [data-send]')].map(
+      (each) => each.getAttribute("data-send"),
+    );
+    expect(offered).toEqual(["apply", "uploadConfirmed", "uploadFailed", "zap"]);
   });
 
   test("a final child has no moves block", () => {
