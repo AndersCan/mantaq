@@ -188,7 +188,7 @@ function drawCount(live: Live, layer: SVGGElement, id: string, count: Count): vo
   const text =
     existing ?? svg(doc, "text", { class: "marker-count", x: 0, y: 3.5, "aria-hidden": "true" });
   text.replaceChildren(
-    svg(doc, "title", {}, [count.hidden.join(", ")]),
+    svg(doc, "title", {}, [count.hidden.join("\n")]),
     doc.createTextNode(`+${count.hidden.length}`),
   );
   text.setAttribute("data-marker-map", count.map);

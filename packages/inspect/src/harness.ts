@@ -150,7 +150,7 @@ async function readChildren(
     const markers = Array.from(graph.querySelectorAll("g.child-marker")).map(own);
     const hidden = Array.from(graph.querySelectorAll("text.marker-count")).flatMap((node) =>
       (node.querySelector("title")?.textContent ?? "")
-        .split(", ")
+        .split("\n")
         .map((key) => ({ ...own(node), key })),
     );
     return [...markers, ...hidden];

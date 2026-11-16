@@ -1141,3 +1141,27 @@ test("each map's children are chips on that map's own states", () => {
   expect(listed("photos")).toEqual(["p1@photos.sendingPhoto"]);
   expect(listed("uploads")).toEqual(["u1@uploads.queued"]);
 });
+
+test("chips slide after a step or a driver update, not after a chip click", () => {
+  const root = document.createElement("div");
+  const hold: { notify?: (state: VizLiveState) => void } = {};
+  const kids = [child("p1", "sendingPhoto"), child("p2", "sendingPhoto")];
+  const driver: VizDriver = {
+    reset: () => live(kids),
+    step: (step) => ({ ...live(kids, [step]), last: null }),
+    listen: (onChange) => {
+      hold.notify = onChange;
+    },
+  };
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] }, { driver });
+  const still = () => root.querySelector(".graph g.child-markers")?.classList.contains("still");
+  expect(still()).toBe(true);
+  sendFrom(root, "p1", "uploadConfirmed");
+  expect(still()).toBe(false);
+  root
+    .querySelector('.graph g.child-marker[data-marker-key="p2"]')
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(still()).toBe(true);
+  hold.notify?.(live([child("p1", "photoSent"), child("p2", "sendingPhoto")]));
+  expect(still()).toBe(false);
+});
