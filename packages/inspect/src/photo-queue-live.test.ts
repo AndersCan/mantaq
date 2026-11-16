@@ -31,26 +31,19 @@ async function mounted(): Promise<HTMLElement> {
   return root;
 }
 
-const clickEdge = (root: HTMLElement, id: string) =>
-  root
-    .querySelector(`g[data-edge-id="${id}"]`)
-    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-
-function sendOnEdge(root: HTMLElement, id: string) {
-  clickEdge(root, id);
+function send(root: HTMLElement, selector: string) {
+  root.querySelector<HTMLButtonElement>(selector)?.click();
 }
 
 function addThree(root: HTMLElement) {
-  sendOnEdge(root, "showingEmptyQueue-photoAdded-showingQueue");
-  sendOnEdge(root, "showingQueue-photoAdded-stay");
-  sendOnEdge(root, "showingQueue-photoAdded-stay");
+  for (let index = 0; index < 3; index += 1) send(root, '[data-send="photoAdded"]');
 }
 
 const children = (root: HTMLElement): Array<{ key: string; state: string }> =>
   JSON.parse(root.querySelector("[data-children]")?.getAttribute("data-children") ?? "[]");
 
 describe("the docs photo queue on the live page", () => {
-  test("three clicks on photoAdded start p1, p2, p3", async () => {
+  test("three sends of photoAdded start p1, p2, p3", async () => {
     const root = await mounted();
     addThree(root);
     expect(children(root)).toEqual(
@@ -61,7 +54,7 @@ describe("the docs photo queue on the live page", () => {
   test("uploadConfirmed goes to p1", async () => {
     const root = await mounted();
     addThree(root);
-    sendOnEdge(root, "photos.sendingPhoto-uploadConfirmed-photoSent");
+    send(root, '[data-actor="photos[p1]"] [data-send="uploadConfirmed"]');
     expect(children(root).find((each) => each.key === "p1")?.state).toBe("photos.photoSent");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
       "uploadConfirmed: p1 sendingPhoto → photoSent",
@@ -71,7 +64,7 @@ describe("the docs photo queue on the live page", () => {
   test("queueCleared names every removed child", async () => {
     const root = await mounted();
     addThree(root);
-    sendOnEdge(root, "showingQueue-queueCleared-showingEmptyQueue");
+    send(root, '[data-send="queueCleared"]');
     expect(root.querySelector("[data-live-removed]")?.textContent).toBe("p1, p2, p3 removed");
     expect(children(root)).toEqual([]);
   });

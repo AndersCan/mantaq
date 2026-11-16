@@ -26,7 +26,6 @@ import { changedKeys, contextLines } from "./context-diff.ts";
 import { html, svg } from "./dom.ts";
 import { defaultValue, parseValue, valueFields, valueText } from "./fill.ts";
 import type { Values } from "./fill.ts";
-import type { Selection } from "./graph.ts";
 import { LOCK_SLOT, textWidth } from "./layout.ts";
 
 export interface ExploreContext {
@@ -46,7 +45,7 @@ export interface ExploreContext {
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
     previous?: VizJson;
-    /** The child a count click walks; the Step tab shows that child of each map. */
+    /** The followed child; the Step tab shows it for each map. */
     picked?: { map: string; key: string } | null;
     /** Replace the walk with these steps from a fresh actor. */
     play: (steps: ReadonlyArray<VizStep>, run?: string) => void;
@@ -57,8 +56,6 @@ export interface ExploreContext {
     /** Set a field's value; undefined clears it. */
     setValue: (name: string, value: VizJson | undefined) => void;
   };
-  /** The closed-by-default "Events and time" fold: its open state lives with the view. */
-  events: { open: boolean; onToggle: (open: boolean) => void };
 }
 
 const GROUP_TITLES: Record<MoveGroup, string> = {
@@ -1200,23 +1197,6 @@ export interface ExploreParts {
   path: HTMLElement;
 }
 
-/** The closed "Events and time" fold; null when nothing would be inside. */
-function eventsFold(
-  doc: Document,
-  context: { events: ExploreContext["events"]; children: Array<HTMLElement | null> },
-): HTMLElement | null {
-  const children = context.children.filter((child): child is HTMLElement => child !== null);
-  if (children.length === 0) return null;
-  const details = html(
-    doc,
-    "details",
-    { class: "explore-events", "data-events": "", open: context.events.open ? "" : null },
-    [html(doc, "summary", {}, ["Events and time"]), ...children],
-  );
-  details.addEventListener("toggle", () => context.events.onToggle(details.open));
-  return details;
-}
-
 /** Live Step tab, below the root's state: regions, held effects, outcome, Send lists, time. */
 function liveParts(
   doc: Document,
@@ -1225,10 +1205,9 @@ function liveParts(
     live: NonNullable<ExploreContext["live"]>;
     current: string;
     final: boolean;
-    events: ExploreContext["events"];
   },
 ): Array<HTMLElement | null> {
-  const { live, final, events } = context;
+  const { live, final } = context;
   const { state } = live;
   const moves: LiveMoves = {
     state,
@@ -1245,20 +1224,15 @@ function liveParts(
       previous: live.previous,
       routes: live.routes,
     }),
-    eventsFold(doc, {
-      events,
-      children: [
-        ...liveBlocks(doc, machine, moves),
-        ...childrenSections(doc, machine, moves),
-        final ? null : timersSection(doc, { state, send: live.send }),
-      ],
-    }),
+    ...liveBlocks(doc, machine, moves),
+    ...childrenSections(doc, machine, moves),
+    final ? null : timersSection(doc, { state, send: live.send }),
   ];
 }
 
 /** The walk, split for the panel's tabs. */
 export function explorePanel(doc: Document, context: ExploreContext): ExploreParts {
-  const { machine, path, live, events } = context;
+  const { machine, path, live } = context;
   const current = live?.state.state ?? stateAfter(machine, path) ?? "";
   const final = machine.states.find((state) => state.id === current)?.final === true;
   const length = live?.state.steps.length ?? path.length;
@@ -1274,17 +1248,12 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
     [
       ...nowSection(doc, machine, { current, final, ...(live ? { state: live.state } : {}) }),
       ...(live
-        ? liveParts(doc, machine, { live, current, final, events })
+        ? liveParts(doc, machine, { live, current, final })
         : [
-            eventsFold(doc, {
-              events,
-              children: [
-                movesSection(doc, movesFrom(machine, current), {
-                  current,
-                  final,
-                  take: context.take,
-                }),
-              ],
+            movesSection(doc, movesFrom(machine, current), {
+              current,
+              final,
+              take: context.take,
             }),
           ]),
       html(doc, "div", { class: "explore-controls" }, [
@@ -1325,29 +1294,6 @@ function historySection(doc: Document, context: ExploreContext): HTMLElement {
       ? [runsSection(doc, context.machine, live), livePathSection(doc, context, live)]
       : [pathSection(doc, context)],
   );
-}
-
-/**
- * Where a click on the diagram moves the walk, or null to just show details:
- * a next-step edge with one target, or a state exactly one next step reaches.
- */
-export function clickStep(
-  machine: VizMachine,
-  context: { path: ReadonlyArray<ExploreStep>; selection: Selection; currents?: string[] },
-): ExploreStep | null {
-  const currents = [...new Set(currentsIn(machine, context))];
-  const { selection } = context;
-  const steps = currents.flatMap((current) =>
-    movesFrom(machine, current).flatMap((move) =>
-      move.targets.map((to) => ({ edge: move.edge.id, to, current })),
-    ),
-  );
-  const matching =
-    selection.kind === "edge"
-      ? steps.filter((step) => step.edge === selection.id)
-      : steps.filter((step) => step.to === selection.id && step.to !== step.current);
-  const only = matching[0];
-  return matching.length === 1 && only !== undefined ? { edge: only.edge, to: only.to } : null;
 }
 
 /** Every state the actor is in now: live, the machine's and each region's; walking, where the path ends. */
@@ -1400,7 +1346,7 @@ export function markExplore(
 const LOCK_WIDTH = 8;
 const LOCK_HEIGHT = 10;
 
-/** A blocked arrow: grey lock left of the label's first line, and `aria-disabled`; the reason is in the note a click opens. */
+/** A blocked arrow: grey lock left of the label's first line, and `aria-disabled`. */
 function markBlocked(element: SVGGElement, reason: string | undefined): void {
   element.classList.toggle("blocked", reason !== undefined);
   element.querySelector(":scope > .blocked-lock")?.remove();

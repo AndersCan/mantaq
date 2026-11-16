@@ -107,7 +107,7 @@ const json = serializeViz(vizDocument([machine]));
 
 ## Screen preview
 
-Next to a machine file, add `<machine file>.preview.ts` (`door.ts` -> `door.preview.ts`). Its default export draws the app's own screen for a state; the live page then opens on a **Screen** tab showing it in a phone-width frame, and clicking a state walks there. Dev server only. `state` is `{ name, payload, context }` as the walk produced them; the frame takes no input.
+Next to a machine file, add `<machine file>.preview.ts` (`door.ts` -> `door.preview.ts`). Its default export draws the app's own screen for a state; the live page then opens on a **Screen** tab showing it in a phone-width frame. Dev server only. `state` is `{ name, payload, context }` as the walk produced them; the frame takes no input.
 
 ```ts
 // door.preview.ts

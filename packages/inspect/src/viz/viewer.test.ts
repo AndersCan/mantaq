@@ -525,15 +525,13 @@ describe("viewer: explore", () => {
     expect(root.querySelectorAll(".graph .edge.next, .graph .state.reachable")).toHaveLength(0);
   });
 
-  test("clicking a next edge or a reachable state on the graph takes the step", () => {
+  test("clicking an edge or a state on the graph selects it and takes no step", () => {
     const root = mount(checkout());
     root.querySelector(".graph .edge.next")?.dispatchEvent(new Event("click"));
-    expect(current(root)).toBe("shippingAddress");
+    expect(current(root)).toBe("basicInfo");
     expect(root.querySelector(".panel [data-selected-edge]")).not.toBeNull();
-    nodeElement(root, "payment")?.dispatchEvent(new Event("click"));
-    expect(current(root)).toBe("payment");
     nodeElement(root, "success")?.dispatchEvent(new Event("click"));
-    expect(current(root)).toBe("payment");
+    expect(current(root)).toBe("basicInfo");
     expect(root.querySelector('.panel [data-selected-state="success"]')).not.toBeNull();
   });
 

@@ -198,12 +198,6 @@ async function missingActor(
   return `no region ${quoted(path)} in ${id}. Regions: ${names}.`;
 }
 
-/** The Send lists sit in a fold that starts closed: open it before looking for a button. */
-async function openEvents(page: Page): Promise<void> {
-  const summary = page.locator(`${PANEL} details[data-events]:not([open]) > summary`);
-  if ((await summary.count()) > 0) await summary.first().click();
-}
-
 function makeSend(
   page: Page,
   id: string,
@@ -220,7 +214,6 @@ function makeSend(
       path === "" ? `${PANEL} [data-actor=""]` : `${PANEL} [data-actor=${quoted(path)}]`;
     const missing = await missingActor(page, { id, actor, path });
     if (missing !== undefined) return Either.left(missing);
-    await openEvents(page);
     const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
     if ((await trigger.count()) === 0) {
       const offered = await attributes(page, `${scope} [data-send]`, "data-send");

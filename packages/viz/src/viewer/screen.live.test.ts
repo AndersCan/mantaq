@@ -134,25 +134,16 @@ describe("Screen tab", () => {
     expect(drawn(root)).toBe("screen of idle");
   });
 
-  test("clicking a state three steps away walks there and shows its screen", () => {
+  test("a click on any state with Screen open does not walk there", () => {
     const navigated: string[][] = [];
     const root = mount({ onNavigate: (where) => navigated.push(where.steps) });
-    clickState(root, "c");
-    expect(drawn(root)).toBe("screen of c");
-    expect(navigated.at(-1)).toEqual(["go", "go", "go"]);
-  });
-
-  test("clicking the next state takes one step and stays on Screen", () => {
-    const root = mount();
-    clickState(root, "a");
-    expect(drawn(root)).toBe("screen of a");
-  });
-
-  test("a state no known walk reaches leaves the walk where it is", () => {
-    const root = mount();
-    clickState(root, "d");
-    expect(drawn(root)).toBe("screen of idle");
-    expect(current(root)).toBe("idle");
+    const calls = navigated.length;
+    for (const id of ["a", "c", "d"]) {
+      clickState(root, id);
+      expect(drawn(root)).toBe("screen of idle");
+      expect(current(root)).toBe("idle");
+    }
+    expect(navigated).toHaveLength(calls);
   });
 
   test("a state off the Screen tab opens its details, as before", () => {

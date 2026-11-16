@@ -31,10 +31,9 @@ test("a clicked item is teal and stays teal over the walk colours", () => {
   expect(listed(".viz .state:focus-visible .frame")).toMatch(/stroke:\s*var\(--select\)/);
 });
 
-test("the active state, running edge and composing edge use the accent", () => {
+test("the active state, and running edge use the accent", () => {
   expect(listed(".viz .taken path")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz .running path")).toMatch(/stroke:\s*var\(--accent\)/);
-  expect(rule(".viz .edge[data-composing] path")).toMatch(/stroke:\s*var\(--accent\)/);
 });
 
 test("tabs and the help link follow the host's text size", () => {

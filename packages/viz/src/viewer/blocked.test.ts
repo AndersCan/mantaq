@@ -67,6 +67,24 @@ describe("blockedReason", () => {
     );
   });
 
+  test("a path compared twice is named once", () => {
+    const base = pay();
+    if (base.explanation?.status !== "analyzed") throw new Error("fixture");
+    const edge: VizEdge = {
+      ...base,
+      explanation: {
+        ...base.explanation,
+        comparisons: [
+          { source: "context", path: "items", operator: ">", literal: 0 },
+          { source: "context", path: "items", operator: "<", literal: 10 },
+        ],
+      },
+    };
+    expect(blockedReason({ edge, outcome: outcome("stay"), live: { items: 0 } })).toBe(
+      "pay is blocked: items is 0",
+    );
+  });
+
   test("a value that is not in the context reads not set", () => {
     expect(blockedReason({ edge: pay(), outcome: outcome("stay"), live: {} })).toBe(
       "pay is blocked: items is not set",

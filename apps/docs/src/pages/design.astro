@@ -127,8 +127,7 @@ const headings = [
   <p><strong>Awaiting approval</strong></p>
   <p>
     New: the child diagram's title counts the children by state, like <code>workers: 2 free, 1
-    working</code>. Click a child state to show a child in it; the Step tab follows it. Send an
-    item and read the title change.
+    working</code>. Send an item and read the title change.
   </p>
   <Machine src="src/design/pool.ts" />
 
@@ -149,11 +148,11 @@ const headings = [
   <p><strong>Awaiting approval</strong></p>
   <p>
     New: an arrow whose guard the current context does not meet is grey with a lock; clicking it
-    shows why and sends nothing. Here <code>eat</code> is blocked until <code>serve</code> puts a plate
+    sends nothing. Here <code>eat</code> is blocked until <code>serve</code> puts a plate
     on the table.
   </p>
   <Step n={6}>
-    A guard is a plain if in the handler: no plates, no full. With no plates, eat is blocked: click
+    A guard is a plain if in the handler: no plates, no full. With no plates, eat is blocked: press
     serve first.
   </Step>
 

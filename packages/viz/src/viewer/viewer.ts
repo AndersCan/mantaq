@@ -20,14 +20,12 @@ import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
 import { decodeLiveSteps, decodePath, encodeLiveStep, encodeStep } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
-import { pathTo } from "../findings.ts";
-import { clickStep, explorePanel, markExplore, changedLines } from "./explore.ts";
+import { explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
-import { childIn, countTitle } from "./pool-count.ts";
-import { removeSheets, showPayloadSheet } from "./payload-sheet.ts";
+import { countTitle } from "./pool-count.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
@@ -48,12 +46,6 @@ interface ViewState {
   afters: VizLiveStep[][];
   /** Context before the last live step; undefined when no step ran. */
   previous: VizJson | undefined;
-  /** Live: the event whose blocked note is open. */
-  composing: string | null;
-  /** Live: the region the open blocked note is for; undefined = the machine itself. */
-  composingActor: VizActorRef | undefined;
-  /** The "Events and time" fold is open; it stays as the user left it across steps and Back. */
-  eventsOpen: boolean;
   /** Live: the child a click in the child graph goes to; null = the lowest key. */
   picked: { map: string; key: string } | null;
   /** The panel tab shown. */
@@ -158,7 +150,7 @@ export interface ViewerOptions {
   panelFooter?: (selection: Selection | undefined) => Node | undefined;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
-  /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state. While it is open, clicking a state walks there. */
+  /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state. */
   screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
@@ -186,7 +178,6 @@ export function mountViewer(
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
-    removeSheets(root);
     root.replaceChildren();
     root.classList.add("viz", "not-content");
     if (!machine) {
@@ -214,7 +205,7 @@ export function mountViewer(
       const details = detailsOf(doc, {
         machine,
         view,
-        select,
+        select: showDetails,
         replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
       });
       const controls = controlsOf(doc, chrome);
@@ -223,7 +214,7 @@ export function mountViewer(
       fillPanel(panel, { doc, view, parts: stepTab, details, controls, screen, refresh, footer });
       mark();
     };
-    const mark = () => markDiagram(root, { machine, view, driver, compose, refresh });
+    const mark = () => markDiagram(root, { machine, view, driver });
     redraw = refresh;
     const walked = (run?: string) => {
       noticeCleared(root, view);
@@ -234,9 +225,7 @@ export function mountViewer(
     const send = stepSender({ view, driver, walked });
     const sendEvent = (event: string, actor?: VizActorRef) =>
       send(eventStep(machine, view, event, actor));
-    const compose = composer(view, refresh);
     const take = (step: ExploreStep) => {
-      if (driver !== undefined) return liveTake(machine, step, { sendEvent, view });
       view.path = [...view.path, step];
       walked();
     };
@@ -250,18 +239,8 @@ export function mountViewer(
       walked();
     };
     const showDetails = detailsShower({ view, panel, refresh });
-    // A click on a next step takes it; either way the clicked element's details show.
-    const select = (selection: Selection) => {
-      if (openBlocked(machine, view, selection, compose)) return;
-      if (pickByClick(machine, view, selection, { refresh, showDetails })) return;
-      const step = clickStep(machine, { path: view.path, selection, ...liveState(view) });
-      if (step !== null) view.selection = selection;
-      if (step !== null) return take(step);
-      const walk = screenWalk({ machine, view, driver, selection });
-      return walk === null ? showDetails(selection) : play(walk, undefined, "screen");
-    };
     const graph = renderGraph(doc, machine, {
-      select,
+      select: showDetails,
       showDetails,
       mode,
       bare: view.diagramOnly,
@@ -358,14 +337,6 @@ function rewindView(view: ViewState, driver: VizDriver | undefined, length: numb
   else view.path = view.path.slice(0, keep);
 }
 
-function composer(view: ViewState, refresh: () => void) {
-  return (event: string | null, actor?: VizActorRef) => {
-    view.composing = event;
-    view.composingActor = event === null ? undefined : actor;
-    refresh();
-  };
-}
-
 function detailsShower(context: { view: ViewState; panel: HTMLElement; refresh: () => void }) {
   const { view, panel, refresh } = context;
   return (selection: Selection, shown?: { findings: boolean }): void => {
@@ -381,37 +352,6 @@ function screenOf(options: ViewerOptions, view: ViewState): Node | undefined {
   return view.live === null ? undefined : options.screen?.(view.live);
 }
 
-/** With Screen open, a click on any state walks the shortest known walk there; otherwise null. */
-function screenWalk(context: {
-  machine: VizMachine;
-  view: ViewState;
-  driver: VizDriver | undefined;
-  selection: Selection;
-}): VizStep[] | null {
-  const { machine, view, driver, selection } = context;
-  if (view.tab !== "screen" || driver === undefined || selection.kind !== "state") return null;
-  if (selection.id === view.live?.state) return null;
-  return walkTo({ machine, view, driver }, selection.id);
-}
-
-/** The shortest known walk to state `id`, cut at the first step that lands there; null when there is none. */
-function walkTo(
-  context: { machine: VizMachine; view: ViewState; driver: VizDriver },
-  id: string,
-): VizStep[] | null {
-  const { machine, view, driver } = context;
-  if (id === machine.initial) return [];
-  const steps = pathTo(machine, id);
-  if (steps === null) return null;
-  let live = driver.reset();
-  for (const [index, step] of steps.entries()) {
-    live = stepSafely(driver, { before: live, step });
-    if (live.state === id) return steps.slice(0, index + 1);
-  }
-  replayInto(view, driver, view.live?.steps ?? []);
-  return null;
-}
-
 function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {
   return {
     machineId: machine?.id ?? "",
@@ -425,9 +365,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     outcomes: [],
     afters: [],
     previous: undefined,
-    composing: null,
-    composingActor: undefined,
-    eventsOpen: false,
     picked: null,
     tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
@@ -521,20 +458,13 @@ function panelTabs(
   });
 }
 
-/** The live driver's part of the panel context, and the fold's open state, which lives in the view. */
+/** The live driver's part of the panel context. */
 function liveOf(
   view: ViewState,
   handlers: Pick<LiveContext, "send" | "play" | "sendEvent" | "setValue" | "routes">,
-): Pick<ExploreContext, "events"> & { live?: LiveContext } {
-  const events = {
-    open: view.eventsOpen,
-    onToggle: (open: boolean) => {
-      view.eventsOpen = open;
-    },
-  };
-  if (view.live === null) return { events };
+): { live?: LiveContext } {
+  if (view.live === null) return {};
   return {
-    events,
     live: {
       state: view.live,
       outcomes: view.outcomes,
@@ -561,19 +491,6 @@ function actorOf(
   return region === "" ? undefined : { region };
 }
 
-/** A live click on an edge sends its event at once, with the values set in the Context tab. */
-function liveTake(
-  machine: VizMachine,
-  step: ExploreStep,
-  handlers: Pick<LiveContext, "sendEvent"> & { view: ViewState },
-): void {
-  const edge = machine.edges.find((each) => each.id === step.edge);
-  if (edge === undefined) return;
-  const actor = actorOf(machine, edge, { state: handlers.view.live, picked: handlers.view.picked });
-  if (actor === "none") return;
-  handlers.sendEvent(edge.event, actor);
-}
-
 /** An effect result that arrives later replaces the live state. */
 function watchDriver(
   view: ViewState,
@@ -588,7 +505,7 @@ function watchDriver(
   });
 }
 
-/** Sets (or, with undefined, clears) a value: any open blocked note closes, the blocked arrows are worked out again and the host hears of it. Only the marks redraw, so the box being typed in keeps focus. */
+/** Sets (or, with undefined, clears) a value: the blocked arrows are worked out again and the host hears of it. Only the marks redraw, so the box being typed in keeps focus. */
 function valueSetter(context: {
   options: ViewerOptions;
   machine: VizMachine;
@@ -599,8 +516,6 @@ function valueSetter(context: {
   return (name, value) => {
     const { [name]: _gone, ...rest } = view.values;
     view.values = value === undefined ? rest : { ...rest, [name]: value };
-    view.composing = null;
-    view.composingActor = undefined;
     view.blockedFor = null;
     navigated(options, { machine, view });
     mark();
@@ -670,7 +585,6 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
     view.outcomes.push(view.live.last);
     view.afters.push(view.live.after);
   }
-  view.composing = null;
 }
 
 /** A driver that throws leaves the state where it was and shows the message as a handler error. */
@@ -681,7 +595,6 @@ function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<Viz
   view.live = played.live;
   view.outcomes = played.outcomes;
   view.afters = played.afters;
-  view.composing = null;
 }
 
 function stepSafely(
@@ -735,27 +648,6 @@ function isTextControl(target: EventTarget | null): boolean {
     target instanceof HTMLSelectElement ||
     (target instanceof HTMLElement && target.isContentEditable)
   );
-}
-
-/** A live click on a child state box walks the lowest key in it, or just shows its details when none is there. True when it was one. */
-function pickByClick(
-  machine: VizMachine,
-  view: ViewState,
-  selection: Selection,
-  then: { refresh: () => void; showDetails: (selection: Selection) => void },
-): boolean {
-  if (view.live === null || selection.kind !== "state") return false;
-  const map = machine.maps.find((each) => selection.id.startsWith(`${each}.`));
-  if (map === undefined) return false;
-  const key = childIn(view.live, map, selection.id);
-  if (key === undefined) then.showDetails(selection);
-  else {
-    view.picked = { map, key };
-    view.selection = selection;
-    view.tab = "step";
-    then.refresh();
-  }
-  return true;
 }
 
 /** `mantaq:pick-child` walks a live child. For the inspect harness and test tools; not public API. */
@@ -894,30 +786,13 @@ function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver |
   });
 }
 
-/** A click on a blocked edge opens the reason where the form would be, and sends nothing. Returns whether it was one. */
-function openBlocked(
-  machine: VizMachine,
-  view: ViewState,
-  selection: Selection,
-  compose: (event: string | null, actor?: VizActorRef) => void,
-): boolean {
-  if (selection.kind !== "edge" || !view.blocked.has(selection.id)) return false;
-  const edge = machine.edges.find((each) => each.id === selection.id);
-  const actor =
-    edge === undefined ? "none" : actorOf(machine, edge, { state: view.live, picked: view.picked });
-  if (edge !== undefined && actor !== "none") compose(edge.event, actor);
-  return true;
-}
-
-/** Everything drawn over the graph: walk marks, selection, and the edge of the open payload sheet. */
+/** Everything drawn over the graph: walk marks and selection. */
 function markDiagram(
   root: HTMLElement,
   context: {
     machine: VizMachine;
     view: ViewState;
     driver: VizDriver | undefined;
-    refresh: () => void;
-    compose: (event: string | null, actor?: VizActorRef) => void;
   },
 ): void {
   const { machine, view } = context;
@@ -926,7 +801,6 @@ function markDiagram(
   const graph = root.querySelector<SVGSVGElement>("svg");
   if (graph !== null) markPools(root, { machine, view });
   markSelection(root, view.selection);
-  showPayloadSheet(root, { ...context, ...view });
 }
 
 /** Each map frame is titled with its live count of children; `data-children` lists them for the inspect harness. */
