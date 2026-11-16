@@ -434,9 +434,20 @@
   box-shadow: none;
 }
 
-.viz .show-controls {
-  margin-left: auto;
-  display: block;
+.viz .viz-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.viz:fullscreen {
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 16px;
+}
+
+.viz:fullscreen .graph {
+  width: max(var(--graph-floor), 100%) !important;
 }
 
 .viz .blocked-note {

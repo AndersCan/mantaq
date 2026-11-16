@@ -56,9 +56,10 @@ describe("renderGraph width", () => {
     const graph = renderGraph(document, machine, {
       select: () => undefined,
     });
-    const match = /^width: clamp\(([\d.]+)rem, 100%, ([\d.]+)em\)$/.exec(
-      graph.getAttribute("style") ?? "",
-    );
+    const match =
+      /^--graph-floor: ([\d.]+)rem; width: clamp\(var\(--graph-floor\), 100%, ([\d.]+)em\)$/.exec(
+        graph.getAttribute("style") ?? "",
+      );
     const units = Number(graph.getAttribute("viewBox")?.split(" ")[2]);
     expect(Number(match?.[1])).toBeCloseTo((units * 0.6) / 12, 0);
     expect(Number(match?.[2])).toBeCloseTo((units * 1.4) / 12, 0);
