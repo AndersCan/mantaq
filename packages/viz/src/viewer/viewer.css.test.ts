@@ -24,25 +24,24 @@ test("a clicked item is teal and stays teal over the walk colours", () => {
   expect(listed(".viz .selected .frame")).toMatch(/stroke:\s*var\(--select\)/);
   const override = css.lastIndexOf(".viz .graph .selected path");
   expect(override).toBeGreaterThan(css.indexOf(".viz .edge.sent path"));
-  expect(override).toBeGreaterThan(css.indexOf(".viz .running path"));
   expect(override).toBeGreaterThan(css.indexOf(".viz .current .frame"));
   expect(listed(".viz .graph .selected path")).toMatch(/stroke:\s*var\(--select\)/);
   expect(listed(".viz .state:focus-visible .frame")).toMatch(/stroke:\s*var\(--select\)/);
 });
 
-test("the active state, and running edge use the accent", () => {
+test("the active state and the next arrows use the accent, and the arrows do not move", () => {
   expect(listed(".viz .current .frame")).toMatch(/stroke:\s*var\(--accent\)/);
-  expect(rule(".viz .running path")).toMatch(/stroke:\s*var\(--accent\)/);
+  expect(rule(".viz .next path")).toMatch(/stroke:\s*var\(--accent\)/);
+  expect(rule(".viz .next path")).not.toMatch(/animation/);
 });
 
 test("tabs follow the host's text size", () => {
   expect(rule('.viz .tab-strip [role="tab"]')).toMatch(/font-size:\s*1em/);
 });
 
-test("buttons and the header heading follow the host's text size", () => {
+test("buttons follow the host's text size", () => {
   expect(css).toMatch(/\n\.viz button \{[^}]*font-size:\s*1em/);
   expect(rule(".viz :where(button, select")).toMatch(/font-size:\s*1em/);
-  expect(rule(".viz .viz-header :is(h1, h2, h3)")).toMatch(/font-size:\s*1\.385em/);
 });
 
 test("a dropped message's Step line uses the banner colour", () => {

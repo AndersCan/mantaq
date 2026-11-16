@@ -179,6 +179,16 @@ const clickEdge = (root: HTMLElement, id: string) =>
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
 describe("live controls", () => {
+  test("a live mount has no title, no reachable box and no chip tint", () => {
+    const { root } = mount();
+    sendSubmit(root);
+    expect(root.querySelector("header")).toBeNull();
+    const titles = [...root.querySelectorAll("h1, h2, h3")];
+    expect(titles.filter((title) => title.closest(".panel") === null)).toEqual([]);
+    expect(root.querySelector(".reachable")).toBeNull();
+    expect(root.querySelector(".chip.running")).toBeNull();
+  });
+
   test("a timer button advances the clock to its deadline", () => {
     const { root } = mount();
     expect(root.querySelector("[data-advance-timer]")).toBeNull();
@@ -496,22 +506,6 @@ describe("runs", () => {
     const { root } = mountRun({ run: "<b>x</b>" });
     expect(root.querySelector("[data-run-missing] b")).toBeNull();
     expect(root.querySelector("[data-run-missing]")?.textContent).toContain("<b>x</b>");
-  });
-
-  test("switching machine clears the run notice", () => {
-    const other: VizMachine = { ...checkout, id: "other" };
-    const root = document.createElement("div");
-    mountViewer(
-      root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRuns, other] },
-      { run: "nope", machine: withRuns.id },
-    );
-    expect(root.querySelector("[data-run-missing]")).not.toBeNull();
-    const picker = root.querySelector("select");
-    if (picker === null) throw new Error("no machine picker");
-    picker.value = "other";
-    picker.dispatchEvent(new Event("change"));
-    expect(root.querySelector("[data-run-missing]")).toBeNull();
   });
 });
 

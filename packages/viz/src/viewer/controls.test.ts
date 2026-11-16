@@ -60,17 +60,16 @@ describe("diagramOnly", () => {
   test("opens with only the canvas and Show controls", () => {
     const root = mount({ diagramOnly: true });
     expect(root.classList.contains("diagram-only")).toBe(true);
-    expect(root.querySelector(".viz-header")).toBeNull();
     expect(root.querySelector(".panel")).toBeNull();
     expect(root.querySelector(".canvas svg")).not.toBeNull();
     expect(root.querySelector("[data-show-controls]")?.textContent).toBe("Show controls");
   });
 
-  test("Show controls brings the header and the Details tab back, with focus on the tab", () => {
+  test("Show controls brings the panel and the Details tab back, with focus on the tab", () => {
     const root = mount({ diagramOnly: true });
     root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
     expect(root.classList.contains("diagram-only")).toBe(false);
-    expect(root.querySelector(".viz-header")).not.toBeNull();
+    expect(root.querySelector(".panel")).not.toBeNull();
     expect(root.querySelector("[data-show-controls]")).toBeNull();
     expect(tabIds(root)).toEqual(["details"]);
     const shown = root.querySelector('[role="tab"][aria-selected="true"]');

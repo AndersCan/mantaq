@@ -165,9 +165,6 @@ describe("a blocked arrow", () => {
     expect(pay?.getAttribute("aria-disabled")).toBe("true");
     expect(pay?.classList.contains("next")).toBe(false);
     expect(pay?.querySelector(".blocked-lock")).not.toBeNull();
-    expect(root.querySelector('[data-node-id="payment"]')?.classList.contains("reachable")).toBe(
-      false,
-    );
     clickEdge(root, "cart-pay-payment");
     expect(sent).toHaveLength(0);
     expect(root.querySelector(".graph .selected")).not.toBeNull();

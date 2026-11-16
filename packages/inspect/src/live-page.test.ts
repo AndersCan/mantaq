@@ -247,25 +247,13 @@ describe("mountDriven with several machines", () => {
   });
 });
 
-describe("mountDriven heading and walk ownership", () => {
+describe("mountDriven walk ownership", () => {
   const create = () => {
     const clock = VirtualClock();
     return { actor: createCheckoutActor(clock), clock };
   };
   const current = (root: HTMLElement) =>
     root.querySelector<HTMLElement>(".explore")?.dataset["current"];
-
-  test("heading sets the title level; the default is h1", async () => {
-    history.replaceState(null, "", "?");
-    const text = await documentText();
-    const plain = document.createElement("div");
-    mountDriven(plain, { source: "test", text, targets: {} });
-    const small = document.createElement("div");
-    mountDriven(small, { source: "test", text, targets: {}, heading: "h2" });
-    expect(plain.querySelector("h1")).not.toBeNull();
-    expect(small.querySelector("h1")).toBeNull();
-    expect(small.querySelector("h2")).not.toBeNull();
-  });
 
   test("a walk for another machine's id is not replayed here", async () => {
     history.replaceState(null, "", "?");

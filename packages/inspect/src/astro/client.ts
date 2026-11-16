@@ -11,7 +11,6 @@ for (const root of document.querySelectorAll<HTMLElement>(".mantaq-machine")) {
       source: src ?? "machine",
       text,
       targets,
-      heading: "h2",
       effectMode: root.dataset["mantaqEffects"] === "run" ? "real" : "held",
       diagramOnly: root.dataset["mantaqDiagramOnly"] !== undefined,
       ...(raw === undefined ? {} : { routes: JSON.parse(raw) }),

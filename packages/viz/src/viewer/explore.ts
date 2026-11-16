@@ -639,21 +639,14 @@ export function markExplore(
   const moves = currents.flatMap((current) => movesFrom(machine, current));
   const open = moves.filter((move) => !blocked.has(move.edge.id));
   const next = new Set(open.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
-  const reachable = new Set(
-    open.flatMap((move) => move.targets).filter((to) => !currents.includes(to)),
-  );
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
     element.classList.toggle("next", next.has(id));
     markBlocked(element, blocked.get(id));
   }
-  for (const element of root.querySelectorAll<SVGGElement>(".graph g.chip")) {
-    element.classList.toggle("running", currents.includes(element.dataset["state"] ?? ""));
-  }
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
     const id = element.dataset["nodeId"];
     element.classList.toggle("current", id !== undefined && currents.includes(id));
-    element.classList.toggle("reachable", id !== undefined && reachable.has(id));
   }
 }
 
