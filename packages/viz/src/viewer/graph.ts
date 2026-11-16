@@ -44,21 +44,6 @@ function defs(doc: Document): SVGDefsElement {
       },
       [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head" })],
     ),
-    svg(
-      doc,
-      "marker",
-      {
-        id: "viz-arrow-loop",
-        viewBox: "0 0 10 10",
-        refX: 10,
-        refY: 5,
-        markerWidth: ARROW_SIZE,
-        markerHeight: ARROW_SIZE,
-        markerUnits: "userSpaceOnUse",
-        orient: "auto-start-reverse",
-      },
-      [svg(doc, "path", { d: "M0,0 L10,5 L0,10 z", class: "arrow-head arrow-head-loop" })],
-    ),
   ]);
 }
 
@@ -258,8 +243,7 @@ function edgeGroup(
       svg(doc, "path", { class: "hit", d: placed.path, "aria-hidden": "true" }),
       svg(doc, "path", {
         d: placed.path,
-        "marker-end":
-          placed.edge.from === placed.target ? "url(#viz-arrow-loop)" : "url(#viz-arrow)",
+        "marker-end": "url(#viz-arrow)",
         style:
           internal === true || edge.kind === "stay"
             ? `--viz-dot-gap: ${placed.dotGap.toFixed(1)}`

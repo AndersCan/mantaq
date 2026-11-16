@@ -178,11 +178,6 @@
   fill: var(--line);
 }
 
-/* Loop heads take the loop's own stroke colour (internal, stay, ...). */
-.viz .graph .arrow-head-loop {
-  fill: context-stroke;
-}
-
 .viz .region rect {
   fill: var(--region-bg);
   stroke: var(--muted);
@@ -249,10 +244,6 @@
 .viz .edge.internal path {
   stroke-dasharray: 1 var(--viz-dot-gap, 3);
   stroke-linecap: round;
-}
-
-.viz .edge.internal text {
-  font-style: italic;
 }
 
 .viz .worker-row {
