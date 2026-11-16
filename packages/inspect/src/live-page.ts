@@ -46,10 +46,6 @@ function liveCreate(targets: LiveTargets, id: string): FuzzTarget["create"] | un
     : undefined;
 }
 
-function routesOf(context: { routes?: VizOutputRoutes }): { routes?: VizOutputRoutes } {
-  return context.routes === undefined ? {} : { routes: context.routes };
-}
-
 /** The viewer's `screen` callback: a phone-width frame of the app's own preview page for the live state. */
 function screenFrame(
   doc: Document,
@@ -150,7 +146,7 @@ export function mountDriven(
   const driver = liveDriver(id, create, context.effectMode);
   mountViewer(viewer, shown, {
     ...options,
-    ...routesOf(context),
+    ...(context.routes === undefined ? {} : { routes: context.routes }),
     ...(driver === undefined ? {} : { driver }),
     ...screenOption({ doc, preview: context.preview, id }),
     ...(context.diagramOnly === true ? { diagramOnly: true } : {}),

@@ -134,9 +134,8 @@ export function mountViewer(
           routes: options.routes,
         }),
       });
-      const details = detailsOf(doc, {
-        machine,
-        view,
+      const details = renderPanel(doc, machine, {
+        selection: view.selection,
         select: showDetails,
         send: sendFor({ root, doc, machine, view, driver }, { sendEvent }),
       });
@@ -206,23 +205,6 @@ export function mountViewer(
   }
 
   render();
-}
-
-/** The Details tab: the diagram's selection. */
-function detailsOf(
-  doc: Document,
-  context: {
-    machine: VizMachine;
-    view: ViewState;
-    select: (selection: Selection) => void;
-    send: Parameters<typeof renderPanel>[2]["send"];
-  },
-): HTMLElement {
-  return renderPanel(doc, context.machine, {
-    selection: context.view.selection,
-    select: context.select,
-    send: context.send,
-  });
 }
 
 type ArrowSend =
@@ -669,7 +651,7 @@ function eventStep(
   return { kind: "event", event, payload, ...(actor ? { actor } : {}) };
 }
 
-/** Takes one live step; an open payload form closes. */
+/** Takes one live step. */
 function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   const length = view.live?.steps.length ?? 0;
   view.live = stepSafely(driver, { before: view.live, step });
@@ -678,7 +660,6 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   }
 }
 
-/** A driver that throws leaves the state where it was and shows the message as a handler error. */
 /** Sets `view.live` to the state after `steps`. */
 function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<VizStep>): void {
   const played = replay(driver, steps);
@@ -686,6 +667,7 @@ function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<Viz
   view.afters = played.afters;
 }
 
+/** A driver that throws leaves the state where it was and shows the message as a handler error. */
 function stepSafely(
   driver: VizDriver,
   context: { before: VizLiveState | null; step: VizStep },
