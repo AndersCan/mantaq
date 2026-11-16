@@ -13,8 +13,6 @@ export type Values = Readonly<Record<string, VizJson>>;
 
 /** Values for an event's payload fields, copied from what this walk sent. */
 interface FillSource {
-  /** Where they come from: `Last sent` for what this walk sent. */
-  path: string;
   /** Field name to value; only fields whose value fits, in the event's field order. */
   values: Array<{ field: string; value: VizJson }>;
 }
@@ -52,25 +50,10 @@ function typedSource(
       break;
     }
   }
-  return values.length === 0 ? null : { path: "Last sent", values };
+  return values.length === 0 ? null : { values };
 }
 
-/** The latest payload this walk sent (or heard) whose keys are exactly the example's: another event carrying the same fields. */
-function sameShape(
-  steps: ReadonlyArray<VizStep>,
-  example: VizJson | undefined,
-): VizJson | undefined {
-  if (!isObject(example)) return undefined;
-  const keys = Object.keys(example).sort().join(",");
-  if (keys === "") return undefined;
-  for (const step of steps.toReversed()) {
-    if (step.kind !== "event" || !isObject(step.payload)) continue;
-    if (Object.keys(step.payload).sort().join(",") === keys) return step.payload;
-  }
-  return undefined;
-}
-
-/** What a click sends for `event`: per field, the value set in the Context tab, else the latest value this walk sent under that name, else the field's example (required fields), else the fuzzer's first payload's value. Without declared fields: the payload this walk last sent with `event`, else the fuzzer's first. undefined = nothing known. */
+/** What a click sends for `event`: per field, the value set in the Context tab, else the latest value this walk sent under that name, else the field's example (required fields), else the fuzzer's first payload's value. Without declared fields: the fuzzer's first payload. undefined = nothing known. */
 export function knownPayload(
   fields: ReadonlyArray<VizField> | null,
   context: {
@@ -81,17 +64,10 @@ export function knownPayload(
     set?: Values;
   },
 ): { payload: VizJson } | undefined {
-  const { event, samples, steps } = context;
+  const { samples, steps } = context;
   const set = context.set ?? {};
   const [fuzzed] = samples;
   if (fields === null || fields.length === 0) {
-    for (const step of steps.toReversed()) {
-      if (step.kind === "event" && step.event === event && step.payload !== null) {
-        return { payload: step.payload };
-      }
-    }
-    const shaped = sameShape(steps, fuzzed);
-    if (shaped !== undefined) return { payload: shaped };
     return fuzzed === undefined ? undefined : { payload: fuzzed };
   }
   const typed = typedSource(fields, steps);
