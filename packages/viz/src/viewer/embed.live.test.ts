@@ -398,6 +398,37 @@ describe("live controls", () => {
     expect(root.querySelector("[data-timer-line]")).toBeNull();
   });
 
+  test("timerArrow: the line counts down from the walk's clock", () => {
+    const { root } = mount({ steps: ['submit={"amount":5}', "@300"] });
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect(root.querySelector("[data-timer-line]")?.textContent).toBe(
+      "paymentTimeout fires on its own in 500 ms; a click sends it now.",
+    );
+  });
+
+  test("timerArrow: only the arrow a click would send carries the line", () => {
+    const root = document.createElement("div");
+    const live = driver();
+    const machine = {
+      ...checkout,
+      edges: [
+        ...checkout.edges,
+        edge("idle", "paymentTimeout", "error"),
+        edge("paying", "cancel", "idle"),
+      ],
+      events: [...checkout.events, { id: "cancel", internal: false, doc: null, payload: null }],
+    };
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver: live });
+    clickArrow(root, "idle-submit-paying");
+    clickEdge(root, "paying-cancel-idle");
+    expect(root.querySelector("[data-send-edge]")).not.toBeNull();
+    expect(root.querySelector("[data-timer-line]")).toBeNull();
+    clickEdge(root, "idle-paymentTimeout-error");
+    expect(root.querySelector("[data-timer-line]")).toBeNull();
+    clickArrow(root, "idle-paymentTimeout-error");
+    expect(live.log).toHaveLength(1);
+  });
+
   test("helpClickedShowingDetails: the ? on a next arrow opens Details with Send and sends nothing", () => {
     const { root, live } = mount();
     clickEdge(root, "idle-submit-paying");

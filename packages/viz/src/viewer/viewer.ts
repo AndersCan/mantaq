@@ -294,7 +294,7 @@ function sendFor(
       case "send": {
         const { actor } = decision;
         const to = actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
-        return here(
+        const sent = here(
           button(doc, ["Send ", code(doc, edge.event), ...to], {
             onClick: () => {
               handlers.sendEvent(edge.event, actor, edge.id);
@@ -303,14 +303,12 @@ function sendFor(
             attrs: { "data-send-edge": edge.id },
           }),
         );
+        const line = timerLine(edge);
+        return line === null ? sent : html(doc, "div", {}, sent === null ? [line] : [line, sent]);
       }
     }
   };
-  return (edge) => {
-    const line = timerLine(edge);
-    const send = sendOf(edge);
-    return line === null ? send : html(doc, "div", {}, send === null ? [line] : [line, send]);
-  };
+  return sendOf;
 }
 
 /** After a Send from this arrow's Details: what was sent and where it went, then the button when it can still be pressed. */
