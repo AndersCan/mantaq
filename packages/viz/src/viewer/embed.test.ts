@@ -102,13 +102,9 @@ describe("mountVizText", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
     const markerOf = (id: string) =>
       root.querySelector(`[data-edge-id="${id}"] path:not(.hit)`)?.getAttribute("marker-end");
-    expect(markerOf("open-stay-open")).toBe("url(#viz-arrow-loop)");
+    expect(markerOf("open-stay-open")).toBe("url(#viz-arrow)");
     expect(markerOf("open-go-done")).toBe("url(#viz-arrow)");
-    const loopMarker = root.querySelector("#viz-arrow-loop");
-    expect(loopMarker?.getAttribute("markerUnits")).toBe("userSpaceOnUse");
-    expect(loopMarker?.getAttribute("markerWidth")).toBe("8");
-    expect(loopMarker?.getAttribute("markerHeight")).toBe("8");
-    expect(loopMarker?.querySelector("path")?.getAttribute("class")).toContain("arrow-head-loop");
+    expect(root.querySelector("#viz-arrow-loop")).toBeNull();
   });
 
   test("without a driver the panel is the Details tab only, with no Send", () => {

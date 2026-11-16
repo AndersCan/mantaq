@@ -37,11 +37,12 @@ const machine: VizMachine = {
 };
 
 describe("renderGraph arrowheads", () => {
-  test("both markers draw the same fixed-size head with the tip on the path end", () => {
+  test("the marker draws a fixed-size head with the tip on the path end", () => {
     const graph = renderGraph(document, machine, {
       select: () => undefined,
     });
-    for (const id of ["viz-arrow", "viz-arrow-loop"]) {
+    expect(graph.querySelector("#viz-arrow-loop")).toBeNull();
+    for (const id of ["viz-arrow"]) {
       const marker = graph.querySelector(`#${id}`);
       expect(marker?.getAttribute("markerUnits")).toBe("userSpaceOnUse");
       expect(marker?.getAttribute("markerWidth")).toBe(String(ARROW_SIZE));
