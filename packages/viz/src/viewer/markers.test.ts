@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
 import fc from "fast-check";
-import type { VizLiveChild, VizMachine } from "../schema.ts";
+import type { VizLiveChild } from "../schema.ts";
 import { drawChildMarkers, type MarkerContext } from "./markers.ts";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -24,14 +24,12 @@ function board(widths: ReadonlyArray<number>): SVGSVGElement {
   return root;
 }
 
-const machine = { states: [] } as unknown as VizMachine;
-
 function child(key: string, state: string): VizLiveChild {
   return { map: "p", key, state: `p.${state}`, since: 0 };
 }
 
 function context(children: VizLiveChild[], over: Partial<MarkerContext> = {}): MarkerContext {
-  return { machine, children, picked: null, onPick: () => undefined, ...over };
+  return { children, picked: null, onPick: () => undefined, ...over };
 }
 
 const markers = (root: SVGSVGElement) =>
@@ -223,18 +221,16 @@ describe("drawChildMarkers branches", () => {
     expect(Math.abs(at(drawn[0]) - 10 - (10 + 168 - end))).toBeLessThan(0.2);
   });
 
-  test("Space picks and keeps the page from scrolling; a final state's chip is outlined", () => {
+  test("Space picks and keeps the page from scrolling", () => {
     const root = board([168]);
-    const machine = { states: [{ id: "p.s0", final: true }] } as unknown as VizMachine;
     const picked: string[] = [];
     drawChildMarkers(
       root,
-      context([child("w1", "s0")], { machine, onPick: (each) => picked.push(each.key) }),
+      context([child("w1", "s0")], { onPick: (each) => picked.push(each.key) }),
     );
     const space = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
     markers(root)[0]?.dispatchEvent(space);
     expect(picked).toEqual(["w1"]);
     expect(space.defaultPrevented).toBe(true);
-    expect(markers(root)[0]?.classList.contains("final")).toBe(true);
   });
 });

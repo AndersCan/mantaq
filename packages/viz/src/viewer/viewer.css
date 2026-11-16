@@ -515,16 +515,6 @@
   stroke: none;
 }
 
-.viz .child-marker.final rect:not(.hit),
-.viz .child-marker.final circle {
-  fill: var(--bg);
-  stroke-width: 1.5;
-}
-
-.viz .child-marker.final text {
-  fill: var(--fg);
-}
-
 .viz .child-marker .hit {
   fill: transparent;
   stroke: none;

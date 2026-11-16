@@ -166,7 +166,7 @@ describe("live actor map children", () => {
   test("a final child's row can be followed too", () => {
     const { root } = mount([child("p1", "photoSent", 3)]);
     const row = root.querySelector('[data-child-key="p1"]');
-    expect(row?.querySelector(".explore-child-now")?.textContent).toBe("p1: in photoSent (final)");
+    expect(row?.querySelector(".explore-child-now")?.textContent).toBe("p1: in photoSent");
     row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(root.querySelector('[data-child-key="p1"][data-followed]')).not.toBeNull();
   });

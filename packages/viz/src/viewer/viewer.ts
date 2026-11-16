@@ -764,7 +764,6 @@ function markDiagram(
   const graph = root.querySelector<SVGSVGElement>(".graph");
   if (graph !== null && view.live !== null) {
     drawChildMarkers(graph, {
-      machine,
       children: view.live.children,
       picked: view.picked,
       onPick: context.pick,
