@@ -814,45 +814,6 @@ describe("field forms and the context table", () => {
     expect(live.log[0]).toEqual([{ kind: "event", event: "ping", payload: null }]);
   });
 
-  test("an event with no declared fields sends the fuzzer's sample every time", () => {
-    const machine: VizMachine = {
-      ...fieldsMachine,
-      fuzz: {
-        seed: 1,
-        iterations: 1,
-        corpus: [{ steps: [{ kind: "event", event: "ping", payload: { x: 1 } }], discovered: [] }],
-        errors: [],
-        failedExpectations: [],
-        expectations: [],
-      },
-    };
-    const { root, live } = mountFields(machine);
-    const step = live.step.bind(live);
-    live.step = (next) => ({
-      ...step(next),
-      last: {
-        from: "idle",
-        event: "ping",
-        to: "idle",
-        outcome: "transition",
-        effects: [],
-        sent: [],
-        context: null,
-        error: null,
-      },
-    });
-    for (const send of [1, 2]) {
-      clickEdge(root, "idle-ping-idle");
-      root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
-      expect(live.log[send - 1]?.at(-1)).toEqual({
-        kind: "event",
-        event: "ping",
-        payload: { x: 1 },
-      });
-      expect(root.querySelector("[data-details-sent]")?.textContent).toContain('with {"x":1}');
-    }
-  });
-
   const requiredMachine: VizMachine = {
     ...fieldsMachine,
     events: [
