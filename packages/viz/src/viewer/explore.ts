@@ -38,7 +38,7 @@ export interface ExploreContext {
     /** The followed child; its row in the Step tab is marked. */
     picked?: { map: string; key: string } | null;
     /** The last Send press; its line leads the Step tab. */
-    sent?: { event: string; actor?: VizActorRef } | null;
+    sent?: SentEvent | null;
     /** Send an event at once, with the values set in the Context tab. */
     sendEvent: (event: string, actor?: VizActorRef) => void;
     /** Field name → the value set in the Context tab. */
@@ -482,7 +482,30 @@ function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
   return matching.map((branch) => branch.conditions);
 }
 
-function outcomeText(doc: Document, machine: VizMachine, step: VizLiveStep): Array<Node | string> {
+/** What a Send press sent: the event, who got it, and its values when there are any. */
+export type SentEvent = {
+  event: string;
+  actor?: VizActorRef;
+  payload: VizJson | null;
+  edge?: string;
+};
+
+export function sentEventLine(doc: Document, sent: SentEvent): Array<Node | string> {
+  return [
+    "Sent ",
+    code(doc, sent.event),
+    sent.actor === undefined
+      ? ""
+      : ` to ${"map" in sent.actor ? sent.actor.key : actorText(sent.actor)}`,
+    sent.payload === null ? "" : ` with ${JSON.stringify(sent.payload)}`,
+  ];
+}
+
+export function outcomeText(
+  doc: Document,
+  machine: VizMachine,
+  step: VizLiveStep,
+): Array<Node | string> {
   const region = step.actor === undefined ? undefined : actorText(step.actor);
   const child = step.actor !== undefined && "map" in step.actor ? step.actor : undefined;
   if (step.outcome === "missing") {
@@ -636,7 +659,7 @@ function liveResultSection(
     state: VizLiveState;
     previous: VizJson | undefined;
     routes: VizOutputRoutes | undefined;
-    sent: { event: string; actor?: VizActorRef } | null;
+    sent: SentEvent | null;
   },
 ): HTMLElement {
   const { machine, state, previous, routes, sent } = live;
@@ -648,13 +671,7 @@ function liveResultSection(
       : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
           sent === null
             ? null
-            : html(doc, "p", { "data-live-sent-event": "" }, [
-                "Sent ",
-                code(doc, sent.event),
-                sent.actor === undefined
-                  ? ""
-                  : ` to ${"map" in sent.actor ? sent.actor.key : actorText(sent.actor)}`,
-              ]),
+            : html(doc, "p", { "data-live-sent-event": "" }, sentEventLine(doc, sent)),
           ...stepLines(doc, { machine, step: last, before: previous, held, routes }),
           last.error === null
             ? null

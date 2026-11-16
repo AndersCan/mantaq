@@ -336,7 +336,7 @@
 }
 
 .viz .state:focus-visible .frame,
-.viz .edge:focus-visible path {
+.viz .edge:focus-visible path:not(.hit) {
   stroke: var(--select);
   stroke-width: 3;
 }
@@ -378,6 +378,14 @@
 
 .viz .edge.blocked text {
   fill: var(--muted);
+}
+
+.viz .graph .edge path.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+  stroke-dasharray: none;
+  pointer-events: stroke;
 }
 
 .viz .blocked-lock {

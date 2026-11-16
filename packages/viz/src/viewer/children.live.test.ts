@@ -226,6 +226,23 @@ describe("live actor map children", () => {
     ]);
   });
 
+  test.each([
+    ["transition", /^Sent uploadConfirmed to p1: .*sendingPhoto → .*waitingForRetry$/],
+    ["stay", /^Sent uploadConfirmed to p1: p1 handled in sendingPhoto, stays$/],
+    ["ignored", /^Sent uploadConfirmed to p1: No handler for uploadConfirmed in .*sendingPhoto/],
+  ] as const)(
+    "after a child arrow's Details send, the Details say who got it and its %s",
+    (outcome, text) => {
+      const { root } = mount([child("p1", "sendingPhoto")], photoQueue, () => ({
+        ...stepOf("uploadConfirmed", "photos.sendingPhoto", "photos.waitingForRetry", outcome),
+        actor: { map: "photos", key: "p1" },
+      }));
+      click(edgeGroup(root));
+      root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+      expect(root.querySelector("[data-details-sent]")?.textContent).toMatch(text);
+    },
+  );
+
   test("a child arrow with no child in its source has no Send button", () => {
     const { root } = mount([child("p1", "waitingForRetry")]);
     click(edgeGroup(root));
