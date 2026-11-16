@@ -281,3 +281,46 @@ function mountWithSteps(steps: string[]): HTMLElement {
   );
   return root;
 }
+
+describe("the Send line", () => {
+  const sentLine = (root: HTMLElement) =>
+    root.querySelector(".explore-outcome")?.firstElementChild?.textContent;
+
+  test("a root Send leads the Step tab with just the event", () => {
+    const flat: VizMachine = {
+      ...photoUpload,
+      id: "flat",
+      initial: "showingUploadScreen",
+      regions: [],
+      partOutputs: {},
+      states: [state("showingUploadScreen", { initial: true }), state("showingUploadedPhoto")],
+      events: [event("photoUploaded")],
+      edges: [edge("showingUploadScreen", "photoUploaded", "showingUploadedPhoto")],
+    };
+    const { root } = mount(flat);
+    root.querySelector<HTMLButtonElement>('[data-send="photoUploaded"]')?.click();
+    expect(sentLine(root)).toBe("Sent photoUploaded");
+  });
+
+  test("a region Send names the region", () => {
+    const { root } = mount();
+    root
+      .querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="photoPicked"]')
+      ?.click();
+    expect(sentLine(root)).toBe("Sent photoPicked to upload");
+  });
+
+  test("a rewind after a Send drops the line", () => {
+    const { root } = mount();
+    root
+      .querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="photoPicked"]')
+      ?.click();
+    root
+      .querySelector<HTMLButtonElement>('[data-actor="network"] [data-send="connectionLost"]')
+      ?.click();
+    expect(sentLine(root)).toBe("Sent connectionLost to network");
+    root.querySelector<HTMLButtonElement>('[data-rewind="1"]')?.click();
+    expect(root.querySelector(".explore-outcome")).not.toBeNull();
+    expect(root.querySelector("[data-live-sent-event]")).toBeNull();
+  });
+});

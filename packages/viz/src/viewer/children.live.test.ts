@@ -338,6 +338,17 @@ describe("live actor map children", () => {
     );
   });
 
+  test("after a Send press the Step tab starts with what was sent, to the child", () => {
+    const { root } = mount([child("p1", "waitingForRetry")], photoQueue, () => ({
+      ...stepOf("retryPressed", "photos.waitingForRetry", "photos.waitingForRetry", "stay"),
+      actor: { map: "photos", key: "p1" },
+    }));
+    expect(root.querySelector("[data-live-sent-event]")).toBeNull();
+    sendFrom(root, "p1", "retryPressed");
+    const outcome = root.querySelector(".explore-outcome");
+    expect(outcome?.firstElementChild?.textContent).toBe("Sent retryPressed to p1");
+  });
+
   test("with two maps the map name shows", () => {
     const two: VizMachine = { ...photoQueue, maps: ["photos", "videos"] };
     const { root } = mount([child("p1", "sendingPhoto")], two, () => ({
