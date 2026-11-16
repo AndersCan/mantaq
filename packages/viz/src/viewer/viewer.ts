@@ -460,7 +460,7 @@ function panelTabs(
     { id: "details", label: "Details", content: context.details },
   ];
   const shown = all.filter((tab): tab is Tab<PanelTab> => tab !== null);
-  const active = shown.find((tab) => tab.id === view.tab)?.id ?? shown[0]?.id ?? "details";
+  const active = shown.find((tab) => tab.id === view.tab)?.id ?? shown[0]?.id;
   return tabs(doc, {
     tabs: shown,
     active,
@@ -559,7 +559,7 @@ function navigated(options: ViewerOptions, now: { machine: VizMachine; view: Vie
   const { machine, view } = now;
   options.onNavigate?.({
     machine: machine.id,
-    steps: walkedSteps(machine, view),
+    steps: view.live?.steps.map(encodeLiveStep) ?? [],
     values: encodeValues(view.values),
   });
 }
@@ -577,10 +577,6 @@ function eventStep(
     afters: view.afters,
   });
   return { kind: "event", event, payload, ...(actor ? { actor } : {}) };
-}
-
-function walkedSteps(machine: VizMachine, view: ViewState): string[] {
-  return view.live === null ? [] : view.live.steps.map(encodeLiveStep);
 }
 
 /** Takes one live step: the context before it becomes `previous`, and an open payload form closes. */
