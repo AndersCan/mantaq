@@ -19,6 +19,7 @@ export type Rule =
   | "paths-near"
   | "arrowheads"
   | "nodes"
+  | "node-inside"
   | "region-edge"
   | "outside";
 
@@ -227,7 +228,14 @@ function beyondStubs(path: ReadonlyArray<Point>): Point[] {
 }
 
 interface Shapes {
-  nodes: Array<{ id: string; part: Part; box: Box; owner: string | null }>;
+  nodes: Array<{
+    id: string;
+    part: Part;
+    box: Box;
+    owner: string | null;
+    frame: Box;
+    inside: Box[];
+  }>;
   edges: Array<{
     id: string;
     from: string;
@@ -273,6 +281,8 @@ function shapesOf(layout: MachineLayout): Shapes {
         height: node.height + grown(node.kind),
       },
       owner: ownerOf(layout, node),
+      frame: { x: node.x, y: node.y, width: node.width, height: node.height },
+      inside: node.kind === "state" ? [node.label, ...node.chips] : [],
     })),
     edges: layout.edges.map((placed) => {
       const path = sampledPath(placed.points);
@@ -478,12 +488,25 @@ function routeOverlaps(shapes: Shapes, add: Add): void {
   }
 }
 
+/** A state's name and chips sit `LABEL_PAD` inside its box (not the grown one) and apart. */
+function insideOverlaps(node: Shapes["nodes"][number], add: Add): void {
+  for (const [index, box] of node.inside.entries()) {
+    const inset = insetIn(box, node.frame);
+    if (inset < LABEL_PAD) add("node-inside", node.part, node.part, inset);
+    for (const other of node.inside.slice(index + 1)) {
+      const gap = boxToBox(box, other);
+      if (gap < LABEL_PAD) add("node-inside", node.part, node.part, gap);
+    }
+  }
+}
+
 function nodeOverlaps(shapes: Shapes, add: Add): void {
   for (const [index, node] of shapes.nodes.entries()) {
     for (const other of shapes.nodes.slice(index + 1)) {
       const gap = boxToBox(node.box, other.box);
       if (gap < LABEL_PAD) add("nodes", node.part, other.part, gap);
     }
+    insideOverlaps(node, add);
     const inset = insetIn(node.box, shapes.canvas);
     if (!(inset >= 0)) add("outside", node.part, "canvas", inset);
     for (const region of shapes.regions) {

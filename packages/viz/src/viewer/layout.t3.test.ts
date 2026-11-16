@@ -63,8 +63,28 @@ describe("region titles have room of their own", () => {
       width: 400,
       height: 200,
       nodes: [
-        { kind: "state", id: "A", state: state("A"), x: 100, y: 100, width: 80, height: 36 },
-        { kind: "state", id: "B", state: state("B"), x: 300, y: 100, width: 80, height: 36 },
+        {
+          kind: "state",
+          id: "A",
+          state: state("A"),
+          x: 100,
+          y: 100,
+          width: 80,
+          height: 36,
+          label: { x: 100, y: 100, width: 10, height: 16 },
+          chips: [],
+        },
+        {
+          kind: "state",
+          id: "B",
+          state: state("B"),
+          x: 300,
+          y: 100,
+          width: 80,
+          height: 36,
+          label: { x: 300, y: 100, width: 10, height: 16 },
+          chips: [],
+        },
       ],
       edges: [
         {
@@ -142,7 +162,19 @@ describe("region titles have room of their own", () => {
     const layout: MachineLayout = {
       width: 400,
       height: 200,
-      nodes: [{ kind: "state", id: "A", state: state("A"), x: 100, y: 100, width: 80, height: 36 }],
+      nodes: [
+        {
+          kind: "state",
+          id: "A",
+          state: state("A"),
+          x: 100,
+          y: 100,
+          width: 80,
+          height: 36,
+          label: { x: 100, y: 100, width: 10, height: 16 },
+          chips: [],
+        },
+      ],
       edges: [],
       regions: [
         {

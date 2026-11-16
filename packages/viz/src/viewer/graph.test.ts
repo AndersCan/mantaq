@@ -185,3 +185,64 @@ describe("renderGraph region title", () => {
     expect(text?.getAttribute("text-anchor")).toBeNull();
   });
 });
+
+describe("renderGraph state inside", () => {
+  test("the name and each chip are drawn from the layout's boxes", () => {
+    const busy = { ...state("busy", false), effects: [{ name: "ping", sends: [] }] };
+    const withChips: VizMachine = { ...machine, states: [state("idle", true), busy] };
+    const graph = renderGraph(document, withChips, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    const placed = placeMachine(withChips).nodes.find((node) => node.id === "busy");
+    if (placed?.kind !== "state") throw new Error("not a state");
+    const group = graph.querySelector('[data-node-id="busy"]');
+    expect(group?.querySelector(":scope > text")?.getAttribute("y")).toBe(
+      String(placed.label.y + 4),
+    );
+    const chip = placed.chips[0];
+    const rect = group?.querySelector(".chip rect");
+    expect(rect?.getAttribute("y")).toBe(String((chip?.y ?? 0) - (chip?.height ?? 0) / 2));
+    expect(rect?.getAttribute("width")).toBe(String(chip?.width));
+    expect(rect?.getAttribute("height")).toBe(String(chip?.height));
+  });
+});
+
+describe("renderGraph state inside: every drawn position comes from the boxes", () => {
+  test("name x, chip rect x, chip text and hint sit on the layout's boxes", () => {
+    const busy = {
+      ...state("busy", false),
+      effects: [
+        { name: "ping", sends: [] },
+        { name: "pong", sends: null },
+      ],
+    };
+    const withChips: VizMachine = { ...machine, states: [state("idle", true), busy] };
+    const graph = renderGraph(document, withChips, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    const placed = placeMachine(withChips).nodes.find((node) => node.id === "busy");
+    if (placed?.kind !== "state") throw new Error("not a state");
+    const group = graph.querySelector('[data-node-id="busy"]');
+    expect(group?.querySelector(":scope > text")?.getAttribute("x")).toBe(String(placed.label.x));
+    const chips = [...(group?.querySelectorAll(".chip") ?? [])];
+    expect(chips).toHaveLength(2);
+    for (const [index, chip] of chips.entries()) {
+      const box = placed.chips[index];
+      if (box === undefined) throw new Error("no box");
+      const rect = chip.querySelector("rect");
+      expect(rect?.getAttribute("x")).toBe(String(box.x - box.width / 2));
+      const text = chip.querySelector("text:not(.hint)");
+      expect(text?.getAttribute("x")).toBe(String(box.x));
+      expect(text?.getAttribute("y")).toBe(String(box.y + 4));
+    }
+    const hint = chips[1]?.querySelector("text.hint");
+    const last = placed.chips[1];
+    if (last === undefined) throw new Error("no box");
+    expect(hint?.getAttribute("x")).toBe(String(last.x + last.width / 2 - 8));
+    expect(hint?.getAttribute("y")).toBe(String(last.y + 4));
+  });
+});

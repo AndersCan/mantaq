@@ -20,6 +20,7 @@ import {
   textWidth,
 } from "./layout.ts";
 import { LABEL_PAD } from "./geometry.ts";
+import type { PlacedState } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
@@ -590,5 +591,40 @@ describe("space inserted for region titles", () => {
     const laid = placeMachine({ ...base, states, regions: [long] });
     expect(overlapsOf(laid)).toEqual([]);
     expect(laid.regions[0]?.width).toBe(textWidth(long) + 8 + 2 * LABEL_PAD);
+  });
+});
+
+describe("state inside", () => {
+  const withEffects = (count: number): PlacedState => {
+    const base = machineOf(["first"], []);
+    const only = base.states[0];
+    if (only === undefined) throw new Error("no state");
+    only.effects = Array.from({ length: count }, (_, i) => ({ name: `fx${i}`, sends: [] }));
+    const placed = placeMachine(base).nodes[0];
+    if (placed?.kind !== "state") throw new Error("not a state");
+    return placed;
+  };
+
+  test("height grows 36, 56, 80, 104 with 0-3 effects", () => {
+    expect([0, 1, 2, 3].map((n) => withEffects(n).height)).toEqual([36, 56, 80, 104]);
+  });
+
+  test("the name box is 8px above its first chip, and the chips are 8px apart", () => {
+    const placed = withEffects(3);
+    const [first, second] = placed.chips;
+    if (first === undefined || second === undefined) throw new Error("no chips");
+    const nameBottom = placed.label.y + placed.label.height / 2;
+    expect(first.y - first.height / 2 - nameBottom).toBe(LABEL_PAD);
+    expect(second.y - second.height / 2 - (first.y + first.height / 2)).toBe(LABEL_PAD);
+    expect(placed.label.y - placed.label.height / 2 - (placed.y - placed.height / 2)).toBe(
+      LABEL_PAD,
+    );
+  });
+
+  test("a state without effects centres its name", () => {
+    const placed = withEffects(0);
+    expect(placed.label.y).toBe(placed.y);
+    expect(placed.label.width).toBe(textWidth("first"));
+    expect(placed.chips).toEqual([]);
   });
 });

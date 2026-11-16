@@ -16,6 +16,10 @@ export interface PlacedState {
   y: number;
   width: number;
   height: number;
+  /** The state's name: centred, `LABEL_PAD` inside the box and clear of the chips. */
+  label: LabelBox;
+  /** One box per effect, top to bottom, under the name. */
+  chips: LabelBox[];
 }
 
 /** Placeholder target for an undetermined edge. One per edge; never shared or guessed. */
@@ -116,7 +120,7 @@ export const LOCK_SLOT = 12;
 const CONDITION_FONT = 10.2;
 const CHIP_FONT = 11;
 const NODE_HEIGHT = 36;
-const CHIP_ROW_HEIGHT = 20;
+const CHIP_HEIGHT = 16;
 const LABEL_HEIGHT = 16;
 /** Label to its own arrow, and to any other arrow: strictly farther, so the nearest arrow is always its own. */
 export const LABEL_OWN = 8;
@@ -174,7 +178,28 @@ function stateWidth(state: VizState): number {
 }
 
 function stateHeight(state: VizState): number {
-  return NODE_HEIGHT + state.effects.length * CHIP_ROW_HEIGHT;
+  return Math.max(
+    NODE_HEIGHT,
+    2 * LABEL_PAD + LABEL_HEIGHT + state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
+  );
+}
+
+/** The name box and chip boxes of a placed state, each `LABEL_PAD` inside and apart. */
+function insideOf(state: VizState, box: LabelBox): { label: LabelBox; chips: LabelBox[] } {
+  const top = box.y - box.height / 2;
+  const label = {
+    x: box.x,
+    y: state.effects.length === 0 ? box.y : top + LABEL_PAD + LABEL_HEIGHT / 2,
+    width: textWidth(state.label),
+    height: LABEL_HEIGHT,
+  };
+  const chips = state.effects.map((_, index) => ({
+    x: box.x,
+    y: top + 2 * LABEL_PAD + LABEL_HEIGHT + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
+    width: box.width - 2 * LABEL_PAD,
+    height: CHIP_HEIGHT,
+  }));
+  return { label, chips };
 }
 
 function parentRegion(region: string): string | null {
@@ -866,6 +891,7 @@ function placeNodes(
     id: state.id,
     state,
     ...at(state.id),
+    ...insideOf(state, at(state.id)),
   }));
   const anys: PlacedAny[] = anyIds(machine).map((id) => ({ kind: "any", id, ...at(id) }));
   const unknowns: PlacedUnknown[] = machine.edges

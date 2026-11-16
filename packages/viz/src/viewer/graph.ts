@@ -100,10 +100,10 @@ function regionGroup(doc: Document, placed: PlacedRegion, isMap: boolean): SVGGE
 }
 
 function chipGroups(doc: Document, placed: PlacedState, bare: boolean): SVGGElement[] {
-  const top = placed.y - placed.height / 2;
-  const width = placed.width - 16;
   return placed.state.effects.map((effect, index) => {
-    const y = top + 36 + index * 20 - 8;
+    const box = placed.chips[index] ?? placed;
+    const width = box.width;
+    const y = box.y - box.height / 2;
     return svg(
       doc,
       "g",
@@ -118,13 +118,13 @@ function chipGroups(doc: Document, placed: PlacedState, bare: boolean): SVGGElem
             : `effect ${effect.name}`,
       },
       [
-        svg(doc, "rect", { x: placed.x - width / 2, y, width, height: 16, rx: 8 }),
-        svg(doc, "text", { x: placed.x, y: y + 12, "text-anchor": "middle" }, [effect.name]),
+        svg(doc, "rect", { x: box.x - width / 2, y, width, height: box.height, rx: 8 }),
+        svg(doc, "text", { x: box.x, y: box.y + 4, "text-anchor": "middle" }, [effect.name]),
         effect.sends === null && !bare
           ? svg(
               doc,
               "text",
-              { class: "hint", x: placed.x + width / 2 - 8, y: y + 12, "text-anchor": "middle" },
+              { class: "hint", x: box.x + width / 2 - 8, y: box.y + 4, "text-anchor": "middle" },
               ["?", svg(doc, "title", {}, ["declare `sends` to see links"])],
             )
           : null,
@@ -209,7 +209,9 @@ function stateGroup(
             class: "frame inner",
           })
         : null,
-      svg(doc, "text", { x: placed.x, y: top + 22, "text-anchor": "middle" }, [state.label]),
+      svg(doc, "text", { x: placed.label.x, y: placed.label.y + 4, "text-anchor": "middle" }, [
+        state.label,
+      ]),
       ...chipGroups(doc, placed, callbacks.bare === true),
       findings.length === 0 || callbacks.bare === true
         ? null
