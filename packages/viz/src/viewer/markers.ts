@@ -99,11 +99,11 @@ function dotsOf(
   children: ReadonlyArray<VizLiveChild>,
   row: Row,
 ): { items: Item[]; count: Count | null } {
-  const fits = Math.floor(row.width / DOT_STEP);
-  const hiddenCount = children.length - fits;
-  const countWidth = hiddenCount > 0 ? textWidth(`+${children.length}`, FONT) + GAP : 0;
-  const capacity =
-    hiddenCount > 0 ? Math.max(0, Math.floor((row.width - countWidth) / DOT_STEP)) : fits;
+  let capacity = Math.min(children.length, Math.floor(row.width / DOT_STEP));
+  const room = (shown: number) =>
+    shown * DOT_STEP +
+    (shown < children.length ? textWidth(`+${children.length - shown}`, FONT) + GAP : 0);
+  while (capacity > 0 && room(capacity) > row.width) capacity -= 1;
   const shown = children.slice(0, capacity);
   const hidden = children.slice(capacity).map((child) => child.key);
   const used =

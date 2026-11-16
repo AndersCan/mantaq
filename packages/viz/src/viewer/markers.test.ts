@@ -38,6 +38,23 @@ const markers = (root: SVGSVGElement) =>
   Array.from(root.querySelectorAll<SVGGElement>("g.child-marker"));
 
 describe("drawChildMarkers", () => {
+  test("dots and +N stay inside the row when the shown count is wider than the total", () => {
+    // textWidth("+22", 10) = 20 but textWidth("+10", 10) = 21: room kept for "+22" is too small for "+10".
+    const root = board([168]);
+    drawChildMarkers(
+      root,
+      context(Array.from({ length: 22 }, (_, i) => child(`k${String(i).padStart(2, "0")}`, "s0"))),
+    );
+    const lefts = markers(root).map((m) =>
+      Number(/translate\(([-\d.]+)px/.exec(m.style.transform)?.[1]),
+    );
+    expect(root.querySelector("text.marker-count")?.lastChild?.textContent).toBe(
+      `+${22 - lefts.length}`,
+    );
+    expect(Math.min(...lefts)).toBeGreaterThanOrEqual(10);
+    root.remove();
+  });
+
   test("a chip per child on its state", () => {
     const root = board([168, 168]);
     drawChildMarkers(root, context([child("w1", "s0"), child("w2", "s0"), child("w3", "s1")]));
@@ -93,7 +110,7 @@ describe("drawChildMarkers", () => {
       fc.property(
         fc.integer({ min: 168, max: 400 }),
         fc.integer({ min: 168, max: 400 }),
-        fc.array(fc.tuple(key, fc.constantFrom("s0", "s1")), { maxLength: 30 }),
+        fc.array(fc.tuple(key, fc.constantFrom("s0", "s1")), { maxLength: 40, size: "max" }),
         (w0, w1, raw) => {
           const seen = new Set<string>();
           const kids = raw
@@ -120,7 +137,7 @@ describe("drawChildMarkers", () => {
           const hidden = new Set(
             Array.from(root.querySelectorAll("text.marker-count")).flatMap((node) =>
               (node.querySelector("title")?.textContent ?? "")
-                .split(", ")
+                .split("\n")
                 .map((k) => `${(node as SVGElement).dataset.markerState}|${k}`),
             ),
           );
