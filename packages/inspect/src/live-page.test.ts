@@ -10,10 +10,10 @@ import { serializeViz } from "@mantaq/viz";
 
 const file = join(import.meta.dirname, "fixtures", "checkout.ts");
 
-async function documentText(): Promise<string> {
+async function documentText(fuzz = false): Promise<string> {
   const inspected = await inspectModule(file, {
     load: async () => ({ createCheckoutActor }),
-    fuzz: false,
+    fuzz: fuzz ? {} : false,
   });
   return serializeViz(vizDocument(inspected.machines));
 }
@@ -119,6 +119,24 @@ describe("mountDriven preview", () => {
     expect(state.context).toBeDefined();
     expect(frame?.title).toBe("Screen of checkout: basicInfo");
     expect(frame?.tabIndex).toBe(-1);
+  });
+
+  test("clicking a state with Screen open previews it on a copy and keeps the live state", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: await documentText(true),
+      targets: { checkout: create },
+      preview: { path: "/__mantaq/preview", machines: ["checkout"] },
+    });
+    root
+      .querySelector('[data-node-id="payment"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const src = new URL(root.querySelector("iframe")?.getAttribute("src") ?? "", "http://x");
+    expect(JSON.parse(src.searchParams.get("state") ?? "{}").name).toBe("payment");
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("basicInfo");
+    expect(root.querySelector("[data-tab-panel=screen]")?.hasAttribute("hidden")).toBe(false);
   });
 
   test("no frame without a preview, or for a machine that has none", async () => {

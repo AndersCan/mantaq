@@ -572,6 +572,36 @@ describe("dryRun", () => {
     expect(live.state).toBe("hungry");
   });
 
+  test("dryWalk returns the fresh state and one per step, leaving the live actor alone", () => {
+    const driver = createDriver(meal);
+    let calls = 0;
+    driver.listen?.(() => {
+      calls += 1;
+    });
+    const walked = driver.dryWalk?.([serve, eat]);
+    expect(walked?.map((each) => each.state)).toEqual(["hungry", "hungry", "full"]);
+    expect(walked?.[2]?.steps).toHaveLength(2);
+    expect(calls).toBe(0);
+    const live = driver.step(serve);
+    expect(live.steps).toHaveLength(1);
+    expect(driver.dryWalk?.([])).toHaveLength(1);
+  });
+
+  test("dryWalk stops after a step that throws", () => {
+    const driver = createDriver({
+      id: "meal-broken-clock",
+      create: () => {
+        const clock = VirtualClock();
+        clock.advance = () => {
+          throw new Error("clock broke");
+        };
+        return { actor: createMeal6(clock), clock };
+      },
+    });
+    const walked = driver.dryWalk?.([serve, { kind: "advance", ms: 5 }, serve]);
+    expect(walked).toHaveLength(2);
+  });
+
   test("candidates are independent of each other", () => {
     const driver = createDriver(meal);
     expect(driver.dryRun?.([serve, eat])).toMatchObject([
