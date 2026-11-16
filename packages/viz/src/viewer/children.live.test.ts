@@ -146,6 +146,10 @@ describe("live actor map children", () => {
     expect(root.querySelectorAll("[data-child-key][data-followed]")).toHaveLength(0);
     expect(rows[0]?.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
     expect(root.querySelector('[data-actor="photos[p1]"] [data-send="retryPressed"]')).toBeNull();
+    const offered = [...root.querySelectorAll('[data-actor="photos[p1]"] [data-send]')].map(
+      (each) => each.getAttribute("data-send"),
+    );
+    expect(offered).toEqual([...new Set(offered)].sort());
     root
       .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]')
       ?.click();

@@ -274,10 +274,9 @@ function makeSend(
     const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
     if ((await trigger.count()) === 0) {
       const note = await page.locator("[data-blocked-note]").first().textContent();
-      return Either.left(`${event} is blocked: ${note ?? ""}`);
+      return Either.left(note ?? `${event} is blocked.`);
     }
     await trigger.click();
-    await page.click('[data-tab="step"]');
     return outcomeOf(page, state);
   };
 }

@@ -99,7 +99,7 @@ test("an event whose guard blocks the arrow is a Left with the reason", async ()
   const meal = join(import.meta.dirname, "../../../apps/docs/src/tutorial/meal-06.ts");
   await withViz(meal, async (viz) => {
     const result = await viz.send("eat");
-    expect(Either.getLeft(result)).toMatch(/^eat is blocked: .+/);
+    expect(Either.getLeft(result)).toBe("eat is blocked: plates is 0");
     expect(Either.getRight(await viz.send("serve"))?.state).toBe("hungry");
     expect(Either.getRight(await viz.send("eat"))?.state).toBe("full");
   });
@@ -220,5 +220,16 @@ test("fills a choice field shown as a row of buttons", async () => {
     expect(Either.getRight(asked)).toEqual({ state: "waitingForAnswer", outcome: "transition" });
     const answered = await viz.send("answered", { code: "c1", answer: "declined" });
     expect(Either.getRight(answered)).toEqual({ state: "declined", outcome: "transition" });
+  });
+}, 60_000);
+
+test("the events a state offers are listed in sorted order", async () => {
+  const meal = join(import.meta.dirname, "../../../apps/docs/src/tutorial/meal-06.ts");
+  await withViz(meal, async (viz) => {
+    await viz.send("serve");
+    const left = Either.getLeft(await viz.send("nothing")) ?? "";
+    const names = (left.split("which offers: ")[1] ?? "").replace(/\.$/, "").split(", ");
+    expect(names.length).toBeGreaterThan(1);
+    expect(names).toEqual([...names].sort());
   });
 }, 60_000);
