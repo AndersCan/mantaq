@@ -100,6 +100,8 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
         deadline = now + 800;
         context = step.payload;
       }
+      if (step.kind === "event" && step.event === "paymentTimeout" && current === "paying")
+        current = "error";
       if (current === "paying" && deadline !== null && now >= deadline) current = "error";
       if (step.kind === "event" && step.event === "submit" && from === "idle") {
         last = {
@@ -372,6 +374,28 @@ describe("live controls", () => {
     expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
       "paymentTimeout can't be sent: the walk is in idle, this arrow leaves paying.",
     );
+  });
+
+  test("timerArrow: a click on a running timer's arrow sends it now; its Details say it fires on its own", () => {
+    const { root, live } = mount();
+    clickArrow(root, "idle-submit-paying");
+    expect(current(root)).toBe("paying");
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect(root.querySelector("[data-timer-line]")?.textContent).toBe(
+      "paymentTimeout fires on its own in 800 ms; a click sends it now.",
+    );
+    expect(live.log).toHaveLength(1);
+    clickArrow(root, "paying-paymentTimeout-error");
+    expect(current(root)).toBe("error");
+    expect(live.log).toHaveLength(2);
+  });
+
+  test("timerArrow: no running timer, no line", () => {
+    const { root } = mount();
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect(root.querySelector("[data-timer-line]")).toBeNull();
+    clickEdge(root, "idle-submit-paying");
+    expect(root.querySelector("[data-timer-line]")).toBeNull();
   });
 
   test("helpClickedShowingDetails: the ? on a next arrow opens Details with Send and sends nothing", () => {

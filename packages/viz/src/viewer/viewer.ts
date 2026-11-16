@@ -17,7 +17,15 @@ import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
 import { renderPanel } from "./panel.ts";
 import { decodeLiveSteps, encodeLiveStep, movesFrom } from "../moves.ts";
-import { button, code, explorePanel, markExplore, outcomeText, sentEventLine } from "./explore.ts";
+import {
+  button,
+  code,
+  elapsed,
+  explorePanel,
+  markExplore,
+  outcomeText,
+  sentEventLine,
+} from "./explore.ts";
 import type { ExploreContext, ExploreParts, SentEvent } from "./explore.ts";
 import { pathTo } from "../findings.ts";
 import { blockedEdges, sentByParts, whyNotHere } from "./blocked.ts";
@@ -261,7 +269,17 @@ function sendFor(
   },
 ): (edge: VizEdge) => HTMLElement | null {
   const { doc, machine, view } = from;
-  return (edge) => {
+  const timerLine = (edge: VizEdge): HTMLElement | null => {
+    const { live } = view;
+    const timer = live?.timers.find((each) => each.eventName === edge.event);
+    if (live === null || timer === undefined) return null;
+    const left = timer.deadline - elapsed(live.steps);
+    return html(doc, "p", { "data-timer-line": edge.event }, [
+      code(doc, edge.event),
+      ` fires on its own in ${left} ms; a click sends it now.`,
+    ]);
+  };
+  const sendOf = (edge: VizEdge): HTMLElement | null => {
     const decision = arrowSend(from, edge);
     const note = (text: string) =>
       html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [text]);
@@ -287,6 +305,11 @@ function sendFor(
         );
       }
     }
+  };
+  return (edge) => {
+    const line = timerLine(edge);
+    const send = sendOf(edge);
+    return line === null ? send : html(doc, "div", {}, send === null ? [line] : [line, send]);
   };
 }
 
