@@ -61,6 +61,8 @@ interface ViewState {
   tab: PanelTab;
   /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
   diagramOnly: boolean;
+  /** The event the last Send press sent and to whom; cleared by any other step. */
+  sent: { event: string; actor?: VizActorRef } | null;
   /** Why the requested run did not open; cleared by the next walk. */
   notice: string | null;
   /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
@@ -225,7 +227,8 @@ export function mountViewer(
     };
     const mark = () => markDiagram(root, { machine, view, driver, pick: () => refresh() });
     redraw = refresh;
-    const walked = (run?: string) => {
+    const walked = (run?: string, sent?: ViewState["sent"]) => {
+      view.sent = sent ?? null;
       view.motion = true;
       noticeCleared(root, view);
       navigated(options, { machine, view, run });
@@ -234,7 +237,7 @@ export function mountViewer(
     const setValue = valueSetter({ options, machine, view, mark });
     const send = stepSender({ view, driver, walked });
     const sendEvent = (event: string, actor?: VizActorRef) =>
-      send(eventStep(machine, view, event, actor));
+      send(eventStep(machine, view, event, actor), { event, ...(actor ? { actor } : {}) });
     const take = (step: ExploreStep) => {
       view.path = [...view.path, step];
       walked();
@@ -459,6 +462,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     motion: false,
     tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
+    sent: null,
     notice: null,
     blocked: new Map(),
     values: decodeValues(options.values ?? []),
@@ -562,6 +566,7 @@ function liveOf(
       afters: view.afters,
       previous: view.previous,
       picked: view.picked,
+      sent: view.sent,
       values: view.values,
       ...handlers,
     },
@@ -618,13 +623,13 @@ function valueSetter(context: {
 function stepSender(context: {
   view: ViewState;
   driver: VizDriver | undefined;
-  walked: () => void;
-}): (step: VizStep) => void {
+  walked: (run?: string, sent?: ViewState["sent"]) => void;
+}): (step: VizStep, sent?: ViewState["sent"]) => void {
   const { view, driver, walked } = context;
-  return (step) => {
+  return (step, sent) => {
     if (driver === undefined) return;
     stepInto(view, driver, step);
-    walked();
+    walked(undefined, sent);
   };
 }
 

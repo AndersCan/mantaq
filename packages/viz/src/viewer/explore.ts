@@ -47,6 +47,8 @@ export interface ExploreContext {
     previous?: VizJson;
     /** The followed child; the Step tab shows it for each map. */
     picked?: { map: string; key: string } | null;
+    /** The last Send press; its line leads the Step tab. */
+    sent?: { event: string; actor?: VizActorRef } | null;
     /** Replace the walk with these steps from a fresh actor. */
     play: (steps: ReadonlyArray<VizStep>, run?: string) => void;
     /** Send an event at once, with the values set in the Context tab. */
@@ -928,15 +930,25 @@ function liveResultSection(
     state: VizLiveState;
     previous: VizJson | undefined;
     routes: VizOutputRoutes | undefined;
+    sent: { event: string; actor?: VizActorRef } | null;
   },
 ): HTMLElement {
-  const { machine, state, previous, routes } = live;
+  const { machine, state, previous, routes, sent } = live;
   const { last, after } = state;
   const held = state.effectMode === "held";
   return html(doc, "div", { class: "explore-live" }, [
     last === null
       ? null
       : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
+          sent === null
+            ? null
+            : html(doc, "p", { "data-live-sent-event": "" }, [
+                "Sent ",
+                code(doc, sent.event),
+                sent.actor === undefined
+                  ? ""
+                  : ` to ${"map" in sent.actor ? sent.actor.key : actorText(sent.actor)}`,
+              ]),
           ...stepLines(doc, { machine, step: last, before: previous, held, routes }),
           last.error === null
             ? null
@@ -1224,6 +1236,7 @@ function liveParts(
       state,
       previous: live.previous,
       routes: live.routes,
+      sent: live.sent ?? null,
     }),
     ...liveBlocks(doc, machine, moves),
     ...childrenSections(doc, machine, moves),
