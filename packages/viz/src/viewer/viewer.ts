@@ -27,6 +27,7 @@ import {
 import type { ExploreStep } from "../moves.ts";
 import { button, code, explorePanel, markExplore, outcomeText, sentEventLine } from "./explore.ts";
 import type { ExploreContext, ExploreParts, SentEvent } from "./explore.ts";
+import { pathTo } from "../findings.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
@@ -108,7 +109,7 @@ export interface ViewerOptions {
   onNavigate?: (where: { machine: string; steps: string[]; values: string[] }) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
-  /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state. */
+  /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state, or, while a state is selected, for that state as a throwaway copy reaches it. */
   screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
@@ -168,7 +169,7 @@ export function mountViewer(
         select: showDetails,
         send: sendFor({ root, doc, machine, view, driver }, { sendEvent, take }),
       });
-      const screen = screenOf(options, view);
+      const screen = screenOf(doc, options, { machine, view, driver });
       panel.replaceChildren(panelTabs(doc, { view, parts: stepTab, details, screen, refresh }));
       mark();
     };
@@ -201,7 +202,7 @@ export function mountViewer(
     };
     const showDetails = (selection: Selection) => {
       view.selection = selection;
-      view.tab = "details";
+      if (!(view.tab === "screen" && selection.kind === "state")) view.tab = "details";
       refresh();
     };
     const graph = renderGraph(doc, machine, { select: showDetails });
@@ -401,8 +402,38 @@ function rewindView(view: ViewState, driver: VizDriver | undefined, length: numb
   else view.path = view.path.slice(0, keep);
 }
 
-function screenOf(options: ViewerOptions, view: ViewState): Node | undefined {
-  return view.live === null ? undefined : options.screen?.(view.live);
+function screenOf(
+  doc: Document,
+  options: ViewerOptions,
+  at: { machine: VizMachine; view: ViewState; driver: VizDriver | undefined },
+): Node | undefined {
+  const { machine, view, driver } = at;
+  const live = view.live;
+  if (live === null || options.screen === undefined) return undefined;
+  const picked = view.selection;
+  const wanted =
+    picked?.kind === "state" &&
+    picked.id !== live.state &&
+    machine.states.some((state) => state.id === picked.id && state.region === null)
+      ? picked.id
+      : null;
+  if (wanted === null) return options.screen(live);
+  const preview = previewOf(machine, { driver, id: wanted });
+  const note = html(doc, "p", { class: "muted", "data-screen-of": wanted }, [
+    preview === null
+      ? `No known walk reaches ${wanted}; this is ${live.state}.`
+      : `This is ${wanted}; the machine is still in ${live.state}.`,
+  ]);
+  return html(doc, "div", {}, [note, options.screen(preview ?? live)]);
+}
+
+function previewOf(
+  machine: VizMachine,
+  of: { driver: VizDriver | undefined; id: string },
+): VizLiveState | null {
+  const steps = pathTo(machine, of.id);
+  if (steps === null) return null;
+  return of.driver?.dryWalk?.(steps).find((entry) => entry.state === of.id) ?? null;
 }
 
 function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {

@@ -63,11 +63,11 @@ const chain: VizMachine = {
   },
 };
 
-function driver(): VizDriver {
+function driver(options: { dryWalk?: boolean } = {}): VizDriver {
   const done: VizStep[] = [];
-  const run = (): VizLiveState => ({
-    state: ids[Math.min(done.length, ids.length - 1)] ?? "idle",
-    steps: [...done],
+  const run = (count = done.length): VizLiveState => ({
+    state: ids[Math.min(count, ids.length - 1)] ?? "idle",
+    steps: done.slice(0, count),
     last: null,
     after: [],
     timers: [],
@@ -87,18 +87,29 @@ function driver(): VizDriver {
       done.push(step);
       return run();
     },
+    ...(options.dryWalk === false
+      ? {}
+      : {
+          dryWalk: (steps: ReadonlyArray<VizStep>) =>
+            [0, ...steps.map((_, i) => i + 1)].map((n) => run(n)),
+        }),
   };
 }
 
 function mount(
-  options: { screen?: boolean; live?: boolean; onNavigate?: (w: { steps: string[] }) => void } = {},
+  options: {
+    screen?: boolean;
+    live?: boolean;
+    dryWalk?: boolean;
+    onNavigate?: (w: { steps: string[] }) => void;
+  } = {},
 ) {
   const root = document.createElement("div");
   mountViewer(
     root,
     { schemaVersion: VIZ_SCHEMA_VERSION, machines: [chain] },
     {
-      ...(options.live === false ? {} : { driver: driver() }),
+      ...(options.live === false ? {} : { driver: driver({ dryWalk: options.dryWalk ?? true }) }),
       ...(options.screen === false
         ? {}
         : {
@@ -124,6 +135,8 @@ const tabIds = (root: HTMLElement) =>
 const drawn = (root: HTMLElement) => root.querySelector(".drawn")?.textContent;
 const screenShown = (root: HTMLElement) =>
   root.querySelector("[data-tab-panel=screen]")?.hasAttribute("hidden") === false;
+const note = (root: HTMLElement) =>
+  root.querySelector("[data-screen-of]")?.textContent ?? undefined;
 const current = (root: HTMLElement) => root.querySelector(".explore")?.getAttribute("data-current");
 
 describe("Screen tab", () => {
@@ -134,16 +147,79 @@ describe("Screen tab", () => {
     expect(drawn(root)).toBe("screen of idle");
   });
 
-  test("a click on any state with Screen open does not walk there", () => {
+  test("a click on a state with Screen open shows that state's screen and does not walk", () => {
     const navigated: string[][] = [];
     const root = mount({ onNavigate: (where) => navigated.push(where.steps) });
     const calls = navigated.length;
-    for (const id of ["a", "c", "d"]) {
+    for (const id of ["a", "c"]) {
       clickState(root, id);
-      expect(drawn(root)).toBe("screen of idle");
+      expect(screenShown(root)).toBe(true);
+      expect(drawn(root)).toBe(`screen of ${id}`);
+      expect(note(root)).toBe(`This is ${id}; the machine is still in idle.`);
       expect(current(root)).toBe("idle");
     }
     expect(navigated).toHaveLength(calls);
+  });
+
+  test("a state no corpus walk reaches shows the live screen and says so", () => {
+    const root = mount();
+    clickState(root, "d");
+    expect(drawn(root)).toBe("screen of idle");
+    expect(note(root)).toBe("No known walk reaches d; this is idle.");
+  });
+
+  test("a driver without dryWalk gives the same note", () => {
+    const root = mount({ dryWalk: false });
+    clickState(root, "a");
+    expect(drawn(root)).toBe("screen of idle");
+    expect(note(root)).toBe("No known walk reaches a; this is idle.");
+  });
+
+  test("selecting the live state shows its screen with no note", () => {
+    const root = mount();
+    clickState(root, "c");
+    clickState(root, "idle");
+    expect(drawn(root)).toBe("screen of idle");
+    expect(note(root)).toBeUndefined();
+  });
+
+  test("a region state with Screen open shows the live screen with no note", () => {
+    const withRegion: VizMachine = {
+      ...chain,
+      regions: ["r"],
+      states: [...chain.states, { ...state("r.x"), region: "r", initial: false }],
+      fuzz:
+        chain.fuzz === null || chain.fuzz === undefined
+          ? chain.fuzz
+          : { ...chain.fuzz, corpus: [{ steps: [go], discovered: ["state:r.x"] }] },
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRegion] },
+      {
+        driver: driver(),
+        screen: (live: VizLiveState) => {
+          const node = document.createElement("p");
+          node.className = "drawn";
+          node.textContent = `screen of ${live.state}`;
+          return node;
+        },
+      },
+    );
+    clickState(root, "r.x");
+    expect(screenShown(root)).toBe(true);
+    expect(drawn(root)).toBe("screen of idle");
+    expect(note(root)).toBeUndefined();
+  });
+
+  test("an arrow click with Screen open opens Details", () => {
+    const root = mount();
+    root
+      .querySelector('[data-edge-id="idle-go-a"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(screenShown(root)).toBe(false);
+    expect(root.querySelector("[data-tab-panel=details]")?.hasAttribute("hidden")).toBe(false);
   });
 
   test("a state off the Screen tab opens its details, as before", () => {

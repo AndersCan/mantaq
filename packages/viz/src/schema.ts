@@ -321,6 +321,12 @@ export interface VizDriver {
    * in the driver itself.
    */
   dryRun?(steps: ReadonlyArray<VizStep>): Array<VizLiveStep | null>;
+  /**
+   * The state of a fresh actor (entry 0) and after each of `steps`, run on a throwaway copy with
+   * effect bodies held; the live actor, its steps and its listener are untouched. Stops after a
+   * step that throws.
+   */
+  dryWalk?(steps: ReadonlyArray<VizStep>): VizLiveState[];
   /** Called with the new state whenever the actor changes outside step()/reset() (an async effect result). */
   listen?(onChange: (state: VizLiveState) => void): void;
 }

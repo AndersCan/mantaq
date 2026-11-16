@@ -529,6 +529,24 @@ function regionsOf(at: Stepping): string {
   ]);
 }
 
+function retire(copy: Session): void {
+  disposeParts(copy);
+  copy.actor.dispose();
+}
+
+/** Each state a quiet copy is in at the start and after `steps`; stops after a step that throws. Disposes the copy. */
+function walkCopy(copy: Session, steps: ReadonlyArray<VizStep>): VizLiveState[] {
+  const out = [liveView(copy, "held")];
+  Either.from(() => {
+    for (const step of steps) {
+      stepOn(copy, step);
+      out.push(liveView(copy, "held"));
+    }
+  });
+  retire(copy);
+  return out;
+}
+
 /** What a running session looks like now: sweeps gone children and spent held effects first. */
 function liveView(session: Session, effectMode: "held" | "real"): VizLiveState {
   const { actor, clock, steps, log, held, maps, actors, children, removed, watch } = session;
@@ -673,8 +691,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
         contextText(copy.actor) === contextText(live.actor);
       return same ? (stepOn(copy, candidate) ?? null) : null;
     });
-    disposeParts(copy);
-    copy.actor.dispose();
+    retire(copy);
     return Either.isRight(result) ? result[1] : null;
   }
 
@@ -696,5 +713,6 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     dryRun(candidates) {
       return candidates.map((candidate) => tryOnCopy(candidate));
     },
+    dryWalk: (steps) => walkCopy(start(target, true), steps),
   };
 }
