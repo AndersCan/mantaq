@@ -2,6 +2,7 @@
 import { describe, expect, test } from "vite-plus/test";
 import fc from "fast-check";
 import type { VizLiveChild } from "../schema.ts";
+import { textWidth } from "./layout.ts";
 import { drawChildMarkers, type MarkerContext } from "./markers.ts";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -200,6 +201,20 @@ describe("drawChildMarkers branches", () => {
     const end =
       at(pills.at(-1)) + Number(pills.at(-1)?.querySelector("rect")?.getAttribute("width"));
     expect(Math.abs(at(pills[0]) - 10 - (10 + 400 - end))).toBeLessThan(0.2);
+  });
+
+  test("pills and a +N are centred as one group, a 4 gap before the +N", () => {
+    // 6 keys "k0".."k5" on a 133 row: 5 pills fill it, so 4 pills (105) + 4 + "+2" are centred.
+    const root = board([133]);
+    drawChildMarkers(root, context(Array.from({ length: 6 }, (_, i) => child(`k${i}`, "s0"))));
+    const pills = markers(root);
+    const count = root.querySelector("text.marker-count");
+    expect(pills).toHaveLength(4);
+    const end =
+      at(pills.at(-1)) + Number(pills.at(-1)?.querySelector("rect")?.getAttribute("width"));
+    expect(Math.abs(at(count ?? undefined) - end - 4)).toBeLessThan(0.1);
+    const right = at(count ?? undefined) + textWidth("+2", 10);
+    expect(Math.abs(at(pills[0]) - 10 - (10 + 133 - right))).toBeLessThan(0.2);
   });
 
   test("a pill shows a long key cut to 8 characters and an empty key as two quotes", () => {
