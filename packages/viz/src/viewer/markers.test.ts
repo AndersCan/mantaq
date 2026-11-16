@@ -55,6 +55,15 @@ describe("drawChildMarkers", () => {
     root.remove();
   });
 
+  test("dots that fit exactly show without a +N", () => {
+    // 13 dots = 156 of 168: no count, so no room is kept for one.
+    const root = board([168]);
+    drawChildMarkers(root, context(Array.from({ length: 13 }, (_, i) => child(`k${i}`, "s0"))));
+    expect(markers(root)).toHaveLength(13);
+    expect(root.querySelector("text.marker-count")).toBeNull();
+    root.remove();
+  });
+
   test("a chip per child on its state", () => {
     const root = board([168, 168]);
     drawChildMarkers(root, context([child("w1", "s0"), child("w2", "s0"), child("w3", "s1")]));
@@ -148,7 +157,7 @@ describe("drawChildMarkers", () => {
           root.remove();
         },
       ),
-      { numRuns: 200, seed: 0x710 },
+      { numRuns: 200, seed: 0x710, endOnFailure: true },
     );
   });
 });
