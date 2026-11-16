@@ -141,6 +141,12 @@ describe("viewer: checkout", () => {
     );
   });
 
+  test("an undetermined arrow's Details title says ?, never a guessed target", () => {
+    const root = mount(undeterminedBack(checkout()));
+    root.querySelector(".edge.undetermined")?.dispatchEvent(new Event("click"));
+    expect(root.querySelector(".details h2")?.textContent).toMatch(/—back→ \?$/);
+  });
+
   test("clicking a state lists its edges and click-through selects the edge", () => {
     const root = mount(checkout());
     root.querySelector('[data-node-id="submitting"]')?.dispatchEvent(new Event("click"));
