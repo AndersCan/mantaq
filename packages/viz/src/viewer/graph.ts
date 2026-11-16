@@ -96,7 +96,6 @@ function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
         class: "chip",
         "data-effect": effect.name,
         "data-state": placed.state.id,
-        tabindex: 0,
         "aria-label": `effect ${effect.name}`,
       },
       [

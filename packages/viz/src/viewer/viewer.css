@@ -96,18 +96,6 @@
     color-scheme: dark;
   }
 }
-.viz .viz-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-}
-
-.viz .viz-header :is(h1, h2, h3) {
-  font-size: 1.385em;
-  margin: 0;
-}
-
 /* Panel always below the graph, so the graph keeps the full width. */
 .viz .viz-main {
   display: grid;
@@ -362,8 +350,6 @@
 .viz .next path {
   stroke: var(--accent);
   stroke-width: 3;
-  stroke-dasharray: 8 5;
-  animation: viz-march 0.8s linear infinite;
 }
 
 .viz .next text {
@@ -393,20 +379,6 @@
   stroke-width: 1.5;
 }
 
-.viz .chip.running rect {
-  fill-opacity: 0.35;
-}
-
-.viz .running path {
-  stroke: var(--accent);
-  stroke-width: 2.5;
-}
-
-.viz .running text {
-  fill: var(--accent);
-  font-weight: 700;
-}
-
 .viz [data-live-dropped] {
   color: var(--banner-fg);
 }
@@ -417,16 +389,6 @@
   stroke: var(--select);
 }
 
-@keyframes viz-march {
-  to {
-    stroke-dashoffset: -13;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .viz .next path {
-    animation: none;
-  }
-}
 .viz .explore {
   background: var(--region-bg);
   border-radius: 6px;
@@ -469,11 +431,6 @@
   border-radius: 4px;
 }
 
-.viz .reachable .frame {
-  stroke: var(--fg);
-  stroke-dasharray: 4 3;
-}
-
 .viz .run-notice {
   background: var(--banner-bg);
   color: var(--banner-fg);
@@ -510,11 +467,6 @@
 
 .viz button:disabled {
   box-shadow: none;
-}
-
-/* A dashed frame's shadow repeats the dashes as noise. */
-.viz .reachable .frame:not(.inner) {
-  filter: none;
 }
 
 .viz .show-controls {

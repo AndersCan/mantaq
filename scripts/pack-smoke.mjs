@@ -139,7 +139,7 @@ console.log(JSON.stringify({ results, page, entryStatus, schemaVersion: doc.sche
   const out = JSON.parse(run("node", ["check.mjs"], app).trim().split("\n").pop());
   for (const [id, found] of Object.entries(out.results)) check(found, `${id} resolves to a file`);
   check(
-    out.page.includes("<style>") && out.page.includes("viz-header"),
+    out.page.includes("<style>") && out.page.includes("viz-main"),
     "plugin page carries a stylesheet",
   );
   check(out.entryStatus === 200, "plugin page serves the live entry");

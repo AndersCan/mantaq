@@ -323,7 +323,7 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector("[data-outcome]")).toBeNull();
   });
 
-  test("hides the machine picker and ignores ?step= in live mode", () => {
+  test("ignores ?step= in live mode", () => {
     const root = document.createElement("div");
     const other = { ...withEvents, id: "other" };
     mountViewer(
@@ -331,7 +331,6 @@ describe("mountViewer with a driver", () => {
       { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEvents, other] },
       { driver: fakeDriver(), steps: ["x"] },
     );
-    expect(root.querySelector(".machine-select")).toBeNull();
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 

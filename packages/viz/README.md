@@ -26,6 +26,8 @@ if (root) {
 
 `mountVizText` validates the JSON and lists every issue in place of the diagram when it is not a current viz document. `mountViewer(root, document)` takes an already-parsed document.
 
+The viewer shows one machine: the `machine` option picks it (default: the first in the document).
+
 ## Walking the graph
 
 What each mark means and how to walk it: [How the visualizer works](https://anderscan.github.io/mantaq/guides/visualizer/). Without a `driver` the viewer draws the diagram and Details; nothing can be sent.

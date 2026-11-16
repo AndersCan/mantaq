@@ -26,7 +26,7 @@ describe("astro client", () => {
     machineRoot({ mantaqViz: "{}", mantaqRoutes: JSON.stringify(routes) });
     await import("./client.ts");
     expect(mountDriven).toHaveBeenCalledTimes(1);
-    expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({ routes, text: "{}", heading: "h2" });
+    expect(mountDriven.mock.calls[0]?.[1]).toMatchObject({ routes, text: "{}" });
   });
 
   test("without data-mantaq-routes the viewer gets no routes", async () => {

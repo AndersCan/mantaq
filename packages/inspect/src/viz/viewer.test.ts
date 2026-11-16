@@ -169,26 +169,20 @@ describe("viewer: checkout", () => {
     ).toBe("payment");
   });
 
-  test("shows no help text or link, no coverage picker and no machine picker for one machine", () => {
+  test("shows no help text or link, and no coverage picker", () => {
     const root = mount(checkout());
     expect(root.querySelector(".banner")).toBeNull();
     expect(root.querySelector(".legend")).toBeNull();
     expect(root.querySelector("a.help-link")).toBeNull();
     expect(root.querySelector(".coverage-mode")).toBeNull();
-    expect(root.querySelector(".machine-select")).toBeNull();
   });
 });
 
 describe("viewer: coverage and switching", () => {
   test("switcher renders every example without manual positioning", () => {
     const viz = toViz(exampleInputs());
-    const root = mount(viz);
     for (const machine of viz.machines) {
-      const select = root.querySelector<HTMLSelectElement>(".machine-select");
-      expect(select).not.toBeNull();
-      if (select) select.value = machine.id;
-      select?.dispatchEvent(new Event("change"));
-      expect(root.querySelector("h1")?.textContent).toBe(`Viz: ${machine.id}`);
+      const root = mount(viz, { machine: machine.id });
       expect(root.querySelectorAll(".state").length).toBe(machine.states.length);
       const positions = [...root.querySelectorAll(".state rect.frame:not(.inner)")].map(
         (rect) => `${rect.getAttribute("x")},${rect.getAttribute("y")}`,

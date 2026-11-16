@@ -102,7 +102,6 @@ export function mountDriven(
     source: string;
     text: string;
     targets: LiveTargets;
-    heading?: "h1" | "h2" | "h3";
     /** Dev server frame page and the machine ids that have a preview file; the viewer gets a Screen tab for those. */
     preview?: { path: string; machines: ReadonlyArray<string> };
     /** Where each machine's outputs go, shown on live steps. */
@@ -151,7 +150,6 @@ export function mountDriven(
   const driver = liveDriver(id, create, context.effectMode);
   mountViewer(viewer, shown, {
     ...options,
-    ...(context.heading === undefined ? {} : { heading: context.heading }),
     ...routesOf(context),
     ...(driver === undefined ? {} : { driver }),
     ...screenOption({ doc, preview: context.preview, id }),

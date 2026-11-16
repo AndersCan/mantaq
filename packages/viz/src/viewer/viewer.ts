@@ -28,7 +28,6 @@ import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
 interface ViewState {
-  machineId: string;
   selection: Selection | null;
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
@@ -54,46 +53,21 @@ interface ViewState {
 
 type PanelTab = "screen" | "step" | "context" | "details";
 
-function machineSelect(
-  doc: Document,
-  viz: VizDocument,
-  context: { view: ViewState; onChange: (id: string) => void },
-): HTMLLabelElement | null {
-  if (viz.machines.length < 2) return null;
-  const select = html(
-    doc,
-    "select",
-    { class: "machine-select" },
-    viz.machines.map((machine) =>
-      html(
-        doc,
-        "option",
-        { value: machine.id, selected: machine.id === context.view.machineId ? "" : null },
-        [machine.id],
-      ),
-    ),
-  );
-  select.addEventListener("change", () => context.onChange(select.value));
-  return html(doc, "label", {}, ["Machine ", select]);
-}
-
 export interface ViewerOptions {
-  /** Title element. Embedded viewers use `h2`/`h3` to fit the host page's outline. */
-  heading?: "h1" | "h2" | "h3";
-  /** Machine to show first; defaults to the first one. */
+  /** Machine to show; defaults to the first. */
   machine?: string;
   /** Live steps (from `?step=`) replayed through `driver`; ignored without one. */
   steps?: ReadonlyArray<string>;
   /**
    * Runs the machine for real: steps go to the driver and the cursor follows its state.
-   * The driver runs one machine, so the machine picker is hidden.
+   * The driver runs one machine.
    */
   driver?: VizDriver;
   /** Name of a run in the shown machine's `runs` to open on (from `?run=`). Wins over `steps`. Replays only with a `driver`. */
   run?: string;
   /** Values events are sent with, as `name=<json>` (from `?value=`); the Context tab sets them. */
   values?: ReadonlyArray<string>;
-  /** Called after every walk, value or machine change, e.g. to keep the URL shareable. */
+  /** Called after every walk, or value change, e.g. to keep the URL shareable. */
   onNavigate?: (where: { machine: string; steps: string[]; values: string[] }) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
@@ -114,7 +88,7 @@ export function mountViewer(
 ): void {
   const doc = root.ownerDocument;
   const first = viz.machines.find((machine) => machine.id === options.machine) ?? viz.machines[0];
-  const view = initialView(first, options);
+  const view = initialView(options);
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
   let redraw: () => void = () => undefined;
@@ -128,7 +102,7 @@ export function mountViewer(
       ?.focus({ preventScroll: true });
   }
   function render(): void {
-    const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
+    const machine = first;
     root.replaceChildren();
     root.classList.add("viz", "not-content");
     if (!machine) {
@@ -136,10 +110,6 @@ export function mountViewer(
       return;
     }
     root.classList.toggle("diagram-only", view.diagramOnly);
-    const chrome = chromeOf(
-      { root, viz, machine, view, options },
-      { render, showControls, live: driver !== undefined },
-    );
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     const refresh = () => {
@@ -188,25 +158,11 @@ export function mountViewer(
       refresh();
     };
     const graph = renderGraph(doc, machine, { select: showDetails });
-    root.append(...layoutOf(doc, { chrome, graph, panel }));
+    root.append(...layoutOf(doc, { view, showControls, graph, panel }));
     refresh();
   }
 
   render();
-}
-
-function chromeOf(
-  from: {
-    root: HTMLElement;
-    viz: VizDocument;
-    machine: VizMachine;
-    view: ViewState;
-    options: ViewerOptions;
-  },
-  rest: Pick<Chrome, "render" | "showControls" | "live">,
-): Chrome {
-  const { options, ...shared } = from;
-  return { ...shared, ...rest, heading: options.heading ?? "h1", onNavigate: options.onNavigate };
 }
 
 /** The Details tab: the diagram's selection. */
@@ -311,24 +267,23 @@ function focusEdge(root: HTMLElement, id: string): void {
 function layoutOf(
   doc: Document,
   context: {
-    chrome: Chrome;
+    view: ViewState;
+    showControls: () => void;
     graph: Node;
     panel: HTMLElement;
   },
 ): HTMLElement[] {
-  const { chrome } = context;
+  const { view } = context;
   const canvas = html(doc, "div", { class: "canvas" }, [context.graph]);
-  const { view } = chrome;
   if (!view.diagramOnly) {
     return [
       ...noticeOf(doc, view),
-      headerOf(doc, chrome),
       html(doc, "div", { class: "viz-main" }, [canvas, context.panel]),
     ];
   }
   const show = html(doc, "button", { type: "button", class: "show-controls" }, ["Show controls"]);
   show.setAttribute("data-show-controls", "");
-  show.addEventListener("click", () => chrome.showControls());
+  show.addEventListener("click", () => context.showControls());
   return [show, html(doc, "div", { class: "viz-main" }, [canvas])];
 }
 
@@ -372,9 +327,8 @@ function previewOf(
   return of.driver?.dryWalk?.(steps).find((entry) => entry.state === of.id) ?? null;
 }
 
-function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {
+function initialView(options: ViewerOptions): ViewState {
   return {
-    machineId: machine?.id ?? "",
     selection: null,
     live: null,
     afters: [],
@@ -623,38 +577,6 @@ function dropGonePick(view: ViewState): void {
   const { picked } = view;
   const there = view.live?.children.some((c) => c.map === picked?.map && c.key === picked.key);
   if (picked !== null && there !== true) view.picked = null;
-}
-
-/** What the header and the layout are built from. */
-interface Chrome {
-  root: HTMLElement;
-  viz: VizDocument;
-  machine: VizMachine;
-  view: ViewState;
-  heading: "h1" | "h2" | "h3";
-  render: () => void;
-  onNavigate: ViewerOptions["onNavigate"];
-  live: boolean;
-  showControls: () => void;
-}
-
-function headerOf(doc: Document, context: Chrome): HTMLElement {
-  const { machine, view, render } = context;
-  return html(doc, "header", { class: "viz-header" }, [
-    html(doc, context.heading, {}, [`Viz: ${machine.id}`]),
-    context.live
-      ? null
-      : machineSelect(doc, context.viz, {
-          view,
-          onChange: (id) => {
-            view.machineId = id;
-            view.selection = null;
-            view.notice = null;
-            context.onNavigate?.({ machine: id, steps: [], values: encodeValues(view.values) });
-            render();
-          },
-        }),
-  ]);
 }
 
 function sameBlocked(asked: NonNullable<ViewState["blockedFor"]>, view: ViewState): boolean {
