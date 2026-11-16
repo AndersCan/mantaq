@@ -171,7 +171,13 @@ function valuesList(
   if (fields.length === 0) return null;
   const rows = fields.map((field) => {
     const set = live.values[field.name];
-    const fallback = defaultValue(field, { live: live.state, afters: live.afters ?? [] });
+    const fallback = defaultValue(field, {
+      live: live.state,
+      afters: live.afters ?? [],
+      events: machine.events
+        .filter((event) => event.payload?.some((each) => each.name === field.name))
+        .map((event) => event.id),
+    });
     const fallbackText = fallback === undefined ? "" : valueText(field, fallback);
     const input = html(doc, "input", {
       type: "text",

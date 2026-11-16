@@ -141,9 +141,11 @@ export function mountViewer(
       view.tab = "step";
       refresh();
       if (from !== "row") return;
-      root
-        .querySelector<HTMLElement>(
-          `[data-child-map="${child.map}"][data-child-key="${child.key}"]`,
+      [...root.querySelectorAll<HTMLElement>("li.explore-child")]
+        .find(
+          (row) =>
+            row.getAttribute("data-child-map") === child.map &&
+            row.getAttribute("data-child-key") === child.key,
         )
         ?.focus({ preventScroll: true });
     };

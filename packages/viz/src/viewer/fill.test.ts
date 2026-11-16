@@ -256,6 +256,16 @@ describe("values set in the Context tab", () => {
     expect(defaultValue({ ...code, optional: true }, { live: null, afters: [] })).toBeUndefined();
   });
 
+  test("the default for a key that started a child is the next free key, as Send sends", () => {
+    const live = {
+      steps: [step("ask", { code: "p1" })],
+      children: [{ map: "m", key: "p1", state: "s", since: 1 }],
+    } as never;
+    expect(defaultValue(code, { live, afters: [], events: ["ask"] })).toBe("p2");
+    expect(defaultValue(code, { live, afters: [] })).toBe("p1");
+    expect(defaultValue(code, { live, afters: [], events: ["other"] })).toBe("p1");
+  });
+
   test("a value the walk sent under another event's name is sent, and a set one beats it", () => {
     const live = { steps: [step("ask", { code: "c1" })], children: [] } as never;
     expect(payloadFor(answering, "answered", { set: {}, live, afters: [] })).toEqual({

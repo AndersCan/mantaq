@@ -334,7 +334,7 @@ describe("live actor map children", () => {
     expect(sent).toEqual([]);
   });
 
-  test("every child has its own Send buttons and a press moves only that child", () => {
+  test("a row press follows its child, and Send in Details moves only that child", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
     expect(root.querySelectorAll("li.explore-child")).toHaveLength(2);
     sendFrom(root, "p2", "uploadConfirmed");
