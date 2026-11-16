@@ -477,9 +477,9 @@ describe("a blocked arrow, more cases", () => {
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
     const arrow = () => root.querySelector('[data-edge-id="photos.sending-confirm-photos.sent"]');
     expect(arrow()?.classList.contains("blocked")).toBe(true);
-    root
-      .querySelector('[data-pool-count] button[data-count-state="photos.sending"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.dispatchEvent(
+      new CustomEvent("mantaq:pick-child", { bubbles: true, detail: { map: "photos", key: "p2" } }),
+    );
     expect(arrow()?.classList.contains("blocked")).toBe(false);
   });
 });
@@ -529,7 +529,7 @@ test("a blocked arrow of the walked child, not the lowest key, opens its note", 
   document.body.append(root);
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
   root
-    .querySelector('[data-pool-count] button[data-count-state="photos.sending"]')
+    .querySelector('.graph g[data-node-id="photos.sending"]')
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   clickEdge(root, "photos.sending-confirm-photos.sent");
   expect(sent).toHaveLength(0);

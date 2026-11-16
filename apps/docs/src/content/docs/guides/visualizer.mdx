@@ -27,7 +27,7 @@ The viewer keeps a cursor on one state, starting at the initial one. Pulsing edg
 - clicking a state that exactly one next step reaches,
 - using a button in the panel.
 
-In an actor map the diagram shows one child: the line under the diagram counts the children by state; click a count to show a child in that state, click again for the next. An arrow goes to the child shown.
+In an actor map the diagram shows one child; the map's title counts the children by state. Click a state in the map to show a child in that state. An arrow goes to the child shown.
 
 The panel groups the next steps:
 
@@ -56,7 +56,7 @@ An edge with an unknown target (dashed, orange) offers each target its handler e
 | Pill inside a state       | An effect the state runs on entry, by name (`chargeCard` in `submitting`) |
 | Dashed circle `?`         | An unknown target                                                         |
 | Shaded rectangle          | A region: its own start arrow and current state                           |
-| Box titled `<map>: <key>` | An actor map: one child, the one the count line shows                     |
+| Box titled `<map>: <n>`   | An actor map: one child; live, the title counts the children by state     |
 
 ### Edges
 

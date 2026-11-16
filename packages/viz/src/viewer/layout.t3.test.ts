@@ -158,6 +158,15 @@ describe("region titles have room of their own", () => {
     expect(region?.width).toBe(textWidth("p: one per key") + 8 + 2 * LABEL_PAD);
   });
 
+  test("a map region reserves the widest live count, every state at 99", () => {
+    const pool = {
+      ...machineOf([state("p.free", "p"), state("p.working", "p")], [], ["p"]),
+      maps: ["p"],
+    };
+    const region = placeMachine(pool).regions[0];
+    expect(region?.width).toBe(textWidth("p: 99 p.free, 99 p.working") + 8 + 2 * LABEL_PAD);
+  });
+
   test("checker: a label on a region's title and a state on a region's title are overlaps", () => {
     const layout: MachineLayout = {
       width: 400,

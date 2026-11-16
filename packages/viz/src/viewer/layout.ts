@@ -505,8 +505,16 @@ function within(region: string, owner: string | null | undefined): boolean {
   );
 }
 
+/** A map's title is the widest of "one per key" and the live count with every state at 99. */
 function regionTitle(machine: VizMachine, region: string): string {
-  return machine.maps.includes(region) ? `${region}: one per key` : region;
+  if (!machine.maps.includes(region)) return region;
+  const counts = machine.states
+    .filter((state) => state.region === region)
+    .map((state) => `99 ${state.label}`)
+    .join(", ");
+  const widest = `${region}: ${counts}`;
+  const idle = `${region}: one per key`;
+  return textWidth(widest) > textWidth(idle) ? widest : idle;
 }
 
 interface Context {

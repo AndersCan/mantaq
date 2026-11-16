@@ -46,30 +46,23 @@ function addThree(root: HTMLElement) {
   sendOnEdge(root, "showingQueue-photoAdded-stay");
 }
 
-const counts = (root: HTMLElement) => [...root.querySelectorAll("[data-pool-count] button")];
+const children = (root: HTMLElement): Array<{ key: string; state: string }> =>
+  JSON.parse(root.querySelector("[data-children]")?.getAttribute("data-children") ?? "[]");
 
 describe("the docs photo queue on the live page", () => {
   test("three clicks on photoAdded start p1, p2, p3", async () => {
     const root = await mounted();
     addThree(root);
-    expect(counts(root).map((each) => each.getAttribute("data-keys"))).toEqual([
-      '["p1","p2","p3"]',
-    ]);
-    expect(counts(root).map((each) => each.getAttribute("data-count-state"))).toEqual([
-      "photos.sendingPhoto",
-    ]);
-    expect(root.querySelector("[data-pool-count]")?.textContent).toBe("3 photos: 3 sendingPhoto");
+    expect(children(root)).toEqual(
+      ["p1", "p2", "p3"].map((key) => ({ key, state: "photos.sendingPhoto" })),
+    );
   });
 
   test("uploadConfirmed goes to p1", async () => {
     const root = await mounted();
     addThree(root);
     sendOnEdge(root, "photos.sendingPhoto-uploadConfirmed-photoSent");
-    expect(
-      counts(root)
-        .find((each) => each.getAttribute("data-keys") === '["p1"]')
-        ?.getAttribute("data-count-state"),
-    ).toBe("photos.photoSent");
+    expect(children(root).find((each) => each.key === "p1")?.state).toBe("photos.photoSent");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
       "uploadConfirmed: p1 sendingPhoto → photoSent",
     );
@@ -80,6 +73,6 @@ describe("the docs photo queue on the live page", () => {
     addThree(root);
     sendOnEdge(root, "showingQueue-queueCleared-showingEmptyQueue");
     expect(root.querySelector("[data-live-removed]")?.textContent).toBe("p1, p2, p3 removed");
-    expect(counts(root)).toEqual([]);
+    expect(children(root)).toEqual([]);
   });
 });
