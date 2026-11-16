@@ -20,6 +20,7 @@ describe("analyzeModule: machine exports", () => {
         unwrap: "self",
         context: null,
         samples: { open: expect.any(Array) },
+        fields: expect.any(Object),
       },
       {
         name: "createGate",
@@ -27,6 +28,7 @@ describe("analyzeModule: machine exports", () => {
         unwrap: "actor",
         context: null,
         samples: { open: expect.any(Array) },
+        fields: expect.any(Object),
       },
       {
         name: "createRealDoor",
@@ -34,6 +36,7 @@ describe("analyzeModule: machine exports", () => {
         unwrap: "self",
         context: null,
         samples: { open: expect.any(Array) },
+        fields: expect.any(Object),
       },
       {
         name: "sharedDoor",
@@ -41,6 +44,7 @@ describe("analyzeModule: machine exports", () => {
         unwrap: "self",
         context: null,
         samples: { open: expect.any(Array) },
+        fields: expect.any(Object),
       },
     ]);
   });
@@ -53,6 +57,7 @@ describe("analyzeModule: machine exports", () => {
         unwrap: "self",
         context: [expect.objectContaining({ name: "attempts", input: "number" })],
         samples: {},
+        fields: {},
       },
     ]);
   });

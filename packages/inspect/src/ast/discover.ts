@@ -22,6 +22,8 @@ export interface MachineExport {
   context: VizField[] | null;
   /** Sample payloads per event id, read from the actor's `send` type and the result's `events` refs. */
   samples: Record<string, VizJson[]>;
+  /** Payload fields per event id, from the same types as `samples`. */
+  fields: Record<string, VizField[]>;
 }
 
 const ACTOR_KEYS = ["send", "snapshot", "inject", "settled"];
@@ -81,42 +83,90 @@ function refShapes(checker: ts.TypeChecker, context: { type: ts.Type; node: ts.N
     });
 }
 
+/** Actor types reached by `unwrap`, then every other actor the result carries next to it (a pool's inbox). */
+function actorTypes(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
+): ts.Type[] {
+  const { type, unwrap, node } = context;
+  const actor = unwrap === "self" ? undefined : type.getProperty("actor");
+  const main = actor === undefined ? type : checker.getTypeOfSymbolAtLocation(actor, node);
+  const others =
+    unwrap === "self"
+      ? []
+      : checker
+          .getPropertiesOfType(type)
+          .filter((property) => property.getName() !== "actor")
+          .map((property) => checker.getTypeOfSymbolAtLocation(property, node))
+          .filter((each) => hasAll(each, ACTOR_KEYS));
+  return [main, ...others];
+}
+
+/** Payload type per event id, from the unions the actors' `send` accepts and the refs in the result's `events` map. Each shape needs a literal `type` and a `payload`. */
+function payloadTypes(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
+): Array<[string, ts.Type]> {
+  const { type, node } = context;
+  const sendShapes = actorTypes(checker, context).flatMap((actorType) => {
+    const send = actorType.getProperty("send");
+    const parameter =
+      send === undefined
+        ? undefined
+        : checker.getSignaturesOfType(
+            checker.getTypeOfSymbolAtLocation(send, node),
+            ts.SignatureKind.Call,
+          )[0]?.parameters[0];
+    return parameter === undefined
+      ? []
+      : membersOf(checker.getTypeOfSymbolAtLocation(parameter, node));
+  });
+  return [...sendShapes, ...refShapes(checker, { type, node })].flatMap(
+    (shape): Array<[string, ts.Type]> => {
+      const typeProperty = shape.getProperty("type");
+      const payloadProperty = shape.getProperty("payload");
+      if (typeProperty === undefined || payloadProperty === undefined) return [];
+      const id = checker.getTypeOfSymbolAtLocation(typeProperty, node);
+      if (!id.isStringLiteral()) return [];
+      return [
+        [
+          id.value,
+          checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(payloadProperty, node)),
+        ],
+      ];
+    },
+  );
+}
+
 /**
- * Samples per event from the types the machine is built from: the union the
- * actor's `send` accepts and the refs in the result's `events` map. Each shape
- * needs a literal `type` and a `payload`. This covers machines built by a
- * helper, whose handlers are not registered in the inspected file.
+ * Samples per event from the types the machine is built from. This covers
+ * machines built by a helper, whose handlers are not registered in the
+ * inspected file.
  */
 function samplesFromTypes(
   checker: ts.TypeChecker,
   context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
 ): Record<string, VizJson[]> {
-  const { type, unwrap, node } = context;
-  const actor = unwrap === "self" ? undefined : type.getProperty("actor");
-  const actorType = actor === undefined ? type : checker.getTypeOfSymbolAtLocation(actor, node);
-  const send = actorType.getProperty("send");
-  const parameter =
-    send === undefined
-      ? undefined
-      : checker.getSignaturesOfType(
-          checker.getTypeOfSymbolAtLocation(send, node),
-          ts.SignatureKind.Call,
-        )[0]?.parameters[0];
-  const sendShapes =
-    parameter === undefined ? [] : membersOf(checker.getTypeOfSymbolAtLocation(parameter, node));
-  const shapes = [...sendShapes, ...refShapes(checker, { type, node })];
-  const entries = shapes.flatMap((shape): Array<[string, VizJson[]]> => {
-    const typeProperty = shape.getProperty("type");
-    const payloadProperty = shape.getProperty("payload");
-    if (typeProperty === undefined || payloadProperty === undefined) return [];
-    const id = checker.getTypeOfSymbolAtLocation(typeProperty, node);
-    if (!id.isStringLiteral()) return [];
-    const samples = samplesOf(
-      checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(payloadProperty, node)),
-      { checker, node, depth: 0 },
-    );
-    return samples.length === 0 ? [] : [[id.value, samples]];
-  });
+  const entries = payloadTypes(checker, context).flatMap(
+    ([id, payload]): Array<[string, VizJson[]]> => {
+      const samples = samplesOf(payload, { checker, node: context.node, depth: 0 });
+      return samples.length === 0 ? [] : [[id, samples]];
+    },
+  );
+  return Object.fromEntries(entries);
+}
+
+/** The Context tab's fields per event, from the same payload types as the samples. */
+function fieldsFromTypes(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
+): Record<string, VizField[]> {
+  const entries = payloadTypes(checker, context).flatMap(
+    ([id, payload]): Array<[string, VizField[]]> => {
+      const fields = fieldsOf(payload, { checker, node: context.node, depth: 0 });
+      return fields === null || fields.length === 0 ? [] : [[id, fields]];
+    },
+  );
   return Object.fromEntries(entries);
 }
 
@@ -167,6 +217,7 @@ function machineExport(
       unwrap: self,
       context: contextOf(checker, { type, unwrap: self, node }),
       samples: samplesFromTypes(checker, { type, unwrap: self, node }),
+      fields: fieldsFromTypes(checker, { type, unwrap: self, node }),
     };
   }
   for (const signature of checker.getSignaturesOfType(type, ts.SignatureKind.Call)) {
@@ -181,6 +232,7 @@ function machineExport(
         unwrap,
         context: contextOf(checker, at),
         samples: samplesFromTypes(checker, at),
+        fields: fieldsFromTypes(checker, at),
       };
     }
   }
