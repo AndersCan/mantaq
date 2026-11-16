@@ -13,8 +13,6 @@ import type {
 import { scopeOf } from "../schema.ts";
 import { compareKeys, currentsOf, walkedChild } from "./compartments.ts";
 import { html } from "./dom.ts";
-import { changesSection } from "./changes.ts";
-import type { ChangesOption } from "./changes.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
 import { availableModes, modeLabel } from "./coverage-mode.ts";
@@ -158,13 +156,6 @@ export interface ViewerOptions {
    * Called on every panel refresh; may return the same node each time. The live page shows notes here.
    */
   panelFooter?: (selection: Selection | undefined) => Node | undefined;
-  /**
-   * Marks what changed in machine `machine` since `before`: added states and arrows are
-   * outlined, and a "What changed" list names them and what was removed.
-   * `onSeen` runs when the reader presses "Mark as seen"; the marks then clear.
-   * Unset, another machine shown, or nothing changed: no marks, no list.
-   */
-  changes?: ChangesOption;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
   /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state. While it is open, clicking a state walks there. */
@@ -191,7 +182,6 @@ export function mountViewer(
   let redraw: () => void = () => undefined;
   listenOnRoot(root, { back: () => back() });
   listenForPick(root, view, () => redraw());
-  const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
   function render(): void {
@@ -276,9 +266,8 @@ export function mountViewer(
       mode,
       bare: view.diagramOnly,
     });
-    const changes = changesSection(doc, machine, graph, changing);
     back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
-    root.append(...layoutOf(doc, { chrome, graph, panel, changes }));
+    root.append(...layoutOf(doc, { chrome, graph, panel }));
     refresh();
   }
 
@@ -344,7 +333,6 @@ function layoutOf(
     chrome: Chrome;
     graph: Node;
     panel: HTMLElement;
-    changes: HTMLElement[];
   },
 ): HTMLElement[] {
   const { chrome } = context;
@@ -354,7 +342,6 @@ function layoutOf(
     return [
       ...noticeOf(doc, view),
       headerOf(doc, chrome),
-      ...context.changes,
       html(doc, "div", { class: "viz-main" }, [canvas, context.panel]),
     ];
   }

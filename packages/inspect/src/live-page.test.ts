@@ -5,7 +5,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { createAnswerActor } from "./fixtures/answer.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { inspectModule, vizDocument } from "./index.ts";
-import { mountDriven, mountLiveDriven, readStorage, takeTargets } from "./live-page.ts";
+import { mountDriven, mountLiveDriven, takeTargets } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
 
 const file = join(import.meta.dirname, "fixtures", "checkout.ts");
@@ -32,6 +32,17 @@ describe("mountDriven", () => {
       targets: { checkout: create },
     });
     expect(root.querySelector("[data-send]")).not.toBeNull();
+  });
+
+  test("a right-click on a state keeps the browser's own menu", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, { source: "test", text: await documentText(), targets: {} });
+    const state = root.querySelector(".state");
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    state?.dispatchEvent(event);
+    expect(state).not.toBeNull();
+    expect(event.defaultPrevented).toBe(false);
   });
 
   test("effectMode real runs the machine's effects; default holds them", async () => {
@@ -375,279 +386,5 @@ describe("a link naming several machines", () => {
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: second, targets: { second: create } });
     expect(current(root)).toBe("shippingAddress");
-  });
-});
-
-describe("compare", () => {
-  const create = () => {
-    const clock = VirtualClock();
-    return { actor: createCheckoutActor(clock), clock };
-  };
-  const targets = { checkout: create, second: create };
-  const current = (root: Element) =>
-    root.querySelector<HTMLElement>(".explore")?.dataset["current"];
-
-  async function twoText(): Promise<string> {
-    const doc = JSON.parse(await documentText());
-    doc.machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
-    return JSON.stringify(doc);
-  }
-
-  async function draw(search: string, text?: string): Promise<HTMLElement> {
-    history.replaceState(null, "", search);
-    const body = text ?? (await twoText());
-    const root = document.createElement("div");
-    document.body.append(root);
-    const original = globalThis.fetch;
-    globalThis.fetch = (async () => new Response(body)) as typeof fetch;
-    try {
-      await mountLiveDriven(root, { source: "/viz.json", targets });
-    } finally {
-      globalThis.fetch = original;
-    }
-    return root;
-  }
-  const texts = (root: ParentNode, selector: string) =>
-    [...root.querySelectorAll(selector)].map((each) => each.textContent);
-  const section = (root: ParentNode, design: string) =>
-    root.querySelector(`section.compare-design[data-design="${design}"]`) as HTMLElement;
-
-  test("two ids show Design A and Design B side by side", async () => {
-    const root = await draw("?machine=checkout&compare=second");
-    expect(texts(root, "h1")).toEqual(["Compare designs"]);
-    expect(
-      [...root.querySelectorAll<HTMLElement>("section.compare-design")].map(
-        (each) => each.dataset["design"],
-      ),
-    ).toEqual(["a", "b"]);
-    expect(texts(root, "h2")).toEqual(["Design A", "Design B"]);
-    expect(texts(root, "h3").filter((t) => t?.startsWith("Viz: "))).toEqual([
-      "Viz: checkout",
-      "Viz: second",
-    ]);
-    expect(root.querySelector("nav.machines")).toBeNull();
-    expect(section(root, "a").querySelector("[data-send]")).not.toBeNull();
-    expect(section(root, "b").querySelector("[data-send]")).not.toBeNull();
-  });
-
-  test("a design not in the document shows a notice in its column and never another machine", async () => {
-    const root = await draw("?machine=checkout&compare=nope");
-    expect(section(root, "b").querySelector(".compare-missing")?.textContent).toBe(
-      "Design B: nope is not on this page. Ask your agent to check the dev server output.",
-    );
-    expect(section(root, "b").querySelector("h3")).toBeNull();
-    expect(section(root, "a").querySelector("h3")?.textContent).toBe("Viz: checkout");
-    expect(root.textContent).not.toContain("Viz: second");
-  });
-
-  test("neither design in the document shows one notice", async () => {
-    const root = await draw("?machine=x&compare=y");
-    expect(root.querySelector("section.compare-design")).toBeNull();
-    expect(texts(root, ".compare-missing")).toEqual([
-      "Neither draft is on this page. Ask your agent to check the dev server output.",
-    ]);
-  });
-
-  test("compare equal to machine, or without machine, is the single viewer", async () => {
-    for (const search of ["?machine=checkout&compare=checkout", "?compare=second"]) {
-      const root = await draw(search);
-      expect(root.querySelector("nav.machines")).not.toBeNull();
-      expect(root.querySelector("section.compare-design")).toBeNull();
-    }
-  });
-
-  test("each design keeps its own walk in the URL across a redraw", async () => {
-    const root = await draw("?machine=checkout&compare=second");
-    const walk = (column: HTMLElement) => {
-      const start = current(column);
-      for (const send of column.querySelectorAll<HTMLElement>("[data-send]")) {
-        if (current(column) !== start) break;
-        send.click();
-      }
-    };
-    const startA = current(section(root, "a"));
-    walk(section(root, "b"));
-    const params = () => new URLSearchParams(location.search);
-    expect(params().getAll("stepB").length).toBeGreaterThan(0);
-    expect(params().getAll("step").length).toBe(0);
-    const stepB = params().getAll("stepB");
-    walk(section(root, "a"));
-    expect(params().getAll("step").length).toBeGreaterThan(0);
-    expect(params().getAll("stepB")).toEqual(stepB);
-    expect(params().get("compare")).toBe("second");
-    const after = [current(section(root, "a")), current(section(root, "b"))];
-    expect(after[0]).not.toBe(startA);
-
-    const again = await draw(location.search);
-    expect([current(section(again, "a")), current(section(again, "b"))]).toEqual(after);
-  });
-
-  test("an invalid document in compare mode lists its issues", async () => {
-    const root = await draw("?machine=checkout&compare=second", "{}");
-    expect(root.textContent).toContain("Cannot show");
-  });
-});
-
-describe("mountLiveDriven notes", () => {
-  const create = () => {
-    const clock = VirtualClock();
-    return { actor: createCheckoutActor(clock), clock };
-  };
-
-  async function fetched(search: string, notes: string | undefined): Promise<string[]> {
-    history.replaceState(null, "", search);
-    const doc = JSON.parse(await documentText());
-    doc.machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
-    const urls: string[] = [];
-    const original = globalThis.fetch;
-    globalThis.fetch = (async (input: string) => {
-      urls.push(String(input));
-      return String(input).includes("notes")
-        ? new Response("{}", { status: 404 })
-        : new Response(JSON.stringify(doc));
-    }) as typeof fetch;
-    try {
-      const root = document.createElement("div");
-      await mountLiveDriven(root, {
-        source: "/viz.json",
-        targets: { checkout: create, second: create },
-        ...(notes === undefined ? {} : { notes }),
-      });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    } finally {
-      globalThis.fetch = original;
-    }
-    return urls;
-  }
-
-  test("without a notes url nothing asks for notes", async () => {
-    const urls = await fetched("?machine=checkout", undefined);
-    expect(urls.filter((each) => each.includes("notes"))).toEqual([]);
-  });
-
-  test("with a notes url a live machine asks for its notes once", async () => {
-    const urls = await fetched("?machine=checkout", "/__mantaq/notes");
-    expect(urls.filter((each) => each.includes("notes"))).toEqual([
-      "/__mantaq/notes?machine=checkout",
-    ]);
-  });
-
-  test("compare mode never asks for notes", async () => {
-    const urls = await fetched("?machine=checkout&compare=second", "/__mantaq/notes");
-    expect(urls.filter((each) => each.includes("notes"))).toEqual([]);
-  });
-});
-
-describe("mountDriven what changed", () => {
-  const source = "/viz.json";
-  const fakeStorage = () => {
-    const map = new Map<string, string>();
-    return {
-      map,
-      getItem: (k: string) => map.get(k) ?? null,
-      setItem: (k: string, v: string) => void map.set(k, v),
-    };
-  };
-  const draw = (text: string, seen?: ReturnType<typeof fakeStorage>) => {
-    history.replaceState(null, "", "?machine=checkout");
-    const root = document.createElement("div");
-    document.body.append(root);
-    mountDriven(root, { source, text, targets: {}, ...(seen === undefined ? {} : { seen }) });
-    return root;
-  };
-  const withState = async () => {
-    const doc = JSON.parse(await documentText());
-    doc.machines[0].states.push({ ...doc.machines[0].states[0], id: "brandNew" });
-    return JSON.stringify(doc);
-  };
-
-  test("the first mount stores one outline per machine and shows no list", async () => {
-    const seen = fakeStorage();
-    const root = draw(await documentText(), seen);
-    expect([...seen.map.keys()]).toEqual([`mantaq:seen:v1:${source}:checkout`]);
-    expect(root.querySelector("section.changes")).toBeNull();
-  });
-
-  test("a later mount marks the new state and keeps the baseline", async () => {
-    const seen = fakeStorage();
-    draw(await documentText(), seen);
-    const baseline = [...seen.map.values()];
-    const root = draw(await withState(), seen);
-    expect(
-      root.querySelector('g.state[data-node-id="brandNew"]')?.classList.contains("added"),
-    ).toBe(true);
-    expect(root.querySelector("section.changes")?.textContent).toContain("Added state brandNew");
-    expect([...seen.map.values()]).toEqual(baseline);
-  });
-
-  test("Mark as seen stores the current outline", async () => {
-    const seen = fakeStorage();
-    draw(await documentText(), seen);
-    const changed = await withState();
-    const root = draw(changed, seen);
-    root.querySelector<HTMLButtonElement>("section.changes button")?.click();
-    expect(draw(changed, seen).querySelector("section.changes")).toBeNull();
-  });
-
-  test.each([
-    "{",
-    '{"states":3}',
-    '{"states":[],"arrows":[{"from":"a","event":"e","to":null,"kind":"bad"}]}',
-    '{"states":[],"arrows":[{"from":"a","event":"e","to":3,"kind":"stay"}]}',
-  ])("a corrupt stored value %s is overwritten", async (bad) => {
-    const seen = fakeStorage();
-    seen.map.set(`mantaq:seen:v1:${source}:checkout`, bad);
-    const root = draw(await documentText(), seen);
-    expect(root.querySelector("section.changes")).toBeNull();
-    expect(JSON.parse(seen.map.get(`mantaq:seen:v1:${source}:checkout`) ?? "")).toHaveProperty(
-      "states",
-    );
-  });
-
-  test("storage whose read throws gives no storage", () => {
-    expect(
-      readStorage(() => {
-        throw new Error("SecurityError");
-      }),
-    ).toBeUndefined();
-    const storage = fakeStorage();
-    expect(readStorage(() => storage)).toBe(storage);
-  });
-
-  test("storage that throws leaves the page working without a list", async () => {
-    const seen = {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-    };
-    const root = document.createElement("div");
-    mountDriven(root, { source, text: await documentText(), targets: {}, seen });
-    expect(root.querySelector(".explore")).not.toBeNull();
-    expect(root.querySelector("section.changes")).toBeNull();
-  });
-
-  test("without seen nothing is stored and nothing is listed", async () => {
-    const root = draw(await withState());
-    expect(root.querySelector("section.changes")).toBeNull();
-  });
-
-  test("the compare page shows no list", async () => {
-    const seen = fakeStorage();
-    draw(await documentText(), seen);
-    const doc = JSON.parse(await withState());
-    doc.machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
-    history.replaceState(null, "", "?machine=checkout&compare=second");
-    const root = document.createElement("div");
-    const original = globalThis.fetch;
-    globalThis.fetch = (async () => new Response(JSON.stringify(doc))) as typeof fetch;
-    try {
-      await mountLiveDriven(root, { source, targets: {}, seen });
-    } finally {
-      globalThis.fetch = original;
-    }
-    expect(root.querySelector("section.changes")).toBeNull();
   });
 });

@@ -30,8 +30,6 @@ export default defineConfig({
 
 Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the export name without `create` / `Actor` (`createCheckoutActor` → `checkout`). `?machine=<a>&compare=<b>` shows two machines side by side, each with its own walk, for choosing between two drafts.
 
-On the dev server, click a state or an arrow to leave a note; it is saved in `<machine file>.notes.md` next to the machine for your coding agent (see the mantaq skill). After each redraw the page outlines the states and arrows that are new since you opened it, and lists what was removed, until you press "Mark as seen".
-
 The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
 
 Effects do not run on the live page: the driver holds them and the panel asks what each one reports. The initial state's effects are the exception (core runs them while the actor is built). `createDriver(target, { effectMode: "real" })` from `@mantaq/inspect/drive` runs them.
