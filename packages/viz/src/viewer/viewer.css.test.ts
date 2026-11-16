@@ -64,6 +64,18 @@ test("the panel stays below the graph at every width", () => {
 });
 
 test("a diagram wider than its canvas scrolls sideways, never clips", () => {
-  expect(rule(".viz .canvas {")).toMatch(/overflow:\s*auto;/);
-  expect(rule(".viz .canvas {")).not.toMatch(/overflow(-x)?:\s*hidden/);
+  const canvas = bare
+    .split("}")
+    .filter((block) =>
+      block
+        .split("{")[0]
+        .split(",")
+        .some((s) => s.trim() === ".viz .canvas"),
+    )
+    .join("}");
+  expect(canvas).toMatch(/overflow:\s*auto;/);
+  // Every rule for the canvas, not only the first: a later overflow(-x) that is not auto/scroll cuts the diagram off.
+  for (const [, value] of canvas.matchAll(/overflow(?:-x)?:\s*([a-z]+)/g)) {
+    expect(value).toMatch(/^(auto|scroll)$/);
+  }
 });
