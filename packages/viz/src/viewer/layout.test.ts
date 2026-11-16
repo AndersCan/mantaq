@@ -624,6 +624,7 @@ describe("state inside", () => {
   test("a state without effects centres its name", () => {
     const placed = withEffects(0);
     expect(placed.label.y).toBe(placed.y);
+    expect(placed.label.width).toBe(textWidth("first"));
     expect(placed.chips).toEqual([]);
   });
 });
