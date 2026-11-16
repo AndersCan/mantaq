@@ -285,3 +285,47 @@ describe("edge cases", () => {
     expect(asked).not.toContain("team.ITEMS_FINISHED");
   });
 });
+
+describe("whyNotHere names the part and the source", () => {
+  test("a region in another state is named by its path", () => {
+    const region = { ...team, maps: [] };
+    expect(
+      whyNotHere(region, edgeOf("workers.working-team.RUN_SUCCEEDED-free"), {
+        live: liveAt("workersBusy", { regions: { workers: "workers.free" } }),
+        picked: null,
+      }),
+    ).toBe("team.RUN_SUCCEEDED can't be sent: workers is in free, this arrow leaves working.");
+  });
+
+  test("an arrow from any state names it so", () => {
+    const anyEdge = {
+      ...edgeOf("workers.working-team.RUN_SUCCEEDED-free"),
+      id: "any",
+      from: "workers.*",
+    };
+    const free = team.states.find((each) => each.id === "workers.free");
+    if (free === undefined) throw new Error("fixture");
+    const done = { ...free, id: "workers.done", final: true };
+    const region = {
+      ...team,
+      maps: [],
+      states: [...team.states, done],
+      edges: [...team.edges, anyEdge],
+    };
+    expect(
+      whyNotHere(region, anyEdge, {
+        live: liveAt("workersBusy", { regions: { workers: "workers.done" } }),
+        picked: null,
+      }),
+    ).toBe("team.RUN_SUCCEEDED can't be sent: workers is in done, this arrow leaves any state.");
+  });
+
+  test("another arrow with the same event out of the current state does not make this one sendable", () => {
+    const busy = edgeOf("workersBusy-team.ITEMS_FINISHED-allWorkersFree");
+    const other = { ...busy, id: "elsewhere", from: "workWaiting" };
+    const machine = { ...team, edges: [...team.edges, other] };
+    expect(whyNotHere(machine, other, { live: liveAt("workersBusy"), picked: null })).toBe(
+      "team.ITEMS_FINISHED can't be sent: the walk is in workersBusy, this arrow leaves workWaiting.",
+    );
+  });
+});

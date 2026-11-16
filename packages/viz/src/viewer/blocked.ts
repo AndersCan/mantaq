@@ -10,6 +10,7 @@ import type {
 } from "../schema.ts";
 import { isAnyState, scopeOf } from "../schema.ts";
 import { localName, walkedChild } from "./compartments.ts";
+import { childWhoText } from "./explore.ts";
 
 /** The parts that send `edge.event` themselves, by name; `[]` means a person may send it. */
 export function sentByParts(machine: VizMachine, edge: VizEdge): string[] {
@@ -38,7 +39,7 @@ export function whyNotHere(
     const child = walkedChild(at.live, scope, at.picked);
     if (child === undefined) return `${edge.event} can't be sent: ${scope} has no child.`;
     current = child.state;
-    who = machine.maps.length > 1 ? `${scope} ${child.key}` : child.key;
+    who = childWhoText(machine, { map: scope, key: child.key });
   } else {
     current = at.live.regions[scope];
     who = scope;

@@ -304,6 +304,18 @@ describe("live actor map children", () => {
     expect(by.root.querySelector(".blocked-lock")).toBeNull();
   });
 
+  test("two senders are joined with and", () => {
+    const fed: VizMachine = {
+      ...photoQueue,
+      partOutputs: { other: ["uploadConfirmed"], third: ["uploadConfirmed"] },
+    };
+    const by = mount([child("p1", "sendingPhoto", 1)], fed);
+    click(edgeGroup(by.root));
+    expect(by.root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "uploadConfirmed is sent by other and third, not by hand.",
+    );
+  });
+
   test("a map with no child has no Send button on its arrows", () => {
     const { root } = mount([]);
     click(edgeGroup(root));
