@@ -353,6 +353,7 @@ describe("live controls", () => {
     const { root } = mount();
     expect(current(root)).toBe("idle");
     expect(root.querySelectorAll(".explore [data-send]")).toHaveLength(0);
+    expect(root.querySelector(".explore [data-doc]")).toBeNull();
     clickEdge(root, "idle-submit-paying");
     root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
     expect(current(root)).toBe("paying");

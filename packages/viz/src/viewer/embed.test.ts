@@ -122,6 +122,35 @@ describe("mountVizText", () => {
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
 
+  test("Details hold the title, the doc line and, for a state, only its links", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    const click = (selector: string) =>
+      root.querySelector(selector)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    click('[data-edge-id="open-go-done"]');
+    const edgeTags = [...(root.querySelector(".details")?.children ?? [])].map((child) =>
+      child.tagName.toLowerCase(),
+    );
+    expect(edgeTags).toEqual(["h2", "p"]);
+    expect(root.querySelector('.details p[data-doc="edge"]')?.textContent).toBe(
+      "Walk through and close up.",
+    );
+    expect(root.querySelector(".details dl")).toBeNull();
+    click('[data-node-id="open"]');
+    expect(root.querySelector('.details p[data-doc="state"]')?.textContent).toBe(
+      "The door stands open.",
+    );
+    const labels = [...root.querySelectorAll(".details [data-field]")].map((dd) =>
+      dd.getAttribute("data-field"),
+    );
+    expect(labels).toEqual(["outgoing", "incoming"]);
+    click('.details [data-edge-link="open-go-done"]');
+    expect(
+      root.querySelector(".graph g.selected[data-edge-id]")?.getAttribute("data-edge-id"),
+    ).toBe("open-go-done");
+    click('[data-node-id="done"]');
+    expect(root.querySelector(".details [data-doc]")).toBeNull();
+  });
+
   test("draws a valid document", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelectorAll(".graph g[data-node-id]")).toHaveLength(2);

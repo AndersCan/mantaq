@@ -22,10 +22,6 @@ function checkout(): VizDocument {
   return toViz([{ id: "checkout", actor: createCheckoutActor() }]);
 }
 
-function field(root: HTMLElement, name: string): string | null | undefined {
-  return root.querySelector(`.panel [data-field="${name}"]`)?.textContent;
-}
-
 /** Checkout as an undeclared actor would export it: `back` targets unknown. */
 function undeterminedBack(viz: VizDocument): VizDocument {
   return {
@@ -41,14 +37,6 @@ function undeterminedBack(viz: VizDocument): VizDocument {
       }),
     })),
   };
-}
-
-function edgeElement(root: HTMLElement, id: string): Element {
-  const found = [...root.querySelectorAll<SVGGElement>(".edge")].find(
-    (element) => element.dataset["edgeId"] === id,
-  );
-  expect(found).toBeDefined();
-  return found ?? root;
 }
 
 describe("viewer: checkout", () => {
@@ -153,24 +141,6 @@ describe("viewer: checkout", () => {
     );
   });
 
-  test("clicking an edge shows source, event and target", () => {
-    const viz = checkout();
-    const root = mount(viz);
-    const edge = viz.machines[0]?.edges.find((candidate) => candidate.event === "paymentOk");
-    edgeElement(root, edge?.id ?? "").dispatchEvent(new Event("click"));
-    expect(field(root, "source")).toBe("submitting");
-    expect(field(root, "event")).toBe("paymentOk (internal)");
-    expect(field(root, "target")).toBe("success");
-  });
-
-  test("undetermined edge panel says undetermined, never a guessed target", () => {
-    const viz = undeterminedBack(checkout());
-    const root = mount(viz);
-    const back = viz.machines[0]?.edges.find((candidate) => candidate.event === "back");
-    edgeElement(root, back?.id ?? "").dispatchEvent(new Event("click"));
-    expect(field(root, "target")).toBe("undetermined");
-  });
-
   test("clicking a state lists its edges and click-through selects the edge", () => {
     const root = mount(checkout());
     root.querySelector('[data-node-id="submitting"]')?.dispatchEvent(new Event("click"));
@@ -256,7 +226,7 @@ describe("viewer: onAny", () => {
     expect(cancel[0]?.getAttribute("aria-label")).toMatch(/^any state on CANCEL to /);
   });
 
-  test("a covered state lists the onAny edges as outgoing; the edge panel names the source", () => {
+  test("a covered state lists the onAny edges as outgoing", () => {
     const viz = saga();
     const root = mount(viz);
     root.querySelector('[data-node-id="processingPayment"]')?.dispatchEvent(new Event("click"));
@@ -264,8 +234,5 @@ describe("viewer: onAny", () => {
       (link) => link.textContent,
     );
     expect(links).toContain("any state —CANCEL→ failed");
-    const cancel = viz.machines[0]?.edges.find((edge) => edge.event === "CANCEL");
-    edgeElement(root, cancel?.id ?? "").dispatchEvent(new Event("click"));
-    expect(field(root, "source")).toBe("any state (onAny)");
   });
 });
