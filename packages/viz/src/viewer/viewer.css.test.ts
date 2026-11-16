@@ -49,11 +49,10 @@ test("buttons, the full screen toggle and the header heading follow the host's t
   expect(rule(".viz .viz-header :is(h1, h2, h3)")).toMatch(/font-size:\s*1\.385em/);
 });
 
-test("a dropped message's Step line and arrow mark use the banner colour", () => {
+test("a dropped message's Step line uses the banner colour", () => {
   const bareRule = (selector: string) =>
     bare.split("}").find((block) => block.trim().startsWith(selector)) ?? "";
   expect(bareRule(".viz [data-live-dropped]")).toMatch(/color:\s*var\(--banner-fg\)/);
-  expect(bareRule(".viz .drop-mark")).toMatch(/fill:\s*var\(--banner-fg\)/);
 });
 
 test("the panel stays below the graph at every width", () => {

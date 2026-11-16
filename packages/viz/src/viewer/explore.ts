@@ -44,8 +44,6 @@ export interface ExploreContext {
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
-    /** The part that sends `event` into `part` ("" = the root); null or unset: it comes from outside. */
-    fromPart?: (part: string, event: string) => string | null;
     send: (step: VizStep) => void;
     previous?: VizJson;
     /** The child a count click walks; the Step tab shows that child of each map. */
@@ -63,14 +61,10 @@ export interface ExploreContext {
   events: { open: boolean; onToggle: (open: boolean) => void };
 }
 
-/** "parts": inputs another part of the machine sends; sending one by hand skips that part. */
-type SendGroup = MoveGroup | "parts";
-
-const GROUP_TITLES: Record<SendGroup, string> = {
+const GROUP_TITLES: Record<MoveGroup, string> = {
   input: "Send an input",
   effect: "Effect reports back",
   internal: "Other internal events",
-  parts: "Sent by another part (by hand skips it)",
 };
 
 function code(doc: Document, text: string): HTMLElement {
@@ -344,7 +338,6 @@ interface LiveMoves {
   final: boolean;
   picked?: { map: string; key: string } | null;
   sendEvent: (event: string, actor?: VizActorRef) => void;
-  fromPart?: (part: string, event: string) => string | null;
 }
 
 /** One sendable event: a button that sends it, or opens its payload form. */
@@ -445,7 +438,7 @@ function liveMovesSection(
   const moves = movesFrom(machine, current);
   const handled = new Set(moves.map((move) => move.edge.event));
   const events = offeredEvents(machine, compartment, [...handled]);
-  const groups: SendGroup[] = ["input", "effect", "internal", "parts"];
+  const groups: MoveGroup[] = ["input", "effect", "internal"];
   const item = (event: string) =>
     sendItem(doc, machine, {
       live,
@@ -456,11 +449,8 @@ function liveMovesSection(
       compartment,
       ...(child === undefined ? {} : { child }),
     });
-  const groupOf = (event: string): SendGroup => {
-    const group = moves.find((each) => each.edge.event === event)?.group ?? "input";
-    const sender = live.fromPart?.(compartment, event) ?? null;
-    return group === "input" && sender !== null ? "parts" : group;
-  };
+  const groupOf = (event: string): MoveGroup =>
+    moves.find((each) => each.edge.event === event)?.group ?? "input";
   return block(
     groups.flatMap((group) => {
       const members = events.filter((event) => groupOf(event) === group);
@@ -1024,13 +1014,8 @@ function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
 }
 
 /** Whether a part had no handler for a message another part sent it. */
-export function isDropped(step: VizLiveStep): boolean {
+function isDropped(step: VizLiveStep): boolean {
   return step.message !== undefined && step.message.dropped !== null;
-}
-
-/** "waiter has no handler for DISH_READY in onBreak": why a part dropped a message. */
-export function dropReasonText(machine: VizMachine, step: VizLiveStep): string {
-  return `${partName(machine, step.actor)} has no handler for ${step.event} in ${localName(step.from)}`;
 }
 
 /** The sender as the row names it ("" is the machine itself); null when no part is known to have sent it. */
@@ -1251,7 +1236,6 @@ function liveParts(
     final,
     picked: live.picked ?? null,
     sendEvent: live.sendEvent,
-    ...(live.fromPart === undefined ? {} : { fromPart: live.fromPart }),
   };
   return [
     ...regionLines(doc, machine, state),

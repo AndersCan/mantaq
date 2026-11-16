@@ -873,7 +873,7 @@ export function dotGapFor(length: number): number {
   return Math.min(MAX_DOT_GAP, Math.max(MIN_DOT_GAP, length * DOT_GAP_PER_LENGTH));
 }
 
-export function polyline(points: ReadonlyArray<Point>): string {
+function polyline(points: ReadonlyArray<Point>): string {
   return points
     .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`)
     .join(" ");
