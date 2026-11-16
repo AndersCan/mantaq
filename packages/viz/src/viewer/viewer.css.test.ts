@@ -62,3 +62,8 @@ test("the panel stays below the graph at every width", () => {
   expect(main).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   expect(rule(".viz .panel {")).not.toMatch(/sticky/);
 });
+
+test("a diagram wider than its canvas scrolls sideways, never clips", () => {
+  expect(rule(".viz .canvas {")).toMatch(/overflow:\s*auto;/);
+  expect(rule(".viz .canvas {")).not.toMatch(/overflow(-x)?:\s*hidden/);
+});
