@@ -151,8 +151,6 @@ function mount(sender: string | null = "") {
 
 const send = (root: HTMLElement, name: string) =>
   root.querySelector<HTMLButtonElement>(`[data-send="${name}"]`)?.click();
-const arrow = (root: HTMLElement) =>
-  root.querySelector<SVGGElement>('g.link[data-event="DISH_READY"]');
 const pathTexts = (root: HTMLElement) =>
   [...root.querySelectorAll("[data-rewind]")].map((each) => each.textContent);
 const text = (root: HTMLElement, selector: string) => root.querySelector(selector)?.textContent;
@@ -164,11 +162,39 @@ function walk(root: HTMLElement, count: number) {
 }
 
 describe("dropped message", () => {
-  test("a taken arrow's Details has no drop line", () => {
+  test("a taken message names sender → receiver on the Path and the Step tab", () => {
     const { root } = mount();
     walk(root, 1);
-    arrow(root)?.dispatchEvent(new Event("click"));
-    expect(root.querySelector("[data-link-dropped]")).toBeNull();
+    expect(pathTexts(root)[1]).toBe("DISH_COOKED, then kitchen → waiter: serving → carryingDish");
+    expect(text(root, "[data-live-after]")).toContain(
+      "Then kitchen sent DISH_READY to waiter: serving → carryingDish",
+    );
+    expect(root.querySelector("[data-live-dropped]")).toBeNull();
+  });
+
+  test("a dropped one starts the Path row with ! and the Step tab says it was dropped", () => {
+    const { root } = mount();
+    walk(root, 4);
+    expect(pathTexts(root)[4]).toBe("! DISH_COOKED, then kitchen → waiter DISH_READY dropped");
+    expect(text(root, "[data-live-dropped]")).toBe(
+      "! Then kitchen sent DISH_READY to waiter: dropped.",
+    );
+    expect(root.querySelector("[data-live-dropped]")?.classList.contains("muted")).toBe(false);
+  });
+
+  test("the ! is gone after rewinding to before the drop", () => {
+    const { root } = mount();
+    walk(root, 5);
+    root.querySelector<HTMLElement>('[data-rewind="3"]')?.click();
+    expect(pathTexts(root).join("|")).not.toContain("!");
+  });
+
+  test("a drop with no known sender shows only on the Path row", () => {
+    const { root } = mount(null);
+    walk(root, 4);
+    expect(pathTexts(root)[4]).toBe("! DISH_COOKED, then waiter DISH_READY dropped");
+    expect(text(root, "[data-live-after]")).toContain("Then waiter took DISH_READY");
+    expect(root.querySelector("[data-live-dropped]")).toBeNull();
   });
 
   test("a stay that took the message reads sent … to … without a move", () => {

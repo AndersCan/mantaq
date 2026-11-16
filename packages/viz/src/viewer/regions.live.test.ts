@@ -154,6 +154,22 @@ describe("live regions", () => {
     );
   });
 
+  test("an input another part sends sits under Send an input, not in a group of its own", () => {
+    const { root } = mount({
+      ...photoUpload,
+      events: photoUpload.events.map((each) =>
+        each.id === "photoUploaded" ? { ...each, internal: false } : each,
+      ),
+    });
+    const groups = [...root.querySelectorAll("[data-group]")].map((each) =>
+      each.getAttribute("data-group"),
+    );
+    expect(groups).not.toContain("parts");
+    expect(
+      root.querySelector('[data-group="input"] [data-send-item="photoUploaded"]'),
+    ).not.toBeNull();
+  });
+
   test("each region gets a line with its own state", () => {
     const { root } = mount();
     const line = root.querySelector('p[data-region="upload"]');
