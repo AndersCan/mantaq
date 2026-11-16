@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.39.0
+
+<sub>2026-11-16</sub>
+
+- _(minor)_
+  [user]: `outlineOf`, `outlineChanges`, `isUnchanged` and the viewer's `changes` option are removed; the viewer no longer outlines what changed.
+  [user]: The dev page no longer takes notes (right-click, `.notes.md`) or compares two designs (`?compare=`); existing `.notes.md` files are left as they are and no longer read.
+- _(minor)_
+  [user]: A click on a state or an arrow only selects it and shows its details; it no longer sends an event, walks to a state with Screen open, or opens a blocked note. Send from the Step tab, which no longer hides its lists in an Events and time fold.
+- _(minor)_
+  [user]: Every child of an actor map shows as a chip with its key on the state it is in; click a chip to follow that child. The count line under the diagram is gone.
+
 ## 0.38.1
 
 <sub>2026-11-15</sub>
