@@ -17,7 +17,15 @@ import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
 import { renderPanel } from "./panel.ts";
 import { decodeLiveSteps, encodeLiveStep, movesFrom } from "../moves.ts";
-import { button, code, explorePanel, markExplore, outcomeText, sentEventLine } from "./explore.ts";
+import {
+  button,
+  code,
+  elapsed,
+  explorePanel,
+  markExplore,
+  outcomeText,
+  sentEventLine,
+} from "./explore.ts";
 import type { ExploreContext, ExploreParts, SentEvent } from "./explore.ts";
 import { pathTo } from "../findings.ts";
 import { blockedEdges, sentByParts, whyNotHere } from "./blocked.ts";
@@ -261,7 +269,17 @@ function sendFor(
   },
 ): (edge: VizEdge) => HTMLElement | null {
   const { doc, machine, view } = from;
-  return (edge) => {
+  const timerLine = (edge: VizEdge): HTMLElement | null => {
+    const { live } = view;
+    const timer = live?.timers.find((each) => each.eventName === edge.event);
+    if (live === null || timer === undefined) return null;
+    const left = timer.deadline - elapsed(live.steps);
+    return html(doc, "p", { "data-timer-line": edge.event }, [
+      code(doc, edge.event),
+      ` fires on its own in ${left} ms; a click sends it now.`,
+    ]);
+  };
+  const sendOf = (edge: VizEdge): HTMLElement | null => {
     const decision = arrowSend(from, edge);
     const note = (text: string) =>
       html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [text]);
@@ -276,7 +294,7 @@ function sendFor(
       case "send": {
         const { actor } = decision;
         const to = actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
-        return here(
+        const sent = here(
           button(doc, ["Send ", code(doc, edge.event), ...to], {
             onClick: () => {
               handlers.sendEvent(edge.event, actor, edge.id);
@@ -285,9 +303,12 @@ function sendFor(
             attrs: { "data-send-edge": edge.id },
           }),
         );
+        const line = timerLine(edge);
+        return line === null ? sent : html(doc, "div", {}, sent === null ? [line] : [line, sent]);
       }
     }
   };
+  return sendOf;
 }
 
 /** After a Send from this arrow's Details: what was sent and where it went, then the button when it can still be pressed. */

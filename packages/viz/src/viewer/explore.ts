@@ -80,7 +80,7 @@ export function childWhoText(machine: VizMachine, ref: ChildRef): string {
 }
 
 /** The clock starts at 0 and only `advance` steps move it. */
-function elapsed(steps: ReadonlyArray<VizStep>): number {
+export function elapsed(steps: ReadonlyArray<VizStep>): number {
   return steps.reduce((sum, step) => sum + (step.kind === "advance" ? step.ms : 0), 0);
 }
 
