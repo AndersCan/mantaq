@@ -86,10 +86,10 @@ describe("knownPayload", () => {
     });
   });
 
-  test("without fields: the last payload sent with this event, else the fuzzer's first", () => {
+  test("without fields: the fuzzer's first, whatever the walk sent", () => {
     const steps = [step("pay", { a: 1 }), step("pay", { a: 3 }), step("other", { a: 5 })];
     const samples = [{ a: 1 }, { a: 2 }];
-    expect(knownPayload(null, { event: "pay", samples, steps })).toEqual({ payload: { a: 3 } });
+    expect(knownPayload(null, { event: "pay", samples, steps })).toEqual({ payload: { a: 1 } });
     expect(knownPayload([], { event: "pay", samples, steps: [] })).toEqual({ payload: { a: 1 } });
   });
 
@@ -193,16 +193,6 @@ describe("freshKeys", () => {
     expect(ask("p1", state)).toBe("p1");
     expect(ask(null, state)).toBeNull();
   });
-});
-
-test("without declared fields, a payload another event carried with the example's keys fills the box", () => {
-  const steps: VizStep[] = [
-    { kind: "event", event: "ITEMS_ASSIGNED", payload: { worker: "w1", items: ["a"] } },
-    { kind: "event", event: "OTHER", payload: { worker: "w2" } },
-  ];
-  expect(
-    knownPayload(null, { event: "ITEMS_FINISHED", samples: [{ items: [], worker: "x" }], steps }),
-  ).toEqual({ payload: { worker: "w1", items: ["a"] } });
 });
 
 describe("values set in the Context tab", () => {
