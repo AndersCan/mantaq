@@ -42,6 +42,8 @@ export interface VizHarness {
   screenshot(path?: string): Promise<Uint8Array>;
   /** Page errors and console errors so far. */
   problems(): string[];
+  /** The browser page, for tests that read layout. */
+  page: Page;
   /** Idempotent: page, browser, server, temp dir. */
   close(): Promise<void>;
 }
@@ -342,6 +344,7 @@ function describe(
     (await page.getAttribute(".explore[data-current]", "data-current")) ?? "";
   const sendTo = makeSend(page, machine, state, lifecycle.isClosed);
   return {
+    page,
     state,
     send: (event, payload) => sendTo({ region: "" }, event, payload),
     sendTo,
