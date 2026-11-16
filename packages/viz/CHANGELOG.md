@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.30.0
+
+<sub>2026-11-16</sub>
+
+- _(minor)_ [user]: Diagram labels sit beside their arrow at their real width, with room for the lock.
+- _(minor)_
+  [user]: Self-loops are nested rectangles above their state, arrows end at separate points on a state's side, and each region has its own title row.
+- _(minor)_
+  [user]: The diagram layout checks itself: a machine it cannot draw without overlaps shows a one-line error instead of an overlapping diagram.
+- _(minor)_ [user]: Parallel arrows in a diagram keep their heads, ends and lanes 8px apart.
+- _(minor)_ [user]: State names and effect chips sit 8px inside their box, with 8px between them.
+- _(minor)_
+  [user]: Machines whose regions talk to each other open on their diagram; the parts board, its Open/← System buttons and the "Sent by another part" Send group are gone.
+
+  [user]: A message a machine cannot take is no longer marked with `!` on its arrow or explained in Details; the Path row and the Step tab still say it was dropped.
+
+- _(minor)_
+  [user]: `outlineOf`, `outlineChanges`, `isUnchanged` and the viewer's `changes` option are removed; the viewer no longer outlines what changed.
+  [user]: The dev page no longer takes notes (right-click, `.notes.md`) or compares two designs (`?compare=`); existing `.notes.md` files are left as they are and no longer read.
+- _(minor)_
+  [user]: A click on a state or an arrow only selects it and shows its details; it no longer sends an event, walks to a state with Screen open, or opens a blocked note. Send from the Step tab, which no longer hides its lists in an Events and time fold.
+- _(minor)_
+  [user]: The selected arrow's Details has a Send button (Send RUN_SUCCEEDED to w1 for a child); a blocked arrow's Details says why. Step tab buttons read "Send <event>".
+- _(minor)_
+  [user]: Every child of an actor map shows as a chip with its key on the state it is in; click a chip to follow that child. The count line under the diagram is gone.
+- _(patch)_ A final state's name keeps 8px clear of its inner frame, and state names keep clear of their box in the docs font.
+- _(patch)_ [user]: States of an actor map leave room at the bottom for their children.
+
 ## 0.29.0
 
 <sub>2026-11-15</sub>
