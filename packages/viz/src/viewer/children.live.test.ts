@@ -195,17 +195,19 @@ describe("live actor map children", () => {
   const box = (root: HTMLElement, state: string) =>
     root.querySelector(`.graph g[data-node-id="photos.${state}"]`);
   const pick = (root: HTMLElement, key: string) =>
-    root.dispatchEvent(
-      new CustomEvent("mantaq:pick-child", { bubbles: true, detail: { map: "photos", key } }),
+    click(root.querySelector(`.graph g.child-marker[data-marker-key="${key}"]`));
+  const chips = (root: HTMLElement) =>
+    Array.from(root.querySelectorAll(".graph g.child-marker")).map(
+      (node) => `${node.getAttribute("data-marker-key")}@${node.getAttribute("data-marker-state")}`,
     );
   const walkedKey = (root: HTMLElement) =>
     root.querySelector("[data-child-key]")?.getAttribute("data-child-key");
 
-  test("the frame title counts the children by state in the machine's order", () => {
-    expect(title(mount([child("p1", "waitingForRetry"), child("p2", "sendingPhoto")]).root)).toBe(
-      "photos: 1 sendingPhoto, 1 waitingForRetry",
-    );
-    expect(title(mount([]).root)).toBe("photos: none");
+  test("each child is a chip on the state it is in; the frame title says one per key", () => {
+    const { root } = mount([child("p1", "waitingForRetry"), child("p2", "sendingPhoto")]);
+    expect(chips(root)).toEqual(["p1@photos.waitingForRetry", "p2@photos.sendingPhoto"]);
+    expect(title(root)).toBe("photos: one per key");
+    expect(chips(mount([]).root)).toEqual([]);
   });
 
   test("a child arrow's Details sends to the walked child", () => {
@@ -255,33 +257,25 @@ describe("live actor map children", () => {
     expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
   });
 
-  test("mantaq:pick-child walks a known key and ignores an unknown one", () => {
-    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
+  test("a chip click follows that child, shows the Step tab and sends nothing", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
     click(box(root, "photoSent"));
     pick(root, "p2");
     expect(walkedKey(root)).toBe("p2");
     expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
-    pick(root, "p9");
-    expect(walkedKey(root)).toBe("p2");
-  });
-
-  test("data-children lists the children as JSON in key order", () => {
-    const { root } = mount([child('q"', "sendingPhoto"), child("a b", "sendingPhoto")]);
     expect(
-      root.querySelector('.graph g.region[data-map="photos"]')?.getAttribute("data-children"),
-    ).toBe(
-      JSON.stringify([
-        { key: "a b", state: "photos.sendingPhoto" },
-        { key: 'q"', state: "photos.sendingPhoto" },
-      ]),
-    );
+      root.querySelector('g.child-marker[data-marker-key="p2"]')?.getAttribute("aria-pressed"),
+    ).toBe("true");
+    pick(root, "p2");
+    expect(walkedKey(root)).toBe("p2");
+    expect(sent).toEqual([]);
   });
 
   test("the frame title stays one per key without a driver", () => {
     const root = document.createElement("div");
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] });
     expect(title(root)).toBe("photos: one per key");
-    expect(root.querySelector("[data-children]")).toBeNull();
+    expect(root.querySelector(".graph g.child-marker")).toBeNull();
     click(box(root, "sendingPhoto"));
     expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
   });
@@ -319,12 +313,7 @@ describe("live actor map children", () => {
     expect(walkedKey(root)).toBe("p2");
     click(root.querySelector('[data-actor="photos[p2]"] [data-send="uploadConfirmed"]'));
     expect(walkedKey(root)).toBe("p1");
-    expect(title(root)).toBe("photos: 1 sendingPhoto");
-  });
-
-  test("no button is drawn inside the diagram", () => {
-    const { root } = mount([child("p1", "sendingPhoto")]);
-    expect(root.querySelector(".graph [aria-pressed]")).toBeNull();
+    expect(chips(root)).toEqual(["p1@photos.sendingPhoto"]);
   });
 
   test("a child move reads the key and the move", () => {
@@ -1136,7 +1125,7 @@ test("a click on a root state whose name starts with the map's sends nothing; it
   expect(sent).toMatchObject([{ kind: "event", event: "paused" }]);
 });
 
-test("each map frame lists only its own children in data-children", () => {
+test("each map's children are chips on that map's own states", () => {
   const machine: VizMachine = {
     ...photoQueue,
     regions: ["photos", "uploads"],
@@ -1146,7 +1135,9 @@ test("each map frame lists only its own children in data-children", () => {
   const upload: VizLiveChild = { map: "uploads", key: "u1", state: "uploads.queued", since: 0 };
   const { root } = mount([child("p1", "sendingPhoto"), upload], machine);
   const listed = (map: string) =>
-    root.querySelector(`.graph g.region[data-map="${map}"]`)?.getAttribute("data-children");
-  expect(listed("photos")).toBe(JSON.stringify([{ key: "p1", state: "photos.sendingPhoto" }]));
-  expect(listed("uploads")).toBe(JSON.stringify([{ key: "u1", state: "uploads.queued" }]));
+    Array.from(root.querySelectorAll(`.graph g.child-marker[data-marker-map="${map}"]`)).map(
+      (node) => `${node.getAttribute("data-marker-key")}@${node.getAttribute("data-marker-state")}`,
+    );
+  expect(listed("photos")).toEqual(["p1@photos.sendingPhoto"]);
+  expect(listed("uploads")).toEqual(["u1@uploads.queued"]);
 });

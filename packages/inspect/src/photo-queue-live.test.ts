@@ -40,7 +40,12 @@ function addThree(root: HTMLElement) {
 }
 
 const children = (root: HTMLElement): Array<{ key: string; state: string }> =>
-  JSON.parse(root.querySelector("[data-children]")?.getAttribute("data-children") ?? "[]");
+  Array.from(root.querySelectorAll(".graph g.child-marker"))
+    .map((node) => ({
+      key: node.getAttribute("data-marker-key") ?? "",
+      state: node.getAttribute("data-marker-state") ?? "",
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key, "en", { numeric: true }));
 
 describe("the docs photo queue on the live page", () => {
   test("three sends of photoAdded start p1, p2, p3", async () => {
