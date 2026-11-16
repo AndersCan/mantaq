@@ -190,28 +190,11 @@ describe("live controls", () => {
   });
 
   test("the timer label counts down the time already advanced", () => {
-    const { root } = mount();
-    sendSubmit(root);
-    const input = root.querySelector<HTMLInputElement>("[data-advance-ms]");
-    if (input) input.value = "300";
-    click(root, "[data-advance]");
+    const { root } = mount({ steps: ['submit={"amount":5}', "@300"] });
     expect(current(root)).toBe("paying");
     expect(root.querySelector("[data-advance-timer]")?.textContent).toBe(
       "advance 500 ms → paymentTimeout",
     );
-  });
-
-  test("free advance sends the typed milliseconds and rejects bad input", () => {
-    const { root, live } = mount();
-    const input = root.querySelector<HTMLInputElement>("[data-advance-ms]");
-    if (input) input.value = "-5";
-    click(root, "[data-advance]");
-    expect(live.log).toEqual([]);
-    expect(root.querySelector(".explore-time [role=alert]")?.hasAttribute("hidden")).toBe(false);
-    const again = root.querySelector<HTMLInputElement>("[data-advance-ms]");
-    if (again) again.value = "250";
-    click(root, "[data-advance]");
-    expect(live.log).toEqual([[{ kind: "advance", ms: 250 }]]);
   });
 
   test("an edge click on an event with no payload still sends at once", () => {
@@ -915,16 +898,6 @@ describe("what ran", () => {
     expect(root.querySelector("[data-live-because]")).toBeNull();
   });
 
-  test("Changed names the keys and Effects started names the effects", () => {
-    const root = mountWith(
-      branching,
-      stepped({ effects: ["charge"], context: { amount: 9, tag: "x" } }).live,
-    );
-    sendVia(root, "submit");
-    expect(text(root, "changed")).toBe("Changed: amount, tag");
-    expect(text(root, "effects")).toBe("Effects started: charge");
-  });
-
   test("an async result renders without another click", () => {
     const { live, push } = stepped({});
     const root = mountWith(branching, live);
@@ -966,7 +939,6 @@ describe("what ran", () => {
     const after = root.querySelector("[data-live-after]");
     expect(after?.textContent).toContain("Then paymentTimeout came back");
     expect(after?.textContent).toContain("paymentTimeout: paying → error");
-    expect(after?.textContent).toContain("Changed: failed");
   });
 
   test("an ignored event says nothing ran", () => {
@@ -1091,6 +1063,30 @@ describe("live effect reports", () => {
     sendVia(root, "start");
     return root;
   }
+  test("Back resets the driver exactly once", () => {
+    const inner = fetchDriver("real");
+    let resets = 0;
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [fetcher] },
+      {
+        driver: {
+          ...inner,
+          reset: () => {
+            resets += 1;
+            return inner.reset();
+          },
+        },
+      },
+    );
+    sendVia(root, "start");
+    sendVia(root, "fetchFailed");
+    const before = resets;
+    click(root, '[data-explore-action="back"]');
+    expect(resets - before).toBe(1);
+  });
+
   test("picking the failure moves down the error path and Back undoes it", () => {
     const root = mountFetcher();
     sendVia(root, "fetchFailed");
@@ -1185,7 +1181,7 @@ describe("live effect reports", () => {
     test("real mode has no Not run here line", () => {
       const root = mountFetcher({ mode: "real" });
       expect(root.querySelector("[data-live-not-run]")).toBeNull();
-      expect(line(root, "effects")).toBe("Effects started: fetchList");
+      expect(root.querySelector("[data-live-effects]")).toBeNull();
     });
 
     test("the outcome does not repeat the effects line", () => {
@@ -1203,7 +1199,7 @@ describe("live effect reports", () => {
       };
       const root = mountFetcher({ mode: "held", machine });
       expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching (final)");
-      expect(root.querySelector("[data-advance]")).toBeNull();
+      expect(root.querySelector(".explore-time")).toBeNull();
     });
 
     test("picking a report moves on and Back returns to the state", () => {
@@ -1215,11 +1211,11 @@ describe("live effect reports", () => {
     });
   });
 
-  test("at rest the Step tab shows the clock and no Send buttons, in no fold", () => {
+  test("at rest the Step tab has no Send buttons, no fold and, without timers, no time block", () => {
     const root = mountFetcher();
     expect(root.querySelector("details")).toBeNull();
     expect(root.querySelector(".explore [data-send]")).toBeNull();
-    expect(root.querySelector(".explore [data-advance]")).not.toBeNull();
+    expect(root.querySelector(".explore .explore-time")).toBeNull();
   });
 });
 

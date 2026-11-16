@@ -271,7 +271,7 @@ describe("mountViewer with a driver", () => {
     send(root, "go");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
     expect(root.querySelector('[data-outcome="transition"]')?.textContent).toContain("open → done");
-    expect(root.querySelector("[data-live-effects]")?.textContent).toBe("Effects started: closeUp");
+    expect(root.querySelector("[data-live-effects]")).toBeNull();
     expect(root.querySelector(".graph g[data-node-id='done']")?.classList).toContain("current");
   });
 

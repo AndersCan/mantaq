@@ -34,8 +34,6 @@ interface ViewState {
   live: VizLiveState | null;
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
   afters: VizLiveStep[][];
-  /** Context before the last live step; undefined when no step ran. */
-  previous: VizJson | undefined;
   /** Live: the followed child, set by a chip click; null = the lowest key. */
   picked: { map: string; key: string } | null;
   /** The panel tab shown. */
@@ -380,7 +378,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     selection: null,
     live: null,
     afters: [],
-    previous: undefined,
     picked: null,
     tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
@@ -481,7 +478,6 @@ function liveOf(
     live: {
       state: view.live,
       afters: view.afters,
-      previous: view.previous,
       picked: view.picked,
       sent: view.sent,
       values: view.values,
@@ -579,9 +575,8 @@ function eventStep(
   return { kind: "event", event, payload, ...(actor ? { actor } : {}) };
 }
 
-/** Takes one live step: the context before it becomes `previous`, and an open payload form closes. */
+/** Takes one live step; an open payload form closes. */
 function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
-  view.previous = view.live?.context;
   const length = view.live?.steps.length ?? 0;
   view.live = stepSafely(driver, { before: view.live, step });
   if (view.live.steps.length === length + 1) {
@@ -590,9 +585,8 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
 }
 
 /** A driver that throws leaves the state where it was and shows the message as a handler error. */
-/** Sets `view.live` to the state after `steps` and `view.previous` to the context before the last of them. */
+/** Sets `view.live` to the state after `steps`. */
 function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<VizStep>): void {
-  view.previous = steps.length === 0 ? undefined : replay(driver, steps.slice(0, -1)).live.context;
   const played = replay(driver, steps);
   view.live = played.live;
   view.afters = played.afters;
