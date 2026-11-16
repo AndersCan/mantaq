@@ -559,6 +559,17 @@ describe("walking: the selected arrow's Send", () => {
     expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
+
+  test("after a walking Send, focus is on the selected arrow", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    document.body.append(root);
+    root
+      .querySelector('[data-edge-id="open-go-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("open-go-done");
+    root.remove();
+  });
 });
 
 describe("effect chip sends hint", () => {
