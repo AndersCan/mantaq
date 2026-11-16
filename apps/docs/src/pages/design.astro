@@ -19,7 +19,6 @@ const headings = [
   { depth: 2, slug: "code-blocks", text: "Code blocks" },
   { depth: 2, slug: "buttons-and-cards", text: "Buttons and cards" },
   { depth: 2, slug: "diagram", text: "Diagram" },
-  { depth: 2, slug: "system-view", text: "System view" },
   { depth: 2, slug: "design-findings", text: "Design findings line" },
   { depth: 2, slug: "tutorial-step", text: "Tutorial step: start marker and self-transitions" },
   { depth: 2, slug: "ai-page-label", text: "AI-written page label" },
@@ -117,34 +116,9 @@ const headings = [
   <p>A docs paragraph, so the diagram's text size is judged against the text around it.</p>
   <Machine src="src/content/docs/checkout.ts" />
 
-  <h2 id="system-view">System view</h2>
-  <p><strong>Awaiting approval</strong></p>
   <p>
-    New: three blocks. A system node (a part's name and its state), an out arrow (an output nobody in
-    the machine takes ends at <code>out of &lt;machine&gt;</code>), and the <code>← System</code>
-    button in the header after Open. Pink marks the arrow that carried the last step; teal marks
-    the clicked arrow or box.
-  </p>
-  <Machine src="src/content/docs/photo-upload.ts" />
-  <Machine src="src/design/out-arrow.ts" />
-  <p>
-    Changed: a part that talks to only one bigger part sits inside it, in a dashed frame. A part
-    with no arrow to another part sits in a row under the board. On a phone the board runs top to
-    bottom.
-  </p>
-  <div class="design-phone">
-    <Machine src="src/content/docs/photo-upload.ts" />
-  </div>
-  <p>
-    New: two blocks on the system view. A <code>from outside</code> pill with an arrow into the
-    part that takes root events (click a line to send it; drawn unclickable without a driver), and
-    a key line under the diagram that writes a shared event prefix once
-    (<code>events: team.*</code>). Two parts share one arrow per direction, with the event names
-    stacked as lines.
-  </p>
-  <p>
-    New: a message a machine cannot take is marked. The arrow name gets a <code>!</code>, the Path
-    row says <code>dropped</code>, and the Step tab and Details say why. Put the waiter on a break,
+    New: a message a machine cannot take is marked. The Path row starts with <code>!</code> and says
+    <code>dropped</code>, and the Step tab says why. Put the waiter on a break,
     then cook a dish.
   </p>
   <Machine src="src/design/dropped-message.ts" />

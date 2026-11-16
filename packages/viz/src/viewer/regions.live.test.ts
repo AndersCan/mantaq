@@ -60,12 +60,15 @@ const photoUpload: VizMachine = {
     event("connectionRestored"),
   ],
   outputs: [],
-  partOutputs: {},
+  partOutputs: { upload: ["photoUploaded"] },
   context: null,
   edges: [
     edge("showingUploadScreen", "photoUploaded", "showingUploadedPhoto"),
     edge("upload.waitingForPhoto", "photoPicked", "upload.sendingPhoto"),
-    edge("upload.sendingPhoto", "uploadConfirmed", "upload.photoSent"),
+    {
+      ...edge("upload.sendingPhoto", "uploadConfirmed", "upload.photoSent"),
+      emits: ["photoUploaded"],
+    },
     edge("network.online", "connectionLost", "network.offline"),
     edge("network.offline", "connectionRestored", "network.online"),
   ],
@@ -136,6 +139,37 @@ function mount(machine: VizMachine = photoUpload) {
 }
 
 describe("live regions", () => {
+  test("a machine whose regions talk opens on its diagram, and an arrow in a region walks it", () => {
+    const { root, sent } = mount();
+    expect(root.querySelector('svg.graph g.region[data-region="upload"]')).not.toBeNull();
+    expect(root.querySelector("[data-system]")).toBeNull();
+    root
+      .querySelector('[data-edge-id="upload.waitingForPhoto-photoPicked-upload.sendingPhoto"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(sent).toEqual([
+      { kind: "event", event: "photoPicked", payload: null, actor: { region: "upload" } },
+    ]);
+    expect(root.querySelector('p[data-region="upload"]')?.getAttribute("data-region-state")).toBe(
+      "upload.sendingPhoto",
+    );
+  });
+
+  test("an input another part sends sits under Send an input, not in a group of its own", () => {
+    const { root } = mount({
+      ...photoUpload,
+      events: photoUpload.events.map((each) =>
+        each.id === "photoUploaded" ? { ...each, internal: false } : each,
+      ),
+    });
+    const groups = [...root.querySelectorAll("[data-group]")].map((each) =>
+      each.getAttribute("data-group"),
+    );
+    expect(groups).not.toContain("parts");
+    expect(
+      root.querySelector('[data-group="input"] [data-send-item="photoUploaded"]'),
+    ).not.toBeNull();
+  });
+
   test("each region gets a line with its own state", () => {
     const { root } = mount();
     const line = root.querySelector('p[data-region="upload"]');

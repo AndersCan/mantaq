@@ -155,7 +155,7 @@ function edgeTitle(edge: VizEdge): string {
 function edgePanel(
   doc: Document,
   edge: VizEdge,
-  context: { machine: VizMachine; replay: Replay; sends?: (edge: VizEdge) => HTMLElement[] },
+  context: { machine: VizMachine; replay: Replay },
 ): HTMLElement {
   const { machine, replay } = context;
   const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
@@ -164,7 +164,6 @@ function edgePanel(
     machineWide(doc, machine, replay),
     routingNote(doc, edge, machine),
     predictionNote(doc, edge, machine),
-    ...(context.sends?.(edge) ?? []),
     list(doc, [
       ["source", isAnyState(edge.from) ? "any state (onAny)" : edge.from],
       [
@@ -378,15 +377,12 @@ export function renderPanel(
     selection: Selection | null;
     select: (selection: Selection) => void;
     replay?: (steps: ReadonlyArray<VizStep>) => void;
-    /** Lines for an edge that sends an event to another part (system view). */
-    sends?: (edge: VizEdge) => HTMLElement[];
   },
 ): HTMLElement {
   const { selection } = context;
   if (selection?.kind === "edge") {
     const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-    if (edge)
-      return edgePanel(doc, edge, { machine, replay: context.replay, sends: context.sends });
+    if (edge) return edgePanel(doc, edge, { machine, replay: context.replay });
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);

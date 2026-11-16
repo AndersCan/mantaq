@@ -151,8 +151,6 @@ function mount(sender: string | null = "") {
 
 const send = (root: HTMLElement, name: string) =>
   root.querySelector<HTMLButtonElement>(`[data-send="${name}"]`)?.click();
-const arrow = (root: HTMLElement) =>
-  root.querySelector<SVGGElement>('g.link[data-event="DISH_READY"]');
 const pathTexts = (root: HTMLElement) =>
   [...root.querySelectorAll("[data-rewind]")].map((each) => each.textContent);
 const text = (root: HTMLElement, selector: string) => root.querySelector(selector)?.textContent;
@@ -164,61 +162,31 @@ function walk(root: HTMLElement, count: number) {
 }
 
 describe("dropped message", () => {
-  test("a taken message names sender → receiver on the Path and the Step tab, and the arrow is pink", () => {
+  test("a taken message names sender → receiver on the Path and the Step tab", () => {
     const { root } = mount();
     walk(root, 1);
     expect(pathTexts(root)[1]).toBe("DISH_COOKED, then kitchen → waiter: serving → carryingDish");
     expect(text(root, "[data-live-after]")).toContain(
       "Then kitchen sent DISH_READY to waiter: serving → carryingDish",
     );
-    expect(arrow(root)?.classList.contains("took")).toBe(true);
-    expect(arrow(root)?.classList.contains("dropped")).toBe(false);
     expect(root.querySelector("[data-live-dropped]")).toBeNull();
   });
 
-  test("a dropped one starts the Path row with !, says dropped, and marks the arrow, not pink", () => {
+  test("a dropped one starts the Path row with ! and the Step tab says it was dropped", () => {
     const { root } = mount();
     walk(root, 4);
     expect(pathTexts(root)[4]).toBe("! DISH_COOKED, then kitchen → waiter DISH_READY dropped");
-    expect(arrow(root)?.classList.contains("dropped")).toBe(true);
-    expect(arrow(root)?.classList.contains("took")).toBe(false);
-    expect(arrow(root)?.querySelector("text")?.textContent).toBe("DISH_READY !");
-    expect(arrow(root)?.querySelector("tspan.drop-mark")).not.toBeNull();
-    expect(arrow(root)?.getAttribute("aria-label")).toBe(
-      "DISH_READY: kitchen to waiter, dropped in this run",
-    );
     expect(text(root, "[data-live-dropped]")).toBe(
       "! Then kitchen sent DISH_READY to waiter: dropped.",
     );
     expect(root.querySelector("[data-live-dropped]")?.classList.contains("muted")).toBe(false);
   });
 
-  test("the mark stays after a later step and is gone after rewinding to before the drop", () => {
+  test("the ! is gone after rewinding to before the drop", () => {
     const { root } = mount();
     walk(root, 5);
-    expect(arrow(root)?.classList.contains("dropped")).toBe(true);
-    expect(arrow(root)?.classList.contains("took")).toBe(false);
     root.querySelector<HTMLElement>('[data-rewind="3"]')?.click();
-    expect(arrow(root)?.classList.contains("dropped")).toBe(false);
-    expect(arrow(root)?.querySelector("tspan.drop-mark")).toBeNull();
-    expect(arrow(root)?.getAttribute("aria-label")).toBe("DISH_READY: kitchen to waiter");
     expect(pathTexts(root).join("|")).not.toContain("!");
-  });
-
-  test("clicking the dropped arrow says why", () => {
-    const { root } = mount();
-    walk(root, 4);
-    arrow(root)?.dispatchEvent(new Event("click"));
-    expect(text(root, "[data-link-dropped]")).toBe(
-      "waiter has no handler for DISH_READY in onBreak.",
-    );
-  });
-
-  test("a taken arrow's Details has no drop line", () => {
-    const { root } = mount();
-    walk(root, 1);
-    arrow(root)?.dispatchEvent(new Event("click"));
-    expect(root.querySelector("[data-link-dropped]")).toBeNull();
   });
 
   test("a drop with no known sender shows only on the Path row", () => {
@@ -227,10 +195,6 @@ describe("dropped message", () => {
     expect(pathTexts(root)[4]).toBe("! DISH_COOKED, then waiter DISH_READY dropped");
     expect(text(root, "[data-live-after]")).toContain("Then waiter took DISH_READY");
     expect(root.querySelector("[data-live-dropped]")).toBeNull();
-    expect(root.querySelector(".dropped")).toBeNull();
-    expect(arrow(root)?.querySelector("tspan.drop-mark")).toBeNull();
-    arrow(root)?.dispatchEvent(new Event("click"));
-    expect(root.querySelector("[data-link-dropped]")).toBeNull();
   });
 
   test("a stay that took the message reads sent … to … without a move", () => {
@@ -323,45 +287,7 @@ const to = (part: string, event: string, partial: Partial<VizLiveStep>): VizLive
   ...partial,
 });
 
-const link = (root: HTMLElement, from: string, event: string, part: string) =>
-  root.querySelector(`g.link[data-from="${from}"][data-event="${event}"][data-to="${part}"]`);
-const marked = (root: HTMLElement) =>
-  [...root.querySelectorAll("g.link.dropped")].map(
-    (each) =>
-      `${each.getAttribute("data-from")}>${each.getAttribute("data-event")}>${each.getAttribute("data-to")}`,
-  );
-
-describe("dropped message among several arrows", () => {
-  test("only the arrow from the sender, with the event, to the receiver is marked", () => {
-    const root = mountHall([
-      [
-        to("waiter", "DISH_READY", {
-          outcome: "ignored",
-          message: { sender: "", dropped: "noHandler" },
-        }),
-      ],
-    ]);
-    send(root, "DISH_COOKED");
-    expect(marked(root)).toEqual([">DISH_READY>waiter"]);
-  });
-
-  test("Details names the reason of the latest drop on the arrow", () => {
-    const drop = (from: string) =>
-      to("waiter", "DISH_READY", {
-        outcome: "ignored",
-        from,
-        to: from,
-        message: { sender: "", dropped: "noHandler" },
-      });
-    const root = mountHall([[drop("waiter.onBreak")], [drop("waiter.onLunch")]]);
-    send(root, "DISH_COOKED");
-    send(root, "DISH_COOKED");
-    link(root, "", "DISH_READY", "waiter")?.dispatchEvent(new Event("click"));
-    expect(text(root, "[data-link-dropped]")).toBe(
-      "waiter has no handler for DISH_READY in onLunch.",
-    );
-  });
-
+describe("several parts move after one step", () => {
   test("more than three things after a step end with how many are left out", () => {
     const moved = (part: string) =>
       to(part, "DISH_READY", {
