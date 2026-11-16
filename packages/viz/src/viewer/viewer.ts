@@ -342,29 +342,31 @@ function walkingSend(
   const current = stateAfter(machine, view.path);
   if (current === null) return null;
   const move = movesFrom(machine, current).find((each) => each.edge.id === edge.id);
-  const targets = move?.targets ?? [];
-  const several = targets.length > 1;
-  const buttons =
-    targets.length === 0
-      ? null
-      : html(
-          doc,
-          "div",
-          {},
-          targets.map((to) =>
-            button(doc, ["Send ", code(doc, edge.event), ...(several ? [` → ${to}`] : [])], {
-              onClick: () => {
-                context.take(
-                  { edge: edge.id, to },
-                  { event: edge.event, payload: null, edge: edge.id },
-                );
-                focusEdge(context.root, edge.id);
-              },
-              attrs: { "data-send-edge": edge.id, "data-target": to },
-            }),
-          ),
-        );
-  return sentHere(doc, { machine, view, edge }, buttons);
+  if (move === undefined || move.targets.length === 0) {
+    return sentHere(doc, { machine, view, edge }, null);
+  }
+  const several = move.targets.length > 1;
+  return sentHere(
+    doc,
+    { machine, view, edge },
+    html(
+      doc,
+      "div",
+      {},
+      move.targets.map((to) =>
+        button(doc, ["Send ", code(doc, edge.event), ...(several ? [` → ${to}`] : [])], {
+          onClick: () => {
+            context.take(
+              { edge: edge.id, to },
+              { event: edge.event, payload: null, edge: edge.id },
+            );
+            focusEdge(context.root, edge.id);
+          },
+          attrs: { "data-send-edge": edge.id, "data-target": to },
+        }),
+      ),
+    ),
+  );
 }
 
 /** Everything the viewer draws under its root: the controls and panel, or with Diagram only just the canvas. */
