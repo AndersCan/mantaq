@@ -892,7 +892,7 @@ function pickByClick(
   if (key === undefined) then.showDetails(selection);
   else {
     view.picked = { map, key };
-    view.selection = selection;
+    view.selection = null;
     view.tab = "step";
     then.refresh();
   }

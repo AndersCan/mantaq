@@ -144,7 +144,7 @@ describe("live actor map children", () => {
     const rows = [...(fold?.querySelectorAll("[data-child-key]") ?? [])];
     expect(rows.map((row) => row.getAttribute("data-child-key"))).toEqual(["p1"]);
     expect(root.querySelectorAll("[data-child-key]")).toHaveLength(1);
-    expect(rows[0]?.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
+    expect(root.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
     const retry = root.querySelector('[data-actor="photos[p1]"] [data-send-item="retryPressed"]');
     expect(retry?.querySelector("[data-ignored]")).not.toBeNull();
     expect(
@@ -168,7 +168,7 @@ describe("live actor map children", () => {
   test("a final child has no moves block", () => {
     const { root } = mount([child("p1", "photoSent", 3)]);
     const row = root.querySelector('[data-child-key="p1"]');
-    expect(row?.querySelector(".explore-child-now")?.textContent).toBe("p1: in photoSent (final)");
+    expect(root.querySelector(".explore-child-now")?.textContent).toBe("p1: in photoSent (final)");
     expect(row?.querySelector("[data-actor]")).toBeNull();
   });
 
@@ -219,7 +219,31 @@ describe("live actor map children", () => {
     expect(walkedKey(root)).toBe("p2");
     expect(sent).toEqual([]);
     expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
-    expect(box(root, "waitingForRetry")?.classList.contains("selected")).toBe(true);
+    expect(box(root, "waitingForRetry")?.classList.contains("selected")).toBe(false);
+  });
+
+  test("a click on a child state is pink there, not teal, and the first Step line names the child", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
+    const pink = () =>
+      [...root.querySelectorAll(".graph g.current")].map(
+        (each) => each.getAttribute("data-node-id") ?? "",
+      );
+    const first = () => root.querySelector(".explore > p");
+    click(box(root, "waitingForRetry"));
+    expect(pink().sort((a, b) => a.localeCompare(b))).toEqual([
+      "photos.waitingForRetry",
+      "showingQueue",
+    ]);
+    expect(box(root, "waitingForRetry")?.classList.contains("selected")).toBe(false);
+    expect(first()?.textContent).toBe("p2: in waitingForRetry");
+    click(box(root, "sendingPhoto"));
+    expect(pink().sort((a, b) => a.localeCompare(b))).toEqual([
+      "photos.sendingPhoto",
+      "showingQueue",
+    ]);
+    expect(first()?.textContent).toBe("p1: in sendingPhoto");
+    expect(root.querySelectorAll(".explore-child-now")).toHaveLength(1);
+    expect(sent).toEqual([]);
   });
 
   test("a click on a child state with no child in it shows details and keeps the pick", () => {

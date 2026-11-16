@@ -517,6 +517,28 @@ function regionLines(doc: Document, machine: VizMachine, state: VizLiveState): H
   });
 }
 
+/** The first lines of the Step tab: each map's walked child and its state. */
+function walkedLines(
+  doc: Document,
+  machine: VizMachine,
+  live: ExploreContext["live"],
+): HTMLElement[] {
+  return machine.maps.flatMap((map) => {
+    const child =
+      live === undefined ? undefined : walkedChild(live.state, map, live.picked ?? null);
+    if (child === undefined) return [];
+    const final = machine.states.find((each) => each.id === child.state)?.final === true;
+    return [
+      html(doc, "p", { class: "explore-now explore-child-now" }, [
+        code(doc, child.key),
+        ": in ",
+        html(doc, "strong", {}, [localName(child.state)]),
+        final ? " (final)" : "",
+      ]),
+    ];
+  });
+}
+
 /** One section per actor map: its walked child, where it is now, and what it handles. */
 function childrenSections(
   doc: Document,
@@ -545,15 +567,7 @@ function childrenSections(
           "data-child-key": child.key,
           "data-child-state": child.state,
         },
-        [
-          html(doc, "p", { class: "explore-now explore-child-now" }, [
-            code(doc, child.key),
-            ": in ",
-            html(doc, "strong", {}, [localName(child.state)]),
-            final ? " (final)" : "",
-          ]),
-          moves,
-        ],
+        [moves],
       );
     });
     if (rows.length === 0) return null;
@@ -1288,6 +1302,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       "data-done": final ? "" : null,
     },
     [
+      ...walkedLines(doc, machine, live),
       ...nowSection(doc, machine, { current, final, ...(live ? { state: live.state } : {}) }),
       ...(live
         ? liveParts(doc, machine, { live, current, final, events })
