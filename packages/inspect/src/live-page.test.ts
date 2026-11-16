@@ -193,6 +193,39 @@ describe("mountDriven values", () => {
   });
 });
 
+describe("mountDriven arrows that land elsewhere", () => {
+  test("an arrow whose guard picks another branch is locked and says where it goes", async () => {
+    const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
+    const inspected = await inspectModule(answerFile, {
+      load: async () => ({ createAnswerActor }),
+      fuzz: false,
+    });
+    history.replaceState(null, "", "/");
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: {
+        answer: () => {
+          const clock = VirtualClock();
+          return { actor: createAnswerActor(clock), clock };
+        },
+      },
+    });
+    sendVia(root, "ask");
+    const arrow = (to: string) =>
+      root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
+    arrow("declined")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "answered goes to accepted, not declined",
+    );
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+    expect(arrow("declined")?.querySelector(".blocked-lock")).not.toBeNull();
+    expect(arrow("accepted")?.querySelector(".blocked-lock")).toBeNull();
+  });
+});
+
 describe("mountLiveDriven", () => {
   async function failing(fetcher: typeof fetch): Promise<string> {
     const root = document.createElement("div");

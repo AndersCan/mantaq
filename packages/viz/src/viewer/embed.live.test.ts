@@ -380,6 +380,19 @@ describe("live controls", () => {
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
 
+  test("an arrow whose source is not current says why, and after a send only the sent line shows", () => {
+    const { root } = mount();
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "paymentTimeout can't be sent: the walk is in idle, this arrow leaves paying.",
+    );
+    clickEdge(root, "idle-submit-paying");
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    clickEdge(root, "idle-submit-paying");
+    expect(root.querySelector("[data-details-sent]")).not.toBeNull();
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+  });
+
   test("the initial arrow has no Send button", () => {
     const { root } = mount();
     clickEdge(root, "__initial__--idle");

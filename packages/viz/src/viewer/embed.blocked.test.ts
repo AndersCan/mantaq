@@ -400,7 +400,7 @@ describe("a blocked arrow, more cases", () => {
           step.actor !== undefined &&
           "key" in step.actor &&
           step.actor.key === "p2"
-            ? { ...stayedStep(step), outcome: "transition" as const }
+            ? { ...stayedStep(step), outcome: "transition" as const, to: "photos.sent" }
             : stayedStep(step),
         ),
     };

@@ -284,6 +284,26 @@ describe("live actor map children", () => {
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
 
+  test("a picked child in another state says so", () => {
+    const two = mount([child("p1", "sendingPhoto", 1), child("p2", "waitingForRetry", 2)]);
+    pick(two.root, "p2");
+    click(edgeGroup(two.root));
+    expect(two.root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "uploadConfirmed can't be sent: p2 is in waitingForRetry, this arrow leaves sendingPhoto.",
+    );
+  });
+
+  test("an arrow another part sends names it, has no Send and no lock", () => {
+    const fed: VizMachine = { ...photoQueue, partOutputs: { other: ["uploadConfirmed"] } };
+    const by = mount([child("p1", "sendingPhoto", 1)], fed);
+    click(edgeGroup(by.root));
+    expect(by.root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "uploadConfirmed is sent by other, not by hand.",
+    );
+    expect(by.root.querySelector("[data-send-edge]")).toBeNull();
+    expect(by.root.querySelector(".blocked-lock")).toBeNull();
+  });
+
   test("a map with no child has no Send button on its arrows", () => {
     const { root } = mount([]);
     click(edgeGroup(root));
