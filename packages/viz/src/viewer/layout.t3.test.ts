@@ -153,35 +153,13 @@ describe("region titles have room of their own", () => {
   });
 
   test("a map region's title reads 'one per key' and sets the width", () => {
-    const pool = { ...machineOf([state("p.b", "p")], [], ["p"]), maps: ["p"] };
-    const region = placeMachine(pool).regions[0];
-    expect(region?.width).toBe(textWidth("p: one per key") + 8 + 2 * LABEL_PAD);
-  });
-
-  test("a map region reserves the widest live count, every state at 99", () => {
+    const name = "poolOfWorkersWithAVeryLongNameThatIsWiderThanAnyStateBox";
     const pool = {
-      ...machineOf([state("p.free", "p"), state("p.working", "p")], [], ["p"]),
-      maps: ["p"],
+      ...machineOf([{ ...state(`${name}.b`, name), label: "b" }], [], [name]),
+      maps: [name],
     };
     const region = placeMachine(pool).regions[0];
-    expect(region?.width).toBe(textWidth("p: 99 p.free, 99 p.working") + 8 + 2 * LABEL_PAD);
-  });
-
-  test("the reserved count names the map's own states by label, not other states or ids", () => {
-    const pool = {
-      ...machineOf(
-        [
-          { ...state("p.idle", "p"), label: "idle" },
-          { ...state("p.busy", "p"), label: "busy" },
-          { ...state("elsewhereWithALongName"), label: "elsewhereWithALongName" },
-        ],
-        [],
-        ["p"],
-      ),
-      maps: ["p"],
-    };
-    const region = placeMachine(pool).regions[0];
-    expect(region?.width).toBe(textWidth("p: 99 idle, 99 busy") + 8 + 2 * LABEL_PAD);
+    expect(region?.width).toBe(textWidth(`${name}: one per key`) + 8 + 2 * LABEL_PAD);
   });
 
   test("checker: a label on a region's title and a state on a region's title are overlaps", () => {

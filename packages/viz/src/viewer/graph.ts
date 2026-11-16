@@ -213,6 +213,16 @@ function stateGroup(
         state.label,
       ]),
       ...chipGroups(doc, placed, callbacks.bare === true),
+      placed.workers === undefined
+        ? null
+        : svg(doc, "rect", {
+            class: "worker-row",
+            "aria-hidden": "true",
+            x: placed.workers.x - placed.workers.width / 2,
+            y: placed.workers.y - placed.workers.height / 2,
+            width: placed.workers.width,
+            height: placed.workers.height,
+          }),
       findings.length === 0 || callbacks.bare === true
         ? null
         : findingMark(doc, placed, { findings, callbacks }),

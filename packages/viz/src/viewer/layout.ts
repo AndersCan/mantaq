@@ -20,6 +20,8 @@ export interface PlacedState {
   label: LabelBox;
   /** One box per effect, top to bottom, under the name. */
   chips: LabelBox[];
+  /** Actor-map states: the row live worker chips sit in, `LABEL_PAD` under the name and effect chips. */
+  workers?: LabelBox;
 }
 
 /** Placeholder target for an undetermined edge. One per edge; never shared or guessed. */
@@ -172,32 +174,48 @@ function regionNodeId(region: string): string {
 
 const HINT_WIDTH = 14;
 
-function stateWidth(state: VizState): number {
+const WORKER_ROW_HEIGHT = 14;
+const MAP_STATE_MIN_WIDTH = 168;
+
+function isMapState(machine: VizMachine, state: VizState): boolean {
+  return state.region !== null && machine.maps.includes(state.region);
+}
+
+function stateWidth(state: VizState, worker: boolean): number {
   const chips = state.effects.map(
     (effect) => textWidth(effect.name, CHIP_FONT) + 24 + (effect.sends === null ? HINT_WIDTH : 0),
   );
   const frame = state.final ? 2 * FINAL_INSET : 0;
-  return Math.max(80, textWidth(state.label) + 24 + frame, ...chips.map((chip) => chip + frame));
+  return Math.max(
+    worker ? MAP_STATE_MIN_WIDTH : 80,
+    textWidth(state.label) + 24 + frame,
+    ...chips.map((chip) => chip + frame),
+  );
 }
 
-function stateHeight(state: VizState): number {
+function stateHeight(state: VizState, worker: boolean): number {
   const frame = state.final ? 2 * FINAL_INSET : 0;
   return (
     frame +
     Math.max(
       NODE_HEIGHT,
       2 * LABEL_PAD + NAME_HEIGHT + state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
-    )
+    ) +
+    (worker ? LABEL_PAD + WORKER_ROW_HEIGHT : 0)
   );
 }
 
 /** The name box and chip boxes of a placed state, each `LABEL_PAD` inside and apart. */
-function insideOf(state: VizState, box: LabelBox): { label: LabelBox; chips: LabelBox[] } {
+function insideOf(
+  state: VizState,
+  box: LabelBox,
+  worker: boolean,
+): { label: LabelBox; chips: LabelBox[]; workers?: LabelBox } {
   const frame = state.final ? FINAL_INSET : 0;
   const top = box.y - box.height / 2 + frame;
   const label = {
     x: box.x,
-    y: state.effects.length === 0 ? box.y : top + LABEL_PAD + NAME_HEIGHT / 2,
+    y: state.effects.length === 0 && !worker ? box.y : top + LABEL_PAD + NAME_HEIGHT / 2,
     width: textWidth(state.label),
     height: NAME_HEIGHT,
   };
@@ -207,7 +225,15 @@ function insideOf(state: VizState, box: LabelBox): { label: LabelBox; chips: Lab
     width: box.width - 2 * (LABEL_PAD + frame),
     height: CHIP_HEIGHT,
   }));
-  return { label, chips };
+  if (!worker) return { label, chips };
+  const above = chips.at(-1) ?? label;
+  const workers = {
+    x: box.x,
+    y: above.y + above.height / 2 + LABEL_PAD + WORKER_ROW_HEIGHT / 2,
+    width: box.width - 2 * (LABEL_PAD + frame),
+    height: WORKER_ROW_HEIGHT,
+  };
+  return { label, chips, workers };
 }
 
 function parentRegion(region: string): string | null {
@@ -330,7 +356,11 @@ function specsOf(machine: VizMachine, heights: ReadonlyMap<string, number>): Map
     loopsOf(machine.edges.filter((edge) => isDrawn(edge) && isLoop(edge) && edge.from === id));
   for (const state of machine.states) {
     const loops = loopsAt(state.id);
-    const size = { width: stateWidth(state), height: tall(state.id, stateHeight(state)) };
+    const worker = isMapState(machine, state);
+    const size = {
+      width: stateWidth(state, worker),
+      height: tall(state.id, stateHeight(state, worker)),
+    };
     specs.set(state.id, specOf(state.id, size, loops, starts.has(state.id) ? ENTRY_STUB : 0));
   }
   for (const id of anyIds(machine)) {
@@ -907,7 +937,7 @@ function placeNodes(
     id: state.id,
     state,
     ...at(state.id),
-    ...insideOf(state, at(state.id)),
+    ...insideOf(state, at(state.id), isMapState(machine, state)),
   }));
   const anys: PlacedAny[] = anyIds(machine).map((id) => ({ kind: "any", id, ...at(id) }));
   const unknowns: PlacedUnknown[] = machine.edges
