@@ -2,6 +2,7 @@
 import { describe, expect, test } from "vite-plus/test";
 import fc from "fast-check";
 import type { VizLiveChild } from "../schema.ts";
+import { textWidth } from "./layout.ts";
 import { drawChildMarkers, type MarkerContext } from "./markers.ts";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -36,7 +37,7 @@ const markers = (root: SVGSVGElement) =>
   Array.from(root.querySelectorAll<SVGGElement>("g.child-marker"));
 
 describe("drawChildMarkers", () => {
-  test("dots and +N stay inside the row when the shown count is wider than the total", () => {
+  test("chips and +N stay inside the row when the shown count is wider than the total", () => {
     // textWidth("+22", 10) = 20 but textWidth("+10", 10) = 21: room kept for "+22" is too small for "+10".
     const root = board([168]);
     drawChildMarkers(
@@ -53,11 +54,11 @@ describe("drawChildMarkers", () => {
     root.remove();
   });
 
-  test("dots that fit exactly show without a +N", () => {
-    // 13 dots = 156 of 168: no count, so no room is kept for one.
+  test("chips that fit exactly show without a +N", () => {
+    // 5 chips of "k0" = 5 * 22 + 4 * 4 = 126 of 168: no count.
     const root = board([168]);
-    drawChildMarkers(root, context(Array.from({ length: 13 }, (_, i) => child(`k${i}`, "s0"))));
-    expect(markers(root)).toHaveLength(13);
+    drawChildMarkers(root, context(Array.from({ length: 5 }, (_, i) => child(`k${i}`, "s0"))));
+    expect(markers(root)).toHaveLength(5);
     expect(root.querySelector("text.marker-count")).toBeNull();
     root.remove();
   });
@@ -133,9 +134,7 @@ describe("drawChildMarkers", () => {
           for (const marker of markers(root)) {
             const at = /translate\(([-\d.]+)px/.exec(marker.style.transform);
             const left = Number(at?.[1]);
-            const shape = marker.querySelector(
-              marker.classList.contains("dot") ? "rect.hit" : "rect",
-            );
+            const shape = marker.querySelector("rect");
             const index = marker.dataset.markerState === "p.s0" ? 0 : 1;
             expect(left).toBeGreaterThanOrEqual(10 - 0.1);
             expect(left + Number(shape?.getAttribute("width"))).toBeLessThanOrEqual(
@@ -169,12 +168,14 @@ describe("drawChildMarkers branches", () => {
   const at = (marker: Element | undefined) =>
     Number(/translate\(([-\d.]+)px/.exec((marker as SVGGElement).style.transform)?.[1]);
 
-  test("more children than fit: dots, then a +N whose title lists each hidden key on its own line, in key order", () => {
+  test("more children than fit: pills, then a +N whose title lists each hidden key on its own line, in key order", () => {
     const root = board([152]);
     const all = [...keys(19), "z, y"].map((key) => child(key, "s0")).reverse();
     drawChildMarkers(root, context(all));
     const drawn = markers(root);
-    expect(drawn.every((each) => each.classList.contains("dot"))).toBe(true);
+    expect(
+      drawn.every((each) => each.querySelector("text")?.textContent === each.dataset.markerKey),
+    ).toBe(true);
     const count = root.querySelector("text.marker-count");
     const hidden = count?.querySelector("title")?.textContent?.split("\n") ?? [];
     expect(count?.textContent?.endsWith(`+${hidden.length}`)).toBe(true);
@@ -186,16 +187,27 @@ describe("drawChildMarkers branches", () => {
     expect(at(count ?? undefined)).toBeLessThan(10 + 152);
   });
 
-  test("seven short keys that would fit as pills are dots", () => {
+  test("seven short keys on a 400 row are seven pills, centred", () => {
     const root = board([400]);
     drawChildMarkers(root, context(keys(7).map((key) => child(key, "s0"))));
-    expect(markers(root).map((each) => each.classList.contains("dot"))).toEqual(
-      Array(7).fill(true),
+    const pills = markers(root);
+    expect(pills).toHaveLength(7);
+    expect(root.querySelector("text.marker-count")).toBeNull();
+    const end =
+      at(pills.at(-1)) + Number(pills.at(-1)?.querySelector("rect")?.getAttribute("width"));
+    expect(Math.abs(at(pills[0]) - 10 - (10 + 400 - end))).toBeLessThan(0.2);
+  });
+
+  test("a row too narrow for any chip draws only a +N listing every key", () => {
+    const root = board([30]);
+    drawChildMarkers(root, context([child("abcdefgh", "s0"), child("bcdefghi", "s0")]));
+    expect(markers(root)).toHaveLength(0);
+    const count = root.querySelector("text.marker-count");
+    expect(count?.textContent).toBe("abcdefgh\nbcdefghi+2");
+    expect(count?.querySelector("title")?.textContent).toBe("abcdefgh\nbcdefghi");
+    expect(Math.abs(at(count ?? undefined) - (10 + (30 - textWidth("+2", 10)) / 2))).toBeLessThan(
+      0.1,
     );
-    const dots = markers(root);
-    expect(Math.abs(at(dots[0]) - 10 - (10 + 400 - (at(dots.at(-1)) + 12)))).toBeLessThan(0.2);
-    drawChildMarkers(root, context(keys(6).map((key) => child(key, "s0"))));
-    expect(markers(root).some((each) => each.classList.contains("dot"))).toBe(false);
   });
 
   test("a pill shows a long key cut to 8 characters and an empty key as two quotes", () => {

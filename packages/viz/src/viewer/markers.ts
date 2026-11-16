@@ -13,10 +13,7 @@ const PILL_H = 14;
 const PILL_PAD = 10;
 const FONT = 10;
 const GAP = 4;
-const MAX_PILLS = 6;
 const MAX_LABEL = 8;
-const DOT_R = 4;
-const DOT_STEP = 12;
 
 interface Row {
   left: number;
@@ -26,7 +23,6 @@ interface Row {
 
 interface Item {
   child: VizLiveChild;
-  dot: boolean;
   width: number;
   left: number;
   cy: number;
@@ -79,55 +75,34 @@ function rowOf(svgRoot: SVGSVGElement, state: string): Row | null {
   return { left: num("x"), width: num("width"), cy: num("y") + num("height") / 2 };
 }
 
-function pillsOf(children: ReadonlyArray<VizLiveChild>, row: Row): Item[] | null {
-  const widths = children.map((child) => textWidth(label(child.key), FONT) + PILL_PAD);
-  const total = widths.reduce((sum, w) => sum + w, 0) + GAP * (children.length - 1);
-  if (children.length > MAX_PILLS || total > row.width) return null;
-  let at = row.left + (row.width - total) / 2;
-  return children.map((child, index) => {
-    const width = widths[index] ?? 0;
-    const item = { child, dot: false, width, left: at, cy: row.cy, state: "" };
-    at += width + GAP;
-    return item;
-  });
-}
-
-function dotsOf(
+function chipsOf(
   children: ReadonlyArray<VizLiveChild>,
   row: Row,
 ): { items: Item[]; count: Count | null } {
-  let capacity = Math.min(children.length, Math.floor(row.width / DOT_STEP));
-  const room = (shown: number) =>
-    shown * DOT_STEP +
-    (shown < children.length ? textWidth(`+${children.length - shown}`, FONT) + GAP : 0);
-  while (capacity > 0 && room(capacity) > row.width) capacity -= 1;
-  const shown = children.slice(0, capacity);
-  const hidden = children.slice(capacity).map((child) => child.key);
-  const used =
-    shown.length * DOT_STEP + (hidden.length > 0 ? textWidth(`+${hidden.length}`, FONT) + GAP : 0);
-  const start = row.left + (row.width - used) / 2;
-  const items = shown.map((child, index) => ({
-    child,
-    dot: true,
-    width: DOT_STEP,
-    left: start + index * DOT_STEP,
-    cy: row.cy,
-    state: "",
-  }));
-  const count =
-    hidden.length > 0
-      ? { map: "", state: "", hidden, left: start + shown.length * DOT_STEP, cy: row.cy }
-      : null;
+  const widths = children.map((child) => textWidth(label(child.key), FONT) + PILL_PAD);
+  const usedBy = (shown: number) => {
+    const rest = children.length - shown;
+    const pills =
+      widths.slice(0, shown).reduce((sum, w) => sum + w, 0) + GAP * Math.max(shown - 1, 0);
+    if (rest === 0) return pills;
+    const count = textWidth(`+${rest}`, FONT);
+    return shown === 0 ? count : pills + GAP + count;
+  };
+  let shown = children.length;
+  while (shown > 0 && usedBy(shown) > row.width) shown -= 1;
+  let at = row.left + (row.width - usedBy(shown)) / 2;
+  const items = children.slice(0, shown).map((child, index) => {
+    const width = widths[index] ?? 0;
+    const item = { child, width, left: at, cy: row.cy, state: "" };
+    at += width + GAP;
+    return item;
+  });
+  const hidden = children.slice(shown).map((child) => child.key);
+  const count = hidden.length > 0 ? { map: "", state: "", hidden, left: at, cy: row.cy } : null;
   return { items, count };
 }
 
 function shapeOf(doc: Document, item: Item): SVGElement[] {
-  if (item.dot) {
-    return [
-      svg(doc, "circle", { cx: DOT_R, cy: 0, r: DOT_R }),
-      svg(doc, "rect", { class: "hit", x: 0, y: -PILL_H / 2, width: DOT_STEP, height: PILL_H }),
-    ];
-  }
   return [
     svg(doc, "rect", { x: 0, y: -PILL_H / 2, width: item.width, height: PILL_H, rx: PILL_H / 2 }),
     svg(doc, "text", { x: item.width / 2, y: 3.5, "text-anchor": "middle" }, [
@@ -165,8 +140,7 @@ function wantedMarkers(svgRoot: SVGSVGElement, children: ReadonlyArray<VizLiveCh
   for (const [state, group] of byState) {
     const row = rowOf(svgRoot, state);
     if (row === null) continue;
-    const pills = pillsOf(group, row);
-    const { items, count } = pills === null ? dotsOf(group, row) : { items: pills, count: null };
+    const { items, count } = chipsOf(group, row);
     for (const item of items) wanted.set(idOf(item.child), { item: { ...item, state } });
     if (count !== null)
       wanted.set(`count:${state}`, { count: { ...count, map: group[0]?.map ?? "", state } });
@@ -211,7 +185,7 @@ function drawMarker(live: Live, layer: SVGGElement, item: Item): void {
   }
   live.kept.set(marker, item);
   const named = item.child.key === "" ? '""' : item.child.key;
-  marker.setAttribute("class", ["child-marker", item.dot && "dot"].filter(Boolean).join(" "));
+  marker.setAttribute("class", "child-marker");
   marker.setAttribute("data-marker-map", item.child.map);
   marker.setAttribute("data-marker-key", item.child.key);
   marker.setAttribute("data-marker-state", item.state);
