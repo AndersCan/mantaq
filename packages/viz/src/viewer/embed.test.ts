@@ -488,6 +488,36 @@ describe("effect chip hover edge cases", () => {
   });
 });
 
+describe("walking: the selected arrow's Send", () => {
+  test("an arrow whose target depends on the payload has no button", () => {
+    const dynamic: VizMachine = {
+      ...door,
+      edges: [...door.edges, { ...edge("open", "dyn", "done"), to: null }],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [dynamic] }));
+    root
+      .querySelector('[data-edge-id="open-dyn-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+    expect(root.querySelector("[data-selected-edge] > div:empty")).toBeNull();
+  });
+
+  test("a click selects, then Send takes the step", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    root
+      .querySelector('[data-edge-id="open-go-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
+    const send = root.querySelector<HTMLButtonElement>("[data-send-edge]");
+    expect(send?.textContent).toBe("Send go");
+    send?.click();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
+    expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+});
+
 describe("effect chip sends hint", () => {
   const withEffect = (sends: string[] | null): VizMachine => ({
     ...door,

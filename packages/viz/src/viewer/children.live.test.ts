@@ -208,6 +208,35 @@ describe("live actor map children", () => {
     expect(title(mount([]).root)).toBe("photos: none");
   });
 
+  test("a child arrow's Details sends to the walked child", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
+    click(edgeGroup(root));
+    const button = root.querySelector<HTMLButtonElement>("[data-send-edge]");
+    expect(button?.textContent).toBe("Send uploadConfirmed to p1");
+    button?.click();
+    expect(sent).toEqual([
+      {
+        kind: "event",
+        event: "uploadConfirmed",
+        payload: null,
+        actor: { map: "photos", key: "p1" },
+      },
+    ]);
+  });
+
+  test("a child arrow with no child in its source has no Send button", () => {
+    const { root } = mount([child("p1", "waitingForRetry")]);
+    click(edgeGroup(root));
+    expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("a map with no child has no Send button on its arrows", () => {
+    const { root } = mount([]);
+    click(edgeGroup(root));
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
   test("a click on a child state selects it, sends nothing and keeps the walked child", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
     click(box(root, "waitingForRetry"));

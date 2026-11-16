@@ -330,6 +330,26 @@ function stayedStep(step: VizStep) {
   };
 }
 
+describe("a blocked arrow's Details", () => {
+  test("says why and has no Send button", () => {
+    const { driver } = fakeDriver();
+    const root = mount(driver);
+    clickEdge(root, "cart-pay-payment");
+    const note = root.querySelector("[data-blocked-note]");
+    expect(note?.getAttribute("data-blocked-note")).toBe("pay");
+    expect(note?.textContent?.length).toBeGreaterThan(0);
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("an open arrow has the button and no note", () => {
+    const { driver } = fakeDriver();
+    const root = mount(driver);
+    clickEdge(root, "cart-addItem-cart");
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+    expect(root.querySelector("[data-send-edge]")?.textContent).toBe("Send addItem");
+  });
+});
+
 describe("a blocked arrow, more cases", () => {
   test("walking to another map child tries its arrows again", () => {
     const machine: VizMachine = {

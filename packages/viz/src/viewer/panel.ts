@@ -155,12 +155,13 @@ function edgeTitle(edge: VizEdge): string {
 function edgePanel(
   doc: Document,
   edge: VizEdge,
-  context: { machine: VizMachine; replay: Replay },
+  context: { machine: VizMachine; replay: Replay; send?: (edge: VizEdge) => HTMLElement | null },
 ): HTMLElement {
   const { machine, replay } = context;
   const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [edgeTitle(edge)]),
+    context.send?.(edge) ?? null,
     machineWide(doc, machine, replay),
     routingNote(doc, edge, machine),
     predictionNote(doc, edge, machine),
@@ -377,12 +378,13 @@ export function renderPanel(
     selection: Selection | null;
     select: (selection: Selection) => void;
     replay?: (steps: ReadonlyArray<VizStep>) => void;
+    send?: (edge: VizEdge) => HTMLElement | null;
   },
 ): HTMLElement {
   const { selection } = context;
   if (selection?.kind === "edge") {
     const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-    if (edge) return edgePanel(doc, edge, { machine, replay: context.replay });
+    if (edge) return edgePanel(doc, edge, { machine, replay: context.replay, send: context.send });
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);

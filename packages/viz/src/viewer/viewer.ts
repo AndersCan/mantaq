@@ -18,9 +18,16 @@ import type { Selection } from "./graph.ts";
 import { availableModes, modeLabel } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
-import { decodeLiveSteps, decodePath, encodeLiveStep, encodeStep } from "../moves.ts";
+import {
+  decodeLiveSteps,
+  decodePath,
+  encodeLiveStep,
+  encodeStep,
+  movesFrom,
+  stateAfter,
+} from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
-import { explorePanel, markExplore, changedLines } from "./explore.ts";
+import { button, code, explorePanel, markExplore, changedLines } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
@@ -207,6 +214,7 @@ export function mountViewer(
         view,
         select: showDetails,
         replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
+        send: sendFor({ doc, machine, view, driver }, { sendEvent, take }),
       });
       const controls = controlsOf(doc, chrome);
       const footer = options.panelFooter;
@@ -275,13 +283,73 @@ function detailsOf(
     view: ViewState;
     select: (selection: Selection) => void;
     replay: Parameters<typeof renderPanel>[2]["replay"];
+    send: Parameters<typeof renderPanel>[2]["send"];
   },
 ): HTMLElement {
   return renderPanel(doc, context.machine, {
     selection: context.view.selection,
     select: context.select,
     replay: context.replay,
+    send: context.send,
   });
+}
+
+/** The selected arrow's Send: live, one button when its source is current; blocked, the reason; walking, a button per target. */
+function sendFor(
+  from: { doc: Document; machine: VizMachine; view: ViewState; driver: VizDriver | undefined },
+  handlers: {
+    sendEvent: (event: string, actor?: VizActorRef) => void;
+    take: (step: ExploreStep) => void;
+  },
+): (edge: VizEdge) => HTMLElement | null {
+  const { doc, machine, view } = from;
+  return (edge) => {
+    if (view.live === null) return walkingSend(doc, { machine, view, edge, take: handlers.take });
+    updateBlocked(machine, view, from.driver);
+    const reason = view.blocked.get(edge.id);
+    if (reason !== undefined) {
+      return html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [reason]);
+    }
+    const actor = actorOf(machine, edge, { state: view.live, picked: view.picked });
+    if (actor === "none") return null;
+    const sendable = currentsOf(view.live, view.picked).some((current) =>
+      movesFrom(machine, current).some((move) => move.edge.id === edge.id),
+    );
+    if (!sendable) return null;
+    const to = actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
+    return button(doc, ["Send ", code(doc, edge.event), ...to], {
+      onClick: () => handlers.sendEvent(edge.event, actor),
+      attrs: { "data-send-edge": edge.id },
+    });
+  };
+}
+
+function walkingSend(
+  doc: Document,
+  context: {
+    machine: VizMachine;
+    view: ViewState;
+    edge: VizEdge;
+    take: (step: ExploreStep) => void;
+  },
+): HTMLElement | null {
+  const { machine, view, edge } = context;
+  const current = stateAfter(machine, view.path);
+  if (current === null) return null;
+  const move = movesFrom(machine, current).find((each) => each.edge.id === edge.id);
+  if (move === undefined || move.targets.length === 0) return null;
+  const several = move.targets.length > 1;
+  return html(
+    doc,
+    "div",
+    {},
+    move.targets.map((to) =>
+      button(doc, ["Send ", code(doc, edge.event), ...(several ? [` → ${to}`] : [])], {
+        onClick: () => context.take({ edge: edge.id, to }),
+        attrs: { "data-send-edge": edge.id, "data-target": to },
+      }),
+    ),
+  );
 }
 
 /** Turns Diagram only on or off (Show controls opens the Step tab when the page asked for Diagram only, else Controls), then puts focus on the Step tab or the button that undoes it. */
