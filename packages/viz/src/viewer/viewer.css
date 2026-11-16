@@ -41,7 +41,7 @@
 }
 
 /* One button look: a bordered button in the text colour. Send is the one
-   filled button. Component rules below (tabs, fullscreen) still win. */
+   filled button. Component rules below (tabs) still win. */
 .viz button {
   font: inherit;
   font-size: 1em;

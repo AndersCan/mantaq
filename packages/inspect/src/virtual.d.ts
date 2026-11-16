@@ -21,8 +21,6 @@ declare module "virtual:mantaq/documents" {
       {
         text: string;
         machines: string[];
-        findings: { machine: string; kind: string; state: string; message: string }[];
-        fuzzed: boolean;
       }
     >
   >;

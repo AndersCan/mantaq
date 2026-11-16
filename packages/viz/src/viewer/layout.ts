@@ -172,8 +172,6 @@ function regionNodeId(region: string): string {
   return `region:${region}`;
 }
 
-const HINT_WIDTH = 14;
-
 const WORKER_ROW_HEIGHT = 14;
 const MAP_STATE_MIN_WIDTH = 168;
 
@@ -182,9 +180,7 @@ function isMapState(machine: VizMachine, state: VizState): boolean {
 }
 
 function stateWidth(state: VizState, worker: boolean): number {
-  const chips = state.effects.map(
-    (effect) => textWidth(effect.name, CHIP_FONT) + 24 + (effect.sends === null ? HINT_WIDTH : 0),
-  );
+  const chips = state.effects.map((effect) => textWidth(effect.name, CHIP_FONT) + 24);
   const frame = state.final ? 2 * FINAL_INSET : 0;
   return Math.max(
     worker ? MAP_STATE_MIN_WIDTH : 80,

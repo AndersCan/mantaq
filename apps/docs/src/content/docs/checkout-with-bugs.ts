@@ -1,6 +1,6 @@
 /**
  * A small checkout with six planted bugs, for the Design gate page.
- * The design gate finds all six; the diagram marks the ones on a state with "!":
+ * The design gate finds all six:
  * 1. `back` in `payment` throws.
  * 2. `payment` is reached with an empty address (see the expectations block).
  * 3. `paymentDeclined` is a dead end.
