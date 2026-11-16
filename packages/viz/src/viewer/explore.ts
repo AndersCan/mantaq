@@ -13,7 +13,6 @@ import type {
   VizOutputRoutes,
   VizStep,
 } from "../schema.ts";
-import { changedKeys } from "./context-diff.ts";
 import { html, svg } from "./dom.ts";
 import { defaultValue, parseValue, valueFields, valueText } from "./fill.ts";
 import type { Values } from "./fill.ts";
@@ -31,7 +30,6 @@ export interface ExploreContext {
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
-    previous?: VizJson;
     /** The followed child; its row in the Step tab is marked. */
     picked?: { map: string; key: string } | null;
     /** The last Send press; its line leads the Step tab. */
@@ -102,26 +100,10 @@ function elapsed(steps: ReadonlyArray<VizStep>): number {
 function timersSection(
   doc: Document,
   context: { state: VizLiveState; send: (step: VizStep) => void },
-): HTMLElement {
+): HTMLElement | null {
   const now = elapsed(context.state.steps);
-  const input = html(doc, "input", {
-    type: "number",
-    min: "0",
-    value: "100",
-    "aria-label": "milliseconds",
-    "data-advance-ms": "",
-  });
-  const problem = html(doc, "p", { class: "explore-warning", role: "alert", hidden: "" }, [
-    "Enter a number of milliseconds, 0 or more.",
-  ]);
-  const advance = () => {
-    const ms = Number(input.value);
-    const valid = input.value.trim() !== "" && Number.isFinite(ms) && ms >= 0;
-    problem.toggleAttribute("hidden", valid);
-    if (valid) context.send({ kind: "advance", ms });
-  };
+  if (context.state.timers.length === 0) return null;
   return html(doc, "div", { class: "explore-time" }, [
-    html(doc, "h3", {}, ["Time"]),
     html(
       doc,
       "ul",
@@ -136,15 +118,6 @@ function timersSection(
         ]);
       }),
     ),
-    html(doc, "div", {}, [
-      input,
-      " ms ",
-      button(doc, ["advance"], {
-        onClick: advance,
-        attrs: { "data-advance": "" },
-      }),
-    ]),
-    problem,
   ]);
 }
 
@@ -262,10 +235,7 @@ function valuesList(
       input,
     ]);
   });
-  return html(doc, "div", { class: "explore-values", "data-values": "" }, [
-    html(doc, "h3", {}, ["Values events send"]),
-    ...rows,
-  ]);
+  return html(doc, "div", { class: "explore-values", "data-values": "" }, [...rows]);
 }
 
 function localState(id: string): string {
@@ -399,14 +369,12 @@ function stepLines(
   context: {
     machine: VizMachine;
     step: VizLiveStep;
-    before: VizJson | undefined;
     held: boolean;
     routes: VizOutputRoutes | undefined;
   },
 ): Array<HTMLElement | null> {
-  const { machine, step, before } = context;
+  const { machine, step } = context;
   const because = becauseOf(machine, step);
-  const changed = changedKeys(before, step.context);
   return [
     html(doc, "p", { "data-live-outcome": "" }, outcomeText(doc, machine, step)),
     because === null
@@ -418,17 +386,8 @@ function stepLines(
             code(doc, conditions.join(" && ")),
           ]),
         ]),
-    changed.length === 0
-      ? null
-      : html(doc, "p", { "data-live-changed": "" }, [`Changed: ${changed.join(", ")}`]),
     sentLine(doc, { machine, step, routes: context.routes }),
     step.effects.length > 0 && context.held ? notRunLine(doc, { machine, step }) : null,
-    step.effects.length === 0 || context.held
-      ? null
-      : html(doc, "p", { "data-live-effects": "" }, [
-          "Effects started: ",
-          ...step.effects.flatMap((name, index) => [index === 0 ? "" : ", ", code(doc, name)]),
-        ]),
   ];
 }
 
@@ -472,12 +431,11 @@ function liveResultSection(
   live: {
     machine: VizMachine;
     state: VizLiveState;
-    previous: VizJson | undefined;
     routes: VizOutputRoutes | undefined;
     sent: SentEvent | null;
   },
 ): HTMLElement {
-  const { machine, state, previous, routes, sent } = live;
+  const { machine, state, routes, sent } = live;
   const { last, after } = state;
   const held = state.effectMode === "held";
   return html(doc, "div", { class: "explore-live" }, [
@@ -487,7 +445,7 @@ function liveResultSection(
           sent === null
             ? null
             : html(doc, "p", { "data-live-sent-event": "" }, sentEventLine(doc, sent)),
-          ...stepLines(doc, { machine, step: last, before: previous, held, routes }),
+          ...stepLines(doc, { machine, step: last, held, routes }),
           last.error === null
             ? null
             : html(
@@ -501,13 +459,12 @@ function liveResultSection(
                 [`Handler threw: ${last.error}`],
               ),
           ...changedChildrenLines(doc, state),
-          ...after.map((step, index) =>
+          ...after.map((step) =>
             html(doc, "div", { "data-live-after": "" }, [
               afterLine(doc, { machine, step, last }),
               ...stepLines(doc, {
                 machine,
                 step,
-                before: (index === 0 ? last : after[index - 1])?.context,
                 held,
                 routes,
               }),
@@ -618,7 +575,6 @@ function liveParts(
     liveResultSection(doc, {
       machine,
       state,
-      previous: live.previous,
       routes: live.routes,
       sent: live.sent ?? null,
     }),
