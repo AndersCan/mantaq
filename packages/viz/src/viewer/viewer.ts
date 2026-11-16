@@ -28,7 +28,6 @@ import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
 interface ViewState {
-  machineId: string;
   selection: Selection | null;
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
@@ -55,7 +54,7 @@ interface ViewState {
 type PanelTab = "screen" | "step" | "context" | "details";
 
 export interface ViewerOptions {
-  /** Machine to show first; defaults to the first one. */
+  /** Machine to show; defaults to the first. */
   machine?: string;
   /** Live steps (from `?step=`) replayed through `driver`; ignored without one. */
   steps?: ReadonlyArray<string>;
@@ -68,7 +67,7 @@ export interface ViewerOptions {
   run?: string;
   /** Values events are sent with, as `name=<json>` (from `?value=`); the Context tab sets them. */
   values?: ReadonlyArray<string>;
-  /** Called after every walk, value or machine change, e.g. to keep the URL shareable. */
+  /** Called after every walk, or value change, e.g. to keep the URL shareable. */
   onNavigate?: (where: { machine: string; steps: string[]; values: string[] }) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
@@ -103,7 +102,7 @@ export function mountViewer(
       ?.focus({ preventScroll: true });
   }
   function render(): void {
-    const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
+    const machine = first;
     root.replaceChildren();
     root.classList.add("viz", "not-content");
     if (!machine) {
@@ -330,7 +329,6 @@ function previewOf(
 
 function initialView(machine: VizMachine | undefined, options: ViewerOptions): ViewState {
   return {
-    machineId: machine?.id ?? "",
     selection: null,
     live: null,
     afters: [],

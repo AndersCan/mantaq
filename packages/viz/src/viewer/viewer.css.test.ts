@@ -33,6 +33,8 @@ test("the active state and the next arrows use the accent, and the arrows do not
   expect(listed(".viz .current .frame")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz .next path")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz .next path")).not.toMatch(/animation/);
+  expect(rule(".viz .next path")).not.toMatch(/stroke-dasharray/);
+  expect(css).not.toMatch(/@keyframes/);
 });
 
 test("tabs follow the host's text size", () => {

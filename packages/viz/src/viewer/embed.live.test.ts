@@ -189,6 +189,27 @@ describe("live controls", () => {
     expect(root.querySelector(".chip.running")).toBeNull();
   });
 
+  test("the current state's effect chip has no tint and is no focus stop", () => {
+    const withEffect: VizMachine = {
+      ...checkout,
+      states: checkout.states.map((each) =>
+        each.id === "paying" ? { ...each, effects: [{ name: "charge", sends: null }] } : each,
+      ),
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect] },
+      { driver: driver() },
+    );
+    sendSubmit(root);
+    expect(current(root)).toBe("paying");
+    const chip = root.querySelector('.chip[data-state="paying"]');
+    expect(chip).not.toBeNull();
+    expect(chip?.classList.contains("running")).toBe(false);
+    expect(chip?.hasAttribute("tabindex")).toBe(false);
+  });
+
   test("a timer button advances the clock to its deadline", () => {
     const { root } = mount();
     expect(root.querySelector("[data-advance-timer]")).toBeNull();
