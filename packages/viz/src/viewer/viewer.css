@@ -281,6 +281,24 @@
   stroke-linecap: round;
 }
 
+.viz .edge.next path {
+  stroke-dasharray: 8 5;
+  stroke-linecap: butt;
+  animation: viz-march 0.8s linear infinite;
+}
+
+@keyframes viz-march {
+  to {
+    stroke-dashoffset: -13;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz .edge.next path {
+    animation: none;
+  }
+}
+
 .viz .unknown-node circle {
   fill: var(--state-bg);
   stroke: var(--unknown);

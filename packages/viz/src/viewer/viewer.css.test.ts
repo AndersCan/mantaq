@@ -28,12 +28,18 @@ test("a clicked item is teal and stays teal over the walk colours", () => {
   expect(listed(".viz .state:focus-visible .frame")).toMatch(/stroke:\s*var\(--select\)/);
 });
 
-test("the active state and the next arrows use the accent, and the arrows do not move", () => {
+test("the active state and the next arrows use the accent, and the arrows move", () => {
   expect(listed(".viz .current .frame")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz .next path")).toMatch(/stroke:\s*var\(--accent\)/);
-  expect(rule(".viz .next path")).not.toMatch(/animation/);
-  expect(rule(".viz .next path")).not.toMatch(/stroke-dasharray/);
-  expect(css).not.toMatch(/@keyframes/);
+  const next = listed(".viz .edge.next path");
+  expect(next).toMatch(/animation:\s*viz-march/);
+  expect(next).toMatch(/stroke-dasharray:\s*8 5/);
+  expect(bare).toMatch(/@keyframes viz-march/);
+  const reduced = bare.slice(bare.indexOf("@media (prefers-reduced-motion: reduce)"));
+  expect(reduced).toMatch(/\.viz \.edge\.next path\s*\{[^}]*animation:\s*none/);
+  const at = bare.indexOf(".viz .edge.next path");
+  expect(at).toBeGreaterThan(bare.indexOf(".viz .edge.stay path"));
+  expect(at).toBeGreaterThan(bare.indexOf(".viz .edge.internal path"));
 });
 
 test("tabs follow the host's text size", () => {
@@ -95,4 +101,21 @@ test("in full screen the diagram widens to fill the screen but keeps its label f
   expect(rule(".viz:fullscreen .graph")).toMatch(
     /width:\s*max\(var\(--graph-floor\),\s*100%\)\s*!important/,
   );
+});
+
+test("the next arrows march one dash period forever; only reduced motion stops them", () => {
+  const next = listed(".viz .edge.next path");
+  const [dash, gap] = (next.match(/stroke-dasharray:\s*(\d+)\s+(\d+)/) ?? []).slice(1).map(Number);
+  expect(next).toMatch(/animation:\s*viz-march\s+[\d.]+m?s\s+linear\s+infinite/);
+  expect(bare).toMatch(
+    new RegExp(
+      `@keyframes viz-march\\s*\\{\\s*to\\s*\\{\\s*stroke-dashoffset:\\s*-${(dash ?? 0) + (gap ?? 0)};`,
+    ),
+  );
+  const reduced =
+    bare.match(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.viz \.edge\.next path\s*\{\s*animation:\s*none;\s*\}\s*\}/g,
+    ) ?? [];
+  expect(reduced).toHaveLength(1);
+  expect(bare.replace(reduced[0] ?? "", "")).not.toMatch(/animation:\s*none/);
 });
