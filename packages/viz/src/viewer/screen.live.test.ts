@@ -183,6 +183,45 @@ describe("Screen tab", () => {
     expect(note(root)).toBeUndefined();
   });
 
+  test("a region state with Screen open shows the live screen with no note", () => {
+    const withRegion: VizMachine = {
+      ...chain,
+      regions: ["r"],
+      states: [...chain.states, { ...state("r.x"), region: "r", initial: false }],
+      fuzz:
+        chain.fuzz === null || chain.fuzz === undefined
+          ? chain.fuzz
+          : { ...chain.fuzz, corpus: [{ steps: [go], discovered: ["state:r.x"] }] },
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRegion] },
+      {
+        driver: driver(),
+        screen: (live: VizLiveState) => {
+          const node = document.createElement("p");
+          node.className = "drawn";
+          node.textContent = `screen of ${live.state}`;
+          return node;
+        },
+      },
+    );
+    clickState(root, "r.x");
+    expect(screenShown(root)).toBe(true);
+    expect(drawn(root)).toBe("screen of idle");
+    expect(note(root)).toBeUndefined();
+  });
+
+  test("an arrow click with Screen open opens Details", () => {
+    const root = mount();
+    root
+      .querySelector('[data-edge-id="idle-go-a"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(screenShown(root)).toBe(false);
+    expect(root.querySelector("[data-tab-panel=details]")?.hasAttribute("hidden")).toBe(false);
+  });
+
   test("a state off the Screen tab opens its details, as before", () => {
     const root = mount();
     root.querySelectorAll<HTMLElement>("[role=tab]")[1]?.click();

@@ -518,6 +518,18 @@ describe("createDriver held effects", () => {
     expect(live.waiting).toEqual(["childWork"]);
   });
 
+  test("dryWalk holds effect bodies even when the live driver runs them for real", async () => {
+    const driver = createDriver(chargeTarget, { effectMode: "real" });
+    const seen: string[] = [];
+    driver.listen?.((live) => seen.push(live.state));
+    called.length = 0;
+    const walked = driver.dryWalk?.([startStep]);
+    expect(walked?.map((each) => each.state)).toEqual(["idle", "charging"]);
+    await macrotask();
+    expect(called).toEqual([]);
+    expect(seen).toEqual([]);
+  });
+
   test("real: effects run as before", async () => {
     const driver = createDriver(chargeTarget, { effectMode: "real" });
     const seen: string[] = [];
@@ -585,6 +597,25 @@ describe("dryRun", () => {
     const live = driver.step(serve);
     expect(live.steps).toHaveLength(1);
     expect(driver.dryWalk?.([])).toHaveLength(1);
+  });
+
+  test("dryWalk disposes its copy", () => {
+    let disposed = 0;
+    const driver = createDriver({
+      id: "meal-counted",
+      create: () => {
+        const clock = VirtualClock();
+        const actor = createMeal6(clock);
+        const dispose = actor.dispose.bind(actor);
+        actor.dispose = () => {
+          disposed += 1;
+          dispose();
+        };
+        return { actor, clock };
+      },
+    });
+    driver.dryWalk?.([serve]);
+    expect(disposed).toBe(1);
   });
 
   test("dryWalk stops after a step that throws", () => {
