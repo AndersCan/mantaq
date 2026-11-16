@@ -14,9 +14,28 @@ test.each([
   [{ left: 4, right: 60 }, 500, 0],
   [{ left: 2400.6, right: 2520.6 }, 0, 2237],
 ])("shows %j from %d at %d", (span, left, expected) => {
-  expect(scrollToShow(box(left), span)).toBe(expected);
+  expect(scrollToShow(box(left), [span])).toBe(expected);
 });
 
 test("a box with no width moves nothing", () => {
-  expect(scrollToShow({ left: 7, width: 0, max: 100 }, { left: 900, right: 990 })).toBe(7);
+  expect(scrollToShow({ left: 7, width: 0, max: 100 }, [{ left: 900, right: 990 }])).toBe(7);
+});
+
+test.each([
+  [
+    [
+      { left: 2400, right: 2520 },
+      { left: 2560, right: 2650 },
+    ],
+    2366,
+  ],
+  [
+    [
+      { left: 2400, right: 2520 },
+      { left: 5000, right: 5100 },
+    ],
+    2236,
+  ],
+])("joins the spans that fit: %j at %d", (spans, expected) => {
+  expect(scrollToShow(box(0), spans)).toBe(expected);
 });
