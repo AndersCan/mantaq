@@ -52,21 +52,15 @@ describe("Getting started step 6, live", () => {
   }
   const edge = (root: HTMLElement, id: string) =>
     root.querySelector(`g.edge[data-edge-id="${id}"]`);
-  const click = (root: HTMLElement, id: string) =>
-    edge(root, id)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const send = (root: HTMLElement, event: string) =>
+    root.querySelector<HTMLButtonElement>(`[data-send="${event}"]`)?.click();
 
   test("eat is blocked while no plate is served, and not after serve", async () => {
     const root = await mount();
     expect(edge(root, "hungry-eat-full")?.classList.contains("blocked")).toBe(true);
-    click(root, "hungry-eat-full");
-    expect(root.querySelector('[data-blocked-note="eat"]')?.textContent).toBe(
-      "eat is blocked: plates is 0",
-    );
-    click(root, "hungry-serve-stay");
+    send(root, "serve");
     expect(edge(root, "hungry-eat-full")?.classList.contains("blocked")).toBe(false);
-    expect(root.querySelector("[data-blocked-note]")).toBeNull();
-    click(root, "hungry-eat-full");
-    expect(root.querySelector(".payload-sheet")).toBeNull();
+    send(root, "eat");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("full");
   });
 });

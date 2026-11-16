@@ -129,19 +129,18 @@ function mount(
 }
 
 describe("live actor map children", () => {
-  test("the Step tab shows no child heading or cards outside the fold", () => {
+  test("the Step tab shows no child heading, and its cards sit in no fold", () => {
     const { root } = mount([child("p1", "sendingPhoto")]);
     expect(root.querySelector(".explore-map h3")).toBeNull();
     expect(root.querySelector(".explore-child")).not.toBeNull();
-    expect(root.querySelector(".explore-map")?.closest("details[data-events]")).not.toBeNull();
+    expect(root.querySelector(".explore-map")?.closest("details")).toBeNull();
     expect(root.querySelector(".panel > .explore-map, .explore-live .explore-child")).toBeNull();
     expect(root.textContent).not.toContain("no children yet");
   });
 
-  test("child rows and their Send buttons are inside Events and time", () => {
+  test("child rows and their Send buttons are in the Step tab", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
-    const fold = root.querySelector("details[data-events]");
-    const rows = [...(fold?.querySelectorAll("[data-child-key]") ?? [])];
+    const rows = [...root.querySelectorAll(".explore [data-child-key]")];
     expect(rows.map((row) => row.getAttribute("data-child-key"))).toEqual(["p1"]);
     expect(root.querySelectorAll("[data-child-key]")).toHaveLength(1);
     expect(rows[0]?.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
@@ -191,9 +190,6 @@ describe("live actor map children", () => {
     );
   const click = (element: Element | null | undefined) =>
     element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  const sentTo = (key: string) => [
-    { kind: "event", event: "uploadConfirmed", payload: null, actor: { map: "photos", key } },
-  ];
   const title = (root: HTMLElement) =>
     root.querySelector('.graph g.region[data-map="photos"] > text')?.textContent;
   const box = (root: HTMLElement, state: string) =>
@@ -212,13 +208,12 @@ describe("live actor map children", () => {
     expect(title(mount([]).root)).toBe("photos: none");
   });
 
-  test("a click on a child state with a child in it picks that child and sends nothing", () => {
+  test("a click on a child state selects it, sends nothing and keeps the walked child", () => {
     const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
-    click(box(root, "photoSent"));
     click(box(root, "waitingForRetry"));
-    expect(walkedKey(root)).toBe("p2");
+    expect(walkedKey(root)).toBe("p1");
     expect(sent).toEqual([]);
-    expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
     expect(box(root, "waitingForRetry")?.classList.contains("selected")).toBe(true);
   });
 
@@ -262,21 +257,6 @@ describe("live actor map children", () => {
     expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
   });
 
-  test("an arrow goes to the only child in its source", () => {
-    const one = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
-    click(edgeGroup(one.root));
-    expect(one.sent).toEqual(sentTo("p1"));
-  });
-
-  test("an arrow goes to the walked child, the lowest key until one is picked", () => {
-    const two = mount([child("p2", "sendingPhoto", 1), child("p1", "sendingPhoto", 2)]);
-    click(edgeGroup(two.root));
-    expect(two.sent).toEqual(sentTo("p1"));
-    pick(two.root, "p2");
-    click(edgeGroup(two.root));
-    expect(two.sent.at(-1)).toEqual(sentTo("p2")[0]);
-  });
-
   test("an arrow with no walked child in its state does nothing", () => {
     const none = mount([child("p1", "waitingForRetry")]);
     click(edgeGroup(none.root));
@@ -311,8 +291,6 @@ describe("live actor map children", () => {
     click(root.querySelector('[data-actor="photos[p2]"] [data-send="uploadConfirmed"]'));
     expect(walkedKey(root)).toBe("p1");
     expect(title(root)).toBe("photos: 1 sendingPhoto");
-    click(edgeGroup(root));
-    expect(sent.at(-1)).toMatchObject({ actor: { key: "p1" } });
   });
 
   test("no button is drawn inside the diagram", () => {
@@ -1064,13 +1042,10 @@ describe("live actor map children", () => {
       [child("p1", "sendingPhoto"), child("p2", "waitingForRetry")],
       withPayload,
     );
-    root
-      .querySelector('.graph g[data-node-id="photos.waitingForRetry"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    pick(root, "p2");
     root
       .querySelector<HTMLButtonElement>('[data-actor="photos[p2]"] [data-send="retryPressed"]')
       ?.click();
-    expect(root.querySelector(".payload-sheet")).toBeNull();
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({
       kind: "event",
@@ -1079,7 +1054,7 @@ describe("live actor map children", () => {
     });
   });
 
-  test("a payload edge click sends to the child in its source at once", () => {
+  test("a payload event sends the example to the child in its source at once", () => {
     const withReason: VizMachine = {
       ...photoQueue,
       events: photoQueue.events.map((each) =>
@@ -1103,10 +1078,8 @@ describe("live actor map children", () => {
     };
     const { root, sent } = mount([child("p1", "sendingPhoto")], withReason);
     root
-      .querySelector(
-        '.graph g[data-edge-id="photos.sendingPhoto-uploadFailed-photos.waitingForRetry"]',
-      )
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadFailed"]')
+      ?.click();
     expect(sent).toEqual([
       {
         kind: "event",
@@ -1118,7 +1091,7 @@ describe("live actor map children", () => {
   });
 });
 
-test("a click on a root state whose name starts with the map's still takes its arrow", () => {
+test("a click on a root state whose name starts with the map's sends nothing; its Send button does", () => {
   const machine: VizMachine = {
     ...photoQueue,
     states: [...photoQueue.states, state("photosPaused")],
@@ -1129,6 +1102,8 @@ test("a click on a root state whose name starts with the map's still takes its a
   root
     .querySelector('.graph g[data-node-id="photosPaused"]')
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(sent).toEqual([]);
+  root.querySelector<HTMLButtonElement>('[data-send="paused"]')?.click();
   expect(sent).toMatchObject([{ kind: "event", event: "paused" }]);
 });
 

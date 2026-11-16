@@ -142,6 +142,11 @@ function fakeDriver(opens: (step: VizStep) => boolean = () => false) {
   return { driver, sent, arrive, dryRuns: () => listens };
 }
 
+const sendEvent = (root: HTMLElement, event: string) =>
+  root
+    .querySelector(`[data-send="${event}"]`)
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
 const clickEdge = (root: HTMLElement, id: string) =>
   root
     .querySelector(`[data-edge-id="${id}"]`)
@@ -154,7 +159,7 @@ function mount(driver: VizDriver, machine: VizMachine = cart) {
 }
 
 describe("a blocked arrow", () => {
-  test("is grey with a lock, not a next step, and opens the reason without sending", () => {
+  test("is grey with a lock, not a next step, and a click on it sends nothing", () => {
     const { driver, sent } = fakeDriver();
     const root = mount(driver);
     const pay = root.querySelector('[data-edge-id="cart-pay-payment"]');
@@ -167,13 +172,10 @@ describe("a blocked arrow", () => {
     );
     clickEdge(root, "cart-pay-payment");
     expect(sent).toHaveLength(0);
-    const note = root.querySelector('[data-blocked-note="pay"]');
-    expect(note?.textContent).toBe("pay is blocked: items is 0");
-    expect(note?.getAttribute("aria-label")).toBe("pay is blocked: items is 0");
-    expect(root.querySelector(".graph .selected")).toBeNull();
+    expect(root.querySelector(".graph .selected")).not.toBeNull();
   });
 
-  test("follows a value set in the Context tab, so its lock matches what a click sends", () => {
+  test("follows a value set in the Context tab, so its lock matches what a send does", () => {
     const coupon = {
       name: "coupon",
       type: "string",
@@ -195,53 +197,28 @@ describe("a blocked arrow", () => {
     const root = mount(driver, withCoupon);
     const pay = () => root.querySelector('[data-edge-id="cart-pay-payment"]');
     expect(pay()?.classList.contains("blocked")).toBe(true);
-    clickEdge(root, "cart-pay-payment");
-    expect(root.querySelector('[data-blocked-note="pay"]')).not.toBeNull();
-    expect(sent).toHaveLength(0);
     const box = root.querySelector<HTMLInputElement>('[data-value="coupon"]');
     if (box) box.value = "nope";
     box?.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")).toBeNull();
     expect(pay()?.classList.contains("blocked")).toBe(true);
     if (box) box.value = "free";
     box?.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")).toBeNull();
     expect(pay()?.classList.contains("blocked")).toBe(false);
-    clickEdge(root, "cart-pay-payment");
+    sendEvent(root, "pay");
     expect(sent).toEqual([{ kind: "event", event: "pay", payload: { coupon: "free" } }]);
-  });
-
-  test("a note closes when a later state unblocks its arrow", () => {
-    const { driver, arrive } = fakeDriver();
-    const root = mount(driver);
-    clickEdge(root, "cart-pay-payment");
-    expect(root.querySelector("[data-blocked-note]")).not.toBeNull();
-    arrive();
-    expect(root.querySelector("[data-blocked-note]")).toBeNull();
-    expect(root.querySelector("[data-composing]")).toBeNull();
-  });
-
-  test("Escape closes the note", () => {
-    const root = mount(fakeDriver().driver);
-    clickEdge(root, "cart-pay-payment");
-    root
-      .querySelector('[data-blocked-note="pay"]')
-      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")).toBeNull();
   });
 
   test("loses the lock once the context allows it, and then sends", () => {
     const { driver, sent } = fakeDriver();
     const root = mount(driver);
     clickEdge(root, "cart-pay-payment");
-    clickEdge(root, "cart-addItem-cart");
-    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+    sendEvent(root, "addItem");
     const pay = root.querySelector('[data-edge-id="cart-pay-payment"]');
     expect(pay?.classList.contains("blocked")).toBe(false);
     expect(pay?.hasAttribute("aria-disabled")).toBe(false);
     expect(pay?.querySelector(".blocked-lock")).toBeNull();
     expect(pay?.classList.contains("next")).toBe(true);
-    clickEdge(root, "cart-pay-payment");
+    sendEvent(root, "pay");
     expect(sent.map((step) => (step.kind === "event" ? step.event : step.kind))).toEqual([
       "addItem",
       "pay",
@@ -276,7 +253,7 @@ describe("a blocked arrow", () => {
     const once = dryRuns();
     clickEdge(root, "cart-pay-payment");
     expect(dryRuns()).toBe(once);
-    clickEdge(root, "cart-addItem-cart");
+    sendEvent(root, "addItem");
     expect(dryRuns()).toBe(once + 1);
   });
 });
@@ -354,79 +331,6 @@ function stayedStep(step: VizStep) {
 }
 
 describe("a blocked arrow, more cases", () => {
-  test("a path compared twice is named once", () => {
-    const machine: VizMachine = {
-      id: "cart",
-      initial: "cart",
-      regions: [],
-      maps: [],
-      actors: [],
-      states: [stateIn("cart", true), stateIn("payment")],
-      events: [eventOf("pay")],
-      outputs: [],
-      partOutputs: {},
-      context: null,
-      edges: [
-        guardedEdge("cart", "pay", "payment", [
-          { path: "items", operator: ">", literal: 0 },
-          { path: "items", operator: "<", literal: 10 },
-        ]),
-      ],
-      runs: [],
-      fuzz: null,
-    };
-    const driver: VizDriver = {
-      reset: () => liveState({}),
-      step: () => liveState({}),
-      dryRun: (steps) => steps.map(stayedStep),
-    };
-    const root = document.createElement("div");
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
-    root
-      .querySelector('[data-edge-id="cart-pay-payment"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector('[data-blocked-note="pay"]')?.textContent).toBe(
-      "pay is blocked: items is 0",
-    );
-  });
-
-  test("Enter then Escape on the focused element closes the note", () => {
-    const machine: VizMachine = {
-      id: "cart",
-      initial: "cart",
-      regions: [],
-      maps: [],
-      actors: [],
-      states: [stateIn("cart", true), stateIn("payment")],
-      events: [eventOf("pay")],
-      outputs: [],
-      partOutputs: {},
-      context: null,
-      edges: [
-        guardedEdge("cart", "pay", "payment", [{ path: "items", operator: "!==", literal: 0 }]),
-      ],
-      runs: [],
-      fuzz: null,
-    };
-    const driver: VizDriver = {
-      reset: () => liveState({}),
-      step: () => liveState({}),
-      dryRun: (steps) => steps.map(stayedStep),
-    };
-    const root = document.createElement("div");
-    document.body.append(root);
-    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
-    const pay = root.querySelector<SVGGElement>('[data-edge-id="cart-pay-payment"]');
-    pay?.focus();
-    pay?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")).not.toBeNull();
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-    );
-    expect(root.querySelector("[data-blocked-note]")).toBeNull();
-    root.remove();
-  });
-
   test("walking to another map child tries its arrows again", () => {
     const machine: VizMachine = {
       id: "queue",
@@ -482,57 +386,4 @@ describe("a blocked arrow, more cases", () => {
     );
     expect(arrow()?.classList.contains("blocked")).toBe(false);
   });
-});
-
-test("a blocked arrow of the walked child, not the lowest key, opens its note", () => {
-  const machine: VizMachine = {
-    id: "queue",
-    initial: "showingQueue",
-    regions: ["photos"],
-    maps: ["photos"],
-    actors: [],
-    states: [
-      stateIn("showingQueue", true),
-      stateIn("photos.sending", true),
-      stateIn("photos.sent"),
-    ],
-    events: [eventOf("confirm")],
-    outputs: [],
-    partOutputs: {},
-    context: null,
-    edges: [
-      guardedEdge("photos.sending", "confirm", "photos.sent", [
-        { path: "quota", operator: "!==", literal: 0 },
-      ]),
-    ],
-    runs: [],
-    fuzz: null,
-  };
-  const state0 = liveState({
-    state: "showingQueue",
-    context: { quota: 0 },
-    children: [
-      { map: "photos", key: "p1", state: "photos.sent", since: 0 },
-      { map: "photos", key: "p2", state: "photos.sending", since: 1 },
-    ],
-  });
-  const sent: VizStep[] = [];
-  const driver: VizDriver = {
-    reset: () => state0,
-    step: (step) => {
-      sent.push(step);
-      return state0;
-    },
-    dryRun: (steps) => steps.map(stayedStep),
-  };
-  const root = document.createElement("div");
-  document.body.append(root);
-  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
-  root
-    .querySelector('.graph g[data-node-id="photos.sending"]')
-    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  clickEdge(root, "photos.sending-confirm-photos.sent");
-  expect(sent).toHaveLength(0);
-  expect(root.querySelector('[data-blocked-note="confirm"]')).not.toBeNull();
-  root.remove();
 });

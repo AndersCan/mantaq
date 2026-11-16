@@ -2,7 +2,6 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
 import { serializeViz } from "../serialize.ts";
-import { clickStep } from "./explore.ts";
 import { mountViewer, mountVizText } from "./embed.ts";
 import type { ViewerSelection } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -131,17 +130,22 @@ describe("mountVizText", () => {
     expect(loopMarker?.querySelector("path")?.getAttribute("class")).toContain("arrow-head-loop");
   });
 
-  test("a walk without a driver keeps its moves inside the Events and time fold", () => {
+  test("a walk without a driver lists its moves at once, in no fold", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    expect(root.querySelector(".panel details[data-events] summary")?.textContent).toBe(
-      "Events and time",
-    );
-    expect(root.querySelectorAll(".panel details[data-events] [data-take]").length).toBeGreaterThan(
-      0,
-    );
-    expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(
-      root.querySelectorAll(".panel details[data-events] [data-take]").length,
-    );
+    expect(root.querySelector(".panel details")).toBeNull();
+    expect(root.querySelectorAll(".panel [data-take]").length).toBeGreaterThan(0);
+  });
+
+  test("no diagram click takes a step", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    const before = root.querySelector(".explore")?.getAttribute("data-current");
+    const targets = [...root.querySelectorAll(".graph [data-edge-id], .graph [data-node-id]")];
+    expect(targets.length).toBeGreaterThan(0);
+    for (const target of targets) {
+      target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe(before);
+      expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
+    }
   });
 
   test("draws a valid document and walks it to Done", () => {
@@ -151,7 +155,6 @@ describe("mountVizText", () => {
     expect(root.querySelector(".panel section.explore[data-done]")?.textContent).toContain(
       "In done (final)",
     );
-    expect(root.querySelector(".panel details[data-events]")).toBeNull();
     expect(root.querySelectorAll(".panel [data-take]")).toHaveLength(0);
   });
 });
@@ -396,12 +399,6 @@ describe("mountViewer with a driver", () => {
     expect(mount).not.toThrow();
     expect(root.querySelector("[data-live-error]")?.textContent).toBe("Handler threw: x");
   });
-
-  test("a graph click is resolved from the live state", () => {
-    const selection = { kind: "state", id: "done" } as const;
-    expect(clickStep(withEvents, { path: [], selection })).not.toBeNull();
-    expect(clickStep(withEvents, { path: [], selection, currents: ["done"] })).toBeNull();
-  });
 });
 
 describe("effect chip hover", () => {
@@ -558,6 +555,9 @@ describe("panelFooter", () => {
       .querySelector(`[data-node-id='${id}']`)
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
+  const take = (root: HTMLElement, id: string) =>
+    root.querySelector<HTMLButtonElement>(`[data-take="${id}"]`)?.click();
+
   test("the footer renders under the tabs with no selection", () => {
     const calls: Array<ViewerSelection | undefined> = [];
     const root = live(calls, footer());
@@ -572,11 +572,11 @@ describe("panelFooter", () => {
     expect(calls.at(-1)).toEqual({ kind: "state", id: "end" });
   });
 
-  test("a click that walks still passes the selection", () => {
+  test("a click on a next state passes the selection and does not walk", () => {
     const calls: Array<ViewerSelection | undefined> = [];
     const root = live(calls, footer());
     click(root, "done");
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
     expect(calls.at(-1)).toEqual({ kind: "state", id: "done" });
   });
 
@@ -592,8 +592,8 @@ describe("panelFooter", () => {
     const f = footer();
     f.append(area);
     const root = live([], f);
-    click(root, "done");
-    click(root, "end");
+    take(root, "open-go-done");
+    take(root, "done-go-end");
     area.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("end");
     root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));

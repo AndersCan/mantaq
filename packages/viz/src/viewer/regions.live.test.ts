@@ -139,13 +139,11 @@ function mount(machine: VizMachine = photoUpload) {
 }
 
 describe("live regions", () => {
-  test("a machine whose regions talk opens on its diagram, and an arrow in a region walks it", () => {
+  test("a machine whose regions talk opens on its diagram, and its Send button walks a region", () => {
     const { root, sent } = mount();
     expect(root.querySelector('svg.graph g.region[data-region="upload"]')).not.toBeNull();
     expect(root.querySelector("[data-system]")).toBeNull();
-    root
-      .querySelector('[data-edge-id="upload.waitingForPhoto-photoPicked-upload.sendingPhoto"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.querySelector<HTMLButtonElement>('[data-send="photoPicked"]')?.click();
     expect(sent).toEqual([
       { kind: "event", event: "photoPicked", payload: null, actor: { region: "upload" } },
     ]);

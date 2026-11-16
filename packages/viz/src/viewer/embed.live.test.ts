@@ -239,9 +239,8 @@ describe("live controls", () => {
         waiting: [],
       };
     }
-    clickEdge(root, "off-flip-on");
+    click(root, '[data-send="flip"]');
     expect(log).toEqual([{ kind: "event", event: "flip", payload: null }]);
-    expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
   test("an edge click on an event with no data sends at once when fuzzing only sent it {}", () => {
@@ -284,10 +283,22 @@ describe("live controls", () => {
         },
       },
     );
-    clickEdge(root, "off-flip-on");
-    expect(root.querySelector(".payload-sheet")).toBeNull();
+    click(root, '[data-send="flip"]');
     expect(log).toHaveLength(1);
     expect(log[0]?.kind === "event" && log[0].event).toBe("flip");
+  });
+
+  test("no diagram click sends", () => {
+    const { root, live } = mount();
+    const targets = [...root.querySelectorAll(".graph [data-edge-id], .graph [data-node-id]")];
+    expect(targets.length).toBeGreaterThan(0);
+    const before = current(root);
+    for (const target of targets) {
+      target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(current(root)).toBe(before);
+      expect(live.log).toHaveLength(0);
+      expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
+    }
   });
 
   test("clicks never scroll or rebuild the canvas", () => {
@@ -675,11 +686,10 @@ describe("field forms and the context table", () => {
 
   test("an arrow click sends at once with the examples and opens no form", () => {
     const { root, live } = mountFields(requiredMachine);
-    clickEdge(root, "idle-submit-paying");
+    sendSubmit(root);
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
-    expect(root.querySelector(".payload-sheet")).toBeNull();
   });
 
   test("a value set in the Context tab is sent by every later click, kept for onNavigate and across Back", () => {
@@ -690,14 +700,14 @@ describe("field forms and the context table", () => {
     expect(valueBox(root, "amount")?.placeholder).toBe("1");
     setBox(root, "amount", "7.5");
     expect(seen.at(-1)).toEqual(["amount=7.5"]);
-    clickEdge(root, "idle-submit-paying");
+    sendSubmit(root);
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } },
     ]);
     expect(seen.at(-1)).toEqual(["amount=7.5"]);
     click(root, '[data-explore-action="back"]');
     expect(valueBox(root, "amount")?.value).toBe("7.5");
-    clickEdge(root, "idle-submit-paying");
+    sendSubmit(root);
     expect(live.log.at(-1)).toEqual([
       { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } },
     ]);
@@ -708,7 +718,7 @@ describe("field forms and the context table", () => {
     expect(valueBox(root, "label")?.value).toBe("from url");
     setBox(root, "amount", "2");
     setBox(root, "amount", "");
-    clickEdge(root, "idle-submit-paying");
+    sendSubmit(root);
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "from url" } },
     ]);
@@ -719,7 +729,7 @@ describe("field forms and the context table", () => {
     setBox(root, "amount", "7");
     setBox(root, "amount", "seven");
     expect(valueBox(root, "amount")?.value).toBe("");
-    clickEdge(root, "idle-submit-paying");
+    sendSubmit(root);
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
@@ -737,7 +747,7 @@ describe("field forms and the context table", () => {
     };
     const { root, live } = mountFields(shared);
     expect(valueBox(root, "label")?.placeholder).toBe("hi");
-    clickEdge(root, "idle-submit-paying");
+    sendSubmit(root);
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
@@ -1366,7 +1376,6 @@ describe("live effect reports", () => {
       const root = mountFetcher({ mode: "held", machine });
       expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching (final)");
       expect(root.querySelector("[data-waiting-on]")).toBeNull();
-      expect(root.querySelector("details[data-events]")).toBeNull();
       expect(root.querySelector("[data-advance]")).toBeNull();
     });
 
@@ -1420,36 +1429,11 @@ describe("live effect reports", () => {
     });
   });
 
-  describe("the Events and time fold", () => {
-    const fold = (root: HTMLElement) =>
-      root.querySelector<HTMLDetailsElement>("details[data-events]");
-
-    test("at rest the Step tab shows the state line and a closed Events and time fold", () => {
-      const root = mountFetcher();
-      expect(fold(root)?.open).toBe(false);
-      expect(fold(root)?.querySelector("summary")?.textContent).toBe("Events and time");
-      expect(fold(root)?.querySelector("[data-send]")).not.toBeNull();
-      expect(fold(root)?.querySelector("[data-advance]")).not.toBeNull();
-      expect(root.querySelector(".explore > [data-send]")).toBeNull();
-    });
-
-    test("the fold stays open across a step and Back", () => {
-      const root = mountFetcher();
-      const details = fold(root);
-      if (details === null) throw new Error("no fold");
-      details.open = true;
-      details.dispatchEvent(new Event("toggle"));
-      click(root, '[data-send="start"]');
-      expect(fold(root)?.open).toBe(true);
-      click(root, '[data-explore-action="back"]');
-      expect(fold(root)?.open).toBe(true);
-    });
-
-    test("a closed fold stays closed across a step", () => {
-      const root = mountFetcher();
-      click(root, '[data-send="start"]');
-      expect(fold(root)?.open).toBe(false);
-    });
+  test("at rest the Step tab shows its Send buttons and the clock, in no fold", () => {
+    const root = mountFetcher();
+    expect(root.querySelector("details")).toBeNull();
+    expect(root.querySelector(".explore [data-send]")).not.toBeNull();
+    expect(root.querySelector(".explore [data-advance]")).not.toBeNull();
   });
 });
 
