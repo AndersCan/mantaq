@@ -193,6 +193,85 @@ describe("mountDriven values", () => {
   });
 });
 
+describe("mountDriven arrows that land elsewhere", () => {
+  test("an arrow whose guard picks another branch is locked and says where it goes", async () => {
+    const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
+    const inspected = await inspectModule(answerFile, {
+      load: async () => ({ createAnswerActor }),
+      fuzz: false,
+    });
+    history.replaceState(null, "", "/");
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: {
+        answer: () => {
+          const clock = VirtualClock();
+          return { actor: createAnswerActor(clock), clock };
+        },
+      },
+    });
+    sendVia(root, "ask");
+    const arrow = (to: string) =>
+      root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
+    arrow("declined")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "answered goes to accepted, not declined",
+    );
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+    expect(arrow("declined")?.querySelector(".blocked-lock")).not.toBeNull();
+    expect(arrow("accepted")?.querySelector(".blocked-lock")).toBeNull();
+  });
+});
+
+describe("mountDriven dry run payload", () => {
+  test("the dry run sends the code the walk is waiting on, as Send does, once the Context box is cleared", async () => {
+    const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
+    const inspected = await inspectModule(answerFile, {
+      load: async () => ({ createAnswerActor }),
+      fuzz: false,
+    });
+    history.replaceState(null, "", "/");
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: {
+        answer: () => {
+          const clock = VirtualClock();
+          return { actor: createAnswerActor(clock), clock };
+        },
+      },
+    });
+    const setValue = (name: string, value: string) => {
+      const box = root.querySelector<HTMLInputElement>(`[data-value="${name}"]`);
+      if (box === null) throw new Error(`no ${name} box`);
+      box.value = value;
+      box.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    setValue("code", "zz-not-the-example");
+    sendVia(root, "ask");
+    setValue("code", "");
+    const arrow = (to: string) =>
+      root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
+    arrow("declined")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "answered goes to accepted, not declined",
+    );
+    expect(arrow("declined")?.querySelector(".blocked-lock")).not.toBeNull();
+    setValue("answer", "declined");
+    arrow("accepted")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "answered goes to declined, not accepted",
+    );
+    expect(arrow("accepted")?.querySelector(".blocked-lock")).not.toBeNull();
+    expect(arrow("declined")?.querySelector(".blocked-lock")).toBeNull();
+  });
+});
+
 describe("mountLiveDriven", () => {
   async function failing(fetcher: typeof fetch): Promise<string> {
     const root = document.createElement("div");

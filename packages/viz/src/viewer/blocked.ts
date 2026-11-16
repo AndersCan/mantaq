@@ -1,4 +1,4 @@
-import { payloadSamples, movesFrom } from "../moves.ts";
+import { movesFrom } from "../moves.ts";
 import type {
   VizActorRef,
   VizEdge,
@@ -8,17 +8,46 @@ import type {
   VizMachine,
   VizStep,
 } from "../schema.ts";
-import { knownPayload } from "./fill.ts";
-import type { Values } from "./fill.ts";
+import { isAnyState, scopeOf } from "../schema.ts";
+import { localName, walkedChild } from "./compartments.ts";
+import { childWhoText } from "./explore.ts";
 
-/**
- * What a dry run sends for `event`: the values set in the Context tab, else the examples, never
- * the last value sent, so a payload-only guard does not block the arrow. null when the event takes no data.
- */
-export function examplePayload(machine: VizMachine, event: string, set: Values): VizJson {
-  const fields = machine.events.find((each) => each.id === event)?.payload ?? null;
-  const samples = payloadSamples(machine, event);
-  return knownPayload(fields, { event, samples, steps: [], set })?.payload ?? null;
+/** The parts that send `edge.event` themselves, by name; `[]` means a person may send it. */
+export function sentByParts(machine: VizMachine, edge: VizEdge): string[] {
+  const scope = scopeOf(edge.from);
+  const parts: Array<[string, string[]]> = [
+    ["", machine.outputs],
+    ...Object.entries(machine.partOutputs),
+  ];
+  return parts
+    .filter(([path, events]) => path !== scope && events.includes(edge.event))
+    .map(([path]) => (path === "" ? machine.id : path));
+}
+
+/** Why the walk cannot send `edge` where it is now, or null when it can (or is unknown). */
+export function whyNotHere(
+  machine: VizMachine,
+  edge: VizEdge,
+  at: { live: VizLiveState; picked: { map: string; key: string } | null },
+): string | null {
+  const scope = scopeOf(edge.from);
+  let current: string | undefined;
+  let who = "the walk";
+  if (scope === "") {
+    current = at.live.state;
+  } else if (machine.maps.includes(scope)) {
+    const child = walkedChild(at.live, scope, at.picked);
+    if (child === undefined) return `${edge.event} can't be sent: ${scope} has no child.`;
+    current = child.state;
+    who = childWhoText(machine, { map: scope, key: child.key });
+  } else {
+    current = at.live.regions[scope];
+    who = scope;
+  }
+  if (current === undefined) return null;
+  if (movesFrom(machine, current).some((move) => move.edge.id === edge.id)) return null;
+  const source = isAnyState(edge.from) ? "any state" : localName(edge.from);
+  return `${edge.event} can't be sent: ${who} is in ${localName(current)}, this arrow leaves ${source}.`;
 }
 
 /** The value at a dotted path in the live context; "not set" when there is none (the Context tab's word). */
@@ -41,11 +70,10 @@ function contextPaths(edge: VizEdge): string[] {
 }
 
 /**
- * Why a transition arrow is blocked: its handler, tried with the example payload, stayed put
- * (or threw), and it reads the context. The reason names those context values. null = not
- * blocked, including when only the payload could be the cause. A handler that reads both and
- * fails on its example payload is drawn blocked with the context values as the reason; give the
- * field an `@example` that passes to fix it.
+ * Why a transition arrow is blocked, tried with the payload Send would send. Its handler stayed
+ * put (or threw) and it reads the context: the reason names those context values. Or the guard
+ * took the walk to another state than the one drawn: the reason names where it goes. null = not
+ * blocked, including when only the payload could be the cause.
  */
 export function blockedReason(context: {
   edge: VizEdge;
@@ -54,6 +82,9 @@ export function blockedReason(context: {
 }): string | null {
   const { edge, outcome, live } = context;
   if (edge.kind !== "transition" || outcome === null) return null;
+  if (edge.to !== null && outcome.outcome === "transition" && outcome.to !== edge.to) {
+    return `${edge.event} goes to ${localName(outcome.to)}, not ${localName(edge.to)}`;
+  }
   const stayed =
     outcome.outcome === "stay" || (outcome.outcome === "missing" && outcome.error !== null);
   if (!stayed) return null;
@@ -71,8 +102,8 @@ export function blockedEdges(
   machine: VizMachine,
   from: {
     live: VizLiveState;
-    /** The values set in the Context tab. */
-    set: Values;
+    /** The payload Send would send for an event. */
+    payloadOf: (event: string) => VizJson;
     currents: ReadonlyArray<string>;
     dryRun: (steps: ReadonlyArray<VizStep>) => Array<VizLiveStep | null>;
     actorOf: (edge: VizEdge) => VizActorRef | undefined | "none";
@@ -82,11 +113,12 @@ export function blockedEdges(
   for (const { edge } of from.currents.flatMap((current) => movesFrom(machine, current))) {
     const actor = from.actorOf(edge);
     if (edge.kind !== "transition" || actor === "none") continue;
+    if (sentByParts(machine, edge).length > 0) continue;
     const key = JSON.stringify([edge.event, actor ?? null]);
     const step: VizStep = {
       kind: "event",
       event: edge.event,
-      payload: examplePayload(machine, edge.event, from.set),
+      payload: from.payloadOf(edge.event),
       ...(actor === undefined ? {} : { actor }),
     };
     const entry = asked.get(key) ?? { step, edges: [] };

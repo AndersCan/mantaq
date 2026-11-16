@@ -75,7 +75,7 @@ function childWho(doc: Document, machine: VizMachine, ref: ChildRef): Array<Node
     : [code(doc, ref.key)];
 }
 
-function childWhoText(machine: VizMachine, ref: ChildRef): string {
+export function childWhoText(machine: VizMachine, ref: ChildRef): string {
   return machine.maps.length > 1 ? `${ref.map} ${ref.key}` : ref.key;
 }
 

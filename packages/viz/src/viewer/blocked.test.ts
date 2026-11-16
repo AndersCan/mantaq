@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
-import type { VizEdge, VizLiveStep, VizMachine } from "../schema.ts";
-import { blockedReason, examplePayload } from "./blocked.ts";
+import { readFileSync } from "node:fs";
+import type { VizEdge, VizLiveState, VizLiveStep, VizMachine } from "../schema.ts";
+import { blockedEdges, blockedReason, sentByParts, whyNotHere } from "./blocked.ts";
 
 function pay(over: Partial<VizEdge> = {}): VizEdge {
   return {
@@ -116,7 +117,13 @@ describe("blockedReason", () => {
 
   test("a transition, an ignored event and a missing actor are not blocked", () => {
     for (const kind of ["transition", "ignored", "missing"] as const) {
-      expect(blockedReason({ edge: pay(), outcome: outcome(kind), live: { items: 0 } })).toBeNull();
+      expect(
+        blockedReason({
+          edge: pay(),
+          outcome: { ...outcome(kind), to: "payment" },
+          live: { items: 0 },
+        }),
+      ).toBeNull();
     }
   });
 
@@ -153,38 +160,172 @@ describe("blockedReason", () => {
   });
 });
 
-describe("examplePayload", () => {
-  const machine = {
-    events: [
-      {
-        id: "pay",
-        internal: false,
-        doc: null,
-        payload: [
-          {
-            name: "email",
-            type: "string",
-            optional: false,
-            doc: null,
-            input: "text",
-            choices: [],
-            sample: "ana@example.com",
-          },
-        ],
-      },
-      { id: "addItem", internal: false, doc: null, payload: null },
-    ],
-    fuzz: {
-      corpus: [{ steps: [{ kind: "event", event: "pay", payload: { email: "" } }] }],
-      errors: [],
-    },
-  } as unknown as VizMachine;
+const team = JSON.parse(
+  readFileSync(new URL("./reference/team-inbox.json", import.meta.url), "utf8"),
+) as VizMachine;
+const edgeOf = (id: string): VizEdge => {
+  const edge = team.edges.find((each) => each.id === id);
+  if (edge === undefined) throw new Error(id);
+  return edge;
+};
+const liveAt = (state: string, over: Partial<VizLiveState> = {}): VizLiveState =>
+  ({ state, regions: {}, children: [], ...over }) as unknown as VizLiveState;
+const child = (key: string, state: string) => ({ map: "workers", key, state, since: 0 });
 
-  test("uses the field example, not an earlier sent value", () => {
-    expect(examplePayload(machine, "pay", {})).toEqual({ email: "ana@example.com" });
+describe("sentByParts", () => {
+  test.each([
+    ["workers.free-team.ITEMS_ASSIGNED-working", ["teamInbox"]],
+    ["workersBusy-team.ITEMS_FINISHED-allWorkersFree", ["workers"]],
+    ["allWorkersFree-team.ITEM_ARRIVED-workersBusy", []],
+    ["workers.working-team.RUN_SUCCEEDED-free", []],
+  ])("%s", (id, parts) => {
+    expect(sentByParts(team, edgeOf(id))).toEqual(parts);
+  });
+});
+
+describe("whyNotHere", () => {
+  const submit = edgeOf("workersBusy-team.ITEMS_FINISHED-allWorkersFree");
+
+  test("the root is in another state", () => {
+    expect(whyNotHere(team, submit, { live: liveAt("allWorkersFree"), picked: null })).toBe(
+      "team.ITEMS_FINISHED can't be sent: the walk is in allWorkersFree, this arrow leaves workersBusy.",
+    );
   });
 
-  test("an event with no data sends null", () => {
-    expect(examplePayload(machine, "addItem", {})).toBeNull();
+  test("a picked child in another state", () => {
+    const live = liveAt("workersBusy", {
+      children: [child("w1", "workers.working"), child("w2", "workers.free")],
+    });
+    expect(
+      whyNotHere(team, edgeOf("workers.working-team.RUN_SUCCEEDED-free"), {
+        live,
+        picked: { map: "workers", key: "w2" },
+      }),
+    ).toBe("team.RUN_SUCCEEDED can't be sent: w2 is in free, this arrow leaves working.");
+  });
+
+  test("a map with no child", () => {
+    expect(
+      whyNotHere(team, edgeOf("workers.working-team.RUN_SUCCEEDED-free"), {
+        live: liveAt("workersBusy"),
+        picked: null,
+      }),
+    ).toBe("team.RUN_SUCCEEDED can't be sent: workers has no child.");
+  });
+
+  test("a sendable arrow gives null", () => {
+    expect(whyNotHere(team, submit, { live: liveAt("workersBusy"), picked: null })).toBeNull();
+    const live = liveAt("workersBusy", { children: [child("w1", "workers.working")] });
+    expect(
+      whyNotHere(team, edgeOf("workers.working-team.RUN_SUCCEEDED-free"), { live, picked: null }),
+    ).toBeNull();
+  });
+});
+
+describe("blockedReason goes elsewhere", () => {
+  test("a transition to another target names it", () => {
+    const edge = pay({ explanation: null, to: "declined" });
+    expect(
+      blockedReason({ edge, outcome: { ...outcome("transition"), to: "accepted" }, live: {} }),
+    ).toBe("pay goes to accepted, not declined");
+  });
+
+  test("a transition to the drawn target is not blocked", () => {
+    const edge = pay({ explanation: null, to: "declined" });
+    expect(
+      blockedReason({ edge, outcome: { ...outcome("transition"), to: "declined" }, live: {} }),
+    ).toBeNull();
+  });
+});
+
+describe("edge cases", () => {
+  test("the part an arrow belongs to does not count as its sender", () => {
+    const own = { ...team, partOutputs: { workers: ["team.RUN_SUCCEEDED"] } };
+    expect(sentByParts(own, edgeOf("workers.working-team.RUN_SUCCEEDED-free"))).toEqual([]);
+  });
+
+  test("a region with no known state is not blamed", () => {
+    const region = { ...team, maps: [] };
+    expect(
+      whyNotHere(region, edgeOf("workers.working-team.RUN_SUCCEEDED-free"), {
+        live: liveAt("workersBusy"),
+        picked: null,
+      }),
+    ).toBeNull();
+  });
+
+  test("with two maps the child is named with its map", () => {
+    const two = { ...team, maps: ["workers", "other"] };
+    const live = liveAt("workersBusy", { children: [child("w1", "workers.free")] });
+    expect(
+      whyNotHere(two, edgeOf("workers.working-team.RUN_SUCCEEDED-free"), { live, picked: null }),
+    ).toBe("team.RUN_SUCCEEDED can't be sent: workers w1 is in free, this arrow leaves working.");
+  });
+
+  test("a transition with no drawn target is not blocked by where it lands", () => {
+    const edge = pay({ explanation: null, to: null });
+    expect(
+      blockedReason({ edge, outcome: { ...outcome("transition"), to: "accepted" }, live: {} }),
+    ).toBeNull();
+  });
+
+  test("arrows another part sends are not tried", () => {
+    const asked: string[] = [];
+    blockedEdges(team, {
+      live: liveAt("workersBusy", { context: {} } as Partial<VizLiveState>),
+      payloadOf: () => null,
+      currents: ["workersBusy"],
+      dryRun: (steps) => {
+        asked.push(...steps.map((step) => (step.kind === "event" ? step.event : "")));
+        return steps.map(() => null);
+      },
+      actorOf: () => undefined,
+    });
+    expect(asked).toContain("team.ITEM_ARRIVED");
+    expect(asked).not.toContain("team.ITEMS_FINISHED");
+  });
+});
+
+describe("whyNotHere names the part and the source", () => {
+  test("a region in another state is named by its path", () => {
+    const region = { ...team, maps: [] };
+    expect(
+      whyNotHere(region, edgeOf("workers.working-team.RUN_SUCCEEDED-free"), {
+        live: liveAt("workersBusy", { regions: { workers: "workers.free" } }),
+        picked: null,
+      }),
+    ).toBe("team.RUN_SUCCEEDED can't be sent: workers is in free, this arrow leaves working.");
+  });
+
+  test("an arrow from any state names it so", () => {
+    const anyEdge = {
+      ...edgeOf("workers.working-team.RUN_SUCCEEDED-free"),
+      id: "any",
+      from: "workers.*",
+    };
+    const free = team.states.find((each) => each.id === "workers.free");
+    if (free === undefined) throw new Error("fixture");
+    const done = { ...free, id: "workers.done", final: true };
+    const region = {
+      ...team,
+      maps: [],
+      states: [...team.states, done],
+      edges: [...team.edges, anyEdge],
+    };
+    expect(
+      whyNotHere(region, anyEdge, {
+        live: liveAt("workersBusy", { regions: { workers: "workers.done" } }),
+        picked: null,
+      }),
+    ).toBe("team.RUN_SUCCEEDED can't be sent: workers is in done, this arrow leaves any state.");
+  });
+
+  test("another arrow with the same event out of the current state does not make this one sendable", () => {
+    const busy = edgeOf("workersBusy-team.ITEMS_FINISHED-allWorkersFree");
+    const other = { ...busy, id: "elsewhere", from: "workWaiting" };
+    const machine = { ...team, edges: [...team.edges, other] };
+    expect(whyNotHere(machine, other, { live: liveAt("workersBusy"), picked: null })).toBe(
+      "team.ITEMS_FINISHED can't be sent: the walk is in workersBusy, this arrow leaves workWaiting.",
+    );
   });
 });

@@ -20,7 +20,7 @@ import { decodeLiveSteps, encodeLiveStep, movesFrom } from "../moves.ts";
 import { button, code, explorePanel, markExplore, outcomeText, sentEventLine } from "./explore.ts";
 import type { ExploreContext, ExploreParts, SentEvent } from "./explore.ts";
 import { pathTo } from "../findings.ts";
-import { blockedEdges } from "./blocked.ts";
+import { blockedEdges, sentByParts, whyNotHere } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
 import { keepInView } from "./keep-in-view.ts";
@@ -223,11 +223,16 @@ function sendFor(
   const { doc, machine, view } = from;
   return (edge) => {
     if (view.live === null) return null;
+    if (edge.kind !== "transition" && edge.kind !== "stay") return null;
+    const note = (text: string) =>
+      html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [text]);
+    const by = sentByParts(machine, edge);
+    if (by.length > 0) return note(`${edge.event} is sent by ${by.join(" and ")}, not by hand.`);
+    const why = whyNotHere(machine, edge, { live: view.live, picked: view.picked });
+    if (why !== null) return sentHere(doc, { machine, view, edge }, null) ?? note(why);
     updateBlocked(machine, view, from.driver);
     const reason = view.blocked.get(edge.id);
-    if (reason !== undefined) {
-      return html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [reason]);
-    }
+    if (reason !== undefined) return note(reason);
     const actor = actorOf(machine, edge, { state: view.live, picked: view.picked });
     if (actor === "none") return null;
     const sendable = currentsOf(view.live, view.picked).some((current) =>
@@ -625,7 +630,8 @@ function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver |
   view.blocked = blockedEdges(machine, {
     live,
     currents: currentsOf(live, view.picked),
-    set: view.values,
+    payloadOf: (event) =>
+      payloadFor(machine, event, { set: view.values, live, afters: view.afters }),
     dryRun: (steps) => driver.dryRun?.(steps) ?? [],
     actorOf: (edge) => actorOf(machine, edge, { state: live, picked: view.picked }),
   });

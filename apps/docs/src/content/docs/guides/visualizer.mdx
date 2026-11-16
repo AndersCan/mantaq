@@ -17,15 +17,15 @@ Reading handlers shows what one state does. The graph shows every path, and walk
 
 <Machine src="src/content/docs/checkout.ts" />
 
-The checkout machine: the thick border is the state the walk is on, accent arrows are the steps you can take next, and the pill in `submitting` (`chargeCard`) is its effect.
+The checkout machine: the thick border is the state the walk is on, accent arrows are the steps the walk can take next, and the pill in `submitting` (`chargeCard`) is its effect.
 
 ### Walking the graph
 
-The viewer keeps a cursor on one state, starting at the initial one. Accent arrows are the steps you can take next. A click on a state or an edge selects it and shows it in Details; it never takes a step. Take a step with **Send** in the selected arrow's Details.
+The viewer keeps a cursor on one state, starting at the initial one. Accent arrows are the steps the walk can take next. A click on a state or an edge selects it and shows it in Details; it never takes a step. Take a step with **Send** in the selected arrow's Details.
 
 In an actor map the diagram shows the child machine once. Live, each child is a chip with its key on the state it is in, and the Step tab lists every child with its state. Click a chip or a row to follow that child: its row is marked, and an arrow's Send in the map goes to it.
 
-The selected arrow's Details has a **Send** button when the walk is in its source state. After a Send from there, Details say what was sent, with its values, and where it went. An arrow selects wherever its line is clicked, dashed and dotted ones included.
+The selected arrow's Details has a **Send** button when the walk is in its source state and no other part sends its event; otherwise one line says why. After a Send from there, Details say what was sent, with its values, and where it went. An arrow selects wherever its line is clicked, dashed and dotted ones included.
 
 Effects do not run on the live page: the answers of `submitting` (`paymentOk`, `paymentFail`, `paymentTimeout`) are the arrows out of it. The initial state's effects run while the machine is built.
 
@@ -56,5 +56,5 @@ On the live page (the Vite plugin) each step runs the real actor, so guards are 
 | Dotted arrow, italic label | A transition on an internal event                  |
 | Dotted self-loop           | The event is handled and the state does not change |
 | Dashed orange arrow        | Undetermined target                                |
-| Accent arrow               | A step you can take next                           |
+| Accent arrow               | A step the walk can take next                      |
 | Teal arrow                 | The arrow selected in Details                      |

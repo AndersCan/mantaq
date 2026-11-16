@@ -8,7 +8,14 @@
  */
 import { Either } from "@mantaq/utils";
 import { machineFindings, movesFrom, parseViz, scopeOf } from "@mantaq/viz";
-import type { VizActorRef, VizFinding, VizJson, VizLiveOutcome, VizMachine } from "@mantaq/viz";
+import type {
+  VizActorRef,
+  VizEdge,
+  VizFinding,
+  VizJson,
+  VizLiveOutcome,
+  VizMachine,
+} from "@mantaq/viz";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -210,6 +217,24 @@ async function pressRow(page: Page, actor: { map: string; key: string }): Promis
   return (await page.getAttribute(row, "data-child-state")) ?? "";
 }
 
+/** Selects each arrow in turn and presses the first Send that is offered; else the first reason given. */
+async function pressFirstSend(
+  page: Page,
+  from: { edges: VizEdge[]; event: string; state: () => Promise<string> },
+): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
+  let note: string | null = null;
+  for (const edge of from.edges) {
+    await page.locator(`.graph g[data-edge-id=${quoted(edge.id)}]`).dispatchEvent("click");
+    const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
+    if ((await trigger.count()) > 0) {
+      await trigger.click();
+      return outcomeOf(page, from.state);
+    }
+    note ??= await page.locator("[data-blocked-note]").first().textContent();
+  }
+  return Either.left(note ?? `${from.event} is blocked.`);
+}
+
 function makeSend(
   page: Page,
   machine: VizMachine,
@@ -234,8 +259,8 @@ function makeSend(
       .flatMap((current) => movesFrom(machine, current))
       .map((move) => move.edge)
       .filter((edge) => scopeOf(edge.from) === ("map" in actor ? actor.map : path));
-    const edge = edges.find((each) => each.event === event);
-    if (edge === undefined) {
+    const offering = edges.filter((each) => each.event === event);
+    if (offering.length === 0) {
       const where =
         "map" in actor
           ? `${path} is in ${await rowState(page, actor)}`
@@ -249,14 +274,7 @@ function makeSend(
     if (problem !== undefined) {
       return Either.left(problem);
     }
-    await page.locator(`.graph g[data-edge-id=${quoted(edge.id)}]`).dispatchEvent("click");
-    const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
-    if ((await trigger.count()) === 0) {
-      const note = await page.locator("[data-blocked-note]").first().textContent();
-      return Either.left(note ?? `${event} is blocked.`);
-    }
-    await trigger.click();
-    return outcomeOf(page, state);
+    return pressFirstSend(page, { edges: offering, event, state });
   };
 }
 
