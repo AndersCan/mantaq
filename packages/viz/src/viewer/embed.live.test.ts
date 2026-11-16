@@ -301,6 +301,46 @@ describe("live controls", () => {
     }
   });
 
+  test("the selected arrow's Details has a Send button that sends and keeps the tab", () => {
+    const { root, live } = mount();
+    clickEdge(root, "idle-submit-paying");
+    const button = root.querySelector<HTMLButtonElement>("[data-send-edge]");
+    expect(button?.textContent).toBe("Send submit");
+    expect(current(root)).toBe("idle");
+    button?.click();
+    expect(live.log).toHaveLength(1);
+    expect(current(root)).toBe("paying");
+    expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("after a Details send, focus is on the selected arrow", () => {
+    const { root } = mount();
+    document.body.append(root);
+    clickEdge(root, "idle-submit-paying");
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    root.remove();
+  });
+
+  test("live Step tab buttons read Send <event>", () => {
+    const { root } = mount();
+    expect(root.querySelector('[data-send="submit"]')?.textContent).toBe("Send submit");
+  });
+
+  test("an arrow whose source is not current has no Send button", () => {
+    const { root } = mount();
+    clickEdge(root, "paying-paymentTimeout-error");
+    expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("the initial arrow has no Send button", () => {
+    const { root } = mount();
+    clickEdge(root, "__initial__--idle");
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
   test("no arrow link in a state's Details sends", () => {
     const { root, live } = mount();
     const before = current(root);

@@ -686,3 +686,7 @@
   gap: 8px;
   align-items: baseline;
 }
+
+.viz .blocked-note {
+  color: var(--muted);
+}

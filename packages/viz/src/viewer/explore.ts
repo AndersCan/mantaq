@@ -64,11 +64,11 @@ const GROUP_TITLES: Record<MoveGroup, string> = {
   internal: "Other internal events",
 };
 
-function code(doc: Document, text: string): HTMLElement {
+export function code(doc: Document, text: string): HTMLElement {
   return html(doc, "code", {}, [text]);
 }
 
-function button(
+export function button(
   doc: Document,
   label: ReadonlyArray<Node | string>,
   context: {
@@ -122,6 +122,7 @@ function moveItem(
       button(
         doc,
         [
+          "Send ",
           code(doc, edge.event),
           ` ${targetText(move, target, context.current)}`,
           ...(via ? [via] : []),
@@ -356,7 +357,7 @@ function sendItem(
   const actor = context.child ?? actorOf(compartment).actor;
   const move = moves.find((each) => each.edge.event === event);
   return html(doc, "li", { "data-send-item": event }, [
-    button(doc, [code(doc, event)], {
+    button(doc, ["Send ", code(doc, event)], {
       onClick: () => live.sendEvent(event, actor),
       attrs: { "data-send": event },
     }),

@@ -488,6 +488,90 @@ describe("effect chip hover edge cases", () => {
   });
 });
 
+describe("walking: the selected arrow's Send", () => {
+  test("an arrow whose target depends on the payload has no button", () => {
+    const dynamic: VizMachine = {
+      ...door,
+      edges: [...door.edges, { ...edge("open", "dyn", "done"), to: null }],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [dynamic] }));
+    root
+      .querySelector('[data-edge-id="open-dyn-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+    expect(root.querySelector("[data-selected-edge] > div:empty")).toBeNull();
+  });
+
+  test("an arrow with several targets has a Send per target, each taking its own step", () => {
+    const push: VizEdge = {
+      ...edge("open", "push", "ajar"),
+      to: null,
+      explanation: {
+        status: "analyzed",
+        location: { file: "door.ts", line: 1, column: 1 },
+        registration: "on",
+        branches: [
+          { conditions: ["hard"], target: { kind: "state", state: "done" } },
+          { conditions: ["!(hard)"], target: { kind: "state", state: "ajar" } },
+        ],
+        payloadReads: [],
+        contextReads: [],
+        contextWrites: [],
+        readsActorState: false,
+        comparisons: [],
+        literals: [],
+      },
+    };
+    const pushy: VizMachine = {
+      ...door,
+      states: [...door.states, state("ajar", { final: true })],
+      events: [...door.events, { id: "push", internal: false, doc: null, payload: null }],
+      edges: [...door.edges, push],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [pushy] }));
+    root
+      .querySelector('[data-edge-id="open-push-ajar"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const sends = [...root.querySelectorAll<HTMLButtonElement>("[data-send-edge]")];
+    expect(sends.map((each) => each.textContent)).toEqual(["Send push → ajar", "Send push → done"]);
+    sends[1]?.click();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
+  });
+
+  test("Step tab buttons start with Send", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    expect(root.querySelector('.panel [data-move="open-go-done"] button')?.textContent).toMatch(
+      /^Send go/,
+    );
+  });
+
+  test("a click selects, then Send takes the step", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    root
+      .querySelector('[data-edge-id="open-go-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
+    const send = root.querySelector<HTMLButtonElement>("[data-send-edge]");
+    expect(send?.textContent).toBe("Send go");
+    send?.click();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
+    expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("after a walking Send, focus is on the selected arrow", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    document.body.append(root);
+    root
+      .querySelector('[data-edge-id="open-go-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("open-go-done");
+    root.remove();
+  });
+});
+
 describe("effect chip sends hint", () => {
   const withEffect = (sends: string[] | null): VizMachine => ({
     ...door,

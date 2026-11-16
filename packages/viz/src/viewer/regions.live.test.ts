@@ -197,6 +197,17 @@ describe("live regions", () => {
     expect(root.querySelector('p[data-region="network"]')?.textContent).toBe("network: in offline");
   });
 
+  test("a region arrow's Details Send sends to that region", () => {
+    const { root, sent } = mount();
+    root
+      .querySelector('[data-edge-id="network.online-connectionLost-network.offline"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(sent).toEqual([
+      { kind: "event", event: "connectionLost", payload: null, actor: { region: "network" } },
+    ]);
+  });
+
   test("a region step reads with local state names", () => {
     const { root } = mount();
     root
