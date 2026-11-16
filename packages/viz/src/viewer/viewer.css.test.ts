@@ -62,3 +62,20 @@ test("the panel stays below the graph at every width", () => {
   expect(main).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   expect(rule(".viz .panel {")).not.toMatch(/sticky/);
 });
+
+test("a diagram wider than its canvas scrolls sideways, never clips", () => {
+  const canvas = bare
+    .split("}")
+    .filter((block) =>
+      block
+        .split("{")[0]
+        .split(",")
+        .some((s) => s.trim() === ".viz .canvas"),
+    )
+    .join("}");
+  expect(canvas).toMatch(/overflow:\s*auto;/);
+  // Every rule for the canvas, not only the first: a later overflow(-x) that is not auto/scroll cuts the diagram off.
+  for (const [, value] of canvas.matchAll(/overflow(?:-x)?:\s*([a-z]+)/g)) {
+    expect(value).toMatch(/^(auto|scroll)$/);
+  }
+});
