@@ -11,6 +11,7 @@ import type {
 } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
+import { sendVia } from "./send-via.ts";
 
 const state = (id: string, initial = false): VizState => ({
   id,
@@ -149,13 +150,12 @@ function mount(sender: string | null = "") {
   return { root };
 }
 
-const send = (root: HTMLElement, name: string) =>
-  root.querySelector<HTMLButtonElement>(`[data-send="${name}"]`)?.click();
+const send = sendVia;
 const text = (root: HTMLElement, selector: string) => root.querySelector(selector)?.textContent;
 
-/** Walks the recorded run through the Step buttons, up to and including step `count`. */
+/** Walks the recorded run through the arrows, up to and including step `count`. */
 function walk(root: HTMLElement, count: number) {
-  const names = ["DISH_COOKED", "DISH_SERVED", "BREAK_STARTED", "DISH_COOKED", "DISH_COOKED"];
+  const names = ["DISH_COOKED", "BREAK_STARTED", "BREAK_STARTED", "DISH_COOKED", "DISH_COOKED"];
   for (const name of names.slice(0, count)) send(root, name);
 }
 

@@ -14,6 +14,7 @@ import type {
 import { decodeLiveSteps, encodeLiveStep, payloadSamples } from "../moves.ts";
 import { mountViewer } from "./embed.ts";
 import { describe, expect, test, vi } from "vite-plus/test";
+import { sendVia } from "./send-via.ts";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
   return {
@@ -168,7 +169,7 @@ const click = (root: HTMLElement, selector: string) =>
   root.querySelector<HTMLButtonElement>(selector)?.click();
 /** Sends `submit` from the Step tab. */
 function sendSubmit(root: HTMLElement) {
-  click(root, '[data-send="submit"]');
+  sendVia(root, "submit");
 }
 const current = (root: HTMLElement) => root.querySelector(".explore")?.getAttribute("data-current");
 
@@ -252,7 +253,7 @@ describe("live controls", () => {
         waiting: [],
       };
     }
-    click(root, '[data-send="flip"]');
+    sendVia(root, "flip");
     expect(log).toEqual([{ kind: "event", event: "flip", payload: null }]);
   });
 
@@ -296,7 +297,7 @@ describe("live controls", () => {
         },
       },
     );
-    click(root, '[data-send="flip"]');
+    sendVia(root, "flip");
     expect(log).toHaveLength(1);
     expect(log[0]?.kind === "event" && log[0].event).toBe("flip");
   });
@@ -339,16 +340,6 @@ describe("live controls", () => {
     expect(detailsSent()).toBeUndefined();
   });
 
-  test("a Send from the Step tab shows its values and no Details line", () => {
-    const { root } = mount();
-    sendSubmit(root);
-    expect(root.querySelector("[data-live-sent-event]")?.textContent).toBe(
-      `Sent submit with {"amount":5}`,
-    );
-    clickEdge(root, "idle-submit-paying");
-    expect(root.querySelector("[data-details-sent]")).toBeNull();
-  });
-
   test("after a Details send, focus is on the selected arrow", () => {
     const { root } = mount();
     document.body.append(root);
@@ -358,9 +349,13 @@ describe("live controls", () => {
     root.remove();
   });
 
-  test("live Step tab buttons read Send <event>", () => {
+  test("the Step tab has no Send buttons; the selected arrow's Details has one", () => {
     const { root } = mount();
-    expect(root.querySelector('[data-send="submit"]')?.textContent).toBe("Send submit");
+    expect(current(root)).toBe("idle");
+    expect(root.querySelectorAll(".explore [data-send]")).toHaveLength(0);
+    clickEdge(root, "idle-submit-paying");
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(current(root)).toBe("paying");
   });
 
   test("an arrow whose source is not current has no Send button", () => {
@@ -407,7 +402,7 @@ describe("live controls", () => {
     clickEdge(root, "idle-submit-paying");
     clickEdge(root, "paying-paymentTimeout-error");
     root.querySelector("[data-node-id]")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    click(root, "[data-send]");
+    click(root, "[data-send-edge]");
     expect(canvas).not.toBeNull();
     expect(root.querySelector(".canvas")).toBe(canvas);
     expect(scroll).not.toHaveBeenCalled();
@@ -601,6 +596,7 @@ describe("field forms and the context table", () => {
       },
       { id: "ping", internal: false, doc: null, payload: null },
     ],
+    edges: [...checkout.edges, { ...edge("idle", "ping", "idle"), kind: "stay" }],
     context: [
       {
         name: "amount",
@@ -648,7 +644,7 @@ describe("field forms and the context table", () => {
 
   test("an event with no payload fields and no samples sends at once", () => {
     const { root, live } = mountFields();
-    click(root, '[data-send="ping"]');
+    sendVia(root, "ping");
     expect(live.log[0]).toEqual([{ kind: "event", event: "ping", payload: null }]);
   });
 
@@ -849,12 +845,12 @@ describe("what ran", () => {
 
   test("Because shows the condition for a transition and a stay", () => {
     const move = mountWith(branching, stepped({}).live);
-    click(move, '[data-send="submit"]');
+    sendVia(move, "submit");
     expect(text(move, "outcome")).toBe("submit: idle → paying");
     expect(text(move, "because")).toBe("Because: payload.amount > 5");
 
     const stay = mountWith(branching, stepped({ to: "idle", outcome: "stay", context: {} }).live);
-    click(stay, '[data-send="submit"]');
+    sendVia(stay, "submit");
     expect(text(stay, "outcome")).toBe("submit: handled in idle, stays");
     expect(text(stay, "because")).toBe("Because: !(payload.amount > 5)");
   });
@@ -864,7 +860,7 @@ describe("what ran", () => {
       [branching.id]: { openAlbum: [{ to: "router", event: "NAVIGATED", at: "a.ts:72" }] },
     };
     const send = (root: HTMLElement) => {
-      click(root, '[data-send="submit"]');
+      sendVia(root, "submit");
     };
     const routed = mountWith(branching, stepped({ sent: ["openAlbum"] }).live, routes);
     send(routed);
@@ -914,7 +910,7 @@ describe("what ran", () => {
       ),
     };
     const root = mountWith(plain, stepped({}).live);
-    click(root, '[data-send="submit"]');
+    sendVia(root, "submit");
     expect(root.querySelector("[data-live-because]")).toBeNull();
   });
 
@@ -923,7 +919,7 @@ describe("what ran", () => {
       branching,
       stepped({ effects: ["charge"], context: { amount: 9, tag: "x" } }).live,
     );
-    click(root, '[data-send="submit"]');
+    sendVia(root, "submit");
     expect(text(root, "changed")).toBe("Changed: amount, tag");
     expect(text(root, "effects")).toBe("Effects started: charge");
   });
@@ -931,7 +927,7 @@ describe("what ran", () => {
   test("an async result renders without another click", () => {
     const { live, push } = stepped({});
     const root = mountWith(branching, live);
-    click(root, '[data-send="submit"]');
+    sendVia(root, "submit");
     expect(root.querySelector("[data-live-after]")).toBeNull();
     push({
       state: "error",
@@ -974,7 +970,7 @@ describe("what ran", () => {
 
   test("an ignored event says nothing ran", () => {
     const root = mountWith(branching, stepped({ to: "idle", outcome: "ignored" }).live);
-    click(root, '[data-send="submit"]');
+    sendVia(root, "submit");
     expect(text(root, "outcome")).toBe("No handler for submit in idle. Nothing ran.");
   });
 });
@@ -1091,70 +1087,15 @@ describe("live effect reports", () => {
       },
       { driver: fetchDriver(options.mode, options.held) },
     );
-    click(root, '[data-send="start"]');
+    sendVia(root, "start");
     return root;
   }
-  const events = (root: HTMLElement, group: string) =>
-    [...root.querySelectorAll(`[data-group="${group}"] [data-send]`)].map((each) =>
-      each.getAttribute("data-send"),
-    );
-
-  test("lists what the running effect reports, with where each comes from", () => {
-    const root = mountFetcher();
-    expect(events(root, "effect")).toEqual(["fetchFailed", "listFetched"]);
-    const from = [...root.querySelectorAll('[data-group="effect"] [data-sent-by]')].map((each) =>
-      each.getAttribute("data-sent-by"),
-    );
-    expect(from).toEqual(["fetchList", "fetchList"]);
-  });
-
-  test("a report shows its handler's doc", () => {
-    const root = mountFetcher();
-    expect(root.querySelector('[data-send-item="fetchFailed"]')?.textContent).toContain(
-      "Fetching failed: the person can try again.",
-    );
-  });
-
   test("picking the failure moves down the error path and Back undoes it", () => {
     const root = mountFetcher();
-    click(root, '[data-send="fetchFailed"]');
+    sendVia(root, "fetchFailed");
     expect(current(root)).toBe("couldNotFetch");
     click(root, '[data-explore-action="back"]');
     expect(current(root)).toBe("fetching");
-  });
-
-  test("inputs are grouped apart and marked ignored", () => {
-    const root = mountFetcher();
-    expect(
-      root.querySelector('[data-group="input"] [data-send-item="start"]')?.textContent,
-    ).toContain(" ignored in fetching");
-  });
-
-  test("a handled internal event no effect sends sits under Other internal events", () => {
-    const root = document.createElement("div");
-    const machine: VizMachine = {
-      ...fetcher,
-      events: [...fetcher.events, { id: "poke", internal: true, doc: null, payload: null }],
-      edges: [...fetcher.edges, edge("fetching", "poke", "waiting")],
-    };
-    mountViewer(
-      root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
-      { driver: fetchDriver() },
-    );
-    click(root, '[data-send="start"]');
-    expect(events(root, "internal")).toEqual(["poke"]);
-    expect(root.querySelector('[data-group="internal"]')?.previousElementSibling?.textContent).toBe(
-      "Other internal events",
-    );
-  });
-
-  test("the old single list is gone", () => {
-    const root = mountFetcher();
-    expect(root.querySelector('[data-group="live"]')).toBeNull();
-    expect([...root.querySelectorAll("h3")].map((each) => each.textContent)).not.toContain(
-      "Send an event",
-    );
   });
 
   describe("held", () => {
@@ -1167,15 +1108,6 @@ describe("live effect reports", () => {
       expect(section?.getAttribute("data-effect-mode")).toBe("held");
       expect(root.querySelector(".explore-note")).toBeNull();
       expect(root.querySelector(".explore-waiting")).toBeNull();
-    });
-
-    test("its reports are sends in the fold's effect group", () => {
-      const root = mountFetcher({ mode: "held" });
-      const inGroup = [
-        ...root.querySelectorAll('.explore-moves [data-group="effect"] [data-send]'),
-      ].map((each) => each.getAttribute("data-send"));
-      expect(inGroup).toContain("listFetched");
-      expect(inGroup).toContain("fetchFailed");
     });
 
     test("a step into fetching names the effect it did not run and what it would send", () => {
@@ -1215,7 +1147,7 @@ describe("live effect reports", () => {
         { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
         { driver: live },
       );
-      click(root, '[data-send="start"]');
+      sendVia(root, "start");
       return root;
     };
 
@@ -1275,17 +1207,17 @@ describe("live effect reports", () => {
 
     test("picking a report moves on and Back returns to the state", () => {
       const root = mountFetcher({ mode: "held" });
-      click(root, '[data-send="fetchFailed"]');
+      sendVia(root, "fetchFailed");
       expect(current(root)).toBe("couldNotFetch");
       click(root, '[data-explore-action="back"]');
       expect(current(root)).toBe("fetching");
     });
   });
 
-  test("at rest the Step tab shows its Send buttons and the clock, in no fold", () => {
+  test("at rest the Step tab shows the clock and no Send buttons, in no fold", () => {
     const root = mountFetcher();
     expect(root.querySelector("details")).toBeNull();
-    expect(root.querySelector(".explore [data-send]")).not.toBeNull();
+    expect(root.querySelector(".explore [data-send]")).toBeNull();
     expect(root.querySelector(".explore [data-advance]")).not.toBeNull();
   });
 });

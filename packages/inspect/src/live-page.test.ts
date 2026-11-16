@@ -7,6 +7,7 @@ import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven, mountLiveDriven, takeTargets } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
+import { sendVia } from "./send-via.ts";
 
 const file = join(import.meta.dirname, "fixtures", "checkout.ts");
 
@@ -31,7 +32,7 @@ describe("mountDriven", () => {
       text: await documentText(),
       targets: { checkout: create },
     });
-    expect(root.querySelector("[data-send]")).not.toBeNull();
+    expect(root.querySelector(".graph g.edge.next")).not.toBeNull();
   });
 
   test("a right-click on a state keeps the browser's own menu", async () => {
@@ -183,12 +184,11 @@ describe("mountDriven values", () => {
         },
       },
     });
-    const click = (selector: string) => root.querySelector<HTMLButtonElement>(selector)?.click();
-    click('[data-send="ask"]');
+    sendVia(root, "ask");
     const answer = root.querySelector<HTMLInputElement>('[data-value="answer"]');
     if (answer) answer.value = "declined";
     answer?.dispatchEvent(new Event("change", { bubbles: true }));
-    click('[data-send="answered"]');
+    sendVia(root, "answered");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
   });
 });
@@ -273,10 +273,7 @@ describe("mountDriven heading and walk ownership", () => {
     const first = document.createElement("div");
     mountDriven(first, { source: "test", text, targets: { checkout: create } });
     const start = current(first);
-    for (const send of first.querySelectorAll<HTMLElement>("[data-send]")) {
-      if (current(first) !== start) break;
-      send.click();
-    }
+    sendVia(first);
     expect(current(first)).not.toBe(start);
     const walk = new URLSearchParams(location.search);
     expect(walk.getAll("step").length).toBeGreaterThan(0);

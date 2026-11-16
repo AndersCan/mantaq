@@ -86,10 +86,22 @@ test("takes a screenshot", async () => {
 
 const fixture = (file: string) => join(import.meta.dirname, "fixtures", file);
 
-test("an event the state ignores is a result, not an error", async () => {
+test("an event the state does not handle is a Left naming what it offers", async () => {
   await withViz(checkout, async (viz) => {
     const result = await viz.send("submitShipping");
-    expect(Either.getRight(result)).toEqual({ state: "basicInfo", outcome: "ignored" });
+    expect(Either.getLeft(result)).toMatch(
+      /^no button for submitShipping: checkout is in basicInfo, which offers: /,
+    );
+  });
+}, 60_000);
+
+test("an event whose guard blocks the arrow is a Left with the reason", async () => {
+  const meal = join(import.meta.dirname, "../../../apps/docs/src/tutorial/meal-06.ts");
+  await withViz(meal, async (viz) => {
+    const result = await viz.send("eat");
+    expect(Either.getLeft(result)).toBe("eat is blocked: plates is 0");
+    expect(Either.getRight(await viz.send("serve"))?.state).toBe("hungry");
+    expect(Either.getRight(await viz.send("eat"))?.state).toBe("full");
   });
 }, 60_000);
 

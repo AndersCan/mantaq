@@ -6,6 +6,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { createPhotoQueueActor } from "../../../apps/docs/src/content/docs/photo-queue.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven } from "./live-page.ts";
+import { sendVia } from "./send-via.ts";
 
 const file = join(import.meta.dirname, "../../../apps/docs/src/content/docs/photo-queue.ts");
 
@@ -36,7 +37,7 @@ function send(root: HTMLElement, selector: string) {
 }
 
 function addThree(root: HTMLElement) {
-  for (let index = 0; index < 3; index += 1) send(root, '[data-send="photoAdded"]');
+  for (let index = 0; index < 3; index += 1) sendVia(root, "photoAdded");
 }
 
 const children = (root: HTMLElement): Array<{ key: string; state: string }> =>
@@ -69,7 +70,7 @@ describe("the docs photo queue on the live page", () => {
   test("queueCleared names every removed child", async () => {
     const root = await mounted();
     addThree(root);
-    send(root, '[data-send="queueCleared"]');
+    sendVia(root, "queueCleared");
     expect(root.querySelector("[data-live-removed]")?.textContent).toBe("p1, p2, p3 removed");
     expect(children(root)).toEqual([]);
   });

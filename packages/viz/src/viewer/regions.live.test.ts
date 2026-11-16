@@ -2,6 +2,7 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
+import { sendVia } from "./send-via.ts";
 import { describe, expect, test } from "vite-plus/test";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
@@ -139,54 +140,17 @@ function mount(machine: VizMachine = photoUpload) {
 }
 
 describe("live regions", () => {
-  test("a machine whose regions talk opens on its diagram, and its Send button walks a region", () => {
+  test("a machine whose regions talk opens on its diagram, and a region arrow's Send walks a region", () => {
     const { root, sent } = mount();
     expect(root.querySelector('svg.graph g.region[data-region="upload"]')).not.toBeNull();
     expect(root.querySelector("[data-system]")).toBeNull();
-    root.querySelector<HTMLButtonElement>('[data-send="photoPicked"]')?.click();
+    sendVia(root, "photoPicked");
     expect(sent).toEqual([
       { kind: "event", event: "photoPicked", payload: null, actor: { region: "upload" } },
     ]);
     expect(
       root.querySelector(".graph g.current[data-node-id='upload.sendingPhoto']"),
     ).not.toBeNull();
-  });
-
-  test("an input another part sends sits under Send an input, not in a group of its own", () => {
-    const { root } = mount({
-      ...photoUpload,
-      events: photoUpload.events.map((each) =>
-        each.id === "photoUploaded" ? { ...each, internal: false } : each,
-      ),
-    });
-    const groups = [...root.querySelectorAll("[data-group]")].map((each) =>
-      each.getAttribute("data-group"),
-    );
-    expect(groups).not.toContain("parts");
-    expect(
-      root.querySelector('[data-group="input"] [data-send-item="photoUploaded"]'),
-    ).not.toBeNull();
-  });
-
-  test("a region's events are buttons under that region only", () => {
-    const { root } = mount();
-    expect(root.querySelector('[data-actor=""] [data-send="photoPicked"]')).toBeNull();
-    expect(root.querySelector('[data-actor="upload"] [data-send="photoPicked"]')).not.toBeNull();
-    expect(root.querySelector('[data-actor="upload"] [data-send="connectionLost"]')).toBeNull();
-    expect(
-      root.querySelector('[data-actor="network"] [data-send="connectionLost"]'),
-    ).not.toBeNull();
-  });
-
-  test("clicking a region's button sends to that region", () => {
-    const { root, sent } = mount();
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="network"] [data-send="connectionLost"]')
-      ?.click();
-    expect(sent).toEqual([
-      { kind: "event", event: "connectionLost", payload: null, actor: { region: "network" } },
-    ]);
-    expect(root.querySelector(".graph g.current[data-node-id='network.offline']")).not.toBeNull();
   });
 
   test("a region arrow's Details Send sends to that region", () => {
@@ -202,17 +166,13 @@ describe("live regions", () => {
 
   test("a region step reads with local state names", () => {
     const { root } = mount();
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="photoPicked"]')
-      ?.click();
+    sendVia(root, "photoPicked");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
       "photoPicked: upload: waitingForPhoto → sendingPhoto",
     );
   });
 
   test("a missing region says so", () => {
-    const { root } = mount();
-    root.querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="photoPicked"]');
     const text = "nope>photoPicked";
     const live = mountWithSteps([text]);
     expect(live.querySelector("[data-live-outcome]")?.textContent).toBe(
@@ -235,21 +195,6 @@ describe("live regions", () => {
   test("the diagram has an entry arrow for the machine and each region", () => {
     const { root } = mount();
     expect(root.querySelectorAll(".graph .entry")).toHaveLength(3);
-  });
-
-  test("a final root still shows the regions' buttons", () => {
-    const { root } = mount();
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="uploadConfirmed"]')
-      ?.click();
-    expect(root.querySelector('[data-actor=""]')).toBeNull();
-    expect(root.querySelector("section.explore[data-done]")).not.toBeNull();
-    expect(
-      root.querySelector('[data-actor="network"] [data-send="connectionLost"]'),
-    ).not.toBeNull();
-    expect(root.querySelector('[data-region-final="upload"]')?.textContent).toBe(
-      "upload is final: it takes no more events.",
-    );
   });
 });
 
@@ -290,26 +235,20 @@ describe("the Send line", () => {
       edges: [edge("showingUploadScreen", "photoUploaded", "showingUploadedPhoto")],
     };
     const { root } = mount(flat);
-    root.querySelector<HTMLButtonElement>('[data-send="photoUploaded"]')?.click();
+    sendVia(root, "photoUploaded");
     expect(sentLine(root)).toBe("Sent photoUploaded");
   });
 
   test("a region Send names the region", () => {
     const { root } = mount();
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="photoPicked"]')
-      ?.click();
+    sendVia(root, "photoPicked");
     expect(sentLine(root)).toBe("Sent photoPicked to upload");
   });
 
   test("a rewind after a Send drops the line", () => {
     const { root } = mount();
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="upload"] [data-send="photoPicked"]')
-      ?.click();
-    root
-      .querySelector<HTMLButtonElement>('[data-actor="network"] [data-send="connectionLost"]')
-      ?.click();
+    sendVia(root, "photoPicked");
+    sendVia(root, "connectionLost");
     expect(sentLine(root)).toBe("Sent connectionLost to network");
     root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.click();
     expect(root.querySelector(".explore-outcome")).not.toBeNull();

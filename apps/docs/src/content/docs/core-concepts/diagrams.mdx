@@ -31,9 +31,9 @@ A box is a state, an arrow is one target of a `to` list labelled with its event.
 
 The panel runs the real machine in your browser. Pulsing arrows are the steps you can take next.
 
-1. Press `submitBasicInfo` in the **Step** tab: it is sent with the example values (change them in the **Context** tab). The walk moves to `shippingAddress`.
-2. Press `submitShipping`, then `submitPayment`. Effects do not run here: the arrows out of `submitting` are what `chargeCard` reports.
-3. Press `paymentOk`. The walk ends in `success`.
+1. Select the `submitBasicInfo` arrow and press **Send** in Details: it is sent with the example values (change them in the **Context** tab). The walk moves to `shippingAddress`.
+2. Send `submitShipping`, then `submitPayment` the same way. Effects do not run here: the arrows out of `submitting` are what `chargeCard` reports.
+3. Send `paymentOk`. The walk ends in `success`.
 
 ### Parts that talk
 
@@ -43,7 +43,7 @@ The panel runs the real machine in your browser. Pulsing arrows are the steps yo
 
 </div>
 
-A machine with regions draws each region as a shaded frame inside its state; the Step tab has a Send list per region.
+A machine with regions draws each region as a shaded frame inside its state; select an arrow in a region and press **Send** to walk that region.
 
 ### Next
 

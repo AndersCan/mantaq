@@ -10,6 +10,7 @@ import type {
 } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
 import { expect, test } from "vite-plus/test";
+import { sendVia } from "./send-via.ts";
 
 const state = (id: string, initial = false): VizState => ({
   id,
@@ -127,9 +128,6 @@ function mount(after: VizLiveStep[], sent: VizStep[] = []) {
   return root;
 }
 
-const sendButton = (root: HTMLElement, event: string) =>
-  root.querySelector<HTMLButtonElement>(`[data-send="${event}"]`);
-
 test("a click sends what a part sent after the last step", () => {
   const assigned = step({
     event: "ITEMS_ASSIGNED",
@@ -137,7 +135,7 @@ test("a click sends what a part sent after the last step", () => {
   });
   const sent: VizStep[] = [];
   const root = mount([assigned], sent);
-  sendButton(root, "ITEM_ARRIVED")?.click();
-  sendButton(root, "ITEMS_FINISHED")?.click();
+  sendVia(root, "ITEM_ARRIVED");
+  sendVia(root, "ITEMS_FINISHED");
   expect(sent.at(-1)).toMatchObject({ event: "ITEMS_FINISHED", payload: { worker: "w1" } });
 });

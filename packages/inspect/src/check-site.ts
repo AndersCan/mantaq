@@ -140,9 +140,12 @@ async function handlesAnEvent(root: PwLocator, page: PwPage): Promise<string | u
     return undefined;
   }
   const before = await explore.first().getAttribute("data-current");
-  const sends = await root.locator("[data-send]").count();
-  for (let index = 0; index < sends; index += 1) {
-    await root.locator("[data-send]").nth(index).click();
+  const arrows = root.locator(".graph g.edge.next");
+  const count = await arrows.count();
+  for (let index = 0; index < count; index += 1) {
+    await arrows.nth(index).dispatchEvent("click");
+    const send = root.locator("[data-send-edge]");
+    await send.first().click();
     await page.waitForTimeout(50);
     const after = await root.locator(".explore").first().getAttribute("data-current");
     const outcome = root.locator("[data-outcome]");
@@ -152,9 +155,9 @@ async function handlesAnEvent(root: PwLocator, page: PwPage): Promise<string | u
       return undefined;
     }
   }
-  return sends === 0
+  return count === 0
     ? "is live but offers no event to send"
-    : `handled none of the ${sends} events it offers`;
+    : `handled none of the ${count} events it offers`;
 }
 
 async function checkPage(

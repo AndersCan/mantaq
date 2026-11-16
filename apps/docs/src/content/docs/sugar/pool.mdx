@@ -44,8 +44,7 @@ Return your machine and the pool's two parts from one factory, and the diagram d
 
 </div>
 
-1. Press `ORDER_PLACED` twice, with a dish each time. `orders` reads `workersBusy`; both cooks are working.
-2. In the Step tab, press `orders.WORKERS_RESIZED` **with payload** `{"count": 1}`: both cooks stay working. Advance 1000 ms: one cook is left, and `orders` reads `allWorkersFree`.
+1. Select the `ORDER_PLACED` arrow and press **Send** twice, with a dish each time (set it in the **Context** tab). `orders` reads `workersBusy`; both cooks are working.
 
 <Code code={kitchenSource} lang="ts" title="kitchen.ts" />
 
