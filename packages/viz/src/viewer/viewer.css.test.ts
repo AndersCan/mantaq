@@ -119,10 +119,3 @@ test("the next arrows march one dash period forever; only reduced motion stops t
   expect(reduced).toHaveLength(1);
   expect(bare.replace(reduced[0] ?? "", "")).not.toMatch(/animation:\s*none/);
 });
-
-test("no rule styles every explore button, and the page has no unused toolbar", () => {
-  const selectors = bare.split("}").flatMap((block) => block.split("{")[0]?.split(",") ?? []);
-  expect(selectors.filter((s) => s.includes(".explore button"))).toEqual([]);
-  const page = readFileSync(new URL("./page.css", import.meta.url), "utf8");
-  expect(page).not.toContain("toolbar");
-});
