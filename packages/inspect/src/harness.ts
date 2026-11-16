@@ -141,39 +141,35 @@ async function readRegions(page: Page): Promise<Record<string, string>> {
 async function readChildren(
   page: Page,
 ): Promise<Array<{ map: string; key: string; state: string }>> {
-  const frames = await page.locator(".graph g.region[data-children]").evaluateAll((nodes) =>
-    nodes.map((node) => ({
-      map: node.getAttribute("data-map") ?? "",
-      children: JSON.parse(node.getAttribute("data-children") ?? "[]") as Array<{
-        key: string;
-        state: string;
-      }>,
-    })),
-  );
-  return frames
-    .flatMap(({ map, children }) =>
-      children.map(({ key, state }) => ({
-        map,
-        key,
-        state: state.slice(state.lastIndexOf(".") + 1),
-      })),
-    )
+  const found = await page.locator(".graph").evaluate((graph) => {
+    const own = (node: Element) => ({
+      map: node.getAttribute("data-marker-map") ?? "",
+      key: node.getAttribute("data-marker-key") ?? "",
+      state: node.getAttribute("data-marker-state") ?? "",
+    });
+    const markers = Array.from(graph.querySelectorAll("g.child-marker")).map(own);
+    const hidden = Array.from(graph.querySelectorAll("text.marker-count")).flatMap((node) =>
+      (node.querySelector("title")?.textContent ?? "")
+        .split("\n")
+        .map((key) => ({ ...own(node), key })),
+    );
+    return [...markers, ...hidden];
+  });
+  return found
+    .map(({ map, key, state }) => ({ map, key, state: state.slice(state.lastIndexOf(".") + 1) }))
     .sort(
       (a, b) => a.map.localeCompare(b.map) || a.key.localeCompare(b.key, "en", { numeric: true }),
     );
 }
 
-/** Pick `actor` in the viewer until the Step tab shows that child; false when no such child exists. */
+/** Follow `actor` by clicking its chip until the Step tab shows that child; false when no chip is drawn for it. */
 async function walkTo(page: Page, actor: { map: string; key: string }): Promise<boolean> {
   const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
   if ((await page.locator(row).count()) === 0) {
-    await page
-      .locator(".graph")
-      .evaluate(
-        (node, detail) =>
-          node.dispatchEvent(new CustomEvent("mantaq:pick-child", { bubbles: true, detail })),
-        actor,
-      );
+    const chip = page.locator(
+      `.graph g.child-marker[data-marker-map=${quoted(actor.map)}][data-marker-key=${quoted(actor.key)}]`,
+    );
+    if ((await chip.count()) > 0) await chip.first().click();
   }
   return (await page.locator(row).count()) > 0;
 }

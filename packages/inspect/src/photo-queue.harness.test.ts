@@ -44,3 +44,16 @@ test("drives the children of the docs photo queue", async () => {
     await viz.close();
   }
 }, 60_000);
+
+test("children() lists the children hidden behind +N, keys with a comma included", async () => {
+  const opened = await openViz({ file: photoQueue });
+  const viz = Either.getRight(opened);
+  if (viz === undefined) throw new Error(String(Either.getLeft(opened)));
+  try {
+    const keys = [...Array.from({ length: 19 }, (_, index) => `p${index + 1}`), "z, y"];
+    for (const photoId of keys) await viz.send("photoAdded", { photoId });
+    expect((await viz.children()).map((child) => child.key)).toEqual(keys);
+  } finally {
+    await viz.close();
+  }
+}, 120_000);

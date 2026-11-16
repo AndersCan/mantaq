@@ -11,7 +11,7 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { scopeOf } from "../schema.ts";
-import { compareKeys, currentsOf, walkedChild } from "./compartments.ts";
+import { currentsOf, walkedChild } from "./compartments.ts";
 import { html } from "./dom.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
@@ -32,7 +32,7 @@ import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
-import { countTitle } from "./pool-count.ts";
+import { drawChildMarkers } from "./markers.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
@@ -53,8 +53,10 @@ interface ViewState {
   afters: VizLiveStep[][];
   /** Context before the last live step; undefined when no step ran. */
   previous: VizJson | undefined;
-  /** Live: the child a click in the child graph goes to; null = the lowest key. */
+  /** Live: the followed child, set by a chip click; null = the lowest key. */
   picked: { map: string; key: string } | null;
+  /** True after a step or an effect result until the diagram is drawn: chips slide. */
+  motion: boolean;
   /** The panel tab shown. */
   tab: PanelTab;
   /** Only the diagram and a "Show controls" button are drawn. Starts from `ViewerOptions.diagramOnly`; not saved. */
@@ -180,7 +182,6 @@ export function mountViewer(
   let back: () => void = () => undefined;
   let redraw: () => void = () => undefined;
   listenOnRoot(root, { back: () => back() });
-  listenForPick(root, view, () => redraw());
   watchDriver(view, { driver, redraw: () => redraw() });
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
   function render(): void {
@@ -222,9 +223,10 @@ export function mountViewer(
       fillPanel(panel, { doc, view, parts: stepTab, details, controls, screen, refresh, footer });
       mark();
     };
-    const mark = () => markDiagram(root, { machine, view, driver });
+    const mark = () => markDiagram(root, { machine, view, driver, pick: () => refresh() });
     redraw = refresh;
     const walked = (run?: string) => {
+      view.motion = true;
       noticeCleared(root, view);
       navigated(options, { machine, view, run });
       refresh();
@@ -454,6 +456,7 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
     afters: [],
     previous: undefined,
     picked: null,
+    motion: false,
     tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
     notice: null,
@@ -586,6 +589,7 @@ function watchDriver(
 ): void {
   context.driver?.listen?.((state) => {
     view.live = state;
+    view.motion = true;
     if (view.afters.length > 0 && view.afters.length === state.steps.length) {
       view.afters[view.afters.length - 1] = state.after;
     }
@@ -738,19 +742,6 @@ function isTextControl(target: EventTarget | null): boolean {
   );
 }
 
-/** `mantaq:pick-child` walks a live child. For the inspect harness and test tools; not public API. */
-function listenForPick(root: HTMLElement, view: ViewState, redraw: () => void): void {
-  root.addEventListener("mantaq:pick-child", (event) => {
-    const detail: unknown = event instanceof CustomEvent ? event.detail : null;
-    const { map, key } = (detail ?? {}) as { map?: unknown; key?: unknown };
-    const there = view.live?.children.some((c) => c.map === map && c.key === key);
-    if (there !== true || typeof map !== "string" || typeof key !== "string") return;
-    view.picked = { map, key };
-    view.tab = "step";
-    redraw();
-  });
-}
-
 /** A pick of a child that is gone is dropped. */
 function dropGonePick(view: ViewState): void {
   const { picked } = view;
@@ -881,31 +872,28 @@ function markDiagram(
     machine: VizMachine;
     view: ViewState;
     driver: VizDriver | undefined;
+    pick: () => void;
   },
 ): void {
   const { machine, view } = context;
   updateBlocked(machine, view, context.driver);
   markExplore(root, { machine, path: view.path, blocked: view.blocked, ...liveState(view) });
-  const graph = root.querySelector<SVGSVGElement>("svg");
-  if (graph !== null) markPools(root, { machine, view });
-  markSelection(root, view.selection);
-}
-
-/** Each map frame is titled with its live count of children; `data-children` lists them for the inspect harness. */
-function markPools(root: HTMLElement, context: { machine: VizMachine; view: ViewState }): void {
-  const { machine, view } = context;
-  const { live } = view;
-  if (live === null) return;
-  for (const map of machine.maps) {
-    const frame = root.querySelector(`.graph g.region[data-map="${map}"]`);
-    const title = frame?.querySelector(":scope > text");
-    if (title !== null && title !== undefined) title.textContent = countTitle(machine, live, map);
-    const children = live.children
-      .filter((child) => child.map === map)
-      .sort((a, b) => compareKeys(a.key, b.key))
-      .map((child) => ({ key: child.key, state: child.state }));
-    frame?.setAttribute("data-children", JSON.stringify(children));
+  const graph = root.querySelector<SVGSVGElement>(".graph");
+  if (graph !== null && view.live !== null) {
+    drawChildMarkers(graph, {
+      machine,
+      children: view.live.children,
+      picked: view.picked,
+      motion: view.motion,
+      onPick: (child) => {
+        view.picked = child;
+        view.tab = "step";
+        context.pick();
+      },
+    });
   }
+  view.motion = false;
+  markSelection(root, view.selection);
 }
 
 function markSelection(root: HTMLElement, selection: Selection | null): void {

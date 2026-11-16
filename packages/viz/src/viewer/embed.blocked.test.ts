@@ -413,9 +413,9 @@ describe("a blocked arrow, more cases", () => {
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
     const arrow = () => root.querySelector('[data-edge-id="photos.sending-confirm-photos.sent"]');
     expect(arrow()?.classList.contains("blocked")).toBe(true);
-    root.dispatchEvent(
-      new CustomEvent("mantaq:pick-child", { bubbles: true, detail: { map: "photos", key: "p2" } }),
-    );
+    root
+      .querySelector<SVGGElement>('g.child-marker[data-marker-key="p2"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(arrow()?.classList.contains("blocked")).toBe(false);
   });
 });
