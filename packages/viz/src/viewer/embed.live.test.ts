@@ -1027,18 +1027,6 @@ describe("what ran", () => {
     return { live, push: (state: VizLiveState) => onChange(state) };
   }
 
-  test("Because shows the condition for a transition and a stay", () => {
-    const move = mountWith(branching, stepped({}).live);
-    sendVia(move, "submit");
-    expect(text(move, "outcome")).toBe("submit: idle → paying");
-    expect(text(move, "because")).toBe("Because: payload.amount > 5");
-
-    const stay = mountWith(branching, stepped({ to: "idle", outcome: "stay", context: {} }).live);
-    sendVia(stay, "submit");
-    expect(text(stay, "outcome")).toBe("submit: handled in idle, stays");
-    expect(text(stay, "because")).toBe("Because: !(payload.amount > 5)");
-  });
-
   test("Sent out names each output, with where the app takes it when the page knows", () => {
     const routes: VizOutputRoutes = {
       [branching.id]: { openAlbum: [{ to: "router", event: "NAVIGATED", at: "a.ts:72" }] },
@@ -1048,7 +1036,7 @@ describe("what ran", () => {
     };
     const routed = mountWith(branching, stepped({ sent: ["openAlbum"] }).live, routes);
     send(routed);
-    expect(text(routed, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED (a.ts:72)");
+    expect(text(routed, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED");
 
     const bare = mountWith(branching, stepped({ sent: ["openAlbum"] }).live);
     send(bare);
@@ -1060,42 +1048,11 @@ describe("what ran", () => {
       routes,
     );
     send(several);
-    expect(text(several, "sent")).toBe(
-      "Sent out: openAlbum → router takes NAVIGATED (a.ts:72); ANSWER_SENT",
-    );
+    expect(text(several, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED; ANSWER_SENT");
 
     const quiet = mountWith(branching, stepped({}).live, routes);
     send(quiet);
     expect(quiet.querySelector("[data-live-sent]")).toBeNull();
-  });
-
-  test("Because is absent when every branch shares a target", () => {
-    const plain: VizMachine = {
-      ...branching,
-      edges: branching.edges.map((candidate) =>
-        candidate.explanation?.status === "analyzed"
-          ? {
-              ...candidate,
-              explanation: {
-                ...candidate.explanation,
-                branches: [
-                  {
-                    conditions: ["a"],
-                    target: { kind: "state", state: "paying" },
-                  },
-                  {
-                    conditions: ["!a"],
-                    target: { kind: "state", state: "paying" },
-                  },
-                ],
-              },
-            }
-          : candidate,
-      ),
-    };
-    const root = mountWith(plain, stepped({}).live);
-    sendVia(root, "submit");
-    expect(root.querySelector("[data-live-because]")).toBeNull();
   });
 
   test("an async result renders without another click", () => {
@@ -1137,7 +1094,7 @@ describe("what ran", () => {
       waiting: [],
     });
     const after = root.querySelector("[data-live-after]");
-    expect(after?.textContent).toContain("Then paymentTimeout came back");
+    expect(after?.textContent).toContain("Then checkout took paymentTimeout");
     expect(after?.textContent).toContain("paymentTimeout: paying → error");
   });
 

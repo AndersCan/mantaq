@@ -1,5 +1,4 @@
 import { movesFrom } from "../moves.ts";
-import { coveredByAny } from "../schema.ts";
 import { actorText, localName } from "./compartments.ts";
 import type {
   VizActorRef,
@@ -200,35 +199,6 @@ function valuesList(
   return html(doc, "div", { class: "explore-values", "data-values": "" }, [...rows]);
 }
 
-function localState(id: string): string {
-  return id.slice(id.lastIndexOf(".") + 1);
-}
-
-/** The conditions that sent the handler to where this step went; null when the outcome did not depend on a condition. */
-function becauseOf(machine: VizMachine, step: VizLiveStep): string[][] | null {
-  if (step.outcome === "ignored") return null;
-  const edge = machine.edges.find(
-    (candidate) =>
-      (candidate.kind === "transition" || candidate.kind === "stay") &&
-      candidate.event === step.event &&
-      (candidate.from === step.from || coveredByAny(candidate.from, step.from)) &&
-      candidate.explanation?.status === "analyzed",
-  );
-  if (edge?.explanation?.status !== "analyzed") return null;
-  const { branches } = edge.explanation;
-  const targets = new Set(branches.map((branch) => JSON.stringify(branch.target)));
-  if (targets.size <= 1) return null;
-  const matching = branches.filter((branch) =>
-    step.outcome === "stay"
-      ? branch.target.kind === "stay"
-      : branch.target.kind === "state" && branch.target.state === localState(step.to),
-  );
-  if (matching.every((branch) => branch.conditions.length === 0)) {
-    return null;
-  }
-  return matching.map((branch) => branch.conditions);
-}
-
 /** What a Send press sent: the event, who got it, and its values when there are any. */
 export type SentEvent = {
   event: string;
@@ -297,7 +267,6 @@ function sentLine(
           code(doc, route.to),
           " takes ",
           code(doc, route.event),
-          ` (${route.at})`,
         ]),
       ];
     }),
@@ -336,18 +305,8 @@ function stepLines(
   },
 ): Array<HTMLElement | null> {
   const { machine, step } = context;
-  const because = becauseOf(machine, step);
   return [
     html(doc, "p", { "data-live-outcome": "" }, outcomeText(doc, machine, step)),
-    because === null
-      ? null
-      : html(doc, "p", { "data-live-because": "" }, [
-          because.length === 1 ? "Because: " : "Because one of: ",
-          ...because.flatMap((conditions, index) => [
-            index === 0 ? "" : "; ",
-            code(doc, conditions.join(" && ")),
-          ]),
-        ]),
     sentLine(doc, { machine, step, routes: context.routes }),
     step.effects.length > 0 && context.held ? notRunLine(doc, { machine, step }) : null,
   ];
@@ -383,7 +342,7 @@ function liveResultSection(
               ),
           ...after.map((step) =>
             html(doc, "div", { "data-live-after": "" }, [
-              afterLine(doc, { machine, step, last }),
+              afterLine(doc, { machine, step }),
               ...stepLines(doc, {
                 machine,
                 step,
@@ -408,10 +367,6 @@ function liveResultSection(
   ]);
 }
 
-function sameActor(left: VizActorRef | undefined, right: VizActorRef | undefined): boolean {
-  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
-}
-
 /** What a moved part is called in a sentence: the machine, a region path, or a map child. */
 function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
   if (actor === undefined) return machine.id;
@@ -432,9 +387,9 @@ function senderName(machine: VizMachine, step: VizLiveStep): string | null {
 /** The line above a later step: who sent it to whom, and where the receiver went; a dropped one says so and why. */
 function afterLine(
   doc: Document,
-  context: { machine: VizMachine; step: VizLiveStep; last: VizLiveStep },
+  context: { machine: VizMachine; step: VizLiveStep },
 ): HTMLElement {
-  const { machine, step, last } = context;
+  const { machine, step } = context;
   const sender = senderName(machine, step);
   const receiver = partName(machine, step.actor);
   if (sender !== null && isDropped(step)) {
@@ -453,9 +408,6 @@ function afterLine(
         ? ` to ${receiver}: ${localName(step.from)} → ${localName(step.to)}`
         : ` to ${receiver}`,
     ]);
-  }
-  if (sameActor(step.actor, last.actor)) {
-    return html(doc, "p", { class: "muted" }, ["Then ", code(doc, step.event), " came back"]);
   }
   return html(doc, "p", { class: "muted" }, [
     `Then ${receiver} took `,
