@@ -173,3 +173,32 @@ describe("fullscreen placement", () => {
     expect(button?.textContent).toBe("Exit full screen");
   });
 });
+
+describe("fullscreen state at render", () => {
+  test("Show controls pressed in full screen draws Exit full screen", () => {
+    const root = document.createElement("div");
+    allowFullscreen(root);
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { diagramOnly: true },
+    );
+    setFullscreenElement(root);
+    root.dispatchEvent(new Event("fullscreenchange"));
+    root.querySelector<HTMLButtonElement>("[data-show-controls]")?.click();
+    const button = root.querySelector<HTMLButtonElement>(".fullscreen-toggle");
+    expect(button?.textContent).toBe("Exit full screen");
+    expect(button?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("the bar sits above the run notice", () => {
+    const root = document.createElement("div");
+    allowFullscreen(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { run: "nope" });
+    expect([...root.children].map((child) => child.className)).toEqual([
+      "viz-bar",
+      "run-notice",
+      "viz-main",
+    ]);
+  });
+});

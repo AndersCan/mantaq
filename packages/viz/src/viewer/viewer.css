@@ -447,7 +447,7 @@
 }
 
 .viz:fullscreen .graph {
-  width: 100% !important;
+  width: max(var(--graph-floor), 100%) !important;
 }
 
 .viz .blocked-note {

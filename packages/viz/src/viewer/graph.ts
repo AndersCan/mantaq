@@ -295,7 +295,7 @@ const LABEL_CAP_EM = 1.4;
  */
 function graphWidth(units: number): string {
   const size = (scale: number) => ((units * scale) / LABEL_UNITS).toFixed(2);
-  return `width: clamp(${size(LABEL_FLOOR_REM)}rem, 100%, ${size(LABEL_CAP_EM)}em)`;
+  return `--graph-floor: ${size(LABEL_FLOOR_REM)}rem; width: clamp(var(--graph-floor), 100%, ${size(LABEL_CAP_EM)}em)`;
 }
 
 /** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. */
