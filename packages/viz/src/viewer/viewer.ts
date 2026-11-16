@@ -168,15 +168,7 @@ export function mountViewer(
     };
     const setValue = valueSetter({ options, machine, view, mark });
     const send = stepSender({ view, driver, walked });
-    const sendEvent = (event: string, actor?: VizActorRef, edge?: string) => {
-      const step = eventStep(machine, view, event, actor);
-      send(step, {
-        event,
-        ...(actor ? { actor } : {}),
-        payload: step.payload,
-        ...(edge === undefined ? {} : { edge }),
-      });
-    };
+    const sendEvent = eventSender({ machine, view, send });
     const rewind = (length: number) => {
       rewindView(view, driver, length);
       walked();
@@ -186,7 +178,21 @@ export function mountViewer(
       if (!(view.tab === "screen" && selection.kind === "state")) view.tab = "details";
       refresh();
     };
-    const graph = renderGraph(doc, machine, { select: showDetails });
+    const openDetails = (selection: Selection) => {
+      showDetails(selection);
+      if (panel.isConnected) panel.scrollIntoView({ block: "nearest", inline: "nearest" });
+    };
+    const graph = renderGraph(doc, machine, {
+      // A click on an arrow sends when Details would offer Send, else opens its Details.
+      select: (selection) => {
+        const edge = machine.edges.find((e) => selection.kind === "edge" && e.id === selection.id);
+        const decision = edge && arrowSend({ machine, view, driver }, edge);
+        if (edge === undefined || decision?.kind !== "send") return openDetails(selection);
+        view.selection = selection;
+        sendEvent(edge.event, decision.actor, edge.id);
+      },
+      ...(view.diagramOnly ? {} : { details: (id: string) => openDetails({ kind: "edge", id }) }),
+    });
     root.append(...layoutOf(doc, { view, showControls, graph, panel, root }));
     follow(true);
   }
@@ -211,6 +217,36 @@ function detailsOf(
   });
 }
 
+type ArrowSend =
+  | { kind: "send"; actor: VizActorRef | undefined }
+  | { kind: "refuse"; text: string }
+  | { kind: "elsewhere"; text: string }
+  | { kind: "none" };
+
+/** What a click on this arrow does: the one decision Details and the diagram share. */
+function arrowSend(
+  from: { machine: VizMachine; view: ViewState; driver: VizDriver | undefined },
+  edge: VizEdge,
+): ArrowSend {
+  const { machine, view } = from;
+  if (view.live === null) return { kind: "none" };
+  if (edge.kind !== "transition" && edge.kind !== "stay") return { kind: "none" };
+  const by = sentByParts(machine, edge);
+  if (by.length > 0)
+    return { kind: "refuse", text: `${edge.event} is sent by ${by.join(" and ")}, not by hand.` };
+  const why = whyNotHere(machine, edge, { live: view.live, picked: view.picked });
+  if (why !== null) return { kind: "elsewhere", text: why };
+  updateBlocked(machine, view, from.driver);
+  const reason = view.blocked.get(edge.id);
+  if (reason !== undefined) return { kind: "refuse", text: reason };
+  const actor = actorOf(machine, edge, { state: view.live, picked: view.picked });
+  if (actor === "none") return { kind: "none" };
+  const sendable = currentsOf(view.live, view.picked).some((current) =>
+    movesFrom(machine, current).some((move) => move.edge.id === edge.id),
+  );
+  return sendable ? { kind: "send", actor } : { kind: "none" };
+}
+
 /** The selected arrow's Send: one button when its source is current; blocked, the reason; no driver, none. */
 function sendFor(
   from: {
@@ -226,32 +262,31 @@ function sendFor(
 ): (edge: VizEdge) => HTMLElement | null {
   const { doc, machine, view } = from;
   return (edge) => {
-    if (view.live === null) return null;
-    if (edge.kind !== "transition" && edge.kind !== "stay") return null;
+    const decision = arrowSend(from, edge);
     const note = (text: string) =>
       html(doc, "p", { class: "blocked-note", "data-blocked-note": edge.event }, [text]);
-    const by = sentByParts(machine, edge);
-    if (by.length > 0) return note(`${edge.event} is sent by ${by.join(" and ")}, not by hand.`);
-    const why = whyNotHere(machine, edge, { live: view.live, picked: view.picked });
-    if (why !== null) return sentHere(doc, { machine, view, edge }, null) ?? note(why);
-    updateBlocked(machine, view, from.driver);
-    const reason = view.blocked.get(edge.id);
-    if (reason !== undefined) return note(reason);
-    const actor = actorOf(machine, edge, { state: view.live, picked: view.picked });
-    if (actor === "none") return null;
-    const sendable = currentsOf(view.live, view.picked).some((current) =>
-      movesFrom(machine, current).some((move) => move.edge.id === edge.id),
-    );
-    if (!sendable) return sentHere(doc, { machine, view, edge }, null);
-    const to = actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
-    const sendButton = button(doc, ["Send ", code(doc, edge.event), ...to], {
-      onClick: () => {
-        handlers.sendEvent(edge.event, actor, edge.id);
-        focusEdge(from.root, edge.id);
-      },
-      attrs: { "data-send-edge": edge.id },
-    });
-    return sentHere(doc, { machine, view, edge }, sendButton);
+    const here = (button: HTMLElement | null) => sentHere(doc, { machine, view, edge }, button);
+    switch (decision.kind) {
+      case "none":
+        return here(null);
+      case "refuse":
+        return note(decision.text);
+      case "elsewhere":
+        return here(null) ?? note(decision.text);
+      case "send": {
+        const { actor } = decision;
+        const to = actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
+        return here(
+          button(doc, ["Send ", code(doc, edge.event), ...to], {
+            onClick: () => {
+              handlers.sendEvent(edge.event, actor, edge.id);
+              focusEdge(from.root, edge.id);
+            },
+            attrs: { "data-send-edge": edge.id },
+          }),
+        );
+      }
+    }
   };
 }
 
@@ -548,6 +583,24 @@ function valueSetter(context: {
     view.blockedFor = null;
     navigated(options, { machine, view });
     mark();
+  };
+}
+
+/** Sends one named event as a step, remembering the arrow it came from. */
+function eventSender(context: {
+  machine: VizMachine;
+  view: ViewState;
+  send: (step: VizStep, sent?: ViewState["sent"]) => void;
+}): (event: string, actor?: VizActorRef, edge?: string) => void {
+  const { machine, view, send } = context;
+  return (event, actor, edge) => {
+    const step = eventStep(machine, view, event, actor);
+    send(step, {
+      event,
+      ...(actor ? { actor } : {}),
+      payload: step.payload,
+      ...(edge === undefined ? {} : { edge }),
+    });
   };
 }
 

@@ -119,6 +119,8 @@ export function textWidth(text: string, fontSize = 12): number {
 
 /** Room left of a transition's label for its lock. */
 export const LOCK_SLOT = 12;
+/** Room right of a label's first line for its `?`. */
+export const HELP_SLOT = 12;
 const CONDITION_FONT = 10.2;
 const CHIP_FONT = 11;
 const NODE_HEIGHT = 36;
@@ -252,7 +254,7 @@ function labelSize(edge: VizEdge): { width: number; height: number } {
     ...lines.map((line, index) => textWidth(line, index === 0 ? 12 : CONDITION_FONT)),
   );
   return {
-    width: widest + 8 + (edge.kind === "transition" ? LOCK_SLOT : 0),
+    width: widest + 8 + HELP_SLOT + (edge.kind === "transition" ? LOCK_SLOT : 0),
     height: LABEL_HEIGHT * lines.length,
   };
 }
@@ -908,7 +910,7 @@ function polyline(points: ReadonlyArray<Point>): string {
 
 function boxed(edge: VizEdge, centre: Point): Pick<PlacedEdge, "label" | "text"> {
   const size = labelSize(edge);
-  const shift = edge.kind === "transition" ? LOCK_SLOT / 2 : 0;
+  const shift = ((edge.kind === "transition" ? LOCK_SLOT : 0) - HELP_SLOT) / 2;
   return {
     label: { x: centre.x, y: centre.y, ...size },
     text: { x: centre.x + shift, y: centre.y },

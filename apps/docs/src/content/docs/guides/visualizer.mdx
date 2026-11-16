@@ -21,11 +21,11 @@ The checkout machine: the thick border is the state the walk is on, accent arrow
 
 ### Walking the graph
 
-The viewer keeps a cursor on one state, starting at the initial one. Accent arrows are the steps the walk can take next. A click on a state or an edge selects it and shows it in Details; it never takes a step. Take a step with **Send** in the selected arrow's Details. **Full screen**, above the diagram, fills the screen with the viewer; Escape returns. Browsers without element full screen (iPhone Safari) show no button.
+The viewer keeps a cursor on one state, starting at the initial one. Accent arrows are the steps the walk can take next. A click on a state selects it and shows it in Details. A click on an arrow the walk can take sends its event with the values in the **Context** tab; on any other arrow it opens Details with one line saying why it can't be sent. The `?` beside an arrow's label opens its Details without sending. **Full screen**, above the diagram, fills the screen with the viewer; Escape returns. Browsers without element full screen (iPhone Safari) show no button.
 
-In an actor map the diagram shows the child machine once. Live, each child is a chip with its key on the state it is in, and the Step tab lists every child with its state. Click a chip or a row to follow that child: its row is marked, and an arrow's Send in the map goes to it.
+In an actor map the diagram shows the child machine once. Live, each child is a chip with its key on the state it is in, and the Step tab lists every child with its state. Click a chip or a row to follow that child: its row is marked, and a click on an arrow in the map sends to it.
 
-The selected arrow's Details has a **Send** button when the walk is in its source state and no other part sends its event; otherwise one line says why. After a Send from there, Details say what was sent, with its values, and where it went. An arrow selects wherever its line is clicked, dashed and dotted ones included.
+The selected arrow's Details has a **Send** button when the walk is in its source state and no other part sends its event; otherwise one line says why. After a Send from there, Details say what was sent, with its values, and where it went. An arrow responds wherever its line is clicked, dashed and dotted ones included.
 
 Effects do not run on the live page: the answers of `submitting` (`paymentOk`, `paymentFail`, `paymentTimeout`) are the arrows out of it. The initial state's effects run while the machine is built.
 
@@ -57,4 +57,5 @@ On the live page (the Vite plugin) each step runs the real actor, so guards are 
 | Dotted self-loop           | The event is handled and the state does not change |
 | Dashed orange arrow        | Undetermined target                                |
 | Accent arrow               | A step the walk can take next                      |
-| Teal arrow                 | The arrow selected in Details                      |
+| Teal arrow                 | The arrow last clicked or shown in Details         |
+| `?` beside a label         | Opens that arrow's Details                         |

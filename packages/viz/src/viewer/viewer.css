@@ -215,6 +215,32 @@
   stroke-width: 1.5;
 }
 
+.viz .edge-help {
+  cursor: pointer;
+  outline: none;
+}
+
+.viz .edge-help .ring {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.viz .edge-help text {
+  fill: var(--muted);
+  font-size: 9px;
+}
+
+.viz .edge-help .hit {
+  fill: transparent;
+  stroke: none;
+}
+
+.viz .edge-help:focus-visible .ring {
+  stroke: var(--select);
+  stroke-width: 2;
+}
+
 .viz .edge .edge-condition {
   font-size: 0.85em;
   fill: var(--muted);

@@ -4,7 +4,7 @@ import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
 import { ARROW_SIZE } from "./geometry.ts";
-import { LOCK_SLOT, placeMachine, textWidth } from "./layout.ts";
+import { HELP_SLOT, LOCK_SLOT, placeMachine, textWidth } from "./layout.ts";
 
 function state(id: string, initial: boolean): VizState {
   return {
@@ -102,6 +102,19 @@ describe("renderGraph guard condition", () => {
     ],
   } as unknown as VizMachine;
 
+  test("on a two-line label the ? sits on the event's line", () => {
+    const graph = renderGraph(document, guarded, {
+      select: () => undefined,
+      details: () => undefined,
+    });
+    const top = Number(
+      graph.querySelector('g.edge[data-edge-id="idle-go-busy"] text')?.getAttribute("y"),
+    );
+    expect(Number(graph.querySelector("[data-details-edge] .ring")?.getAttribute("cy"))).toBe(
+      top - 4,
+    );
+  });
+
   test("the condition is a second line on the arrow and in its aria-label", () => {
     const graph = renderGraph(document, guarded, {
       select: () => undefined,
@@ -134,6 +147,59 @@ describe("renderGraph transition label", () => {
     ],
   };
 
+  const withHelp = (details?: (id: string) => void, select = () => undefined) => {
+    const root = document.createElement("div");
+    root.append(renderGraph(document, go, { select, ...(details ? { details } : {}) }));
+    return root;
+  };
+  const edgeId = "idle-submitWWW-busy";
+
+  test("one ? follows its arrow's group, outside it, with its centre in the label box", () => {
+    const root = withHelp(() => undefined);
+    const helps = root.querySelectorAll("[data-details-edge]");
+    expect(helps).toHaveLength(1);
+    const help = helps[0];
+    const arrow = root.querySelector(`[data-edge-id="${edgeId}"]`);
+    expect(arrow?.nextElementSibling).toBe(help);
+    expect(arrow?.contains(help ?? null)).toBe(false);
+    const label = placeMachine(go).edges[0]?.label;
+    const circle = help?.querySelector(".ring");
+    const cx = Number(circle?.getAttribute("cx"));
+    const cy = Number(circle?.getAttribute("cy"));
+    expect(Math.abs(cx - (label?.x ?? 0))).toBeLessThan((label?.width ?? 0) / 2);
+    expect(Math.abs(cy - (label?.y ?? 0))).toBeLessThan((label?.height ?? 0) / 2);
+  });
+
+  test("the ? sits right of the label's text, inside its box, on the first line", () => {
+    const ring = withHelp(() => undefined).querySelector("[data-details-edge] .ring");
+    const placed = placeMachine(go).edges[0];
+    const cx = Number(ring?.getAttribute("cx"));
+    const r = Number(ring?.getAttribute("r"));
+    expect(cx - r).toBeGreaterThanOrEqual((placed?.text.x ?? 0) + textWidth("submitWWW") / 2);
+    expect(cx + r).toBeLessThanOrEqual((placed?.label.x ?? 0) + (placed?.label.width ?? 0) / 2);
+    expect(Number(ring?.getAttribute("cy"))).toBe(placed?.text.y);
+    const mark = withHelp(() => undefined).querySelector("[data-details-edge] text");
+    expect(Number(mark?.getAttribute("y"))).toBe((placed?.text.y ?? 0) + 3);
+  });
+
+  test("no ? is drawn without a details callback", () => {
+    expect(withHelp().querySelector("[data-details-edge]")).toBeNull();
+  });
+
+  test("Enter on the ? calls details, not select", () => {
+    const details: string[] = [];
+    const selected: string[] = [];
+    const root = withHelp(
+      (id) => details.push(id),
+      () => void selected.push("x") as undefined,
+    );
+    root
+      .querySelector("[data-details-edge]")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(details).toEqual([edgeId]);
+    expect(selected).toEqual([]);
+  });
+
   test("draws the text right of the lock slot and the lock inside it", () => {
     const root = document.createElement("div");
     root.append(
@@ -148,7 +214,7 @@ describe("renderGraph transition label", () => {
     expect(spans.length).toBeGreaterThan(0);
     for (const span of spans) expect(Number(span.getAttribute("x"))).toBe(placed?.text.x);
     expect(Number(text?.getAttribute("y"))).toBe((placed?.text.y ?? 0) + 4);
-    expect(placed?.text.x).toBe((placed?.label.x ?? 0) + LOCK_SLOT / 2);
+    expect(placed?.text.x).toBe((placed?.label.x ?? 0) + (LOCK_SLOT - HELP_SLOT) / 2);
     markExplore(root, { machine: go, blocked: new Map([["idle-submitWWW-busy", "no"]]) });
     const lock = Number(root.querySelector(".blocked-lock rect")?.getAttribute("x"));
     const textLeft = (placed?.text.x ?? 0) - textWidth("submitWWW") / 2;

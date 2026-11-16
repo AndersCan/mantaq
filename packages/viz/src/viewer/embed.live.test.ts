@@ -148,6 +148,7 @@ function driver(held: VizJson = null): VizDriver & { log: VizStep[][] } {
 
 function mount(
   options: {
+    diagramOnly?: boolean;
     steps?: string[];
     onNavigate?: (w: { steps: string[] }) => void;
   } = {},
@@ -173,9 +174,16 @@ function sendSubmit(root: HTMLElement) {
 }
 const current = (root: HTMLElement) => root.querySelector(".explore")?.getAttribute("data-current");
 
-const clickEdge = (root: HTMLElement, id: string) =>
+/** A click on the arrow itself: sends when Details would offer Send. */
+const clickArrow = (root: HTMLElement, id: string) =>
   root
     .querySelector(`[data-edge-id="${id}"]`)
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+/** The `?` beside an arrow: opens its Details without sending. */
+const clickEdge = (root: HTMLElement, id: string) =>
+  root
+    .querySelector(`[data-details-edge="${id}"]`)
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
 describe("live controls", () => {
@@ -316,9 +324,9 @@ describe("live controls", () => {
     expect(log[0]?.kind === "event" && log[0].event).toBe("flip");
   });
 
-  test("no diagram click sends", () => {
+  test("no state click or ? sends", () => {
     const { root, live } = mount();
-    const targets = [...root.querySelectorAll(".graph [data-edge-id], .graph [data-node-id]")];
+    const targets = [...root.querySelectorAll(".graph [data-details-edge], .graph [data-node-id]")];
     expect(targets.length).toBeGreaterThan(0);
     const before = current(root);
     for (const target of targets) {
@@ -328,6 +336,97 @@ describe("live controls", () => {
       expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
     }
   });
+
+  test("arrowClickedSending: a click on a next arrow sends, selects it and keeps the tab", () => {
+    const { root, live } = mount();
+    const arrow = () => root.querySelector('[data-edge-id="idle-submit-paying"]');
+    const tab = root.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute("data-tab");
+    clickArrow(root, "idle-submit-paying");
+    expect(live.log).toHaveLength(1);
+    expect(current(root)).toBe("paying");
+    expect(arrow()?.classList.contains("selected")).toBe(true);
+    expect(root.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute("data-tab")).toBe(
+      tab,
+    );
+    root.querySelector<HTMLElement>('[data-tab="details"]')?.click();
+    expect(root.querySelector("[data-details-sent]")).not.toBeNull();
+  });
+
+  test("a keyboard Enter on a next arrow sends and focus stays on it", () => {
+    const { root, live } = mount();
+    document.body.append(root);
+    const arrow = root.querySelector<SVGElement>('[data-edge-id="idle-submit-paying"]');
+    arrow?.focus();
+    arrow?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(live.log).toHaveLength(1);
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    root.remove();
+  });
+
+  test("arrowClickedShowingWhyNot: an arrow from another state opens Details with the line, sends nothing", () => {
+    const { root, live } = mount();
+    clickArrow(root, "paying-paymentTimeout-error");
+    expect(live.log).toHaveLength(0);
+    expect(current(root)).toBe("idle");
+    expect(root.querySelector('[data-tab="details"][aria-selected="true"]')).not.toBeNull();
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "paymentTimeout can't be sent: the walk is in idle, this arrow leaves paying.",
+    );
+  });
+
+  test("helpClickedShowingDetails: the ? on a next arrow opens Details with Send and sends nothing", () => {
+    const { root, live } = mount();
+    clickEdge(root, "idle-submit-paying");
+    expect(live.log).toHaveLength(0);
+    expect(root.querySelector("[data-send-edge]")).not.toBeNull();
+  });
+
+  test("an arrow click that opens Details, and a ?, scroll the panel in; a sending click does not", () => {
+    const { root } = mount();
+    document.body.append(root);
+    const scroll = vi
+      .spyOn(HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => undefined);
+    clickEdge(root, "idle-submit-paying");
+    expect(scroll).toHaveBeenCalledTimes(1);
+    clickArrow(root, "paying-paymentTimeout-error");
+    expect(scroll).toHaveBeenCalledTimes(2);
+    clickArrow(root, "idle-submit-paying");
+    expect(scroll).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+    root.remove();
+  });
+
+  test("diagramOnlyNoHelp: no ? is drawn, and an arrow click still sends", () => {
+    const { root, live } = mount({ diagramOnly: true });
+    expect(root.querySelector("[data-details-edge]")).toBeNull();
+    clickArrow(root, "idle-submit-paying");
+    expect(live.log).toHaveLength(1);
+    clickArrow(root, "idle-submit-paying");
+    expect(live.log).toHaveLength(1);
+  });
+
+  test.each([[[]], [["submit"]]] as const)(
+    "one rule after steps %j: a click on an arrow sends exactly when its ? shows Send",
+    (steps) => {
+      const ids = [...mount().root.querySelectorAll("[data-details-edge]")].map((each) =>
+        each.getAttribute("data-details-edge"),
+      );
+      expect(ids.length).toBeGreaterThan(0);
+      let shownAny = false;
+      for (const id of ids) {
+        const offered = mount({ steps: [...steps] });
+        clickEdge(offered.root, id ?? "");
+        const shown = offered.root.querySelector("[data-send-edge]") !== null;
+        shownAny ||= shown;
+        const sent = mount({ steps: [...steps] });
+        const before = sent.live.log.length;
+        clickArrow(sent.root, id ?? "");
+        expect(sent.live.log.length > before).toBe(shown);
+      }
+      expect(shownAny).toBe(true);
+    },
+  );
 
   test("the selected arrow's Details has a Send button that sends and keeps the tab", () => {
     const { root, live } = mount();

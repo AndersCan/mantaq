@@ -27,7 +27,7 @@ import { mantaqViz } from "./vite.ts";
 export interface VizHarness {
   /** The current state id. */
   state(): Promise<string>;
-  /** Select the event's arrow out of the current state and press Send in Details, as a person would. An event with no arrow from here is a Left naming the events that have one. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
+  /** Open the Details of the event's arrow out of the current state and press its Send, as a person would. An event with no arrow from here is a Left naming the events that have one. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
   send(
     event: string,
     payload?: Record<string, VizJson>,
@@ -217,14 +217,14 @@ async function pressRow(page: Page, actor: { map: string; key: string }): Promis
   return (await page.getAttribute(row, "data-child-state")) ?? "";
 }
 
-/** Selects each arrow in turn and presses the first Send that is offered; else the first reason given. */
+/** Opens each arrow's Details in turn and presses the first Send that is offered; else the first reason given. */
 async function pressFirstSend(
   page: Page,
   from: { edges: VizEdge[]; event: string; state: () => Promise<string> },
 ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
   let note: string | null = null;
   for (const edge of from.edges) {
-    await page.locator(`.graph g[data-edge-id=${quoted(edge.id)}]`).dispatchEvent("click");
+    await page.locator(`.graph g[data-details-edge=${quoted(edge.id)}]`).dispatchEvent("click");
     const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
     if ((await trigger.count()) > 0) {
       await trigger.click();
