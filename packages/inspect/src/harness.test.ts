@@ -257,6 +257,9 @@ test("the current state stays inside the box on a phone after every send", async
       await viz.send(event);
       expect(await hidden(), event).toEqual([]);
     }
+    await viz.page.goto(viz.page.url());
+    await viz.page.waitForSelector(".graph g.current");
+    expect(await hidden(), "reload").toEqual([]);
   } finally {
     await viz.close();
   }

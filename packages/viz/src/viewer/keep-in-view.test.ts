@@ -12,6 +12,7 @@ test.each([
   [{ left: 100, right: 700 }, 0, 84],
   [{ left: 5900, right: 5990 }, 0, 5700],
   [{ left: 4, right: 60 }, 500, 0],
+  [{ left: 2400.6, right: 2520.6 }, 0, 2237],
 ])("shows %j from %d at %d", (span, left, expected) => {
   expect(scrollToShow(box(left), span)).toBe(expected);
 });

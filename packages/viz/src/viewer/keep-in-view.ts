@@ -10,13 +10,13 @@ export function scrollToShow(
   const fits = span.right - span.left + 2 * MARGIN <= view.width;
   const target =
     span.left < view.left || !fits ? span.left - MARGIN : span.right + MARGIN - view.width;
-  return Math.round(Math.min(Math.max(target, 0), Math.max(view.max, 0)));
+  return Math.round(Math.min(Math.max(target, 0), view.max));
 }
 
 /** Scrolls the canvas sideways (never the page) so the machine's current state shows. */
 export function keepInView(root: HTMLElement, current: string | undefined): void {
   const canvas = root.querySelector<HTMLElement>(".canvas");
-  if (!canvas || current === undefined || canvas.clientWidth === 0) return;
+  if (!canvas || current === undefined) return;
   const node = canvas.querySelector(`.graph g[data-node-id="${CSS.escape(current)}"]`);
   if (!node) return;
   const rect = node.getBoundingClientRect();
