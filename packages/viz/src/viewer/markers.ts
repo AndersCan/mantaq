@@ -82,11 +82,9 @@ function chipsOf(
   const widths = children.map((child) => textWidth(label(child.key), FONT) + PILL_PAD);
   const usedBy = (shown: number) => {
     const rest = children.length - shown;
-    const pills =
-      widths.slice(0, shown).reduce((sum, w) => sum + w, 0) + GAP * Math.max(shown - 1, 0);
+    const pills = widths.slice(0, shown).reduce((sum, w) => sum + w, 0) + GAP * (shown - 1);
     if (rest === 0) return pills;
-    const count = textWidth(`+${rest}`, FONT);
-    return shown === 0 ? count : pills + GAP + count;
+    return pills + GAP + textWidth(`+${rest}`, FONT);
   };
   let shown = children.length;
   while (shown > 0 && usedBy(shown) > row.width) shown -= 1;

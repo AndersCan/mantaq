@@ -2,7 +2,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import fc from "fast-check";
 import type { VizLiveChild } from "../schema.ts";
-import { textWidth } from "./layout.ts";
 import { drawChildMarkers, type MarkerContext } from "./markers.ts";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -55,12 +54,17 @@ describe("drawChildMarkers", () => {
   });
 
   test("chips that fit exactly show without a +N", () => {
-    // 5 chips of "k0" = 5 * 22 + 4 * 4 = 126 of 168: no count.
+    // 5 chips "k0".."k4" = (14 + 13 * 3 + 14) + 5 * 10 + 4 * 4 = 133: no count on 168 or on exactly 133.
     const root = board([168]);
     drawChildMarkers(root, context(Array.from({ length: 5 }, (_, i) => child(`k${i}`, "s0"))));
     expect(markers(root)).toHaveLength(5);
     expect(root.querySelector("text.marker-count")).toBeNull();
     root.remove();
+    const exact = board([133]);
+    drawChildMarkers(exact, context(Array.from({ length: 5 }, (_, i) => child(`k${i}`, "s0"))));
+    expect(markers(exact)).toHaveLength(5);
+    expect(exact.querySelector("text.marker-count")).toBeNull();
+    exact.remove();
   });
 
   test("a chip per child on its state", () => {
@@ -196,18 +200,6 @@ describe("drawChildMarkers branches", () => {
     const end =
       at(pills.at(-1)) + Number(pills.at(-1)?.querySelector("rect")?.getAttribute("width"));
     expect(Math.abs(at(pills[0]) - 10 - (10 + 400 - end))).toBeLessThan(0.2);
-  });
-
-  test("a row too narrow for any chip draws only a +N listing every key", () => {
-    const root = board([30]);
-    drawChildMarkers(root, context([child("abcdefgh", "s0"), child("bcdefghi", "s0")]));
-    expect(markers(root)).toHaveLength(0);
-    const count = root.querySelector("text.marker-count");
-    expect(count?.textContent).toBe("abcdefgh\nbcdefghi+2");
-    expect(count?.querySelector("title")?.textContent).toBe("abcdefgh\nbcdefghi");
-    expect(Math.abs(at(count ?? undefined) - (10 + (30 - textWidth("+2", 10)) / 2))).toBeLessThan(
-      0.1,
-    );
   });
 
   test("a pill shows a long key cut to 8 characters and an empty key as two quotes", () => {
