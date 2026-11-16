@@ -12,6 +12,7 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
+import { sendVia } from "./send-via.ts";
 import { describe, expect, test } from "vite-plus/test";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
@@ -144,13 +145,7 @@ describe("live actor map children", () => {
     expect(rows.map((row) => row.getAttribute("data-child-key"))).toEqual(["p1", "p2"]);
     expect(root.querySelectorAll("[data-child-key][data-followed]")).toHaveLength(0);
     expect(rows[0]?.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
-    const retry = root.querySelector('[data-actor="photos[p1]"] [data-send-item="retryPressed"]');
-    expect(retry?.querySelector("[data-ignored]")).not.toBeNull();
-    expect(
-      root.querySelector(
-        '[data-actor="photos[p1]"] [data-send-item="uploadConfirmed"] [data-ignored]',
-      ),
-    ).toBeNull();
+    expect(root.querySelector('[data-actor="photos[p1]"] [data-send="retryPressed"]')).toBeNull();
     root
       .querySelector<HTMLButtonElement>('[data-actor="photos[p1]"] [data-send="uploadConfirmed"]')
       ?.click();
@@ -453,6 +448,11 @@ describe("live actor map children", () => {
     const withPhotoAdded: VizMachine = {
       ...photoQueue,
       events: [...photoQueue.events, event("photoAdded"), event("queueCleared")],
+      edges: [
+        ...photoQueue.edges,
+        { ...edge("showingQueue", "photoAdded", "showingQueue"), kind: "stay" },
+        { ...edge("showingQueue", "queueCleared", "showingQueue"), kind: "stay" },
+      ],
     };
     const removedChild = (key: string, at: number, until: number): VizRemovedChild => ({
       ...child(key, "sendingPhoto", at),
@@ -482,8 +482,7 @@ describe("live actor map children", () => {
     }
     const rootStay = (name: string): VizLiveStep =>
       stepOf(name, "showingQueue", "showingQueue", "stay");
-    const clickSend = (root: HTMLElement, id: string) =>
-      root.querySelector<HTMLButtonElement>(`[data-send="${id}"]`)?.click();
+    const clickSend = sendVia;
 
     const afterAdd1 = { children: [child("p1", "sendingPhoto", 1)] };
 
@@ -825,7 +824,7 @@ test("a click on a root state whose name starts with the map's sends nothing; it
     .querySelector('.graph g[data-node-id="photosPaused"]')
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   expect(sent).toEqual([]);
-  root.querySelector<HTMLButtonElement>('[data-send="paused"]')?.click();
+  sendVia(root, "paused");
   expect(sent).toMatchObject([{ kind: "event", event: "paused" }]);
 });
 

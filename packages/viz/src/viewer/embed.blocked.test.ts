@@ -11,6 +11,7 @@ import type {
 } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
+import { sendVia } from "./send-via.ts";
 
 function state(id: string, initial = false): VizState {
   return {
@@ -142,10 +143,7 @@ function fakeDriver(opens: (step: VizStep) => boolean = () => false) {
   return { driver, sent, arrive, dryRuns: () => listens };
 }
 
-const sendEvent = (root: HTMLElement, event: string) =>
-  root
-    .querySelector(`[data-send="${event}"]`)
-    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+const sendEvent = sendVia;
 
 const clickEdge = (root: HTMLElement, id: string) =>
   root

@@ -119,7 +119,7 @@ describe("checkSite", () => {
         "/: page error: boom",
         "/: the overview box orphan opens this page, but no viewer here holds orphan",
         "/blank/: blank.ts () draws no diagram",
-        "/deaf/: ../fixtures/deaf.ts (deaf) handled none of the 1 events it offers",
+        "/deaf/: ../fixtures/deaf.ts (deaf) is live but offers no event to send",
         "/machines/: overview box receiver links to /gone/?machine=receiver, which is not built",
         "/machines/: overview box sender links to /gone/?machine=sender, which is not built",
       ].sort(),

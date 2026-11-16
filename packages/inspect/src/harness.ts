@@ -7,7 +7,7 @@
  * holds effects, so an effect only reports when the caller sends its event.
  */
 import { Either } from "@mantaq/utils";
-import { machineFindings, parseViz } from "@mantaq/viz";
+import { machineFindings, movesFrom, parseViz, scopeOf } from "@mantaq/viz";
 import type { VizActorRef, VizFinding, VizJson, VizLiveOutcome, VizMachine } from "@mantaq/viz";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
@@ -20,14 +20,14 @@ import { mantaqViz } from "./vite.ts";
 export interface VizHarness {
   /** The current state id. */
   state(): Promise<string>;
-  /** Click what one person would click; an ignored event is a result, not an error. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
+  /** Select the event's arrow out of the current state and press Send in Details, as a person would. An event with no arrow from here is a Left naming the events that have one. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
   send(
     event: string,
     payload?: Record<string, VizJson>,
   ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>>;
   /** Where each region is now, by local state name: `{ network: "online", upload: "sendingPhoto" }`. */
   regions(): Promise<Record<string, string>>;
-  /** Like `send`, for the Send button under a region. An unknown region is a result, not an error. */
+  /** Like `send`, for an arrow in a region or the Send button in a worker's row. An unknown region is a result, not an error. */
   sendTo(
     actor: VizActorRef,
     event: string,
@@ -182,11 +182,57 @@ async function missingActor(
       .map((child) => child.key);
     return `no child ${quoted(actor.key)} in ${quoted(actor.map)} of ${id}. Children: ${keys.join(", ")}.`;
   }
-  if (path === "" || (await page.locator(`${PANEL} [data-actor=${quoted(path)}]`).count()) > 0) {
+  if (path === "" || Object.keys(await readRegions(page, machine)).includes(path)) {
     return undefined;
   }
   const names = Object.keys(await readRegions(page, machine)).join(", ");
   return `no region ${quoted(path)} in ${id}. Regions: ${names}.`;
+}
+
+/** The local state name of a worker, from its row on the Step tab. */
+async function rowState(page: Page, actor: { map: string; key: string }): Promise<string> {
+  const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
+  const state = await page.getAttribute(row, "data-child-state");
+  return (state ?? "").slice((state ?? "").lastIndexOf(".") + 1);
+}
+
+/** The outcome of the last Send, read from the Step tab. */
+async function outcomeOf(
+  page: Page,
+  state: () => Promise<string>,
+): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
+  const outcome =
+    (await page.getAttribute(`${PANEL} [data-outcome]`, "data-outcome")) ?? "transition";
+  return Either.right({ state: await state(), outcome: outcome as VizLiveOutcome });
+}
+
+/** Press the Send button in a worker's row on the Step tab. */
+async function pressRow(
+  page: Page,
+  context: {
+    actor: { map: string; key: string };
+    event: string;
+    payload: Record<string, VizJson> | undefined;
+    state: () => Promise<string>;
+  },
+): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
+  const { actor, event, payload, state } = context;
+  await page.click('[data-tab="step"]');
+  const scope = `${PANEL} [data-actor=${quoted(actorPath(actor))}]`;
+  const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
+  if ((await trigger.count()) === 0) {
+    const offered = await attributes(page, `${scope} [data-send]`, "data-send");
+    return Either.left(
+      `no button for ${event}: ${actorPath(actor)} is in ${await rowState(page, actor)}, which offers: ${[...new Set(offered)].join(", ")}.`,
+    );
+  }
+  const problem = payload === undefined ? undefined : await setValues(page, payload);
+  if (problem !== undefined) {
+    return Either.left(problem);
+  }
+  await page.click('[data-tab="step"]');
+  await trigger.click();
+  return outcomeOf(page, state);
 }
 
 function makeSend(
@@ -200,32 +246,39 @@ function makeSend(
     if (isClosed()) {
       return Either.left("harness is closed");
     }
-    await page.click('[data-tab="step"]');
     const path = actorPath(actor);
-    const scope =
-      path === "" ? `${PANEL} [data-actor=""]` : `${PANEL} [data-actor=${quoted(path)}]`;
     const missing = await missingActor(page, { machine, actor, path });
     if (missing !== undefined) return Either.left(missing);
-    const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
-    if ((await trigger.count()) === 0) {
-      const offered = await attributes(page, `${scope} [data-send]`, "data-send");
+    if ("map" in actor) return pressRow(page, { actor, event, payload, state });
+    const currents = await page
+      .locator(".graph g.current[data-node-id]")
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));
+    const edges = currents
+      .flatMap((current) => movesFrom(machine, current))
+      .map((move) => move.edge)
+      .filter((edge) => scopeOf(edge.from) === path);
+    const edge = edges.find((each) => each.event === event);
+    if (edge === undefined) {
       const where =
         path === ""
           ? `${id} is in ${await state()}`
           : `region ${path} is in ${(await readRegions(page, machine))[path]}`;
-      return Either.left(
-        `no button for ${event}: ${where}, which offers: ${[...new Set(offered)].join(", ")}.`,
-      );
+      const offered = [...new Set(edges.map((each) => each.event))].sort();
+      return Either.left(`no button for ${event}: ${where}, which offers: ${offered.join(", ")}.`);
     }
     const problem = payload === undefined ? undefined : await setValues(page, payload);
     if (problem !== undefined) {
       return Either.left(problem);
     }
-    await page.click('[data-tab="step"]');
+    await page.locator(`.graph g[data-edge-id=${quoted(edge.id)}]`).dispatchEvent("click");
+    const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
+    if ((await trigger.count()) === 0) {
+      const note = await page.locator("[data-blocked-note]").first().textContent();
+      return Either.left(`${event} is blocked: ${note ?? ""}`);
+    }
     await trigger.click();
-    const outcome =
-      (await page.getAttribute(`${PANEL} [data-outcome]`, "data-outcome")) ?? "transition";
-    return Either.right({ state: await state(), outcome: outcome as VizLiveOutcome });
+    await page.click('[data-tab="step"]');
+    return outcomeOf(page, state);
   };
 }
 

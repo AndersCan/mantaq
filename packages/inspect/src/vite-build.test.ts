@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vite-plus/test";
+import { sendVia } from "./send-via.ts";
 
 let out = "";
 
@@ -44,7 +45,8 @@ describe("mantaqViz build", () => {
     globalThis.fetch = async () => new Response(text);
     await import(/* @vite-ignore */ pathToFileURL(join(out, entry)).href);
     const root = document.querySelector("#app");
-    await vi.waitFor(() => expect(root?.querySelector("[data-send]")).not.toBeNull());
+    await vi.waitFor(() => expect(root?.querySelector(".graph g.edge.next")).not.toBeNull());
+    expect(root !== null && sendVia(root)).toBe(true);
   });
 });
 

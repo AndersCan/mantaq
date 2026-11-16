@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vite-plus/test";
+import { sendVia } from "./send-via.ts";
 
 process.env["ASTRO_TELEMETRY_DISABLED"] = "1";
 
@@ -113,9 +114,9 @@ describe("mantaqViz for Astro", () => {
     expect(entry).not.toBe("");
     await import(/* @vite-ignore */ pathToFileURL(join(dist, entry)).href);
     const root = document.querySelectorAll<HTMLElement>(".mantaq-machine")[0];
-    await vi.waitFor(() => expect(root?.querySelector("[data-send]")).not.toBeNull());
+    await vi.waitFor(() => expect(root?.querySelector(".graph g.edge.next")).not.toBeNull());
     const before = root?.querySelector<HTMLElement>(".explore")?.dataset["current"];
-    root?.querySelector<HTMLElement>("[data-send]")?.click();
+    if (root !== undefined) sendVia(root);
     await vi.waitFor(() =>
       expect(root?.querySelector<HTMLElement>(".explore")?.dataset["current"]).not.toBe(before),
     );

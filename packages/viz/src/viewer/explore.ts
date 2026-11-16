@@ -1,7 +1,6 @@
 import { movesFrom } from "../moves.ts";
 import { coveredByAny } from "../schema.ts";
-import { actorOf, actorText, localName, offeredEvents, regionPaths } from "./compartments.ts";
-import type { Move, MoveGroup } from "../moves.ts";
+import { actorText, localName } from "./compartments.ts";
 import type {
   VizActorRef,
   VizJson,
@@ -45,12 +44,6 @@ export interface ExploreContext {
     setValue: (name: string, value: VizJson | undefined) => void;
   };
 }
-
-const GROUP_TITLES: Record<MoveGroup, string> = {
-  input: "Send an input",
-  effect: "Effect reports back",
-  internal: "Other internal events",
-};
 
 export function code(doc: Document, text: string): HTMLElement {
   return html(doc, "code", {}, [text]);
@@ -163,107 +156,33 @@ function timersSection(
 
 interface LiveMoves {
   state: VizLiveState;
-  send: (step: VizStep) => void;
-  final: boolean;
   picked?: { map: string; key: string } | null;
   sendEvent: (event: string, actor?: VizActorRef) => void;
 }
 
-/** One sendable event: a button that sends it, or opens its payload form. */
-function sendItem(
+/** A worker's Send buttons: one per event its state handles. */
+function childSends(
   doc: Document,
   machine: VizMachine,
-  context: {
-    live: LiveMoves;
-    moves: Move[];
-    event: string;
-    tagged: boolean;
-    current: string;
-    compartment: string;
-    /** Set for an actor map's child; otherwise the region of `compartment`. */
-    child?: VizActorRef;
-  },
+  context: { live: LiveMoves; child: VizActorRef; state: string },
 ): HTMLElement {
-  const { live, moves, event, tagged, current, compartment } = context;
-  const actor = context.child ?? actorOf(compartment).actor;
-  const move = moves.find((each) => each.edge.event === event);
-  return html(doc, "li", { "data-send-item": event }, [
-    button(doc, ["Send ", code(doc, event)], {
-      onClick: () => live.sendEvent(event, actor),
-      attrs: { "data-send": event },
-    }),
-    move === undefined
-      ? html(doc, "span", { class: "muted", "data-ignored": "" }, [` ignored in ${current}`])
-      : null,
-    !tagged || move === undefined || move.sentBy.length === 0
-      ? null
-      : html(doc, "span", { class: "muted", "data-sent-by": move.sentBy.join(",") }, [
-          ` from ${move.sentBy.join(", ")}`,
-        ]),
-    move === undefined ? null : docNote(doc, { text: move.edge.doc, scope: "edge" }),
-  ]);
-}
-
-/** The Send list of one actor: the machine itself (""), a region (its path) or, with `child`, a map's child. */
-function liveMovesSection(
-  doc: Document,
-  machine: VizMachine,
-  live: LiveMoves & { current: string; compartment: string; child?: VizActorRef },
-): HTMLElement | null {
-  const { current, compartment, child } = live;
-  const actor = child === undefined ? actorOf(compartment) : { actor: child };
-  if (child !== undefined && live.final) return null;
-  const title = compartment === "" ? "h3" : "h4";
-  if (live.final && compartment === "") return null;
-  const heading =
-    compartment === "" || child !== undefined
-      ? []
-      : [html(doc, "h3", {}, [code(doc, compartment), " handles"])];
-  const block = (children: Array<HTMLElement | null>) =>
+  const { live, child, state } = context;
+  const events = [...new Set(movesFrom(machine, state).map((move) => move.edge.event))].sort();
+  return html(doc, "div", { "data-actor": actorText(child) }, [
     html(
       doc,
-      "div",
-      {
-        class: compartment === "" ? "explore-moves" : "explore-moves explore-region-moves",
-        "data-actor": actorText(actor.actor),
-      },
-      [...heading, ...children],
-    );
-  if (live.final) {
-    return block([
-      html(doc, "p", { class: "explore-end", "data-region-final": compartment }, [
-        code(doc, compartment),
-        " is final: it takes no more events.",
-      ]),
-    ]);
-  }
-  const moves = movesFrom(machine, current);
-  const handled = new Set(moves.map((move) => move.edge.event));
-  const events = offeredEvents(machine, compartment, [...handled]);
-  const groups: MoveGroup[] = ["input", "effect", "internal"];
-  const item = (event: string) =>
-    sendItem(doc, machine, {
-      live,
-      moves,
-      event,
-      tagged: true,
-      current,
-      compartment,
-      ...(child === undefined ? {} : { child }),
-    });
-  const groupOf = (event: string): MoveGroup =>
-    moves.find((each) => each.edge.event === event)?.group ?? "input";
-  return block(
-    groups.flatMap((group) => {
-      const members = events.filter((event) => groupOf(event) === group);
-      return members.length === 0
-        ? []
-        : [
-            html(doc, title, {}, [GROUP_TITLES[group]]),
-            html(doc, "ul", { "data-group": group }, members.map(item)),
-          ];
-    }),
-  );
+      "ul",
+      {},
+      events.map((event) =>
+        html(doc, "li", {}, [
+          button(doc, ["Send ", code(doc, event)], {
+            onClick: () => live.sendEvent(event, child),
+            attrs: { "data-send": event },
+          }),
+        ]),
+      ),
+    ),
+  ]);
 }
 
 /** One section per actor map: its walked child, where it is now, and what it handles. */
@@ -280,13 +199,6 @@ function childrenSections(
       .map((child) => {
         const info = machine.states.find((each) => each.id === child.state);
         const final = info?.final === true;
-        const moves = liveMovesSection(doc, machine, {
-          ...live,
-          current: child.state,
-          compartment: map,
-          final,
-          child: { map, key: child.key },
-        });
         return html(
           doc,
           "li",
@@ -304,7 +216,13 @@ function childrenSections(
               html(doc, "strong", {}, [localName(child.state)]),
               final ? " (final)" : "",
             ]),
-            moves,
+            final
+              ? null
+              : childSends(doc, machine, {
+                  live,
+                  child: { map, key: child.key },
+                  state: child.state,
+                }),
           ],
         );
       });
@@ -313,27 +231,6 @@ function childrenSections(
       html(doc, "ul", { class: "explore-children" }, rows),
     ]);
   });
-}
-
-/** The root's Send list, then one per region. The root's "Done." does not stop the regions. */
-function liveBlocks(
-  doc: Document,
-  machine: VizMachine,
-  live: LiveMoves,
-): Array<HTMLElement | null> {
-  const finalOf = (id: string) => machine.states.find((each) => each.id === id)?.final === true;
-  return [
-    liveMovesSection(doc, machine, { ...live, current: live.state.state, compartment: "" }),
-    ...regionPaths(live.state).map((path) => {
-      const current = live.state.regions[path] ?? "";
-      return liveMovesSection(doc, machine, {
-        ...live,
-        current,
-        compartment: path,
-        final: finalOf(current),
-      });
-    }),
-  ];
 }
 
 /** One text box per field name the machine's events carry; empty = the default shown in grey. */
@@ -732,13 +629,7 @@ function liveParts(
 ): Array<HTMLElement | null> {
   const { live, final } = context;
   const { state } = live;
-  const moves: LiveMoves = {
-    state,
-    send: live.send,
-    final,
-    picked: live.picked ?? null,
-    sendEvent: live.sendEvent,
-  };
+  const moves: LiveMoves = { state, picked: live.picked ?? null, sendEvent: live.sendEvent };
   return [
     liveResultSection(doc, {
       machine,
@@ -747,7 +638,6 @@ function liveParts(
       routes: live.routes,
       sent: live.sent ?? null,
     }),
-    ...liveBlocks(doc, machine, moves),
     ...childrenSections(doc, machine, moves),
     final ? null : timersSection(doc, { state, send: live.send }),
   ];

@@ -7,6 +7,7 @@ import { createMeal6 } from "../../../apps/docs/src/tutorial/meal-06.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
+import { sendVia } from "./send-via.ts";
 
 const file = join(import.meta.dirname, "../../../apps/docs/src/tutorial/meal-06.ts");
 
@@ -50,8 +51,7 @@ describe("Getting started step 6, live", () => {
   }
   const edge = (root: HTMLElement, id: string) =>
     root.querySelector(`g.edge[data-edge-id="${id}"]`);
-  const send = (root: HTMLElement, event: string) =>
-    root.querySelector<HTMLButtonElement>(`[data-send="${event}"]`)?.click();
+  const send = sendVia;
 
   test("eat is blocked while no plate is served, and not after serve", async () => {
     const root = await mount();

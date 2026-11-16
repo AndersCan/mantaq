@@ -4,6 +4,7 @@ import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } 
 import { serializeViz } from "../serialize.ts";
 import { mountViewer, mountVizText } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
+import { sendVia } from "./send-via.ts";
 
 function state(id: string, flags: { initial?: boolean; final?: boolean } = {}): VizState {
   return {
@@ -216,7 +217,11 @@ describe("mountViewer with a driver", () => {
       ...door.events,
       { id: "peek", internal: false, doc: null, payload: null },
       { id: "boom", internal: false, doc: null, payload: null },
-      { id: "idle", internal: false, doc: null, payload: null },
+    ],
+    edges: [
+      ...door.edges,
+      { ...edge("open", "peek", "open"), kind: "stay" },
+      { ...edge("open", "boom", "open"), kind: "stay" },
     ],
   };
   const mountLive = (): HTMLElement => {
@@ -230,16 +235,7 @@ describe("mountViewer with a driver", () => {
     );
     return root;
   };
-  const send = (root: HTMLElement, event: string) =>
-    root.querySelector<HTMLButtonElement>(`[data-send="${event}"]`)?.click();
-
-  test("shows inputs with no handler as ignored", () => {
-    const root = mountLive();
-    expect(root.querySelector('[data-send-item="go"] [data-ignored]')).toBeNull();
-    expect(root.querySelector('[data-send-item="peek"] [data-ignored]')?.textContent).toBe(
-      " ignored in open",
-    );
-  });
+  const send = sendVia;
 
   test("a transition moves the cursor and lists the effects run", () => {
     const root = mountLive();
@@ -273,12 +269,10 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector('[data-tab-panel="details"]')?.hasAttribute("hidden")).toBe(false);
   });
 
-  test("stay and ignored outcomes keep the cursor", () => {
+  test("a stay outcome keeps the cursor", () => {
     const root = mountLive();
     send(root, "peek");
     expect(root.querySelector('[data-outcome="stay"]')?.textContent).toContain("stays");
-    send(root, "idle");
-    expect(root.querySelector('[data-outcome="ignored"]')?.textContent).toContain("Nothing ran.");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 
