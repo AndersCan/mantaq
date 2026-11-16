@@ -444,7 +444,17 @@ export async function inspectModule(
       each.samples,
     );
     const withContext: VizMachine | null =
-      inspected.machine === null ? null : { ...inspected.machine, context: each.context };
+      inspected.machine === null
+        ? null
+        : {
+            ...inspected.machine,
+            context: each.context,
+            events: inspected.machine.events.map((event) =>
+              event.payload === null && each.fields[event.id] !== undefined
+                ? { ...event, payload: each.fields[event.id] ?? null }
+                : event,
+            ),
+          };
     const instance =
       each.call === "instance" ? ["not fuzzed: exported as one actor, not a factory"] : [];
     return {
