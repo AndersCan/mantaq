@@ -8,7 +8,6 @@ const rule = (selector: string) =>
 
 test("the active walk uses the accent and controls do not", () => {
   expect(rule(".viz .next path")).toMatch(/stroke:\s*var\(--accent\)/);
-  expect(rule(".viz button.primary")).not.toMatch(/--accent|--select/);
   expect(rule(".viz button:focus-visible")).not.toMatch(/--accent/);
 });
 

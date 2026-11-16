@@ -257,7 +257,7 @@ function labelSize(edge: VizEdge): { width: number; height: number } {
   };
 }
 
-function isDrawn(edge: VizEdge): boolean {
+export function isDrawn(edge: VizEdge): boolean {
   return edge.kind !== "initial" && edge.kind !== "effect";
 }
 

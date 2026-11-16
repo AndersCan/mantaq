@@ -3,6 +3,7 @@ import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { localName } from "./compartments.ts";
 import { activatable, html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
+import { isDrawn } from "./layout.ts";
 
 type Row = [label: string, value: Node | string];
 
@@ -78,9 +79,11 @@ function statePanel(
 ): HTMLElement {
   const { machine, select } = context;
   const outgoing = machine.edges.filter(
-    (edge) => edge.from === state.id || (!state.final && coveredByAny(edge.from, state.id)),
+    (edge) =>
+      isDrawn(edge) &&
+      (edge.from === state.id || (!state.final && coveredByAny(edge.from, state.id))),
   );
-  const incoming = machine.edges.filter((edge) => edge.to === state.id && edge.kind !== "initial");
+  const incoming = machine.edges.filter((edge) => isDrawn(edge) && edge.to === state.id);
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
     html(doc, "h2", {}, [`State ${state.id}`]),
     docLine(doc, "state", state.doc),

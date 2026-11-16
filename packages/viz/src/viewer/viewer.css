@@ -1,7 +1,6 @@
 .viz {
   /* Black and white throughout. --accent marks the active state and its
      transitions; --select marks what was clicked or focused. */
-  --fuzz: #138a4a;
   --bg: #ffffff;
   --fg: #000000;
   --muted: #6b6b70;
@@ -63,18 +62,6 @@
   cursor: default;
 }
 
-.viz button.primary {
-  color: var(--bg);
-  background: var(--fg);
-  border-color: var(--fg);
-  font-weight: 600;
-}
-
-.viz button.primary:hover:not(:disabled) {
-  background: var(--fg);
-  opacity: 0.85;
-}
-
 @media (prefers-color-scheme: dark) {
   .viz {
     --bg: #000000;
@@ -89,10 +76,8 @@
     --accent: #ff6fae;
     --select: #3fd0f0;
     --unknown: #f0a742;
-    --fuzz: #4cc98a;
     --banner-bg: #2e2510;
     --banner-fg: #f3d58c;
-    --added: #7aa2ff;
     color-scheme: dark;
   }
 }
@@ -193,7 +178,7 @@
   fill: var(--line);
 }
 
-/* Loop heads take the loop's own stroke colour (internal, fuzz, stay, ...). */
+/* Loop heads take the loop's own stroke colour (internal, stay, ...). */
 .viz .graph .arrow-head-loop {
   fill: context-stroke;
 }
@@ -265,24 +250,9 @@
   stroke-dasharray: 6 4;
 }
 
-.viz .edge.fuzz path {
-  stroke: var(--fuzz);
-}
-
-.viz .edge.fuzz text {
-  fill: var(--fuzz);
-}
-
 .viz .edge.stay path {
   stroke-dasharray: 1 var(--viz-dot-gap, 3);
   stroke-linecap: round;
-}
-
-.viz .steps {
-  margin: 0;
-  padding-left: 20px;
-  font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
 }
 
 .viz .unknown-node circle {
@@ -417,11 +387,6 @@
   display: flex;
   gap: 6px;
   margin: 8px 0;
-}
-
-.viz .explore .unhandled code {
-  text-decoration: line-through;
-  color: var(--unknown);
 }
 
 .viz .explore-warning {
