@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import type { VizLiveChild, VizLiveState, VizMachine, VizState } from "../schema.ts";
-import { countsOf, nextKey, nounOf } from "./pool-count.ts";
+import { childIn, countsOf, countTitle } from "./pool-count.ts";
 
 const state = (id: string): VizState => ({
   id,
@@ -54,27 +54,45 @@ test("keys sort numerically", () => {
   expect(counts.items[0]?.keys).toEqual(["w2", "w10"]);
 });
 
-test("the noun loses its s for exactly one child", () => {
-  expect(nounOf("workers", 1)).toBe("worker");
-  expect(nounOf("workers", 2)).toBe("workers");
-  expect(nounOf("workers", 0)).toBe("workers");
-  expect(nounOf("team", 1)).toBe("team");
+test("the title counts by state in machine order, whatever the child order", () => {
+  const live = liveOf([child("w1", "working"), child("w2", "free")]);
+  expect(countTitle(machine, live, "workers")).toBe("workers: 1 free, 1 working");
 });
 
-test("nextKey walks on, wraps, and starts at the first", () => {
-  expect(nextKey(["w1", "w2"], "w1")).toBe("w2");
-  expect(nextKey(["w1", "w2"], "w2")).toBe("w1");
-  expect(nextKey(["w1", "w2"], undefined)).toBe("w1");
-  expect(nextKey(["w1", "w2"], "w9")).toBe("w1");
+test("the title of one state lists just it", () => {
+  const live = liveOf([child("w1", "free"), child("w2", "free")]);
+  expect(countTitle(machine, live, "workers")).toBe("workers: 2 free");
 });
 
-test("walking as many times as there are keys visits each once and comes back", () => {
-  const keys = ["w1", "w2", "w10"];
-  const seen: string[] = [];
-  let at: string | undefined = "w1";
-  for (let n = 0; n < keys.length; n++) {
-    at = nextKey(keys, at);
-    seen.push(at);
-  }
-  expect(seen).toEqual(["w2", "w10", "w1"]);
+test("the title with no children is none", () => {
+  expect(countTitle(machine, liveOf([]), "workers")).toBe("workers: none");
+});
+
+test("the title ignores another map's children", () => {
+  const other = { ...child("x1", "free"), map: "other" };
+  expect(countTitle(machine, liveOf([other]), "workers")).toBe("workers: none");
+});
+
+test("a click picks the lowest key in the state, w2 before w10", () => {
+  const live = liveOf([child("w10", "free"), child("w2", "free"), child("w1", "working")]);
+  expect(childIn(live, "workers", "workers.free")).toBe("w2");
+});
+
+test("a nested state's child is in its parent state", () => {
+  const nested = { ...child("w1", "working"), state: "workers.working.lifting" };
+  expect(childIn(liveOf([nested]), "workers", "workers.working")).toBe("w1");
+});
+
+test("a state no child is in picks none", () => {
+  expect(childIn(liveOf([child("w1", "free")]), "workers", "workers.working")).toBeUndefined();
+});
+
+test("a state whose id only starts with the same letters does not match", () => {
+  const near = { ...child("w1", "workingLate") };
+  expect(childIn(liveOf([near]), "workers", "workers.working")).toBeUndefined();
+});
+
+test("another map's child is not picked", () => {
+  const other = { ...child("x1", "free"), map: "other" };
+  expect(childIn(liveOf([other]), "workers", "workers.free")).toBeUndefined();
 });

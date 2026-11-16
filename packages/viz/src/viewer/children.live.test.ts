@@ -185,15 +185,6 @@ describe("live actor map children", () => {
     expect(current.sort()).toEqual(["photos.sendingPhoto", "showingQueue"]);
   });
 
-  test("the frame names the walked child, or none", () => {
-    const title = (root: HTMLElement) =>
-      root.querySelector('.graph g.region[data-map="photos"] > text')?.textContent;
-    expect(title(mount([child("p10", "sendingPhoto"), child("p2", "sendingPhoto")]).root)).toBe(
-      "photos: p2",
-    );
-    expect(title(mount([]).root)).toBe("photos: none");
-  });
-
   const edgeGroup = (root: HTMLElement) =>
     root.querySelector<SVGGElement>(
       '.graph g[data-edge-id="photos.sendingPhoto-uploadConfirmed-photos.photoSent"]',
@@ -203,55 +194,72 @@ describe("live actor map children", () => {
   const sentTo = (key: string) => [
     { kind: "event", event: "uploadConfirmed", payload: null, actor: { map: "photos", key } },
   ];
-  const line = (root: HTMLElement) => root.querySelector("[data-pool-count]")?.textContent;
-  const count = (root: HTMLElement, state: string) =>
-    root.querySelector<HTMLButtonElement>(
-      `[data-pool-count] button[data-count-state$=".${state}"]`,
+  const title = (root: HTMLElement) =>
+    root.querySelector('.graph g.region[data-map="photos"] > text')?.textContent;
+  const box = (root: HTMLElement, state: string) =>
+    root.querySelector(`.graph g[data-node-id="photos.${state}"]`);
+  const pick = (root: HTMLElement, key: string) =>
+    root.dispatchEvent(
+      new CustomEvent("mantaq:pick-child", { bubbles: true, detail: { map: "photos", key } }),
     );
   const walkedKey = (root: HTMLElement) =>
     root.querySelector("[data-child-key]")?.getAttribute("data-child-key");
 
-  test("the line counts the children by state in the machine's order", () => {
-    expect(line(mount([child("p1", "waitingForRetry"), child("p2", "sendingPhoto")]).root)).toBe(
-      "2 photos: 1 sendingPhoto, 1 waitingForRetry",
+  test("the frame title counts the children by state in the machine's order", () => {
+    expect(title(mount([child("p1", "waitingForRetry"), child("p2", "sendingPhoto")]).root)).toBe(
+      "photos: 1 sendingPhoto, 1 waitingForRetry",
     );
-    expect(line(mount([child("p1", "sendingPhoto")]).root)).toBe("1 photo: 1 sendingPhoto");
-    expect(line(mount([]).root)).toBe("0 photos: ");
-    expect(count(mount([]).root, "sendingPhoto")).toBeNull();
+    expect(title(mount([]).root)).toBe("photos: none");
   });
 
-  test("the line is not drawn without a driver", () => {
+  test("a click on a child state with a child in it picks that child and sends nothing", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
+    click(box(root, "photoSent"));
+    click(box(root, "waitingForRetry"));
+    expect(walkedKey(root)).toBe("p2");
+    expect(sent).toEqual([]);
+    expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
+    expect(box(root, "waitingForRetry")?.classList.contains("selected")).toBe(true);
+  });
+
+  test("a click on a child state with no child in it shows details and keeps the pick", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
+    pick(root, "p2");
+    click(box(root, "photoSent"));
+    expect(sent).toEqual([]);
+    expect(walkedKey(root)).toBe("p2");
+    expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  test("mantaq:pick-child walks a known key and ignores an unknown one", () => {
+    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
+    click(box(root, "photoSent"));
+    pick(root, "p2");
+    expect(walkedKey(root)).toBe("p2");
+    expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
+    pick(root, "p9");
+    expect(walkedKey(root)).toBe("p2");
+  });
+
+  test("data-children lists the children as JSON in key order", () => {
+    const { root } = mount([child('q"', "sendingPhoto"), child("a b", "sendingPhoto")]);
+    expect(
+      root.querySelector('.graph g.region[data-map="photos"]')?.getAttribute("data-children"),
+    ).toBe(
+      JSON.stringify([
+        { key: "a b", state: "photos.sendingPhoto" },
+        { key: 'q"', state: "photos.sendingPhoto" },
+      ]),
+    );
+  });
+
+  test("the frame title stays one per key without a driver", () => {
     const root = document.createElement("div");
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] });
-    expect(root.querySelector("[data-pool-count]")).toBeNull();
-  });
-
-  test("a click on a count walks a child in that state and presses it", () => {
-    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "waitingForRetry")]);
-    expect(count(root, "sendingPhoto")?.getAttribute("aria-pressed")).toBe("true");
-    expect(count(root, "waitingForRetry")?.getAttribute("aria-pressed")).toBe("false");
-    click(count(root, "waitingForRetry"));
-    expect(walkedKey(root)).toBe("p2");
-    expect(count(root, "waitingForRetry")?.getAttribute("aria-pressed")).toBe("true");
-    expect(count(root, "sendingPhoto")?.getAttribute("aria-pressed")).toBe("false");
-    expect(root.querySelector('.graph g.region[data-map="photos"] > text')?.textContent).toBe(
-      "photos: p2",
-    );
-  });
-
-  test("a second click on the same count walks the next key and wraps", () => {
-    const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
-    click(count(root, "sendingPhoto"));
-    expect(walkedKey(root)).toBe("p2");
-    click(count(root, "sendingPhoto"));
-    expect(walkedKey(root)).toBe("p1");
-  });
-
-  test("the counts keep their keys as JSON", () => {
-    const { root } = mount([child("a b", "sendingPhoto"), child('q"', "sendingPhoto")]);
-    expect(count(root, "sendingPhoto")?.getAttribute("data-keys")).toBe(
-      JSON.stringify(["a b", 'q"']),
-    );
+    expect(title(root)).toBe("photos: one per key");
+    expect(root.querySelector("[data-children]")).toBeNull();
+    click(box(root, "sendingPhoto"));
+    expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");
   });
 
   test("an arrow goes to the only child in its source", () => {
@@ -260,11 +268,11 @@ describe("live actor map children", () => {
     expect(one.sent).toEqual(sentTo("p1"));
   });
 
-  test("an arrow goes to the walked child, the lowest key until a count is clicked", () => {
+  test("an arrow goes to the walked child, the lowest key until one is picked", () => {
     const two = mount([child("p2", "sendingPhoto", 1), child("p1", "sendingPhoto", 2)]);
     click(edgeGroup(two.root));
     expect(two.sent).toEqual(sentTo("p1"));
-    click(count(two.root, "sendingPhoto"));
+    pick(two.root, "p2");
     click(edgeGroup(two.root));
     expect(two.sent.at(-1)).toEqual(sentTo("p2")[0]);
   });
@@ -277,7 +285,7 @@ describe("live actor map children", () => {
 
   test("with a child walked, another child's arrow is not next and its click shows details", () => {
     const two = mount([child("p1", "sendingPhoto", 1), child("p2", "waitingForRetry", 2)]);
-    click(count(two.root, "waitingForRetry"));
+    pick(two.root, "p2");
     click(edgeGroup(two.root));
     expect(two.sent).toEqual([]);
     expect(two.root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe(
@@ -298,11 +306,11 @@ describe("live actor map children", () => {
       },
     };
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] }, { driver });
-    click(count(root, "sendingPhoto"));
+    pick(root, "p2");
     expect(walkedKey(root)).toBe("p2");
     click(root.querySelector('[data-actor="photos[p2]"] [data-send="uploadConfirmed"]'));
     expect(walkedKey(root)).toBe("p1");
-    expect(line(root)).toBe("1 photo: 1 sendingPhoto");
+    expect(title(root)).toBe("photos: 1 sendingPhoto");
     click(edgeGroup(root));
     expect(sent.at(-1)).toMatchObject({ actor: { key: "p1" } });
   });
@@ -1056,7 +1064,9 @@ describe("live actor map children", () => {
       [child("p1", "sendingPhoto"), child("p2", "waitingForRetry")],
       withPayload,
     );
-    click(count(root, "waitingForRetry"));
+    root
+      .querySelector('.graph g[data-node-id="photos.waitingForRetry"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     root
       .querySelector<HTMLButtonElement>('[data-actor="photos[p2]"] [data-send="retryPressed"]')
       ?.click();
@@ -1108,16 +1118,31 @@ describe("live actor map children", () => {
   });
 });
 
-test("a count keeps focus after a click, so Enter walks the next child", () => {
-  const { root } = mount([child("p1", "sendingPhoto"), child("p2", "sendingPhoto")]);
-  document.body.append(root);
-  const button = () =>
-    root.querySelector<HTMLButtonElement>(
-      '[data-pool-count] button[data-count-state="photos.sendingPhoto"]',
-    );
-  button()?.focus();
-  button()?.click();
-  expect(root.querySelector("[data-child-key]")?.getAttribute("data-child-key")).toBe("p2");
-  expect(document.activeElement).toBe(button());
-  root.remove();
+test("a click on a root state whose name starts with the map's still takes its arrow", () => {
+  const machine: VizMachine = {
+    ...photoQueue,
+    states: [...photoQueue.states, state("photosPaused")],
+    events: [...photoQueue.events, event("paused")],
+    edges: [...photoQueue.edges, edge("showingQueue", "paused", "photosPaused")],
+  };
+  const { root, sent } = mount([child("p1", "sendingPhoto")], machine);
+  root
+    .querySelector('.graph g[data-node-id="photosPaused"]')
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(sent).toMatchObject([{ kind: "event", event: "paused" }]);
+});
+
+test("each map frame lists only its own children in data-children", () => {
+  const machine: VizMachine = {
+    ...photoQueue,
+    regions: ["photos", "uploads"],
+    maps: ["photos", "uploads"],
+    states: [...photoQueue.states, state("uploads.queued", { initial: true })],
+  };
+  const upload: VizLiveChild = { map: "uploads", key: "u1", state: "uploads.queued", since: 0 };
+  const { root } = mount([child("p1", "sendingPhoto"), upload], machine);
+  const listed = (map: string) =>
+    root.querySelector(`.graph g.region[data-map="${map}"]`)?.getAttribute("data-children");
+  expect(listed("photos")).toBe(JSON.stringify([{ key: "p1", state: "photos.sendingPhoto" }]));
+  expect(listed("uploads")).toBe(JSON.stringify([{ key: "u1", state: "uploads.queued" }]));
 });

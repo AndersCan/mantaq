@@ -545,25 +545,6 @@
   }
 }
 
-.viz .pool-count {
-  color: var(--muted);
-  font-size: 0.8125rem;
-  margin: 4px 0 0;
-}
-
-.viz .pool-count button {
-  background: none;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  padding: 0 2px;
-}
-
-.viz .pool-count button:hover {
-  text-decoration: underline;
-}
-
 .viz .explore {
   background: var(--region-bg);
   border-radius: 6px;

@@ -11,7 +11,7 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { scopeOf } from "../schema.ts";
-import { currentsOf, walkedChild } from "./compartments.ts";
+import { compareKeys, currentsOf, walkedChild } from "./compartments.ts";
 import { html } from "./dom.ts";
 import { changesSection } from "./changes.ts";
 import type { ChangesOption } from "./changes.ts";
@@ -28,7 +28,7 @@ import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
-import { countLines } from "./pool-count.ts";
+import { childIn, countTitle } from "./pool-count.ts";
 import { removeSheets, showPayloadSheet } from "./payload-sheet.ts";
 import { keyLine } from "./key.ts";
 import {
@@ -208,10 +208,10 @@ export function mountViewer(
   const view = initialView(first, options);
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
-  // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   let redraw: () => void = () => undefined;
   listenOnRoot(root, { back: () => back() });
+  listenForPick(root, view, () => redraw());
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
@@ -293,6 +293,7 @@ export function mountViewer(
     // A click on a next step takes it; either way the clicked element's details show.
     const select = (selection: Selection) => {
       if (openBlocked(machine, view, selection, compose)) return;
+      if (pickByClick(machine, view, selection, { refresh, showDetails })) return;
       const step = clickStep(machine, { path: view.path, selection, ...liveState(view) });
       if (step !== null) view.selection = selection;
       if (step !== null) return take(step);
@@ -877,6 +878,40 @@ function isTextControl(target: EventTarget | null): boolean {
   );
 }
 
+/** A live click on a child state box walks the lowest key in it, or just shows its details when none is there. True when it was one. */
+function pickByClick(
+  machine: VizMachine,
+  view: ViewState,
+  selection: Selection,
+  then: { refresh: () => void; showDetails: (selection: Selection) => void },
+): boolean {
+  if (view.live === null || selection.kind !== "state") return false;
+  const map = machine.maps.find((each) => selection.id.startsWith(`${each}.`));
+  if (map === undefined) return false;
+  const key = childIn(view.live, map, selection.id);
+  if (key === undefined) then.showDetails(selection);
+  else {
+    view.picked = { map, key };
+    view.selection = selection;
+    view.tab = "step";
+    then.refresh();
+  }
+  return true;
+}
+
+/** `mantaq:pick-child` walks a live child. For the inspect harness and test tools; not public API. */
+function listenForPick(root: HTMLElement, view: ViewState, redraw: () => void): void {
+  root.addEventListener("mantaq:pick-child", (event) => {
+    const detail: unknown = event instanceof CustomEvent ? event.detail : null;
+    const { map, key } = (detail ?? {}) as { map?: unknown; key?: unknown };
+    const there = view.live?.children.some((c) => c.map === map && c.key === key);
+    if (there !== true || typeof map !== "string" || typeof key !== "string") return;
+    view.picked = { map, key };
+    view.tab = "step";
+    redraw();
+  });
+}
+
 /** A pick of a child that is gone is dropped. */
 function dropGonePick(view: ViewState): void {
   const { picked } = view;
@@ -1085,48 +1120,25 @@ function markDiagram(
   updateBlocked(machine, view, context.driver);
   markExplore(root, { machine, path: view.path, blocked: view.blocked, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>("svg");
-  if (graph !== null) markPools(root, { machine, view, refresh: context.refresh });
+  if (graph !== null) markPools(root, { machine, view });
   markSelection(root, view.selection);
   showPayloadSheet(root, { ...context, ...view });
 }
 
-function focusedCountState(root: HTMLElement): string | undefined {
-  const focused = root.ownerDocument.activeElement;
-  return focused instanceof HTMLElement && focused.closest("[data-pool-count]") !== null
-    ? focused.dataset.countState
-    : undefined;
-}
-
-/** The count lines under the diagram, and each map frame titled with the child it shows. */
-function markPools(
-  root: HTMLElement,
-  context: { machine: VizMachine; view: ViewState; refresh: () => void },
-): void {
-  const { machine, view, refresh } = context;
+/** Each map frame is titled with its live count of children; `data-children` lists them for the inspect harness. */
+function markPools(root: HTMLElement, context: { machine: VizMachine; view: ViewState }): void {
+  const { machine, view } = context;
   const { live } = view;
-  const canvas = root.querySelector(".canvas");
-  const focusedState = focusedCountState(root);
-  canvas?.querySelectorAll("[data-pool-count]").forEach((line) => line.remove());
-  if (live === null || canvas === null) return;
-  canvas.append(
-    ...countLines(root.ownerDocument, {
-      machine,
-      live,
-      picked: view.picked,
-      onWalk: (child) => {
-        view.picked = child;
-        refresh();
-      },
-    }),
-  );
-  if (focusedState !== undefined)
-    canvas
-      .querySelector<HTMLElement>(`[data-pool-count] button[data-count-state="${focusedState}"]`)
-      ?.focus();
+  if (live === null) return;
   for (const map of machine.maps) {
-    const title = root.querySelector(`.graph g.region[data-map="${map}"] > text`);
-    if (title !== null)
-      title.textContent = `${map}: ${walkedChild(live, map, view.picked)?.key ?? "none"}`;
+    const frame = root.querySelector(`.graph g.region[data-map="${map}"]`);
+    const title = frame?.querySelector(":scope > text");
+    if (title !== null && title !== undefined) title.textContent = countTitle(machine, live, map);
+    const children = live.children
+      .filter((child) => child.map === map)
+      .sort((a, b) => compareKeys(a.key, b.key))
+      .map((child) => ({ key: child.key, state: child.state }));
+    frame?.setAttribute("data-children", JSON.stringify(children));
   }
 }
 

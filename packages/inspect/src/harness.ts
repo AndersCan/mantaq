@@ -138,42 +138,42 @@ async function readRegions(page: Page): Promise<Record<string, string>> {
   );
 }
 
-/** Every child row of the Step tab: map, key and local state name. */
-async function readCounts(page: Page): Promise<Array<{ map: string; id: string; keys: string[] }>> {
-  return page.locator("[data-pool-count] button[data-keys]").evaluateAll((nodes) =>
-    nodes.map((node) => ({
-      map: node.closest("[data-pool-count]")?.getAttribute("data-pool-count") ?? "",
-      id: node.getAttribute("data-count-state") ?? "",
-      keys: JSON.parse(node.getAttribute("data-keys") ?? "[]") as string[],
-    })),
-  );
-}
-
 async function readChildren(
   page: Page,
 ): Promise<Array<{ map: string; key: string; state: string }>> {
-  const counts = await readCounts(page);
-  return counts
-    .flatMap(({ map, id, keys }) =>
-      keys.map((key) => ({ map, key, state: id.slice(id.lastIndexOf(".") + 1) })),
+  const frames = await page.locator(".graph g.region[data-children]").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      map: node.getAttribute("data-map") ?? "",
+      children: JSON.parse(node.getAttribute("data-children") ?? "[]") as Array<{
+        key: string;
+        state: string;
+      }>,
+    })),
+  );
+  return frames
+    .flatMap(({ map, children }) =>
+      children.map(({ key, state }) => ({
+        map,
+        key,
+        state: state.slice(state.lastIndexOf(".") + 1),
+      })),
     )
     .sort(
       (a, b) => a.map.localeCompare(b.map) || a.key.localeCompare(b.key, "en", { numeric: true }),
     );
 }
 
-/** Click the count holding `key` until the Step tab shows that child; false when none holds it. */
+/** Pick `actor` in the viewer until the Step tab shows that child; false when no such child exists. */
 async function walkTo(page: Page, actor: { map: string; key: string }): Promise<boolean> {
   const row = `${PANEL} [data-child-map=${quoted(actor.map)}][data-child-key=${quoted(actor.key)}]`;
-  const holding = (await readCounts(page)).find(
-    (count) => count.map === actor.map && count.keys.includes(actor.key),
-  );
-  if (holding === undefined) return false;
-  const button = page.locator(
-    `[data-pool-count=${quoted(actor.map)}] button[data-count-state=${quoted(holding.id)}]`,
-  );
-  for (let n = 0; n < holding.keys.length && (await page.locator(row).count()) === 0; n++) {
-    await button.click();
+  if ((await page.locator(row).count()) === 0) {
+    await page
+      .locator(".graph")
+      .evaluate(
+        (node, detail) =>
+          node.dispatchEvent(new CustomEvent("mantaq:pick-child", { bubbles: true, detail })),
+        actor,
+      );
   }
   return (await page.locator(row).count()) > 0;
 }
