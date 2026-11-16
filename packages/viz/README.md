@@ -2,7 +2,7 @@
 
 Draws a Mantaq machine in the browser and lets you walk it. Input is a viz document: versioned, deterministic JSON. `@mantaq/inspect` makes one from your machine; this package only reads it, and runs nothing.
 
-- `@mantaq/viz`: the document. Types, `parseViz` / `validateViz` (untrusted JSON → `Either<VizIssue[], VizDocument>`, every issue with its path), `serializeViz`, and the walk (`movesFrom`, `decodePath`, …). No DOM.
+- `@mantaq/viz`: the document. Types, `parseViz` / `validateViz` (untrusted JSON → `Either<VizIssue[], VizDocument>`, every issue with its path), `serializeViz`, and the walk (`movesFrom`, …). No DOM.
 - `@mantaq/viz/viewer`: `mountViewer(root, document)` / `mountVizText(root, { source, text })` to embed it in a page, plus `@mantaq/viz/viewer.css`.
 
 Most apps never import this package directly: add the [`@mantaq/inspect`](https://www.npmjs.com/package/@mantaq/inspect) Vite plugin and open `/__mantaq/` on your dev server (`npx vite` or `npm run dev`).
@@ -28,7 +28,7 @@ if (root) {
 
 ## Walking the graph
 
-What each mark means and how to walk it: [How the visualizer works](https://anderscan.github.io/mantaq/guides/visualizer/). Without a `driver` the walk follows declarations, so guards are not evaluated (`movesFrom`, `unhandledSends`, `decodePath` in `src/moves.ts`).
+What each mark means and how to walk it: [How the visualizer works](https://anderscan.github.io/mantaq/guides/visualizer/). Without a `driver` the viewer draws the diagram and Details; nothing can be sent.
 
 **Live** (`mountViewer(root, doc, { driver })`, or the `@mantaq/inspect` Vite page): steps run the real actor through `createDriver` from `@mantaq/inspect/drive`. Effects are held, except the initial state's, which core runs while the actor is built. `VizLiveState` carries what the panel shows: `effectMode`, `waiting`, `payload`, `context`, `timers` and `after` (results an effect sends back later, offered through the driver's optional `listen(onChange)`).
 

@@ -3,16 +3,6 @@ import { coveredByAny } from "./schema.ts";
 import type { VizActorRef, VizEdge, VizJson, VizMachine, VizStep } from "./schema.ts";
 
 /**
- * Walking the drawn graph by hand: no actor runs. A path is the edges taken
- * from the initial state, each with the state it led to. Guards are not
- * evaluated, so a path shows what the declarations allow, not what a run does.
- */
-export interface ExploreStep {
-  edge: string;
-  to: string;
-}
-
-/**
  * `input`: sent from outside. `effect`: sent by an effect of the current
  * state (its `sends` list). `internal`: any other internal event (another
  * actor, a timer the effect did not declare, a test injecting it).
@@ -84,11 +74,6 @@ export function movesFrom(machine: VizMachine, state: string): Move[] {
     );
 }
 
-/** Where a path ends: the last step's target, or the initial state. */
-export function stateAfter(machine: VizMachine, path: ReadonlyArray<ExploreStep>): string | null {
-  return path.at(-1)?.to ?? machine.initial;
-}
-
 /** Events an effect of `state` declares in `sends` that no handler in `state` takes. */
 export function unhandledSends(
   machine: VizMachine,
@@ -101,34 +86,6 @@ export function unhandledSends(
       .filter((event) => !handled.has(event))
       .map((event) => ({ effect: effect.name, event })),
   );
-}
-
-/** One step as text for a URL: the edge id, plus `~target` when the edge has no single target. */
-export function encodeStep(machine: VizMachine, step: ExploreStep): string {
-  const edge = machine.edges.find((each) => each.id === step.edge);
-  return edge !== undefined && edge.to === null && edge.kind !== "stay"
-    ? `${step.edge}~${step.to}`
-    : step.edge;
-}
-
-/**
- * Rebuild a path from encoded steps (e.g. `?step=` in a shared link). Stops at
- * the first step the graph does not allow from where the path has got to, so
- * a link from an older document still opens at its last valid point.
- */
-export function decodePath(machine: VizMachine, encoded: ReadonlyArray<string>): ExploreStep[] {
-  const path: ExploreStep[] = [];
-  for (const text of encoded) {
-    const cut = text.lastIndexOf("~");
-    const edgeId = cut === -1 ? text : text.slice(0, cut);
-    const from = stateAfter(machine, path);
-    const move =
-      from === null ? undefined : movesFrom(machine, from).find((each) => each.edge.id === edgeId);
-    const to = cut === -1 && move?.targets.length === 1 ? move.targets[0] : text.slice(cut + 1);
-    if (move === undefined || to === undefined || !move.targets.includes(to)) break;
-    path.push({ edge: edgeId, to });
-  }
-  return path;
 }
 
 /**

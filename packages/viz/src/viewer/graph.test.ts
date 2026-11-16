@@ -148,7 +148,7 @@ describe("renderGraph transition label", () => {
     for (const span of spans) expect(Number(span.getAttribute("x"))).toBe(placed?.text.x);
     expect(Number(text?.getAttribute("y"))).toBe((placed?.text.y ?? 0) + 4);
     expect(placed?.text.x).toBe((placed?.label.x ?? 0) + LOCK_SLOT / 2);
-    markExplore(root, { machine: go, path: [], blocked: new Map([["idle-submitWWW-busy", "no"]]) });
+    markExplore(root, { machine: go, blocked: new Map([["idle-submitWWW-busy", "no"]]) });
     const lock = Number(root.querySelector(".blocked-lock rect")?.getAttribute("x"));
     const textLeft = (placed?.text.x ?? 0) - textWidth("submitWWW") / 2;
     const boxLeft = (placed?.label.x ?? 0) - (placed?.label.width ?? 0) / 2;

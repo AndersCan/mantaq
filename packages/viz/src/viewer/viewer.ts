@@ -16,15 +16,7 @@ import { html } from "./dom.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
 import { renderPanel } from "./panel.ts";
-import {
-  decodeLiveSteps,
-  decodePath,
-  encodeLiveStep,
-  encodeStep,
-  movesFrom,
-  stateAfter,
-} from "../moves.ts";
-import type { ExploreStep } from "../moves.ts";
+import { decodeLiveSteps, encodeLiveStep, movesFrom } from "../moves.ts";
 import { button, code, explorePanel, markExplore, outcomeText, sentEventLine } from "./explore.ts";
 import type { ExploreContext, ExploreParts, SentEvent } from "./explore.ts";
 import { pathTo } from "../findings.ts";
@@ -38,8 +30,6 @@ import type { Tab } from "./tabs.ts";
 interface ViewState {
   machineId: string;
   selection: Selection | null;
-  /** Steps taken from the initial state. */
-  path: ExploreStep[];
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
@@ -94,7 +84,7 @@ export interface ViewerOptions {
   heading?: "h1" | "h2" | "h3";
   /** Machine to show first; defaults to the first one. */
   machine?: string;
-  /** Encoded steps to open on (from `?step=`), in the shown machine. With a `driver`, live steps replayed through it. */
+  /** Live steps (from `?step=`) replayed through `driver`; ignored without one. */
   steps?: ReadonlyArray<string>;
   /**
    * Runs the machine for real: steps go to the driver and the cursor follows its state.
@@ -116,8 +106,8 @@ export interface ViewerOptions {
 }
 
 /**
- * Mount a viewer for an viz document into `root`. Walking the graph moves a
- * cursor over the drawn edges; no actor runs. The document is the only input.
+ * Mount a viewer for an viz document into `root`. With a `driver` the walk runs
+ * the real actor; without one the viewer draws the diagram and Details only.
  */
 export function mountViewer(
   root: HTMLElement,
@@ -158,8 +148,6 @@ export function mountViewer(
       dropGonePick(view);
       const stepTab = explorePanel(doc, {
         machine,
-        path: view.path,
-        take,
         rewind,
         ...liveOf(view, { send, sendEvent, setValue, routes: options.routes }),
       });
@@ -167,7 +155,7 @@ export function mountViewer(
         machine,
         view,
         select: showDetails,
-        send: sendFor({ root, doc, machine, view, driver }, { sendEvent, take }),
+        send: sendFor({ root, doc, machine, view, driver }, { sendEvent }),
       });
       const screen = screenOf(doc, options, { machine, view, driver });
       panel.replaceChildren(panelTabs(doc, { view, parts: stepTab, details, screen, refresh }));
@@ -191,10 +179,6 @@ export function mountViewer(
         payload: step.payload,
         ...(edge === undefined ? {} : { edge }),
       });
-    };
-    const take = (step: ExploreStep, sent?: ViewState["sent"]) => {
-      view.path = [...view.path, step];
-      walked(sent);
     };
     const rewind = (length: number) => {
       rewindView(view, driver, length);
@@ -244,7 +228,7 @@ function detailsOf(
   });
 }
 
-/** The selected arrow's Send: live, one button when its source is current; blocked, the reason; walking, a button per target. */
+/** The selected arrow's Send: one button when its source is current; blocked, the reason; no driver, none. */
 function sendFor(
   from: {
     root: HTMLElement;
@@ -255,13 +239,11 @@ function sendFor(
   },
   handlers: {
     sendEvent: (event: string, actor?: VizActorRef, edge?: string) => void;
-    take: (step: ExploreStep, sent?: ViewState["sent"]) => void;
   },
 ): (edge: VizEdge) => HTMLElement | null {
   const { doc, machine, view } = from;
   return (edge) => {
-    if (view.live === null)
-      return walkingSend(doc, { root: from.root, machine, view, edge, take: handlers.take });
+    if (view.live === null) return null;
     updateBlocked(machine, view, from.driver);
     const reason = view.blocked.get(edge.id);
     if (reason !== undefined) {
@@ -303,7 +285,7 @@ function sentHere(
   return html(doc, "div", {}, [line, sendButton]);
 }
 
-/** Where the last Send went: the driver's outcome live, `from → to` walking. */
+/** Where the last Send went: the driver's outcome. */
 function sentOutcome(
   doc: Document,
   machine: VizMachine,
@@ -318,56 +300,13 @@ function sentOutcome(
     const tail = moved ? [": ", ...text.slice(-1)] : [": ", ...text];
     return last.error === null ? tail : [...tail, `. It threw: ${last.error}`];
   }
-  const to = view.path.at(-1)?.to;
-  const before = stateAfter(machine, view.path.slice(0, -1));
-  return to === undefined || before === null ? null : [`: ${before} → ${to}`];
+  return null;
 }
 
 /** The Send button goes once pressed; focus moves to the selected arrow so keyboard users keep their place. */
 function focusEdge(root: HTMLElement, id: string): void {
   const edges = [...root.querySelectorAll<SVGElement>("g[data-edge-id]")];
   edges.find((each) => each.getAttribute("data-edge-id") === id)?.focus({ preventScroll: true });
-}
-
-function walkingSend(
-  doc: Document,
-  context: {
-    root: HTMLElement;
-    machine: VizMachine;
-    view: ViewState;
-    edge: VizEdge;
-    take: (step: ExploreStep, sent?: ViewState["sent"]) => void;
-  },
-): HTMLElement | null {
-  const { machine, view, edge } = context;
-  const current = stateAfter(machine, view.path);
-  if (current === null) return null;
-  const move = movesFrom(machine, current).find((each) => each.edge.id === edge.id);
-  if (move === undefined || move.targets.length === 0) {
-    return sentHere(doc, { machine, view, edge }, null);
-  }
-  const several = move.targets.length > 1;
-  return sentHere(
-    doc,
-    { machine, view, edge },
-    html(
-      doc,
-      "div",
-      {},
-      move.targets.map((to) =>
-        button(doc, ["Send ", code(doc, edge.event), ...(several ? [` → ${to}`] : [])], {
-          onClick: () => {
-            context.take(
-              { edge: edge.id, to },
-              { event: edge.event, payload: null, edge: edge.id },
-            );
-            focusEdge(context.root, edge.id);
-          },
-          attrs: { "data-send-edge": edge.id, "data-target": to },
-        }),
-      ),
-    ),
-  );
 }
 
 /** Everything the viewer draws under its root: the controls and panel, or with Diagram only just the canvas. */
@@ -399,7 +338,6 @@ function rewindView(view: ViewState, driver: VizDriver | undefined, length: numb
   const keep = Math.max(0, length);
   if (driver !== undefined && view.live !== null)
     replayInto(view, driver, view.live.steps.slice(0, keep));
-  else view.path = view.path.slice(0, keep);
 }
 
 function screenOf(
@@ -440,10 +378,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
   return {
     machineId: machine?.id ?? "",
     selection: null,
-    path:
-      machine === undefined || options.driver !== undefined
-        ? []
-        : decodePath(machine, options.steps ?? []),
     live: null,
     afters: [],
     previous: undefined,
@@ -515,7 +449,7 @@ function panelTabs(
     context.screen === undefined
       ? null
       : { id: "screen", label: "Screen", content: html(doc, "div", {}, [context.screen]) },
-    { id: "step", label: "Step", content: parts.step },
+    parts.step === null ? null : { id: "step", label: "Step", content: parts.step },
     parts.context === null
       ? null
       : {
@@ -526,7 +460,7 @@ function panelTabs(
     { id: "details", label: "Details", content: context.details },
   ];
   const shown = all.filter((tab): tab is Tab<PanelTab> => tab !== null);
-  const active = shown.some((tab) => tab.id === view.tab) ? view.tab : "step";
+  const active = shown.find((tab) => tab.id === view.tab)?.id ?? shown[0]?.id ?? "details";
   return tabs(doc, {
     tabs: shown,
     active,
@@ -646,9 +580,7 @@ function eventStep(
 }
 
 function walkedSteps(machine: VizMachine, view: ViewState): string[] {
-  return view.live === null
-    ? view.path.map((step) => encodeStep(machine, step))
-    : view.live.steps.map(encodeLiveStep);
+  return view.live === null ? [] : view.live.steps.map(encodeLiveStep);
 }
 
 /** Takes one live step: the context before it becomes `previous`, and an open payload form closes. */
@@ -727,7 +659,6 @@ function headerOf(doc: Document, context: Chrome): HTMLElement {
           onChange: (id) => {
             view.machineId = id;
             view.selection = null;
-            view.path = [];
             view.notice = null;
             context.onNavigate?.({ machine: id, steps: [], values: encodeValues(view.values) });
             render();
@@ -776,7 +707,7 @@ function markDiagram(
 ): void {
   const { machine, view } = context;
   updateBlocked(machine, view, context.driver);
-  markExplore(root, { machine, path: view.path, blocked: view.blocked, ...liveState(view) });
+  markExplore(root, { machine, blocked: view.blocked, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>(".graph");
   if (graph !== null && view.live !== null) {
     drawChildMarkers(graph, {

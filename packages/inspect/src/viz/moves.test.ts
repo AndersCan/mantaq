@@ -1,7 +1,7 @@
 import { toVizMachine } from "../structure.ts";
 import { createCheckoutActor } from "../fixtures/checkout.ts";
 import { createSagaActor } from "../fixtures/saga.ts";
-import { decodePath, encodeStep, movesFrom, stateAfter, unhandledSends } from "@mantaq/viz";
+import { movesFrom, unhandledSends } from "@mantaq/viz";
 import type { VizMachine } from "@mantaq/viz";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -76,17 +76,5 @@ describe("unhandledSends", () => {
     expect(unhandledSends(extra, "submitting")).toEqual([
       { effect: "chargeCard", event: "refund" },
     ]);
-  });
-});
-
-describe("paths", () => {
-  test("encode and decode round-trip; stateAfter follows the last step", () => {
-    const machine = checkout();
-    const first = movesFrom(machine, "basicInfo")[0];
-    const step = { edge: first?.edge.id ?? "", to: first?.targets[0] ?? "" };
-    expect(stateAfter(machine, [])).toBe("basicInfo");
-    expect(stateAfter(machine, [step])).toBe("shippingAddress");
-    expect(encodeStep(machine, step)).toBe(step.edge);
-    expect(decodePath(machine, [encodeStep(machine, step)])).toEqual([step]);
   });
 });

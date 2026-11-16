@@ -37,9 +37,7 @@ On the live page every event has a Send button in the Step tab. Effects do not r
 
 A final state ends the walk. **Back** and **Reset** undo steps. `?machine=checkout&run=<name>` opens a recorded run by name; use it for links in docs and issues.
 
-A static walk follows declarations: guards are not evaluated, so a path may not happen at runtime. On the live page (the Vite plugin), each step runs the real actor, so guards are evaluated.
-
-An edge with an unknown target (dashed, orange) offers each target its handler explanation names. Without an explanation it cannot be taken.
+On the live page (the Vite plugin) each step runs the real actor, so guards are evaluated.
 
 ### Nodes
 

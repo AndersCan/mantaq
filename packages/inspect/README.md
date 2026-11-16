@@ -30,7 +30,7 @@ export default defineConfig({
 
 Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the export name without `create` / `Actor` (`createCheckoutActor` → `checkout`).
 
-The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines fall back to the static walk.
+The live page runs the real actor, so it needs an exported factory on a `VirtualClock`; instance or `RealClock` machines show the diagram and Details, with no Send.
 
 Effects do not run on the live page: the driver holds them and the panel asks what each one reports. The initial state's effects are the exception (core runs them while the actor is built). `createDriver(target, { effectMode: "real" })` from `@mantaq/inspect/drive` runs them.
 
@@ -68,7 +68,7 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 - **What fails the build.** An empty `machines`, a missing file, a file that cannot load, two files exporting the same machine id, a `src` that is not in `machines`, and a file with no exported actor. Design findings do not fail the build by default and the page does not show them; the design gate in your tests reports them. Pass `failOnFindings: true` and `astro build` fails on any design finding, a machine that could not be fuzzed, an expectation that is not checked, or a recorded run that does not replay, listing each with the events that lead there; `astro dev` is unchanged.
 - **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations, timeLimitMs }` (see the Vite options). Default: seeded, up to 2000 iterations (stops early at full coverage), no time limit, so builds are reproducible.
 - **Running effects.** By default the live panel holds each effect and asks what it reports. `runEffects` runs that diagram's effects in the reader's browser; timers still wait for the time buttons. Use it for machines whose effects only use the clock.
-- Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the static walk.
+- Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the diagram and Details, with no Send.
 
 **Overview of all machines.** `<Machines pages={...} />` draws every machine given to `mantaqViz` as a box. An arrow goes from A to B labelled `e` when `e` is in A's declared `outputs` and B handles `e` as an input. It is also drawn when app code that listens to A (`onOutput(a, ...)`, `a.on("output" | "change", ...)`) can send an event to B, labelled `trigger → event` and listed under the diagram with the line that sends. Calls are followed two levels deep. Test files are skipped. A machine is drawn dashed, and listed under the diagram, when no app code uses its factory. App code is the files of the machine's tsconfig except test files. A call, or passing the factory as a value, counts. A machine exported only as an actor instance always counts as run.
 
@@ -143,7 +143,7 @@ astro build && mantaq-check-site dist --base /docs
 - **Exports.** An actor, or a function that returns one (or `{ actor }`). Functions are called with no arguments, with a `VirtualClock` when the first parameter is a clock, or with `{ clock }` when it is an options object with a `clock`. Functions with other required parameters are skipped. Discovery reads types only; nothing is called to find out.
 - **A fresh actor per call**, to fuzz. A file that only exports one actor instance is drawn, not fuzzed. When a file has factories, its actor instances are skipped.
 - **Exported factories.** Export a factory that takes ports and a clock, not only a built instance. See [Machines in an application](https://anderscan.github.io/mantaq/guides/machines-in-an-app/).
-- **A factory, for the live page.** The page recreates the actor on every step, so it needs an exported factory; a file that only exports an instance stays a static walk, with the usual warning.
+- **A factory, for the live page.** The page recreates the actor on every step, so it needs an exported factory; a file that only exports an instance shows the diagram and Details, with no Send, and the usual warning.
 - **Expectations, optional.** Export `<machine id>Expectations` (type `Expectations<typeof createXActor>`) with `neverSee` and `mustSee` contexts per state. Fuzzing reports a never-see that was reached, and a must-see that no run reached. See [Design gate](https://anderscan.github.io/mantaq/guides/design-gate/).
 - **A `VirtualClock`**, to fuzz. An actor on the real clock is drawn, with a warning.
 

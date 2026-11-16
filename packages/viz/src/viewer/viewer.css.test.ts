@@ -31,7 +31,7 @@ test("a clicked item is teal and stays teal over the walk colours", () => {
 });
 
 test("the active state, and running edge use the accent", () => {
-  expect(listed(".viz .taken path")).toMatch(/stroke:\s*var\(--accent\)/);
+  expect(listed(".viz .current .frame")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz .running path")).toMatch(/stroke:\s*var\(--accent\)/);
 });
 
