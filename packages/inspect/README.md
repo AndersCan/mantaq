@@ -62,10 +62,10 @@ import Machine from "@mantaq/inspect/astro/Machine.astro";
 <Machine src="src/machines/checkout.ts" />
 ```
 
-`astro build` writes, per `<Machine>`, a one-line count of design findings, then the diagram with the live panel. Each state with a finding (unreachable, a handler that throws under fuzzing, an effect sending an event nobody handles) carries a ! mark; click it to read the finding and replay the path. `?machine=<id>&step=` walks work as on the Vite page. `?machine=<id>&run=<name>` opens a recorded run by name; use it for links in docs and issues. Repeat `machine=` (`?machine=a&machine=b&run=<name>`) to open the run of that name in each named machine's viewer on the page, for example both people's sides of one story; viewers holding none of them are left alone.
+`astro build` writes, per `<Machine>`, the diagram with the live panel. `?machine=<id>&step=` walks work as on the Vite page. `?machine=<id>&run=<name>` opens a recorded run by name; use it for links in docs and issues. Repeat `machine=` (`?machine=a&machine=b&run=<name>`) to open the run of that name in each named machine's viewer on the page, for example both people's sides of one story; viewers holding none of them are left alone.
 
 - **Two lists.** A file is named twice: in `machines` (paths, not globs; relative to the Astro root or absolute) and in the page's `src`. The browser script is built before pages render, so it cannot learn the list from the pages.
-- **What fails the build.** An empty `machines`, a missing file, a file that cannot load, two files exporting the same machine id, a `src` that is not in `machines`, and a file with no exported actor. Design findings do not fail the build by default; they show on the page. Pass `failOnFindings: true` and `astro build` fails on any design finding, a machine that could not be fuzzed, an expectation that is not checked, or a recorded run that does not replay, listing each with the events that lead there; `astro dev` is unchanged.
+- **What fails the build.** An empty `machines`, a missing file, a file that cannot load, two files exporting the same machine id, a `src` that is not in `machines`, and a file with no exported actor. Design findings do not fail the build by default and the page does not show them; the design gate in your tests reports them. Pass `failOnFindings: true` and `astro build` fails on any design finding, a machine that could not be fuzzed, an expectation that is not checked, or a recorded run that does not replay, listing each with the events that lead there; `astro dev` is unchanged.
 - **Options.** `fuzz`: `false` for structure only, or `{ seed, iterations, timeLimitMs }` (see the Vite options). Default: seeded, up to 2000 iterations (stops early at full coverage), no time limit, so builds are reproducible.
 - **Running effects.** By default the live panel holds each effect and asks what it reports. `runEffects` runs that diagram's effects in the reader's browser; timers still wait for the time buttons. Use it for machines whose effects only use the clock.
 - Needs `astro` `^7` (optional peer). The live panel needs the same exported factory on a `VirtualClock` as the Vite page; other machines show the static walk.
@@ -148,14 +148,6 @@ astro build && mantaq-check-site dist --base /docs
 - **A `VirtualClock`**, to fuzz. An actor on the real clock is drawn, with a warning.
 
 Every part that cannot run is skipped with a warning, never guessed.
-
-## Coverage: two sources, two questions
-
-The viewer's "Coverage from" picker in the Controls tab dims elements with zero hits. What dimmed means depends on the source:
-
-- **examples + fuzz** (`reached`): neither an example nor fuzzing reached this. The default when both sources are present, and the same merge `expectReached` uses. Fix a miss by adding an example to `tests`.
-- **example tests** (`tested`): no test exercises this. Collected by replaying the named runs you pass as `tests`, each on a fresh actor.
-- **fuzz runs** (`coverage`): no fuzz run produced this. Fuzzing reaches almost everything, so little is dimmed. What does stay dimmed is usually a **declared but unreached edge**: the handler lists the target in `to`, but its guards may never allow it. Saga's `compensatingRefund -REFUND_DONE-> failed` is an example. The edge panel calls these out. Fuzzing is not proof, so check the handler.
 
 ## How each tool works
 

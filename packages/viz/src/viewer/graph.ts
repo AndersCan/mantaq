@@ -1,10 +1,5 @@
-import { machineFindings } from "../findings.ts";
-import type { VizFinding } from "../findings.ts";
 import { isAnyState } from "../schema.ts";
-import { movesFrom } from "../moves.ts";
-import type { VizCoverage, VizEdge, VizMachine } from "../schema.ts";
-import { measure } from "./coverage-mode.ts";
-import type { CoverageMode } from "./coverage-mode.ts";
+import type { VizEdge, VizMachine } from "../schema.ts";
 import { activatable, html, svg } from "./dom.ts";
 import { edgeCondition, edgeLines, edgeText } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
@@ -17,20 +12,10 @@ export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: stri
 
 export interface GraphCallbacks {
   select(selection: Selection): void;
-  /** Show the details of a selection without taking a step. */
-  showDetails(selection: Selection, options?: { findings: boolean }): void;
-  /** Coverage source the overlay dims by. */
-  mode: CoverageMode;
-  /** Draw only state names, effect names and arrow labels: no finding marks, no "?" hints. */
-  bare?: boolean;
 }
 
 function sourceText(from: string): string {
   return isAnyState(from) ? "any state" : from;
-}
-
-function isUnreached(coverage: VizCoverage | null): boolean {
-  return coverage !== null && coverage.hits === 0;
 }
 
 function classes(names: Record<string, boolean>): string {
@@ -99,7 +84,7 @@ function regionGroup(doc: Document, placed: PlacedRegion, isMap: boolean): SVGGE
   );
 }
 
-function chipGroups(doc: Document, placed: PlacedState, bare: boolean): SVGGElement[] {
+function chipGroups(doc: Document, placed: PlacedState): SVGGElement[] {
   return placed.state.effects.map((effect, index) => {
     const box = placed.chips[index] ?? placed;
     const width = box.width;
@@ -112,74 +97,17 @@ function chipGroups(doc: Document, placed: PlacedState, bare: boolean): SVGGElem
         "data-effect": effect.name,
         "data-state": placed.state.id,
         tabindex: 0,
-        "aria-label":
-          effect.sends === null
-            ? `effect ${effect.name} (declare sends to see links)`
-            : `effect ${effect.name}`,
+        "aria-label": `effect ${effect.name}`,
       },
       [
         svg(doc, "rect", { x: box.x - width / 2, y, width, height: box.height, rx: 8 }),
         svg(doc, "text", { x: box.x, y: box.y + 4, "text-anchor": "middle" }, [effect.name]),
-        effect.sends === null && !bare
-          ? svg(
-              doc,
-              "text",
-              { class: "hint", x: box.x + width / 2 - 8, y: box.y + 4, "text-anchor": "middle" },
-              ["?", svg(doc, "title", {}, ["declare `sends` to see links"])],
-            )
-          : null,
       ],
     );
   });
 }
 
-function findingMark(
-  doc: Document,
-  placed: PlacedState,
-  context: { findings: ReadonlyArray<VizFinding>; callbacks: GraphCallbacks },
-): SVGGElement {
-  const { findings, callbacks } = context;
-  const id = placed.state.id;
-  const cx = placed.x + placed.width / 2 - 2;
-  const cy = placed.y - placed.height / 2 + 2;
-  const titles = findings.map((finding) => finding.title).join("; ");
-  const noun = findings.length === 1 ? "finding" : "findings";
-  const mark = svg(
-    doc,
-    "g",
-    {
-      class: "finding-mark",
-      "data-finding-count": findings.length,
-      "data-state": id,
-      tabindex: 0,
-      role: "button",
-      "aria-label": `${findings.length} ${noun} on ${id}: ${titles}`,
-    },
-    [
-      svg(doc, "circle", { cx, cy, r: 8 }),
-      svg(doc, "text", { x: cx, y: cy + 4, "text-anchor": "middle" }, ["!"]),
-    ],
-  );
-  const open = () => callbacks.showDetails({ kind: "state", id }, { findings: true });
-  mark.addEventListener("click", (event) => {
-    event.stopPropagation();
-    open();
-  });
-  mark.addEventListener("keydown", (event) => {
-    if (!("key" in event) || (event.key !== "Enter" && event.key !== " ")) return;
-    event.preventDefault();
-    event.stopPropagation();
-    open();
-  });
-  return mark;
-}
-
-function stateGroup(
-  doc: Document,
-  placed: PlacedState,
-  context: { callbacks: GraphCallbacks; findings: ReadonlyArray<VizFinding> },
-): SVGGElement {
-  const { callbacks, findings } = context;
+function stateGroup(doc: Document, placed: PlacedState, callbacks: GraphCallbacks): SVGGElement {
   const { state } = placed;
   const left = placed.x - placed.width / 2;
   const top = placed.y - placed.height / 2;
@@ -192,7 +120,6 @@ function stateGroup(
         state: true,
         initial: state.initial,
         final: state.final,
-        unreached: isUnreached(measure(callbacks.mode, state)),
       }),
       "data-node-id": state.id,
       "aria-label": `state ${state.id}${state.final ? " (final)" : ""}`,
@@ -212,7 +139,7 @@ function stateGroup(
       svg(doc, "text", { x: placed.label.x, y: placed.label.y + 4, "text-anchor": "middle" }, [
         state.label,
       ]),
-      ...chipGroups(doc, placed, callbacks.bare === true),
+      ...chipGroups(doc, placed),
       placed.workers === undefined
         ? null
         : svg(doc, "rect", {
@@ -223,9 +150,6 @@ function stateGroup(
             width: placed.workers.width,
             height: placed.workers.height,
           }),
-      findings.length === 0 || callbacks.bare === true
-        ? null
-        : findingMark(doc, placed, { findings, callbacks }),
     ],
   );
   activatable(group, () => callbacks.select({ kind: "state", id: state.id }));
@@ -269,12 +193,9 @@ function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
 function nodeGroup(
   doc: Document,
   node: PlacedState | PlacedUnknown | PlacedAny,
-  context: { callbacks: GraphCallbacks; findings: ReadonlyMap<string, VizFinding[]> },
+  callbacks: GraphCallbacks,
 ): SVGGElement {
-  if (node.kind === "state") {
-    const findings = context.findings.get(node.state.id) ?? [];
-    return stateGroup(doc, node, { callbacks: context.callbacks, findings });
-  }
+  if (node.kind === "state") return stateGroup(doc, node, callbacks);
   return node.kind === "any" ? anyGroup(doc, node) : unknownGroup(doc, node);
 }
 
@@ -327,7 +248,6 @@ function edgeGroup(
         fuzz: edge.origin === "fuzz",
         undetermined: edge.to === null,
         internal: internal === true,
-        unreached: isUnreached(measure(context.callbacks.mode, edge)),
       }),
       "data-edge-id": edge.id,
       "data-from": edge.from,
@@ -361,62 +281,6 @@ function entryArrow(doc: Document, entry: { from: Point; to: Point }): SVGGEleme
   ]);
 }
 
-/** Toggle `highlight` on an edge and both of its endpoints while hovered. */
-function wireHover(root: SVGSVGElement): void {
-  for (const edge of root.querySelectorAll<SVGGElement>(".edge")) {
-    const ends = new Set([edge.dataset["from"], edge.dataset["to"]]);
-    const endpoints = () =>
-      [...root.querySelectorAll<SVGGElement>("[data-node-id]")].filter((node) =>
-        ends.has(node.dataset["nodeId"]),
-      );
-    edge.addEventListener("mouseenter", () => {
-      for (const element of [edge, ...endpoints()]) element.classList.add("highlight");
-    });
-    edge.addEventListener("mouseleave", () => {
-      for (const element of [edge, ...endpoints()]) element.classList.remove("highlight");
-    });
-  }
-}
-
-/** Edges a chip's effect sends, including `onAny` handlers, by edge id. */
-function sentEdges(root: SVGSVGElement, machine: VizMachine, chip: SVGGElement): SVGGElement[] {
-  const effect = chip.dataset["effect"] ?? "";
-  const ids = new Set(
-    movesFrom(machine, chip.dataset["state"] ?? "")
-      .filter((move) => move.sentBy.includes(effect))
-      .map((move) => move.edge.id),
-  );
-  return [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
-    ids.has(edge.dataset["edgeId"] ?? ""),
-  );
-}
-
-/** Hovering or focusing a chip highlights the edges for its `sends` and dims the rest. */
-function wireChips(root: SVGSVGElement, doc: Document, machine: VizMachine): void {
-  const emitters = new Map<SVGGElement, string[]>();
-  for (const chip of root.querySelectorAll<SVGGElement>(".chip")) {
-    const edges = sentEdges(root, machine, chip);
-    const effect = chip.dataset["effect"] ?? "";
-    for (const edge of edges) emitters.set(edge, [...(emitters.get(edge) ?? []), effect]);
-    const on = () => {
-      if (edges.length === 0) return;
-      root.classList.add("chip-active");
-      for (const edge of edges) edge.classList.add("sent");
-    };
-    const off = () => {
-      root.classList.remove("chip-active");
-      for (const edge of edges) edge.classList.remove("sent");
-    };
-    chip.addEventListener("mouseenter", on);
-    chip.addEventListener("mouseleave", off);
-    chip.addEventListener("focusin", on);
-    chip.addEventListener("focusout", off);
-  }
-  for (const [edge, names] of emitters) {
-    edge.prepend(svg(doc, "title", {}, [`emitted by ${names.join(", ")}`]));
-  }
-}
-
 /** Label size in viewBox units (`.graph text`). */
 const LABEL_UNITS = 12;
 
@@ -446,11 +310,6 @@ export function renderGraph(
     return html(doc, "p", { class: "load-error", role: "alert" }, [`Cannot draw ${machine.id}.`]);
   }
   const placed = layout[1];
-  const findings = new Map<string, VizFinding[]>();
-  for (const finding of machineFindings(machine)) {
-    if (finding.state === null || finding.note) continue;
-    findings.set(finding.state, [...(findings.get(finding.state) ?? []), finding]);
-  }
   const root = svg(
     doc,
     "svg",
@@ -471,10 +330,8 @@ export function renderGraph(
       ),
       ...placed.edges.map((edge) => edgeGroup(doc, edge, { machine, callbacks })),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
-      ...placed.nodes.map((node) => nodeGroup(doc, node, { callbacks, findings })),
+      ...placed.nodes.map((node) => nodeGroup(doc, node, callbacks)),
     ],
   );
-  wireHover(root);
-  wireChips(root, doc, machine);
   return root;
 }

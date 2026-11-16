@@ -13,7 +13,7 @@
  * Throwing in the hook and in the component frontmatter is Astro's failure
  * channel: it stops the build and prints the message.
  */
-import { machineFindings, serializeViz } from "@mantaq/viz";
+import { serializeViz } from "@mantaq/viz";
 import type { VizMachine } from "@mantaq/viz";
 import type { AstroIntegration } from "astro";
 import type { Plugin } from "vite";
@@ -126,18 +126,6 @@ async function documentsSource(
     documents[file] = {
       text: serializeViz(vizDocument(loaded.machines)),
       machines: loaded.machines.map((machine) => machine.id),
-      findings: loaded.machines.flatMap((machine) =>
-        machineFindings(machine).map((f) => ({
-          machine: machine.id,
-          kind: f.kind,
-          state: f.state,
-          event: f.event,
-          note: f.note,
-          title: f.title,
-          message: f.message,
-        })),
-      ),
-      fuzzed: context.fuzz !== false,
     };
   }
   if (context.failOnFindings === true) {

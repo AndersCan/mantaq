@@ -15,8 +15,6 @@ import { currentsOf, walkedChild } from "./compartments.ts";
 import { html } from "./dom.ts";
 import { renderGraph } from "./graph.ts";
 import type { Selection } from "./graph.ts";
-import { availableModes, modeLabel } from "./coverage-mode.ts";
-import type { CoverageMode } from "./coverage-mode.ts";
 import { renderPanel } from "./panel.ts";
 import {
   decodeLiveSteps,
@@ -36,13 +34,9 @@ import { drawChildMarkers } from "./markers.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
-const DOCS_URL = "https://anderscan.github.io/mantaq/guides/visualizer/";
-
 interface ViewState {
   machineId: string;
   selection: Selection | null;
-  /** null = use the machine's best available mode. */
-  coverage: CoverageMode | null;
   /** Steps taken from the initial state. */
   path: ExploreStep[];
   /** Set while a driver runs the actor. */
@@ -73,14 +67,7 @@ interface ViewState {
   blockedFor: { live: VizLiveState; picked: ViewState["picked"]; values: Values } | null;
 }
 
-type PanelTab = "screen" | "step" | "context" | "path" | "details" | "controls";
-
-function effectiveMode(view: ViewState, machine: VizMachine): CoverageMode {
-  const modes = availableModes(machine);
-  if (view.coverage === "off") return "off";
-  if (view.coverage !== null && modes.includes(view.coverage)) return view.coverage;
-  return modes[0] ?? "off";
-}
+type PanelTab = "screen" | "step" | "context" | "path" | "details";
 
 function machineSelect(
   doc: Document,
@@ -103,32 +90,6 @@ function machineSelect(
   );
   select.addEventListener("change", () => context.onChange(select.value));
   return html(doc, "label", {}, ["Machine ", select]);
-}
-
-function isMode(value: string): value is CoverageMode {
-  return value === "off" || value === "run" || value === "tests" || value === "reached";
-}
-
-function coveragePicker(
-  doc: Document,
-  context: { machine: VizMachine; mode: CoverageMode; onChange: (mode: CoverageMode) => void },
-): HTMLLabelElement | null {
-  const modes = availableModes(context.machine);
-  if (modes.length === 0) return null;
-  const select = html(
-    doc,
-    "select",
-    { class: "coverage-mode" },
-    [...modes, "off" as const].map((mode) =>
-      html(doc, "option", { value: mode, selected: mode === context.mode ? "" : null }, [
-        modeLabel(mode, context.machine),
-      ]),
-    ),
-  );
-  select.addEventListener("change", () => {
-    if (isMode(select.value)) context.onChange(select.value);
-  });
-  return html(doc, "label", {}, ["Coverage from ", select]);
 }
 
 export interface ViewerOptions {
@@ -181,11 +142,16 @@ export function mountViewer(
   const view = initialView(first, options);
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
-  let back: () => void = () => undefined;
   let redraw: () => void = () => undefined;
-  listenOnRoot(root, { back: () => back() });
   watchDriver(view, { driver, redraw: () => redraw() });
-  const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
+  function showControls(): void {
+    view.diagramOnly = false;
+    view.tab = "step";
+    render();
+    root
+      .querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+      ?.focus({ preventScroll: true });
+  }
   function render(): void {
     const machine = viz.machines.find((candidate) => candidate.id === view.machineId);
     root.replaceChildren();
@@ -194,12 +160,10 @@ export function mountViewer(
       root.append(html(doc, "p", { class: "empty" }, ["Document has no machines."]));
       return;
     }
-    const mode = effectiveMode(view, machine);
-    root.classList.toggle("coverage-on", mode !== "off");
     root.classList.toggle("diagram-only", view.diagramOnly);
     const chrome = chromeOf(
       { root, viz, machine, view, options },
-      { mode, render, setDiagramOnly, live: driver !== undefined },
+      { render, showControls, live: driver !== undefined },
     );
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
@@ -216,13 +180,11 @@ export function mountViewer(
         machine,
         view,
         select: showDetails,
-        replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
         send: sendFor({ root, doc, machine, view, driver }, { sendEvent, take }),
       });
-      const controls = controlsOf(doc, chrome);
       const footer = options.panelFooter;
       const screen = screenOf(options, view);
-      fillPanel(panel, { doc, view, parts: stepTab, details, controls, screen, refresh, footer });
+      fillPanel(panel, { doc, view, parts: stepTab, details, screen, refresh, footer });
       mark();
     };
     const mark = () => markDiagram(root, { machine, view, driver, pick: () => refresh() });
@@ -251,14 +213,12 @@ export function mountViewer(
       rewindView(view, driver, length);
       walked();
     };
-    const showDetails = detailsShower({ view, panel, refresh });
-    const graph = renderGraph(doc, machine, {
-      select: showDetails,
-      showDetails,
-      mode,
-      bare: view.diagramOnly,
-    });
-    back = () => rewind((view.live?.steps.length ?? view.path.length) - 1);
+    const showDetails = (selection: Selection) => {
+      view.selection = selection;
+      view.tab = "details";
+      refresh();
+    };
+    const graph = renderGraph(doc, machine, { select: showDetails });
     root.append(...layoutOf(doc, { chrome, graph, panel }));
     refresh();
   }
@@ -274,7 +234,7 @@ function chromeOf(
     view: ViewState;
     options: ViewerOptions;
   },
-  rest: Pick<Chrome, "mode" | "render" | "setDiagramOnly" | "live">,
+  rest: Pick<Chrome, "render" | "showControls" | "live">,
 ): Chrome {
   const { options, ...shared } = from;
   return { ...shared, ...rest, heading: options.heading ?? "h1", onNavigate: options.onNavigate };
@@ -287,14 +247,12 @@ function detailsOf(
     machine: VizMachine;
     view: ViewState;
     select: (selection: Selection) => void;
-    replay: Parameters<typeof renderPanel>[2]["replay"];
     send: Parameters<typeof renderPanel>[2]["send"];
   },
 ): HTMLElement {
   return renderPanel(doc, context.machine, {
     selection: context.view.selection,
     select: context.select,
-    replay: context.replay,
     send: context.send,
   });
 }
@@ -377,27 +335,6 @@ function walkingSend(
   );
 }
 
-/** Turns Diagram only on or off (Show controls opens the Step tab when the page asked for Diagram only, else Controls), then puts focus on the Step tab or the button that undoes it. */
-function diagramOnlySwitch(
-  root: HTMLElement,
-  view: ViewState,
-  render: () => void,
-  fromOption: boolean | undefined,
-): (on: boolean) => void {
-  return (on) => {
-    view.diagramOnly = on;
-    const toStep = !on && fromOption === true;
-    if (!on) view.tab = toStep ? "step" : "controls";
-    render();
-    const target = on
-      ? "[data-show-controls]"
-      : toStep
-        ? '[role="tab"][aria-selected="true"]'
-        : "[data-diagram-only]";
-    root.querySelector<HTMLElement>(target)?.focus({ preventScroll: true });
-  };
-}
-
 /** Everything the viewer draws under its root: the controls and panel, or with Diagram only just the canvas. */
 function layoutOf(
   doc: Document,
@@ -419,7 +356,7 @@ function layoutOf(
   }
   const show = html(doc, "button", { type: "button", class: "show-controls" }, ["Show controls"]);
   show.setAttribute("data-show-controls", "");
-  show.addEventListener("click", () => chrome.setDiagramOnly(false));
+  show.addEventListener("click", () => chrome.showControls());
   return [show, html(doc, "div", { class: "viz-main" }, [canvas])];
 }
 
@@ -430,17 +367,6 @@ function rewindView(view: ViewState, driver: VizDriver | undefined, length: numb
   else view.path = view.path.slice(0, keep);
 }
 
-function detailsShower(context: { view: ViewState; panel: HTMLElement; refresh: () => void }) {
-  const { view, panel, refresh } = context;
-  return (selection: Selection, shown?: { findings: boolean }): void => {
-    view.selection = selection;
-    view.tab = "details";
-    refresh();
-    if (shown?.findings === true)
-      panel.querySelector<HTMLElement>(".state-findings h4")?.focus({ preventScroll: true });
-  };
-}
-
 function screenOf(options: ViewerOptions, view: ViewState): Node | undefined {
   return view.live === null ? undefined : options.screen?.(view.live);
 }
@@ -449,7 +375,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
   return {
     machineId: machine?.id ?? "",
     selection: null,
-    coverage: null,
     path:
       machine === undefined || options.driver !== undefined
         ? []
@@ -511,14 +436,13 @@ function runNotice(machine: VizMachine, run: { name: string; found: boolean }): 
 
 type LiveContext = NonNullable<ExploreContext["live"]>;
 
-/** Step, Context (live only), Path, Details and Controls as tabs; Context counts the lines the last step changed. */
+/** Step, Context (live only), Path and Details as tabs; Context counts the lines the last step changed. */
 function panelTabs(
   doc: Document,
   context: {
     view: ViewState;
     parts: ExploreParts;
     details: HTMLElement;
-    controls: HTMLElement;
     screen: Node | undefined;
     refresh: () => void;
   },
@@ -539,7 +463,6 @@ function panelTabs(
         },
     { id: "path", label: "Path", content: parts.path },
     { id: "details", label: "Details", content: context.details },
-    { id: "controls", label: "Controls", content: context.controls },
   ];
   const shown = all.filter((tab): tab is Tab<PanelTab> => tab !== null);
   const active = shown.some((tab) => tab.id === view.tab) ? view.tab : "step";
@@ -720,11 +643,6 @@ function stepSafely(
   }
 }
 
-function setFullscreenLabel(button: HTMLButtonElement, active: boolean): void {
-  button.textContent = active ? "Exit full screen" : "Full screen";
-  button.setAttribute("aria-pressed", String(active));
-}
-
 function fillPanel(
   panel: HTMLElement,
   context: Parameters<typeof panelTabs>[1] & {
@@ -737,16 +655,6 @@ function fillPanel(
   panel.replaceChildren(panelTabs(doc, tabs), ...(node === undefined ? [] : [node]));
 }
 
-/** Arrow keys belong to the control while typing or choosing in it. */
-function isTextControl(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
 /** A pick of a child that is gone is dropped. */
 function dropGonePick(view: ViewState): void {
   const { picked } = view;
@@ -754,44 +662,17 @@ function dropGonePick(view: ViewState): void {
   if (picked !== null && there !== true) view.picked = null;
 }
 
-/** Listeners that outlive each render: ArrowLeft steps back, and the button label follows fullscreen. */
-function listenOnRoot(root: HTMLElement, keys: { back: () => void }): void {
-  root.addEventListener("keydown", (event) => {
-    if (!("key" in event) || isTextControl(event.target)) return;
-    if (event.key === "ArrowLeft") keys.back();
-  });
-  root.addEventListener("fullscreenchange", () => {
-    const toggle = root.querySelector<HTMLButtonElement>(".fullscreen-toggle");
-    if (toggle !== null) setFullscreenLabel(toggle, root.ownerDocument.fullscreenElement === root);
-  });
-}
-
-/** Null where the browser cannot fullscreen an element (no API, or blocked by the host page). */
-function fullscreenButton(doc: Document, root: HTMLElement): HTMLButtonElement | null {
-  if (!doc.fullscreenEnabled || typeof root.requestFullscreen !== "function") return null;
-  const button = html(doc, "button", { type: "button", class: "fullscreen-toggle" });
-  setFullscreenLabel(button, doc.fullscreenElement === root);
-  button.addEventListener("click", () => {
-    const request =
-      doc.fullscreenElement === root ? doc.exitFullscreen() : root.requestFullscreen();
-    // A refused request leaves the viewer as it was.
-    request.catch(() => undefined);
-  });
-  return button;
-}
-
-/** What the header and the Controls tab are built from. */
+/** What the header and the layout are built from. */
 interface Chrome {
   root: HTMLElement;
   viz: VizDocument;
   machine: VizMachine;
   view: ViewState;
   heading: "h1" | "h2" | "h3";
-  mode: CoverageMode;
   render: () => void;
   onNavigate: ViewerOptions["onNavigate"];
   live: boolean;
-  setDiagramOnly: (on: boolean) => void;
+  showControls: () => void;
 }
 
 function headerOf(doc: Document, context: Chrome): HTMLElement {
@@ -811,34 +692,6 @@ function headerOf(doc: Document, context: Chrome): HTMLElement {
             render();
           },
         }),
-    html(
-      doc,
-      "a",
-      { class: "help-link", href: DOCS_URL, target: "_blank", rel: "noopener noreferrer" },
-      ["How this works"],
-    ),
-  ]);
-}
-
-/** The Controls tab: Coverage from (when a mode has data), Full screen (where the browser allows), Diagram only. */
-function controlsOf(doc: Document, context: Chrome): HTMLElement {
-  const { root, machine, view, render } = context;
-  const diagramOnly = html(doc, "button", { type: "button", class: "diagram-only-toggle" }, [
-    "Diagram only",
-  ]);
-  diagramOnly.setAttribute("data-diagram-only", "");
-  diagramOnly.addEventListener("click", () => context.setDiagramOnly(true));
-  return html(doc, "div", { class: "controls" }, [
-    coveragePicker(doc, {
-      machine,
-      mode: context.mode,
-      onChange: (next) => {
-        view.coverage = next;
-        render();
-      },
-    }),
-    fullscreenButton(doc, root),
-    diagramOnly,
   ]);
 }
 

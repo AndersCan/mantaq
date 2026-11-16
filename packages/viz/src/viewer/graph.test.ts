@@ -40,8 +40,6 @@ describe("renderGraph arrowheads", () => {
   test("both markers draw the same fixed-size head with the tip on the path end", () => {
     const graph = renderGraph(document, machine, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     for (const id of ["viz-arrow", "viz-arrow-loop"]) {
       const marker = graph.querySelector(`#${id}`);
@@ -57,8 +55,6 @@ describe("renderGraph width", () => {
   test("floors labels at 0.6rem and caps them at 1.4em", () => {
     const graph = renderGraph(document, machine, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const match = /^width: clamp\(([\d.]+)rem, 100%, ([\d.]+)em\)$/.exec(
       graph.getAttribute("style") ?? "",
@@ -108,8 +104,6 @@ describe("renderGraph guard condition", () => {
   test("the condition is a second line on the arrow and in its aria-label", () => {
     const graph = renderGraph(document, guarded, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const edge = graph.querySelector('g.edge[data-edge-id="idle-go-busy"]');
     expect(edge?.querySelector(".edge-condition")?.textContent).toBe("ok");
@@ -144,8 +138,6 @@ describe("renderGraph transition label", () => {
     root.append(
       renderGraph(document, go, {
         select: () => undefined,
-        showDetails: () => undefined,
-        mode: "off",
       }),
     );
     const placed = placeMachine(go).edges[0];
@@ -175,8 +167,6 @@ describe("renderGraph region title", () => {
     };
     const graph = renderGraph(document, pooled, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const rect = graph.querySelector("g.region > rect");
     const text = graph.querySelector("g.region > text");
@@ -192,8 +182,6 @@ describe("renderGraph state inside", () => {
     const withChips: VizMachine = { ...machine, states: [state("idle", true), busy] };
     const graph = renderGraph(document, withChips, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const placed = placeMachine(withChips).nodes.find((node) => node.id === "busy");
     if (placed?.kind !== "state") throw new Error("not a state");
@@ -210,7 +198,7 @@ describe("renderGraph state inside", () => {
 });
 
 describe("renderGraph state inside: every drawn position comes from the boxes", () => {
-  test("name x, chip rect x, chip text and hint sit on the layout's boxes", () => {
+  test("name x, chip rect x and chip text sit on the layout's boxes", () => {
     const busy = {
       ...state("busy", false),
       effects: [
@@ -221,8 +209,6 @@ describe("renderGraph state inside: every drawn position comes from the boxes", 
     const withChips: VizMachine = { ...machine, states: [state("idle", true), busy] };
     const graph = renderGraph(document, withChips, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const placed = placeMachine(withChips).nodes.find((node) => node.id === "busy");
     if (placed?.kind !== "state") throw new Error("not a state");
@@ -235,15 +221,10 @@ describe("renderGraph state inside: every drawn position comes from the boxes", 
       if (box === undefined) throw new Error("no box");
       const rect = chip.querySelector("rect");
       expect(rect?.getAttribute("x")).toBe(String(box.x - box.width / 2));
-      const text = chip.querySelector("text:not(.hint)");
+      const text = chip.querySelector("text");
       expect(text?.getAttribute("x")).toBe(String(box.x));
       expect(text?.getAttribute("y")).toBe(String(box.y + 4));
     }
-    const hint = chips[1]?.querySelector("text.hint");
-    const last = placed.chips[1];
-    if (last === undefined) throw new Error("no box");
-    expect(hint?.getAttribute("x")).toBe(String(last.x + last.width / 2 - 8));
-    expect(hint?.getAttribute("y")).toBe(String(last.y + 4));
   });
 });
 
@@ -257,8 +238,6 @@ describe("renderGraph worker row", () => {
     };
     const graph = renderGraph(document, pooled, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const placed = placeMachine(pooled).nodes.find((node) => node.id === "p.free");
     if (placed?.kind !== "state" || placed.workers === undefined) throw new Error("no row");

@@ -20,8 +20,6 @@ describe("Getting started step 6", () => {
     if (machine === undefined) return;
     const graph = renderGraph(document, machine, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const eat = graph.querySelector('g.edge[data-edge-id="hungry-eat-full"]');
     expect(eat?.querySelector(".edge-condition")?.textContent).toBe('food !== "" && plates !== 0');

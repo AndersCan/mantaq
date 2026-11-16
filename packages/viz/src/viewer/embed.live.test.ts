@@ -1498,27 +1498,18 @@ describe("live effect reports", () => {
   });
 });
 
-describe("Controls tab, live", () => {
-  test("the live Controls tab has no ask toggle: here it holds only Diagram only", () => {
-    const { root } = mount();
-    const panel = root.querySelector('[data-tab-panel="controls"] .controls');
-    expect([...(panel?.querySelectorAll("button") ?? [])].map((each) => each.textContent)).toEqual([
-      "Diagram only",
-    ]);
-  });
-
-  test("Diagram only hides the run notice", () => {
+describe("Show controls, live", () => {
+  test("opens the Step tab, and the Context tab when events carry fields", () => {
     const root = document.createElement("div");
     mountViewer(
       root,
       { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
-      {
-        driver: driver(),
-        run: "nope",
-      },
+      { driver: driver(), diagramOnly: true },
     );
-    expect(root.querySelector("[data-run-missing]")).not.toBeNull();
-    click(root, "[data-diagram-only]");
-    expect(root.querySelector("[data-run-missing]")).toBeNull();
+    expect(root.querySelector(".panel")).toBeNull();
+    click(root, "[data-show-controls]");
+    const ids = [...root.querySelectorAll("[data-tab]")].map((tab) => tab.getAttribute("data-tab"));
+    expect(ids).toEqual(["step", "context", "path", "details"]);
+    expect(root.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Step");
   });
 });

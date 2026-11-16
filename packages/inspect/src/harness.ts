@@ -38,8 +38,6 @@ export interface VizHarness {
   /** Every child of every actor map, sorted by map then key, by local state name: `[{ map: "photos", key: "p1", state: "sendingPhoto" }]`. */
   children(): Promise<Array<{ map: string; key: string; state: string }>>;
   findings(): VizFinding[];
-  /** Click the finding's "!" mark, then its Replay button; left when the finding has no replay. */
-  replay(finding: VizFinding): Promise<Either<string, { state: string }>>;
   /** The text of the Step tab panel. */
   text(): Promise<string>;
   /** Viewport PNG; written to `path` when given. */
@@ -309,23 +307,6 @@ function describe(
     regions: () => readRegions(page),
     children: () => readChildren(page),
     findings: () => machineFindings(machine),
-    replay: async (finding) => {
-      if (lifecycle.isClosed()) {
-        return Either.left("harness is closed");
-      }
-      if (finding.state === null || (finding.steps?.length ?? 0) === 0) {
-        return Either.left(`${finding.title} has nothing to replay.`);
-      }
-      await page.click(`.finding-mark[data-state=${quoted(finding.state)}]`);
-      const button = page.locator(
-        `article.finding[data-kind=${quoted(finding.kind)}][data-state=${quoted(finding.state)}] [data-replay]`,
-      );
-      if ((await button.count()) === 0) {
-        return Either.left(`no Replay button for ${finding.title}.`);
-      }
-      await button.first().click();
-      return Either.right({ state: await state() });
-    },
     text: async () => {
       await page.click('[data-tab="step"]');
       return page.locator(PANEL).innerText();

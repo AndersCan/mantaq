@@ -24,16 +24,3 @@
   box-shadow: var(--mq-shadow-4);
   font-size: var(--sl-text-base);
 }
-
-/* Fullscreen needs no card chrome. */
-.mantaq-machine .viz:fullscreen {
-  margin: 0;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-/* Readers of the docs never see the design findings banner, whatever its count. */
-.mantaq-findings {
-  display: none;
-}
