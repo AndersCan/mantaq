@@ -42,3 +42,19 @@ test("a worker's missing event names the worker's state and its row's events", a
     );
   });
 }, 60_000);
+
+test("sendTo a worker sends its payload, names a blocked arrow, and a root event leaves the picked worker", async () => {
+  await withViz(join(docs, "content/docs/photo-queue.ts"), async (viz) => {
+    await viz.send("photoAdded", { photoId: "p1" });
+    await viz.send("photoAdded", { photoId: "p2" });
+    const sent = await viz.sendTo({ map: "photos", key: "p2" }, "uploadFailed");
+    expect(Either.getRight(sent)?.state).toBeDefined();
+    expect((await viz.children()).map((child) => `${child.key} ${child.state}`)).toEqual([
+      "p1 sendingPhoto",
+      "p2 waitingForRetry",
+    ]);
+    const root = await viz.send("photoAdded", { photoId: "p3" });
+    expect(Either.getLeft(root)).toBeUndefined();
+    expect((await viz.children()).map((child) => child.key)).toEqual(["p1", "p2", "p3"]);
+  });
+}, 60_000);

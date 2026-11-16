@@ -216,11 +216,24 @@ export function valueFields(machine: VizMachine): VizField[] {
 /** What `field` is sent with when nothing is set: the latest value the walk sent or heard under that name, else the example; undefined = left out. */
 export function defaultValue(
   field: VizField,
-  from: { live: VizLiveState | null; afters: ReadonlyArray<ReadonlyArray<VizLiveStep>> },
+  from: {
+    live: VizLiveState | null;
+    afters: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
+    events?: ReadonlyArray<string>;
+  },
 ): VizJson | undefined {
-  const steps = from.live === null ? [] : heardSteps(from.live.steps, from.afters);
+  const { live } = from;
+  const steps = live === null ? [] : heardSteps(live.steps, from.afters);
   const sent = typedSource([field], steps)?.values[0]?.value;
-  if (sent !== undefined) return sent;
+  if (sent !== undefined) {
+    const event = from.events?.[0];
+    if (live === null || event === undefined) return sent;
+    const fresh = freshKeys(
+      { [field.name]: sent },
+      { event, state: { steps: live.steps, children: live.children, removed: live.removed } },
+    );
+    return isObject(fresh) ? fresh[field.name] : sent;
+  }
   return field.optional ? undefined : field.sample;
 }
 

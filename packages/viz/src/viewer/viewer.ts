@@ -118,7 +118,12 @@ export function mountViewer(
       const stepTab = explorePanel(doc, {
         machine,
         rewind,
-        ...liveOf(view, { send, sendEvent, setValue, routes: options.routes }),
+        ...liveOf(view, {
+          send,
+          pick: (child) => pick(child, "row"),
+          setValue,
+          routes: options.routes,
+        }),
       });
       const details = detailsOf(doc, {
         machine,
@@ -130,7 +135,22 @@ export function mountViewer(
       panel.replaceChildren(panelTabs(doc, { view, parts: stepTab, details, screen, refresh }));
       mark();
     };
-    const mark = () => markDiagram(root, { machine, view, driver, pick: () => refresh() });
+    const pick = (child: { map: string; key: string }, from: "row" | "chip") => {
+      view.picked = child;
+      view.selection = null;
+      view.tab = "step";
+      refresh();
+      if (from !== "row") return;
+      [...root.querySelectorAll<HTMLElement>("li.explore-child")]
+        .find(
+          (row) =>
+            row.getAttribute("data-child-map") === child.map &&
+            row.getAttribute("data-child-key") === child.key,
+        )
+        ?.focus({ preventScroll: true });
+    };
+    const mark = () =>
+      markDiagram(root, { machine, view, driver, pick: (child) => pick(child, "chip") });
     const follow = () => {
       refresh();
       keepInView(root, view.live === null ? undefined : currentsOf(view.live, view.picked)[0]);
@@ -430,7 +450,7 @@ function panelTabs(
 /** The live driver's part of the panel context. */
 function liveOf(
   view: ViewState,
-  handlers: Pick<LiveContext, "send" | "sendEvent" | "setValue" | "routes">,
+  handlers: Pick<LiveContext, "send" | "pick" | "setValue" | "routes">,
 ): { live?: LiveContext } {
   if (view.live === null) return {};
   return {
@@ -438,7 +458,6 @@ function liveOf(
       state: view.live,
       afters: view.afters,
       picked: view.picked,
-      sent: view.sent,
       values: view.values,
       ...handlers,
     },
@@ -619,7 +638,7 @@ function markDiagram(
     machine: VizMachine;
     view: ViewState;
     driver: VizDriver | undefined;
-    pick: () => void;
+    pick: (child: { map: string; key: string }) => void;
   },
 ): void {
   const { machine, view } = context;
@@ -631,12 +650,7 @@ function markDiagram(
       machine,
       children: view.live.children,
       picked: view.picked,
-      onPick: (child) => {
-        view.picked = child;
-        view.selection = null;
-        view.tab = "step";
-        context.pick();
-      },
+      onPick: context.pick,
     });
   }
   markSelection(root, view.selection);

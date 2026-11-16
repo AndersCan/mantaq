@@ -32,10 +32,6 @@ async function mounted(): Promise<HTMLElement> {
   return root;
 }
 
-function send(root: HTMLElement, selector: string) {
-  root.querySelector<HTMLButtonElement>(selector)?.click();
-}
-
 function addThree(root: HTMLElement) {
   for (let index = 0; index < 3; index += 1) sendVia(root, "photoAdded");
 }
@@ -60,7 +56,8 @@ describe("the docs photo queue on the live page", () => {
   test("uploadConfirmed goes to p1", async () => {
     const root = await mounted();
     addThree(root);
-    send(root, '[data-actor="photos[p1]"] [data-send="uploadConfirmed"]');
+    root.querySelector<HTMLElement>('li[data-child-key="p1"]')?.click();
+    sendVia(root, "uploadConfirmed");
     expect(children(root).find((each) => each.key === "p1")?.state).toBe("photos.photoSent");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
       "uploadConfirmed: p1 sendingPhoto → photoSent",
@@ -71,7 +68,6 @@ describe("the docs photo queue on the live page", () => {
     const root = await mounted();
     addThree(root);
     sendVia(root, "queueCleared");
-    expect(root.querySelector("[data-live-removed]")?.textContent).toBe("p1, p2, p3 removed");
     expect(children(root)).toEqual([]);
   });
 });
