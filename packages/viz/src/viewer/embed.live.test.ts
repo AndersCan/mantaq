@@ -406,20 +406,27 @@ describe("live controls", () => {
     expect(live.log).toHaveLength(1);
   });
 
-  test("one rule: a click on an arrow sends exactly when its ? shows Send", () => {
-    const ids = [...mount().root.querySelectorAll("[data-details-edge]")].map((each) =>
-      each.getAttribute("data-details-edge"),
-    );
-    expect(ids.length).toBeGreaterThan(0);
-    for (const id of ids) {
-      const offered = mount();
-      clickEdge(offered.root, id ?? "");
-      const shown = offered.root.querySelector("[data-send-edge]") !== null;
-      const sent = mount();
-      clickArrow(sent.root, id ?? "");
-      expect(sent.live.log.length > 0).toBe(shown);
-    }
-  });
+  test.each([[[]], [["submit"]]] as const)(
+    "one rule after steps %j: a click on an arrow sends exactly when its ? shows Send",
+    (steps) => {
+      const ids = [...mount().root.querySelectorAll("[data-details-edge]")].map((each) =>
+        each.getAttribute("data-details-edge"),
+      );
+      expect(ids.length).toBeGreaterThan(0);
+      let shownAny = false;
+      for (const id of ids) {
+        const offered = mount({ steps: [...steps] });
+        clickEdge(offered.root, id ?? "");
+        const shown = offered.root.querySelector("[data-send-edge]") !== null;
+        shownAny ||= shown;
+        const sent = mount({ steps: [...steps] });
+        const before = sent.live.log.length;
+        clickArrow(sent.root, id ?? "");
+        expect(sent.live.log.length > before).toBe(shown);
+      }
+      expect(shownAny).toBe(true);
+    },
+  );
 
   test("the selected arrow's Details has a Send button that sends and keeps the tab", () => {
     const { root, live } = mount();

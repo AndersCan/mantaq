@@ -411,6 +411,28 @@ describe("live actor map children", () => {
     );
   });
 
+  test.each([[undefined], ["p1"], ["p2"]] as const)(
+    "one rule in a map, following %s: a click on an arrow sends exactly when its ? shows Send",
+    (key) => {
+      const fed: VizMachine = { ...photoQueue, partOutputs: { other: ["uploadFailed"] } };
+      const at = () => [child("p1", "sendingPhoto", 1), child("p2", "waitingForRetry", 2)];
+      const ids = photoQueue.edges.map((each) => each.id);
+      let shownAny = false;
+      for (const id of ids) {
+        const offered = mount(at(), fed);
+        if (key !== undefined) pick(offered.root, key);
+        click(offered.root.querySelector(`[data-details-edge="${id}"]`));
+        const shown = offered.root.querySelector("[data-send-edge]") !== null;
+        shownAny ||= shown;
+        const clicked = mount(at(), fed);
+        if (key !== undefined) pick(clicked.root, key);
+        click(clicked.root.querySelector(`[data-edge-id="${id}"]`));
+        expect(clicked.sent.length > 0).toBe(shown);
+      }
+      expect(shownAny).toBe(true);
+    },
+  );
+
   test("an arrow with no walked child in its state does nothing", () => {
     const none = mount([child("p1", "waitingForRetry")]);
     click(helpOf(none.root));

@@ -168,15 +168,7 @@ export function mountViewer(
     };
     const setValue = valueSetter({ options, machine, view, mark });
     const send = stepSender({ view, driver, walked });
-    const sendEvent = (event: string, actor?: VizActorRef, edge?: string) => {
-      const step = eventStep(machine, view, event, actor);
-      send(step, {
-        event,
-        ...(actor ? { actor } : {}),
-        payload: step.payload,
-        ...(edge === undefined ? {} : { edge }),
-      });
-    };
+    const sendEvent = eventSender({ machine, view, send });
     const rewind = (length: number) => {
       rewindView(view, driver, length);
       walked();
@@ -191,8 +183,14 @@ export function mountViewer(
       if (panel.isConnected) panel.scrollIntoView({ block: "nearest", inline: "nearest" });
     };
     const graph = renderGraph(doc, machine, {
-      select: (selection) =>
-        clicked({ machine, view, driver }, selection, { sendEvent, openDetails }),
+      // A click on an arrow sends when Details would offer Send, else opens its Details.
+      select: (selection) => {
+        const edge = machine.edges.find((e) => selection.kind === "edge" && e.id === selection.id);
+        const decision = edge && arrowSend({ machine, view, driver }, edge);
+        if (edge === undefined || decision?.kind !== "send") return openDetails(selection);
+        view.selection = selection;
+        sendEvent(edge.event, decision.actor, edge.id);
+      },
       ...(view.diagramOnly ? {} : { details: (id: string) => openDetails({ kind: "edge", id }) }),
     });
     root.append(...layoutOf(doc, { view, showControls, graph, panel, root }));
@@ -217,27 +215,6 @@ function detailsOf(
     select: context.select,
     send: context.send,
   });
-}
-
-/** A click on an arrow sends when Details would offer Send, else opens its Details; a state opens its Details. */
-function clicked(
-  from: { machine: VizMachine; view: ViewState; driver: VizDriver | undefined },
-  selection: Selection,
-  handlers: {
-    sendEvent: (event: string, actor?: VizActorRef, edge?: string) => void;
-    openDetails: (selection: Selection) => void;
-  },
-): void {
-  const { id } = selection;
-  const edge =
-    selection.kind === "edge" ? from.machine.edges.find((each) => each.id === id) : undefined;
-  const decision = edge === undefined ? null : arrowSend(from, edge);
-  if (edge === undefined || decision?.kind !== "send") {
-    handlers.openDetails(selection);
-    return;
-  }
-  from.view.selection = { kind: "edge", id };
-  handlers.sendEvent(edge.event, decision.actor, id);
 }
 
 type ArrowSend =
@@ -606,6 +583,24 @@ function valueSetter(context: {
     view.blockedFor = null;
     navigated(options, { machine, view });
     mark();
+  };
+}
+
+/** Sends one named event as a step, remembering the arrow it came from. */
+function eventSender(context: {
+  machine: VizMachine;
+  view: ViewState;
+  send: (step: VizStep, sent?: ViewState["sent"]) => void;
+}): (event: string, actor?: VizActorRef, edge?: string) => void {
+  const { machine, view, send } = context;
+  return (event, actor, edge) => {
+    const step = eventStep(machine, view, event, actor);
+    send(step, {
+      event,
+      ...(actor ? { actor } : {}),
+      payload: step.payload,
+      ...(edge === undefined ? {} : { edge }),
+    });
   };
 }
 

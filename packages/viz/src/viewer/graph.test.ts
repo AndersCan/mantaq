@@ -102,6 +102,19 @@ describe("renderGraph guard condition", () => {
     ],
   } as unknown as VizMachine;
 
+  test("on a two-line label the ? sits on the event's line", () => {
+    const graph = renderGraph(document, guarded, {
+      select: () => undefined,
+      details: () => undefined,
+    });
+    const top = Number(
+      graph.querySelector('g.edge[data-edge-id="idle-go-busy"] text')?.getAttribute("y"),
+    );
+    expect(Number(graph.querySelector("[data-details-edge] .ring")?.getAttribute("cy"))).toBe(
+      top - 4,
+    );
+  });
+
   test("the condition is a second line on the arrow and in its aria-label", () => {
     const graph = renderGraph(document, guarded, {
       select: () => undefined,
@@ -155,6 +168,18 @@ describe("renderGraph transition label", () => {
     const cy = Number(circle?.getAttribute("cy"));
     expect(Math.abs(cx - (label?.x ?? 0))).toBeLessThan((label?.width ?? 0) / 2);
     expect(Math.abs(cy - (label?.y ?? 0))).toBeLessThan((label?.height ?? 0) / 2);
+  });
+
+  test("the ? sits right of the label's text, inside its box, on the first line", () => {
+    const ring = withHelp(() => undefined).querySelector("[data-details-edge] .ring");
+    const placed = placeMachine(go).edges[0];
+    const cx = Number(ring?.getAttribute("cx"));
+    const r = Number(ring?.getAttribute("r"));
+    expect(cx - r).toBeGreaterThanOrEqual((placed?.text.x ?? 0) + textWidth("submitWWW") / 2);
+    expect(cx + r).toBeLessThanOrEqual((placed?.label.x ?? 0) + (placed?.label.width ?? 0) / 2);
+    expect(Number(ring?.getAttribute("cy"))).toBe(placed?.text.y);
+    const mark = withHelp(() => undefined).querySelector("[data-details-edge] text");
+    expect(Number(mark?.getAttribute("y"))).toBe((placed?.text.y ?? 0) + 3);
   });
 
   test("no ? is drawn without a details callback", () => {

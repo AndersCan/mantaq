@@ -27,7 +27,7 @@ import { mantaqViz } from "./vite.ts";
 export interface VizHarness {
   /** The current state id. */
   state(): Promise<string>;
-  /** Select the event's arrow out of the current state and press Send in Details, as a person would. An event with no arrow from here is a Left naming the events that have one. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
+  /** Open the Details of the event's arrow out of the current state and press its Send, as a person would. An event with no arrow from here is a Left naming the events that have one. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
   send(
     event: string,
     payload?: Record<string, VizJson>,
