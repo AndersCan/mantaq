@@ -102,3 +102,20 @@ test("in full screen the diagram widens to fill the screen but keeps its label f
     /width:\s*max\(var\(--graph-floor\),\s*100%\)\s*!important/,
   );
 });
+
+test("the next arrows march one dash period forever; only reduced motion stops them", () => {
+  const next = listed(".viz .edge.next path");
+  const [dash, gap] = (next.match(/stroke-dasharray:\s*(\d+)\s+(\d+)/) ?? []).slice(1).map(Number);
+  expect(next).toMatch(/animation:\s*viz-march\s+[\d.]+m?s\s+linear\s+infinite/);
+  expect(bare).toMatch(
+    new RegExp(
+      `@keyframes viz-march\\s*\\{\\s*to\\s*\\{\\s*stroke-dashoffset:\\s*-${(dash ?? 0) + (gap ?? 0)};`,
+    ),
+  );
+  const reduced =
+    bare.match(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.viz \.edge\.next path\s*\{\s*animation:\s*none;\s*\}\s*\}/g,
+    ) ?? [];
+  expect(reduced).toHaveLength(1);
+  expect(bare.replace(reduced[0] ?? "", "")).not.toMatch(/animation:\s*none/);
+});
