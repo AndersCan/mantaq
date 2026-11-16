@@ -41,8 +41,28 @@ describe("checker: region titles against arrowheads and entry arrows", () => {
       width: 500,
       height: 240,
       nodes: [
-        { kind: "state", id: "A", state: state("A"), x: 100, y: 100, width: 80, height: 36 },
-        { kind: "state", id: "B", state: state("B"), x: 340, y: 100, width: 80, height: 36 },
+        {
+          kind: "state",
+          id: "A",
+          state: state("A"),
+          x: 100,
+          y: 100,
+          width: 80,
+          height: 36,
+          label: { x: 100, y: 100, width: 10, height: 16 },
+          chips: [],
+        },
+        {
+          kind: "state",
+          id: "B",
+          state: state("B"),
+          x: 340,
+          y: 100,
+          width: 80,
+          height: 36,
+          label: { x: 340, y: 100, width: 10, height: 16 },
+          chips: [],
+        },
       ],
       edges: [
         {
@@ -77,7 +97,19 @@ describe("checker: region titles against arrowheads and entry arrows", () => {
     const layout: MachineLayout = {
       width: 500,
       height: 240,
-      nodes: [{ kind: "state", id: "A", state: state("A"), x: 300, y: 100, width: 80, height: 36 }],
+      nodes: [
+        {
+          kind: "state",
+          id: "A",
+          state: state("A"),
+          x: 300,
+          y: 100,
+          width: 80,
+          height: 36,
+          label: { x: 300, y: 100, width: 10, height: 16 },
+          chips: [],
+        },
+      ],
       edges: [],
       regions: [
         {

@@ -19,7 +19,17 @@ function vizState(id: string, region: string | null): VizState {
 }
 
 function node(id: string, x: number, region: string | null = null): PlacedState {
-  return { kind: "state", id, state: vizState(id, region), x, y: 100, width: 80, height: 36 };
+  return {
+    kind: "state",
+    id,
+    state: vizState(id, region),
+    x,
+    y: 100,
+    width: 80,
+    height: 36,
+    label: { x, y: 100, width: 10, height: 16 },
+    chips: [],
+  };
 }
 
 function placedEdge(
@@ -616,6 +626,46 @@ describe("overlapsOf: review repros (arrows 8px)", () => {
     });
     expect(ofRule(layout, "paths-near")).toEqual([
       { rule: "paths-near", a: "path:e", b: "path:f", gap: 6 },
+    ]);
+  });
+});
+
+describe("node-inside", () => {
+  const stateWith = (label: { y: number }, chips: Array<{ y: number }>): MachineLayout => {
+    const base = node("A", 100);
+    return layoutOf({
+      nodes: [
+        {
+          ...base,
+          y: 100,
+          height: 80,
+          label: { x: 100, y: label.y, width: 20, height: 16 },
+          chips: chips.map((chip) => ({ x: 100, y: chip.y, width: 64, height: 16 })),
+        },
+      ],
+    });
+  };
+
+  test("a name box 8px from the top and a chip 8px below it is clean", () => {
+    expect(ofRule(stateWith({ y: 76 }, [{ y: 100 }]), "node-inside")).toEqual([]);
+  });
+
+  test("today's geometry: chip 2px under the name box", () => {
+    // top 60: name box 70..86 (top+10), chip 88..104 (top+28)
+    expect(ofRule(stateWith({ y: 78 }, [{ y: 96 }]), "node-inside")).toEqual([
+      { rule: "node-inside", a: "node:A", b: "node:A", gap: 2 },
+    ]);
+  });
+
+  test("a name box 6px from the box top", () => {
+    expect(ofRule(stateWith({ y: 74 }, []), "node-inside")).toEqual([
+      { rule: "node-inside", a: "node:A", b: "node:A", gap: 6 },
+    ]);
+  });
+
+  test("a chip 6px from the box bottom", () => {
+    expect(ofRule(stateWith({ y: 76 }, [{ y: 126 }]), "node-inside")).toEqual([
+      { rule: "node-inside", a: "node:A", b: "node:A", gap: 6 },
     ]);
   });
 });

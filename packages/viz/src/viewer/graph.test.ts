@@ -185,3 +185,26 @@ describe("renderGraph region title", () => {
     expect(text?.getAttribute("text-anchor")).toBeNull();
   });
 });
+
+describe("renderGraph state inside", () => {
+  test("the name and each chip are drawn from the layout's boxes", () => {
+    const busy = { ...state("busy", false), effects: [{ name: "ping", sends: [] }] };
+    const withChips: VizMachine = { ...machine, states: [state("idle", true), busy] };
+    const graph = renderGraph(document, withChips, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    const placed = placeMachine(withChips).nodes.find((node) => node.id === "busy");
+    if (placed?.kind !== "state") throw new Error("not a state");
+    const group = graph.querySelector('[data-node-id="busy"]');
+    expect(group?.querySelector(":scope > text")?.getAttribute("y")).toBe(
+      String(placed.label.y + 4),
+    );
+    const chip = placed.chips[0];
+    const rect = group?.querySelector(".chip rect");
+    expect(rect?.getAttribute("y")).toBe(String((chip?.y ?? 0) - (chip?.height ?? 0) / 2));
+    expect(rect?.getAttribute("width")).toBe(String(chip?.width));
+    expect(rect?.getAttribute("height")).toBe(String(chip?.height));
+  });
+});
