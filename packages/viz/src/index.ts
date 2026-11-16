@@ -13,5 +13,3 @@ export type { Move, MoveGroup } from "./moves.ts";
 export { routingWarnings } from "./routing.ts";
 export type { RoutingWarning } from "./routing.ts";
 export { UPDATE_EVENT, livePageHtml } from "./html.ts";
-export { linksInside, systemOf } from "./system.ts";
-export type { MachineSystem, SystemEntry, SystemLink, SystemPart } from "./system.ts";

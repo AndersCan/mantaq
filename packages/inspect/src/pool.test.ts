@@ -1,5 +1,4 @@
 import { VirtualClock } from "@mantaq/core";
-import { systemOf } from "@mantaq/viz";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
 import { createTeamInbox } from "./fixtures/pool.ts";
@@ -21,27 +20,6 @@ describe("a pool, as parts that talk", () => {
       workers: ["team.ITEMS_FAILED", "team.ITEMS_FINISHED"],
     });
   });
-
-  test("the inbox and the workers link both ways", () => {
-    const system = systemOf(machine!);
-    expect(system.parts.map((part) => [part.id, part.kind])).toEqual([
-      ["", "root"],
-      ["workers", "map"],
-    ]);
-    const assigned = system.links.find((link) => link.event === "team.ITEMS_ASSIGNED");
-    expect(assigned).toMatchObject({
-      from: "",
-      to: "workers",
-      handledIn: ["workers.free"],
-    });
-    expect(system.links.filter((link) => link.to === "").map((link) => link.event)).toEqual([
-      "team.ITEMS_FAILED",
-      "team.ITEMS_FINISHED",
-    ]);
-    for (const link of system.links.filter((each) => each.to === "")) {
-      expect(link.handledIn).toEqual(["workWaiting", "workersBusy"]);
-    }
-  });
 });
 
 describe("a step on a pool names the part that moved after it", () => {
@@ -62,8 +40,5 @@ describe("regions record their outputs too", () => {
   test("the upload region's photoUploaded reaches its parent", () => {
     const machine = toViz([{ id: "photoUpload", actor: createUploadRegionsActor() }]).machines[0];
     expect(machine?.partOutputs).toEqual({ upload: ["photoUploaded"] });
-    expect(systemOf(machine!).links).toMatchObject([
-      { from: "upload", to: "", event: "photoUploaded" },
-    ]);
   });
 });

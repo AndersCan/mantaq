@@ -1,5 +1,4 @@
 import { VirtualClock } from "@mantaq/core";
-import { systemOf } from "@mantaq/viz";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
 import { createKitchen } from "./fixtures/kitchen.ts";
@@ -33,23 +32,6 @@ describe("a kitchen and the pool it feeds, as one board", () => {
     expect(machine.initial).toBe("takingOrders");
     expect(machine.states.find((each) => each.id === "orders.allWorkersFree")?.initial).toBe(true);
     expect(machine.partOutputs["orders"]).toEqual(["orders.ITEMS_ASSIGNED"]);
-  });
-
-  test("the arrows run kitchen to orders, orders to cooks and cooks back", () => {
-    const system = systemOf(machine);
-    expect(system.parts.map((part) => [part.id, part.kind, part.within, part.alone])).toEqual([
-      ["", "root", "orders", false],
-      ["cooks", "map", "orders", false],
-      ["orders", "actor", null, false],
-    ]);
-    expect(
-      system.links.map((link) => `${link.from || "kitchen"} → ${link.to || "kitchen"}`),
-    ).toEqual(["kitchen → orders", "cooks → orders", "cooks → orders", "orders → cooks"]);
-  });
-
-  test("drawn as a plain region, the inbox's output goes only to its parent, so no arrow reaches the cooks", () => {
-    const system = systemOf({ ...machine, actors: [] });
-    expect(system.links.find((link) => link.from === "orders")?.to).toBeNull();
   });
 });
 
