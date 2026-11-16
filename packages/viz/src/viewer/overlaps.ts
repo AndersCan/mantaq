@@ -293,7 +293,10 @@ function shapesOf(layout: MachineLayout): Shapes {
               height: node.height - 2 * FINAL_INSET,
             }
           : null,
-      inside: node.kind === "state" ? [node.label, ...node.chips] : [],
+      inside:
+        node.kind === "state"
+          ? [node.label, ...node.chips, ...(node.workers ? [node.workers] : [])]
+          : [],
     })),
     edges: layout.edges.map((placed) => {
       const path = sampledPath(placed.points);

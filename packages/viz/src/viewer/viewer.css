@@ -284,6 +284,12 @@
   font-style: italic;
 }
 
+.viz .worker-row {
+  fill: none;
+  stroke: none;
+  pointer-events: none;
+}
+
 .viz .chip rect {
   fill: var(--fg);
   fill-opacity: 0.12;

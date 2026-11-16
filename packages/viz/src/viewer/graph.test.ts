@@ -246,3 +246,28 @@ describe("renderGraph state inside: every drawn position comes from the boxes", 
     expect(hint?.getAttribute("y")).toBe(String(last.y + 4));
   });
 });
+
+describe("renderGraph worker row", () => {
+  test("a state of an actor map draws a hidden rect.worker-row on its box; other states none", () => {
+    const pooled: VizMachine = {
+      ...machine,
+      regions: ["p"],
+      maps: ["p"],
+      states: [state("idle", true), { ...state("p.free", false), region: "p" }],
+    };
+    const graph = renderGraph(document, pooled, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    const placed = placeMachine(pooled).nodes.find((node) => node.id === "p.free");
+    if (placed?.kind !== "state" || placed.workers === undefined) throw new Error("no row");
+    const row = graph.querySelector('[data-node-id="p.free"] > rect.worker-row');
+    expect(row?.getAttribute("aria-hidden")).toBe("true");
+    expect(row?.getAttribute("x")).toBe(String(placed.workers.x - placed.workers.width / 2));
+    expect(row?.getAttribute("y")).toBe(String(placed.workers.y - placed.workers.height / 2));
+    expect(row?.getAttribute("width")).toBe(String(placed.workers.width));
+    expect(row?.getAttribute("height")).toBe(String(placed.workers.height));
+    expect(graph.querySelector('[data-node-id="idle"] rect.worker-row')).toBeNull();
+  });
+});

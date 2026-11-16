@@ -315,6 +315,45 @@ describe("map-child states", () => {
     expect(plain?.height).toBe(36);
     expect(plain?.width).toBeLessThan(168);
   });
+
+  test("each state of an actor map has a worker row inside its box, below the name and chips", () => {
+    const machine = machineOf(
+      ["first", "p.free", "p.working"],
+      [edge({ from: "first", event: "go", target: "p.free" })],
+    );
+    const states = machine.states.map((each) =>
+      each.id === "first"
+        ? each
+        : {
+            ...each,
+            region: "p",
+            effects:
+              each.id === "p.working"
+                ? [{ name: "run", sends: null } as unknown as VizState["effects"][number]]
+                : [],
+          },
+    );
+    const placed = placeMachine({ ...machine, states, regions: ["p"], maps: ["p"] }).nodes;
+    const stateOf = (id: string) => {
+      const node = placed.find((each) => each.kind === "state" && each.id === id);
+      return node?.kind === "state" ? node : undefined;
+    };
+    expect(stateOf("first")?.workers).toBeUndefined();
+    for (const id of ["p.free", "p.working"]) {
+      const node = stateOf(id);
+      const row = node?.workers;
+      if (node === undefined || row === undefined) throw new Error(`no worker row on ${id}`);
+      expect(node.width).toBeGreaterThanOrEqual(168);
+      expect(row.x - row.width / 2).toBeGreaterThanOrEqual(node.x - node.width / 2 + LABEL_PAD);
+      expect(row.x + row.width / 2).toBeLessThanOrEqual(node.x + node.width / 2 - LABEL_PAD);
+      expect(row.y + row.height / 2).toBeLessThanOrEqual(node.y + node.height / 2 - LABEL_PAD);
+      const above = node.chips.at(-1) ?? node.label;
+      expect(row.y - row.height / 2).toBeGreaterThanOrEqual(above.y + above.height / 2 + LABEL_PAD);
+      expect(overlapsOf(placeMachine({ ...machine, states, regions: ["p"], maps: ["p"] }))).toEqual(
+        [],
+      );
+    }
+  });
 });
 
 describe("two-line edge labels", () => {

@@ -153,9 +153,13 @@ describe("region titles have room of their own", () => {
   });
 
   test("a map region's title reads 'one per key' and sets the width", () => {
-    const pool = { ...machineOf([state("p.b", "p")], [], ["p"]), maps: ["p"] };
+    const name = "poolOfWorkersWithAVeryLongNameThatIsWiderThanAnyStateBox";
+    const pool = {
+      ...machineOf([{ ...state(`${name}.b`, name), label: "b" }], [], [name]),
+      maps: [name],
+    };
     const region = placeMachine(pool).regions[0];
-    expect(region?.width).toBe(textWidth("p: one per key") + 8 + 2 * LABEL_PAD);
+    expect(region?.width).toBe(textWidth(`${name}: one per key`) + 8 + 2 * LABEL_PAD);
   });
 
   test("a map region reserves the widest live count, every state at 99", () => {
@@ -171,8 +175,8 @@ describe("region titles have room of their own", () => {
     const pool = {
       ...machineOf(
         [
-          { ...state("p.idle", "p"), label: "idle" },
-          { ...state("p.busy", "p"), label: "busy" },
+          { ...state("p.idle", "p"), label: "idleUntilAnItemArrives" },
+          { ...state("p.busy", "p"), label: "busyWithTheCurrentItem" },
           { ...state("elsewhereWithALongName"), label: "elsewhereWithALongName" },
         ],
         [],
@@ -181,7 +185,9 @@ describe("region titles have room of their own", () => {
       maps: ["p"],
     };
     const region = placeMachine(pool).regions[0];
-    expect(region?.width).toBe(textWidth("p: 99 idle, 99 busy") + 8 + 2 * LABEL_PAD);
+    expect(region?.width).toBe(
+      textWidth("p: 99 idleUntilAnItemArrives, 99 busyWithTheCurrentItem") + 8 + 2 * LABEL_PAD,
+    );
   });
 
   test("checker: a label on a region's title and a state on a region's title are overlaps", () => {
