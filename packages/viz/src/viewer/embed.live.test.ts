@@ -1462,7 +1462,7 @@ describe("Controls tab, live", () => {
     ]);
   });
 
-  test("Diagram only hides the changes list and the run notice", () => {
+  test("Diagram only hides the run notice", () => {
     const root = document.createElement("div");
     mountViewer(
       root,
@@ -1470,17 +1470,10 @@ describe("Controls tab, live", () => {
       {
         driver: driver(),
         run: "nope",
-        changes: {
-          machine: "checkout",
-          before: { states: ["idle"], arrows: [] },
-          onSeen: () => {},
-        },
       },
     );
-    expect(root.querySelector("section.changes")).not.toBeNull();
     expect(root.querySelector("[data-run-missing]")).not.toBeNull();
     click(root, "[data-diagram-only]");
-    expect(root.querySelector("section.changes")).toBeNull();
     expect(root.querySelector("[data-run-missing]")).toBeNull();
   });
 });

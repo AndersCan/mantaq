@@ -16,7 +16,6 @@
   --unknown: #a35c00;
   --banner-bg: #fff6e0;
   --banner-fg: #5a3e00;
-  --added: #2f5fd0;
   color-scheme: light;
   background: var(--bg);
   color: var(--fg);
@@ -365,20 +364,6 @@
 .viz.coverage-on .state.unreached .frame,
 .viz.coverage-on .edge.unreached path {
   stroke-dasharray: 3 3;
-}
-
-.viz .state.added .frame,
-.viz .edge.added path {
-  stroke: var(--added);
-  stroke-width: 2.5;
-}
-
-.viz .changes {
-  background: var(--banner-bg);
-  color: var(--banner-fg);
-  padding: 6px 8px;
-  border-radius: 4px;
-  margin: 0 0 8px;
 }
 
 .viz .highlight path,

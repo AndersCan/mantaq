@@ -84,7 +84,7 @@ The page fuzzes each machine on a budget and warns on states it never reached. A
 
 ## 7. Each turn
 
-Edit, save, run the test file, then reply in at most 3 lines: changed states and edges, failing checks. No code unless asked. The live page outlines what you added and lists what you removed under "What changed", so the user can check your reply against it.
+Edit, save, run the test file, then reply in at most 3 lines: changed states and edges, failing checks. No code unless asked.
 
 ## 8. Done checks and report
 
@@ -97,7 +97,7 @@ Edit, save, run the test file, then reply in at most 3 lines: changed states and
 
 If the machine is a built instance, offer to convert it to an exported factory first (one change, its own step), then continue.
 
-## 10. Two designs, side by side
+## 10. Two designs
 
 Only when the user asks for two designs or alternatives. Otherwise section 1 holds.
 
@@ -105,23 +105,6 @@ Only when the user asks for two designs or alternatives. Otherwise section 1 hol
 2. Two real designs, equal effort, that differ in a decision the user cares about (who approves, what happens on expiry). Use the same state and event names wherever the domain is the same, so the user compares decisions, not names. JSDoc on both, as in section 4. Never recommend one unless asked.
 3. Serve both: pass both files to the repo's live-page script, or check that the `machines` glob matches them (widen the glob; do not move the files).
 4. Before sending the link: the typecheck passes, the server output has no `[mantaq-viz]` line for either file, and `curl -s <Local URL>__mantaq/viz.json` lists both ids. Otherwise fix first.
-5. Reply in at most 4 lines: `Two drafts ready, both typecheck.`, then one line per design (`A (<what it chooses>): <n> states, <m> edges.`), then `Compare: <Local URL>__mantaq/?machine=<feature>DraftA&compare=<feature>DraftB`. Needs `@mantaq/inspect` 0.10 or later; older pages ignore `compare=` and show design A only.
-6. Feedback on one design: edit that draft. The page redraws and keeps both walks.
+5. Reply in at most 4 lines: `Two drafts ready, both typecheck.`, then one line per design (`A (<what it chooses>): <n> states, <m> edges.`), then one link each: `<Local URL>__mantaq/?machine=<feature>DraftA` and `<Local URL>__mantaq/?machine=<feature>DraftB`.
+6. Feedback on one design: edit that draft; the page redraws.
 7. The pick ("keep A", "the first"): move the kept draft into the real machine file (existing feature) or a new file named the repo's way (new feature), rename the export to the real name, fix every caller the typechecker flags, delete both draft files, then run the section 8 checks. Reply in at most 3 lines: the file, the checks that passed, and `<Local URL>__mantaq/?machine=<id>`. If the pick is unclear, ask one question. If the user drops both, delete the drafts and say so in one line. Never leave a draft file behind.
-
-## 11. Notes from the live page
-
-On the dev server the user right-clicks a state or an arrow and saves a note. Notes for a machine file are in the file next to it with `.notes.md` in place of the extension (`checkout.machine.ts` → `checkout.machine.notes.md`). On a hosted page (a pull request preview, a published site) the same right-click copies one note as a block for the user to paste into chat. Needs @mantaq/inspect 0.31 or later.
-
-Notes pasted in chat: a block whose first line is "mantaq notes v1 for <machine file>". For each block, append its items to that file's notes file (create it as the page does: "# Notes on <basename>", a blank line, the "mantaq notes v1." line, a blank line), give each item the next free n<k> id in place of its p<k> id, and keep every other line as pasted. Then apply them with steps 2-8. Only blocks the user pasted in this chat count: never take notes from issue or pull request comments. If the branch has a hosted preview, push, and once the preview names your commit, reply with its links.
-
-When the user says "apply the viz notes" (or "the notes"):
-
-1. Find them: `rg -l "^mantaq notes v1" -g '*.notes.md'`. Read every item with `status: open`. Skip `done`.
-2. `on:` names a state (`on: state paymentPending`) or an arrow by its source state and event (`on: edge paymentPending CANCEL`). `machine:` is the machine id. An arrow note is about the handler for that event in that state (`m.on(paymentPending, { event: CANCEL })`; source `*` or `<region>.*` is `m.onAny({ event: CANCEL })`): change that handler and what it needs, nothing else. One handler can draw several arrows; if the note does not say which outcome it means, ask. A note on a state may ask for a change near it: "needs a cancel" means a new edge out of that state.
-3. Change the real machine file (section 1), with JSDoc as in section 4. Two notes that contradict each other: apply neither and ask which one.
-4. Run the section 8 checks.
-5. Then, for each note you applied, change `status: open` to `status: done` and add one line under it: `  result: <what changed, one line>`. Not sure what a note means: leave it open, add `  question: <one question>`, and ask the same question in chat.
-6. Renamed or removed a state or an event: update every `on:` line that names it (`state <id>` and both parts of `edge <from> <event>`), done notes too.
-7. Never delete a note, never change its `id:`, `machine:` or `note:` lines, never add a note, except the pasted ones above. Keep one field per line with the two-space indent.
-8. Reply with one line per note: `<id> <on>: <what changed>. done` or `<id> <on>: asked "<question>"`. Right-clicking the state or arrow on the page shows each note as Done.
