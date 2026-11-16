@@ -23,6 +23,7 @@ import { pathTo } from "../findings.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
+import { keepInView } from "./keep-in-view.ts";
 import { drawChildMarkers } from "./markers.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
@@ -130,12 +131,16 @@ export function mountViewer(
       mark();
     };
     const mark = () => markDiagram(root, { machine, view, driver, pick: () => refresh() });
-    redraw = refresh;
+    const follow = () => {
+      refresh();
+      keepInView(root, view.live === null ? undefined : currentsOf(view.live, view.picked)[0]);
+    };
+    redraw = follow;
     const walked = (sent?: ViewState["sent"]) => {
       view.sent = sent ?? null;
       noticeCleared(root, view);
       navigated(options, { machine, view });
-      refresh();
+      follow();
     };
     const setValue = valueSetter({ options, machine, view, mark });
     const send = stepSender({ view, driver, walked });
@@ -159,7 +164,7 @@ export function mountViewer(
     };
     const graph = renderGraph(doc, machine, { select: showDetails });
     root.append(...layoutOf(doc, { view, showControls, graph, panel }));
-    refresh();
+    follow();
   }
 
   render();

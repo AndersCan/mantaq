@@ -222,3 +222,45 @@ test("fills a choice field shown as a row of buttons", async () => {
     expect(Either.getRight(answered)).toEqual({ state: "declined", outcome: "transition" });
   });
 }, 60_000);
+
+test("the current state stays inside the box on a phone after every send", async () => {
+  const opened = await openViz({ file: checkout, viewport: { width: 390, height: 800 } });
+  const viz = Either.getRight(opened);
+  if (viz === undefined) throw new Error(String(Either.getLeft(opened)));
+  const hidden = () =>
+    viz.page.evaluate(() => {
+      const canvas = document.querySelector<HTMLElement>(".canvas")!;
+      const box = canvas.getBoundingClientRect();
+      const left = box.left + canvas.clientLeft;
+      return [...canvas.querySelectorAll(".graph g.current[data-node-id]")]
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.left < left - 0.5 || rect.right > left + canvas.clientWidth + 0.5;
+        })
+        .map((node) => node.getAttribute("data-node-id"));
+    });
+  try {
+    expect(
+      await viz.page.evaluate(() => {
+        const canvas = document.querySelector<HTMLElement>(".canvas")!;
+        return canvas.scrollWidth > canvas.clientWidth;
+      }),
+    ).toBe(true);
+    expect(await hidden()).toEqual([]);
+    for (const event of [
+      "submitBasicInfo",
+      "submitShipping",
+      "submitPayment",
+      "paymentFail",
+      "back",
+    ]) {
+      await viz.send(event);
+      expect(await hidden(), event).toEqual([]);
+    }
+    await viz.page.goto(viz.page.url());
+    await viz.page.waitForSelector(".graph g.current");
+    expect(await hidden(), "reload").toEqual([]);
+  } finally {
+    await viz.close();
+  }
+}, 60_000);
