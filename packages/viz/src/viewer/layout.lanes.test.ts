@@ -1,7 +1,9 @@
+import counterexamples from "./reference/property-counterexamples.json" with { type: "json" };
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { PATH_GAP } from "./geometry.ts";
-import { checkedLayout, freeLane, lanePoints, laneOrder, placeMachine } from "./layout.ts";
+import type { PlacedEdge } from "./layout.ts";
+import { checkedLayout, freeLane, lanePoints, laneOrder, lanesOf, placeMachine } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
@@ -297,3 +299,102 @@ describe("lanePoints", () => {
 function cross0() {
   return { edge: 0, from: 1, yLeft: 0, yRight: 0, id: "e" };
 }
+
+describe("laneOrder titles and fallback rows", () => {
+  const gap = { start: 626, end: 686 };
+  const cross = (id: string, yLeft: number, yRight: number) => ({
+    edge: 0,
+    from: 1,
+    yLeft,
+    yRight,
+    id,
+  });
+  const order = (crossings: ReturnType<typeof cross>[], titles: Parameters<typeof laneOrder>[2]) =>
+    laneOrder({ ...gap, crossings }, [], titles).map(
+      (piece) => `${piece.crossing.id} ${piece.yLeft}→${piece.yRight}`,
+    );
+  const swap = [cross("e0", 40, 144), cross("e4", 148, 50)];
+
+  test("a title left of the gap does not block its row", () => {
+    expect(order(swap, [{ x: 500, y: 97, width: 40, height: 16 }])[0]).toBe("e0 40→97");
+  });
+
+  test("a title whose band is clear of the row but not by LANE_TITLE_CLEAR blocks it", () => {
+    expect(order(swap, [{ x: 656, y: 108, width: 40, height: 16 }])[0]).toBe("e0 40→28");
+  });
+
+  test("the row below every row is taken when the one above is under a title", () => {
+    const pair = [cross("a", 100, 112), cross("b", 114, 98)];
+    expect(order(pair, [{ x: 656, y: 86, width: 40, height: 16 }])[0]).toBe("a 100→126");
+  });
+
+  test("rows exactly 2 PATH_GAP apart leave room for a jog row between", () => {
+    expect(order([cross("a", 100, 124), cross("b", 126, 98)], [])[0]).toBe("a 100→112");
+  });
+
+  test("every row under a title: the nearest is taken anyway", () => {
+    const pair = [cross("a", 100, 126), cross("b", 128, 98)];
+    expect(order(pair, [{ x: 656, y: 113, width: 40, height: 400 }])[0]).toBe("a 100→113");
+  });
+});
+
+describe("a split arrow's path", () => {
+  test("runs level and vertical only, one lane per piece (the 3/8 machine's e4)", () => {
+    const machine = (counterexamples as VizMachine[]).at(-3);
+    if (machine === undefined) throw new Error("missing counterexample");
+    const placed = placeMachine(machine);
+    for (const { edge, points } of placed.edges) {
+      if (edge.to === edge.from) continue;
+      for (let at = 1; at < points.length; at++) {
+        const a = points[at - 1];
+        const b = points[at];
+        if (a === undefined || b === undefined) continue;
+        expect(Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 0.5).toBe(true);
+      }
+    }
+    const e4 = placed.edges.find((placedEdge) => placedEdge.edge.id === "e4");
+    expect(e4?.points).toEqual(
+      expect.arrayContaining([
+        { x: 650, y: 286 },
+        { x: 650, y: 258.25 },
+        { x: 686, y: 258.25 },
+        { x: 686, y: 230.5 },
+      ]),
+    );
+  });
+});
+
+describe("lanesOf level rows", () => {
+  const placedEdge = (id: string, points: Array<{ x: number; y: number }>): PlacedEdge => ({
+    edge: edge(id, "go", `${id}2`),
+    target: `${id}2`,
+    path: "",
+    points,
+    label: { x: 0, y: 0, width: 0, height: 0 },
+    text: { x: 0, y: 0 },
+    dotGap: 4,
+  });
+  const swap = [
+    placedEdge("a", [
+      { x: 0, y: 100 },
+      { x: 100, y: 112 },
+    ]),
+    placedEdge("b", [
+      { x: 0, y: 114 },
+      { x: 100, y: 98 },
+    ]),
+  ];
+  const ys = (placed: PlacedEdge): number[] => placed.points.map((point) => point.y);
+
+  test("a level arrow across the gap keeps the jog off its row", () => {
+    const alone = lanesOf(swap, []).edges[0];
+    const level = placedEdge("c", [
+      { x: 0, y: 86 },
+      { x: 100, y: 86 },
+    ]);
+    const blocked = lanesOf([...swap, level], []).edges[0];
+    expect(alone === undefined ? [] : ys(alone)).toContain(86);
+    expect(blocked === undefined ? [] : ys(blocked)).not.toContain(86);
+    expect(blocked === undefined ? [] : ys(blocked)).toContain(126);
+  });
+});

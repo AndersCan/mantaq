@@ -1121,7 +1121,7 @@ export function lanePoints(
  * of its own, then level: lanes are `PATH_GAP` apart, so steep arrows never
  * run alongside. A gap too narrow for its lanes reports how much to widen.
  */
-function lanesOf(
+export function lanesOf(
   edges: ReadonlyArray<PlacedEdge>,
   titles: ReadonlyArray<LabelBox>,
 ): { edges: PlacedEdge[]; widen: Widen[] } {
