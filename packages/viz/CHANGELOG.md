@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.32.0
+
+<sub>2026-11-16</sub>
+
+- _(minor)_
+  [user]: A viewer without a `driver` shows the diagram and Details only; the hand walk, `?step=` without a driver, and the exports `decodePath`, `encodeStep`, `stateAfter`, `ExploreStep` are gone.
+- _(minor)_
+  [user]: The Step tab's Send lists (input/effect/internal groups, "ignored in X", region lists) are gone: select an arrow and press Send in Details. Each worker keeps its row with Send buttons for the events its state handles. An event the current state does not handle can no longer be sent.
+- _(minor)_
+  [user]: Details show the selection's title, its doc and, for an arrow, Send; for a state, its outgoing and incoming arrows. The id, flags, region, effects, source, target and emits rows, and the Step tab's doc notes, are gone.
+- _(minor)_
+  [user]: The Step tab no longer shows 'Changed: keys', 'Effects started' or the free 'advance N ms' box; each timer keeps its own advance button.
+- _(minor)_
+  [user]: The viewer no longer draws a 'Viz: <id>' title or a machine dropdown (`heading` option removed). Next arrows are accent-coloured and still; the dashed 'reachable' box and the chip tint are gone.
+  [user]: The viewer shows one machine; the `machine` option picks which (default: the first).
+- _(minor)_
+  [user]: systemOf, linksInside and the MachineSystem, SystemEntry, SystemLink and SystemPart types are removed; nothing in the viewer used them since the parts board went.
+- _(minor)_
+  [user]: Worker rows in the Step tab now pick the worker to follow instead of sending; use the arrow's Send in Details. The row Send buttons (`[data-actor] [data-send]`), the "started", "removed" and "sent" lines (`[data-live-started]`, `[data-live-removed]`, `[data-live-sent-event]`, `.explore-now`) and the Context box placeholder are gone; Context boxes show the value Send will use.
+- _(minor)_
+  [user]: Select any arrow in the visualizer and Details either shows Send or says in one line why it can't be sent: the walk is in another state, another part sends the event, or the guard would take the walk somewhere else.
+  [user]: An arrow whose guard would land in a different state than the one drawn is now locked and says where it goes. A machine whose example values always take one branch now shows locks on the other branches; change the value in Context to try them.
+- _(patch)_
+  [user]: A diagram wider than its box scrolls sideways by itself when it opens and after Send, Back, Reset or a finished effect, so the current state is in view. Clicking a box or arrow still never scrolls.
+- _(patch)_ [user]: a state's links in Details match the arrows drawn, and arrows found by fuzzing now look like the other arrows.
+- _(patch)_
+  [user]: A pool's diagram opens with its working workers in view; when the box is too narrow for them and the machine's own state, the workers come first on open and the machine's state comes first after each step.
+
 ## 0.31.0
 
 <sub>2026-11-16</sub>
