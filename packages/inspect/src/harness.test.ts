@@ -302,3 +302,34 @@ test("a pool opens with its working workers in the box", async () => {
     await viz.close();
   }
 }, 60_000);
+
+test("a pool opens with its workers and the machine's state in a box wide enough for both", async () => {
+  const file = join(import.meta.dirname, "../../../apps/docs/src/pool/team-inbox.ts");
+  const opened = await openViz({
+    file,
+    machine: "teamInbox",
+    viewport: { width: 1280, height: 900 },
+  });
+  const viz = Either.getRight(opened);
+  if (viz === undefined) throw new Error(String(Either.getLeft(opened)));
+  try {
+    await viz.page.goto(viz.page.url() + "&run=" + encodeURIComponent("Four items, three workers"));
+    await viz.page.waitForSelector(".graph g.current");
+    const hidden = await viz.page.evaluate(() => {
+      const canvas = document.querySelector<HTMLElement>(".canvas")!;
+      const left = canvas.getBoundingClientRect().left + canvas.clientLeft;
+      return [
+        ...canvas.querySelectorAll(".graph g.current[data-node-id]"),
+        ...canvas.querySelectorAll(".graph g.child-marker[data-marker-key]"),
+      ]
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.left < left - 0.5 || rect.right > left + canvas.clientWidth + 0.5;
+        })
+        .map((node) => node.getAttribute("data-node-id") ?? node.getAttribute("data-marker-key"));
+    });
+    expect(hidden).toEqual([]);
+  } finally {
+    await viz.close();
+  }
+}, 60_000);

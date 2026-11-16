@@ -39,3 +39,18 @@ test.each([
 ])("joins the spans that fit: %j at %d", (spans, expected) => {
   expect(scrollToShow(box(0), spans)).toBe(expected);
 });
+
+test.each([
+  [0, 2366],
+  [3000, 2384],
+])("joins a later span on the left: from %d at %d", (left, expected) => {
+  const spans = [
+    { left: 2560, right: 2650 },
+    { left: 2400, right: 2520 },
+  ];
+  expect(scrollToShow(box(left), spans)).toBe(expected);
+});
+
+test("no spans moves nothing", () => {
+  expect(scrollToShow(box(40), [])).toBe(40);
+});
