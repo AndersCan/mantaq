@@ -7,8 +7,6 @@ export interface MarkerContext {
   machine: VizMachine;
   children: ReadonlyArray<VizLiveChild>;
   picked: { map: string; key: string } | null;
-  /** True only right after a step or an effect result: moves slide. */
-  motion: boolean;
   onPick(child: { map: string; key: string }): void;
 }
 
@@ -243,7 +241,6 @@ function forgetGone(live: Live, wanted: ReadonlyMap<string, Wanted>): void {
 /** Draws one marker per child in a layer kept on `svgRoot` across calls, keyed `map\0key`. */
 export function drawChildMarkers(svgRoot: SVGSVGElement, context: MarkerContext): void {
   const layer = layerOf(svgRoot);
-  layer.classList.toggle("still", !context.motion);
   const live: Live = layers.get(layer) ?? { context, elements: new Map(), kept: new Map() };
   live.context = context;
   layers.set(layer, live);

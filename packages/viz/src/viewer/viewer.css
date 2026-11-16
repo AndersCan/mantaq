@@ -528,7 +528,6 @@
 .viz .child-marker {
   cursor: pointer;
   outline: none;
-  transition: transform 250ms ease-out;
 }
 
 .viz .child-marker rect:not(.hit),
@@ -575,12 +574,7 @@
   font-size: 10px;
 }
 
-.viz .child-markers.still .child-marker {
-  transition: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .viz .child-markers .child-marker {
-    transition: none;
-  }
+.viz .explore-child[data-followed] {
+  border-left: 2px solid var(--select);
+  padding-left: 6px;
 }

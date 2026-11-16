@@ -74,3 +74,9 @@ test("a diagram wider than its canvas scrolls sideways, never clips", () => {
     expect(value).toMatch(/^(auto|scroll)$/);
   }
 });
+
+test("a child chip never slides: no child-marker rule has a transition", () => {
+  const rules = bare.split("}").filter((block) => block.split("{")[0].includes("child-marker"));
+  expect(rules.length).toBeGreaterThan(0);
+  for (const block of rules) expect(block).not.toMatch(/transition/);
+});
