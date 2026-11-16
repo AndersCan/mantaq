@@ -189,6 +189,14 @@ describe("live controls", () => {
     expect(current(root)).toBe("error");
   });
 
+  test("the timer label counts down the time already advanced", () => {
+    const { root } = mount({ steps: ['submit={"amount":5}', "@300"] });
+    expect(current(root)).toBe("paying");
+    expect(root.querySelector("[data-advance-timer]")?.textContent).toBe(
+      "advance 500 ms → paymentTimeout",
+    );
+  });
+
   test("an edge click on an event with no payload still sends at once", () => {
     const toggle: VizMachine = {
       ...checkout,

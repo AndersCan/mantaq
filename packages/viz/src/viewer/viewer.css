@@ -433,12 +433,6 @@
   padding: 6px 10px;
 }
 
-.viz .explore h3 {
-  font-size: 0.8125rem;
-  margin: 10px 0 4px;
-  color: var(--muted);
-}
-
 .viz .explore ul,
 .viz .explore ol {
   margin: 0;

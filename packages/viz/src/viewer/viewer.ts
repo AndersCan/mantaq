@@ -575,7 +575,7 @@ function eventStep(
   return { kind: "event", event, payload, ...(actor ? { actor } : {}) };
 }
 
-/** Takes one live step: and an open payload form closes. */
+/** Takes one live step; an open payload form closes. */
 function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   const length = view.live?.steps.length ?? 0;
   view.live = stepSafely(driver, { before: view.live, step });
