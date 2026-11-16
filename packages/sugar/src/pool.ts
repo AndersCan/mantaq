@@ -52,7 +52,7 @@ export interface Pool<T, N extends string> {
   resize(count: number): void;
 }
 
-interface InboxContext<T> {
+export interface InboxContext<T> {
   /** Items not yet handed out, first in line first. */
   waiting: T[];
   /** Ids of the workers that take work now. */

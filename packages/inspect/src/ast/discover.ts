@@ -91,14 +91,10 @@ function actorTypes(
   const { type, unwrap, node } = context;
   const actor = unwrap === "self" ? undefined : type.getProperty("actor");
   const main = actor === undefined ? type : checker.getTypeOfSymbolAtLocation(actor, node);
-  const others =
-    unwrap === "self"
-      ? []
-      : checker
-          .getPropertiesOfType(type)
-          .filter((property) => property.getName() !== "actor")
-          .map((property) => checker.getTypeOfSymbolAtLocation(property, node))
-          .filter((each) => hasAll(each, ACTOR_KEYS));
+  const others = checker
+    .getPropertiesOfType(type)
+    .filter((property) => property.getName() !== "actor")
+    .map((property) => checker.getTypeOfSymbolAtLocation(property, node));
   return [main, ...others];
 }
 
