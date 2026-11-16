@@ -10,7 +10,6 @@ import {
   ENTRY_LENGTH,
   LABEL_FOREIGN,
   LABEL_OWN,
-  LABEL_PAD,
   LEG_GAP,
   LEG_INSET,
   LOCK_SLOT,
@@ -20,6 +19,7 @@ import {
   STUB,
   textWidth,
 } from "./layout.ts";
+import { LABEL_PAD } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
@@ -273,6 +273,20 @@ describe("entry arrows", () => {
     const region = layout.regions[0];
     const entry = layout.entries[0];
     expect((entry?.from.x ?? 0) - 6).toBeGreaterThan((region?.x ?? 0) - (region?.width ?? 0) / 2);
+  });
+
+  test("a state that starts the machine and its region gets one entry", () => {
+    const machine = machineOf(
+      ["up.a", "up.b"],
+      [edge({ from: "up.a", event: "go", target: "up.b" })],
+    );
+    const states = machine.states.map((each) => ({
+      ...each,
+      region: "up",
+      initial: each.id === "up.a",
+    }));
+    const layout = placeMachine({ ...machine, initial: "up.a", states, regions: ["up"] });
+    expect(layout.entries).toHaveLength(1);
   });
 
   test("a machine without regions has one", () => {

@@ -110,7 +110,7 @@ describe("mountVizText", () => {
     expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
   });
 
-  test("a self-loop uses the small arrowhead", () => {
+  test("a self-loop uses the loop arrowhead", () => {
     const machine: VizMachine = {
       ...door,
       edges: [
@@ -126,8 +126,8 @@ describe("mountVizText", () => {
     expect(markerOf("open-go-done")).toBe("url(#viz-arrow)");
     const loopMarker = root.querySelector("#viz-arrow-loop");
     expect(loopMarker?.getAttribute("markerUnits")).toBe("userSpaceOnUse");
-    expect(loopMarker?.getAttribute("markerWidth")).toBe("6");
-    expect(loopMarker?.getAttribute("markerHeight")).toBe("6");
+    expect(loopMarker?.getAttribute("markerWidth")).toBe("8");
+    expect(loopMarker?.getAttribute("markerHeight")).toBe("8");
     expect(loopMarker?.querySelector("path")?.getAttribute("class")).toContain("arrow-head-loop");
   });
 

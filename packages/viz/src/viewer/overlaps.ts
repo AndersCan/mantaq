@@ -1,5 +1,6 @@
 import type { Point } from "@dagrejs/dagre";
 import { scopeOf } from "../schema.ts";
+import { ARROW_SIZE, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import type { MachineLayout } from "./layout.ts";
 
 type Part =
@@ -15,7 +16,7 @@ type Part =
 export type Rule =
   | "label-clear"
   | "path-through-node"
-  | "paths-alongside"
+  | "paths-near"
   | "arrowheads"
   | "nodes"
   | "region-edge"
@@ -37,14 +38,11 @@ interface Box {
   height: number;
 }
 
-const LABEL_PAD = 8;
 const PATH_NODE_CLEAR = 4;
 const STUB = 12;
 const SAMPLE_STEP = 2;
-const ALONGSIDE_GAP = 3;
-const ALONGSIDE_RUN = 12;
 const MARK_OVERHANG = 6;
-const ARROW_SIZE = 8;
+const ENTRY_DOT = 12;
 
 function sub(a: Point, b: Point): Point {
   return { x: a.x - b.x, y: a.y - b.y };
@@ -230,8 +228,16 @@ function beyondStubs(path: ReadonlyArray<Point>): Point[] {
 
 interface Shapes {
   nodes: Array<{ id: string; part: Part; box: Box; owner: string | null }>;
-  edges: Array<{ id: string; from: string; target: string; path: Point[]; label: Box; arrow: Box }>;
-  entries: Array<{ part: Part; line: Point[] }>;
+  edges: Array<{
+    id: string;
+    from: string;
+    target: string;
+    path: Point[];
+    route: ReadonlyArray<Point>;
+    label: Box;
+    arrow: Box;
+  }>;
+  entries: Array<{ part: Part; line: Point[]; route: Point[]; dot: Box }>;
   regions: Array<{
     part: Part;
     title: Part;
@@ -275,6 +281,7 @@ function shapesOf(layout: MachineLayout): Shapes {
         from: placed.edge.from,
         target: placed.target,
         path,
+        route: placed.points,
         label: placed.label,
         arrow: arrowBox(path),
       };
@@ -282,6 +289,8 @@ function shapesOf(layout: MachineLayout): Shapes {
     entries: layout.entries.map((entry, index) => ({
       part: `entry:${index}`,
       line: samplePolyline([entry.from, entry.to]),
+      route: [entry.from, entry.to],
+      dot: { x: entry.from.x, y: entry.from.y, width: ENTRY_DOT, height: ENTRY_DOT },
     })),
     regions: layout.regions.map((region) => ({
       part: `region:${region.region}`,
@@ -345,63 +354,128 @@ function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   if (!(pathInset >= 0)) add("outside", part, "canvas", pathInset);
   const arrowInset = insetIn(one.arrow, rest.canvas);
   if (!(arrowInset >= 0)) add("outside", `arrow:${one.id}`, "canvas", arrowInset);
-  for (const other of rest.edges.filter((each) => each.id > one.id))
-    pairOverlaps(one, other, rest, add);
 }
 
-function pairOverlaps(one: PlacedLabel, other: PlacedLabel, rest: Shapes, add: Add): void {
-  const arrowGap = boxToBox(one.arrow, other.arrow);
-  if (arrowGap < 0) add("arrowheads", `arrow:${one.id}`, `arrow:${other.id}`, arrowGap);
-  const shared = rest.nodes.some(
-    (node) =>
-      [one.from, one.target].includes(node.id) && [other.from, other.target].includes(node.id),
+/** Shortest distance between two segments that do not cross. */
+function segmentGap(a1: Point, a2: Point, b1: Point, b2: Point): number {
+  return Math.min(
+    pointToSegment(a1, b1, b2),
+    pointToSegment(a2, b1, b2),
+    pointToSegment(b1, a1, a2),
+    pointToSegment(b2, a1, a2),
   );
-  if (longestRun(shared ? beyondStubs(one.path) : one.path, other.path) > ALONGSIDE_RUN) {
-    add("paths-alongside", `path:${one.id}`, `path:${other.id}`, 0);
+}
+
+function pointToSegment(point: Point, from: Point, to: Point): number {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = dx * dx + dy * dy;
+  const t =
+    length === 0
+      ? 0
+      : Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / length));
+  return Math.hypot(point.x - (from.x + t * dx), point.y - (from.y + t * dy));
+}
+
+function cross(o: Point, a: Point, b: Point): number {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+}
+
+function segmentsCross(a1: Point, a2: Point, b1: Point, b2: Point): boolean {
+  const d1 = cross(b1, b2, a1);
+  const d2 = cross(b1, b2, a2);
+  const d3 = cross(a1, a2, b1);
+  const d4 = cross(a1, a2, b2);
+  return d1 * d2 < 0 && d3 * d4 < 0;
+}
+
+/**
+ * Two routes' closest approach. A single crossing in the middle of both
+ * segments is allowed when it is `PATH_GAP` from all four segment ends;
+ * anything else must keep `PATH_GAP` between the segments.
+ */
+function routesGap(a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): number {
+  let best = Infinity;
+  for (let i = 1; i < a.length; i++) {
+    const a1 = a[i - 1];
+    const a2 = a[i];
+    if (a1 === undefined || a2 === undefined) continue;
+    for (let j = 1; j < b.length; j++) {
+      const b1 = b[j - 1];
+      const b2 = b[j];
+      if (b1 === undefined || b2 === undefined) continue;
+      const near = crossingGap(a1, a2, b1, b2) ?? segmentGap(a1, a2, b1, b2);
+      best = Math.min(best, near);
+    }
+  }
+  return best;
+}
+
+/** For two segments that cross at one point: the distance from it to the nearest segment end; else undefined. */
+function crossingGap(a1: Point, a2: Point, b1: Point, b2: Point): number | undefined {
+  if (!segmentsCross(a1, a2, b1, b2)) return undefined;
+  const t = cross(b1, b2, a1) / (cross(b1, b2, a1) - cross(b1, b2, a2));
+  const at = { x: a1.x + t * (a2.x - a1.x), y: a1.y + t * (a2.y - a1.y) };
+  const ends = Math.min(
+    Math.hypot(at.x - a1.x, at.y - a1.y),
+    Math.hypot(at.x - a2.x, at.y - a2.y),
+    Math.hypot(at.x - b1.x, at.y - b1.y),
+    Math.hypot(at.x - b2.x, at.y - b2.y),
+  );
+  return ends;
+}
+
+/** Every arrowhead and entry dot, at least `LABEL_PAD` from every other head and from every route that is not its own. */
+function headOverlaps(shapes: Shapes, add: Add): void {
+  const heads: Array<{ part: Part; box: Box; own: ReadonlyArray<Point> }> = [
+    ...shapes.edges.map((edge) => ({
+      part: `arrow:${edge.id}` as Part,
+      box: edge.arrow,
+      own: edge.route,
+    })),
+    ...shapes.entries.flatMap((entry) => [
+      { part: entry.part, box: arrowBox(entry.route), own: entry.route },
+      { part: entry.part, box: entry.dot, own: entry.route },
+    ]),
+  ];
+  const routes: Array<{ part: Part; route: ReadonlyArray<Point>; sampled: Point[] }> = [
+    ...shapes.edges.map((edge) => ({
+      part: `path:${edge.id}` as Part,
+      route: edge.route,
+      sampled: edge.path,
+    })),
+    ...shapes.entries.map((entry) => ({
+      part: entry.part,
+      route: entry.route,
+      sampled: entry.line,
+    })),
+  ];
+  for (const [index, head] of heads.entries()) {
+    for (const other of heads.slice(index + 1)) {
+      if (other.own === head.own) continue;
+      const gap = boxToBox(head.box, other.box);
+      if (gap < LABEL_PAD) add("arrowheads", head.part, other.part, gap);
+    }
+    for (const other of routes) {
+      if (other.route === head.own) continue;
+      const gap = pathToBox(other.sampled, head.box);
+      if (gap < LABEL_PAD) add("arrowheads", head.part, other.part, gap);
+    }
   }
 }
 
-const grids = new WeakMap<ReadonlyArray<Point>, Map<number, Point[]>>();
-
-function cellKey(column: number, row: number): number {
-  return column * 100003 + row;
-}
-
-/** Points bucketed in `ALONGSIDE_GAP` cells, built once per path. */
-function gridOf(points: ReadonlyArray<Point>): Map<number, Point[]> {
-  const known = grids.get(points);
-  if (known !== undefined) return known;
-  const cells = new Map<number, Point[]>();
-  for (const point of points) {
-    const key = cellKey(Math.floor(point.x / ALONGSIDE_GAP), Math.floor(point.y / ALONGSIDE_GAP));
-    const cell = cells.get(key);
-    if (cell === undefined) cells.set(key, [point]);
-    else cell.push(point);
+function routeOverlaps(shapes: Shapes, add: Add): void {
+  const routes: Array<{ part: Part; route: ReadonlyArray<Point> }> = [
+    ...shapes.edges.map((edge) => ({ part: `path:${edge.id}` as Part, route: edge.route })),
+    ...shapes.entries.map((entry) => ({ part: entry.part, route: entry.route })),
+  ];
+  for (const [index, one] of routes.entries()) {
+    for (const other of routes.slice(index + 1)) {
+      if (boxToBox(boundsOfPath(one.route), boundsOfPath(other.route)) >= PATH_GAP) continue;
+      const gap = routesGap(one.route, other.route);
+      if (gap < PATH_GAP) add("paths-near", one.part, other.part, gap);
+    }
   }
-  grids.set(points, cells);
-  return cells;
-}
-
-/** Length of the longest stretch of `path` within `ALONGSIDE_GAP` of `other`. */
-function longestRun(path: ReadonlyArray<Point>, other: ReadonlyArray<Point>): number {
-  if (boxToBox(boundsOfPath(path), boundsOfPath(other)) >= ALONGSIDE_GAP) return 0;
-  const cells = gridOf(other);
-  const nearOther = (point: Point): boolean => {
-    const column = Math.floor(point.x / ALONGSIDE_GAP);
-    const row = Math.floor(point.y / ALONGSIDE_GAP);
-    for (let x = column - 1; x <= column + 1; x++)
-      for (let y = row - 1; y <= row + 1; y++)
-        for (const each of cells.get(cellKey(x, y)) ?? [])
-          if (Math.hypot(point.x - each.x, point.y - each.y) < ALONGSIDE_GAP) return true;
-    return false;
-  };
-  let run = 0;
-  let longest = 0;
-  for (const point of path) {
-    run = nearOther(point) ? run + SAMPLE_STEP : 0;
-    longest = Math.max(longest, run);
-  }
-  return longest;
 }
 
 function nodeOverlaps(shapes: Shapes, add: Add): void {
@@ -439,6 +513,8 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
     pathOverlaps(edge, shapes, add);
   }
   nodeOverlaps(shapes, add);
+  headOverlaps(shapes, add);
+  routeOverlaps(shapes, add);
   for (const entry of shapes.entries) {
     for (const region of shapes.regions) {
       const gap = pathToBox(entry.line, region.titleBox);

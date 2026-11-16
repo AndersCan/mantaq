@@ -1,6 +1,7 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { LABEL_PAD, placeMachine, textWidth } from "./layout.ts";
+import { LABEL_PAD } from "./geometry.ts";
+import { placeMachine, textWidth } from "./layout.ts";
 import type { MachineLayout } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -498,10 +499,8 @@ describe("a region's title row sits above every arrow that runs inside it", () =
 
   test("an arrow that leaves a map runs below the map's title row", () => {
     const laid = placeMachine(machine);
-    expect(
-      overlapsOf(laid)
-        .filter((overlap) => overlap.rule !== "paths-alongside")
-        .map((overlap) => `${overlap.rule} ${overlap.a} ${overlap.b}`),
-    ).toEqual([]);
+    expect(overlapsOf(laid).map((overlap) => `${overlap.rule} ${overlap.a} ${overlap.b}`)).toEqual(
+      [],
+    );
   });
 });

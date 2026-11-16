@@ -3,6 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
+import { ARROW_SIZE } from "./geometry.ts";
 import { LOCK_SLOT, placeMachine, textWidth } from "./layout.ts";
 
 function state(id: string, initial: boolean): VizState {
@@ -34,6 +35,23 @@ const machine: VizMachine = {
   runs: [],
   fuzz: null,
 };
+
+describe("renderGraph arrowheads", () => {
+  test("both markers draw the same fixed-size head with the tip on the path end", () => {
+    const graph = renderGraph(document, machine, {
+      select: () => undefined,
+      showDetails: () => undefined,
+      mode: "off",
+    });
+    for (const id of ["viz-arrow", "viz-arrow-loop"]) {
+      const marker = graph.querySelector(`#${id}`);
+      expect(marker?.getAttribute("markerUnits")).toBe("userSpaceOnUse");
+      expect(marker?.getAttribute("markerWidth")).toBe(String(ARROW_SIZE));
+      expect(marker?.getAttribute("markerHeight")).toBe(String(ARROW_SIZE));
+      expect(marker?.getAttribute("refX")).toBe("10");
+    }
+  });
+});
 
 describe("renderGraph width", () => {
   test("floors labels at 0.6rem and caps them at 1.4em", () => {
