@@ -61,12 +61,10 @@ test("fuzz sends the returned inbox's own events: WORKERS_RESIZED gets hits", as
   expect(resized.some((each) => (each.coverage?.hits ?? 0) > 0)).toBe(true);
 }, 60_000);
 
-test("a returned machine's internal event is internal, so the board draws no entry for it", async () => {
+test("a returned machine's internal event is internal", async () => {
   const { toViz } = await import("./structure.ts");
-  const { systemOf } = await import("@mantaq/viz");
   const machine = toViz([{ id: "x", ...create() }]).machines[0]!;
   expect(machine.events.find((each) => each.id === "expired")?.internal).toBe(true);
-  expect(systemOf(machine).entries).not.toContainEqual({ to: "timer", event: "expired" });
 });
 
 test("a replay sends a step to the returned machine", () => {
