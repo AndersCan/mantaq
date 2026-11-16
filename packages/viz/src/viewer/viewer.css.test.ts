@@ -28,12 +28,18 @@ test("a clicked item is teal and stays teal over the walk colours", () => {
   expect(listed(".viz .state:focus-visible .frame")).toMatch(/stroke:\s*var\(--select\)/);
 });
 
-test("the active state and the next arrows use the accent, and the arrows do not move", () => {
+test("the active state and the next arrows use the accent, and the arrows move", () => {
   expect(listed(".viz .current .frame")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz .next path")).toMatch(/stroke:\s*var\(--accent\)/);
-  expect(rule(".viz .next path")).not.toMatch(/animation/);
-  expect(rule(".viz .next path")).not.toMatch(/stroke-dasharray/);
-  expect(css).not.toMatch(/@keyframes/);
+  const next = listed(".viz .edge.next path");
+  expect(next).toMatch(/animation:\s*viz-march/);
+  expect(next).toMatch(/stroke-dasharray:\s*8 5/);
+  expect(bare).toMatch(/@keyframes viz-march/);
+  const reduced = bare.slice(bare.indexOf("@media (prefers-reduced-motion: reduce)"));
+  expect(reduced).toMatch(/\.viz \.edge\.next path\s*\{[^}]*animation:\s*none/);
+  const at = bare.indexOf(".viz .edge.next path");
+  expect(at).toBeGreaterThan(bare.indexOf(".viz .edge.stay path"));
+  expect(at).toBeGreaterThan(bare.indexOf(".viz .edge.internal path"));
 });
 
 test("tabs follow the host's text size", () => {
