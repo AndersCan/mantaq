@@ -339,8 +339,8 @@ describe("laneOrder titles and fallback rows", () => {
 });
 
 describe("a split arrow's path", () => {
-  test("runs level and vertical only, one lane per piece (the 3/8 machine's e4)", () => {
-    const machine = (counterexamples as VizMachine[]).at(-3);
+  test("runs level and vertical only, one lane per piece (the 2nd-last counterexample's e5)", () => {
+    const machine = (counterexamples as VizMachine[]).at(-2);
     if (machine === undefined) throw new Error("missing counterexample");
     const placed = placeMachine(machine);
     for (const { edge, points } of placed.edges) {
@@ -352,13 +352,13 @@ describe("a split arrow's path", () => {
         expect(Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 0.5).toBe(true);
       }
     }
-    const e4 = placed.edges.find((placedEdge) => placedEdge.edge.id === "e4");
-    expect(e4?.points).toEqual(
+    const e5 = placed.edges.find((placedEdge) => placedEdge.edge.id === "e5");
+    expect(e5?.points).toEqual(
       expect.arrayContaining([
-        { x: 254, y: 284.5 },
-        { x: 674, y: 284.5 },
-        { x: 674, y: 230.5 },
-        { x: 686, y: 230.5 },
+        { x: 437, y: 769 },
+        { x: 437, y: 715.5 },
+        { x: 461, y: 715.5 },
+        { x: 461, y: 658.5 },
       ]),
     );
   });
