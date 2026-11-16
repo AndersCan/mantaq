@@ -7,7 +7,7 @@ import { measure } from "./coverage-mode.ts";
 import type { CoverageMode } from "./coverage-mode.ts";
 import { activatable, html, svg } from "./dom.ts";
 import { edgeCondition, edgeLines, edgeText } from "./labels.ts";
-import { ARROW_SIZE } from "./geometry.ts";
+import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
 import { layoutMachine } from "./layout.ts";
 import { Either } from "@mantaq/utils";
 import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
@@ -201,10 +201,10 @@ function stateGroup(
       svg(doc, "rect", { ...frame, class: "frame" }),
       state.final
         ? svg(doc, "rect", {
-            x: left + 4,
-            y: top + 4,
-            width: placed.width - 8,
-            height: placed.height - 8,
+            x: left + FINAL_INSET,
+            y: top + FINAL_INSET,
+            width: placed.width - 2 * FINAL_INSET,
+            height: placed.height - 2 * FINAL_INSET,
             rx: 5,
             class: "frame inner",
           })

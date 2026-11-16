@@ -1,6 +1,6 @@
 import type { Point } from "@dagrejs/dagre";
 import { scopeOf } from "../schema.ts";
-import { ARROW_SIZE, LABEL_PAD, PATH_GAP } from "./geometry.ts";
+import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import type { MachineLayout } from "./layout.ts";
 
 type Part =
@@ -234,6 +234,8 @@ interface Shapes {
     box: Box;
     owner: string | null;
     frame: Box;
+    /** A final state's inner frame: the name and chips keep `LABEL_PAD` inside it. */
+    inner: Box | null;
     inside: Box[];
   }>;
   edges: Array<{
@@ -282,6 +284,15 @@ function shapesOf(layout: MachineLayout): Shapes {
       },
       owner: ownerOf(layout, node),
       frame: { x: node.x, y: node.y, width: node.width, height: node.height },
+      inner:
+        node.kind === "state" && node.state.final
+          ? {
+              x: node.x,
+              y: node.y,
+              width: node.width - 2 * FINAL_INSET,
+              height: node.height - 2 * FINAL_INSET,
+            }
+          : null,
       inside: node.kind === "state" ? [node.label, ...node.chips] : [],
     })),
     edges: layout.edges.map((placed) => {
@@ -493,6 +504,8 @@ function insideOverlaps(node: Shapes["nodes"][number], add: Add): void {
   for (const [index, box] of node.inside.entries()) {
     const inset = insetIn(box, node.frame);
     if (inset < LABEL_PAD) add("node-inside", node.part, node.part, inset);
+    const innerInset = node.inner === null ? Infinity : insetIn(box, node.inner);
+    if (innerInset < LABEL_PAD) add("node-inside", node.part, node.part, innerInset);
     for (const other of node.inside.slice(index + 1)) {
       const gap = boxToBox(box, other);
       if (gap < LABEL_PAD) add("node-inside", node.part, node.part, gap);

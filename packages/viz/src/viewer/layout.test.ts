@@ -312,7 +312,7 @@ describe("map-child states", () => {
       each.id === "first" ? each : { ...each, region: "photos" },
     );
     const plain = size({ ...base, states, regions: ["photos"], maps: [] }, "photos.sending");
-    expect(plain?.height).toBe(36);
+    expect(plain?.height).toBe(40);
     expect(plain?.width).toBeLessThan(168);
   });
 });
@@ -595,6 +595,26 @@ describe("space inserted for region titles", () => {
 });
 
 describe("state inside", () => {
+  test("a final state's name keeps LABEL_PAD from its inner frame; a long name clears the box at docs line height", () => {
+    const base = machineOf(["success", "submitting"], []);
+    const states = base.states.map((each) =>
+      each.id === "success" ? { ...each, final: true } : each,
+    );
+    const laid = placeMachine({ ...base, states });
+    expect(overlapsOf(laid)).toEqual([]);
+    const [success, submitting] = ["success", "submitting"].map((id) => {
+      const placed = laid.nodes.find((each) => each.id === id);
+      if (placed?.kind !== "state") throw new Error("not a state");
+      return placed;
+    });
+    // inner frame is 4 inside; name box 16 high, docs line box 21 high
+    expect(((success?.height ?? 0) - 8 - 21) / 2).toBeGreaterThanOrEqual(LABEL_PAD);
+    expect(((success?.width ?? 0) - 8 - textWidth("success")) / 2).toBeGreaterThanOrEqual(
+      LABEL_PAD,
+    );
+    expect(((submitting?.height ?? 0) - 21) / 2).toBeGreaterThanOrEqual(LABEL_PAD);
+  });
+
   const withEffects = (count: number): PlacedState => {
     const base = machineOf(["first"], []);
     const only = base.states[0];
@@ -605,8 +625,8 @@ describe("state inside", () => {
     return placed;
   };
 
-  test("height grows 36, 56, 80, 104 with 0-3 effects", () => {
-    expect([0, 1, 2, 3].map((n) => withEffects(n).height)).toEqual([36, 56, 80, 104]);
+  test("height grows 40, 56, 80, 104 with 0-3 effects", () => {
+    expect([0, 1, 2, 3].map((n) => withEffects(n).height)).toEqual([40, 56, 80, 104]);
   });
 
   test("the name box is 8px above its first chip, and the chips are 8px apart", () => {

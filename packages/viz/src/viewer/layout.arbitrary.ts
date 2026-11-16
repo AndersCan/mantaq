@@ -105,6 +105,7 @@ export const machineArbitrary: fc.Arbitrary<VizMachine> = fc
     placement: fc.array(fc.integer({ min: 0, max: 4 }), { minLength: 14, maxLength: 14 }),
     effects: fc.array(fc.array(name(3, 20), { maxLength: 3 }), { minLength: 14, maxLength: 14 }),
     withStart: fc.boolean(),
+    finals: fc.array(fc.boolean(), { minLength: 14, maxLength: 14 }),
   })
   .chain((base) => {
     const regions = REGION_NAMES.slice(0, base.regionCount).filter(
@@ -114,7 +115,10 @@ export const machineArbitrary: fc.Arbitrary<VizMachine> = fc
       const slot = base.placement[index] ?? 0;
       const region = slot === 0 ? undefined : regions[(slot - 1) % Math.max(regions.length, 1)];
       const id = region === undefined ? leaf : `${region}.${leaf}`;
-      return stateOf(id, region ?? null, false, base.effects[index] ?? []);
+      return {
+        ...stateOf(id, region ?? null, false, base.effects[index] ?? []),
+        final: base.finals[index] === true,
+      };
     });
     const used = regions.filter((region) =>
       states.some((each) => each.id.startsWith(`${region}.`)),
