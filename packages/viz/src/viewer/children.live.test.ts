@@ -1117,3 +1117,32 @@ describe("live actor map children", () => {
     ]);
   });
 });
+
+test("a click on a root state whose name starts with the map's still takes its arrow", () => {
+  const machine: VizMachine = {
+    ...photoQueue,
+    states: [...photoQueue.states, state("photosPaused")],
+    events: [...photoQueue.events, event("paused")],
+    edges: [...photoQueue.edges, edge("showingQueue", "paused", "photosPaused")],
+  };
+  const { root, sent } = mount([child("p1", "sendingPhoto")], machine);
+  root
+    .querySelector('.graph g[data-node-id="photosPaused"]')
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(sent).toMatchObject([{ kind: "event", event: "paused" }]);
+});
+
+test("each map frame lists only its own children in data-children", () => {
+  const machine: VizMachine = {
+    ...photoQueue,
+    regions: ["photos", "uploads"],
+    maps: ["photos", "uploads"],
+    states: [...photoQueue.states, state("uploads.queued", { initial: true })],
+  };
+  const upload: VizLiveChild = { map: "uploads", key: "u1", state: "uploads.queued", since: 0 };
+  const { root } = mount([child("p1", "sendingPhoto"), upload], machine);
+  const listed = (map: string) =>
+    root.querySelector(`.graph g.region[data-map="${map}"]`)?.getAttribute("data-children");
+  expect(listed("photos")).toBe(JSON.stringify([{ key: "p1", state: "photos.sendingPhoto" }]));
+  expect(listed("uploads")).toBe(JSON.stringify([{ key: "u1", state: "uploads.queued" }]));
+});

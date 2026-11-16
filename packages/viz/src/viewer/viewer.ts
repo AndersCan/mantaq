@@ -208,10 +208,10 @@ export function mountViewer(
   const view = initialView(first, options);
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
-  // Re-bound by each render: ArrowLeft steps back.
   let back: () => void = () => undefined;
   let redraw: () => void = () => undefined;
-  listenOnRoot(root, { back: () => back(), view, redraw: () => redraw() });
+  listenOnRoot(root, { back: () => back() });
+  listenForPick(root, view, () => redraw());
   const changing = { option: options.changes, seen: false, render: () => render() };
   watchDriver(view, { driver, redraw: () => redraw() });
   const setDiagramOnly = diagramOnlySwitch(root, view, () => render(), options.diagramOnly);
@@ -878,7 +878,6 @@ function isTextControl(target: EventTarget | null): boolean {
   );
 }
 
-/** A pick of a child that is gone is dropped. */
 /** A live click on a child state box walks the lowest key in it, or just shows its details when none is there. True when it was one. */
 function pickByClick(
   machine: VizMachine,
@@ -913,6 +912,7 @@ function listenForPick(root: HTMLElement, view: ViewState, redraw: () => void): 
   });
 }
 
+/** A pick of a child that is gone is dropped. */
 function dropGonePick(view: ViewState): void {
   const { picked } = view;
   const there = view.live?.children.some((c) => c.map === picked?.map && c.key === picked.key);
@@ -920,11 +920,7 @@ function dropGonePick(view: ViewState): void {
 }
 
 /** Listeners that outlive each render: ArrowLeft steps back, and the button label follows fullscreen. */
-function listenOnRoot(
-  root: HTMLElement,
-  keys: { back: () => void; view: ViewState; redraw: () => void },
-): void {
-  listenForPick(root, keys.view, keys.redraw);
+function listenOnRoot(root: HTMLElement, keys: { back: () => void }): void {
   root.addEventListener("keydown", (event) => {
     if (!("key" in event) || isTextControl(event.target)) return;
     if (event.key === "ArrowLeft") keys.back();
