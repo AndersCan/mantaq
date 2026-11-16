@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.41.1
+
+<sub>2026-11-16</sub>
+
+- _(patch)_ [user]: mantaq-check-site sends by clicking each next arrow.
+
 ## 0.41.0
 
 <sub>2026-11-16</sub>

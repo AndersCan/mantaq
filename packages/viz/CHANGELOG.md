@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.33.0
+
+<sub>2026-11-16</sub>
+
+- _(minor)_ [user]: The Full screen button is back above the diagram; in full screen the diagram widens to fill it.
+- _(minor)_
+  [user]: A click on an arrow the walk can take sends its event; on any other arrow it opens Details with why. A small ? beside each arrow label opens Details without sending. Labels are 12px wider for it.
+- _(patch)_ [user]: Arrows the walk can take next move again; reduced-motion users get still arrows.
+- _(patch)_ [user]: A timer's arrow now says it fires on its own and how many milliseconds are left; a click sends it now.
+
 ## 0.32.0
 
 <sub>2026-11-16</sub>
