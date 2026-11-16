@@ -263,3 +263,73 @@ test("the current state stays inside the box on a phone after every send", async
     await viz.close();
   }
 }, 60_000);
+
+test("a pool opens with its working workers in the box", async () => {
+  const file = join(import.meta.dirname, "../../../apps/docs/src/pool/team-inbox.ts");
+  const opened = await openViz({
+    file,
+    machine: "teamInbox",
+    viewport: { width: 630, height: 900 },
+  });
+  const viz = Either.getRight(opened);
+  if (viz === undefined) throw new Error(String(Either.getLeft(opened)));
+  const hidden = () =>
+    viz.page.evaluate(() => {
+      const canvas = document.querySelector<HTMLElement>(".canvas")!;
+      const box = canvas.getBoundingClientRect();
+      const left = box.left + canvas.clientLeft;
+      const nodes = [
+        ...canvas.querySelectorAll(".graph g.current[data-node-id]"),
+        ...canvas.querySelectorAll(".graph g.child-marker[data-marker-key]"),
+      ];
+      return nodes
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.left < left - 0.5 || rect.right > left + canvas.clientWidth + 0.5;
+        })
+        .map((node) => node.getAttribute("data-node-id") ?? node.getAttribute("data-marker-key"));
+    });
+  try {
+    await viz.page.goto(viz.page.url() + "&run=" + encodeURIComponent("Four items, three workers"));
+    await viz.page.waitForSelector(".graph g.current");
+    expect(
+      await viz.page.evaluate(() => document.querySelector<HTMLElement>(".canvas")!.clientWidth),
+    ).toBeLessThan(805);
+    expect(await hidden()).toEqual(["workWaiting"]);
+    await viz.send("team.ITEM_ARRIVED", { item: "e" });
+    expect(await hidden()).not.toContain("workWaiting");
+  } finally {
+    await viz.close();
+  }
+}, 60_000);
+
+test("a pool opens with its workers and the machine's state in a box wide enough for both", async () => {
+  const file = join(import.meta.dirname, "../../../apps/docs/src/pool/team-inbox.ts");
+  const opened = await openViz({
+    file,
+    machine: "teamInbox",
+    viewport: { width: 1280, height: 900 },
+  });
+  const viz = Either.getRight(opened);
+  if (viz === undefined) throw new Error(String(Either.getLeft(opened)));
+  try {
+    await viz.page.goto(viz.page.url() + "&run=" + encodeURIComponent("Four items, three workers"));
+    await viz.page.waitForSelector(".graph g.current");
+    const hidden = await viz.page.evaluate(() => {
+      const canvas = document.querySelector<HTMLElement>(".canvas")!;
+      const left = canvas.getBoundingClientRect().left + canvas.clientLeft;
+      return [
+        ...canvas.querySelectorAll(".graph g.current[data-node-id]"),
+        ...canvas.querySelectorAll(".graph g.child-marker[data-marker-key]"),
+      ]
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.left < left - 0.5 || rect.right > left + canvas.clientWidth + 0.5;
+        })
+        .map((node) => node.getAttribute("data-node-id") ?? node.getAttribute("data-marker-key"));
+    });
+    expect(hidden).toEqual([]);
+  } finally {
+    await viz.close();
+  }
+}, 60_000);

@@ -151,11 +151,14 @@ export function mountViewer(
     };
     const mark = () =>
       markDiagram(root, { machine, view, driver, pick: (child) => pick(child, "chip") });
-    const follow = () => {
+    const follow = (opening = false) => {
       refresh();
-      keepInView(root, view.live === null ? undefined : currentsOf(view.live, view.picked)[0]);
+      if (view.live === null) return;
+      const currents = currentsOf(view.live, view.picked);
+      const child = currents[currents.length - new Set(view.live.children.map((c) => c.map)).size];
+      keepInView(root, opening && child !== undefined ? [child, currents[0]!] : [currents[0]!]);
     };
-    redraw = follow;
+    redraw = () => follow();
     const walked = (sent?: ViewState["sent"]) => {
       view.sent = sent ?? null;
       noticeCleared(root, view);
@@ -184,7 +187,7 @@ export function mountViewer(
     };
     const graph = renderGraph(doc, machine, { select: showDetails });
     root.append(...layoutOf(doc, { view, showControls, graph, panel }));
-    follow();
+    follow(true);
   }
 
   render();
