@@ -92,6 +92,18 @@ function ofRule(layout: MachineLayout, rule: Rule): Overlap[] {
 const labelAt = (x: number, y: number) => ({ x, y });
 
 describe("overlapsOf", () => {
+  test("node-inside: a final state's name within 8px of its inner frame", () => {
+    const final = node("done", 100);
+    final.state = { ...final.state, final: true };
+    final.height = 48;
+    final.label = { x: 100, y: 100, width: 80 - 2 * 4 - 2 * 6, height: 16 };
+    expect(ofRule(layoutOf({ nodes: [final] }), "node-inside").map((each) => each.gap)).toEqual([
+      6,
+    ]);
+    final.label = { x: 100, y: 100, width: 80 - 2 * 4 - 2 * 8, height: 16 };
+    expect(ofRule(layoutOf({ nodes: [final] }), "node-inside")).toEqual([]);
+  });
+
   test("a clean layout has no overlaps, and a path may touch its own end nodes", () => {
     const layout = layoutOf({ edges: [placedEdge("e", straight, labelAt(200, 60))] });
     expect(overlapsOf(layout)).toEqual([]);

@@ -605,8 +605,8 @@ describe("state inside", () => {
     return placed;
   };
 
-  test("height grows 36, 56, 80, 104 with 0-3 effects", () => {
-    expect([0, 1, 2, 3].map((n) => withEffects(n).height)).toEqual([36, 56, 80, 104]);
+  test("height grows 36, 58, 82, 106 with 0-3 effects", () => {
+    expect([0, 1, 2, 3].map((n) => withEffects(n).height)).toEqual([36, 58, 82, 106]);
   });
 
   test("the name box is 8px above its first chip, and the chips are 8px apart", () => {

@@ -1,7 +1,7 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
-import { ARROW_SIZE, LABEL_PAD, PATH_GAP } from "./geometry.ts";
+import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
 import type { Overlap } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
@@ -122,6 +122,8 @@ const CHIP_FONT = 11;
 const NODE_HEIGHT = 36;
 const CHIP_HEIGHT = 16;
 const LABEL_HEIGHT = 16;
+/** A state name's box: tall enough for the docs font's glyphs (16.25), which edge labels never need. */
+const NAME_HEIGHT = 18;
 /** Label to its own arrow, and to any other arrow: strictly farther, so the nearest arrow is always its own. */
 export const LABEL_OWN = 8;
 export const LABEL_FOREIGN = 14;
@@ -174,29 +176,35 @@ function stateWidth(state: VizState): number {
   const chips = state.effects.map(
     (effect) => textWidth(effect.name, CHIP_FONT) + 24 + (effect.sends === null ? HINT_WIDTH : 0),
   );
-  return Math.max(80, textWidth(state.label) + 24, ...chips);
+  const frame = state.final ? 2 * FINAL_INSET : 0;
+  return Math.max(80, textWidth(state.label) + 24 + frame, ...chips.map((chip) => chip + frame));
 }
 
 function stateHeight(state: VizState): number {
-  return Math.max(
-    NODE_HEIGHT,
-    2 * LABEL_PAD + LABEL_HEIGHT + state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
+  const frame = state.final ? 2 * FINAL_INSET : 0;
+  return (
+    frame +
+    Math.max(
+      NODE_HEIGHT,
+      2 * LABEL_PAD + NAME_HEIGHT + state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
+    )
   );
 }
 
 /** The name box and chip boxes of a placed state, each `LABEL_PAD` inside and apart. */
 function insideOf(state: VizState, box: LabelBox): { label: LabelBox; chips: LabelBox[] } {
-  const top = box.y - box.height / 2;
+  const frame = state.final ? FINAL_INSET : 0;
+  const top = box.y - box.height / 2 + frame;
   const label = {
     x: box.x,
-    y: state.effects.length === 0 ? box.y : top + LABEL_PAD + LABEL_HEIGHT / 2,
+    y: state.effects.length === 0 ? box.y : top + LABEL_PAD + NAME_HEIGHT / 2,
     width: textWidth(state.label),
-    height: LABEL_HEIGHT,
+    height: NAME_HEIGHT,
   };
   const chips = state.effects.map((_, index) => ({
     x: box.x,
-    y: top + 2 * LABEL_PAD + LABEL_HEIGHT + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
-    width: box.width - 2 * LABEL_PAD,
+    y: top + 2 * LABEL_PAD + NAME_HEIGHT + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
+    width: box.width - 2 * (LABEL_PAD + frame),
     height: CHIP_HEIGHT,
   }));
   return { label, chips };
