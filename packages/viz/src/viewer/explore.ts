@@ -72,12 +72,6 @@ export function button(
   return element;
 }
 
-function docNote(doc: Document, note: { text: string | null; scope: string }): HTMLElement | null {
-  return note.text === null
-    ? null
-    : html(doc, "p", { class: "doc", "data-doc": note.scope }, [note.text]);
-}
-
 type ChildRef = { map: string; key: string };
 
 /** The key, with the map name only when the machine has more than one map. */
@@ -591,23 +585,13 @@ function afterLine(
   ]);
 }
 
-function nowSection(
-  doc: Document,
-  machine: VizMachine,
-  context: { current: string; final: boolean },
-): Array<HTMLElement | null> {
+function nowSection(doc: Document, context: { current: string; final: boolean }): HTMLElement {
   const { current, final } = context;
-  return [
-    html(doc, "p", { class: "explore-now" }, [
-      "In ",
-      html(doc, "strong", {}, [current]),
-      final ? " (final)" : "",
-    ]),
-    docNote(doc, {
-      text: machine.states.find((state) => state.id === current)?.doc ?? null,
-      scope: "state",
-    }),
-  ];
+  return html(doc, "p", { class: "explore-now" }, [
+    "In ",
+    html(doc, "strong", {}, [current]),
+    final ? " (final)" : "",
+  ]);
 }
 
 export interface ExploreParts {
@@ -661,7 +645,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       "data-done": final ? "" : null,
     },
     [
-      ...nowSection(doc, machine, { current, final }),
+      nowSection(doc, { current, final }),
       ...liveParts(doc, machine, { live, current, final }),
       html(doc, "div", { class: "explore-controls" }, [
         button(doc, ["Back"], {

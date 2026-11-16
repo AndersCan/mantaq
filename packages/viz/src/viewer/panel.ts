@@ -18,15 +18,6 @@ function list(doc: Document, rows: ReadonlyArray<Row>): HTMLDListElement {
   );
 }
 
-function joined(values: ReadonlyArray<string>): string {
-  return values.length === 0 ? "none" : values.join(", ");
-}
-
-function targetText(edge: VizEdge): string {
-  if (edge.kind === "stay") return `${edge.to ?? edge.from} (handled, no state change)`;
-  return edge.to ?? "undetermined";
-}
-
 function sourceText(from: string): string {
   return isAnyState(from) ? "any state" : from;
 }
@@ -64,26 +55,19 @@ function edgeTitle(edge: VizEdge): string {
   return edge.kind === "initial" ? `start → ${to}` : `${from} —${edge.event}→ ${to}`;
 }
 
+function docLine(doc: Document, scope: string, text: string | null): HTMLElement | null {
+  return text === null ? null : html(doc, "p", { class: "doc", "data-doc": scope }, [text]);
+}
+
 function edgePanel(
   doc: Document,
   edge: VizEdge,
-  context: { machine: VizMachine; send?: (edge: VizEdge) => HTMLElement | null },
+  send: ((edge: VizEdge) => HTMLElement | null) | undefined,
 ): HTMLElement {
-  const { machine } = context;
-  const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [edgeTitle(edge)]),
-    context.send?.(edge) ?? null,
-    list(doc, [
-      ["source", isAnyState(edge.from) ? "any state (onAny)" : edge.from],
-      [
-        "event",
-        edge.kind === "initial" ? "(initial)" : `${edge.event}${internal ? " (internal)" : ""}`,
-      ],
-      ["target", targetText(edge)],
-      ["doc", edge.doc ?? "none"],
-      ["emits", joined(edge.emits)],
-    ]),
+    send?.(edge) ?? null,
+    docLine(doc, "edge", edge.doc),
   ]);
 }
 
@@ -93,30 +77,14 @@ function statePanel(
   context: { machine: VizMachine; select: (selection: Selection) => void },
 ): HTMLElement {
   const { machine, select } = context;
-  const flags = [state.initial ? "initial" : "", state.final ? "final" : ""].filter(Boolean);
   const outgoing = machine.edges.filter(
     (edge) => edge.from === state.id || (!state.final && coveredByAny(edge.from, state.id)),
   );
   const incoming = machine.edges.filter((edge) => edge.to === state.id && edge.kind !== "initial");
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
     html(doc, "h2", {}, [`State ${state.id}`]),
+    docLine(doc, "state", state.doc),
     list(doc, [
-      ["id", state.id],
-      ["doc", state.doc ?? "none"],
-      state.region !== null && machine.maps.includes(state.region)
-        ? ["actor map", state.region]
-        : ["region", state.region ?? "(root)"],
-      ["flags", joined(flags)],
-      [
-        "effects on entry",
-        joined(
-          state.effects.map((effect) =>
-            effect.sends === null
-              ? effect.name
-              : `${effect.name} (sends ${effect.sends.join(", ") || "nothing"})`,
-          ),
-        ),
-      ],
       ["outgoing", edgeList(doc, outgoing, select)],
       ["incoming", edgeList(doc, incoming, select)],
     ]),
@@ -136,7 +104,7 @@ export function renderPanel(
   const { selection } = context;
   if (selection?.kind === "edge") {
     const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-    if (edge) return edgePanel(doc, edge, { machine, send: context.send });
+    if (edge) return edgePanel(doc, edge, context.send);
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);

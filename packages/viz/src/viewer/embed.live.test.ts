@@ -353,6 +353,7 @@ describe("live controls", () => {
     const { root } = mount();
     expect(current(root)).toBe("idle");
     expect(root.querySelectorAll(".explore [data-send]")).toHaveLength(0);
+    expect(root.querySelector(".explore [data-doc]")).toBeNull();
     clickEdge(root, "idle-submit-paying");
     root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
     expect(current(root)).toBe("paying");
@@ -1235,5 +1236,35 @@ describe("Show controls, live", () => {
     const ids = [...root.querySelectorAll("[data-tab]")].map((tab) => tab.getAttribute("data-tab"));
     expect(ids).toEqual(["step", "details"]);
     expect(root.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Step");
+  });
+});
+
+describe("Details and Step tab with docs", () => {
+  test("the Step tab shows no state doc; a sendable arrow's Details are title, Send, doc", () => {
+    const root = document.createElement("div");
+    const documented: VizMachine = {
+      ...checkout,
+      states: checkout.states.map((candidate) =>
+        candidate.id === "idle" ? { ...candidate, doc: "Waiting for an order." } : candidate,
+      ),
+      edges: checkout.edges.map((candidate) =>
+        candidate.id === "idle-submit-paying" ? { ...candidate, doc: "Pay for it." } : candidate,
+      ),
+    };
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [documented] },
+      { driver: driver() },
+    );
+    expect(current(root)).toBe("idle");
+    expect(root.querySelector(".explore [data-doc]")).toBeNull();
+    clickEdge(root, "idle-submit-paying");
+    const children = [...(root.querySelector(".details")?.children ?? [])].map(
+      (child) =>
+        child.getAttribute("data-send-edge") ??
+        child.getAttribute("data-doc") ??
+        child.tagName.toLowerCase(),
+    );
+    expect(children).toEqual(["h2", "idle-submit-paying", "edge"]);
   });
 });
