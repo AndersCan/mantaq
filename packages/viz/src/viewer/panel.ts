@@ -1,13 +1,8 @@
-import { routingWarnings } from "../routing.ts";
 import { coveredByAny, isAnyState } from "../schema.ts";
-import type { VizEdge, VizMachine, VizState, VizStep } from "../schema.ts";
-import { machineFindings } from "../findings.ts";
-import type { VizFinding } from "../findings.ts";
+import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { localName } from "./compartments.ts";
 import { activatable, html } from "./dom.ts";
-import { renderExplanation } from "./explanation.ts";
 import type { Selection } from "./graph.ts";
-import { rulesSection } from "./rules.ts";
 
 type Row = [label: string, value: Node | string];
 
@@ -23,83 +18,8 @@ function list(doc: Document, rows: ReadonlyArray<Row>): HTMLDListElement {
   );
 }
 
-/** Analysis and coverage rows, folded: they explain the tool, not the machine. */
-function debugFold(doc: Document, rows: ReadonlyArray<Row>): HTMLElement {
-  return html(doc, "details", { class: "details-debug", "data-debug": "" }, [
-    html(doc, "summary", {}, ["Analysis and coverage"]),
-    list(doc, rows),
-  ]);
-}
-
 function joined(values: ReadonlyArray<string>): string {
   return values.length === 0 ? "none" : values.join(", ");
-}
-
-function hitsText(coverage: { hits: number } | null): string {
-  return coverage === null ? "not supplied" : String(coverage.hits);
-}
-
-const ORIGIN_LABELS: Record<VizEdge["origin"], string> = {
-  declared: "declared (builder `to`)",
-  probe: "probe",
-  fuzz: "fuzz (observed, not declared)",
-};
-
-function runLabel(machine: VizMachine): string {
-  return machine.fuzz === null ? "run hits" : "fuzz hits";
-}
-
-/**
- * A declared or probed edge no fuzz run produced. `to` lists what the handler
- * may return, not what its guards allow; probing runs it with `{}` and a sample
- * context. Either way the live machine may never take it.
- */
-function predictionNote(doc: Document, edge: VizEdge, machine: VizMachine): HTMLElement | null {
-  const unobserved = edge.coverage !== null && edge.coverage.hits === 0;
-  if (
-    machine.fuzz === null ||
-    edge.origin === "fuzz" ||
-    edge.kind !== "transition" ||
-    !unobserved
-  ) {
-    return null;
-  }
-  const source =
-    edge.origin === "declared"
-      ? "The handler declares this target in `to`, but no fuzz run produced it. Its guards may never allow it."
-      : "Probing predicted this edge, but no fuzz run produced it. Probing calls the handler with an empty payload and a sample context, so this edge may be impossible in a real run.";
-  return html(doc, "p", { class: "prediction-note", role: "note" }, [
-    `${source} Fuzzing never proves that, so check the handler.`,
-  ]);
-}
-
-function stepText(step: VizStep): string {
-  if (step.kind === "advance") return `advance ${step.ms}ms`;
-  return step.payload === null ? step.event : `${step.event} ${JSON.stringify(step.payload)}`;
-}
-
-function featureOf(edge: VizEdge): string | null {
-  if (edge.kind === "stay") return `stay:${edge.from}>${edge.event}`;
-  if (edge.kind !== "transition" || edge.to === null) return null;
-  return `edge:${edge.from}>${edge.event}>${edge.to}`;
-}
-
-/** Shortest kept fuzz sequence that first reached this edge, as a numbered list. */
-function reachedBy(doc: Document, edge: VizEdge, machine: VizMachine): Node | string {
-  const feature = featureOf(edge);
-  if (machine.fuzz === null) return "not fuzzed";
-  const sequences = machine.fuzz.corpus.filter(
-    (sequence) => feature !== null && sequence.discovered.includes(feature),
-  );
-  const shortest = sequences.sort((left, right) => left.steps.length - right.steps.length)[0];
-  if (shortest === undefined) return "no kept sequence";
-  if (shortest.steps.length === 0) return "initial state";
-  return html(
-    doc,
-    "ol",
-    { class: "steps" },
-    shortest.steps.map((step) => html(doc, "li", {}, [stepText(step)])),
-  );
 }
 
 function targetText(edge: VizEdge): string {
@@ -109,14 +29,6 @@ function targetText(edge: VizEdge): string {
 
 function sourceText(from: string): string {
   return isAnyState(from) ? "any state" : from;
-}
-
-function routingNote(doc: Document, edge: VizEdge, machine: VizMachine): HTMLElement | null {
-  if (!isAnyState(edge.from)) return null;
-  const warning = routingWarnings(machine).find((each) => each.event === edge.event);
-  return warning
-    ? html(doc, "p", { class: "routing-note", role: "note" }, [warning.message])
-    : null;
 }
 
 function edgeLink(
@@ -155,16 +67,13 @@ function edgeTitle(edge: VizEdge): string {
 function edgePanel(
   doc: Document,
   edge: VizEdge,
-  context: { machine: VizMachine; replay: Replay; send?: (edge: VizEdge) => HTMLElement | null },
+  context: { machine: VizMachine; send?: (edge: VizEdge) => HTMLElement | null },
 ): HTMLElement {
-  const { machine, replay } = context;
+  const { machine } = context;
   const internal = machine.events.find((event) => event.id === edge.event)?.internal === true;
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [edgeTitle(edge)]),
     context.send?.(edge) ?? null,
-    machineWide(doc, machine, replay),
-    routingNote(doc, edge, machine),
-    predictionNote(doc, edge, machine),
     list(doc, [
       ["source", isAnyState(edge.from) ? "any state (onAny)" : edge.from],
       [
@@ -175,130 +84,15 @@ function edgePanel(
       ["doc", edge.doc ?? "none"],
       ["emits", joined(edge.emits)],
     ]),
-    debugFold(doc, [
-      ["id", edge.id],
-      ["kind", edge.kind],
-      ["origin", ORIGIN_LABELS[edge.origin]],
-      ["contexts", joined(edge.contexts)],
-      [runLabel(machine), hitsText(edge.coverage)],
-      ["test hits", hitsText(edge.tested)],
-      ["explanation", renderExplanation(doc, { edge, machine })],
-      ["reached by", reachedBy(doc, edge, machine)],
-    ]),
   ]);
-}
-
-const REPLAY_LABELS: Partial<Record<VizFinding["kind"], string>> = {
-  deadEnd: "Replay how it gets stuck",
-  handlerError: "Replay the throw",
-};
-
-type Replay = ((steps: ReadonlyArray<VizStep>) => void) | undefined;
-
-function findingArticle(doc: Document, finding: VizFinding, replay: Replay): HTMLElement {
-  const { steps } = finding;
-  const path =
-    steps === null || steps.length === 0
-      ? [html(doc, "p", { class: "finding-no-replay" }, [finding.noReplay ?? ""])]
-      : [
-          html(doc, "p", {}, ["Found by:"]),
-          html(
-            doc,
-            "ol",
-            { class: "steps" },
-            steps.map((step) => html(doc, "li", {}, [stepText(step)])),
-          ),
-        ];
-  const button =
-    replay === undefined || steps === null || steps.length === 0
-      ? null
-      : html(doc, "button", { type: "button", "data-replay": "" }, [
-          REPLAY_LABELS[finding.kind] ?? "Replay how it gets here",
-        ]);
-  button?.addEventListener("click", () => replay?.(steps ?? []));
-  return html(
-    doc,
-    "article",
-    {
-      class: "finding",
-      "data-kind": finding.kind,
-      "data-state": finding.state ?? "",
-      "data-event": finding.event ?? "",
-      ...(finding.note ? { "data-note": "" } : {}),
-    },
-    [
-      html(doc, "h4", { tabindex: "-1" }, [finding.title]),
-      html(doc, "p", {}, [finding.proof]),
-      html(doc, "p", { class: "finding-fix" }, [`Fix: ${finding.fix}`]),
-      ...path,
-      button,
-    ],
-  );
-}
-
-function findingsSection(
-  doc: Document,
-  findings: ReadonlyArray<VizFinding>,
-  context: { className: string; heading: string; count: string; replay: Replay },
-): HTMLElement | null {
-  if (findings.length === 0) return null;
-  return html(
-    doc,
-    "section",
-    { class: context.className, [context.count]: String(findings.length) },
-    [
-      html(doc, "h3", {}, [context.heading]),
-      ...findings.map((finding) => findingArticle(doc, finding, context.replay)),
-    ],
-  );
-}
-
-function bugs(findings: ReadonlyArray<VizFinding>): VizFinding[] {
-  return findings.filter((finding) => !finding.note);
-}
-
-function notes(findings: ReadonlyArray<VizFinding>): VizFinding[] {
-  return findings.filter((finding) => finding.note);
-}
-
-function notesSection(
-  doc: Document,
-  findings: ReadonlyArray<VizFinding>,
-  replay: Replay,
-): HTMLElement | null {
-  return findingsSection(doc, notes(findings), {
-    className: "state-notes",
-    heading: "Naming notes",
-    count: "data-notes",
-    replay,
-  });
-}
-
-/** Bugs about no single state (an event nobody handles); shown at the top of every Details view. */
-function machineWide(doc: Document, machine: VizMachine, replay: Replay): HTMLElement | null {
-  return findingsSection(
-    doc,
-    bugs(machineFindings(machine).filter((finding) => finding.state === null)),
-    {
-      className: "machine-findings",
-      heading: "About the whole machine",
-      count: "data-findings",
-      replay,
-    },
-  );
 }
 
 function statePanel(
   doc: Document,
   state: VizState,
-  context: {
-    machine: VizMachine;
-    select: (selection: Selection) => void;
-    replay?: (steps: ReadonlyArray<VizStep>) => void;
-  },
+  context: { machine: VizMachine; select: (selection: Selection) => void },
 ): HTMLElement {
-  const { machine, select, replay } = context;
-  const findings = machineFindings(machine).filter((finding) => finding.state === state.id);
+  const { machine, select } = context;
   const flags = [state.initial ? "initial" : "", state.final ? "final" : ""].filter(Boolean);
   const outgoing = machine.edges.filter(
     (edge) => edge.from === state.id || (!state.final && coveredByAny(edge.from, state.id)),
@@ -306,15 +100,6 @@ function statePanel(
   const incoming = machine.edges.filter((edge) => edge.to === state.id && edge.kind !== "initial");
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
     html(doc, "h2", {}, [`State ${state.id}`]),
-    machineWide(doc, machine, replay),
-    findingsSection(doc, bugs(findings), {
-      className: "state-findings",
-      heading: "Findings",
-      count: "data-findings",
-      replay,
-    }),
-    notesSection(doc, findings, replay),
-    rulesSection(doc, machine, state.id),
     list(doc, [
       ["id", state.id],
       ["doc", state.doc ?? "none"],
@@ -335,38 +120,6 @@ function statePanel(
       ["outgoing", edgeList(doc, outgoing, select)],
       ["incoming", edgeList(doc, incoming, select)],
     ]),
-    debugFold(doc, [
-      [machine.fuzz === null ? "run visits" : "fuzz visits", hitsText(state.coverage)],
-      ["test visits", hitsText(state.tested)],
-    ]),
-  ]);
-}
-
-function fuzzSummary(doc: Document, machine: VizMachine): HTMLElement | null {
-  const { fuzz } = machine;
-  if (fuzz === null) return null;
-  const errors: Node | string =
-    fuzz.errors.length === 0
-      ? "none"
-      : html(
-          doc,
-          "ul",
-          {},
-          fuzz.errors.map((error) =>
-            html(doc, "li", { class: "fuzz-error" }, [
-              `${error.from} on ${error.event}: ${error.message} — `,
-              html(doc, "code", {}, [error.steps.map(stepText).join(" → ")]),
-            ]),
-          ),
-        );
-  return html(doc, "section", { class: "fuzz-summary" }, [
-    html(doc, "h2", {}, ["Fuzz run"]),
-    list(doc, [
-      ["seed", String(fuzz.seed)],
-      ["iterations", String(fuzz.iterations)],
-      ["kept sequences", String(fuzz.corpus.length)],
-      ["handler errors", errors],
-    ]),
   ]);
 }
 
@@ -377,24 +130,17 @@ export function renderPanel(
   context: {
     selection: Selection | null;
     select: (selection: Selection) => void;
-    replay?: (steps: ReadonlyArray<VizStep>) => void;
     send?: (edge: VizEdge) => HTMLElement | null;
   },
 ): HTMLElement {
   const { selection } = context;
   if (selection?.kind === "edge") {
     const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-    if (edge) return edgePanel(doc, edge, { machine, replay: context.replay, send: context.send });
+    if (edge) return edgePanel(doc, edge, { machine, send: context.send });
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);
-    if (state)
-      return statePanel(doc, state, { machine, select: context.select, replay: context.replay });
+    if (state) return statePanel(doc, state, { machine, select: context.select });
   }
-  const wide = machineFindings(machine).filter((finding) => finding.state === null);
-  return html(doc, "div", {}, [
-    machineWide(doc, machine, context.replay),
-    notesSection(doc, wide, context.replay),
-    fuzzSummary(doc, machine),
-  ]);
+  return html(doc, "p", { class: "muted" }, ["Click a state or an arrow in the diagram."]);
 }

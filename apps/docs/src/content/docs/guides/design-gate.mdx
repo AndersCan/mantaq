@@ -65,15 +65,9 @@ checkout has 1 design error:
   - archived can never be reached. No transition leads into archived. From basicInfo, the machine can only reach basicInfo, error, payment, shippingAddress, submitting and success. Add a transition into archived, or remove it.
 ```
 
-Unreached edges and `onAny` routing warnings are not errors. They show in the visualizer and the Vite plugin's output, and do not fail the test.
+Unreached edges and `onAny` routing warnings are not errors. They show in the Vite plugin's output and do not fail the test.
 
 The reachability check is static. It reads the graph, so it needs no fuzzing: pass `fuzz: false` to skip the fuzz run. When an edge has an unknown target, the check cannot tell and reports nothing.
-
-### On the diagram
-
-The same findings show on the diagram: a state with a finding carries a "!" mark. Click it to read the finding, then **Replay** to run the events that found it.
-
-<Machine src="src/content/docs/checkout-with-bugs.ts" />
 
 ### Names
 
@@ -100,7 +94,7 @@ export const checkoutWithBugsExpectations: Expectations<typeof createCheckoutWit
 };
 ```
 
-The diagram above is built from this block: `payment` carries a "!" for `payment was reached with {"address":""}`, and Replay runs the events that got there. Editor completion offers state names and context keys, and a typo fails to compile.
+This block makes the gate report `payment was reached with {"address":""}`, with the events that got there. Editor completion offers state names and context keys, and a typo fails to compile.
 
 - `undefined` means "not set": `{ note: undefined }` matches a context without `note`.
 - A must-see miss says no fuzz run reached the context. Add a recorded run to `tests` (see "Assert what gets reached") or raise `fuzz.iterations`.

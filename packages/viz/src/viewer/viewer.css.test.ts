@@ -8,7 +8,6 @@ const rule = (selector: string) =>
 
 test("the active walk uses the accent and controls do not", () => {
   expect(rule(".viz .next path")).toMatch(/stroke:\s*var\(--accent\)/);
-  expect(rule(".viz .edge.sent path")).toMatch(/stroke:\s*var\(--accent\)/);
   expect(rule(".viz button.primary")).not.toMatch(/--accent|--select/);
   expect(rule(".viz button:focus-visible")).not.toMatch(/--accent/);
 });
@@ -36,15 +35,13 @@ test("the active state, and running edge use the accent", () => {
   expect(rule(".viz .running path")).toMatch(/stroke:\s*var\(--accent\)/);
 });
 
-test("tabs and the help link follow the host's text size", () => {
+test("tabs follow the host's text size", () => {
   expect(rule('.viz .tab-strip [role="tab"]')).toMatch(/font-size:\s*1em/);
-  expect(rule(".viz .help-link")).toMatch(/font-size:\s*1em/);
 });
 
-test("buttons, the full screen toggle and the header heading follow the host's text size", () => {
+test("buttons and the header heading follow the host's text size", () => {
   expect(css).toMatch(/\n\.viz button \{[^}]*font-size:\s*1em/);
   expect(rule(".viz :where(button, select")).toMatch(/font-size:\s*1em/);
-  expect(rule(".viz .fullscreen-toggle")).toMatch(/font-size:\s*1em/);
   expect(rule(".viz .viz-header :is(h1, h2, h3)")).toMatch(/font-size:\s*1\.385em/);
 });
 

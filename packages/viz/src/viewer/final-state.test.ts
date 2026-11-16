@@ -76,8 +76,6 @@ describe("renderGraph final state: the inner frame is drawn FINAL_INSET inside",
     const machine = machineOf([state("first", false), state("done", true)]);
     const graph = renderGraph(document, machine, {
       select: () => undefined,
-      showDetails: () => undefined,
-      mode: "off",
     });
     const done = placed(machine, "done");
     const inner = graph.querySelector('[data-node-id="done"] rect.inner');

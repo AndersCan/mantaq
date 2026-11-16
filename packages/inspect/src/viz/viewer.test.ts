@@ -1,13 +1,9 @@
 // @vitest-environment happy-dom
-import { toViz, toVizMachine } from "../structure.ts";
-import { annotateMachine } from "../ast/annotate.ts";
-import { EXAMPLE_ROOT, exampleInputs, exampleTargets, handWrittenBaselines } from "../examples.ts";
-import { withTestCoverage } from "../fuzz/coverage.ts";
+import { toViz } from "../structure.ts";
+import { exampleInputs, exampleTargets } from "../examples.ts";
 import { DEFAULT_SEED } from "@mantaq/pbt";
 
 import { createCheckoutActor } from "../fixtures/checkout.ts";
-import { createStateRoutingActor } from "../fixtures/state-routing.ts";
-import { join } from "node:path";
 import type { VizDocument, VizExplanation } from "@mantaq/viz";
 import { fuzz } from "../fuzz/fuzz.ts";
 import { fuzzedMachine } from "../fuzz/to-viz.ts";
@@ -152,10 +148,12 @@ describe("viewer: checkout", () => {
     root
       .querySelector('[data-node-id="submitting"] .chip')
       ?.dispatchEvent(new Event("click", { bubbles: true }));
-    expect(field(root, "run visits")).toBe("not supplied");
+    expect(root.querySelector("[data-selected-state]")?.getAttribute("data-selected-state")).toBe(
+      "submitting",
+    );
   });
 
-  test("clicking an edge shows source, event, target and 'not analyzed'", () => {
+  test("clicking an edge shows source, event and target", () => {
     const viz = checkout();
     const root = mount(viz);
     const edge = viz.machines[0]?.edges.find((candidate) => candidate.event === "paymentOk");
@@ -163,9 +161,6 @@ describe("viewer: checkout", () => {
     expect(field(root, "source")).toBe("submitting");
     expect(field(root, "event")).toBe("paymentOk (internal)");
     expect(field(root, "target")).toBe("success");
-    expect(field(root, "explanation")).toBe("not analyzed");
-    expect(field(root, "run hits")).toBe("not supplied");
-    expect(field(root, "test hits")).toBe("not supplied");
   });
 
   test("undetermined edge panel says undetermined, never a guessed target", () => {
@@ -179,7 +174,6 @@ describe("viewer: checkout", () => {
   test("clicking a state lists its edges and click-through selects the edge", () => {
     const root = mount(checkout());
     root.querySelector('[data-node-id="submitting"]')?.dispatchEvent(new Event("click"));
-    expect(field(root, "run visits")).toBe("not supplied");
     const links = root.querySelectorAll<HTMLElement>(".panel [data-edge-link]");
     expect(links.length).toBeGreaterThan(2);
     const first = links[0];
@@ -199,71 +193,17 @@ describe("viewer: checkout", () => {
     ).toBe("payment");
   });
 
-  test("hover highlights the edge and both endpoints", () => {
-    const viz = checkout();
-    const root = mount(viz);
-    const edge = viz.machines[0]?.edges.find((candidate) => candidate.event === "submitPayment");
-    const element = edgeElement(root, edge?.id ?? "");
-    element.dispatchEvent(new Event("mouseenter"));
-    expect([...root.querySelectorAll(".highlight")].length).toBe(3);
-    element.dispatchEvent(new Event("mouseleave"));
-    expect(root.querySelectorAll(".highlight").length).toBe(0);
-  });
-
-  test("shows no help text, only a link to the docs page; no coverage picker without a run", () => {
+  test("shows no help text or link, no coverage picker and no machine picker for one machine", () => {
     const root = mount(checkout());
     expect(root.querySelector(".banner")).toBeNull();
     expect(root.querySelector(".legend")).toBeNull();
-    const link = root.querySelector("a.help-link");
-    expect(link?.textContent).toBe("How this works");
-    expect(link?.getAttribute("href")).toBe(
-      "https://anderscan.github.io/mantaq/guides/visualizer/",
-    );
+    expect(root.querySelector("a.help-link")).toBeNull();
     expect(root.querySelector(".coverage-mode")).toBeNull();
     expect(root.querySelector(".machine-select")).toBeNull();
   });
 });
 
-function pick(root: HTMLElement, mode: string): void {
-  const select = root.querySelector<HTMLSelectElement>(".coverage-mode");
-  expect(select).not.toBeNull();
-  if (select) select.value = mode;
-  select?.dispatchEvent(new Event("change"));
-}
-
-function checkoutWithRun(): VizDocument {
-  const target = exampleTargets().find((each) => each.id === "checkout");
-  if (!target) return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [] };
-  const steps = handWrittenBaselines()["checkout"]?.[0]?.slice(0, 1) ?? [];
-  const machine = withTestCoverage(
-    target,
-    toVizMachine({ id: "checkout", actor: target.create().actor }),
-    [steps],
-  );
-  return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] };
-}
-
 describe("viewer: coverage and switching", () => {
-  test("unreached edges and states are marked", () => {
-    const root = mount(checkoutWithRun());
-    expect(root.querySelector(".coverage-mode")).not.toBeNull();
-    expect(root.classList.contains("coverage-on")).toBe(true);
-    expect(root.querySelector('[data-node-id="payment"]')?.classList.contains("unreached")).toBe(
-      true,
-    );
-    expect(
-      root.querySelector('[data-node-id="shippingAddress"]')?.classList.contains("unreached"),
-    ).toBe(false);
-    expect(root.querySelectorAll(".edge.unreached").length).toBeGreaterThan(0);
-  });
-
-  test("picking 'off' turns the overlay off", () => {
-    const root = mount(checkoutWithRun());
-    pick(root, "off");
-    expect(root.classList.contains("coverage-on")).toBe(false);
-    expect(root.querySelectorAll(".unreached").length).toBe(0);
-  });
-
   test("switcher renders every example without manual positioning", () => {
     const viz = toViz(exampleInputs());
     const root = mount(viz);
@@ -298,23 +238,6 @@ describe("viewer: fuzz results", () => {
     expect(fuzzTransitions).toEqual([]);
     expect(root.querySelectorAll(".edge.fuzz.stay").length).toBeGreaterThan(0);
   });
-
-  test("edge panel shows origin and the replay sequence that reached it", () => {
-    const viz = fuzzed("retry");
-    const root = mount(viz);
-    const edge = viz.machines[0]?.edges.find((candidate) => candidate.origin === "fuzz");
-    edgeElement(root, edge?.id ?? "").dispatchEvent(new Event("click"));
-    expect(field(root, "origin")).toBe("fuzz (observed, not declared)");
-    const steps = [...root.querySelectorAll(".panel .steps li")].map((item) => item.textContent);
-    expect(steps.at(-1)).toMatch(/^failed/);
-  });
-
-  test("idle panel shows the fuzz run summary", () => {
-    const root = mount(fuzzed("checkout"));
-    expect(root.querySelector(".fuzz-summary")).not.toBeNull();
-    expect(field(root, "seed")).toBe(String(DEFAULT_SEED));
-    expect(field(root, "handler errors")).toBe("none");
-  });
 });
 
 describe("viewer: onAny", () => {
@@ -344,107 +267,6 @@ describe("viewer: onAny", () => {
     const cancel = viz.machines[0]?.edges.find((edge) => edge.event === "CANCEL");
     edgeElement(root, cancel?.id ?? "").dispatchEvent(new Event("click"));
     expect(field(root, "source")).toBe("any state (onAny)");
-  });
-
-  test("an onAny handler that reads actor state gets the per-state routing note", () => {
-    const machine = annotateMachine(
-      toVizMachine({ id: "routing", actor: createStateRoutingActor() }),
-      {
-        file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/state-routing.ts"),
-        root: EXAMPLE_ROOT,
-      },
-    );
-    const root = mount({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] });
-    const back = machine.edges.find((edge) => edge.event === "back");
-    edgeElement(root, back?.id ?? "").dispatchEvent(new Event("click"));
-    expect(root.querySelector(".panel .routing-note")?.textContent).toMatch(
-      /^onAny\(back\) reads actor state/,
-    );
-  });
-});
-
-describe("viewer: AST explanations", () => {
-  function annotatedCredit(): VizDocument {
-    const credit = exampleTargets().find((each) => each.id === "credit");
-    if (!credit) return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [] };
-    const machine = annotateMachine(toVizMachine({ id: "credit", actor: credit.create().actor }), {
-      file: credit.source,
-      root: EXAMPLE_ROOT,
-    });
-    return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] };
-  }
-
-  test("every analyzed branch maps to a declared edge", () => {
-    const viz = annotatedCredit();
-    const root = mount(viz);
-    const apply = viz.machines[0]?.edges.find((edge) => edge.event === "apply");
-    edgeElement(root, apply?.id ?? "").dispatchEvent(new Event("click"));
-    const statuses = [...root.querySelectorAll<HTMLElement>(".panel .branch")].map(
-      (item) => item.dataset["branchStatus"],
-    );
-    expect(statuses).toEqual(["in graph", "in graph", "this edge"]);
-    expect(root.querySelector('.panel [data-explain="comparisons"]')?.textContent).toContain(
-      "payload.amount > 50000",
-    );
-  });
-
-  test("not analyzed shows reason and snippet", () => {
-    const viz = annotatedCredit();
-    const root = mount(viz);
-    const reset = viz.machines[0]?.edges.find((edge) => edge.event === "reset");
-    edgeElement(root, reset?.id ?? "").dispatchEvent(new Event("click"));
-    expect(root.querySelector('.panel [data-explain="not analyzed"]')?.textContent).toContain(
-      "resetHandler",
-    );
-    expect(root.querySelector(".panel pre")?.textContent).toBe("resetHandler");
-  });
-});
-
-describe("viewer: fuzz vs test coverage", () => {
-  function fuzzedAndTested(id: string): VizDocument {
-    const target = exampleTargets().find((each) => each.id === id);
-    if (!target) return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [] };
-    const fuzzed = fuzzedMachine(target, fuzz(target, { seed: DEFAULT_SEED, iterations: 2000 }));
-    const machine = withTestCoverage(target, fuzzed, handWrittenBaselines()[id] ?? []);
-    return { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] };
-  }
-
-  test("examples + fuzz is the default; a state or edge either source reached is not dimmed", () => {
-    const root = mount(fuzzedAndTested("checkout"));
-    expect(root.querySelector<HTMLSelectElement>(".coverage-mode")?.value).toBe("reached");
-    // The example tests never fire paymentFail, but fuzzing does.
-    const paymentFail = () =>
-      root.querySelector(
-        '.edge[data-from="submitting"][data-to="error"][aria-label*="paymentFail"]',
-      );
-    expect(paymentFail()?.classList.contains("unreached")).toBe(false);
-    pick(root, "tests");
-    expect(paymentFail()?.classList.contains("unreached")).toBe(true);
-  });
-
-  test("declared edge no fuzz run produced gets the 'guards may never allow it' note", () => {
-    const viz = fuzzedAndTested("saga");
-    const root = mount(viz);
-    const predicted = viz.machines[0]?.edges.find(
-      (edge) =>
-        edge.from === "compensatingRefund" && edge.event === "REFUND_DONE" && edge.to === "failed",
-    );
-    expect(predicted?.coverage).toEqual({ hits: 0 });
-    edgeElement(root, predicted?.id ?? "").dispatchEvent(new Event("click"));
-    expect(root.querySelector(".panel .prediction-note")?.textContent).toMatch(
-      /^The handler declares this target in `to`, but no fuzz run produced it/,
-    );
-    expect(field(root, "fuzz hits")).toBe("0");
-  });
-
-  test("edges fuzzing reached get no note", () => {
-    const viz = fuzzedAndTested("saga");
-    const root = mount(viz);
-    const reached = viz.machines[0]?.edges.find(
-      (edge) => edge.origin === "declared" && (edge.coverage?.hits ?? 0) > 0,
-    );
-    edgeElement(root, reached?.id ?? "").dispatchEvent(new Event("click"));
-    expect(root.querySelector(".panel .prediction-note")).toBeNull();
   });
 });
 
@@ -535,15 +357,13 @@ describe("viewer: explore", () => {
     expect(root.querySelector('.panel [data-selected-state="success"]')).not.toBeNull();
   });
 
-  test("back, reset, rewinding the path and ArrowLeft", () => {
+  test("back, reset and rewinding the path", () => {
     const root = mount(checkout());
     take(root, "submitBasicInfo");
     take(root, "submitShipping");
     take(root, "submitPayment");
     root.querySelector<HTMLButtonElement>('[data-explore-action="back"]')?.click();
     expect(current(root)).toBe("payment");
-    root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expect(current(root)).toBe("shippingAddress");
     root.querySelector<HTMLButtonElement>('.panel [data-rewind="1"]')?.click();
     expect(current(root)).toBe("shippingAddress");
     root.querySelector<HTMLButtonElement>('[data-explore-action="reset"]')?.click();

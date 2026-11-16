@@ -23,7 +23,6 @@ export default defineConfig({
     mantaqViz({
       machines: [
         "src/content/docs/checkout.ts",
-        "src/content/docs/checkout-with-bugs.ts",
         "src/content/docs/photo-upload.ts",
         "src/content/docs/photo-queue.ts",
         "src/design/pool.ts",

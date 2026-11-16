@@ -53,7 +53,3 @@ What each mark means and how to walk it: [How the visualizer works](https://ande
 | `machine.fuzz`        | `null` or `{ seed, iterations, corpus: [{ steps, discovered }], errors: [{ from, event, message, steps }], failedExpectations, expectations: [{ kind, state, match, held }] }`; every sequence is shrunk and replayable from a fresh actor                                                                                            |
 
 Bump `VIZ_SCHEMA_VERSION` on any breaking change. The validator accepts only the current version.
-
-## Coverage
-
-The **Coverage from** picker dims what no run reached. What each source means: the [`@mantaq/inspect` README](../inspect/README.md#coverage-two-sources-two-questions).

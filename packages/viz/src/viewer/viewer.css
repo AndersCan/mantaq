@@ -96,7 +96,6 @@
     color-scheme: dark;
   }
 }
-
 .viz .viz-header {
   display: flex;
   flex-wrap: wrap;
@@ -107,12 +106,6 @@
 .viz .viz-header :is(h1, h2, h3) {
   font-size: 1.385em;
   margin: 0;
-}
-
-.viz .help-link {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 1em;
 }
 
 /* Panel always below the graph, so the graph keeps the full width. */
@@ -279,12 +272,6 @@
   font-size: 11px;
 }
 
-.viz .chip .hint {
-  font-weight: bold;
-  fill: var(--unknown);
-  cursor: help;
-}
-
 .viz .edge.undetermined path {
   stroke: var(--unknown);
   stroke-dasharray: 6 4;
@@ -342,34 +329,9 @@
   stroke-width: 1.5;
 }
 
-.viz.coverage-on .unreached {
-  opacity: 0.35;
-}
-
-.viz.coverage-on .state.unreached .frame,
-.viz.coverage-on .edge.unreached path {
-  stroke-dasharray: 3 3;
-}
-
-.viz .highlight path,
-.viz .highlight .frame,
-.viz .highlight circle,
 .viz .selected path,
 .viz .selected .frame {
   stroke: var(--select);
-  stroke-width: 2.5;
-}
-
-.viz .chip {
-  cursor: help;
-}
-
-.viz .graph.chip-active .edge:not(.sent) {
-  opacity: 0.2;
-}
-
-.viz .edge.sent path {
-  stroke: var(--accent);
   stroke-width: 2.5;
 }
 
@@ -385,40 +347,6 @@
 
 .viz .muted {
   color: var(--muted);
-}
-
-.viz .explanation p {
-  margin: 2px 0;
-}
-
-.viz .explanation pre {
-  overflow-x: auto;
-  font-size: 0.75rem;
-  background: var(--region-bg);
-  padding: 6px;
-  border-radius: 4px;
-}
-
-.viz .branches {
-  padding-left: 16px;
-}
-
-.viz .branch[data-branch-status="not in graph"] .branch-status {
-  color: var(--unknown);
-  font-weight: 600;
-}
-
-.viz .branch[data-branch-status="this edge"] .branch-status {
-  color: var(--fg);
-  font-weight: 600;
-}
-
-.viz .prediction-note,
-.viz .routing-note {
-  background: var(--banner-bg);
-  color: var(--banner-fg);
-  padding: 6px 8px;
-  border-radius: 4px;
 }
 
 /* Explore: the walk over the drawn graph. */
@@ -487,13 +415,11 @@
     stroke-dashoffset: -13;
   }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .viz .next path {
     animation: none;
   }
 }
-
 .viz .explore {
   background: var(--region-bg);
   border-radius: 6px;
@@ -564,53 +490,12 @@
   font-weight: 600;
 }
 
-.viz .fullscreen-toggle {
-  font: inherit;
-  font-size: 1em;
-  color: var(--fg);
-  background: var(--state-bg);
-  border: 1px solid var(--state-border);
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-}
-
-.viz:fullscreen {
-  box-sizing: border-box;
-  overflow: auto;
-  padding: 16px;
-}
-
-.viz:fullscreen .viz-main {
-  min-height: 0;
-}
-
 .viz .run-notice {
   background: var(--banner-bg);
   color: var(--banner-fg);
   padding: 6px 8px;
   border-radius: 4px;
   margin: 0 0 8px;
-}
-
-.viz .finding-mark {
-  cursor: pointer;
-}
-
-.viz .finding-mark circle {
-  fill: var(--banner-bg);
-  stroke: var(--banner-fg);
-}
-
-.viz .finding-mark text {
-  fill: var(--banner-fg);
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.viz .finding-mark:focus-visible circle {
-  stroke: var(--select);
-  stroke-width: 3;
 }
 
 .viz .explore-field {
@@ -658,26 +543,13 @@
 }
 
 /* A dashed frame's shadow repeats the dashes as noise. */
-.viz .reachable .frame:not(.inner),
-.viz.coverage-on .unreached .frame:not(.inner) {
+.viz .reachable .frame:not(.inner) {
   filter: none;
-}
-
-.viz .controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .viz .show-controls {
   margin-left: auto;
   display: block;
-}
-
-.viz .details-debug summary {
-  color: var(--muted);
-  cursor: pointer;
-  margin-top: 8px;
 }
 
 .viz .explore-path-head {

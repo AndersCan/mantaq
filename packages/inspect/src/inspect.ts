@@ -101,7 +101,7 @@ export interface InspectTarget {
   source?: AnalysisSource;
   /** Sample payloads per event; replace the ones read from types. */
   payloads?: Readonly<Record<string, ReadonlyArray<VizJson>>>;
-  /** Named runs your tests take: "Coverage from: example tests", fuzz seeds, and the live page's Runs list. */
+  /** Named runs your tests take: fuzz seeds, and the live page's Runs list. */
   tests?: ReadonlyArray<VizRun>;
   /** `false` = structure only. */
   fuzz?: false | FuzzSettings;

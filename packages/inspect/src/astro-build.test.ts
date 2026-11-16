@@ -25,8 +25,6 @@ const wiredQuiet = "../fixtures/wired/quiet.ts";
 const deadEnd = "../fixtures/dead-end.ts";
 const instance = "../fixtures/instance.ts";
 const badExpectations = "../fixtures/bad-expectations.ts";
-const unhandled = "../fixtures/unhandled.ts";
-const vagueNames = "../fixtures/vague-names.ts";
 
 function page(sources: string[]): string {
   const tags = sources.map((src) => `<Machine src="${src}" />`).join("\n");
@@ -82,25 +80,16 @@ afterAll(() => {
 });
 
 describe("mantaqViz for Astro", () => {
-  test("renders findings and a viz document per Machine", () => {
+  test("renders a viz document per Machine", () => {
     document.documentElement.innerHTML = built();
     const roots = [...document.querySelectorAll<HTMLElement>(".mantaq-machine")];
     expect(roots).toHaveLength(2);
     for (const root of roots) {
       expect(Either.isRight(parseViz(root.dataset["mantaqViz"] ?? ""))).toBe(true);
     }
-    const findings = [...document.querySelectorAll<HTMLElement>(".mantaq-findings")];
-    expect(findings).toHaveLength(2);
-    expect(findings[0]?.dataset["count"]).toBe("0");
-    expect(findings[1]?.dataset["count"]).toBe("1");
-    expect(findings[0]?.textContent?.trim()).toBe("No design findings. Fuzzing is off.");
-    expect(findings[1]?.textContent?.replace(/\s+/g, " ").trim()).toBe(
-      "1 design finding in orphan: orphan can never be reached.",
-    );
-    expect(findings[1]?.querySelector("ul")).toBeNull();
   });
 
-  test("diagramOnly drops the findings section and keeps the diagram", async () => {
+  test("diagramOnly keeps the diagram", async () => {
     const root = makeSite([orphan]);
     try {
       writeFileSync(
@@ -109,39 +98,9 @@ describe("mantaqViz for Astro", () => {
       );
       await buildSite(root, [orphan]);
       document.documentElement.innerHTML = readFileSync(join(root, "dist", "index.html"), "utf8");
-      expect(document.querySelector(".mantaq-findings")).toBeNull();
-      expect(document.body.textContent).not.toContain("design finding");
       expect(
         document.querySelector(".mantaq-machine")?.hasAttribute("data-mantaq-diagram-only"),
       ).toBe(true);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  }, 120_000);
-
-  test("the banner for a machine with only a naming note says no findings", async () => {
-    const root = makeSite([vagueNames]);
-    try {
-      await buildSite(root, [vagueNames]);
-      document.documentElement.innerHTML = readFileSync(join(root, "dist", "index.html"), "utf8");
-      const banner = document.querySelector<HTMLElement>(".mantaq-findings");
-      expect(banner?.dataset["count"]).toBe("0");
-      expect(banner?.textContent?.trim()).toBe("No design findings. Fuzzing is off.");
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  }, 120_000);
-
-  test("the banner names an input no state handles", async () => {
-    const root = makeSite([unhandled]);
-    try {
-      await buildSite(root, [unhandled]);
-      document.documentElement.innerHTML = readFileSync(join(root, "dist", "index.html"), "utf8");
-      const banner = document.querySelector<HTMLElement>(".mantaq-findings");
-      expect(banner?.dataset["count"]).toBe("1");
-      expect(banner?.textContent?.replace(/\s+/g, " ").trim()).toBe(
-        "1 design finding in unhandled: callOff is declared but no state handles it.",
-      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

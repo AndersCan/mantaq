@@ -290,7 +290,7 @@ describe("mountViewer with a driver", () => {
       [...root.querySelectorAll("[data-tab-panel]")]
         .filter((panel) => !panel.hasAttribute("hidden"))
         .map((panel) => panel.getAttribute("data-tab-panel"));
-    expect(labels()).toEqual(["Step", "Context", "Path", "Details", "Controls"]);
+    expect(labels()).toEqual(["Step", "Context", "Path", "Details"]);
     expect(shown()).toEqual(["step"]);
     send(root, "go");
     expect(labels()[1]).toBe("Context (1 changed)");
@@ -333,16 +333,6 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelectorAll("[data-rewind]")).toHaveLength(2);
     root.querySelector<HTMLButtonElement>('[data-explore-action="reset"]')?.click();
     expect(root.querySelector("[data-outcome]")).toBeNull();
-  });
-
-  test("ArrowLeft steps back one live step", () => {
-    const root = mountLive();
-    send(root, "peek");
-    send(root, "peek");
-    send(root, "go");
-    root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expect(root.querySelectorAll("[data-rewind]")).toHaveLength(3);
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 
   test("hides the machine picker and ignores ?step= in live mode", () => {
@@ -398,93 +388,6 @@ describe("mountViewer with a driver", () => {
       );
     expect(mount).not.toThrow();
     expect(root.querySelector("[data-live-error]")?.textContent).toBe("Handler threw: x");
-  });
-});
-
-describe("effect chip hover", () => {
-  const withEffect: VizMachine = {
-    ...door,
-    states: door.states.map((each) =>
-      each.id === "open" ? { ...each, effects: [{ name: "greet", sends: ["go"] }] } : each,
-    ),
-  };
-
-  test("hovering a chip highlights the edges it sends, labels them and dims the rest", () => {
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect] }));
-    const chip = root.querySelector(".chip");
-    const sent = root.querySelector('[data-edge-id="open-go-done"]');
-    expect(sent?.querySelector("title")?.textContent).toBe("emitted by greet");
-    chip?.dispatchEvent(new Event("mouseenter"));
-    expect(sent?.classList.contains("sent")).toBe(true);
-    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(true);
-    chip?.dispatchEvent(new Event("mouseleave"));
-    expect(sent?.classList.contains("sent")).toBe(false);
-    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(false);
-  });
-
-  test("a chip without declared sends changes nothing", () => {
-    const none = {
-      ...withEffect,
-      states: withEffect.states.map((each) => ({
-        ...each,
-        effects: each.effects.map((effect) => ({ ...effect, sends: null })),
-      })),
-    };
-    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [none] }));
-    root.querySelector(".chip")?.dispatchEvent(new Event("mouseenter"));
-    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(false);
-  });
-});
-
-describe("effect chip hover edge cases", () => {
-  const anyMachine: VizMachine = {
-    ...door,
-    states: [
-      {
-        ...state("open", { initial: true }),
-        effects: [
-          { name: "greet", sends: ["go"] },
-          { name: "wave", sends: ["go"] },
-          { name: "lost", sends: ["nothing"] },
-        ],
-      },
-      state("done", { final: true }),
-    ],
-    events: [
-      { id: "go", internal: true, doc: null, payload: null },
-      { id: "nothing", internal: true, doc: null, payload: null },
-    ],
-    edges: [edge("__initial__", "", "open"), edge("*", "go", "done")],
-  };
-  const build = () =>
-    mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [anyMachine] }));
-  const chipOf = (root: HTMLElement, name: string) =>
-    root.querySelector(`.chip[data-effect="${name}"]`);
-
-  test("an onAny handler for a sent event is highlighted and names every emitter", () => {
-    const root = build();
-    const sent = root.querySelector('[data-edge-id="*-go-done"]');
-    expect(sent?.querySelector("title")?.textContent).toBe("emitted by greet, wave");
-    chipOf(root, "greet")?.dispatchEvent(new Event("mouseenter"));
-    expect(sent?.classList.contains("sent")).toBe(true);
-    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(true);
-  });
-
-  test("focus and blur toggle the highlight", () => {
-    const root = build();
-    const sent = root.querySelector('[data-edge-id="*-go-done"]');
-    chipOf(root, "wave")?.dispatchEvent(new Event("focusin"));
-    expect(sent?.classList.contains("sent")).toBe(true);
-    chipOf(root, "wave")?.dispatchEvent(new Event("focusout"));
-    expect(sent?.classList.contains("sent")).toBe(false);
-    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(false);
-  });
-
-  test("a sent event with no edge changes nothing", () => {
-    const root = build();
-    chipOf(root, "lost")?.dispatchEvent(new Event("mouseenter"));
-    expect(root.querySelector(".graph")?.classList.contains("chip-active")).toBe(false);
-    expect(root.querySelector(".sent")).toBeNull();
   });
 });
 
@@ -572,34 +475,17 @@ describe("walking: the selected arrow's Send", () => {
   });
 });
 
-describe("effect chip sends hint", () => {
-  const withEffect = (sends: string[] | null): VizMachine => ({
-    ...door,
-    states: door.states.map((each) =>
-      each.id === "open" ? { ...each, effects: [{ name: "announcement", sends }] } : each,
-    ),
-  });
-  const render = (sends: string[] | null) =>
-    mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect(sends)] }));
-
-  test("an effect without declared sends shows a ? with the hint", () => {
-    const hint = render(null).querySelector(".chip .hint");
-    expect(hint?.textContent).toContain("?");
-    expect(hint?.querySelector("title")?.textContent).toBe("declare `sends` to see links");
-  });
-
-  test("the chip reserves room for the hint and is labelled for keyboard users", () => {
-    const chipWidth = (sends: string[] | null) =>
-      Number(render(sends).querySelector(".chip rect")?.getAttribute("width"));
-    expect(chipWidth(null)).toBeGreaterThan(chipWidth(["go"]));
-    expect(render(null).querySelector(".chip")?.getAttribute("aria-label")).toContain(
-      "declare sends",
-    );
-  });
-
-  test("declared sends, including an empty list, show no hint", () => {
-    expect(render(["go"]).querySelector(".chip .hint")).toBeNull();
-    expect(render([]).querySelector(".chip .hint")).toBeNull();
+describe("effect chip", () => {
+  test("is labelled with its effect name for keyboard users", () => {
+    const withEffect: VizMachine = {
+      ...door,
+      states: door.states.map((each) =>
+        each.id === "open" ? { ...each, effects: [{ name: "greet", sends: null }] } : each,
+      ),
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEffect] }));
+    expect(root.querySelector(".chip")?.getAttribute("aria-label")).toBe("effect greet");
+    expect(root.querySelector(".chip .hint")).toBeNull();
   });
 });
 
@@ -639,9 +525,6 @@ describe("panelFooter", () => {
       .querySelector(`[data-node-id='${id}']`)
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-  const take = (root: HTMLElement, id: string) =>
-    root.querySelector<HTMLButtonElement>(`[data-take="${id}"]`)?.click();
-
   test("the footer renders under the tabs with no selection", () => {
     const calls: Array<ViewerSelection | undefined> = [];
     const root = live(calls, footer());
@@ -669,18 +552,5 @@ describe("panelFooter", () => {
     click(root, "done");
     click(root, "end");
     expect(root.querySelectorAll("aside.panel #f")).toHaveLength(1);
-  });
-
-  test("ArrowLeft in a text field does not step back", () => {
-    const area = document.createElement("textarea");
-    const f = footer();
-    f.append(area);
-    const root = live([], f);
-    take(root, "open-go-done");
-    take(root, "done-go-end");
-    area.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("end");
-    root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
   });
 });
