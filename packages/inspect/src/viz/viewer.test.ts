@@ -202,11 +202,12 @@ function fuzzed(id: string): VizDocument {
 describe("viewer: fuzz results", () => {
   test("fuzz-observed stays are drawn distinctly; declared transitions need no fuzz edge", () => {
     const root = mount(fuzzed("retry"));
-    const fuzzTransitions = [...root.querySelectorAll<SVGGElement>(".edge.fuzz")].filter(
-      (edge) => !edge.classList.contains("stay"),
+    const fuzzEdges = [...root.querySelectorAll<SVGGElement>(".edge")].filter((edge) =>
+      edge.dataset["edgeId"]?.startsWith("fuzz:"),
     );
+    const fuzzTransitions = fuzzEdges.filter((edge) => !edge.classList.contains("stay"));
     expect(fuzzTransitions).toEqual([]);
-    expect(root.querySelectorAll(".edge.fuzz.stay").length).toBeGreaterThan(0);
+    expect(fuzzEdges.length).toBeGreaterThan(0);
   });
 });
 

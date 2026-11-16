@@ -169,6 +169,23 @@ describe("mountVizText", () => {
     }
   });
 
+  test("the start state's incoming links leave out the start arrow", () => {
+    const file = join(import.meta.dirname, "reference", "docs-checkout.json");
+    const machine = JSON.parse(readFileSync(file, "utf8")) as VizMachine;
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    root
+      .querySelector('[data-node-id="basicInfo"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const ids = [...root.querySelectorAll(".details [data-edge-link]")].map((link) =>
+      link.getAttribute("data-edge-link"),
+    );
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids).not.toContain("__initial__->basicInfo");
+    for (const id of ids) {
+      expect(root.querySelector(`.graph g[data-edge-id="${id}"]`)).not.toBeNull();
+    }
+  });
+
   test("draws a valid document", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     expect(root.querySelectorAll(".graph g[data-node-id]")).toHaveLength(2);
