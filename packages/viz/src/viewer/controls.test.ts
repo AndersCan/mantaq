@@ -72,7 +72,7 @@ describe("diagramOnly", () => {
     expect(root.classList.contains("diagram-only")).toBe(false);
     expect(root.querySelector(".viz-header")).not.toBeNull();
     expect(root.querySelector("[data-show-controls]")).toBeNull();
-    expect(tabIds(root)).toEqual(["step", "path", "details"]);
+    expect(tabIds(root)).toEqual(["step", "details"]);
     const shown = root.querySelector('[role="tab"][aria-selected="true"]');
     expect(shown?.textContent).toBe("Step");
     expect(document.activeElement).toBe(shown);

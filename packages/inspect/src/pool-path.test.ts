@@ -13,48 +13,9 @@ const create = () => {
   return { actor: made.actor, clock, made };
 };
 const machine = toViz([{ id: "teamInbox", ...create() }]).machines[0]!;
-const pathTexts = (root: HTMLElement) =>
-  [...root.querySelectorAll("[data-rewind]")].map((b) => b.textContent);
+const current = (root: HTMLElement) => root.querySelector(".explore")?.getAttribute("data-current");
 
-test("pool: a replayed link names w1 then w2 on the Path", async () => {
-  const steps = ['team.ITEM_ARRIVED={"item":"a"}', 'team.ITEM_ARRIVED={"item":"b"}'];
-  const root = document.createElement("div");
-  mountViewer(
-    root,
-    { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
-    { driver: createDriver({ id: "teamInbox", create }), steps },
-  );
-  const first = pathTexts(root);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(first[1]).toContain("then teamInbox → w1: free → working");
-  expect(first[2]).toContain("then teamInbox → w2: free → working");
-});
-
-test("pool, real effects: a late move shown on a step stays on it after the next step", async () => {
-  const root = document.createElement("div");
-  mountViewer(
-    root,
-    { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
-    {
-      driver: createDriver({ id: "teamInbox", create }, { effectMode: "real" }),
-      steps: ['team.ITEM_ARRIVED={"item":"a"}'],
-    },
-  );
-  await new Promise((r) => setTimeout(r, 20));
-  const before = pathTexts(root)[1];
-  root.querySelector<HTMLButtonElement>('[data-send="team.ITEM_ARRIVED"]')?.click();
-  const after = pathTexts(root);
-  expect(after.length).toBe(3);
-  // The driver names the late move's sender only after the row first showed (driver follow-up).
-  expect(before).toBe(
-    "team.ITEM_ARRIVED {item a}, then teamInbox → w1: free → working; w1: working → free; teamInbox: workersBusy → allWorkersFree",
-  );
-  expect(after[1]).toBe(
-    "team.ITEM_ARRIVED {item a}, then teamInbox → w1: free → working; w1: working → free; workers → teamInbox: workersBusy → allWorkersFree",
-  );
-});
-
-test("pool: w1 finishes and takes the waiting item; the Path names both moves (plan Try it step 4)", () => {
+test("pool: w1 finishes and takes the waiting item; the diagram shows the machine busy", () => {
   const steps = [
     'team.ITEM_ARRIVED={"item":"a"}',
     'team.ITEM_ARRIVED={"item":"b"}',
@@ -67,10 +28,7 @@ test("pool: w1 finishes and takes the waiting item; the Path names both moves (p
     { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
     { driver: createDriver({ id: "teamInbox", create }), steps },
   );
-  const texts = pathTexts(root);
-  expect(texts).toHaveLength(5);
-  expect(texts[4]).toContain("teamInbox: workWaiting → workersBusy");
-  expect(texts[4]).toContain("w1: free → working");
+  expect(current(root)).toBe("workersBusy");
 });
 
 test("pool: event ids containing a dot replay from a link", () => {
@@ -83,8 +41,5 @@ test("pool: event ids containing a dot replay from a link", () => {
       steps: ['team.ITEM_ARRIVED={"item":"a"}'],
     },
   );
-  expect(root.querySelectorAll("[data-live-cascade]")).toHaveLength(1);
-  expect(pathTexts(root)[1]).toBe(
-    "team.ITEM_ARRIVED {item a}, then teamInbox → w1: free → working",
-  );
+  expect(current(root)).toBe("workersBusy");
 });

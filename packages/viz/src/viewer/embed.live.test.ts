@@ -172,7 +172,6 @@ describe("live controls", () => {
     expect(timer?.textContent).toBe("advance 800 ms → paymentTimeout");
     click(root, "[data-advance-timer]");
     expect(current(root)).toBe("error");
-    expect(root.querySelector('[data-rewind="2"]')?.textContent).toBe("advance 800 ms");
   });
 
   test("the timer label counts down the time already advanced", () => {
@@ -386,7 +385,6 @@ describe("live controls", () => {
     click(root, "[data-advance-timer]");
     click(root, '[data-explore-action="back"]');
     expect(current(root)).toBe("paying");
-    expect(root.querySelectorAll("[data-rewind]")).toHaveLength(2);
   });
 
   test("the URL steps round-trip to the same state", () => {
@@ -398,9 +396,6 @@ describe("live controls", () => {
     expect(steps).toEqual(['submit={"amount":5}', "@800"]);
     const second = mount({ steps });
     expect(current(second.root)).toBe(current(first.root));
-    expect(second.root.querySelector("[data-live-context]")?.textContent).toBe(
-      first.root.querySelector("[data-live-context]")?.textContent,
-    );
   });
 });
 
@@ -425,48 +420,6 @@ describe("runs", () => {
       },
     ],
   };
-
-  function mountRuns(onNavigate: (w: { steps: string[]; run?: string }) => void = () => undefined) {
-    const root = document.createElement("div");
-    mountViewer(
-      root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withRuns] },
-      { driver: driver(), onNavigate },
-    );
-    return root;
-  }
-
-  test("lists each run by name", () => {
-    const root = mountRuns();
-    const names = [...root.querySelectorAll("[data-run]")].map((each) => each.textContent);
-    expect(names).toEqual(["pays and times out", "submits", "empty", "breaks"]);
-  });
-
-  test("clicking a run replays it from a fresh actor and updates the URL steps", () => {
-    const seen: string[][] = [];
-    const root = mountRuns((where) => seen.push(where.steps));
-    sendSubmit(root);
-    click(root, '[data-run="pays and times out"]');
-    expect(current(root)).toBe("error");
-    expect(seen.at(-1)).toEqual(['submit={"amount":5}', "@800"]);
-    click(root, '[data-run="submits"]');
-    expect(current(root)).toBe("paying");
-    expect(seen.at(-1)).toEqual(['submit={"amount":5}']);
-  });
-
-  test("a run with no steps resets to the initial state", () => {
-    const root = mountRuns();
-    sendSubmit(root);
-    click(root, '[data-run="empty"]');
-    expect(current(root)).toBe("idle");
-  });
-
-  test("a run stops at the first step that errors", () => {
-    const root = mountRuns();
-    click(root, '[data-run="breaks"]');
-    expect(current(root)).toBe("idle");
-    expect(root.textContent).toContain("unknown event nope");
-  });
 
   function mountRun(options: { run: string; steps?: string[]; driven?: boolean }) {
     const root = document.createElement("div");
@@ -524,13 +477,6 @@ describe("runs", () => {
     );
   });
 
-  test("clicking a run reports its name to onNavigate", () => {
-    const seen: Array<{ run?: string }> = [];
-    const root = mountRuns((where) => seen.push(where));
-    click(root, '[data-run="submits"]');
-    expect(seen.at(-1)?.run).toBe("submits");
-  });
-
   test("a run name from the URL is shown as text, not markup", () => {
     const { root } = mountRun({ run: "<b>x</b>" });
     expect(root.querySelector("[data-run-missing] b")).toBeNull();
@@ -551,11 +497,6 @@ describe("runs", () => {
     picker.value = "other";
     picker.dispatchEvent(new Event("change"));
     expect(root.querySelector("[data-run-missing]")).toBeNull();
-  });
-
-  test("a machine without runs shows no Runs section", () => {
-    const { root } = mount();
-    expect(root.querySelector("[data-runs]")).toBeNull();
   });
 });
 
@@ -581,27 +522,6 @@ describe("live step encoding", () => {
   test("samples skip null payloads and other events", () => {
     expect(payloadSamples(checkout, "paymentTimeout")).toEqual([]);
     expect(payloadSamples(checkout, "submit")).toEqual([{ amount: 5 }, { amount: 9 }]);
-  });
-});
-
-describe("context highlight", () => {
-  const marked = (root: HTMLElement) =>
-    [...root.querySelectorAll("[data-live-context] [data-context-changed]")].map((node) =>
-      node.textContent?.trim(),
-    );
-
-  test("nothing is marked before a step, the changed lines after", () => {
-    const { root } = mount();
-    expect(marked(root)).toEqual([]);
-    sendSubmit(root);
-    expect(marked(root)).toEqual(['"amount": 5']);
-  });
-
-  test("Back highlights against the step before", () => {
-    const { root } = mount({ steps: ['submit={"amount":5}', "@800"] });
-    expect(marked(root)).toEqual([]);
-    click(root, '[data-explore-action="back"]');
-    expect(marked(root)).toEqual(['"amount": 5']);
   });
 });
 
@@ -696,15 +616,6 @@ describe("field forms and the context table", () => {
     expect(live.log[0]).toEqual([{ kind: "event", event: "ping", payload: null }]);
   });
 
-  test("the Context tab lists each declared field with its meaning and value", () => {
-    const { root } = mountFields();
-    click(root, '[data-send="ping"]');
-    const row = root.querySelector('[data-context-field="amount"]');
-    expect(row?.textContent).toContain("What is owed.");
-    expect(row?.textContent).toContain("not set");
-    expect(root.querySelector("[data-context-changed]")).toBeNull();
-  });
-
   const requiredMachine: VizMachine = {
     ...fieldsMachine,
     events: [
@@ -735,15 +646,6 @@ describe("field forms and the context table", () => {
       },
     ],
   };
-
-  test("the context table marks a field the last step changed", () => {
-    const { root } = mountFields(requiredMachine);
-    setBox(root, "amount", "7");
-    click(root, '[data-send="submit"]');
-    const row = root.querySelector('[data-context-field="amount"]');
-    expect(row?.hasAttribute("data-context-changed")).toBe(true);
-    expect(row?.textContent).toContain("7");
-  });
 
   test("an arrow click sends at once with the examples and opens no form", () => {
     const { root, live } = mountFields(requiredMachine);
@@ -812,12 +714,6 @@ describe("field forms and the context table", () => {
     expect(live.log[0]).toEqual([
       { kind: "event", event: "submit", payload: { amount: 1, label: "hi" } },
     ]);
-  });
-
-  test("a context without declared fields falls back to the JSON view", () => {
-    const { root } = mountFields({ ...fieldsMachine, context: null });
-    expect(root.querySelector("[data-context-fields]")).toBeNull();
-    expect(root.querySelector("[data-live-context] pre")).not.toBeNull();
   });
 });
 
@@ -1228,15 +1124,6 @@ describe("live effect reports", () => {
   describe("held", () => {
     const line = (root: HTMLElement, hook: string) =>
       root.querySelector(`[data-live-${hook}]`)?.textContent;
-    const waitingOn = (root: HTMLElement) =>
-      root.querySelector<HTMLElement>('.explore-now [data-waiting-on="fetchList"]');
-    const withEffect = (sends: string[] | null): VizMachine => ({
-      ...fetcher,
-      states: fetcher.states.map((each) =>
-        each.id === "fetching" ? { ...each, effects: [{ name: "fetchList", sends }] } : each,
-      ),
-    });
-
     test("the live section carries the effect mode and no explaining paragraph", () => {
       const root = mountFetcher({ mode: "held" });
       const section = root.querySelector("section.explore");
@@ -1244,14 +1131,6 @@ describe("live effect reports", () => {
       expect(section?.getAttribute("data-effect-mode")).toBe("held");
       expect(root.querySelector(".explore-note")).toBeNull();
       expect(root.querySelector(".explore-waiting")).toBeNull();
-    });
-
-    test("the state line says what it waits for and what that reports", () => {
-      const root = mountFetcher({ mode: "held" });
-      expect(root.querySelector(".explore-now")?.textContent).toBe(
-        "In fetching, waiting for fetchList",
-      );
-      expect(waitingOn(root)?.getAttribute("data-reports")).toBe("listFetched fetchFailed");
     });
 
     test("its reports are sends in the fold's effect group", () => {
@@ -1346,88 +1225,7 @@ describe("live effect reports", () => {
       expect(root.querySelector(".explore-effects")).toBeNull();
     });
 
-    test("an effect that reports nothing is not named", () => {
-      const root = mountFetcher({ mode: "held", machine: withEffect([]) });
-      expect(root.querySelector("[data-waiting-on]")).toBeNull();
-      expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching");
-    });
-
-    test("an effect that does not declare its reports is named with none", () => {
-      const root = mountFetcher({ mode: "held", machine: withEffect(null) });
-      expect(waitingOn(root)?.getAttribute("data-reports")).toBe("");
-      expect(waitingOn(root)?.textContent).toBe("fetchList");
-    });
-
-    test("an effect that is not waiting is not named", () => {
-      const root = mountFetcher({ mode: "held", held: [] });
-      expect(root.querySelector("[data-waiting-on]")).toBeNull();
-    });
-
-    test("a held effect in a region is named on the region's line", () => {
-      const machine: VizMachine = {
-        ...fetcher,
-        regions: ["upload"],
-        states: [
-          state("waiting", { initial: true }),
-          {
-            ...state("upload.sending"),
-            effects: [{ name: "sendPhoto", sends: ["photoSent"] }],
-          },
-        ],
-        events: [{ id: "photoSent", internal: true, doc: null, payload: null }],
-        edges: [edge("upload.sending", "photoSent", "upload.sending")],
-      };
-      const live: VizLiveState = {
-        state: "waiting",
-        steps: [],
-        last: null,
-        after: [],
-        timers: [],
-        context: null,
-        payload: null,
-        children: [],
-        regions: { upload: "upload.sending" },
-        effectMode: "held",
-        waiting: ["sendPhoto"],
-      };
-      const root = document.createElement("div");
-      mountViewer(
-        root,
-        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
-        {
-          driver: { reset: () => live, step: () => live },
-        },
-      );
-      const line = root.querySelector('.explore-region-now [data-waiting-on="sendPhoto"]');
-      expect(line?.getAttribute("data-reports")).toBe("photoSent");
-      expect(
-        root.querySelector(".explore-now:not(.explore-region-now) [data-waiting-on]"),
-      ).toBeNull();
-      expect(root.querySelector('[data-send="photoSent"]')).not.toBeNull();
-    });
-
-    test("two waiting effects are joined with a comma", () => {
-      const machine: VizMachine = {
-        ...fetcher,
-        states: fetcher.states.map((each) =>
-          each.id === "fetching"
-            ? {
-                ...each,
-                effects: [
-                  { name: "fetchList", sends: ["listFetched"] },
-                  { name: "fetchMore", sends: ["fetchFailed"] },
-                ],
-              }
-            : each,
-        ),
-      };
-      const root = mountFetcher({ mode: "held", machine, held: ["fetchList", "fetchMore"] });
-      expect(root.querySelector(".explore-now")?.textContent).toBe(
-        "In fetching, waiting for fetchList, fetchMore",
-      );
-    });
-
-    test("a final root with a held effect does not say it waits", () => {
+    test("a final root with a held effect shows no clock", () => {
       const machine: VizMachine = {
         ...fetcher,
         states: fetcher.states.map((each) =>
@@ -1436,57 +1234,15 @@ describe("live effect reports", () => {
       };
       const root = mountFetcher({ mode: "held", machine });
       expect(root.querySelector(".explore-now")?.textContent).toBe("In fetching (final)");
-      expect(root.querySelector("[data-waiting-on]")).toBeNull();
       expect(root.querySelector("[data-advance]")).toBeNull();
     });
 
-    test("a final region with a held effect does not say it waits", () => {
-      const machine: VizMachine = {
-        ...fetcher,
-        regions: ["upload"],
-        states: [
-          state("waiting", { initial: true }),
-          {
-            ...state("upload.sending"),
-            final: true,
-            effects: [{ name: "sendPhoto", sends: ["photoSent"] }],
-          },
-        ],
-        events: [{ id: "photoSent", internal: true, doc: null, payload: null }],
-        edges: [],
-      };
-      const live: VizLiveState = {
-        state: "waiting",
-        steps: [],
-        last: null,
-        after: [],
-        timers: [],
-        context: null,
-        payload: null,
-        children: [],
-        regions: { upload: "upload.sending" },
-        effectMode: "held",
-        waiting: ["sendPhoto"],
-      };
-      const root = document.createElement("div");
-      mountViewer(
-        root,
-        { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
-        { driver: { reset: () => live, step: () => live } },
-      );
-      expect(root.querySelector(".explore-region-now")?.textContent).toBe(
-        "upload: in sending (final)",
-      );
-      expect(root.querySelector("[data-waiting-on]")).toBeNull();
-    });
-
-    test("picking a report moves on and Back returns to waiting", () => {
+    test("picking a report moves on and Back returns to the state", () => {
       const root = mountFetcher({ mode: "held" });
       click(root, '[data-send="fetchFailed"]');
       expect(current(root)).toBe("couldNotFetch");
-      expect(waitingOn(root)).toBeNull();
       click(root, '[data-explore-action="back"]');
-      expect(waitingOn(root)).not.toBeNull();
+      expect(current(root)).toBe("fetching");
     });
   });
 
@@ -1499,7 +1255,7 @@ describe("live effect reports", () => {
 });
 
 describe("Show controls, live", () => {
-  test("opens the Step tab, and the Context tab when events carry fields", () => {
+  test("opens the Step tab", () => {
     const root = document.createElement("div");
     mountViewer(
       root,
@@ -1509,7 +1265,7 @@ describe("Show controls, live", () => {
     expect(root.querySelector(".panel")).toBeNull();
     click(root, "[data-show-controls]");
     const ids = [...root.querySelectorAll("[data-tab]")].map((tab) => tab.getAttribute("data-tab"));
-    expect(ids).toEqual(["step", "context", "path", "details"]);
+    expect(ids).toEqual(["step", "details"]);
     expect(root.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Step");
   });
 });

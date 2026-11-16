@@ -25,7 +25,7 @@ import {
   stateAfter,
 } from "../moves.ts";
 import type { ExploreStep } from "../moves.ts";
-import { button, code, explorePanel, markExplore, changedLines } from "./explore.ts";
+import { button, code, explorePanel, markExplore } from "./explore.ts";
 import type { ExploreContext, ExploreParts } from "./explore.ts";
 import { blockedEdges } from "./blocked.ts";
 import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
@@ -41,8 +41,6 @@ interface ViewState {
   path: ExploreStep[];
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
-  /** Entry i is the driver's `last` for `live.steps[i]`. */
-  outcomes: Array<VizLiveStep | null>;
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
   afters: VizLiveStep[][];
   /** Context before the last live step; undefined when no step ran. */
@@ -67,7 +65,7 @@ interface ViewState {
   blockedFor: { live: VizLiveState; picked: ViewState["picked"]; values: Values } | null;
 }
 
-type PanelTab = "screen" | "step" | "context" | "path" | "details";
+type PanelTab = "screen" | "step" | "context" | "details";
 
 function machineSelect(
   doc: Document,
@@ -108,18 +106,8 @@ export interface ViewerOptions {
   run?: string;
   /** Values events are sent with, as `name=<json>` (from `?value=`); the Context tab sets them. */
   values?: ReadonlyArray<string>;
-  /** Called after every walk, value or machine change, e.g. to keep the URL shareable. `run` is set when the walk is a run just played from the Runs list. */
-  onNavigate?: (where: {
-    machine: string;
-    steps: string[];
-    values: string[];
-    run?: string;
-  }) => void;
-  /**
-   * Content under the panel tabs for the selected state or edge (undefined: nothing selected).
-   * Called on every panel refresh; may return the same node each time. The live page shows notes here.
-   */
-  panelFooter?: (selection: Selection | undefined) => Node | undefined;
+  /** Called after every walk, value or machine change, e.g. to keep the URL shareable. */
+  onNavigate?: (where: { machine: string; steps: string[]; values: string[] }) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
   /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state. */
@@ -174,7 +162,7 @@ export function mountViewer(
         path: view.path,
         take,
         rewind,
-        ...liveOf(view, { send, play, sendEvent, setValue, routes: options.routes }),
+        ...liveOf(view, { send, sendEvent, setValue, routes: options.routes }),
       });
       const details = detailsOf(doc, {
         machine,
@@ -182,18 +170,17 @@ export function mountViewer(
         select: showDetails,
         send: sendFor({ root, doc, machine, view, driver }, { sendEvent, take }),
       });
-      const footer = options.panelFooter;
       const screen = screenOf(options, view);
-      fillPanel(panel, { doc, view, parts: stepTab, details, screen, refresh, footer });
+      panel.replaceChildren(panelTabs(doc, { view, parts: stepTab, details, screen, refresh }));
       mark();
     };
     const mark = () => markDiagram(root, { machine, view, driver, pick: () => refresh() });
     redraw = refresh;
-    const walked = (run?: string, sent?: ViewState["sent"]) => {
+    const walked = (sent?: ViewState["sent"]) => {
       view.sent = sent ?? null;
       view.motion = true;
       noticeCleared(root, view);
-      navigated(options, { machine, view, run });
+      navigated(options, { machine, view });
       refresh();
     };
     const setValue = valueSetter({ options, machine, view, mark });
@@ -203,11 +190,6 @@ export function mountViewer(
     const take = (step: ExploreStep) => {
       view.path = [...view.path, step];
       walked();
-    };
-    const play = (steps: ReadonlyArray<VizStep>, run?: string, tab?: ViewState["tab"]) => {
-      if (tab !== undefined) view.tab = tab;
-      if (driver !== undefined) replayInto(view, driver, steps);
-      walked(run);
     };
     const rewind = (length: number) => {
       rewindView(view, driver, length);
@@ -380,7 +362,6 @@ function initialView(machine: VizMachine | undefined, options: ViewerOptions): V
         ? []
         : decodePath(machine, options.steps ?? []),
     live: null,
-    outcomes: [],
     afters: [],
     previous: undefined,
     picked: null,
@@ -436,7 +417,7 @@ function runNotice(machine: VizMachine, run: { name: string; found: boolean }): 
 
 type LiveContext = NonNullable<ExploreContext["live"]>;
 
-/** Step, Context (live only), Path and Details as tabs; Context counts the lines the last step changed. */
+/** The Step, Context and Details tabs; Context only live and with value fields. */
 function panelTabs(
   doc: Document,
   context: {
@@ -448,7 +429,6 @@ function panelTabs(
   },
 ): HTMLElement {
   const { view, parts } = context;
-  const changed = view.live === null ? 0 : changedLines(view.live, view.previous);
   const all: Array<Tab<PanelTab> | null> = [
     context.screen === undefined
       ? null
@@ -458,10 +438,9 @@ function panelTabs(
       ? null
       : {
           id: "context",
-          label: changed === 0 ? "Context" : `Context (${changed} changed)`,
+          label: "Context",
           content: parts.context,
         },
-    { id: "path", label: "Path", content: parts.path },
     { id: "details", label: "Details", content: context.details },
   ];
   const shown = all.filter((tab): tab is Tab<PanelTab> => tab !== null);
@@ -479,13 +458,12 @@ function panelTabs(
 /** The live driver's part of the panel context. */
 function liveOf(
   view: ViewState,
-  handlers: Pick<LiveContext, "send" | "play" | "sendEvent" | "setValue" | "routes">,
+  handlers: Pick<LiveContext, "send" | "sendEvent" | "setValue" | "routes">,
 ): { live?: LiveContext } {
   if (view.live === null) return {};
   return {
     live: {
       state: view.live,
-      outcomes: view.outcomes,
       afters: view.afters,
       previous: view.previous,
       picked: view.picked,
@@ -546,13 +524,13 @@ function valueSetter(context: {
 function stepSender(context: {
   view: ViewState;
   driver: VizDriver | undefined;
-  walked: (run?: string, sent?: ViewState["sent"]) => void;
+  walked: (sent?: ViewState["sent"]) => void;
 }): (step: VizStep, sent?: ViewState["sent"]) => void {
   const { view, driver, walked } = context;
   return (step, sent) => {
     if (driver === undefined) return;
     stepInto(view, driver, step);
-    walked(undefined, sent);
+    walked(sent);
   };
 }
 
@@ -562,16 +540,12 @@ function noticeCleared(root: HTMLElement, view: ViewState): void {
 }
 
 /** Tells the host where the walk and the values now are. */
-function navigated(
-  options: ViewerOptions,
-  now: { machine: VizMachine; view: ViewState; run?: string },
-): void {
-  const { machine, view, run } = now;
+function navigated(options: ViewerOptions, now: { machine: VizMachine; view: ViewState }): void {
+  const { machine, view } = now;
   options.onNavigate?.({
     machine: machine.id,
     steps: walkedSteps(machine, view),
     values: encodeValues(view.values),
-    ...(run === undefined ? {} : { run }),
   });
 }
 
@@ -602,7 +576,6 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   const length = view.live?.steps.length ?? 0;
   view.live = stepSafely(driver, { before: view.live, step });
   if (view.live.steps.length === length + 1) {
-    view.outcomes.push(view.live.last);
     view.afters.push(view.live.after);
   }
 }
@@ -613,7 +586,6 @@ function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<Viz
   view.previous = steps.length === 0 ? undefined : replay(driver, steps.slice(0, -1)).live.context;
   const played = replay(driver, steps);
   view.live = played.live;
-  view.outcomes = played.outcomes;
   view.afters = played.afters;
 }
 
@@ -641,18 +613,6 @@ function stepSafely(
       after: before.after,
     };
   }
-}
-
-function fillPanel(
-  panel: HTMLElement,
-  context: Parameters<typeof panelTabs>[1] & {
-    doc: Document;
-    footer: ViewerOptions["panelFooter"];
-  },
-): void {
-  const { doc, footer, ...tabs } = context;
-  const node = footer?.(tabs.view.selection ?? undefined);
-  panel.replaceChildren(panelTabs(doc, tabs), ...(node === undefined ? [] : [node]));
 }
 
 /** A pick of a child that is gone is dropped. */
@@ -772,18 +732,16 @@ function liveState(view: ViewState): { currents?: string[] } {
 function replay(
   driver: VizDriver,
   steps: ReadonlyArray<VizStep>,
-): { live: VizLiveState; outcomes: Array<VizLiveStep | null>; afters: VizLiveStep[][] } {
+): { live: VizLiveState; afters: VizLiveStep[][] } {
   let live = driver.reset();
-  const outcomes: Array<VizLiveStep | null> = [];
   const afters: VizLiveStep[][] = [];
   for (const step of steps) {
     const length = live.steps.length;
     live = stepSafely(driver, { before: live, step });
     if (live.steps.length === length + 1) {
-      outcomes.push(live.last);
       afters.push(live.after);
     }
-    if (live.last?.error) return { live, outcomes, afters };
+    if (live.last?.error) return { live, afters };
   }
-  return { live, outcomes, afters };
+  return { live, afters };
 }

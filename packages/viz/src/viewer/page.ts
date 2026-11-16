@@ -4,20 +4,14 @@
 import type { ViewerOptions } from "./embed.ts";
 import "./viewer.css";
 
-function rememberWalk(where: {
-  machine: string;
-  steps: string[];
-  values: string[];
-  run?: string;
-}): void {
+function rememberWalk(where: { machine: string; steps: string[]; values: string[] }): void {
   const next = new URLSearchParams(location.search);
   next.set("machine", where.machine);
   next.delete("step");
   next.delete("run");
   next.delete("value");
   for (const value of where.values) next.append("value", value);
-  if (where.run !== undefined) next.set("run", where.run);
-  else for (const step of where.steps) next.append("step", step);
+  for (const step of where.steps) next.append("step", step);
   history.replaceState(null, "", `?${next.toString()}`);
 }
 

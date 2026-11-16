@@ -1,6 +1,6 @@
 /**
  * Drive a machine on the live viz in headless Chromium: build the file's page,
- * open it, send events by name, read the state, what is waiting and the
+ * open it, send events by name, read the state and the
  * findings, take a screenshot. Internal: not exported from the package.
  *
  * The harness does not wait for a real effect's later answer: the live driver
@@ -20,8 +20,6 @@ import { mantaqViz } from "./vite.ts";
 export interface VizHarness {
   /** The current state id. */
   state(): Promise<string>;
-  /** Effects waiting for an answer, with the events each reports. */
-  waiting(): Promise<Array<{ effect: string; reports: string[] }>>;
   /** Click what one person would click; an ignored event is a result, not an error. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
   send(
     event: string,
@@ -106,6 +104,11 @@ async function setValues(
   page: Page,
   values: Record<string, VizJson | undefined>,
 ): Promise<string | undefined> {
+  const [first] = Object.keys(values);
+  if (first === undefined) return undefined;
+  if ((await page.locator('[data-tab="context"]').count()) === 0) {
+    return `no value box for ${first}.`;
+  }
   await page.click('[data-tab="context"]');
   for (const [key, value] of Object.entries(values)) {
     const box = page.locator(`[data-value=${quoted(key)}]`);
@@ -120,20 +123,19 @@ async function setValues(
   return undefined;
 }
 
-/** Local state names of every region, read from the Step tab's region lines. */
-async function readRegions(page: Page): Promise<Record<string, string>> {
-  await page.click('[data-tab="step"]');
-  const lines = await page
-    .locator(`${PANEL} p[data-region][data-region-state]`)
-    .evaluateAll((nodes) =>
-      nodes.map((node) => [
-        node.getAttribute("data-region") ?? "",
-        node.getAttribute("data-region-state") ?? "",
-      ]),
-    );
-  return Object.fromEntries(
-    lines.map(([path = "", id = ""]) => [path, id.slice(id.lastIndexOf(".") + 1)]),
-  );
+/** Local state names of every region, read from the diagram's current states. */
+async function readRegions(page: Page, machine: VizMachine): Promise<Record<string, string>> {
+  const ids = await page
+    .locator(".graph g.current[data-node-id]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));
+  const entries = ids.flatMap((id) => {
+    const dot = id.lastIndexOf(".");
+    if (dot === -1) return [];
+    const scope = id.slice(0, dot);
+    const inMap = machine.maps.some((map) => scope === map || scope.startsWith(`${map}.`));
+    return inMap ? [] : [[scope, id.slice(dot + 1)] as const];
+  });
+  return Object.fromEntries(entries);
 }
 
 async function readChildren(
@@ -175,9 +177,10 @@ async function walkTo(page: Page, actor: { map: string; key: string }): Promise<
 /** Why the region or map child `actor` is not on the Step tab; undefined when it is (or for the machine itself). */
 async function missingActor(
   page: Page,
-  context: { id: string; actor: VizActorRef; path: string },
+  context: { machine: VizMachine; actor: VizActorRef; path: string },
 ): Promise<string | undefined> {
-  const { id, actor, path } = context;
+  const { machine, actor, path } = context;
+  const id = machine.id;
   if ("map" in actor) {
     if (await walkTo(page, actor)) return undefined;
     const keys = (await readChildren(page))
@@ -185,19 +188,20 @@ async function missingActor(
       .map((child) => child.key);
     return `no child ${quoted(actor.key)} in ${quoted(actor.map)} of ${id}. Children: ${keys.join(", ")}.`;
   }
-  if (path === "" || (await page.locator(`${PANEL} p[data-region=${quoted(path)}]`).count()) > 0) {
+  if (path === "" || (await page.locator(`${PANEL} [data-actor=${quoted(path)}]`).count()) > 0) {
     return undefined;
   }
-  const names = Object.keys(await readRegions(page)).join(", ");
+  const names = Object.keys(await readRegions(page, machine)).join(", ");
   return `no region ${quoted(path)} in ${id}. Regions: ${names}.`;
 }
 
 function makeSend(
   page: Page,
-  id: string,
+  machine: VizMachine,
   state: () => Promise<string>,
   isClosed: () => boolean,
 ): VizHarness["sendTo"] {
+  const id = machine.id;
   return async (actor, event, payload) => {
     if (isClosed()) {
       return Either.left("harness is closed");
@@ -206,7 +210,7 @@ function makeSend(
     const path = actorPath(actor);
     const scope =
       path === "" ? `${PANEL} [data-actor=""]` : `${PANEL} [data-actor=${quoted(path)}]`;
-    const missing = await missingActor(page, { id, actor, path });
+    const missing = await missingActor(page, { machine, actor, path });
     if (missing !== undefined) return Either.left(missing);
     const trigger = page.locator(`${scope} [data-send=${quoted(event)}]`).first();
     if ((await trigger.count()) === 0) {
@@ -214,7 +218,7 @@ function makeSend(
       const where =
         path === ""
           ? `${id} is in ${await state()}`
-          : `region ${path} is in ${(await readRegions(page))[path]}`;
+          : `region ${path} is in ${(await readRegions(page, machine))[path]}`;
       return Either.left(
         `no button for ${event}: ${where}, which offers: ${[...new Set(offered)].join(", ")}.`,
       );
@@ -290,21 +294,12 @@ function describe(
 ): VizHarness {
   const state = async () =>
     (await page.getAttribute(".explore[data-current]", "data-current")) ?? "";
-  const sendTo = makeSend(page, machine.id, state, lifecycle.isClosed);
+  const sendTo = makeSend(page, machine, state, lifecycle.isClosed);
   return {
     state,
-    waiting: () =>
-      page.locator(`${PANEL} [data-waiting-on]`).evaluateAll((nodes) =>
-        nodes.map((node) => ({
-          effect: node.getAttribute("data-waiting-on") ?? "",
-          reports: (node.getAttribute("data-reports") ?? "")
-            .split(" ")
-            .filter((each) => each !== ""),
-        })),
-      ),
     send: (event, payload) => sendTo({ region: "" }, event, payload),
     sendTo,
-    regions: () => readRegions(page),
+    regions: () => readRegions(page, machine),
     children: () => readChildren(page),
     findings: () => machineFindings(machine),
     text: async () => {

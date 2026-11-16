@@ -17,6 +17,7 @@ test("drives the children of the docs photo queue", async () => {
       { map: "photos", key: "p1", state: "sendingPhoto" },
       { map: "photos", key: "p2", state: "sendingPhoto" },
     ]);
+    expect(await viz.regions()).toEqual({});
     const p1 = { map: "photos", key: "p1" };
     await viz.sendTo(p1, "uploadFailed");
     expect((await viz.children())[0]?.state).toBe("waitingForRetry");

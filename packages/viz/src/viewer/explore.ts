@@ -11,7 +11,6 @@ import {
 import type { ExploreStep, Move, MoveGroup } from "../moves.ts";
 import type {
   VizActorRef,
-  VizField,
   VizJson,
   VizLiveChild,
   VizRemovedChild,
@@ -22,7 +21,7 @@ import type {
   VizOutputRoutes,
   VizStep,
 } from "../schema.ts";
-import { changedKeys, contextLines } from "./context-diff.ts";
+import { changedKeys } from "./context-diff.ts";
 import { html, svg } from "./dom.ts";
 import { defaultValue, parseValue, valueFields, valueText } from "./fill.ts";
 import type { Values } from "./fill.ts";
@@ -37,8 +36,6 @@ export interface ExploreContext {
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
   live?: {
     state: VizLiveState;
-    /** Entry i is the driver's `last` for `state.steps[i]`. */
-    outcomes: ReadonlyArray<VizLiveStep | null>;
     /** Entry i is what moved after `state.steps[i]`, as the driver reported it then. */
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
@@ -49,8 +46,6 @@ export interface ExploreContext {
     picked?: { map: string; key: string } | null;
     /** The last Send press; its line leads the Step tab. */
     sent?: { event: string; actor?: VizActorRef } | null;
-    /** Replace the walk with these steps from a fresh actor. */
-    play: (steps: ReadonlyArray<VizStep>, run?: string) => void;
     /** Send an event at once, with the values set in the Context tab. */
     sendEvent: (event: string, actor?: VizActorRef) => void;
     /** Field name → the value set in the Context tab. */
@@ -173,83 +168,6 @@ function movesSection(
   );
 }
 
-/** The path as plain text: the machine, then one numbered line per entry, full text where the button shortens it. */
-function pathText(machine: string, list: Element): string {
-  const lines = [...list.querySelectorAll("li > button")].map(
-    (entry, index) => `${index}. ${entry.getAttribute("title") ?? entry.textContent ?? ""}`,
-  );
-  return [`${machine} path`, ...lines].join("\n");
-}
-
-/** "Copy path": puts the path on the clipboard and says whether it worked. */
-function copyPathButton(doc: Document, machine: string, list: Element): HTMLElement {
-  const copy = html(doc, "button", { type: "button", "data-copy-path": "" }, ["Copy path"]);
-  copy.addEventListener("click", () => {
-    const clipboard = doc.defaultView?.navigator.clipboard;
-    const done = (text: string) => {
-      copy.textContent = text;
-    };
-    if (clipboard === undefined) return done("Copy failed: select the path instead");
-    clipboard.writeText(pathText(machine, list)).then(
-      () => done("Copied"),
-      () => done("Copy failed: select the path instead"),
-    );
-  });
-  return copy;
-}
-
-/** The Path heading with its Copy button, then the list. */
-function pathBlock(doc: Document, machine: string, list: HTMLElement): HTMLElement {
-  return html(doc, "div", { class: "explore-path" }, [
-    html(doc, "div", { class: "explore-path-head" }, [
-      html(doc, "h3", {}, ["Path"]),
-      copyPathButton(doc, machine, list),
-    ]),
-    list,
-  ]);
-}
-
-function pathSection(doc: Document, context: ExploreContext): HTMLElement {
-  const { machine, path } = context;
-  const edges = new Map(machine.edges.map((edge) => [edge.id, edge]));
-  let from = machine.initial ?? "";
-  const items = path.map((step, index) => {
-    const event = edges.get(step.edge)?.event ?? step.edge;
-    const text = step.to === from ? `${event} in ${from}: stays` : `${event}: ${from} → ${step.to}`;
-    from = step.to;
-    return html(doc, "li", { "aria-current": index === path.length - 1 ? "step" : null }, [
-      button(doc, [text], {
-        onClick: () => context.rewind(index + 1),
-        attrs: { "data-rewind": String(index + 1) },
-      }),
-    ]);
-  });
-  return pathBlock(
-    doc,
-    machine.id,
-    html(doc, "ol", {}, [
-      html(doc, "li", { "aria-current": path.length === 0 ? "step" : null }, [
-        button(doc, [`start in ${machine.initial ?? "?"}`], {
-          onClick: () => context.rewind(0),
-          attrs: { "data-rewind": "0" },
-        }),
-      ]),
-      ...items,
-    ]),
-  );
-}
-
-/** An object prints `{name value, name value}` (strings raw, other values as JSON); anything else as JSON. */
-function payloadText(value: VizJson): string {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return JSON.stringify(value);
-  }
-  const fields = Object.entries(value).map(
-    ([name, each]) => `${name} ${typeof each === "string" ? each : JSON.stringify(each)}`,
-  );
-  return `{${fields.join(", ")}}`;
-}
-
 type ChildRef = { map: string; key: string };
 
 /** The key, with the map name only when the machine has more than one map. */
@@ -270,12 +188,6 @@ function startedAt(state: VizLiveState, n: number): VizLiveChild[] {
 
 function removedAt(state: VizLiveState, n: number): VizRemovedChild[] {
   return (state.removed ?? []).filter((child) => child.until === n);
-}
-
-/** `p1, p2, p3`; cut, more than 3 keys read `p1, p2, p3 and N more`. */
-function keyList(keys: ReadonlyArray<string>, cut: boolean): string {
-  if (!cut || keys.length <= 3) return keys.join(", ");
-  return `${keys.slice(0, 3).join(", ")} and ${keys.length - 3} more`;
 }
 
 /** The clock starts at 0 and only `advance` steps move it. */
@@ -375,33 +287,6 @@ function sendItem(
   ]);
 }
 
-type StateEffects = VizMachine["states"][number]["effects"];
-
-interface WaitingEffect {
-  /** "" for the machine itself, else the region's path. */
-  compartment: string;
-  /** The state the effect belongs to: the top-level state or a region's current state. */
-  from: string;
-  effect: StateEffects[number];
-}
-
-/** The held effects of the current state and of each region's current state that still wait for an answer. */
-function waitingEffects(machine: VizMachine, state: VizLiveState): WaitingEffect[] {
-  if (state.effectMode !== "held") return [];
-  const owners = [
-    { compartment: "", from: state.state },
-    ...regionPaths(state).map((path) => ({ compartment: path, from: state.regions[path] ?? "" })),
-  ];
-  return owners.flatMap(({ compartment, from }) => {
-    const effects = machine.states.find((each) => each.id === from)?.effects ?? [];
-    return state.waiting.flatMap((name) =>
-      effects
-        .filter((effect) => effect.name === name)
-        .map((effect) => ({ compartment, from, effect })),
-    );
-  });
-}
-
 /** The Send list of one actor: the machine itself (""), a region (its path) or, with `child`, a map's child. */
 function liveMovesSection(
   doc: Document,
@@ -462,49 +347,6 @@ function liveMovesSection(
           ];
     }),
   );
-}
-
-/** ", waiting for a, b" for the held effects of one compartment that still wait; nothing when none do. */
-function waitingText(
-  doc: Document,
-  machine: VizMachine,
-  context: { state: VizLiveState; compartment: string },
-): Array<Node | string> {
-  const { state, compartment } = context;
-  const waiting = waitingEffects(machine, state).filter(
-    (each) => each.compartment === compartment && each.effect.sends?.length !== 0,
-  );
-  return waiting.flatMap(({ from, effect }, index) => {
-    const handled = new Set(movesFrom(machine, from).map((move) => move.edge.event));
-    const reports = (effect.sends ?? []).filter((event) => handled.has(event)).join(" ");
-    return [
-      index === 0 ? ", waiting for " : ", ",
-      html(doc, "code", { "data-waiting-on": effect.name, "data-reports": reports }, [effect.name]),
-    ];
-  });
-}
-
-/** One line per region: where it is now. */
-function regionLines(doc: Document, machine: VizMachine, state: VizLiveState): HTMLElement[] {
-  return regionPaths(state).flatMap((path) => {
-    const id = state.regions[path] ?? "";
-    const info = machine.states.find((each) => each.id === id);
-    return [
-      html(
-        doc,
-        "p",
-        { class: "explore-now explore-region-now", "data-region": path, "data-region-state": id },
-        [
-          code(doc, path),
-          ": in ",
-          html(doc, "strong", {}, [localName(id)]),
-          info?.final ? " (final)" : "",
-          ...(info?.final ? [] : waitingText(doc, machine, { state, compartment: path })),
-        ],
-      ),
-      docNote(doc, { text: info?.doc ?? null, scope: "state" }),
-    ].filter((node): node is HTMLElement => node !== null);
-  });
 }
 
 /** One section per actor map: its walked child, where it is now, and what it handles. */
@@ -574,83 +416,6 @@ function liveBlocks(
   ];
 }
 
-function runsSection(
-  doc: Document,
-  machine: VizMachine,
-  live: { play: (steps: ReadonlyArray<VizStep>, run?: string) => void },
-): HTMLElement | null {
-  if (machine.runs.length === 0) return null;
-  return html(doc, "div", { class: "explore-runs", "data-runs": "" }, [
-    html(doc, "h3", {}, ["Runs"]),
-    html(
-      doc,
-      "ul",
-      {},
-      machine.runs.map((run) =>
-        html(doc, "li", {}, [
-          button(doc, [run.name], {
-            onClick: () => live.play(run.steps, run.name),
-            attrs: { "data-run": run.name },
-          }),
-        ]),
-      ),
-    ),
-  ]);
-}
-
-function fieldValue(value: VizJson, name: string): string {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return "not set";
-  return Object.hasOwn(value, name) ? (JSON.stringify(value[name]) ?? "not set") : "not set";
-}
-
-/** One row per declared context field: meaning and value now, changed ones marked. */
-function fieldsTable(
-  doc: Document,
-  context: {
-    fields: ReadonlyArray<VizField>;
-    value: VizJson;
-    previous: VizJson | undefined;
-  },
-): HTMLElement {
-  const { fields, value, previous } = context;
-  const head = ["Field", "Type", "Meaning", "Now"];
-  return html(doc, "table", { "data-context-fields": "" }, [
-    html(doc, "thead", {}, [
-      html(
-        doc,
-        "tr",
-        {},
-        head.map((name) => html(doc, "th", {}, [name])),
-      ),
-    ]),
-    html(
-      doc,
-      "tbody",
-      {},
-      fields.map((field) => {
-        const now = fieldValue(value, field.name);
-        const changed = previous !== undefined && now !== fieldValue(previous, field.name);
-        return html(
-          doc,
-          "tr",
-          {
-            "data-context-field": field.name,
-            "data-context-changed": changed ? "" : null,
-          },
-          [
-            html(doc, "td", {}, [code(doc, field.name)]),
-            html(doc, "td", {}, [code(doc, field.type)]),
-            html(doc, "td", {}, [field.doc ?? ""]),
-            html(doc, "td", {}, [
-              changed ? html(doc, "mark", { class: "context-changed" }, [now]) : now,
-            ]),
-          ],
-        );
-      }),
-    ),
-  ]);
-}
-
 /** One text box per field name the machine's events carry; empty = the default shown in grey. */
 function valuesList(
   doc: Document,
@@ -690,46 +455,6 @@ function valuesList(
     html(doc, "h3", {}, ["Values events send"]),
     ...rows,
   ]);
-}
-
-/** The values events send, then the declared fields as a table, or the pretty-printed context with changed lines marked. */
-function contextSection(
-  doc: Document,
-  context: {
-    machine: VizMachine;
-    value: VizJson;
-    previous: VizJson | undefined;
-    live: NonNullable<ExploreContext["live"]>;
-  },
-): HTMLElement {
-  const { machine, value, previous } = context;
-  const body =
-    machine.context !== null
-      ? fieldsTable(doc, { fields: machine.context, value, previous })
-      : prettyContext(doc, value, previous);
-  return html(doc, "div", { class: "explore-context" }, [
-    valuesList(doc, context),
-    html(doc, "div", { "data-live-context": "" }, [body]),
-  ]);
-}
-
-function prettyContext(doc: Document, value: VizJson, previous: VizJson | undefined): HTMLElement {
-  return html(
-    doc,
-    "pre",
-    {},
-    contextLines(value, previous).flatMap((line, index) => [
-      index === 0 ? "" : "\n",
-      line.changed
-        ? html(doc, "mark", { class: "context-changed", "data-context-changed": "" }, [line.text])
-        : line.text,
-    ]),
-  );
-}
-
-/** How many context lines the last live step changed. */
-export function changedLines(state: VizLiveState, previous: VizJson | undefined): number {
-  return contextLines(state.context, previous).filter((line) => line.changed).length;
 }
 
 function localState(id: string): string {
@@ -833,21 +558,6 @@ function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLive
       ];
     }),
   ]);
-}
-
-/** The last step left everything as it was: no move, same context, nothing sent, nothing after it, no child started or removed. */
-function noChange(
-  step: VizLiveStep,
-  at: { before: VizJson | undefined; state: VizLiveState },
-): boolean {
-  const { before, state } = at;
-  const stayed =
-    step.outcome === "stay" || (step.outcome === "transition" && step.from === step.to);
-  if (!stayed || before === undefined || step.sent.length > 0) return false;
-  if (state.after.length > 0) return false;
-  const n = state.steps.length;
-  if (startedAt(state, n).length > 0 || removedAt(state, n).length > 0) return false;
-  return JSON.stringify(before) === JSON.stringify(step.context);
 }
 
 function stepLines(
@@ -963,11 +673,6 @@ function liveResultSection(
                 [`Handler threw: ${last.error}`],
               ),
           ...changedChildrenLines(doc, state),
-          noChange(last, { before: previous, state })
-            ? html(doc, "p", { class: "muted", "data-live-no-change": "" }, [
-                "Nothing changed: the handler kept the state and context, and sent nothing.",
-              ])
-            : null,
           ...after.map((step, index) =>
             html(doc, "div", { "data-live-after": "" }, [
               afterLine(doc, { machine, step, last }),
@@ -996,23 +701,6 @@ function liveResultSection(
   ]);
 }
 
-/** `: p1 sendingPhoto → photoSent` and its kin for a step sent to a map child; "" for any other step. */
-function childMove(
-  machine: VizMachine,
-  step: VizStep,
-  outcome: VizLiveStep | null | undefined,
-): string {
-  const actor = step.kind === "event" ? step.actor : undefined;
-  if (actor === undefined || !("map" in actor) || outcome === undefined || outcome === null)
-    return "";
-  const who = childWhoText(machine, actor);
-  if (outcome.outcome === "transition") {
-    return `: ${who} ${localName(outcome.from)} → ${localName(outcome.to)}`;
-  }
-  if (outcome.outcome === "stay") return `: ${who} stays in ${localName(outcome.from)}`;
-  return `: ${who}, nothing ran`;
-}
-
 function sameActor(left: VizActorRef | undefined, right: VizActorRef | undefined): boolean {
   return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 }
@@ -1032,12 +720,6 @@ function isDropped(step: VizLiveStep): boolean {
 function senderName(machine: VizMachine, step: VizLiveStep): string | null {
   const sender = step.message?.sender ?? null;
   return sender === "" ? machine.id : sender;
-}
-
-/** `orders → ` before a part's name when the step says who sent it; "" otherwise. */
-function fromSender(machine: VizMachine, step: VizLiveStep): string {
-  const sender = senderName(machine, step);
-  return sender === null ? "" : `${sender} → `;
 }
 
 /** The line above a later step: who sent it to whom, and where the receiver went; a dropped one says so and why. */
@@ -1075,124 +757,17 @@ function afterLine(
   ]);
 }
 
-/** `, then orders → w1: free → working; kitchen → waiter DISH_READY dropped`: what the other parts did after the step; "" when nothing. */
-function thenMoves(machine: VizMachine, later: ReadonlyArray<VizLiveStep>): string {
-  const dropped = later
-    .filter(isDropped)
-    .map(
-      (each) =>
-        `${fromSender(machine, each)}${partName(machine, each.actor)} ${each.event} dropped`,
-    );
-  const moved = later
-    .filter((each) => each.outcome === "transition")
-    .map(
-      (each) =>
-        `${fromSender(machine, each)}${partName(machine, each.actor)}: ${localName(each.from)} → ${localName(each.to)}`,
-    );
-  const items = [...dropped, ...moved];
-  if (items.length === 0) return "";
-  const more = items.length > 3 ? ` and ${items.length - 3} more` : "";
-  return `, then ${items.slice(0, 3).join("; ")}${more}`;
-}
-
-/** The Path entry for step `index`: what was sent, what the child did, which children it started or removed. */
-function pathEntry(
-  machine: VizMachine,
-  at: {
-    live: {
-      state: VizLiveState;
-      outcomes: ReadonlyArray<VizLiveStep | null>;
-      afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
-    };
-    index: number;
-  },
-): { text: string; title: string | null; cascade: boolean } {
-  const { index } = at;
-  const { state, outcomes, afters } = at.live;
-  const step = state.steps[index];
-  if (step === undefined) return { text: "", title: null, cascade: false };
-  const head =
-    step.kind === "advance"
-      ? `advance ${step.ms} ms`
-      : step.payload === null
-        ? step.event
-        : `${step.event} ${payloadText(step.payload)}`;
-  const later = index === state.steps.length - 1 ? state.after : (afters?.[index] ?? []);
-  const move = childMove(machine, step, outcomes[index]) + thenMoves(machine, later);
-  const started = startedAt(state, index + 1).map((child) => child.key);
-  const removed = removedAt(state, index + 1).map((child) => child.key);
-  const suffix = (cut: boolean) => {
-    const parts = [
-      started.length === 0 ? null : `${keyList(started, cut)} started`,
-      removed.length === 0 ? null : `${keyList(removed, cut)} removed`,
-    ].filter((part): part is string => part !== null);
-    return parts.length === 0 ? "" : ` → ${parts.join("; ")}`;
-  };
-  const mark = later.some(isDropped) ? "! " : "";
-  const text = mark + head + move + suffix(true);
-  const full = mark + head + move + suffix(false);
-  return {
-    text,
-    title: full === text ? null : full,
-    cascade: later.some((each) => each.outcome === "transition"),
-  };
-}
-
-function pathButton(
-  doc: Document,
-  at: { context: ExploreContext; live: NonNullable<ExploreContext["live"]>; index: number },
-): HTMLElement {
-  const { context, live, index } = at;
-  const { text, title, cascade } = pathEntry(context.machine, { live, index });
-  return button(doc, [text], {
-    onClick: () => context.rewind(index + 1),
-    attrs: {
-      "data-rewind": String(index + 1),
-      ...(title === null ? {} : { title }),
-      ...(cascade ? { "data-live-cascade": "" } : {}),
-    },
-  });
-}
-
-function livePathSection(
-  doc: Document,
-  context: ExploreContext,
-  live: NonNullable<ExploreContext["live"]>,
-): HTMLElement {
-  const { state } = live;
-  return pathBlock(
-    doc,
-    context.machine.id,
-    html(doc, "ol", {}, [
-      html(doc, "li", { "aria-current": state.steps.length === 0 ? "step" : null }, [
-        button(doc, ["start"], {
-          onClick: () => context.rewind(0),
-          attrs: { "data-rewind": "0" },
-        }),
-      ]),
-      ...state.steps.map((_, index) =>
-        html(doc, "li", { "aria-current": index === state.steps.length - 1 ? "step" : null }, [
-          pathButton(doc, { context, live, index }),
-        ]),
-      ),
-    ]),
-  );
-}
-
 function nowSection(
   doc: Document,
   machine: VizMachine,
-  context: { current: string; final: boolean; state?: VizLiveState },
+  context: { current: string; final: boolean },
 ): Array<HTMLElement | null> {
-  const { current, final, state } = context;
+  const { current, final } = context;
   return [
     html(doc, "p", { class: "explore-now" }, [
       "In ",
       html(doc, "strong", {}, [current]),
       final ? " (final)" : "",
-      ...(state === undefined || final
-        ? []
-        : waitingText(doc, machine, { state, compartment: "" })),
     ]),
     docNote(doc, {
       text: machine.states.find((state) => state.id === current)?.doc ?? null,
@@ -1204,10 +779,8 @@ function nowSection(
 export interface ExploreParts {
   /** Where the walk is and what can happen next. */
   step: HTMLElement;
-  /** Live only: the actor's context. */
+  /** Live only: the values events send; null when the machine's events carry no fields. */
   context: HTMLElement | null;
-  /** Runs and the steps taken so far. */
-  path: HTMLElement;
 }
 
 /** Live Step tab, below the root's state: regions, held effects, outcome, Send lists, time. */
@@ -1230,7 +803,6 @@ function liveParts(
     sendEvent: live.sendEvent,
   };
   return [
-    ...regionLines(doc, machine, state),
     liveResultSection(doc, {
       machine,
       state,
@@ -1260,7 +832,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       "data-done": final ? "" : null,
     },
     [
-      ...nowSection(doc, machine, { current, final, ...(live ? { state: live.state } : {}) }),
+      ...nowSection(doc, machine, { current, final }),
       ...(live
         ? liveParts(doc, machine, { live, current, final })
         : [
@@ -1286,28 +858,8 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
   );
   return {
     step,
-    context: live
-      ? contextSection(doc, {
-          machine,
-          value: live.state.context,
-          previous: live.previous,
-          live,
-        })
-      : null,
-    path: historySection(doc, context),
+    context: live ? valuesList(doc, { machine, live }) : null,
   };
-}
-
-function historySection(doc: Document, context: ExploreContext): HTMLElement {
-  const { live } = context;
-  return html(
-    doc,
-    "div",
-    { class: "explore-history" },
-    live
-      ? [runsSection(doc, context.machine, live), livePathSection(doc, context, live)]
-      : [pathSection(doc, context)],
-  );
 }
 
 /** Every state the actor is in now: live, the machine's and each region's; walking, where the path ends. */

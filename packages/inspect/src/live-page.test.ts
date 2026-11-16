@@ -304,15 +304,6 @@ describe("mountDriven runs by name", () => {
     expect(location.search).toBe("?machine=checkout&run=gives%20basic%20info");
   });
 
-  test("clicking a run writes machine and run, no step", async () => {
-    history.replaceState(null, "", "?machine=checkout");
-    const root = document.createElement("div");
-    mountDriven(root, { source: "test", text: await withRuns(), targets: { checkout: create } });
-    root.querySelector<HTMLElement>('[data-run="gives basic info"]')?.click();
-    expect(new URLSearchParams(location.search).get("run")).toBe("gives basic info");
-    expect(new URLSearchParams(location.search).has("step")).toBe(false);
-  });
-
   test("switching machine drops run", async () => {
     history.replaceState(null, "", "?machine=checkout&run=gives%20basic%20info");
     const root = document.createElement("div");

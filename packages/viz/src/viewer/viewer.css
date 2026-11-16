@@ -450,10 +450,6 @@
   cursor: pointer;
 }
 
-.viz .explore-path li[aria-current="step"] button {
-  font-weight: 700;
-}
-
 .viz .explore-controls {
   display: flex;
   gap: 6px;
@@ -477,19 +473,6 @@
   stroke-dasharray: 4 3;
 }
 
-.viz .explore-context pre {
-  margin: 0;
-  overflow: auto;
-  font-size: 0.75rem;
-  background: var(--region-bg);
-}
-
-.viz .explore-context mark.context-changed {
-  background: var(--banner-bg);
-  color: var(--banner-fg);
-  font-weight: 600;
-}
-
 .viz .run-notice {
   background: var(--banner-bg);
   color: var(--banner-fg);
@@ -502,20 +485,6 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.viz .explore-context table {
-  border-collapse: collapse;
-  font-size: 0.75rem;
-  width: 100%;
-}
-
-.viz .explore-context th,
-.viz .explore-context td {
-  text-align: left;
-  vertical-align: top;
-  padding: 2px 6px;
-  border-bottom: 1px solid var(--state-border);
 }
 
 /* Depth: a dot grid under the diagram, hard offset shadows on states
@@ -550,13 +519,6 @@
 .viz .show-controls {
   margin-left: auto;
   display: block;
-}
-
-.viz .explore-path-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: baseline;
 }
 
 .viz .blocked-note {
