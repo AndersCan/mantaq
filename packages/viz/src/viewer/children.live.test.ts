@@ -228,7 +228,7 @@ describe("live actor map children", () => {
 
   test.each([
     ["transition", /^Sent uploadConfirmed to p1: .*sendingPhoto → .*waitingForRetry$/],
-    ["stay", /^Sent uploadConfirmed to p1: p1 handled in sendingPhoto, stays$/],
+    ["stay", /^Sent uploadConfirmed to p1: handled in sendingPhoto, stays$/],
     ["ignored", /^Sent uploadConfirmed to p1: No handler for uploadConfirmed in .*sendingPhoto/],
   ] as const)(
     "after a child arrow's Details send, the Details say who got it and its %s",
@@ -242,6 +242,40 @@ describe("live actor map children", () => {
       expect(root.querySelector("[data-details-sent]")?.textContent).toMatch(text);
     },
   );
+
+  test("after a Details send that stays, the Send button is still there", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto")], photoQueue, () => ({
+      ...stepOf("uploadConfirmed", "photos.sendingPhoto", "photos.waitingForRetry", "stay"),
+      actor: { map: "photos", key: "p1" },
+    }));
+    click(edgeGroup(root));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(root.querySelector("[data-details-sent]")).not.toBeNull();
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(sent).toHaveLength(2);
+  });
+
+  test("a Details send the driver gives no outcome for shows no Details line", () => {
+    const { root, sent } = mount([child("p1", "sendingPhoto")]);
+    click(edgeGroup(root));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(sent).toHaveLength(1);
+    expect(root.querySelector("[data-details-sent]")).toBeNull();
+    expect(root.querySelector("[data-send-edge]")).not.toBeNull();
+  });
+
+  test("after a Details send whose handler threw, the Details say so", () => {
+    const { root } = mount([child("p1", "sendingPhoto")], photoQueue, () => ({
+      ...stepOf("uploadConfirmed", "photos.sendingPhoto", "photos.sendingPhoto", "stay"),
+      error: "upload failed",
+      actor: { map: "photos", key: "p1" },
+    }));
+    click(edgeGroup(root));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(root.querySelector("[data-details-sent]")?.parentElement?.textContent).toContain(
+      "upload failed",
+    );
+  });
 
   test("a child arrow with no child in its source has no Send button", () => {
     const { root } = mount([child("p1", "waitingForRetry")]);

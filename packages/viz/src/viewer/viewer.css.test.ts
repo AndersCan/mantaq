@@ -86,5 +86,7 @@ test("an arrow's hit path is a wide transparent stroke that takes the pointer", 
   const rule = /\.viz \.graph \.edge path\.hit \{([^}]*)\}/.exec(css)?.[1] ?? "";
   expect(rule).toContain("stroke: transparent");
   expect(rule).toContain("pointer-events: stroke");
+  // Dashed and dotted arrows: without this the hit path takes their dashes and misses in the gaps.
+  expect(rule).toContain("stroke-dasharray: none");
   expect(Number(/stroke-width: (\d+)/.exec(rule)?.[1])).toBeGreaterThanOrEqual(10);
 });

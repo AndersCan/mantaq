@@ -316,3 +316,16 @@ describe("the Send line", () => {
     expect(root.querySelector("[data-live-sent-event]")).toBeNull();
   });
 });
+
+describe("region Details sent line", () => {
+  test("a region arrow's Details Send names the region once", () => {
+    const { root } = mount();
+    root
+      .querySelector('[data-edge-id="network.online-connectionLost-network.offline"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(root.querySelector("[data-details-sent]")?.textContent).toBe(
+      "Sent connectionLost to network: waitingForPhoto → sendingPhoto",
+    );
+  });
+});

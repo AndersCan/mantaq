@@ -312,10 +312,10 @@ function sentOutcome(
   if (last !== undefined) {
     if (last === null) return null;
     const text = outcomeText(doc, machine, last);
-    // A move's text opens with the event, which the sent line already names.
-    return last.outcome === "transition" || last.outcome === "stay"
-      ? text.slice(1)
-      : [": ", ...text];
+    // A move's text opens with the event and who ran it, which the sent line already names.
+    const moved = last.outcome === "transition" || last.outcome === "stay";
+    const tail = moved ? [": ", ...text.slice(-1)] : [": ", ...text];
+    return last.error === null ? tail : [...tail, `. It threw: ${last.error}`];
   }
   const to = view.path.at(-1)?.to;
   const before = stateAfter(machine, view.path.slice(0, -1));

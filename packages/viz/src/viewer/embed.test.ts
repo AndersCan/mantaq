@@ -96,7 +96,7 @@ describe("mountVizText", () => {
       expect(path.getAttribute("style")).not.toContain("stroke-dasharray");
     }
     const plain = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
-    expect(plain.querySelector(".graph g.edge path")?.hasAttribute("style")).toBe(false);
+    expect(plain.querySelector(".graph g.edge path:not(.hit)")?.hasAttribute("style")).toBe(false);
   });
 
   test("a self-loop uses the loop arrowhead", () => {
