@@ -314,6 +314,20 @@ describe("live controls", () => {
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
 
+  test("after a Details send, focus is on the selected arrow", () => {
+    const { root } = mount();
+    document.body.append(root);
+    clickEdge(root, "idle-submit-paying");
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    root.remove();
+  });
+
+  test("live Step tab buttons read Send <event>", () => {
+    const { root } = mount();
+    expect(root.querySelector('[data-send="submit"]')?.textContent).toBe("Send submit");
+  });
+
   test("an arrow whose source is not current has no Send button", () => {
     const { root } = mount();
     clickEdge(root, "paying-paymentTimeout-error");

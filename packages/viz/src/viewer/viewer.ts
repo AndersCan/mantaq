@@ -214,7 +214,7 @@ export function mountViewer(
         view,
         select: showDetails,
         replay: driver === undefined ? undefined : (steps) => play(steps, undefined, "step"),
-        send: sendFor({ doc, machine, view, driver }, { sendEvent, take }),
+        send: sendFor({ root, doc, machine, view, driver }, { sendEvent, take }),
       });
       const controls = controlsOf(doc, chrome);
       const footer = options.panelFooter;
@@ -296,7 +296,13 @@ function detailsOf(
 
 /** The selected arrow's Send: live, one button when its source is current; blocked, the reason; walking, a button per target. */
 function sendFor(
-  from: { doc: Document; machine: VizMachine; view: ViewState; driver: VizDriver | undefined },
+  from: {
+    root: HTMLElement;
+    doc: Document;
+    machine: VizMachine;
+    view: ViewState;
+    driver: VizDriver | undefined;
+  },
   handlers: {
     sendEvent: (event: string, actor?: VizActorRef) => void;
     take: (step: ExploreStep) => void;
@@ -304,7 +310,8 @@ function sendFor(
 ): (edge: VizEdge) => HTMLElement | null {
   const { doc, machine, view } = from;
   return (edge) => {
-    if (view.live === null) return walkingSend(doc, { machine, view, edge, take: handlers.take });
+    if (view.live === null)
+      return walkingSend(doc, { root: from.root, machine, view, edge, take: handlers.take });
     updateBlocked(machine, view, from.driver);
     const reason = view.blocked.get(edge.id);
     if (reason !== undefined) {
@@ -318,15 +325,25 @@ function sendFor(
     if (!sendable) return null;
     const to = actor !== undefined && "map" in actor ? [" to ", code(doc, actor.key)] : [];
     return button(doc, ["Send ", code(doc, edge.event), ...to], {
-      onClick: () => handlers.sendEvent(edge.event, actor),
+      onClick: () => {
+        handlers.sendEvent(edge.event, actor);
+        focusEdge(from.root, edge.id);
+      },
       attrs: { "data-send-edge": edge.id },
     });
   };
 }
 
+/** The Send button goes once pressed; focus moves to the selected arrow so keyboard users keep their place. */
+function focusEdge(root: HTMLElement, id: string): void {
+  const edges = [...root.querySelectorAll<SVGElement>("g[data-edge-id]")];
+  edges.find((each) => each.getAttribute("data-edge-id") === id)?.focus({ preventScroll: true });
+}
+
 function walkingSend(
   doc: Document,
   context: {
+    root: HTMLElement;
     machine: VizMachine;
     view: ViewState;
     edge: VizEdge;
@@ -345,7 +362,10 @@ function walkingSend(
     {},
     move.targets.map((to) =>
       button(doc, ["Send ", code(doc, edge.event), ...(several ? [` → ${to}`] : [])], {
-        onClick: () => context.take({ edge: edge.id, to }),
+        onClick: () => {
+          context.take({ edge: edge.id, to });
+          focusEdge(context.root, edge.id);
+        },
         attrs: { "data-send-edge": edge.id, "data-target": to },
       }),
     ),

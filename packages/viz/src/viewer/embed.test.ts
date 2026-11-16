@@ -503,6 +503,49 @@ describe("walking: the selected arrow's Send", () => {
     expect(root.querySelector("[data-selected-edge] > div:empty")).toBeNull();
   });
 
+  test("an arrow with several targets has a Send per target, each taking its own step", () => {
+    const push: VizEdge = {
+      ...edge("open", "push", "ajar"),
+      to: null,
+      explanation: {
+        status: "analyzed",
+        location: { file: "door.ts", line: 1, column: 1 },
+        registration: "on",
+        branches: [
+          { conditions: ["hard"], target: { kind: "state", state: "done" } },
+          { conditions: ["!(hard)"], target: { kind: "state", state: "ajar" } },
+        ],
+        payloadReads: [],
+        contextReads: [],
+        contextWrites: [],
+        readsActorState: false,
+        comparisons: [],
+        literals: [],
+      },
+    };
+    const pushy: VizMachine = {
+      ...door,
+      states: [...door.states, state("ajar", { final: true })],
+      events: [...door.events, { id: "push", internal: false, doc: null, payload: null }],
+      edges: [...door.edges, push],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [pushy] }));
+    root
+      .querySelector('[data-edge-id="open-push-ajar"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const sends = [...root.querySelectorAll<HTMLButtonElement>("[data-send-edge]")];
+    expect(sends.map((each) => each.textContent)).toEqual(["Send push → ajar", "Send push → done"]);
+    sends[1]?.click();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("done");
+  });
+
+  test("Step tab buttons start with Send", () => {
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
+    expect(root.querySelector('.panel [data-move="open-go-done"] button')?.textContent).toMatch(
+      /^Send go/,
+    );
+  });
+
   test("a click selects, then Send takes the step", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     root

@@ -341,6 +341,18 @@ describe("a blocked arrow's Details", () => {
     expect(root.querySelector("[data-send-edge]")).toBeNull();
   });
 
+  test("names the guard's context values and follows an effect result while shown", () => {
+    const { driver, arrive } = fakeDriver();
+    const root = mount(driver);
+    clickEdge(root, "cart-pay-payment");
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "pay is blocked: items is 0",
+    );
+    arrive();
+    expect(root.querySelector("[data-blocked-note]")).toBeNull();
+    expect(root.querySelector("[data-send-edge]")?.textContent).toBe("Send pay");
+  });
+
   test("an open arrow has the button and no note", () => {
     const { driver } = fakeDriver();
     const root = mount(driver);
