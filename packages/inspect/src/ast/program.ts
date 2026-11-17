@@ -18,6 +18,10 @@ export interface Registration {
   /** Resolved state name; null for onAny or when the type has no literal name. */
   state: string | null;
   event: string | null;
+  /** Regex source for an event whose type is a template literal (`${N}.ITEM_ARRIVED`); null otherwise. */
+  eventPattern: string | null;
+  /** JSDoc of the symbol the `event:` expression names. null = none. */
+  eventDoc: string | null;
   /** The `event:` expression: an EventRef, whose type carries the payload type. */
   eventRef: ts.Expression;
   handler: ts.Expression | undefined;
@@ -26,10 +30,8 @@ export interface Registration {
   doc: string | null;
 }
 
-export interface LoadedSource {
-  checker: ts.TypeChecker;
-  sourceFile: ts.SourceFile;
-  root: string;
+/** What one source file contributes: its handler registrations and descriptions. */
+export interface FileRead {
   registrations: Registration[];
   /** Leading JSDoc by state name, from `const x = state("x")()` declarations. */
   stateDocs: Map<string, string>;
@@ -37,6 +39,14 @@ export interface LoadedSource {
   eventDocs: Map<string, string>;
   /** JSDoc above each `m.effect(state, ...)` call by state name, in registration order. */
   effectDocs: Map<string, string[]>;
+}
+
+export interface LoadedSource extends FileRead {
+  checker: ts.TypeChecker;
+  sourceFile: ts.SourceFile;
+  root: string;
+  /** Other files of the program (not declarations) that register handlers, e.g. a pool built in a library. */
+  elsewhere: Array<FileRead & { file: string }>;
 }
 
 /**
@@ -126,6 +136,25 @@ function property(literal: ts.ObjectLiteralExpression, name: string): ts.Express
   return undefined;
 }
 
+const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** `^<text>.+<text>$` for an event typed as a template literal; null for any other type. */
+function templatePattern(checker: ts.TypeChecker, eventRef: ts.Expression): string | null {
+  const symbol = checker.getTypeAtLocation(eventRef).getProperty("type");
+  if (symbol === undefined) return null;
+  const type = checker.getTypeOfSymbolAtLocation(symbol, eventRef);
+  if ((type.flags & ts.TypeFlags.TemplateLiteral) === 0) return null;
+  const { texts } = type as ts.TemplateLiteralType;
+  return `^${texts.map(escapeRegex).join(".+")}$`;
+}
+
+function eventDocOf(checker: ts.TypeChecker, eventRef: ts.Expression): string | null {
+  const text = ts.displayPartsToString(
+    checker.getSymbolAtLocation(eventRef)?.getDocumentationComment(checker),
+  );
+  return text === "" ? null : text;
+}
+
 function toRegistration(checker: ts.TypeChecker, call: ts.CallExpression): Registration | null {
   if (!ts.isPropertyAccessExpression(call.expression)) return null;
   const method = call.expression.name.text;
@@ -139,6 +168,8 @@ function toRegistration(checker: ts.TypeChecker, call: ts.CallExpression): Regis
     kind: method,
     state: stateArg === undefined ? null : literalProperty(checker, stateArg, "name"),
     event: literalProperty(checker, eventRef, "type"),
+    eventPattern: templatePattern(checker, eventRef),
+    eventDoc: eventDocOf(checker, eventRef),
     eventRef,
     handler: property(options, "handler"),
     call,
@@ -186,9 +217,27 @@ function collectDeclarationDocs(
   }
 }
 
+function readFile(checker: ts.TypeChecker, sourceFile: ts.SourceFile): FileRead {
+  const registrations: Registration[] = [];
+  const stateDocs = new Map<string, string>();
+  const eventDocs = new Map<string, string>();
+  const effectDocs = new Map<string, string[]>();
+  const visit = (node: ts.Node): void => {
+    const found = ts.isCallExpression(node) ? toRegistration(checker, node) : null;
+    if (found) registrations.push(found);
+    if (ts.isVariableStatement(node)) collectDeclarationDocs(node, { stateDocs, eventDocs });
+    ts.forEachChild(node, visit);
+    // After the children, so a chained `.effect` link follows the links before it.
+    if (ts.isCallExpression(node)) collectEffectDoc(checker, node, effectDocs);
+  };
+  visit(sourceFile);
+  return { registrations, stateDocs, eventDocs, effectDocs };
+}
+
 /**
- * Type-check one file and collect its handler registrations. Any compiler
- * failure becomes a Left reason; it never throws.
+ * Type-check one file and collect its handler registrations, plus those of the
+ * program's other source files. Any compiler failure becomes a Left reason; it
+ * never throws.
  */
 export function loadSource(source: AnalysisSource): Either<string, LoadedSource> {
   const loaded = Either.from(() => {
@@ -196,28 +245,20 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
     const sourceFile = program.getSourceFile(source.file);
     if (sourceFile === undefined) return `source not found: ${source.file}`;
     const checker = program.getTypeChecker();
-    const registrations: Registration[] = [];
-    const stateDocs = new Map<string, string>();
-    const eventDocs = new Map<string, string>();
-    const effectDocs = new Map<string, string[]>();
-    const visit = (node: ts.Node): void => {
-      const found = ts.isCallExpression(node) ? toRegistration(checker, node) : null;
-      if (found) registrations.push(found);
-      if (ts.isVariableStatement(node)) collectDeclarationDocs(node, { stateDocs, eventDocs });
-      ts.forEachChild(node, visit);
-      // After the children, so a chained `.effect` link follows the links before it.
-      if (ts.isCallExpression(node)) collectEffectDoc(checker, node, effectDocs);
-    };
-    visit(sourceFile);
-    return {
-      checker,
-      sourceFile,
-      root: source.root,
-      registrations,
-      stateDocs,
-      eventDocs,
-      effectDocs,
-    };
+    const elsewhere = program
+      .getSourceFiles()
+      .filter(
+        (other) =>
+          other !== sourceFile &&
+          !other.isDeclarationFile &&
+          !other.fileName.includes("/node_modules/"),
+      )
+      .map((other) => ({
+        file: relative(source.root, other.fileName).split(sep).join("/"),
+        ...readFile(checker, other),
+      }))
+      .filter((other) => other.registrations.length > 0);
+    return { checker, sourceFile, root: source.root, elsewhere, ...readFile(checker, sourceFile) };
   });
   if (Either.isLeft(loaded)) return Either.left(`compiler failed: ${String(loaded[0])}`);
   const value = loaded[1];
