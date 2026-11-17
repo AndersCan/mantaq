@@ -1,6 +1,6 @@
 ---
 title: Start with your coding agent
-description: From an empty Vite project to your machine in the live viewer, with one prompt.
+description: From an empty Vite project to two machines that talk in the live viewer, with one prompt.
 ---
 
 ## What
@@ -30,7 +30,7 @@ No skills support? Tell your agent to read https://anderscan.github.io/mantaq/ll
 ### 2. Tell your agent what to model
 
 ```text
-Use the mantaq skill. Model our checkout: the customer fills in basic info, then pays, and it ends in success. Set it up and open it in the live viewer.
+Use the mantaq skill. A checkout that waits up to 30 seconds for payment and expires when time runs out, and a stock service that holds the item while checkout waits and lets it go when checkout expires. Set it up and open it in the live viewer.
 ```
 
 Or describe your own flow in plain words.
@@ -39,7 +39,7 @@ A step that can time out: say how long it waits and what happens when time runs 
 
 ### 3. What you get
 
-The agent installs `@mantaq/core` and `@mantaq/inspect` (and `@mantaq/sugar` when the flow has a timer), writes `src/checkout.machine.ts` and the Vite plugin, and starts the dev server. The viewer is at `/__mantaq/?machine=checkout` on the port the dev server prints.
+The agent installs `@mantaq/core`, `@mantaq/sugar` (for the 30-second timer) and `@mantaq/inspect`, writes `src/checkout.machine.ts` with both machines and the Vite plugin, and starts the dev server. The viewer is at `/__mantaq/?machine=checkout` on the port the dev server prints. Click the first arrow out of checkout's start state: the Step tab says what checkout sent to stock and where stock went.
 
 The Vite config looks like this:
 
