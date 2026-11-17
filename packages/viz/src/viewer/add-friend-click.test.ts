@@ -198,6 +198,7 @@ const addFriend: VizMachine = {
     errors: [],
     failedExpectations: [],
     expectations: [],
+    messages: [],
     corpus: [
       {
         steps: [open(["a", "b"], ["a", "b"])],

@@ -66,6 +66,22 @@ export interface Trace {
   children: SeenChild[];
   /** First send per (sender, receiver, event) to a machine that handles the event in no state, in send order. */
   lost: LostSend[];
+  /** Messages one machine sent another that took them, raw state ids at send time, deduped, in the order each send returned. */
+  sends: SentMessage[];
+}
+
+/** The send a part is taking now, and the state it took it in. */
+interface Receiving {
+  name: string;
+  event: string;
+  took: string | null;
+}
+
+/** A message from the state a sender was in to the state of the receiver that took it. */
+interface SentMessage {
+  from: string;
+  event: string;
+  to: string;
 }
 
 /** One message a machine sent another that handles its event in no state. */
@@ -230,7 +246,7 @@ export function messageOf(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
-function featuresOf(trace: Pick<Trace, "visited" | "observations" | "errors">): string[] {
+function featuresOf(trace: Pick<Trace, "visited" | "observations" | "errors" | "sends">): string[] {
   const features = new Set<string>();
   for (const state of trace.visited) features.add(`state:${state}`);
   for (const seen of trace.observations) {
@@ -241,6 +257,7 @@ function featuresOf(trace: Pick<Trace, "visited" | "observations" | "errors">): 
     );
   }
   for (const error of trace.errors) features.add(`error:${error.from}>${error.event}`);
+  for (const sent of trace.sends) features.add(`send:${sent.from}>${sent.event}>${sent.to}`);
   return [...features].sort();
 }
 
@@ -368,10 +385,15 @@ function watchSends(context: {
   parts: Readonly<Record<string, AnyActor<unknown>>>;
   maps: Readonly<Record<string, ActorMapLike>>;
   at: () => number;
-}): { lost: LostSend[]; step: () => void } {
-  const { parts, maps, at } = context;
+  root: string;
+}): { lost: LostSend[]; sent: SentMessage[]; step: () => void } {
+  const { parts, maps, at, root } = context;
   const lost: LostSend[] = [];
+  const sent: SentMessage[] = [];
   let mover: string | null = null;
+  let receiving: Receiving | null = null;
+  const idOf = (name: string, state: string): string =>
+    name === root ? state : `${name}.${state}`;
   const restoring = (run: () => void): void => {
     const saved = mover;
     try {
@@ -383,8 +405,24 @@ function watchSends(context: {
   for (const [name, part] of Object.entries(parts)) {
     const send = part.send.bind(part);
     Either.from(() => {
-      part.on("transition", { fn: () => void (mover = name) });
+      part.on("transition", {
+        fn: (change) => {
+          // The first transition of the send being run is the arrow that took it;
+          // an entry effect or a message the receiver sends itself moves it later.
+          if (
+            receiving !== null &&
+            receiving.name === name &&
+            receiving.event === change.event.type &&
+            receiving.took === null
+          )
+            receiving.took = idOf(name, change.from);
+          mover = name;
+        },
+      });
       part.send = (event) => {
+        const senderState = mover === null || mover === name ? undefined : parts[mover]?.state.name;
+        const senderId =
+          mover === null || senderState === undefined ? null : idOf(mover, senderState);
         if (
           mover !== null &&
           handlesNowhere(part, event.type) &&
@@ -394,7 +432,23 @@ function watchSends(context: {
         ) {
           lost.push({ sender: mover, receiver: name, event: event.type, step: at() });
         }
-        restoring(() => send(event));
+        const outer = receiving;
+        const now: Receiving = { name, event: event.type, took: null };
+        receiving = now;
+        restoring(() => {
+          mover = name;
+          send(event);
+        });
+        receiving = outer;
+        if (
+          senderId !== null &&
+          now.took !== null &&
+          !sent.some(
+            (each) => each.from === senderId && each.event === event.type && each.to === now.took,
+          )
+        ) {
+          sent.push({ from: senderId, event: event.type, to: now.took });
+        }
       };
     });
   }
@@ -412,6 +466,7 @@ function watchSends(context: {
   }
   return {
     lost,
+    sent,
     step: () => {
       mover = null;
     },
@@ -550,7 +605,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   let index = 0;
   const sinks = { visited, observations, errors, plain };
   const at = (): number => index;
-  const sends = watchSends({ parts: { [target.id]: actor, ...actors }, maps, at });
+  const sends = watchSends({ parts: { [target.id]: actor, ...actors }, maps, at, root: target.id });
   const recorder = recordChildren({
     root: actor,
     maps,
@@ -619,7 +674,9 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   for (const map of Object.values(maps)) map.dispose();
   for (const part of Object.values(actors)) part.dispose();
   actor.dispose();
-  const features = [...new Set([...featuresOf({ visited, observations, errors }), ...hits])].sort();
+  const features = [
+    ...new Set([...featuresOf({ visited, observations, errors, sends: sends.sent }), ...hits]),
+  ].sort();
   const missingPayloads = recording.missing();
   return {
     visited,
@@ -631,5 +688,6 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     missingPayloads,
     children: recorder.children,
     lost: sends.lost,
+    sends: sends.sent,
   };
 }

@@ -1,5 +1,7 @@
 import { toViz } from "../structure.ts";
 import { createCheckoutActor } from "../fixtures/checkout.ts";
+import { createRenamedCheckout } from "../fixtures/renamed-wire.ts";
+import { inspect } from "../inspect.ts";
 import { parseViz, validateViz } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
@@ -24,7 +26,7 @@ describe("validateViz rejects", () => {
 
   test("version 9 documents and a missing outputs list", () => {
     expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
-      "$.schemaVersion: expected 17, got 9",
+      "$.schemaVersion: expected 18, got 9",
     ]);
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["outputs"];
@@ -33,7 +35,7 @@ describe("validateViz rejects", () => {
 
   test("version 11 documents", () => {
     expect(issues({ schemaVersion: 11, machines: [] })).toEqual([
-      "$.schemaVersion: expected 17, got 11",
+      "$.schemaVersion: expected 18, got 11",
     ]);
   });
 
@@ -102,6 +104,7 @@ describe("validateViz rejects", () => {
       errors: [],
       failedExpectations: [],
       expectations: [],
+      messages: [],
     };
     expect(issues(doc)).toEqual([
       "$.machines[0].fuzz.corpus[0].steps[0].kind: expected event or advance",
@@ -126,6 +129,7 @@ describe("validateViz rejects", () => {
         { kind: "mustSee", state: "a", match: "{}", steps: null },
       ],
       expectations: [],
+      messages: [],
     };
     expect(issues(doc)).toEqual([
       "$.machines[0].fuzz.failedExpectations[0].kind: expected neverSee or mustSee",
@@ -144,6 +148,7 @@ describe("validateViz rejects", () => {
       errors: [],
       failedExpectations: [],
       expectations: [{ kind: "neverSee", state: "a", match: "{}", held: "yes" }],
+      messages: [],
     };
     expect(issues(doc)).toEqual(["$.machines[0].fuzz.expectations[0].held: expected boolean"]);
   });
@@ -259,5 +264,66 @@ describe("validateViz refuses actors that cannot be parts", () => {
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["actors"];
     expect(issues(doc)).toEqual(["$.machines[0].actors: expected string[]"]);
+  });
+});
+
+describe("validateViz refuses a recorded message that does not fit the machine", () => {
+  const wired = inspect({
+    id: "renamedCheckout",
+    create: () => createRenamedCheckout(),
+    fuzz: { seed: 1, iterations: 300 },
+  }).machine;
+  const entry = { from: "waitingForPayment", event: "START", to: "payment.ready" };
+
+  function withMessage(change: Record<string, string>) {
+    const doc = JSON.parse(JSON.stringify({ schemaVersion: 18, machines: [wired] })) as {
+      machines: Array<{ fuzz: { messages: unknown[] } }>;
+    };
+    doc.machines[0]!.fuzz.messages = [{ ...entry, ...change }];
+    return doc;
+  }
+
+  const at = "$.machines[0].fuzz.messages[0]";
+
+  test("the unchanged entry is valid", () => {
+    expect(issues(withMessage({}))).toEqual([]);
+  });
+
+  test("a missing list", () => {
+    const doc = withMessage({});
+    delete (doc.machines[0]!.fuzz as Record<string, unknown>)["messages"];
+    expect(issues(doc)).toEqual(["$.machines[0].fuzz.messages: expected array"]);
+  });
+
+  test("a sender state that is not declared", () => {
+    expect(issues(withMessage({ from: "nowhere" }))).toEqual([`${at}.from: unknown state nowhere`]);
+  });
+
+  test("a receiving arrow that does not take the event", () => {
+    expect(issues(withMessage({ to: "payment.charging" }))).toEqual([
+      `${at}.to: no arrow from payment.charging takes START`,
+    ]);
+  });
+
+  test("both ends in one machine", () => {
+    expect(issues(withMessage({ from: "payment.charging", to: "payment.ready" }))).toEqual([
+      `${at}: from and to are in the same machine`,
+    ]);
+  });
+
+  test("an end in a machine that is not a part", () => {
+    const doc = withMessage({});
+    (doc.machines[0] as { actors?: string[] }).actors = [];
+    expect(issues(doc)).toEqual([`${at}.to: "payment" is not in actors`]);
+  });
+
+  test("a sender in a machine that is not a part", () => {
+    const doc = withMessage({
+      from: "payment.ready",
+      event: "PAYMENT_CONFIRMED",
+      to: "waitingForPayment",
+    });
+    (doc.machines[0] as { actors?: string[] }).actors = [];
+    expect(issues(doc)).toEqual([`${at}.from: "payment" is not in actors`]);
   });
 });

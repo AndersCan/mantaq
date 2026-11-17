@@ -37,6 +37,7 @@ const machine: VizMachine = {
     errors: [],
     failedExpectations: [],
     expectations: [],
+    messages: [],
   },
 };
 

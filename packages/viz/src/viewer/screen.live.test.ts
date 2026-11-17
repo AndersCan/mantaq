@@ -60,6 +60,7 @@ const chain: VizMachine = {
     errors: [],
     failedExpectations: [],
     expectations: [],
+    messages: [],
   },
 };
 

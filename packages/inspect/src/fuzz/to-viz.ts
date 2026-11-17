@@ -1,6 +1,6 @@
 import { toVizMachine } from "../structure.ts";
 import { ANY_STATE, coveredByAny } from "@mantaq/viz";
-import type { VizEdge, VizEvent, VizMachine } from "@mantaq/viz";
+import type { VizEdge, VizEvent, VizFuzzMessage, VizMachine } from "@mantaq/viz";
 import { edgeHits, stateVisits } from "./coverage.ts";
 import type { FuzzResult } from "./fuzz.ts";
 import { eventCatalog, execute } from "./run.ts";
@@ -15,13 +15,16 @@ function observedKey(seen: Observation, from: string): string {
  * event, else the `*` source when an `onAny` handler does. One `*` edge beats
  * the same stay repeated on every state.
  */
-function anySourceOf(machine: VizMachine, seen: Observation): string | undefined {
+function anySourceOf(
+  machine: VizMachine,
+  seen: Pick<Observation, "from" | "event">,
+): string | undefined {
   return machine.edges.find(
     (edge) => edge.event === seen.event && coveredByAny(edge.from, seen.from),
   )?.from;
 }
 
-function sourceOf(machine: VizMachine, seen: Observation): string {
+function sourceOf(machine: VizMachine, seen: Pick<Observation, "from" | "event">): string {
   const own = machine.edges.some((edge) => edge.from === seen.from && edge.event === seen.event);
   return own ? seen.from : (anySourceOf(machine, seen) ?? seen.from);
 }
@@ -75,6 +78,27 @@ function byId<T extends { id: string }>(left: T, right: T): number {
   return left.id > right.id ? 1 : 0;
 }
 
+/** Messages the replayed corpus sent between machines, each at the arrow that took it; sorted, no duplicates. */
+function messagesOf(base: VizMachine, traces: ReadonlyArray<Trace>): VizFuzzMessage[] {
+  const all = traces
+    .flatMap((trace) => trace.sends)
+    .map((sent) => ({
+      from: sent.from,
+      event: sent.event,
+      to: sourceOf(base, { from: sent.to, event: sent.event }),
+    }));
+  const unique = [
+    ...new Map(all.map((each) => [`${each.from}>${each.event}>${each.to}`, each])).values(),
+  ];
+  return unique.sort(
+    (a, b) => compare(a.from, b.from) || compare(a.event, b.event) || compare(a.to, b.to),
+  );
+}
+
+function compare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 /**
  * Viz machine with fuzz results written in: coverage from replaying the
  * shrunk corpus, newly discovered edges (origin `fuzz`), and the corpus itself.
@@ -111,6 +135,7 @@ export function fuzzedMachine(target: FuzzTarget, result: FuzzResult): VizMachin
       errors: result.errors,
       failedExpectations: result.failedExpectations,
       expectations: result.expectations,
+      messages: messagesOf(base, traces),
     },
   };
 }

@@ -3,6 +3,7 @@ import type {
   VizFailedExpectation,
   VizFuzz,
   VizFuzzError,
+  VizFuzzMessage,
   VizFuzzSequence,
   VizRun,
   VizStep,
@@ -96,6 +97,14 @@ function readExpectation(reader: Reader, record: JsonObject, path: string): VizE
   };
 }
 
+function readMessage(reader: Reader, record: JsonObject, path: string): VizFuzzMessage {
+  return {
+    from: readString(reader, { record, key: "from", path }),
+    event: readString(reader, { record, key: "event", path }),
+    to: readString(reader, { record, key: "to", path }),
+  };
+}
+
 export function readFuzz(reader: Reader, at: { record: JsonObject; path: string }): VizFuzz | null {
   const value = at.record["fuzz"];
   if (value === null) return null;
@@ -120,6 +129,9 @@ export function readFuzz(reader: Reader, at: { record: JsonObject; path: string 
     ),
     expectations: readList(reader, { record: value, key: "expectations", path }, (item, itemPath) =>
       readExpectation(reader, item, itemPath),
+    ),
+    messages: readList(reader, { record: value, key: "messages", path }, (item, itemPath) =>
+      readMessage(reader, item, itemPath),
     ),
   };
 }

@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 17;
+export const VIZ_SCHEMA_VERSION = 18;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -368,6 +368,16 @@ export interface VizExpectation {
   held: boolean;
 }
 
+/** A message one machine sent another while fuzzing, and the arrow that took it. The board draws it as a dotted line. */
+export interface VizFuzzMessage {
+  /** State the sender was in when its wire sent it: a root state id, or a returned machine's prefixed id ("stock.holding"). */
+  from: string;
+  /** Event the receiver got; a wire may send another event than the output it heard. */
+  event: string;
+  /** Source of the receiver's arrow that took it: a state id ("payment.ready"), or "payment.*" / "*" when an `onAny` handler took it. */
+  to: string;
+}
+
 export interface VizFuzz {
   seed: number;
   iterations: number;
@@ -377,6 +387,8 @@ export interface VizFuzz {
   failedExpectations: VizFailedExpectation[];
   /** Every rule the machine file writes, checked by this run. Same order as failedExpectations: machine state order, neverSee before mustSee, then as written. [] = none written. */
   expectations: VizExpectation[];
+  /** Messages between the machine and the machines its factory returns next to it, taken in the replayed corpus. Sorted by from, event, to; no duplicates. [] = none seen. */
+  messages: VizFuzzMessage[];
 }
 
 export interface VizDocument {
