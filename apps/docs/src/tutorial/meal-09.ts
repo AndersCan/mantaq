@@ -45,7 +45,6 @@ export const meal9 = machine("meal9", {
       inputs: [drink],
       states: [thirsty, quenched],
       initial: thirsty,
-      clock,
       setup: (m) => {
         /** A drink ends the thirst. */
         m.on(thirsty, { event: drink, to: [quenched], handler: () => ({ state: quenched }) });

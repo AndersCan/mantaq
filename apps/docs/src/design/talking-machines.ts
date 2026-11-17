@@ -36,7 +36,7 @@ const sold = state("sold")().final();
 
 /** A checkout that waits 30 seconds for payment, and a stock service that holds the item meanwhile. */
 export const checkoutMachine = machine("checkout", {
-  create: () => {
+  create: ({ clock }) => {
     const stock = Actor({
       inputs: [holdItem, releaseItem, itemSold],
       outputs: [itemHeld],
@@ -61,6 +61,7 @@ export const checkoutMachine = machine("checkout", {
       outputs: [holdItem, itemSold, releaseItem],
       states: [browsing, waitingForStock, waitingForPayment, paid, expired],
       initial: browsing,
+      clock,
       setup: (m) => {
         /** The person starts: ask stock to hold the item. */
         m.on(browsing, {

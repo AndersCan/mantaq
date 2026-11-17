@@ -16,7 +16,7 @@ test("one click on CHECKOUT_STARTED goes into stock and back", () => {
     id: "checkout",
     create: () => {
       const clock = VirtualClock();
-      const made = checkoutMachine.create();
+      const made = checkoutMachine.create({ clock });
       return { actor: made.actor, clock, made };
     },
   });
