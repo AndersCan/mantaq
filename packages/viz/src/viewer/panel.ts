@@ -3,6 +3,7 @@ import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { localName } from "./compartments.ts";
 import { activatable, html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
+import { edgeCondition } from "./labels.ts";
 import { isDrawn } from "./layout.ts";
 
 type Row = [label: string, value: Node | string];
@@ -27,9 +28,12 @@ function edgeLink(
   doc: Document,
   edge: VizEdge,
   select: (selection: Selection) => void,
+  withCondition: boolean,
 ): HTMLLIElement {
+  const condition = withCondition ? edgeCondition(edge) : null;
+  const when = condition === null ? "" : ` [${condition}]`;
   const link = html(doc, "span", { class: "link", "data-edge-link": edge.id }, [
-    `${sourceText(edge.from)} —${edge.event || "initial"}→ ${edge.to ?? "?"}`,
+    `${sourceText(edge.from)} —${edge.event || "initial"}${when}→ ${edge.to ?? "?"}`,
   ]);
   activatable(link, () => select({ kind: "edge", id: edge.id }));
   return html(doc, "li", {}, [link]);
@@ -39,21 +43,46 @@ function edgeList(
   doc: Document,
   edges: ReadonlyArray<VizEdge>,
   select: (selection: Selection) => void,
+  withCondition: boolean,
 ): Node | string {
   if (edges.length === 0) return "none";
   return html(
     doc,
     "ul",
     {},
-    edges.map((edge) => edgeLink(doc, edge, select)),
+    edges.map((edge) => edgeLink(doc, edge, select, withCondition)),
   );
 }
 
-/** `free —ITEMS_ASSIGNED→ working`: the edge as the diagram draws it. */
+/** `idle —apply [score < 600]→ rejected`: the edge as the diagram draws it, with its condition. */
 function edgeTitle(edge: VizEdge): string {
   const from = isAnyState(edge.from) ? "any state" : localName(edge.from);
   const to = edge.to === null ? "?" : localName(edge.to);
-  return edge.kind === "initial" ? `start → ${to}` : `${from} —${edge.event}→ ${to}`;
+  const condition = edgeCondition(edge);
+  const when = condition === null ? "" : ` [${condition}]`;
+  return edge.kind === "initial" ? `start → ${to}` : `${from} —${edge.event}${when}→ ${to}`;
+}
+
+/** The other arrows of this edge's event from the same state, in the order the code branches. */
+function sameEvent(machine: VizMachine, edge: VizEdge): VizEdge[] {
+  if (edgeCondition(edge) === null) return [];
+  const branches = edge.explanation?.status === "analyzed" ? edge.explanation.branches : [];
+  const rank = (other: VizEdge): number => {
+    const index = branches.findIndex(
+      (branch) =>
+        branch.target.kind === "state" && branch.target.state === localName(other.to ?? ""),
+    );
+    return index === -1 ? branches.length : index;
+  };
+  return machine.edges
+    .filter(
+      (other) =>
+        other.id !== edge.id &&
+        other.kind === "transition" &&
+        other.from === edge.from &&
+        other.event === edge.event,
+    )
+    .sort((a, b) => rank(a) - rank(b) || (a.to ?? "").localeCompare(b.to ?? ""));
 }
 
 function docLine(doc: Document, scope: string, text: string | null): HTMLElement | null {
@@ -63,12 +92,21 @@ function docLine(doc: Document, scope: string, text: string | null): HTMLElement
 function edgePanel(
   doc: Document,
   edge: VizEdge,
-  send: ((edge: VizEdge) => HTMLElement | null) | undefined,
+  context: {
+    machine: VizMachine;
+    select: (selection: Selection) => void;
+    send: ((edge: VizEdge) => HTMLElement | null) | undefined;
+  },
 ): HTMLElement {
+  const { machine, select, send } = context;
+  const siblings = sameEvent(machine, edge);
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [edgeTitle(edge)]),
     send?.(edge) ?? null,
     docLine(doc, "edge", edge.doc),
+    siblings.length === 0
+      ? null
+      : list(doc, [["same event", edgeList(doc, siblings, select, true)]]),
   ]);
 }
 
@@ -88,8 +126,8 @@ function statePanel(
     html(doc, "h2", {}, [`State ${state.id}`]),
     docLine(doc, "state", state.doc),
     list(doc, [
-      ["outgoing", edgeList(doc, outgoing, select)],
-      ["incoming", edgeList(doc, incoming, select)],
+      ["outgoing", edgeList(doc, outgoing, select, false)],
+      ["incoming", edgeList(doc, incoming, select, false)],
     ]),
   ]);
 }
@@ -107,7 +145,7 @@ export function renderPanel(
   const { selection } = context;
   if (selection?.kind === "edge") {
     const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-    if (edge) return edgePanel(doc, edge, context.send);
+    if (edge) return edgePanel(doc, edge, { machine, select: context.select, send: context.send });
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);
