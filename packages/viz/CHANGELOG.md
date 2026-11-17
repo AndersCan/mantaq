@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.34.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_
+  [user]: An event with no declared fields always sends the fuzzer's sample payload (Details shows it after Send); it no longer copies a payload sent earlier in the walk, which nobody could see or change.
+- _(patch)_
+  [user]: A child chip in a final state looks like every other chip; its state's double border already says final. Worker rows drop " (final)".
+- _(patch)_
+  [user]: Every chip shows its child's key: as many pills as fit, then "+N" (hover lists the rest). The unlabelled dots are gone.
+- _(patch)_
+  [user]: The Step tab drops the "Because:" line (the arrow shows its guard), says "took" for a step that came back, and drops the source location from "Sent out".
+- _(patch)_
+  [user]: Loops use the same arrow head as other arrows, and internal-event labels are upright; the dotted line marks them.
+- _(patch)_ [user]: Unused styles go, including .toolbar in page.css; disabled Back and Reset show the default cursor.
+
 ## 0.33.0
 
 <sub>2026-11-16</sub>
