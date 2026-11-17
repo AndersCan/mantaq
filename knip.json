@@ -9,7 +9,8 @@
     "@stryker-mutator/core",
     "@stryker-mutator/vitest-runner",
     "@typescript/native-preview",
-    "@varlock/bumpy"
+    "@varlock/bumpy",
+    "playwright"
   ],
   "workspaces": {
     ".": {

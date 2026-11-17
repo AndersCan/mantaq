@@ -165,6 +165,60 @@ describe("mountDriven targets", () => {
   });
 });
 
+describe("mountDriven machines without timers", () => {
+  function realClockTarget() {
+    return () => {
+      const actor = createAnswerActor(RealClock() as unknown as ReturnType<typeof VirtualClock>);
+      return { actor, clock: actor.clock as unknown as ReturnType<typeof VirtualClock> };
+    };
+  }
+
+  async function answerText(): Promise<string> {
+    const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "answer.ts"), {
+      load: async () => ({ createAnswerActor }),
+      fuzz: false,
+    });
+    return serializeViz(vizDocument(inspected.machines));
+  }
+
+  test("an actor on a real clock runs live and marks its current state", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: await answerText(),
+      targets: { answer: realClockTarget() },
+    });
+    expect(root.querySelector("[data-live-note]")).not.toBeNull();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("noAskYet");
+    root.remove();
+  });
+
+  test("a timer set on that real clock throws the VirtualClock message", async () => {
+    const root = document.createElement("div");
+    const made: Array<ReturnType<ReturnType<typeof realClockTarget>>> = [];
+    const create = realClockTarget();
+    mountDriven(root, {
+      source: "test",
+      text: await answerText(),
+      targets: {
+        answer: () => {
+          const each = create();
+          made.push(each);
+          return each;
+        },
+      },
+    });
+    const clock = made.at(-1)?.actor.clock;
+    expect(() => clock?.setTimeout(1, { cb: () => {} })).toThrow(
+      "needs a factory that takes a VirtualClock",
+    );
+    expect(() => clock?.setInterval(1, { cb: () => {} })).toThrow(
+      "needs a factory that takes a VirtualClock",
+    );
+  });
+});
+
 describe("mountDriven values", () => {
   test("the answer events send the code the machine is waiting on and the value set in the Context tab", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");

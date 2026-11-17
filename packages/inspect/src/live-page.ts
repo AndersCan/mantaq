@@ -9,6 +9,7 @@ import type { ViewerOptions } from "@mantaq/viz/viewer";
 import { linkOptions } from "@mantaq/viz/page";
 import { parseViz } from "@mantaq/viz";
 import type { VizDocument, VizDriver, VizOutputRoutes } from "@mantaq/viz";
+import { VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import { createDriver } from "./drive.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -37,13 +38,39 @@ function ownWalk(viz: VizDocument): ReturnType<typeof linkOptions> {
   return held === undefined ? { onNavigate: linked.onNavigate } : { ...linked, machine: held };
 }
 
-/** The target for `id` when it runs on a clock the page can advance. */
+const NEEDS_VIRTUAL_CLOCK =
+  "this machine uses timers, so it needs a factory that takes a VirtualClock (see the @mantaq/inspect README)";
+
+function isAdvanceable(clock: object): boolean {
+  return typeof Reflect.get(clock, "advance") === "function";
+}
+
+/**
+ * A target whose actor runs on a real clock and sets no timers: the driver gets
+ * a stand-in VirtualClock that nothing schedules on. A timer on the real clock
+ * throws, since the page could not advance it.
+ */
+function withoutTimers(create: FuzzTarget["create"]): FuzzTarget["create"] {
+  return () => {
+    const made = create();
+    const real = made.actor.clock;
+    const refuse = (): never => {
+      throw new Error(NEEDS_VIRTUAL_CLOCK);
+    };
+    real.setTimeout = refuse;
+    real.setInterval = refuse;
+    return { ...made, clock: VirtualClock() };
+  };
+}
+
+/** The target for `id` when the page can run it: on a clock it can advance, or on a real clock with no timers. */
 function liveCreate(targets: LiveTargets, id: string): FuzzTarget["create"] | undefined {
   const target = targets[id];
-  // Same rule as static inspection: a driver needs a clock it can advance.
-  return target !== undefined && typeof Reflect.get(target().clock, "advance") === "function"
-    ? target
-    : undefined;
+  if (target === undefined) return undefined;
+  const made = target();
+  if (isAdvanceable(made.clock)) return target;
+  // A real-clock actor with a stand-in clock beside it; a mismatch (an advanceable actor clock) stays out.
+  return isAdvanceable(made.actor.clock) ? undefined : withoutTimers(target);
 }
 
 function routesOf(context: { routes?: VizOutputRoutes }): { routes?: VizOutputRoutes } {
