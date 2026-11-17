@@ -68,6 +68,8 @@ export interface Trace {
   lost: LostSend[];
   /** Messages one machine sent another that took them, raw state ids at send time, deduped, in the order each send returned. */
   sends: SentMessage[];
+  /** Each message a machine sent another that handles it in some state, and whether any send of it was taken. Sender and receiver are machine names. */
+  wires: Wire[];
 }
 
 /** The send a part is taking now, and the state it took it in. */
@@ -82,6 +84,14 @@ interface SentMessage {
   from: string;
   event: string;
   to: string;
+}
+
+/** A wire between two machines seen in a run. */
+interface Wire {
+  sender: string;
+  event: string;
+  receiver: string;
+  taken: boolean;
 }
 
 /** One message a machine sent another that handles its event in no state. */
@@ -375,6 +385,37 @@ function handlesNowhere(actor: AnyActor<unknown>, event: string): boolean {
   return Object.values(transitions).every((row) => row?.[event] === undefined);
 }
 
+/** Record a send with a known sender: the message when a state took it, the wire when the receiver handles the event somewhere. */
+function noteDelivery(
+  into: { sent: SentMessage[]; wires: Wire[] },
+  delivery: {
+    sender: string;
+    senderId: string;
+    event: string;
+    receiver: string;
+    took: string | null;
+  },
+  handled: boolean,
+): void {
+  const { sender, senderId, event, receiver, took } = delivery;
+  if (handled) noteWire(into.wires, { sender, event, receiver, taken: took !== null });
+  if (took === null) return;
+  const seen = into.sent.some(
+    (each) => each.from === senderId && each.event === event && each.to === took,
+  );
+  if (!seen) into.sent.push({ from: senderId, event, to: took });
+}
+
+/** Add a wire, or mark the one already seen as taken when this send was. */
+function noteWire(wires: Wire[], wire: Wire): void {
+  const seen = wires.find(
+    (each) =>
+      each.sender === wire.sender && each.receiver === wire.receiver && each.event === wire.event,
+  );
+  if (seen === undefined) wires.push(wire);
+  else seen.taken = seen.taken || wire.taken;
+}
+
 /**
  * Note every message one watched machine sends another that handles it in no
  * state. The sender is the machine whose `send` is running, or the one that
@@ -386,10 +427,11 @@ function watchSends(context: {
   maps: Readonly<Record<string, ActorMapLike>>;
   at: () => number;
   root: string;
-}): { lost: LostSend[]; sent: SentMessage[]; step: () => void } {
+}): { lost: LostSend[]; sent: SentMessage[]; wires: Wire[]; step: () => void } {
   const { parts, maps, at, root } = context;
   const lost: LostSend[] = [];
   const sent: SentMessage[] = [];
+  const wires: Wire[] = [];
   let mover: string | null = null;
   let receiving: Receiving | null = null;
   const idOf = (name: string, state: string): string =>
@@ -420,6 +462,7 @@ function watchSends(context: {
         },
       });
       part.send = (event) => {
+        const sender = mover;
         const senderState = mover === null || mover === name ? undefined : parts[mover]?.state.name;
         const senderId =
           mover === null || senderState === undefined ? null : idOf(mover, senderState);
@@ -440,14 +483,9 @@ function watchSends(context: {
           send(event);
         });
         receiving = outer;
-        if (
-          senderId !== null &&
-          now.took !== null &&
-          !sent.some(
-            (each) => each.from === senderId && each.event === event.type && each.to === now.took,
-          )
-        ) {
-          sent.push({ from: senderId, event: event.type, to: now.took });
+        if (sender !== null && senderId !== null) {
+          const delivery = { sender, senderId, event: event.type, receiver: name, took: now.took };
+          noteDelivery({ sent, wires }, delivery, !handlesNowhere(part, event.type));
         }
       };
     });
@@ -467,6 +505,7 @@ function watchSends(context: {
   return {
     lost,
     sent,
+    wires,
     step: () => {
       mover = null;
     },
@@ -689,5 +728,6 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     children: recorder.children,
     lost: sends.lost,
     sends: sends.sent,
+    wires: sends.wires,
   };
 }

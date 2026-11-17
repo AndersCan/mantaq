@@ -5,6 +5,7 @@ import { onOutput } from "@mantaq/sugar";
 import { expect, test } from "vite-plus/test";
 import { createCheckout } from "../fixtures/lost-message.ts";
 import { createRenamedCheckout } from "../fixtures/renamed-wire.ts";
+import { inspect } from "../inspect.ts";
 import { fuzz } from "./fuzz.ts";
 import { execute } from "./run.ts";
 import { fuzzedMachine } from "./to-viz.ts";
@@ -515,4 +516,66 @@ test("a receiver that sends itself the same event is recorded at the arrow that 
   const target = { id: "a", create };
   const go_: VizStep = { kind: "event", event: "GO", payload: null };
   expect(execute(target, [go_]).sends).toEqual([{ from: "idle", event: "ASK", to: "b.ready" }]);
+});
+
+test("every wire of the renamed checkout gets a line on every seed", () => {
+  const expected = [
+    { from: "paid", event: "ORDER_CLOSED", to: "payment.*" },
+    { from: "payment.ready", event: "PAYMENT_CONFIRMED", to: "waitingForPayment" },
+    started,
+  ];
+  for (let seed = 1; seed <= 100; seed += 1) {
+    const target = { id: "renamedCheckout", create: () => createRenamedCheckout(), fuzz: { seed } };
+    expect({ seed, messages: inspect(target).machine.fuzz?.messages }).toEqual({
+      seed,
+      messages: expected,
+    });
+  }
+});
+
+test("a wire never taken stops at the budget", () => {
+  const sent = state("sent")().final();
+  const waiting = state("waiting")();
+  const ready = state("ready")();
+  const pinged = state("pinged")().final();
+  const open = event("OPEN")();
+  function create() {
+    const clock = VirtualClock();
+    const b = Actor({
+      inputs: [open, ping],
+      states: [waiting, ready, pinged],
+      initial: waiting,
+      clock,
+      setup: (m) => {
+        m.on(waiting, { event: open, to: [ready], handler: () => ({ state: ready }) });
+        m.on(ready, { event: ping, to: [pinged], handler: () => ({ state: pinged }) });
+      },
+    });
+    const a = Actor({
+      inputs: [go],
+      outputs: [ping],
+      states: [idle, sent],
+      initial: idle,
+      clock,
+      setup: (m) => {
+        m.on(idle, {
+          event: go,
+          to: [sent],
+          handler: () => ({ state: sent, emit: [ping.create()] }),
+        });
+      },
+    });
+    onOutput(a, (out) => {
+      if (ping.is(out)) b.send(ping.create());
+    });
+    return { actor: a, clock, made: { b } };
+  }
+  const { machine } = inspect({
+    id: "a",
+    create,
+    fuzz: { seed: 1, iterations: 0 },
+    tests: [{ name: "go", steps: [{ kind: "event", event: "GO", payload: null }] }],
+  });
+  expect(machine.fuzz?.iterations).toBe(0);
+  expect(machine.fuzz?.messages).toEqual([]);
 });
