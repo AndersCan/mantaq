@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.36.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_
+  [user]: The live board draws a dotted line for each message one machine sends another, from the sender's state to the arrow that takes it.
+
 ## 0.35.0
 
 <sub>2026-11-17</sub>
