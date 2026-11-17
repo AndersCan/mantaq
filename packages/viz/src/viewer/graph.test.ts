@@ -149,6 +149,30 @@ describe("renderGraph guard condition", () => {
     expect(edge?.getAttribute("aria-label")).toBe("idle on go to busy, else");
   });
 
+  test("a middle arm reads as else if in its aria-label", () => {
+    const [first] = guarded.edges;
+    const split = {
+      ...guarded,
+      edges: [
+        {
+          ...first,
+          explanation: {
+            ...analyzed,
+            branches: [
+              { conditions: ["ok"], target: { kind: "state", state: "done" } },
+              { conditions: ["!(ok)", "late"], target: { kind: "state", state: "busy" } },
+              { conditions: ["!(ok)", "!(late)"], target: { kind: "state", state: "idle" } },
+            ],
+          },
+        },
+      ],
+    } as unknown as VizMachine;
+    const graph = renderGraph(document, split, { select: () => undefined });
+    const edge = graph.querySelector('g.edge[data-edge-id="idle-go-busy"]');
+    expect(edge?.querySelector(".edge-condition")?.textContent).toBe("else if late");
+    expect(edge?.getAttribute("aria-label")).toBe("idle on go to busy, else if late");
+  });
+
   test("a condition that only starts with the letters else reads with when", () => {
     const [first] = guarded.edges;
     const split = {
