@@ -20,10 +20,11 @@ carry data alongside "where it is". Everything below describes that model.
 
 ## Vocabulary
 
-| Term              | Meaning                                                                                              | In Mantaq                               |
-| ----------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| **State machine** | A model where the thing is in exactly one of a known set of states, and events move it between them. | The general idea you model with Mantaq. |
-| **Statechart**    | An extended state machine: states nest, run in parallel, and carry data. Mantaq's actual model.      | What an `Actor` is.                     |
+| Term              | Meaning                                                                                                             | In Mantaq                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Machine**       | A named, buildable state machine: an id and a `create` that makes a fresh actor. A timer takes `clock` in `create`. | `machine("checkout", { create })`: names a machine; `create` builds a fresh actor. Tests pass a `VirtualClock`. |
+| **State machine** | A model where the thing is in exactly one of a known set of states, and events move it between them.                | The general idea you model with Mantaq.                                                                         |
+| **Statechart**    | An extended state machine: states nest, run in parallel, and carry data. Mantaq's actual model.                     | What an `Actor` is.                                                                                             |
 
 | **State** | One situation the machine can be in, a named point in the flow. Answer: "where am I?" | `state("payment")()` builds a state. States are declared and listed in the actor. |
 | **Event** | An occurrence the machine reacts to. The only thing that moves a machine. | `event("submitPayment")()` builds one. You send it with `actor.send(...)`. |

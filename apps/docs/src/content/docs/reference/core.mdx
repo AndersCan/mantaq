@@ -5,7 +5,7 @@ description: Core API reference.
 
 ## What
 
-The state machine runtime: `state`, `event`, `Actor`, the clocks and the snapshot types.
+The state machine runtime: `state`, `event`, `Actor`, `machine`, `VirtualClock` and the snapshot types.
 
 ## Why
 
@@ -34,6 +34,24 @@ meal.snapshot().path; // ["full"]
 ```
 
 Each entry below lists the signature, then what it does.
+
+---
+
+## `machine(id, { create })`
+
+```ts
+function machine<const Id extends string, Made, Options extends object = {}>(
+  id: Id,
+  definition: { create: (options: Options & { clock: Clock }) => Made },
+): Machine<Id, Omit<Options, "clock">, Made>;
+
+interface Machine<Id, Options, Made> {
+  readonly id: Id;
+  create(options?: Options & { clock?: Clock }): Made;
+}
+```
+
+Names a machine and builds a fresh actor per `machine.create()` call. `create` gets a `clock`: real time by default, a `VirtualClock` when the caller passes one (`meal.create({ clock })`). Every other option needs a default. A machine with no timers never reads `clock`.
 
 ---
 
@@ -73,7 +91,10 @@ function event<const T extends string>(
 Two calls: id, then payload type. Payload must be `object | void`.
 
 ```ts
-const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
+const submitBasicInfo = event("submitBasicInfo")<{
+  email: string;
+  name: string;
+}>();
 const back = event("back")();
 ```
 
@@ -163,8 +184,16 @@ Type-safe registrar passed to `setup`. Targets validate against declared states,
 
 ```ts
 setup: (m) => {
-  m.on(basicInfo, { event: submitBasicInfo, to: [payment], handler: () => ({ state: payment }) });
-  m.onAny({ event: back, to: [basicInfo], handler: () => ({ state: basicInfo }) });
+  m.on(basicInfo, {
+    event: submitBasicInfo,
+    to: [payment],
+    handler: () => ({ state: payment }),
+  });
+  m.onAny({
+    event: back,
+    to: [basicInfo],
+    handler: () => ({ state: basicInfo }),
+  });
   m.effect(payment, { name: "chargePayment", fn: ({ signal, emit }) => {} });
 };
 ```
@@ -193,7 +222,12 @@ effectName)`). Initial state runs effects at construction with synthetic event
 class VirtualClock implements Clock {
   advance(ms: number): void;
   hasPending(): boolean;
-  pendingTimers(): Array<{ id: number; deadline: number; ms: number; eventName?: string }>;
+  pendingTimers(): Array<{
+    id: number;
+    deadline: number;
+    ms: number;
+    eventName?: string;
+  }>;
   setDrain(fn: () => void): void;
   now(): number;
   setTimeout(ms, cb, options?): number;

@@ -56,7 +56,7 @@ test("checkout has no design errors", () => {
 - a declared state with no path from the initial state,
 - a state that is not final where nothing can happen (no handler, no effect),
 - an input or internal event that no state handles,
-- a message one machine sends another that handles it in none of its states (when the factory returns them together, `{ actor, payment }`).
+- a message one machine sends another that handles it in none of its states (when `create` returns them together, `{ actor, payment }`).
 
 The message lists one line per error:
 

@@ -306,7 +306,6 @@ function createPool<T, const N extends string>(options: {
   keep?: "queue" | "set";
   key?: (item: T) => string;
   batch?: number;
-  clock?: Clock;
 }): {
   actor: Actor;
   workers: ActorMap;
