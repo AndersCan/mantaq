@@ -154,6 +154,10 @@ function collectErrors(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): 
   );
 }
 
+function compare(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function collectLost(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): LostMessage[] {
   const found = new Map<string, LostMessage>();
   for (const entry of corpus) {
@@ -171,7 +175,12 @@ function collectLost(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): Lo
       found.set(key, { sender: lost.sender, receiver: lost.receiver, event: lost.event, steps });
     }
   }
-  return [...found.entries()].sort(([left], [right]) => (left < right ? -1 : 1)).map(([, v]) => v);
+  return [...found.values()].sort(
+    (left, right) =>
+      compare(left.sender, right.sender) ||
+      compare(left.receiver, right.receiver) ||
+      compare(left.event, right.event),
+  );
 }
 
 function checkExpectations(

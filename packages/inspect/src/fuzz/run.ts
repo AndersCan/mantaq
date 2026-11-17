@@ -69,7 +69,7 @@ export interface Trace {
 }
 
 /** One message a machine sent another that handles its event in no state. */
-export interface LostSend {
+interface LostSend {
   /** Machine whose run made the send. */
   sender: string;
   /** Machine it was sent to. */
@@ -366,40 +366,50 @@ function handlesNowhere(actor: AnyActor<unknown>, event: string): boolean {
  */
 function watchSends(context: {
   parts: Readonly<Record<string, AnyActor<unknown>>>;
+  maps: Readonly<Record<string, ActorMapLike>>;
   at: () => number;
 }): { lost: LostSend[]; expect: (own: { name: string; event: string } | null) => void } {
-  const { parts, at } = context;
+  const { parts, maps, at } = context;
   const lost: LostSend[] = [];
-  const stack: string[] = [];
   let mover: string | null = null;
   let own: { name: string; event: string } | null = null;
+  const restoring = (run: () => void): void => {
+    const saved = mover;
+    try {
+      run();
+    } finally {
+      mover = saved;
+    }
+  };
   for (const [name, part] of Object.entries(parts)) {
     const send = part.send.bind(part);
-    const moved = { fn: () => void (mover = name) };
     Either.from(() => {
-      part.on("transition", moved);
-      part.on("error", moved);
+      part.on("transition", { fn: () => void (mover = name) });
       part.send = (event) => {
-        const sender = stack.at(-1) ?? mover;
-        if (own?.name === name && own.event === event.type) own = null;
-        else if (
-          sender !== null &&
+        if (
+          !(own?.name === name && own.event === event.type) &&
+          mover !== null &&
           handlesNowhere(part, event.type) &&
           !lost.some(
-            (each) => each.sender === sender && each.receiver === name && each.event === event.type,
+            (each) => each.sender === mover && each.receiver === name && each.event === event.type,
           )
         ) {
-          lost.push({ sender, receiver: name, event: event.type, step: at() });
+          lost.push({ sender: mover, receiver: name, event: event.type, step: at() });
         }
-        const saved = mover;
-        stack.push(name);
-        try {
-          send(event);
-        } finally {
-          stack.pop();
-          mover = saved;
-        }
+        restoring(() => send(event));
       };
+    });
+  }
+  for (const [name, map] of Object.entries(maps)) {
+    const send: unknown = Reflect.get(map, "send");
+    if (typeof send !== "function") continue;
+    Either.from(() => {
+      Reflect.set(map, "send", (...args: unknown[]) =>
+        restoring(() => {
+          mover = name;
+          Reflect.apply(send, map, args);
+        }),
+      );
     });
   }
   return {
@@ -543,7 +553,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   let index = 0;
   const sinks = { visited, observations, errors, plain };
   const at = (): number => index;
-  const sends = watchSends({ parts: { [target.id]: actor, ...actors }, at });
+  const sends = watchSends({ parts: { [target.id]: actor, ...actors }, maps, at });
   const recorder = recordChildren({
     root: actor,
     maps,
@@ -583,7 +593,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
     statesBefore.push(actor.state.name);
-    sends.expect(ownSend(target.id, { root: actor, actors, step }));
+    sends.expect(ownSend(target.id, step));
     // Core reports handler and effect-body throws via "error"; a throw from
     // user code the step runs outside them (a timer callback under
     // `clock.advance`) ends this run as an error, not the whole fuzz.
@@ -628,18 +638,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
 }
 
 /** The step's own event when `applyStep` sends it to a watched machine; null for a timer or a map child. */
-function ownSend(
-  rootName: string,
-  context: {
-    root: AnyActor<unknown>;
-    actors: Readonly<Record<string, AnyActor<unknown>>>;
-    step: VizStep;
-  },
-): { name: string; event: string } | null {
-  const { root, actors, step } = context;
+function ownSend(rootName: string, step: VizStep): { name: string; event: string } | null {
   if (step.kind !== "event" || (step.actor !== undefined && "map" in step.actor)) return null;
-  const name = step.actor === undefined ? rootName : step.actor.region;
-  const part = step.actor === undefined ? root : actors[name];
-  if (part === undefined) return null;
-  return { name, event: step.event };
+  return { name: step.actor === undefined ? rootName : step.actor.region, event: step.event };
 }
