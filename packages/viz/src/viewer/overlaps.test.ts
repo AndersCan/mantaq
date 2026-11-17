@@ -117,6 +117,19 @@ describe("overlapsOf", () => {
     ]);
   });
 
+  test("label-clear: only the last point of a 32-point run is near the label", () => {
+    // f's corner (202,40) is sampled point 31, the last of the first run: 7.2px from e's label; points 30 and 32 are 8px or more.
+    const layout = layoutOf({
+      edges: [
+        placedEdge("e", straight, labelAt(217, 54)),
+        placedEdge("f", "M140,40 L202,40 L202,-100", labelAt(100, 0)),
+      ],
+    });
+    expect(
+      overlapsOf(layout).filter((each) => each.a === "label:e" && each.b === "path:f"),
+    ).toEqual([{ rule: "label-clear", a: "label:e", b: "path:f", gap: 7.2 }]);
+  });
+
   test("label-clear: a label near the corner of a slanted arrow's bounding box, far from the arrow, passes", () => {
     const layout = layoutOf({
       edges: [placedEdge("e", "M140,100 L260,160", labelAt(255, 88))],
