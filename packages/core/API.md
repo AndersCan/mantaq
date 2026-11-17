@@ -21,7 +21,8 @@ class Actor<
   ActorContext = Record<string, unknown>,
 > {
   state: States[number] | ErrorState;
-  readonly clock: Clock;
+  /** Only when `clock` was given; `undefined` otherwise. */
+  readonly clock: Clock | undefined;
   readonly context: ActorContext;
   readonly regions: Record<string, AnyActor>;
   constructor(options: {
@@ -61,17 +62,6 @@ const a = new Actor({
   setup: (m) => m.on(idle, { event: click, handler: () => ({}) }),
 });
 a.send(click.create());
-```
-
-### RealClock
-
-Wall-clock `Clock` via platform timers; the default. No public surface beyond `Clock`. `now()`: milliseconds. RealClock: since the Unix epoch. VirtualClock: virtual time, starting at 0.
-
-```ts
-class RealClock implements Clock {
-  // no public members beyond Clock
-}
-const id = new RealClock().setTimeout(10, () => {});
 ```
 
 ### VirtualClock
@@ -378,7 +368,7 @@ Structural handle for any actor. Regions, `context`, and `options`. `context` is
 ```ts
 interface AnyActor<C = Record<string, unknown>> {
   state: AnyStateRef;
-  clock: Clock;
+  clock?: Clock | undefined;
   regions: Record<string, AnyActor>;
   context?: C;
   send(event: AnyEventRef | InternalEvent): void;
@@ -558,6 +548,7 @@ interface EffectInput<ActorContext, Payload = unknown, Emit = InternalEvent> {
   event: InternalEvent;
   context: Context<ActorContext>;
   emit: (event: Emit) => void;
+  /** Only when the actor was given a `clock`; an effect that uses it does not compile without one. */
   clock: Clock;
 }
 ```

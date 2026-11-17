@@ -3,7 +3,7 @@ import { buildQueue } from "./built-elsewhere-parts.ts";
 
 /** A queue whose events are not registered in this file. */
 export const jobs = machine("jobs", {
-  create: ({ clock }) => {
-    return buildQueue(clock);
+  create: () => {
+    return buildQueue();
   },
 });

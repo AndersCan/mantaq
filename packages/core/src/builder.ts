@@ -1,4 +1,5 @@
 import type { AnyActor } from "./actor-internal.ts";
+import type { Clock } from "./clock.ts";
 import type { Context, CreatedOf, EffectFn, TransitionResult } from "./actor-types.ts";
 import type { AnyEventRef, EventRef, CreatedOfEvent, InternalEvent } from "./index.ts";
 import type { RuntimeTransitionHandler } from "./parse-handler.ts";
@@ -19,7 +20,7 @@ export type TransitionHandler<
 export interface EffectEntry<ActorContext> {
   name: string;
   sends?: string[]; // declared event types, for tooling; undefined = not declared
-  fn: EffectFn<ActorContext>;
+  fn: EffectFn<ActorContext, unknown, InternalEvent, undefined>;
 }
 
 type EmitOf<E> = E extends readonly AnyEventRef[] ? CreatedOf<E[number]> : InternalEvent;
@@ -68,6 +69,7 @@ export interface ActorBuilder<
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext,
+  Time extends Clock | undefined = Clock,
 > {
   on<
     S extends States[number],
@@ -76,18 +78,22 @@ export interface ActorBuilder<
   >(
     stateRef: S,
     options: HandlerOptions<S, To, Outputs, ActorContext, E>,
-  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
+  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time>;
   onAny<
     E extends Inputs[number] | Internal[number],
     const To extends readonly States[number][] = readonly [],
   >(
     options: HandlerOptions<States[number], To, Outputs, ActorContext, E>,
-  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
+  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time>;
   /** `sends`: internal events `fn` may emit; `emit` only accepts those. Omit for untyped `emit`. */
   effect<S extends States[number], const E extends SendList<Internal> = undefined>(
     stateRef: S,
-    definition: { name: string; sends?: E; fn: EffectFn<ActorContext, PayloadOf<S>, EmitOf<E>> },
-  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>;
+    definition: {
+      name: string;
+      sends?: E;
+      fn: EffectFn<ActorContext, PayloadOf<S>, EmitOf<E>, Time>;
+    },
+  ): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time>;
   /** @internal */
   build(): BuiltMaps<States, ActorContext>;
 }
@@ -98,7 +104,8 @@ export function ActorBuilder<
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext,
->(): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
+  Time extends Clock | undefined = Clock,
+>(): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time> {
   const transitions: BuiltMaps<States, ActorContext>["transitions"] = {};
   const targets: BuiltMaps<States, ActorContext>["targets"] = {};
   const effects: BuiltMaps<States, ActorContext>["effects"] = {};
@@ -112,13 +119,13 @@ export function ActorBuilder<
     (targets[stateName] ??= {})[eventType] = (options.to ?? []).map((target) => target.name);
   }
 
-  const self: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> = {
-    on(stateRef, options): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
+  const self: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time> = {
+    on(stateRef, options): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time> {
       register(stateRef.name, options);
       return self;
     },
 
-    onAny(options): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext> {
+    onAny(options): ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time> {
       register("Any", options);
       return self;
     },
@@ -145,4 +152,5 @@ export type SetupFn<
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext,
-> = (m: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>) => void;
+  Time extends Clock | undefined = Clock,
+> = (m: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time>) => void;

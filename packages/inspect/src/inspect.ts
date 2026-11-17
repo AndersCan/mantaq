@@ -164,7 +164,9 @@ function machineRunner(machine: Machine): Either<string, FuzzTarget["create"]> {
   const { actor, clock } = create();
   // An actor on the real clock sets no timer inspect must move; only a second virtual clock is out of reach.
   const elsewhere =
-    typeof Reflect.get(actor.clock, "advance") === "function" && actor.clock !== clock;
+    actor.clock !== undefined &&
+    typeof Reflect.get(actor.clock, "advance") === "function" &&
+    actor.clock !== clock;
   return elsewhere ? Either.left(NOT_ON_GIVEN_CLOCK) : Either.right(create);
 }
 

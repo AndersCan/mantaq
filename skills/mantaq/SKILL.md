@@ -43,7 +43,7 @@ One way to do things; don't invent competing patterns.
 - **State payload.** Data tied to one visit to a state, passed on transition. Per-visit data → payload. Cross-step data → context.
 - **Effect.** `{ name, sends, fn }`: a named side effect that runs when a state is entered and is aborted when it is left. All async work, timers and I/O live here. Never in transition handlers. `sends` declares the internal events `fn` emits, and the diagram links them.
 - **Transition handler.** Pure decision: gets `(event, { context, state })`, where `state` is the typed current state. Read them, return the next state and/or events to emit. Registered per state (`m.on`) or for every state (`m.onAny`), with `to` listing every state it may return (compile-checked; omit `to` for a handler that only stays). `to` is what the diagram draws, and returning a state not in `to` fails to compile.
-- **Clock.** The only source of time. `VirtualClock` in tests, `RealClock` in production.
+- **Clock.** The only source of time. `machine("id", { create: ({ clock }) => Actor({ clock, … }) })` gets real time by default and a `VirtualClock` in tests; an actor without a clock has no time.
 - **Regions.** Child actors composed into a parent. Forwarding events into a child is manual.
 - **Actor.** Build it with `Actor({...})` (a function, no `new`). Wires the above together: declared `inputs` (what callers send), `internal` events (emitted back to itself), `outputs` (emitted outward), states, initial state, context, clock, and a `setup` that registers handlers and effects.
 

@@ -1,4 +1,4 @@
-import type { EffectInput, InternalEvent } from "@mantaq/core";
+import type { Clock, EffectInput, InternalEvent } from "@mantaq/core";
 
 export function withTimeout<
   ActorContext,
@@ -12,7 +12,14 @@ export function withTimeout<
   },
 ): void {
   const { input, event } = options;
-  input.clock.setTimeout(durationMs, {
+  // A JS caller or a cast can reach here without a clock; the types do not allow it.
+  const clock: Clock | undefined = Reflect.get(input, "clock");
+  if (clock === undefined) {
+    throw new Error(
+      `withTimeout(${durationMs}): this actor has no clock. Pass the clock create() gets to Actor({ clock }).`,
+    );
+  }
+  clock.setTimeout(durationMs, {
     signal: input.signal,
     eventName: event().type,
     cb: () => {

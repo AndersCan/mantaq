@@ -19,7 +19,6 @@ export const kitchenMachine = machine("kitchen", {
       name: "orders",
       workers: 2,
       run: (_dishes, { signal }) => wait({ clock, ms: 1000, signal }),
-      clock,
     });
     const kitchen = Actor({
       inputs: [orderPlaced],

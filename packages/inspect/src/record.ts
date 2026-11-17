@@ -123,7 +123,7 @@ function finish(attempt: Pending[], passed: boolean): void {
       console.warn(`recordRuns: "${each.name}" not recorded, ${each.problem}`);
       continue;
     }
-    const now = each.actor.clock.now();
+    const now = timeOf(each.actor);
     if (now > each.seen) each.steps.push({ kind: "advance", ms: now - each.seen });
     const count = (counts.get(each.name) ?? 0) + 1;
     const name = count === 1 ? each.name : `${each.name} #${count}`;
@@ -182,6 +182,11 @@ export function recordRuns<Id extends string, Options extends object, M extends 
   };
 }
 
+/** An actor without a clock has no time: 0. */
+function timeOf(actor: AnyActor<unknown>): number {
+  return actor.clock?.now() ?? 0;
+}
+
 /** Record what the test does to the actor `made` holds, until the test ends. */
 function track(made: Made, context: Pick<Pending, "id" | "extra" | "replay">): void {
   const actor = actorOf(made);
@@ -193,12 +198,12 @@ function track(made: Made, context: Pick<Pending, "id" | "extra" | "replay">): v
     testPath,
     steps: [],
     problem: "",
-    seen: actor.clock.now(),
+    seen: timeOf(actor),
   };
   pending.push(entry);
   actor.on("transition", {
     fn: ({ event }) => {
-      const now = actor.clock.now();
+      const now = timeOf(actor);
       if (now > entry.seen) entry.steps.push({ kind: "advance", ms: now - entry.seen });
       entry.seen = now;
       const payload = jsonPayload(event.payload);

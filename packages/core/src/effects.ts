@@ -14,7 +14,7 @@ export interface EffectRunnerOptions<ActorContext> {
   event: InternalEvent;
   context: Context<ActorContext>;
   emit: (event: InternalEvent) => void;
-  clock: Clock;
+  clock: Clock | undefined;
   abort: AbortController;
   lastGood: LastKnownState;
   onError: (error: unknown, lastGood: LastKnownState) => void;
@@ -44,7 +44,7 @@ export function runEffects<ActorContext>(
         event: options.event,
         context: options.context,
         emit: options.emit,
-        clock: options.clock,
+        ...(options.clock && { clock: options.clock }),
       });
       return true;
     });

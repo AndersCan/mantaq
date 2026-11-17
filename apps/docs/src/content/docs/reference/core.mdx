@@ -124,7 +124,7 @@ class Actor<
 | `states`         | `StateRef[]`                        | All states                           |
 | `initial`        | `StateRef` or `{ state, payload? }` | Start state                          |
 | `context`        | `ActorContext`                      | Initial context                      |
-| `clock`          | `Clock`                             | Default: `RealClock`                 |
+| `clock`          | `Clock`                             | Default: none. No clock, no time     |
 | `setup`          | `(m: ActorBuilder) => void`         | Register transitions and effects     |
 | `regions`        | `Record<string, AnyActor>`          | Static children                      |
 | `internalBudget` | `number`                            | Max internal events (default: 10000) |
@@ -204,22 +204,6 @@ class VirtualClock implements Clock {
 ```
 
 Deterministic. `advance(ms)` fires all due timers instantly. Aborted signal passed to `setTimeout`/`setInterval` returns `-1`.
-
----
-
-## `RealClock`
-
-```ts
-class RealClock implements Clock {
-  now(): number;
-  setTimeout(ms, cb, options?): number;
-  clearTimeout(id): void;
-  setInterval(ms, cb, options?): number;
-  clearInterval(id): void;
-}
-```
-
-Real timers via `globalThis.setTimeout`. Default for actors. `now()`: milliseconds. RealClock: since the Unix epoch. VirtualClock: virtual time, starting at 0.
 
 ---
 

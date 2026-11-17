@@ -23,7 +23,7 @@ export interface InstrumentedActor<C = Record<string, unknown>> {
   snapshot(): Snapshot<C>;
   regions: Record<string, AnyActor>;
   context?: C;
-  clock: AnyActor["clock"];
+  clock?: AnyActor["clock"];
   on<E extends SubscriberEventName>(event: E, options: { fn: SubscriberHandler<C, E> }): () => void;
   recover(target: { state: AnyActor["state"]; context: C }): void;
   settled(): Promise<void>;

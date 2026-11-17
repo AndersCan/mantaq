@@ -3,7 +3,7 @@ import { createActorMap } from "./actors/actor-map.ts";
 import type { ActorMap } from "./actors/actor-map.ts";
 import { withPromise } from "./effects/promise.ts";
 import { Actor, event, state } from "@mantaq/core";
-import type { Clock, EventRef } from "@mantaq/core";
+import type { EventRef } from "@mantaq/core";
 
 /** The seven events of a pool, every id prefixed with the pool's name. */
 export interface PoolEvents<T, N extends string> {
@@ -36,7 +36,6 @@ export interface PoolOptions<T, N extends string> {
   key?: (item: T) => string;
   /** Most items one worker takes at once. Default 1. Infinity: all that wait. Below 1 counts as 1. */
   batch?: number;
-  clock?: Clock;
 }
 
 export interface Pool<T, N extends string> {
@@ -100,7 +99,6 @@ interface Shared<T, N extends string> {
   setOfKeys: boolean;
   keyOf: (item: T) => string;
   run: PoolOptions<T, N>["run"];
-  clock: Clock | undefined;
 }
 
 /** Nothing waits and no worker is running. */
@@ -197,7 +195,7 @@ function arrival<T, N extends string>(
 }
 
 function buildInbox<T, N extends string>(shared: Shared<T, N>) {
-  const { events, clock } = shared;
+  const { events } = shared;
   const ids = Array.from({ length: shared.size }, (_, index) => workerId(index + 1));
   const start: InboxContext<T> = { waiting: [], free: [...ids], workers: ids, size: shared.size };
   return Actor({
@@ -211,7 +209,6 @@ function buildInbox<T, N extends string>(shared: Shared<T, N>) {
     states: [allWorkersFree, workersBusy, workWaiting],
     initial: allWorkersFree,
     context: start,
-    ...(clock && { clock }),
     setup: (m) => {
       /** A free worker always exists, so the item goes straight out. */
       m.on(allWorkersFree, {
@@ -312,7 +309,7 @@ function buildInbox<T, N extends string>(shared: Shared<T, N>) {
 
 function buildWorker<T, N extends string>(options: { shared: Shared<T, N>; workerId: string }) {
   const { shared, workerId } = options;
-  const { events, run, clock } = shared;
+  const { events, run } = shared;
   const idle: { items: T[] } = { items: [] };
   return Actor({
     inputs: [events.ITEMS_ASSIGNED],
@@ -321,7 +318,6 @@ function buildWorker<T, N extends string>(options: { shared: Shared<T, N>; worke
     states: [free, working],
     initial: free,
     context: idle,
-    ...(clock && { clock }),
     setup: (m) => {
       /** Take the assignment and start the run. */
       m.on(free, {
@@ -387,7 +383,6 @@ export function createPool<T, const N extends string>(options: PoolOptions<T, N>
     setOfKeys: options.keep === "set",
     keyOf: options.key ?? ((item: T) => JSON.stringify(item)),
     run: options.run,
-    clock: options.clock,
   };
   const inbox = buildInbox(shared);
   const workers = createActorMap((key) => {

@@ -276,7 +276,9 @@ describe("runEffects", () => {
         idle: [
           {
             name: "emitAndRecord",
-            fn: ({ signal, state, event, context, emit, clock: c }) => {
+            fn: (input) => {
+              const { signal, state, event, context, emit } = input;
+              const c: unknown = Reflect.get(input, "clock");
               expect({
                 aborted: signal.aborted,
                 stateName: state.name,

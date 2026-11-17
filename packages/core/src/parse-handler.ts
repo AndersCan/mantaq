@@ -42,6 +42,8 @@ export function parseTransitionHandler<States extends readonly AnyStateRef[], Ac
  * The runner hands over the same payload typed as `unknown`. This is the one
  * place where the payload type is restored.
  */
-export function parseEffectFn<ActorContext>(candidate: unknown): EffectFn<ActorContext> {
-  return candidate as EffectFn<ActorContext>;
+export function parseEffectFn<ActorContext>(
+  candidate: unknown,
+): EffectFn<ActorContext, unknown, InternalEvent, undefined> {
+  return candidate as EffectFn<ActorContext, unknown, InternalEvent, undefined>;
 }

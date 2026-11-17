@@ -1,12 +1,12 @@
 import { computeCoverage } from "./coverage.ts";
 import { Actor, event, state } from "@mantaq/core";
-import type { EffectFn } from "@mantaq/core";
+import type { EffectFn, InternalEvent } from "@mantaq/core";
 import { buildGraph, createHistory } from "@mantaq/traversal";
 import { describe, expect, test } from "vite-plus/test";
 
 function makeActor(effects?: {
-  a?: EffectFn<Record<string, unknown>>;
-  b?: EffectFn<Record<string, unknown>>;
+  a?: EffectFn<Record<string, unknown>, unknown, InternalEvent, undefined>;
+  b?: EffectFn<Record<string, unknown>, unknown, InternalEvent, undefined>;
 }) {
   const goEvent = event("GO")();
   const stopEvent = event("STOP")();
