@@ -17,6 +17,6 @@ Some events are only valid under a condition: no plates, no meal. Putting the co
 
 <Step n={6}>
   A guard is a plain `if` in the handler: no plates, no `full`. With no plates, `eat` is blocked:
-  click `serve` first. The arrow shows the `if` condition as written, so naming it (`const noPlate =
-  …; if (noPlate)`) is what the arrow reads.
+  click `serve` first. The arrow to `full` shows each early-return `if`, negated: name the condition
+  (`const noPlate = …; if (noPlate) return {};`) and the arrow reads `!(noPlate)`.
 </Step>
