@@ -1,6 +1,6 @@
 import { actorSpec, definePart, withParts } from "../parts.ts";
 import { withTimeout } from "./timeout.ts";
-import { VirtualClock, Context, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, Context, event, state } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 
 describe("withTimeout", () => {
@@ -248,5 +248,46 @@ describe("withTimeout — timer lifecycle", () => {
 
     actor.dispose();
     expect(clock.hasPending()).toBe(false);
+  });
+
+  test("throws, naming the missing clock, when the input has none", () => {
+    const input = {
+      signal: new AbortController().signal,
+      state: { name: "", payload: undefined },
+      event: { type: "" },
+      context: Context({ get: () => undefined, set: () => {} }),
+      emit: () => {},
+    };
+    expect(() =>
+      withTimeout(100, {
+        // @ts-expect-error the input of an actor without a clock has no clock
+        // suppressed: the compile error is the contract
+        input,
+        event: () => ({ type: "timeout" }),
+      }),
+    ).toThrow(
+      "withTimeout(100): this actor has no clock. Pass the clock create() gets to Actor({ clock }).",
+    );
+  });
+
+  test("an actor without a clock goes to error when its effect starts a timer", () => {
+    const idle = state("idle")();
+    const done = event("done")();
+    const actor = Actor({
+      inputs: [],
+      internal: [done],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, {
+          name: "wait",
+          fn: (input) =>
+            // @ts-expect-error this actor has no clock, so the effect input has none
+            // suppressed: the compile error is the contract
+            withTimeout(5, { input, event: () => done.create() }),
+        });
+      },
+    });
+    expect(actor.snapshot().error?.reason).toBe("effect");
   });
 });

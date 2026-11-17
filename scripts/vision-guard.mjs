@@ -48,9 +48,11 @@ const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 // lines of option types and call sites (ceiling 1880).
 // Raised again 2026-11-17: machine(), the one typed handle tools and tests build actors from
 // (+~30 lines, ceiling 1910).
-const BUDGET_TOTAL_LINES = 1910;
+// Raised again 2026-11-17: an actor has a clock only when given one, so `Actor`, the effect
+// types and the builder carry a `Time` type parameter (+~15 lines, ceiling 1930).
+const BUDGET_TOTAL_LINES = 1930;
 const BUDGET_FILE_LINES = 650;
-const BUDGET_EXPORTS = 34;
+const BUDGET_EXPORTS = 33;
 
 const FORBIDDEN = [
   { name: "as any", pattern: /\bas any\b/g },

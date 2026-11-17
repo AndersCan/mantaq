@@ -1,7 +1,7 @@
 export type InternalEvent = { type: string; payload?: unknown };
 
 export { Actor } from "./actor.ts";
-export { RealClock, VirtualClock } from "./actor.ts";
+export { VirtualClock } from "./actor.ts";
 export type { Clock, Snapshot, AnyActor, ActorOptions, InitialState } from "./actor.ts";
 export { Context } from "./context.ts";
 export { machine } from "./machine.ts";

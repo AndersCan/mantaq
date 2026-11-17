@@ -1,5 +1,4 @@
 import { createPool, poolEvents } from "./index.ts";
-import { VirtualClock } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -431,16 +430,10 @@ describe("createPool details", () => {
     expect(control.starts).toEqual([["a"], ["a", "b"]]);
   });
 
-  test("the clock reaches the inbox and every worker", () => {
-    const clock = VirtualClock();
-    const pool = createPool<string, "p">({
-      name: "p",
-      workers: 2,
-      clock,
-      run: () => Promise.resolve(),
-    });
+  test("the inbox and every worker have no clock", () => {
+    const pool = createPool<string, "p">({ name: "p", workers: 2, run: () => Promise.resolve() });
     const clocks = pool.workers.keys().map((key) => (pool.workers.get(key) as AnyActor).clock);
-    expect([pool.actor.clock, ...clocks]).toEqual([clock, clock, clock]);
+    expect([pool.actor.clock, ...clocks]).toEqual([undefined, undefined, undefined]);
   });
 
   test("declares its inputs, outputs, targets and effect for tooling", () => {

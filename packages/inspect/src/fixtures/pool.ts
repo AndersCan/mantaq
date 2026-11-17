@@ -3,12 +3,11 @@ import { createPool } from "@mantaq/sugar";
 
 /** A team inbox: two workers behind one inbox, built with `createPool`. */
 export const teamInbox = machine("teamInbox", {
-  create: ({ clock }) => {
+  create: () => {
     return createPool<string, "team">({
       name: "team",
       workers: 2,
       run: () => Promise.resolve(),
-      clock,
     });
   },
 });

@@ -14,17 +14,27 @@ export type NonFinalStateRef<States extends AnyStateRef[]> = Extract<
   { isFinal: false }
 >;
 
-export interface EffectInput<ActorContext, Payload = unknown, Emit = InternalEvent> {
+/** `clock` is there only when the actor was given one (`Time` is a `Clock`). */
+export type EffectInput<
+  ActorContext,
+  Payload = unknown,
+  Emit = InternalEvent,
+  Time extends Clock | undefined = Clock,
+> = {
   signal: AbortSignal;
   state: { name: string; payload: Payload };
   event: InternalEvent;
   context: Context<ActorContext>;
   emit: (event: Emit) => void;
-  clock: Clock;
-}
+} & ([Time] extends [Clock] ? { clock: Clock } : {});
 
-export type EffectFn<ActorContext, Payload = unknown, Emit = InternalEvent> = (
-  input: EffectInput<ActorContext, Payload, Emit>,
+export type EffectFn<
+  ActorContext,
+  Payload = unknown,
+  Emit = InternalEvent,
+  Time extends Clock | undefined = Clock,
+> = (
+  input: EffectInput<ActorContext, Payload, Emit, Time>,
 ) => void | Promise<void> | { then(onFulfilled: unknown, onRejected: unknown): unknown };
 export type ErrorReason =
   | "transition"

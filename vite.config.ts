@@ -45,6 +45,7 @@ export default defineConfig({
           "packages/core/src/actor.ts",
           "packages/core/src/builder.ts",
           "packages/sugar/src/actors/actor-map.ts",
+          "packages/sugar/src/effects/timeout.ts",
           "packages/traversal/src/graph.ts",
         ],
         rules: {

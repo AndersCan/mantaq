@@ -21,7 +21,7 @@
  * request/response journey, driven by a VirtualClock.
  */
 
-import { Actor, VirtualClock, RealClock, state, event } from "@mantaq/core";
+import { Actor, VirtualClock, state, event } from "@mantaq/core";
 import type { Clock } from "@mantaq/core";
 import { createActorMap, states, events, withTimeout, onOutput } from "@mantaq/sugar";
 import { describe, it, expect } from "vite-plus/test";
@@ -100,7 +100,7 @@ function createRequestHandler(orderId: string, options: { clock: Clock }) {
 }
 
 export function createRequester(options: { clock?: Clock; defaultTimeoutMs?: number } = {}) {
-  const clock = options.clock ?? RealClock();
+  const clock = options.clock ?? VirtualClock();
   const defaultTimeoutMs = options.defaultTimeoutMs ?? 5000;
   const pending = new Map<string, Array<(settled: Settled) => void>>();
 

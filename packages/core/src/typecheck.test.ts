@@ -1,7 +1,8 @@
 /* oxlint-disable oxlinter/comments-multiline-jsdoc -- ts-strict-casting requires a rationale line comment directly below each @ts-expect-error, and typescript requires line comments between the directive and the code */
 import type { ErrorReason } from "./actor-types.ts";
-import { Actor, state, event, Context, StateRef, machine } from "./index.ts";
+import { Actor, state, event, Context, StateRef, VirtualClock, machine } from "./index.ts";
 import type {
+  AnyActor,
   Machine,
   ActorOptions,
   AnyStateRef,
@@ -807,5 +808,127 @@ describe("type level contract — machine", () => {
     // @ts-expect-error nope is not a create option
     // suppressed: create accepts only its declared options
     plain.create({ nope: 1 });
+  });
+});
+
+describe("time only when given", () => {
+  const idle = state("idle")();
+  const tick = event("tick")();
+
+  test("an effect that uses the clock compiles when the actor has one", () => {
+    const clock = VirtualClock();
+    const actor = Actor({
+      clock,
+      inputs: [],
+      internal: [tick],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, { name: "wait", fn: (input) => void input.clock.now() });
+      },
+    });
+    expectTypeOf(actor.clock).toEqualTypeOf<typeof clock>();
+  });
+
+  test("an effect that uses the clock does not compile when the actor has none", () => {
+    Actor({
+      inputs: [],
+      internal: [tick],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, {
+          name: "wait",
+          // @ts-expect-error Property 'clock' does not exist: no clock was given
+          // suppressed: the compile error is the contract
+          fn: (input) => void input.clock.now(),
+        });
+      },
+    });
+  });
+
+  test("an effect that does not use time compiles without a clock, and the actor has none", () => {
+    const actor = Actor({
+      inputs: [],
+      internal: [tick],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, { name: "quiet", fn: ({ context }) => void context.get() });
+      },
+    });
+    expectTypeOf(actor.clock).toEqualTypeOf<undefined>();
+    expect(actor.clock).toBeUndefined();
+  });
+
+  test("an actor without a clock is accepted wherever any actor is", () => {
+    const actor = Actor({ inputs: [], states: [idle], initial: idle, setup: () => {} });
+    const any: AnyActor = actor;
+    expect(any.clock).toBeUndefined();
+  });
+
+  test("a machine whose create is not given a clock to Actor has no clock effects", () => {
+    const quiet = machine("quiet", {
+      create: () => Actor({ inputs: [], states: [idle], initial: idle, setup: () => {} }),
+    });
+    expect(quiet.create().clock).toBeUndefined();
+  });
+
+  test("a machine passes the clock create receives to its actor", () => {
+    const clock = VirtualClock();
+    const timed = machine("timed", {
+      create: ({ clock: given }) =>
+        Actor({
+          clock: given,
+          inputs: [],
+          internal: [tick],
+          states: [idle],
+          initial: idle,
+          setup: (m) => {
+            m.effect(idle, { name: "wait", fn: (input) => void input.clock.now() });
+          },
+        }),
+    });
+    expect(timed.create({ clock }).clock).toBe(clock);
+  });
+
+  test("a timer on the given clock moves the actor when the clock advances", () => {
+    const clock = VirtualClock();
+    const waiting = state("waiting")();
+    const done = state("done")();
+    const fired = event("fired")();
+    const actor = Actor({
+      clock,
+      inputs: [],
+      internal: [fired],
+      states: [waiting, done],
+      initial: waiting,
+      setup: (m) => {
+        m.on(waiting, { event: fired, to: [done], handler: () => ({ state: done }) });
+        m.effect(waiting, {
+          name: "wait",
+          sends: [fired],
+          fn: (input) => {
+            input.clock.setTimeout(100, { cb: () => input.emit(fired.create()) });
+          },
+        });
+      },
+    });
+    clock.advance(100);
+    expect(actor.state.name).toBe("done");
+  });
+
+  test("an effect of an actor without a clock gets an input with no clock key", () => {
+    const keys: string[] = [];
+    Actor({
+      inputs: [],
+      states: [idle],
+      initial: idle,
+      setup: (m) => {
+        m.effect(idle, { name: "look", fn: (input) => void keys.push(...Object.keys(input)) });
+      },
+    });
+    expect(keys).not.toContain("clock");
+    expect(keys).toContain("signal");
   });
 });

@@ -28,7 +28,7 @@ export type SubscriberHandler<C, E extends SubscriberEventName> = E extends "cha
 
 export interface AnyActor<C = Record<string, unknown>> {
   state: AnyStateRef;
-  clock: Clock;
+  clock?: Clock | undefined;
   regions: Record<string, AnyActor>;
   send(event: InternalEvent): void;
   snapshot(): Snapshot<C>;

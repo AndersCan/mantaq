@@ -44,6 +44,7 @@ function liveCreate(targets: LiveTargets, id: string): FuzzTarget["create"] | un
   const made = target();
   // An actor on a virtual clock other than the one handed in: its timers are out of the page's reach.
   const elsewhere =
+    made.actor.clock !== undefined &&
     typeof Reflect.get(made.actor.clock, "advance") === "function" &&
     made.actor.clock !== made.clock;
   return elsewhere ? undefined : target;

@@ -22,7 +22,6 @@ import type { AnyEventRef } from "./event.ts";
 import type { InternalEvent } from "./index.ts";
 import { parseContextOption } from "./parse-context-option.ts";
 import { InternalQueue } from "./queue.ts";
-import { RealClock } from "./real-clock.ts";
 import { buildSnapshot } from "./snapshot.ts";
 import { StateRef, isStateRef } from "./state.ts";
 import type { AnyStateRef } from "./state.ts";
@@ -31,7 +30,7 @@ import { createAbortController } from "./abort.ts";
 import { VirtualClock } from "./virtual-clock.ts";
 import { Either } from "@mantaq/utils";
 
-export { RealClock, VirtualClock };
+export { VirtualClock };
 export type { Clock, Snapshot, AnyActor };
 
 export type InitialState<S extends AnyStateRef> =
@@ -68,6 +67,7 @@ export interface ActorOptions<
   Internal extends readonly AnyEventRef[],
   Outputs extends readonly AnyEventRef[],
   ActorContext = Record<string, unknown>,
+  Time extends Clock | undefined = Clock | undefined,
 > {
   inputs: Inputs;
   outputs?: Outputs;
@@ -75,9 +75,9 @@ export interface ActorOptions<
   states: States;
   context?: ActorContext;
   initial: InitialState<States[number]>;
-  clock?: Clock;
+  clock?: Time;
   internalBudget?: number;
-  setup: SetupFn<States, Inputs, Internal, Outputs, ActorContext>;
+  setup: SetupFn<States, Inputs, Internal, Outputs, ActorContext, NoInfer<Time>>;
   regions?: Record<string, AnyActor>;
 }
 
@@ -120,9 +120,11 @@ export interface Actor<
   Internal extends readonly AnyEventRef[] = readonly [],
   Outputs extends readonly AnyEventRef[] = readonly [],
   ActorContext = Record<string, unknown>,
+  Time extends Clock | undefined = Clock | undefined,
 > extends AnyActor<ActorContext> {
   state: States[number] | ErrorState;
-  readonly clock: Clock;
+  /** Time exists only when `Actor({ clock })` was given one. */
+  readonly clock: Time;
   readonly context: ActorContext;
   readonly regions: Record<string, AnyActor>;
   readonly options: InternalActorOptions<States, Inputs, Internal, Outputs, ActorContext>;
@@ -145,10 +147,11 @@ export function Actor<
   const Internal extends readonly AnyEventRef[] = readonly [],
   const Outputs extends readonly AnyEventRef[] = readonly [],
   ActorContext = Record<string, unknown>,
+  Time extends Clock | undefined = undefined,
 >(
-  options: ActorOptions<States, Inputs, Internal, Outputs, ActorContext>,
-): Actor<States, Inputs, Internal, Outputs, ActorContext> {
-  const builder = ActorBuilder<States, Inputs, Internal, Outputs, ActorContext>();
+  options: ActorOptions<States, Inputs, Internal, Outputs, ActorContext, Time>,
+): Actor<States, Inputs, Internal, Outputs, ActorContext, Time> {
+  const builder = ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Time>();
   options.setup(builder);
   const built = builder.build();
 
@@ -162,8 +165,8 @@ export function Actor<
   const internalIds = new Set((options.internal ?? []).map((entry) => entry.type));
   const inputIds = new Set(options.inputs.map((entry) => entry.type));
   const internalBudget = options.internalBudget ?? 10_000;
-  const clock: Clock = options.clock ?? RealClock();
-  clock.setDrain?.(drain);
+  const clock = options.clock;
+  clock?.setDrain?.(drain);
 
   let currentState: States[number] | ErrorState;
   let currentPayload: unknown;
@@ -210,11 +213,11 @@ export function Actor<
     }
   }
 
-  const publicActor: Actor<States, Inputs, Internal, Outputs, ActorContext> = {
+  const publicActor: Actor<States, Inputs, Internal, Outputs, ActorContext, Time> = {
     get state(): States[number] | ErrorState {
       return currentState;
     },
-    clock,
+    clock: options.clock as Time,
     get regions(): Record<string, AnyActor> {
       return regionActors;
     },
