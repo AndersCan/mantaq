@@ -373,6 +373,18 @@ describe("blockedEdges chooses a payload per arrow", () => {
     expect(chosen.get("cart-pay-two")).toBe(0);
   });
 
+  test("an arrow no candidate takes sends the default, not the first candidate tried", () => {
+    // On a run the run's payload (3) is tried first; neither takes cart-pay-two.
+    const { blocked, chosen } = blockedEdges(machine, {
+      ...base,
+      candidatesOf: () => [3, 0],
+      defaultOf: () => 0,
+      dryRun,
+    });
+    expect(blocked.has("cart-pay-two")).toBe(false);
+    expect(chosen.get("cart-pay-two")).toBe(0);
+  });
+
   test("a locked arrow names where the default goes", () => {
     const { blocked } = blockedEdges(machine, {
       ...base,
