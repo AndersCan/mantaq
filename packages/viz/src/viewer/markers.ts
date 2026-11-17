@@ -13,6 +13,7 @@ const PILL_H = 14;
 const PILL_PAD = 10;
 const FONT = 10;
 const GAP = 4;
+const HIT_PAD = 6;
 const MAX_LABEL = 8;
 
 interface Row {
@@ -106,6 +107,13 @@ function shapeOf(doc: Document, item: Item): SVGElement[] {
     svg(doc, "text", { x: item.width / 2, y: 3.5, "text-anchor": "middle" }, [
       label(item.child.key),
     ]),
+    svg(doc, "rect", {
+      class: "marker-hit",
+      x: -HIT_PAD,
+      y: -PILL_H / 2 - HIT_PAD,
+      width: item.width + 2 * HIT_PAD,
+      height: PILL_H + 2 * HIT_PAD,
+    }),
   ];
 }
 

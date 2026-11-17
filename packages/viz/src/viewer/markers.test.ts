@@ -101,6 +101,17 @@ describe("drawChildMarkers", () => {
     ]);
   });
 
+  test("a chip's click area reaches past its pill", () => {
+    const root = board([168, 168]);
+    drawChildMarkers(root, context([child("w1", "s0")]));
+    const pill = markers(root)[0]?.querySelector("rect");
+    const hit = markers(root)[0]?.querySelector("rect.marker-hit");
+    expect(Number(hit?.getAttribute("width"))).toBeGreaterThan(Number(pill?.getAttribute("width")));
+    expect(Number(hit?.getAttribute("height"))).toBeGreaterThan(
+      Number(pill?.getAttribute("height")),
+    );
+  });
+
   test("a child that moves keeps its element", () => {
     const root = board([168, 168]);
     drawChildMarkers(root, context([child("w1", "s0")]));
