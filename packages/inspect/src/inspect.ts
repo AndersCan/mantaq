@@ -1,7 +1,7 @@
 import type { AnalysisSource } from "./ast/program.ts";
 import type { AnyActor, Clock } from "@mantaq/core";
 import type { AnyExpectations, CheckedExpectation } from "./expectations.ts";
-import type { FuzzOptions, FuzzStop } from "./fuzz/fuzz.ts";
+import type { FuzzOptions, FuzzStop, LostMessage } from "./fuzz/fuzz.ts";
 import type { FuzzTarget, MissingPayload } from "./fuzz/run.ts";
 import type { MachineExport } from "./ast/discover.ts";
 import type { ModuleAnalysis } from "./ast/annotate.ts";
@@ -115,6 +115,8 @@ export interface Inspected {
   warnings: string[];
   /** Events fuzzing sent without a payload whose fields the machine read; empty when fuzzing is off. */
   missingPayloads: MissingPayload[];
+  /** Messages one machine sent another that handles them in no state; empty when fuzzing is off. */
+  lostMessages: LostMessage[];
 }
 
 /**
@@ -189,9 +191,9 @@ function annotator(
 function driven(
   target: InspectTarget,
   context: { structure: VizMachine; run: Either<string, FuzzTarget> },
-): { machine: VizMachine; notes: string[]; missing: MissingPayload[] } {
+): { machine: VizMachine; notes: string[]; missing: MissingPayload[]; lost: LostMessage[] } {
   const { structure, run } = context;
-  if (Either.isLeft(run)) return { machine: structure, notes: [run[0]], missing: [] };
+  if (Either.isLeft(run)) return { machine: structure, notes: [run[0]], missing: [], lost: [] };
   const settings = target.fuzz;
   const fuzzed = settings === false ? null : fuzzRun(run[1], { target, settings, structure });
   const base = fuzzed?.machine ?? structure;
@@ -203,7 +205,12 @@ function driven(
           base,
           target.tests.map((each) => each.steps),
         );
-  return { machine, notes: fuzzed?.warnings ?? [], missing: fuzzed?.missing ?? [] };
+  return {
+    machine,
+    notes: fuzzed?.warnings ?? [],
+    missing: fuzzed?.missing ?? [],
+    lost: fuzzed?.lost ?? [],
+  };
 }
 
 /** Why written expectations are not checked, if they are not. */
@@ -225,7 +232,7 @@ function uncheckedExpectations(
 function fuzzRun(
   runner: FuzzTarget,
   context: { target: InspectTarget; settings: FuzzSettings | undefined; structure: VizMachine },
-): { machine: VizMachine; warnings: string[]; missing: MissingPayload[] } {
+): { machine: VizMachine; warnings: string[]; missing: MissingPayload[]; lost: LostMessage[] } {
   const { target, settings, structure } = context;
   const result = fuzz(runner, {
     seed: settings?.seed ?? DEFAULT_SEED,
@@ -239,6 +246,7 @@ function fuzzRun(
     machine,
     warnings: fuzzWarnings(machine, { stopped: result.stopped, missing }),
     missing,
+    lost: result.lostMessages,
   };
 }
 
@@ -259,7 +267,7 @@ function inspectWith(
     structure.states.filter((each) => each.region === null).map((each) => each.id),
   );
   const run = runner(target, { ...inferred, ...target.payloads }, expected.checked);
-  const { machine, notes, missing } = driven(target, { structure, run });
+  const { machine, notes, missing, lost } = driven(target, { structure, run });
   const unchecked = uncheckedExpectations(target, { expected, run, structure });
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
@@ -268,6 +276,7 @@ function inspectWith(
   return {
     machine: annotated,
     missingPayloads: missing,
+    lostMessages: lost,
     warnings: [
       ...unanalyzed,
       ...mapWarnings(created.made),

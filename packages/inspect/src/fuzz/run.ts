@@ -64,6 +64,19 @@ export interface Trace {
   missingPayloads: MissingPayload[];
   /** The map children the run started, in start order; a key started twice appears twice. */
   children: SeenChild[];
+  /** First send per (sender, receiver, event) to a machine that handles the event in no state, in send order. */
+  lost: LostSend[];
+}
+
+/** One message a machine sent another that handles its event in no state. */
+interface LostSend {
+  /** Machine whose run made the send. */
+  sender: string;
+  /** Machine it was sent to. */
+  receiver: string;
+  event: string;
+  /** Index of the step during which it was sent. */
+  step: number;
 }
 
 /** A map child a run started, with the steps it was alive for. */
@@ -338,6 +351,73 @@ export function applyStep(
   } else actor.send(toEvent(step, context.emptyPayload));
 }
 
+/** True when a machine declares transitions and no state, `Any` included, has a row for the event. */
+function handlesNowhere(actor: AnyActor<unknown>, event: string): boolean {
+  const transitions = actor.options?.transitions;
+  if (typeof transitions !== "object" || transitions === null) return false;
+  return Object.values(transitions).every((row) => row?.[event] === undefined);
+}
+
+/**
+ * Note every message one watched machine sends another that handles it in no
+ * state. The sender is the machine whose `send` is running, or the one that
+ * last moved this step (a timer-driven output). With no known sender nothing
+ * is noted. `step` starts a step: the fuzzer's own send has no sender.
+ */
+function watchSends(context: {
+  parts: Readonly<Record<string, AnyActor<unknown>>>;
+  maps: Readonly<Record<string, ActorMapLike>>;
+  at: () => number;
+}): { lost: LostSend[]; step: () => void } {
+  const { parts, maps, at } = context;
+  const lost: LostSend[] = [];
+  let mover: string | null = null;
+  const restoring = (run: () => void): void => {
+    const saved = mover;
+    try {
+      run();
+    } finally {
+      mover = saved;
+    }
+  };
+  for (const [name, part] of Object.entries(parts)) {
+    const send = part.send.bind(part);
+    Either.from(() => {
+      part.on("transition", { fn: () => void (mover = name) });
+      part.send = (event) => {
+        if (
+          mover !== null &&
+          handlesNowhere(part, event.type) &&
+          !lost.some(
+            (each) => each.sender === mover && each.receiver === name && each.event === event.type,
+          )
+        ) {
+          lost.push({ sender: mover, receiver: name, event: event.type, step: at() });
+        }
+        restoring(() => send(event));
+      };
+    });
+  }
+  for (const [name, map] of Object.entries(maps)) {
+    const send: unknown = Reflect.get(map, "send");
+    if (typeof send !== "function") continue;
+    Either.from(() => {
+      Reflect.set(map, "send", (...args: unknown[]) =>
+        restoring(() => {
+          mover = name;
+          Reflect.apply(send, map, args);
+        }),
+      );
+    });
+  }
+  return {
+    lost,
+    step: () => {
+      mover = null;
+    },
+  };
+}
+
 type Sinks = {
   visited: string[];
   observations: Observation[];
@@ -470,6 +550,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   let index = 0;
   const sinks = { visited, observations, errors, plain };
   const at = (): number => index;
+  const sends = watchSends({ parts: { [target.id]: actor, ...actors }, maps, at });
   const recorder = recordChildren({
     root: actor,
     maps,
@@ -509,6 +590,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
     statesBefore.push(actor.state.name);
+    sends.step();
     // Core reports handler and effect-body throws via "error"; a throw from
     // user code the step runs outside them (a timer callback under
     // `clock.advance`) ends this run as an error, not the whole fuzz.
@@ -548,5 +630,6 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     features,
     missingPayloads,
     children: recorder.children,
+    lost: sends.lost,
   };
 }
