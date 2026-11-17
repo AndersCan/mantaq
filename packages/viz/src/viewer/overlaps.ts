@@ -146,15 +146,31 @@ function boundsOfPath(path: ReadonlyArray<Point>): Box {
   return bounds;
 }
 
+const CHUNK = 32;
+const pathChunks = new WeakMap<ReadonlyArray<Point>, Array<{ start: number; box: Box }>>();
+
+/** A route cut into runs of `CHUNK` points, each with its box, remembered per route. */
+function chunksOfPath(path: ReadonlyArray<Point>): Array<{ start: number; box: Box }> {
+  const known = pathChunks.get(path);
+  if (known !== undefined) return known;
+  const chunks = [];
+  for (let start = 0; start < path.length; start += CHUNK)
+    chunks.push({ start, box: boundsOfPath(path.slice(start, start + CHUNK)) });
+  pathChunks.set(path, chunks);
+  return chunks;
+}
+
 function pathToBox(path: ReadonlyArray<Point>, box: Box): number {
   const around = boxToBox(boundsOfPath(path), box);
   if (around >= LABEL_PAD) return around;
   let best = Infinity;
-  for (const point of path) {
-    // A point `LABEL_PAD` or more away on one axis is that far away: it cannot lower a gap below `LABEL_PAD`.
-    if (Math.abs(point.x - box.x) - box.width / 2 >= LABEL_PAD) continue;
-    if (Math.abs(point.y - box.y) - box.height / 2 >= LABEL_PAD) continue;
-    best = Math.min(best, pointToBox(point, box));
+  for (const chunk of chunksOfPath(path)) {
+    if (boxToBox(chunk.box, box) >= LABEL_PAD) continue;
+    const end = Math.min(chunk.start + CHUNK, path.length);
+    for (let index = chunk.start; index < end; index++) {
+      const point = path[index];
+      if (point !== undefined) best = Math.min(best, pointToBox(point, box));
+    }
   }
   return best;
 }

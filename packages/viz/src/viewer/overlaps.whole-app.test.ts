@@ -8,7 +8,7 @@ import type { Overlap } from "./overlaps.ts";
 import { expect, test } from "vite-plus/test";
 
 /** A copy with a few nodes moved onto their neighbours and one route shifted, so the checker has overlaps to find. */
-export function crowded(layout: MachineLayout): MachineLayout {
+function crowded(layout: MachineLayout): MachineLayout {
   const nodes = layout.nodes.map((node, index) => {
     const target = layout.nodes[index + 1];
     return index % 9 === 3 && target !== undefined
