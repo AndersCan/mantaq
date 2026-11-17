@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.42.2
+
+<sub>2026-11-17</sub>
+
+- _(patch)_ A machine that sets no timers runs live on a docs page without being given a clock.
+
 ## 0.42.1
 
 <sub>2026-11-17</sub>
