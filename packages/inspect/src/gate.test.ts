@@ -4,6 +4,9 @@ import { createDoorActor } from "./fixtures/factories.ts";
 import { createDocumentedActor } from "./fixtures/documented.ts";
 import { createVagueNamesActor } from "./fixtures/vague-names.ts";
 import { createThrowingActor } from "./fixtures/throwing.ts";
+import { createCheckout } from "./fixtures/lost-message.ts";
+import { createDroppedMessage } from "./fixtures/dropped-message.ts";
+import { onOutput, withTimeout } from "@mantaq/sugar";
 import { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts";
 import { inspect } from "./inspect.ts";
 import { join } from "node:path";
@@ -268,5 +271,134 @@ describe("handlers and effects with no description", () => {
 
   test("fuzz stay edges collapse into the same notes", () => {
     expect(arrowLines({ iterations: 200 })).toEqual(sorted);
+  });
+});
+
+const timedOut = event("PAYMENT_TIMED_OUT")();
+const payStarted = event("PAYMENT_STARTED")();
+const charged = event("CARD_CHARGED")();
+const payClicked = event("PAY_CLICKED")();
+const waitedTooLong = event("WAITED_TOO_LONG")();
+const browsing = state("browsing")();
+const waiting = state("waiting")();
+const gaveUp = state("gaveUp")().final();
+const ready = state("ready")();
+const charging = state("charging")();
+
+/** Checkout and payment where payment has no handler for PAYMENT_TIMED_OUT; `declared` also leaves it out of payment's inputs. */
+function createCheckoutWithoutTimeoutHandler(declared: boolean, effectSendsTimeout = false) {
+  const clock = VirtualClock();
+  const payment = Actor({
+    inputs: declared ? [payStarted, charged, timedOut] : [payStarted, charged],
+    internal: effectSendsTimeout ? [timedOut] : [],
+    states: [ready, charging],
+    initial: ready,
+    clock,
+    setup: (m) => {
+      m.on(ready, { event: payStarted, to: [charging], handler: () => ({ state: charging }) });
+      m.on(charging, { event: charged, to: [ready], handler: () => ({ state: ready }) });
+      if (effectSendsTimeout)
+        m.effect(charging, { name: "chargeDeadline", sends: [timedOut], fn: () => undefined });
+    },
+  });
+  const checkout = Actor({
+    inputs: [payClicked],
+    internal: [waitedTooLong],
+    outputs: [payStarted, timedOut],
+    states: [browsing, waiting, gaveUp],
+    initial: browsing,
+    clock,
+    setup: (m) => {
+      m.on(browsing, {
+        event: payClicked,
+        to: [waiting],
+        handler: () => ({ state: waiting, emit: [payStarted.create()] }),
+      });
+      m.effect(waiting, {
+        name: "paymentDeadline",
+        sends: [waitedTooLong],
+        fn: (input) => withTimeout(30_000, { input, event: () => waitedTooLong.create() }),
+      });
+      m.on(waiting, {
+        event: waitedTooLong,
+        to: [gaveUp],
+        handler: () => ({ state: gaveUp, emit: [timedOut.create()] }),
+      });
+    },
+  });
+  onOutput(checkout, (out) => payment.send(out as never));
+  return { actor: checkout, payment };
+}
+
+function failureOf(run: () => void): string {
+  try {
+    run();
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+  return "";
+}
+
+describe("expectNoDesignErrors on a lost message", () => {
+  const lostLine =
+    "  - checkout sends PAYMENT_TIMED_OUT to payment, which never handles it. No state of payment has a handler for PAYMENT_TIMED_OUT, so the message is lost. Handle PAYMENT_TIMED_OUT in a state of payment, or stop sending it.";
+
+  test("checkout and payment have no design errors", () => {
+    expect(() =>
+      expectNoDesignErrors({ id: "checkout", create: () => createCheckout() }),
+    ).not.toThrow();
+  });
+
+  test("fails when payment declares PAYMENT_TIMED_OUT but handles it in no state", () => {
+    const message = failureOf(() =>
+      expectNoDesignErrors({
+        id: "checkout",
+        create: () => createCheckoutWithoutTimeoutHandler(true),
+      }),
+    );
+    expect(message).toContain(`checkout has 1 design error:\n${lostLine}\n`);
+    expect(message).toMatch(/^ {4}after: PAY_CLICKED → /m);
+    expect(message).not.toContain("is declared but no state handles it");
+  });
+
+  test("fails when the event is forwarded with a cast to a receiver that does not declare it", () => {
+    const message = failureOf(() =>
+      expectNoDesignErrors({
+        id: "checkout",
+        create: () => createCheckoutWithoutTimeoutHandler(false),
+      }),
+    );
+    expect(message).toContain(lostLine);
+  });
+
+  test("a message dropped only in the current state is not lost", () => {
+    expect(inspect({ id: "kitchen", create: () => createDroppedMessage() }).lostMessages).toEqual(
+      [],
+    );
+  });
+
+  test("keeps another kind of finding about the lost event, after the lost line", () => {
+    const message = failureOf(() =>
+      expectNoDesignErrors({
+        id: "checkout",
+        create: () => createCheckoutWithoutTimeoutHandler(false, true),
+      }),
+    );
+    expect(message).toContain(`checkout has 3 design errors:\n${lostLine}\n`);
+    expect(message).toMatch(
+      /\n {2}- chargeDeadline sends PAYMENT_TIMED_OUT, but payment\.charging has no handler for it\./,
+    );
+    expect(message.indexOf(lostLine)).toBeLessThan(message.indexOf("chargeDeadline sends"));
+  });
+
+  test("the checkout example documents every handler and effect", () => {
+    const message = failureOf(() =>
+      expectNoDesignErrors({
+        id: "checkout",
+        create: () => createCheckout(),
+        source: { file: join(FIXTURES, "lost-message.ts"), root: FIXTURES },
+      }),
+    );
+    expect(message).not.toContain("has no description");
   });
 });
