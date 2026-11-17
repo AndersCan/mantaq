@@ -30,7 +30,7 @@ describe("layout guarantee on generated machines", () => {
           expect(Either.isRight(layoutMachine(machine))).toBe(true);
         },
       ),
-      { seed: 0x753, numRuns: 300 },
+      { seed: 0x757, numRuns: 300 },
     );
   }, 30_000);
 });

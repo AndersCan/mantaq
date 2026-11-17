@@ -16,7 +16,9 @@ beforeAll(async () => {
     configFile: false,
     logLevel: "silent",
     server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
-    plugins: [mantaqViz({ machines: ["lost-message.ts"], fuzz: { iterations: 300 } })],
+    plugins: [
+      mantaqViz({ machines: ["lost-message.ts", "renamed-wire.ts"], fuzz: { iterations: 300 } }),
+    ],
   });
   await server.listen();
   const address = server.httpServer?.address();
@@ -44,8 +46,8 @@ test("a message between two machines is a dotted line, and an arrow's click stil
     })),
   );
   expect(lines).toEqual([
-    { from: "waitingForPayment", to: "payment.ready", text: 0, arrow: 1, dashed: true },
     { from: "gaveUp", to: "payment.charging", text: 0, arrow: 1, dashed: true },
+    { from: "waitingForPayment", to: "payment.ready", text: 0, arrow: 1, dashed: true },
   ]);
   expect(await page.locator("g.edge").count()).toBe(6);
   await page.screenshot({ path: process.env["MESSAGES_SHOT"] ?? "/tmp/messages-checkout.png" });
@@ -66,5 +68,28 @@ test("a message between two machines is a dotted line, and an arrow's click stil
     .getByText("Then checkout sent PAYMENT_STARTED to payment: ready → charging")
     .first()
     .waitFor();
+  await page.close();
+}, 60_000);
+
+test("a renamed wire and an any-state handler get lines; an unwired same-named event gets none", async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  await page.goto(`${origin}/__mantaq/?machine=renamedCheckout`);
+  await page.locator("g.edge").first().waitFor();
+  expect(await page.locator(".load-error").count()).toBe(0);
+  const lines = await page
+    .locator("g.message")
+    .evaluateAll((groups) =>
+      groups.map((group) => [
+        group.getAttribute("data-message-from"),
+        group.getAttribute("data-message-to"),
+      ]),
+    );
+  expect(lines).toEqual([
+    ["paid", "payment.*"],
+    ["payment.ready", "waitingForPayment"],
+    ["waitingForPayment", "payment.ready"],
+  ]);
+  expect(await page.locator('g.message[data-message-from="gaveUp"]').count()).toBe(0);
+  await page.screenshot({ path: process.env["MESSAGES_SHOT"] ?? "/tmp/messages-renamed.png" });
   await page.close();
 }, 60_000);
