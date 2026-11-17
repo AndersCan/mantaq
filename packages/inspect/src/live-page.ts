@@ -68,9 +68,11 @@ function liveCreate(targets: LiveTargets, id: string): FuzzTarget["create"] | un
   const target = targets[id];
   if (target === undefined) return undefined;
   const made = target();
+  // An actor on a virtual clock other than the one handed in: its timers are out of the page's reach.
+  if (isAdvanceable(made.actor.clock) && made.actor.clock !== made.clock) return undefined;
   if (isAdvanceable(made.clock)) return target;
-  // A real-clock actor with a stand-in clock beside it; a mismatch (an advanceable actor clock) stays out.
-  return isAdvanceable(made.actor.clock) ? undefined : withoutTimers(target);
+  // A real-clock actor with a stand-in clock beside it.
+  return withoutTimers(target);
 }
 
 function routesOf(context: { routes?: VizOutputRoutes }): { routes?: VizOutputRoutes } {

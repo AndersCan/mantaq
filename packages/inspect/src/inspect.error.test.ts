@@ -139,6 +139,17 @@ describe("inspectModule: machine(...) exports", () => {
     ]);
   });
 
+  test("an export whose id is not a string at runtime is skipped", async () => {
+    const result = await inspectModule(file, {
+      load: async (path) => ({
+        ...(await load(path)),
+        sleeper: { id: 5, create: () => undefined },
+      }),
+      fuzz: false,
+    });
+    expect(result.machines.map((machine) => machine.id)).toEqual(["deadline", "stubborn"]);
+  });
+
   test("an export that is not a machine at runtime is skipped", async () => {
     const result = await inspectModule(file, {
       load: async (path) => ({ ...(await load(path)), sleeper: { id: "sleeper" } }),
@@ -146,5 +157,13 @@ describe("inspectModule: machine(...) exports", () => {
     });
     expect(result.machines.map((machine) => machine.id)).toEqual(["deadline", "stubborn"]);
     expect(result.warnings).toContain("sleeper: sleeper did not return an actor");
+  });
+});
+
+describe("inspectModule: a machine export named apart from its id", () => {
+  test("is known by its machine id, and <id>Expectations is claimed by it", async () => {
+    const result = await inspectModule(join(FIXTURES, "machine-renamed.ts"), { load });
+    expect(result.machines.map((machine) => machine.id)).toEqual(["lamp"]);
+    expect(result.warnings.filter((warning) => warning.includes("matches no machine"))).toEqual([]);
   });
 });

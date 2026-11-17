@@ -76,6 +76,10 @@ describe("analyzeModule: machine exports", () => {
     expect(analysis("machine-and-factory")?.machines.map((found) => found.name)).toEqual(["solo"]);
   });
 
+  test("a machine whose id is not a literal is not a machine export", () => {
+    expect(analysis("machine-gated")?.machines.map((found) => found.name)).toEqual(["gated"]);
+  });
+
   test("a file without machines has none", () => {
     expect(analysis("no-machines")?.machines).toEqual([]);
   });

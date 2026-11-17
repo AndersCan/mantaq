@@ -190,3 +190,12 @@ describe("targetsSource: machine(...) exports", () => {
     expect(mixed).not.toContain('"legacy"');
   });
 });
+
+describe("targetsSource: a machine export named apart from its id", () => {
+  test("is keyed by the machine id, as the document is", () => {
+    const source = targetsSource([join(import.meta.dirname, "fixtures/machine-renamed.ts")]);
+    expect(source).toContain(
+      '"lamp": () => { const clock = VirtualClock(); const made = m0["deskLamp"].create({ clock });',
+    );
+  });
+});

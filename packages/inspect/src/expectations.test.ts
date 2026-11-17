@@ -1,3 +1,4 @@
+import { deadline } from "./fixtures/machine-values.ts";
 import { VirtualClock } from "@mantaq/core";
 import { machineFindings } from "@mantaq/viz";
 import type { VizStep } from "@mantaq/viz";
@@ -321,5 +322,14 @@ describe("Expectations type", () => {
     expectTypeOf<{ paymnt: object }>().not.toExtend<Checkout>();
     expectTypeOf<{ payment: { neverSee: [{ orderId: number }] } }>().not.toExtend<Checkout>();
     expectTypeOf<{ __error: object }>().not.toExtend<Checkout>();
+  });
+});
+
+describe("Expectations type: machine(...) values", () => {
+  test("Expectations<typeof m> is keyed by the machine's states, not never", () => {
+    type Deadline = Expectations<typeof deadline>;
+    expectTypeOf<Deadline>().not.toBeNever();
+    expectTypeOf<{ error: { neverSee: [object] } }>().toExtend<Deadline>();
+    expectTypeOf<{ eror: object }>().not.toExtend<Deadline>();
   });
 });

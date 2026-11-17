@@ -309,6 +309,21 @@ test("without one", () => {
     expect(recorded.sleeper.map((each) => each.end)).toEqual(["awake"]);
   });
 
+  test("a run that only passes with the port is dropped, naming the port", () => {
+    const dir = join(SCRATCH, "machine-gated");
+    testFile(
+      dir,
+      `test("opens", () => {
+  const actor = make.create({ open: true });
+  actor.send({ type: "wake" });
+  expect(actor.state.name).toBe("awake");
+});`,
+      { fixture: join(HERE, "fixtures/machine-gated.ts"), factory: "gated" },
+    );
+    const result = run(dir, {});
+    expect(result.output).toContain("This test passed: open.");
+  });
+
   test("the wrapped machine keeps its id", () => {
     expect(recordRuns(deadline).id).toBe("deadline");
   });

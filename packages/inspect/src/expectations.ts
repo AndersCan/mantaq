@@ -13,12 +13,16 @@ export interface StateExpectations<C> {
   readonly mustSee?: ReadonlyArray<ContextMatch<C>>;
 }
 
-/** The actor a factory returns, or the actor itself. */
-type ActorOf<M> = M extends (...args: never[]) => infer R
+/** The actor a machine's `create` or a factory returns, or the actor itself. */
+type ActorOf<M> = M extends { create: (...args: never[]) => infer R }
   ? R extends { actor: infer A }
     ? A
     : R
-  : M;
+  : M extends (...args: never[]) => infer R
+    ? R extends { actor: infer A }
+      ? A
+      : R
+    : M;
 
 /** Expectations for one machine, keyed by its state names. `Expectations<typeof createCheckoutActor>`. */
 export type Expectations<M> =
