@@ -149,9 +149,8 @@ function templatePattern(checker: ts.TypeChecker, eventRef: ts.Expression): stri
 }
 
 function eventDocOf(checker: ts.TypeChecker, eventRef: ts.Expression): string | null {
-  const name = ts.isPropertyAccessExpression(eventRef) ? eventRef.name : eventRef;
   const text = ts.displayPartsToString(
-    checker.getSymbolAtLocation(name)?.getDocumentationComment(checker),
+    checker.getSymbolAtLocation(eventRef)?.getDocumentationComment(checker),
   );
   return text === "" ? null : text;
 }

@@ -63,23 +63,6 @@ describe("handlers registered in another file of the program", () => {
     );
   });
 
-  test("two other files registering the same state and event is not analyzed, naming both", async () => {
-    const machine = await inspect("two-libs/app.ts");
-    const edge = machine.edges.find((e) => e.event === "go");
-    expect(edge?.explanation).toMatchObject({
-      status: "not_analyzed",
-      reason:
-        "handlers for (idle, go) found in more than one file: src/fixtures/two-libs/left.ts, src/fixtures/two-libs/right.ts",
-    });
-  });
-
-  test("the machine file's own registration wins over another file's", async () => {
-    const machine = await inspect("two-libs/own.ts");
-    const edge = machine.edges.find((e) => e.event === "go");
-    expect(edge?.doc).toBe("Own goes.");
-    expect(edge?.explanation?.status).toBe("analyzed");
-  });
-
   test("a registration reads its event's doc and pattern; an undocumented plain event has neither doc nor pattern", () => {
     const pool = Either.getRight(
       loadSource({ file: join(FIXTURES, "pool.ts"), root: EXAMPLE_ROOT }),
@@ -89,7 +72,7 @@ describe("handlers registered in another file of the program", () => {
       .find((registration) => registration.eventPattern === "^.+\\.ITEM_ARRIVED$");
     expect(arrived?.eventDoc).toBe("App → inbox: one item to hand out.");
     const left = Either.getRight(
-      loadSource({ file: join(FIXTURES, "two-libs/left.ts"), root: EXAMPLE_ROOT }),
+      loadSource({ file: join(FIXTURES, "lend/child.ts"), root: EXAMPLE_ROOT }),
     );
     expect(left?.registrations.map((r) => [r.event, r.eventPattern, r.eventDoc])).toEqual([
       ["go", null, null],

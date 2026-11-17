@@ -23,7 +23,7 @@ export interface HandlerSite {
 }
 
 /** Handlers and descriptions of one source file. */
-export interface FileDocs {
+interface FileDocs {
   sites: HandlerSite[];
   stateDocs: ReadonlyMap<string, string>;
   eventDocs: ReadonlyMap<string, string>;
@@ -151,14 +151,11 @@ function explain(
 ): { explanation: VizExplanation | null; doc: string | null; supplier: FileDocs | null } {
   if (edge.kind === "initial") return { explanation: null, doc: null, supplier: null };
   if (edge.kind === "effect") {
-    const name = localState(edge.from);
-    const own = context.docs.effectDocs.get(name);
-    if (own !== undefined) return { explanation: null, doc: own.join("\n\n"), supplier: null };
-    const lender = context.docs.elsewhere.find((other) => other.effectDocs.has(name));
+    const docs = context.docs.effectDocs.get(localState(edge.from));
     return {
       explanation: null,
-      doc: lender?.effectDocs.get(name)?.join("\n\n") ?? null,
-      supplier: lender ?? null,
+      doc: docs === undefined ? null : docs.join("\n\n"),
+      supplier: null,
     };
   }
   const own = siteFor(context.docs.sites, edge);
@@ -260,6 +257,11 @@ export function annotateWith(
         null,
       payload: eventPayloads.get(event.id) ?? null,
     })),
-    edges: drawn,
+    edges: drawn.map((edge) => {
+      if (edge.kind !== "effect" || edge.doc !== null) return edge;
+      const name = localState(edge.from);
+      const docs = lent.find((other) => other.effectDocs.has(name))?.effectDocs.get(name);
+      return { ...edge, doc: docs === undefined ? null : docs.join("\n\n") };
+    }),
   };
 }
