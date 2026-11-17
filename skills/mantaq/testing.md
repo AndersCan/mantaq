@@ -4,18 +4,55 @@ Deterministic tests with the VirtualClock + vitest. Harness and coverage from `@
 
 ## Deterministic Tests (VirtualClock)
 
-Never real timers in tests. Inject `VirtualClock`, jump with `advance`.
+Never real timers in tests. A machine with timers gets a `VirtualClock` from `create({ clock })`; jump with `advance`. A timeless machine is built with `create()`.
 
 ```ts
-import { Actor, VirtualClock } from "@mantaq/core";
-import { matches } from "@mantaq/sugar";
+import { Actor, VirtualClock, event, machine, state } from "@mantaq/core";
+import { matches, withTimeout } from "@mantaq/sugar";
+import { expect, test } from "vitest";
 
-const clock = VirtualClock();
-const actor = Actor({ clock, ... });
+const submit = event("SUBMIT")();
+const submitDone = event("SUBMIT_DONE")();
+const fillingForm = state("fillingForm")();
+const submitting = state("submitting")();
+const submitted = state("submitted")().final();
 
-actor.send(submit.create({ ... }));
-clock.advance(800);                       // fires timers, drains queue — synchronous
-expect(matches(actor, "submitted")).toBe(true);
+const form = machine("form", {
+  create: ({ clock }) =>
+    Actor({
+      clock,
+      inputs: [submit],
+      internal: [submitDone],
+      states: [fillingForm, submitting, submitted],
+      initial: fillingForm,
+      setup: (m) => {
+        m.on(fillingForm, {
+          event: submit,
+          to: [submitting],
+          handler: () => ({ state: submitting }),
+        });
+        m.on(submitting, {
+          event: submitDone,
+          to: [submitted],
+          handler: () => ({ state: submitted }),
+        });
+        m.effect(submitting, {
+          name: "submitDelay",
+          sends: [submitDone],
+          fn: (input) => withTimeout(800, { input, event: () => submitDone.create() }),
+        });
+      },
+    }),
+});
+
+test("the form submits after 800ms", () => {
+  const clock = VirtualClock();
+  const actor = form.create({ clock });
+
+  actor.send(submit.create());
+  clock.advance(800); // fires timers, drains queue — synchronous
+  expect(matches(actor, "submitted")).toBe(true);
+});
 ```
 
 No awaits needed for timer work. For promise-based effects, `await actor.settled()`. Pending timers are not queued events, so `settled()` does not advance time. It does not wait for an effect whose state was left (aborted on exit), so a walk that injects an effect's answer can await it even when the real call never answers.
@@ -25,6 +62,8 @@ Assert no leaked timers at the end of a test with the clock's pending-timer insp
 ## Failure-Path Injection
 
 `actor.send()` only accepts declared input events. To exercise an error branch, inject an internal event by id through the harness's `send` (or the actor's `inject`):
+
+<!-- docs-check: skip -->
 
 ```ts
 import { createTestHarness } from "@mantaq/test";
@@ -46,6 +85,8 @@ Use this for internal failure events (`PAYMENT_FAILED`, timeouts, retries) witho
 ## An App That Does Not Use Mantaq
 
 `assertMatchesModel` (`@mantaq/test` 2.1) runs random walks on a model machine and on the app, and fails with a minimal event sequence after which their states differ.
+
+<!-- docs-check: skip -->
 
 ```ts
 import { assertMatchesModel } from "@mantaq/test";
@@ -79,6 +120,8 @@ Guide: https://anderscan.github.io/mantaq/guides/app-without-mantaq/
 
 Prove behavior, don't just assert happy paths. The harness records visited states, fired transitions and executed effects, and offers `assert*` / `was*` helpers plus a `coverage()` report:
 
+<!-- docs-check: skip -->
+
 ```ts
 const h = createTestHarness(actor);
 h.send(someEvent.create());
@@ -95,12 +138,15 @@ Other assertions cover a specific state, transition or effect being visited or n
 
 ## Record Runs
 
-Wrap the machine factory once per test file. Each passing test that builds an actor with it is recorded as a named run in `__runs__/<test file>.json`, which the live page lists.
+Wrap the machine once per test file. Each passing test that builds an actor with it is recorded as a named run in `__runs__/<test file>.json`, which the live page lists.
+
+<!-- docs-check: skip -->
 
 ```ts
 import { recordRuns } from "@mantaq/inspect/record";
+import { invite } from "./invite.machine.ts";
 
-const make = recordRuns(createInviteLinkActor);
+const make = recordRuns(invite);
 ```
 
 Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a stale file fails the test. Name tests as user-visible journeys: the test name is the run's label. Link a run as `?machine=<id>&run=<name>`.
@@ -109,12 +155,15 @@ A journey through an effect's answer injects that answer right after the send th
 
 ## Design Gate
 
+<!-- docs-check: skip -->
+
 ```ts
 import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
+import { join } from "node:path";
+import { invite } from "./invite.machine.ts";
 
 const target = {
-  id: "inviteLink",
-  create: () => createInviteLinkActor({ clock: VirtualClock() }),
+  machine: invite,
   source: { file: join(import.meta.dirname, "invite-link.ts"), root: import.meta.dirname },
 };
 expectNoDesignErrors(target); // fuzzes: handler throws, unhandled effect sends, dead ends, unreachable states, events no state handles; with `source`: vague or undocumented names, handlers and effects
@@ -125,7 +174,7 @@ expectNoDesignErrors({ ...target, fuzz: false }); // structure only, no fuzzing
 
 Fuzz throws in app code are real findings: fix them, never suppress.
 
-Bad data without a crash: export `<machine id>Expectations` beside the factory, `payment: { neverSee: [{ address: "" }] }` typed `Expectations<typeof createXActor>`.
+Bad data without a crash: export `<machine id>Expectations` beside the machine, `payment: { neverSee: [{ address: "" }] }` typed `Expectations<typeof x>`.
 `mustSee` lists contexts some run must reach. Tests can pass the block as `expectations` on the target.
 Payloads come from `source` or `payloads: { event: [...] }`. If fuzzing sent an event with no payload and the machine read a field of it, all three checks stop and name the event and the fields: add `source` or real payloads, never reshape the design to get past it.
 
@@ -135,6 +184,8 @@ With `@mantaq/test` 2.0 the `*` any-node (`m.onAny`) counts in coverage: it is o
 
 To check that no message between your machines was dropped in a run, step it with `createDriver` from `@mantaq/inspect/drive` and read `after[].message`: `sender` is the part that sent it (`""` is the machine itself, `null` is unknown), and `dropped` is `"noHandler"` when the receiver had no handler in its state, else `null`. Needs `@mantaq/inspect` 0.37 or later.
 
+<!-- docs-check: skip -->
+
 ```ts
 import { createDriver } from "@mantaq/inspect/drive";
 import { VirtualClock } from "@mantaq/core";
@@ -143,7 +194,7 @@ const driver = createDriver({
   id: "kitchen",
   create: () => {
     const clock = VirtualClock();
-    const made = createKitchen({ clock });
+    const made = kitchen.create({ clock });
     return { actor: made.actor, clock, made };
   },
 });
