@@ -8,6 +8,7 @@ const go = event("GO")();
 const known = event("KNOWN")();
 const yell = event("Y_EVENT")();
 const zap = event("Z_EVENT")();
+const ant = event("A_EVENT")();
 
 function create() {
   const clock = VirtualClock();
@@ -25,7 +26,7 @@ function create() {
   const c = quiet();
   const a = Actor({
     inputs: [go],
-    outputs: [zap, yell],
+    outputs: [zap, yell, ant],
     states: [idle],
     initial: idle,
     clock,
@@ -33,11 +34,11 @@ function create() {
       m.on(idle, {
         event: go,
         to: [idle],
-        handler: () => ({ state: idle, emit: [zap.create(), yell.create()] }),
+        handler: () => ({ state: idle, emit: [zap.create(), yell.create(), ant.create()] }),
       });
     },
   });
-  onOutput(a, (out) => (out.type === "Z_EVENT" ? b.send(out as never) : c.send(out as never)));
+  onOutput(a, (out) => (out.type !== "Y_EVENT" ? b.send(out as never) : c.send(out as never)));
   return { actor: a, b, c, clock };
 }
 
@@ -45,5 +46,5 @@ test("lost messages are sorted by sender, then receiver, then event", () => {
   const found = inspect({ id: "a", create }).lostMessages.map(
     ({ sender, receiver, event: name }) => `${sender} ${receiver} ${name}`,
   );
-  expect(found).toEqual(["a b Z_EVENT", "a c Y_EVENT"]);
+  expect(found).toEqual(["a b A_EVENT", "a b Z_EVENT", "a c Y_EVENT"]);
 });

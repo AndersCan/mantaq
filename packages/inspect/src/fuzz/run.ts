@@ -362,17 +362,16 @@ function handlesNowhere(actor: AnyActor<unknown>, event: string): boolean {
  * Note every message one watched machine sends another that handles it in no
  * state. The sender is the machine whose `send` is running, or the one that
  * last moved this step (a timer-driven output). With no known sender nothing
- * is noted. `expect` marks the step's own event, which is the fuzzer's, not a message.
+ * is noted. `step` starts a step: the fuzzer's own send has no sender.
  */
 function watchSends(context: {
   parts: Readonly<Record<string, AnyActor<unknown>>>;
   maps: Readonly<Record<string, ActorMapLike>>;
   at: () => number;
-}): { lost: LostSend[]; expect: (own: { name: string; event: string } | null) => void } {
+}): { lost: LostSend[]; step: () => void } {
   const { parts, maps, at } = context;
   const lost: LostSend[] = [];
   let mover: string | null = null;
-  let own: { name: string; event: string } | null = null;
   const restoring = (run: () => void): void => {
     const saved = mover;
     try {
@@ -387,7 +386,6 @@ function watchSends(context: {
       part.on("transition", { fn: () => void (mover = name) });
       part.send = (event) => {
         if (
-          !(own?.name === name && own.event === event.type) &&
           mover !== null &&
           handlesNowhere(part, event.type) &&
           !lost.some(
@@ -414,9 +412,8 @@ function watchSends(context: {
   }
   return {
     lost,
-    expect: (next) => {
+    step: () => {
       mover = null;
-      own = next;
     },
   };
 }
@@ -593,7 +590,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
     statesBefore.push(actor.state.name);
-    sends.expect(ownSend(target.id, step));
+    sends.step();
     // Core reports handler and effect-body throws via "error"; a throw from
     // user code the step runs outside them (a timer callback under
     // `clock.advance`) ends this run as an error, not the whole fuzz.
@@ -635,10 +632,4 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     children: recorder.children,
     lost: sends.lost,
   };
-}
-
-/** The step's own event when `applyStep` sends it to a watched machine; null for a timer or a map child. */
-function ownSend(rootName: string, step: VizStep): { name: string; event: string } | null {
-  if (step.kind !== "event" || (step.actor !== undefined && "map" in step.actor)) return null;
-  return { name: step.actor === undefined ? rootName : step.actor.region, event: step.event };
 }
