@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.45.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_
+  recordRuns now also records the steps a test makes on the other machines a factory returns, as actor.region steps, and replay drops the ones a wire already delivers. Breaking: a test whose factory returns other machines must refresh its committed **runs** file once, without CI set.
+- _(patch)_
+  Machines a factory returns next to the root now get sample payloads for the events their effects emit, so the Context tab shows their fields.
+
 ## 0.44.0
 
 <sub>2026-11-17</sub>
