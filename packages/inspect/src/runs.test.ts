@@ -49,6 +49,21 @@ describe("normalizeRun on a factory that returns other machines", () => {
     expect(result).toEqual(Either.right([click, charged]));
   });
 
+  test("a part step the test makes twice is kept twice", () => {
+    const closed = { kind: "event" as const, event: "ORDER_CLOSED", payload: null, actor: payment };
+    const result = normalizeRun(renamed, { name: "t", end: "browsing", steps: [closed, closed] });
+    expect(result).toEqual(Either.right([closed, closed]));
+  });
+
+  test("only the step right before a part step can have delivered it", () => {
+    const result = normalizeRun(renamed, {
+      name: "t",
+      end: "paid",
+      steps: [click, charged, cascaded],
+    });
+    expect(result).toEqual(Either.right([click, charged, cascaded]));
+  });
+
   test("a step on a part with nothing before it to deliver it is kept", () => {
     const result = normalizeRun(renamed, { name: "t", end: "browsing", steps: [cascaded] });
     expect(result).toEqual(Either.right([cascaded]));
