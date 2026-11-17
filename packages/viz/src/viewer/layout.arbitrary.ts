@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
+import { isDrawn } from "./layout.ts";
 
 const NAME_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.WWMMmmww";
 const REGION_NAMES = ["a", "a.b", "c", "d"];
@@ -155,19 +156,32 @@ export const machineArbitrary: fc.Arbitrary<VizMachine> = fc
       });
   });
 
-/** `machineArbitrary` with its non-map top-level regions made parts and some edges emitting other edges' events. */
+/** `machineArbitrary` with its non-map top-level regions made parts and fuzz messages from some edges' targets to other edges' sources. */
 export const talkingArbitrary: fc.Arbitrary<VizMachine> = machineArbitrary.map((machine) => {
   const count = machine.edges.length;
+  const messages = machine.edges.flatMap((edge, index) => {
+    const receiver = machine.edges[(index * 7 + 1) % count];
+    return index % 2 === 0 &&
+      count > 1 &&
+      receiver !== undefined &&
+      edge.to !== null &&
+      isDrawn(receiver)
+      ? [{ from: edge.to, event: receiver.event, to: receiver.from }]
+      : [];
+  });
   return {
     ...machine,
     actors: machine.regions.filter(
       (region) => !region.includes(".") && !machine.maps.includes(region),
     ),
-    edges: machine.edges.map((edge, index) => {
-      const emitted = machine.edges[(index * 7 + 1) % count]?.event;
-      return index % 2 === 0 && count > 1 && emitted !== undefined
-        ? { ...edge, emits: [emitted] }
-        : edge;
-    }),
+    fuzz: {
+      seed: 0,
+      iterations: 0,
+      corpus: [],
+      errors: [],
+      failedExpectations: [],
+      expectations: [],
+      messages,
+    },
   };
 });

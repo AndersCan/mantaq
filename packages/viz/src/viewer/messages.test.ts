@@ -1,6 +1,5 @@
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
-import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { sentByParts } from "./blocked.ts";
+import type { VizEdge, VizFuzzMessage, VizMachine, VizState } from "../schema.ts";
 import { LABEL_PAD } from "./geometry.ts";
 import { messagesOf, placeMachine } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
@@ -43,8 +42,7 @@ function machineOf(parts: {
   edges: VizEdge[];
   actors?: string[];
   maps?: string[];
-  outputs?: string[];
-  partOutputs?: Record<string, string[]>;
+  messages?: VizFuzzMessage[];
 }): VizMachine {
   const regions = [
     ...new Set(parts.states.flatMap((id) => (id.includes(".") ? [id.split(".")[0] ?? ""] : []))),
@@ -59,151 +57,119 @@ function machineOf(parts: {
     regions,
     maps: parts.maps ?? [],
     actors: parts.actors ?? [],
-    outputs: parts.outputs ?? [],
-    partOutputs: parts.partOutputs ?? {},
+    outputs: [],
+    partOutputs: {},
     context: null,
-    fuzz: null,
+    fuzz: parts.messages === undefined ? null : { messages: parts.messages },
     runs: [],
   } as unknown as VizMachine;
 }
 
-const lost = machineOf({
-  states: ["browsing", "waitingForPayment", "gaveUp", "payment.ready", "payment.charging"],
+const renamed = machineOf({
+  states: ["browsing", "waitingForPayment", "paid", "gaveUp", "payment.ready", "payment.charging"],
   edges: [
     edge("browsing", "PAY_CLICKED", "waitingForPayment", ["PAYMENT_STARTED"]),
+    edge("waitingForPayment", "PAYMENT_CONFIRMED", "paid", ["ORDER_CLOSED"]),
     edge("waitingForPayment", "WAITED_TOO_LONG", "gaveUp", ["PAYMENT_TIMED_OUT"]),
-    edge("payment.ready", "PAYMENT_STARTED", "payment.charging"),
+    edge("payment.ready", "START", "payment.charging"),
+    edge("payment.charging", "CARD_CHARGED", "payment.ready", ["PAYMENT_CONFIRMED"]),
     edge("payment.charging", "PAYMENT_TIMED_OUT", "payment.ready"),
+    edge("payment.*", "ORDER_CLOSED", null),
   ],
   actors: ["payment"],
-  outputs: ["PAYMENT_STARTED", "PAYMENT_TIMED_OUT"],
-});
-
-const kitchen = machineOf({
-  states: ["open", "waiter.serving", "waiter.carryingDish"],
-  edges: [
-    edge("open", "DISH_COOKED", "open", ["DISH_READY"]),
-    edge("waiter.serving", "DISH_READY", "waiter.carryingDish"),
+  messages: [
+    { from: "paid", event: "ORDER_CLOSED", to: "payment.*" },
+    { from: "payment.ready", event: "PAYMENT_CONFIRMED", to: "waitingForPayment" },
+    { from: "waitingForPayment", event: "START", to: "payment.ready" },
   ],
-  actors: ["waiter"],
-  outputs: ["DISH_READY"],
-});
-
-const stock = machineOf({
-  states: ["waitingForStock", "waitingForPayment", "stock.free", "stock.holding"],
-  edges: [
-    edge("stock.free", "HOLD_ITEM", "stock.holding", ["ITEM_HELD"]),
-    edge("waitingForStock", "ITEM_HELD", "waitingForPayment"),
-  ],
-  actors: ["stock"],
-  partOutputs: { stock: ["ITEM_HELD"] },
 });
 
 describe("messagesOf", () => {
-  test("a message runs from the state the sender is in to the arrow that takes it", () => {
-    expect(messagesOf(lost)).toEqual([
-      { from: "waitingForPayment", to: "payment.ready", event: "PAYMENT_STARTED" },
-      { from: "gaveUp", to: "payment.charging", event: "PAYMENT_TIMED_OUT" },
-    ]);
+  test("a board that was not fuzzed has no lines", () => {
+    expect(messagesOf({ ...renamed, fuzz: null })).toEqual([]);
   });
 
-  test("a stay edge sends from its own state", () => {
+  test("an event name another machine's arrow takes draws no line unless fuzzing saw the send", () => {
+    expect(messagesOf({ ...renamed, fuzz: { messages: [] } } as unknown as VizMachine)).toEqual([]);
+  });
+
+  test("a renamed wire, an any-state handler and a reply each keep their line, in document order", () => {
+    expect(messagesOf(renamed)).toEqual(renamed.fuzz?.messages);
+  });
+
+  test("one line per pair of states, though several states of the receiver took it", () => {
+    const kitchen = machineOf({
+      states: ["takingOrders"],
+      edges: [],
+      messages: [
+        { from: "takingOrders", event: "ITEM_ARRIVED", to: "orders.allWorkersFree" },
+        { from: "takingOrders", event: "ITEM_ARRIVED", to: "orders.workersBusy" },
+        { from: "takingOrders", event: "ITEM_ARRIVED", to: "orders.workWaiting" },
+      ],
+    });
     expect(messagesOf(kitchen)).toEqual([
-      { from: "open", to: "waiter.serving", event: "DISH_READY" },
+      { from: "takingOrders", event: "ITEM_ARRIVED", to: "orders.allWorkersFree" },
     ]);
   });
 
-  test("a part can send to the root", () => {
-    expect(messagesOf(stock)).toEqual([
-      { from: "stock.holding", to: "waitingForStock", event: "ITEM_HELD" },
-    ]);
-  });
-
-  test("a region that is not an actor gets no line", () => {
-    expect(messagesOf({ ...stock, actors: [] })).toEqual([]);
-  });
-
-  test("a map gets no line", () => {
-    expect(messagesOf({ ...stock, actors: [], maps: ["stock"] })).toEqual([]);
-  });
-
-  test("an arrow from any state takes no message", () => {
-    const anyState = {
-      ...stock,
-      edges: [stock.edges[0], edge("stock.*", "ITEM_HELD", "waitingForPayment")],
-    };
-    expect(messagesOf(anyState as VizMachine)).toEqual([]);
-  });
-
-  test("a sender that ends nowhere sends no line", () => {
-    const sender = edge("stock.free", "HOLD_ITEM", null, ["ITEM_HELD"]);
-    expect(messagesOf({ ...stock, edges: [sender, stock.edges[1]] } as VizMachine)).toEqual([]);
-  });
-
-  test("an event handled in the sender's own scope draws no line", () => {
-    const own = machineOf({
-      states: ["a", "b"],
-      edges: [edge("a", "GO", "b", ["DONE"]), edge("b", "DONE", "a")],
-    });
-    expect(messagesOf(own)).toEqual([]);
-  });
-
-  test("two events between the same two states are one line", () => {
+  test("two events from one state to one state are one line, the first", () => {
     const twice = machineOf({
-      states: ["paid", "stock.holding", "stock.free"],
-      edges: [
-        edge("paid", "A", "paid", ["ONE", "TWO"]),
-        edge("stock.holding", "ONE", "stock.free"),
-        edge("stock.holding", "TWO", "stock.free"),
+      states: ["paid"],
+      edges: [],
+      messages: [
+        { from: "paid", event: "ONE", to: "stock.holding" },
+        { from: "paid", event: "TWO", to: "stock.holding" },
       ],
-      actors: ["stock"],
     });
-    expect(messagesOf(twice)).toEqual([{ from: "paid", to: "stock.holding", event: "ONE" }]);
+    expect(messagesOf(twice)).toEqual([{ from: "paid", event: "ONE", to: "stock.holding" }]);
   });
 
-  test("one event taken in two states of the other machine is one line", () => {
+  test("the same message into two different states of the receiver is one line", () => {
     const two = machineOf({
-      states: ["paid", "stock.holding", "stock.free"],
-      edges: [
-        edge("paid", "A", "paid", ["ONE"]),
-        edge("stock.holding", "ONE", "stock.free"),
-        edge("stock.free", "ONE", "stock.holding"),
+      states: ["paid"],
+      edges: [],
+      messages: [
+        { from: "paid", event: "ONE", to: "stock.holding" },
+        { from: "paid", event: "ONE", to: "stock.free" },
       ],
-      actors: ["stock"],
     });
-    expect(messagesOf(two)).toEqual([{ from: "paid", to: "stock.holding", event: "ONE" }]);
+    expect(messagesOf(two)).toEqual([{ from: "paid", event: "ONE", to: "stock.holding" }]);
   });
 
-  test("every line implies the refusal of a by-hand click on the arrow that takes it", () => {
-    for (const machine of [lost, kitchen, stock]) {
-      for (const message of messagesOf(machine)) {
-        for (const receiver of machine.edges.filter(
-          (each) => each.from === message.to && each.event === message.event,
-        )) {
-          expect(sentByParts(machine, receiver).length).toBeGreaterThan(0);
-        }
-      }
-    }
+  test("the same event from two states into one machine keeps both lines", () => {
+    const both = machineOf({
+      states: ["a", "b"],
+      edges: [],
+      messages: [
+        { from: "a", event: "ONE", to: "stock.holding" },
+        { from: "b", event: "ONE", to: "stock.holding" },
+      ],
+    });
+    expect(messagesOf(both)).toHaveLength(2);
   });
 });
 
 describe("placeMachine with messages", () => {
-  test.each([lost, kitchen])("lines are placed apart from arrows, inside the canvas", (machine) => {
-    const placed = placeMachine(machine);
-    expect(placed.messages.map((message) => [message.from, message.to])).toEqual(
-      messagesOf(machine).map((message) => [message.from, message.to]),
-    );
+  test("lines are placed apart from arrows, inside the canvas", () => {
+    const placed = placeMachine(renamed);
+    expect(placed.messages.map((message) => [message.from, message.to])).toEqual([
+      ["paid", "payment.*"],
+      ["payment.ready", "waitingForPayment"],
+      ["waitingForPayment", "payment.ready"],
+    ]);
     expect(placed.edges.filter((each) => each.edge.id.startsWith("message:"))).toEqual([]);
     for (const message of placed.messages) {
       for (const point of message.points) {
         expect(point.y).toBeGreaterThanOrEqual(LABEL_PAD);
         expect(point.y).toBeLessThanOrEqual(placed.height - LABEL_PAD);
+        expect(point.x).toBeGreaterThanOrEqual(LABEL_PAD);
+        expect(point.x).toBeLessThanOrEqual(placed.width - LABEL_PAD);
       }
     }
     expect(overlapsOf(placed)).toEqual([]);
   });
 
   test("a board without messages has none", () => {
-    expect(placeMachine({ ...lost, actors: [] }).messages).toEqual([]);
+    expect(placeMachine({ ...renamed, fuzz: null }).messages).toEqual([]);
   });
 });

@@ -190,7 +190,20 @@ const machine = {
       tested: null,
     },
   ],
-  fuzz: null,
+  fuzz: {
+    seed: 0,
+    iterations: 0,
+    corpus: [],
+    errors: [],
+    failedExpectations: [],
+    expectations: [],
+    messages: [
+      { from: "a.SWc3", to: "WC3WxZ67B4Q", event: "AAA" },
+      { from: "vroqmPJyFMs", to: "a.SWc3", event: "AAS" },
+      { from: "vroqmPJyFMs", to: "WC3WxZ67B4Q", event: "AAA" },
+      { from: "a.89NR", to: "WC3WxZ67B4Q", event: "AAA" },
+    ],
+  },
   runs: [],
 } as unknown as VizMachine;
 

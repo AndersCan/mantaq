@@ -1,5 +1,5 @@
 import { isAnyState, scopeOf } from "../schema.ts";
-import type { VizEdge, VizMachine, VizState } from "../schema.ts";
+import type { VizEdge, VizFuzzMessage, VizMachine, VizState } from "../schema.ts";
 import { edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
@@ -258,43 +258,22 @@ interface LabelBox {
   height: number;
 }
 
-/** One message between the root and a machine returned next to it: the line runs from `from` to `to`. */
-export interface Message {
-  /** The state the sender is in after sending: the sending arrow's `to`. */
-  from: string;
-  /** The source state of the arrow in the other machine that takes it. */
-  to: string;
-  event: string;
-}
-
-/** Messages between the root and the machines the factory returns next to it, matched by event name. One line per (from, to) and per (from, event, receiving machine). */
-export function messagesOf(machine: VizMachine): Message[] {
-  const scopes = new Set(["", ...machine.actors]);
-  const takes = (sender: VizEdge, event: string) => (receiver: VizEdge) =>
-    receiver.event === event &&
-    isDrawn(receiver) &&
-    !isAnyState(receiver.from) &&
-    scopes.has(scopeOf(receiver.from)) &&
-    scopeOf(receiver.from) !== scopeOf(sender.from);
-  const found: Message[] = [];
+/** Messages fuzzing saw one machine send another: one line per (from, to) and per (from, event, receiving machine), in document order. */
+export function messagesOf(machine: VizMachine): VizFuzzMessage[] {
+  const found: VizFuzzMessage[] = [];
   const seen = new Set<string>();
-  for (const sender of machine.edges) {
-    if (sender.to === null || !scopes.has(scopeOf(sender.from))) continue;
-    for (const event of sender.emits) {
-      for (const receiver of machine.edges.filter(takes(sender, event))) {
-        const pair = `${sender.to}>${receiver.from}`;
-        const delivery = `${sender.to}|${event}|${scopeOf(receiver.from)}`;
-        if (seen.has(pair) || seen.has(delivery)) continue;
-        seen.add(pair);
-        seen.add(delivery);
-        found.push({ from: sender.to, to: receiver.from, event });
-      }
-    }
+  for (const message of machine.fuzz?.messages ?? []) {
+    const pair = `${message.from}>${message.to}`;
+    const delivery = `${message.from}|${message.event}|${scopeOf(message.to)}`;
+    if (seen.has(pair) || seen.has(delivery)) continue;
+    seen.add(pair);
+    seen.add(delivery);
+    found.push(message);
   }
   return found;
 }
 
-function messageEdge(message: Message): VizEdge {
+function messageEdge(message: VizFuzzMessage): VizEdge {
   return {
     id: `message:${message.from}>${message.to}`,
     from: message.from,
