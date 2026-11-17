@@ -69,7 +69,8 @@ function sameEvent(machine: VizMachine, edge: VizEdge): VizEdge[] {
   const branches = edge.explanation?.status === "analyzed" ? edge.explanation.branches : [];
   const rank = (other: VizEdge): number => {
     const index = branches.findIndex(
-      (branch) => branch.target.kind === "state" && branch.target.state === other.to,
+      (branch) =>
+        branch.target.kind === "state" && branch.target.state === localName(other.to ?? ""),
     );
     return index === -1 ? branches.length : index;
   };

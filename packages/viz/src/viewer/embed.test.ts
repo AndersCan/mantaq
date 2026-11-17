@@ -241,6 +241,107 @@ describe("mountVizText", () => {
     ]);
   });
 
+  test("same event inside a region lists siblings in source order", () => {
+    const branches: VizBranch[] = [
+      { conditions: ["score < 600"], target: { kind: "state", state: "rejected" } },
+      {
+        conditions: ["!(score < 600)", "amount > 50000"],
+        target: { kind: "state", state: "review" },
+      },
+      {
+        conditions: ["!(score < 600)", "!(amount > 50000)"],
+        target: { kind: "state", state: "approved" },
+      },
+    ];
+    const explanation: VizEdge["explanation"] = {
+      status: "analyzed",
+      location: { file: "a.ts", line: 1, column: 1 },
+      registration: "on",
+      branches,
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    };
+    const inR = (id: string, flags: { initial?: boolean; final?: boolean } = {}) => ({
+      ...state(`r.${id}`, flags),
+      region: "r",
+    });
+    const machine: VizMachine = {
+      ...door,
+      initial: "idle",
+      regions: ["r"],
+      states: [
+        state("idle", { initial: true }),
+        inR("idle", { initial: true }),
+        inR("review"),
+        inR("approved"),
+        inR("rejected"),
+      ],
+      events: [{ id: "apply", internal: false, doc: null, payload: null }],
+      edges: [
+        edge("__initial__", "", "idle"),
+        { ...edge("r.idle", "apply", "r.review"), explanation },
+        { ...edge("r.idle", "apply", "r.approved"), explanation },
+        { ...edge("r.idle", "apply", "r.rejected"), explanation },
+      ],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    root
+      .querySelector('[data-edge-id="r.idle-apply-r.review"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
+    expect(links.map((link) => link.textContent)).toEqual([
+      "r.idle —apply [score < 600]→ r.rejected",
+      "r.idle —apply [else]→ r.approved",
+    ]);
+  });
+
+  test("same event lists siblings no branch of this arrow reaches last, by target", () => {
+    const explanation: VizEdge["explanation"] = {
+      status: "analyzed",
+      location: { file: "a.ts", line: 1, column: 1 },
+      registration: "on",
+      branches: [
+        { conditions: ["ok"], target: { kind: "state", state: "done" } },
+        { conditions: ["!(ok)"], target: { kind: "state", state: "other" } },
+      ],
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    };
+    const machine: VizMachine = {
+      ...door,
+      initial: "idle",
+      states: ["idle", "zeta", "alpha", "other", "done"].map((id) =>
+        state(id, { initial: id === "idle" }),
+      ),
+      events: [{ id: "go", internal: false, doc: null, payload: null }],
+      edges: [
+        edge("__initial__", "", "idle"),
+        edge("idle", "go", "zeta"),
+        edge("idle", "go", "alpha"),
+        { ...edge("idle", "go", "other"), explanation },
+        { ...edge("idle", "go", "done"), explanation },
+      ],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    root
+      .querySelector('[data-edge-id="idle-go-done"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
+    expect(links.map((link) => link.textContent)).toEqual([
+      "idle —go [else]→ other",
+      "idle —go→ alpha",
+      "idle —go→ zeta",
+    ]);
+  });
+
   test("Details hold the title, the doc line and, for a state, only its links", () => {
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [door] }));
     const click = (selector: string) =>
