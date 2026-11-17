@@ -41,8 +41,10 @@ export const meal6 = machine("meal6", {
           event: eat,
           to: [full],
           handler: (event, { context }) => {
-            if (event.payload.food === "") return {};
-            if (context.get().plates === 0) return {};
+            const noFood = event.payload.food === "";
+            const noPlate = context.get().plates === 0;
+            if (noFood) return {};
+            if (noPlate) return {};
             return { state: full };
           },
         });
