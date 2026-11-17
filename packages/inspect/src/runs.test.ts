@@ -5,8 +5,9 @@ import { Either } from "@mantaq/utils";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { EXAMPLE_ROOT } from "./examples.ts";
+import { renamedCheckout } from "./fixtures/renamed-wire.ts";
 import { timed as timedMachine } from "./fixtures/timed.ts";
-import { inspectModule } from "./inspect.ts";
+import { inspect, inspectModule } from "./inspect.ts";
 import { normalizeRun, readRuns } from "./runs.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
@@ -23,6 +24,62 @@ const timed: FuzzTarget = {
 const start = { kind: "event" as const, event: "start", payload: {} };
 const expired = { kind: "event" as const, event: "expired", payload: {} };
 const advance = { kind: "advance" as const, ms: 800 };
+
+const renamed: FuzzTarget = {
+  id: "renamedCheckout",
+  create: () => {
+    const clock = VirtualClock();
+    const made = renamedCheckout.create({ clock });
+    return { actor: made.actor, clock, made };
+  },
+};
+
+describe("normalizeRun on a factory that returns other machines", () => {
+  const click = { kind: "event" as const, event: "PAY_CLICKED", payload: null };
+  const payment = { region: "payment" };
+  const cascaded = { kind: "event" as const, event: "START", payload: null, actor: payment };
+  const charged = { kind: "event" as const, event: "CARD_CHARGED", payload: null, actor: payment };
+
+  test("a step a wire already delivered is dropped, one the test made is kept", () => {
+    const result = normalizeRun(renamed, {
+      name: "t",
+      end: "paid",
+      steps: [click, cascaded, charged],
+    });
+    expect(result).toEqual(Either.right([click, charged]));
+  });
+
+  test("a part step the test makes twice is kept twice", () => {
+    const closed = { kind: "event" as const, event: "ORDER_CLOSED", payload: null, actor: payment };
+    const result = normalizeRun(renamed, { name: "t", end: "browsing", steps: [closed, closed] });
+    expect(result).toEqual(Either.right([closed, closed]));
+  });
+
+  test("only the step right before a part step can have delivered it", () => {
+    const result = normalizeRun(renamed, {
+      name: "t",
+      end: "paid",
+      steps: [click, charged, cascaded],
+    });
+    expect(result).toEqual(Either.right([click, charged, cascaded]));
+  });
+
+  test("a step on a part with nothing before it to deliver it is kept", () => {
+    const result = normalizeRun(renamed, { name: "t", end: "browsing", steps: [cascaded] });
+    expect(result).toEqual(Either.right([cascaded]));
+  });
+
+  test("the recorded run seeds the wire into fuzz messages with no iterations", () => {
+    const { machine } = inspect({
+      machine: renamedCheckout,
+      fuzz: { seed: 1, iterations: 1 },
+      tests: [{ name: "pay", steps: [click, charged] }],
+    });
+    expect(machine.fuzz?.messages).toContainEqual(
+      expect.objectContaining({ from: "waitingForPayment", event: "START", to: "payment.ready" }),
+    );
+  });
+});
 
 describe("normalizeRun", () => {
   test("a timer's internal event is dropped: the advance reproduces it", () => {

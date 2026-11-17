@@ -67,6 +67,25 @@ function release(
   actor.dispose();
 }
 
+/** Every event type the root handles, and `<name>\0<type>` for each other machine, as it happens. */
+function producedBy(
+  actor: AnyActor<unknown>,
+  actors: Readonly<Record<string, AnyActor<unknown>>>,
+): string[] {
+  const produced: string[] = [];
+  actor.on("transition", { fn: ({ event }) => void produced.push(event.type) });
+  for (const [name, part] of Object.entries(actors)) {
+    part.on("transition", { fn: ({ event }) => void produced.push(`${name}\u0000${event.type}`) });
+  }
+  return produced;
+}
+
+/** The `produced` key of a step on another machine the factory returned, or "" (never produced). */
+function partKey(step: VizStep): string {
+  if (step.kind !== "event" || step.actor === undefined || !("region" in step.actor)) return "";
+  return `${step.actor.region}\u0000${step.event}`;
+}
+
 /**
  * Replay a raw recording on a fresh actor and keep only the steps that cannot
  * be reproduced: an internal event the replay already produced (a timer after
@@ -79,8 +98,7 @@ export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<strin
   const maps = actorMapsOf(made).maps;
   const actors = otherActorsOf(made, actor);
   const internal = new Set(eventCatalog(actor).internal);
-  let produced: string[] = [];
-  actor.on("transition", { fn: ({ event }) => void produced.push(event.type) });
+  const produced = producedBy(actor, actors);
   for (const step of run.steps) {
     const problem = stepProblem(actor, step, { maps, actors });
     if (problem !== null) {
@@ -92,9 +110,12 @@ export function normalizeRun(target: FuzzTarget, run: RecordedRun): Either<strin
   for (const step of run.steps) {
     const root = step.kind === "event" && step.actor === undefined;
     if (root && internal.has(step.event) && dropOne(produced, step.event)) continue;
-    produced = [];
+    const part = partKey(step);
+    if (dropOne(produced, part)) continue;
+    produced.length = 0;
     applyStep(actor, { step, clock, internal, maps, actors });
     if (root && internal.has(step.event)) dropOne(produced, step.event);
+    dropOne(produced, part);
     kept.push(step);
   }
   const ended = actor.state.name;
