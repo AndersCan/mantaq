@@ -904,13 +904,13 @@ describe("field forms and the context table", () => {
     expect(valueBox(root, "label")?.value).toBe("x");
   });
 
-  test("typing the shown default sets no value", () => {
+  test("a typed default is kept and sent", () => {
     const seen: string[][] = [];
     const { root } = mountFields(requiredMachine, {
       onNavigate: (where) => seen.push(where.values),
     });
     setBox(root, "amount", "1");
-    expect(seen.at(-1) ?? []).toEqual([]);
+    expect(seen.at(-1)).toEqual(["amount=1"]);
     expect(valueBox(root, "amount")?.value).toBe("1");
   });
 

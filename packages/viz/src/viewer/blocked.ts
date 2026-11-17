@@ -93,54 +93,82 @@ export function blockedReason(context: {
   return `${edge.event} is blocked: ${paths.map((path) => `${path} is ${valueAt(live, path)}`).join(", ")}`;
 }
 
+function takes(edge: VizEdge, outcome: VizLiveStep | null): boolean {
+  return (
+    outcome !== null &&
+    outcome.outcome === "transition" &&
+    (edge.to === null || outcome.to === edge.to)
+  );
+}
+
+type Asked = { asked: Map<string, VizStep>; arrows: Array<{ edge: VizEdge; keys: string[] }> };
+
+/** Every distinct step to try, and per transition arrow the keys of its candidates. */
+function askedArrows(
+  machine: VizMachine,
+  from: {
+    currents: ReadonlyArray<string>;
+    candidatesOf: (edge: VizEdge) => ReadonlyArray<VizJson>;
+    actorOf: (edge: VizEdge) => VizActorRef | undefined | "none";
+  },
+): Asked {
+  const asked = new Map<string, VizStep>();
+  const arrows: Array<{ edge: VizEdge; keys: string[] }> = [];
+  for (const { edge } of from.currents.flatMap((current) => movesFrom(machine, current))) {
+    const actor = from.actorOf(edge);
+    if (edge.kind !== "transition" || actor === "none") continue;
+    if (sentByParts(machine, edge).length > 0) continue;
+    const keys = from.candidatesOf(edge).map((payload) => {
+      const key = JSON.stringify([edge.event, actor ?? null, payload]);
+      const step: VizStep = {
+        kind: "event",
+        event: edge.event,
+        payload,
+        ...(actor === undefined ? {} : { actor }),
+      };
+      asked.set(key, asked.get(key) ?? step);
+      return key;
+    });
+    arrows.push({ edge, keys });
+  }
+  return { asked, arrows };
+}
+
 /**
- * Edge id → reason for every transition arrow out of `currents` that the live state's guard
- * stops. Each distinct (event, actor) is tried once on a throwaway copy via `dryRun`; a throw
- * blocks nothing.
+ * Per transition arrow out of `currents`: the first candidate payload `dryRun` says takes it (the
+ * arrow's `chosen` payload), and, when none does, the default's reason (`blocked`). Each distinct
+ * (event, actor, payload) is tried once on a throwaway copy; a throw blocks nothing and chooses nothing.
  */
 export function blockedEdges(
   machine: VizMachine,
   from: {
     live: VizLiveState;
-    /** The payload Send would send for an event. */
-    payloadOf: (event: string) => VizJson;
+    /** The payloads a click on an arrow may send, the default first. */
+    candidatesOf: (edge: VizEdge) => ReadonlyArray<VizJson>;
     currents: ReadonlyArray<string>;
     dryRun: (steps: ReadonlyArray<VizStep>) => Array<VizLiveStep | null>;
     actorOf: (edge: VizEdge) => VizActorRef | undefined | "none";
   },
-): Map<string, string> {
-  const asked = new Map<string, { step: VizStep; edges: VizEdge[] }>();
-  for (const { edge } of from.currents.flatMap((current) => movesFrom(machine, current))) {
-    const actor = from.actorOf(edge);
-    if (edge.kind !== "transition" || actor === "none") continue;
-    if (sentByParts(machine, edge).length > 0) continue;
-    const key = JSON.stringify([edge.event, actor ?? null]);
-    const step: VizStep = {
-      kind: "event",
-      event: edge.event,
-      payload: from.payloadOf(edge.event),
-      ...(actor === undefined ? {} : { actor }),
-    };
-    const entry = asked.get(key) ?? { step, edges: [] };
-    entry.edges.push(edge);
-    asked.set(key, entry);
-  }
+): { blocked: Map<string, string>; chosen: Map<string, VizJson> } {
+  const { asked, arrows } = askedArrows(machine, from);
   const blocked = new Map<string, string>();
-  const entries = [...asked.values()];
+  const chosen = new Map<string, VizJson>();
+  const order = [...asked.keys()];
   try {
-    const outcomes = from.dryRun(entries.map((each) => each.step));
-    entries.forEach(({ edges }, index) => {
-      for (const edge of edges) {
-        const reason = blockedReason({
-          edge,
-          outcome: outcomes[index] ?? null,
-          live: from.live.context,
-        });
-        if (reason !== null) blocked.set(edge.id, reason);
-      }
-    });
+    const outcomes = from.dryRun([...asked.values()]);
+    const outcomeOf = (key: string | undefined): VizLiveStep | null =>
+      key === undefined ? null : (outcomes[order.indexOf(key)] ?? null);
+    for (const { edge, keys } of arrows) {
+      const taken = keys.find((each) => takes(edge, outcomeOf(each)));
+      const step = asked.get(taken ?? keys[0] ?? "");
+      if (step?.kind === "event") chosen.set(edge.id, step.payload);
+      if (taken !== undefined) continue;
+      const outcome = outcomeOf(keys[0]);
+      const reason = blockedReason({ edge, outcome, live: from.live.context });
+      if (reason !== null) blocked.set(edge.id, reason);
+    }
   } catch {
-    return new Map();
+    return { blocked: new Map(), chosen: new Map() };
   }
-  return blocked;
+  return { blocked, chosen };
 }

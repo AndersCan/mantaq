@@ -181,9 +181,8 @@ function valuesList(
     input.value = set === undefined ? fallbackText : valueText(field, set);
     input.addEventListener("change", () => {
       const value = parseValue(field, input.value);
-      const untouched = value === undefined || JSON.stringify(value) === JSON.stringify(fallback);
-      if (untouched) input.value = fallbackText;
-      live.setValue(field.name, untouched ? undefined : value);
+      if (value === undefined) input.value = fallbackText;
+      live.setValue(field.name, value);
     });
     return html(doc, "label", { class: "explore-field" }, [
       html(doc, "span", {}, [
