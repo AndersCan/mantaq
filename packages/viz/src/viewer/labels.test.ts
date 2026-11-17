@@ -62,6 +62,29 @@ describe("edgeCondition", () => {
     expect(edgeCondition(edge)).toBe("!(a === 1 && b)");
   });
 
+  test("a double negation of a name reads as the name", () => {
+    const edge = edgeWith([
+      branch(["!(!hasFood)", "!(!hasPlate)"], "payment"),
+      branch(["x"], null),
+    ]);
+    expect(edgeCondition(edge)).toBe("hasFood && hasPlate");
+  });
+
+  test("a negated single name, property or call loses its brackets", () => {
+    const text = (guard: string): string | null =>
+      edgeCondition(edgeWith([branch([guard], "payment"), branch(["x"], null)]));
+    expect(text("!(noFood)")).toBe("!noFood");
+    expect(text("!(order.paid)")).toBe("!order.paid");
+    expect(text("!(isPaid(order))")).toBe("!isPaid(order)");
+  });
+
+  test("a negated name inside a longer condition is kept", () => {
+    const text = (guard: string): string | null =>
+      edgeCondition(edgeWith([branch([guard], "payment"), branch(["x"], null)]));
+    expect(text("!(!a && b)")).toBe("!(!a && b)");
+    expect(text("!(a && b)")).toBe("!(a && b)");
+  });
+
   test("null when every branch goes", () => {
     expect(
       edgeCondition(edgeWith([branch(["a"], "payment"), branch(["!(a)"], "payment")])),
@@ -206,13 +229,13 @@ describe("edgeCondition else side needs the same earlier conditions", () => {
       branch(["!(a)", "c"], null),
       branch(["!(a)", "!(c)"], "w"),
     ];
-    expect(textsOf(nested, ["x", "y", "w"])).toEqual(["a && c", "else if a", "else if !(c)"]);
+    expect(textsOf(nested, ["x", "y", "w"])).toEqual(["a && c", "else if a", "else if !c"]);
   });
 });
 
 describe("edgeCondition when one arrow is reached twice around another", () => {
   test("if (a) return x; if (b) return y; return x; keeps x's text true", () => {
     const twice = [branch(["a"], "x"), branch(["!(a)", "b"], "y"), branch(["!(a)", "!(b)"], "x")];
-    expect(textsOf(twice, ["x", "y"])).toEqual(["a || !(a) && !(b)", "else if b"]);
+    expect(textsOf(twice, ["x", "y"])).toEqual(["a || !a && !b", "else if b"]);
   });
 });
