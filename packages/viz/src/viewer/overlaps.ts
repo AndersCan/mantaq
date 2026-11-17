@@ -244,7 +244,7 @@ interface Shapes {
     target: string;
     path: Point[];
     route: ReadonlyArray<Point>;
-    label: Box;
+    label: Box | null;
     arrow: Box;
   }>;
   entries: Array<{ part: Part; line: Point[]; route: Point[]; dot: Box }>;
@@ -298,18 +298,32 @@ function shapesOf(layout: MachineLayout): Shapes {
           ? [node.label, ...node.chips, ...(node.workers ? [node.workers] : [])]
           : [],
     })),
-    edges: layout.edges.map((placed) => {
-      const path = sampledPath(placed.points);
-      return {
-        id: placed.edge.id,
-        from: placed.edge.from,
-        target: placed.target,
-        path,
-        route: placed.points,
-        label: placed.label,
-        arrow: arrowBox(path),
-      };
-    }),
+    edges: [
+      ...layout.edges.map((placed) => {
+        const path = sampledPath(placed.points);
+        return {
+          id: placed.edge.id,
+          from: placed.edge.from,
+          target: placed.target,
+          path,
+          route: placed.points,
+          label: placed.label,
+          arrow: arrowBox(path),
+        };
+      }),
+      ...layout.messages.map((placed) => {
+        const path = sampledPath(placed.points);
+        return {
+          id: `message:${placed.from}>${placed.to}`,
+          from: placed.from,
+          target: placed.to,
+          path,
+          route: placed.points,
+          label: null,
+          arrow: arrowBox(path),
+        };
+      }),
+    ],
     entries: layout.entries.map((entry, index) => ({
       part: `entry:${index}`,
       line: samplePolyline([entry.from, entry.to]),
@@ -336,22 +350,25 @@ function shapesOf(layout: MachineLayout): Shapes {
 type PlacedLabel = Shapes["edges"][number];
 
 function labelOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
+  const { label } = one;
+  if (label === null) return;
   const part: Part = `label:${one.id}`;
   const near = (other: Part, gap: number): void => {
     if (gap < LABEL_PAD) add("label-clear", part, other, gap);
   };
   for (const other of rest.edges) {
-    if (other.id > one.id) near(`label:${other.id}`, boxToBox(one.label, other.label));
-    near(`path:${other.id}`, pathToBox(other.path, one.label));
-    near(`arrow:${other.id}`, boxToBox(one.label, other.arrow));
+    if (other.id > one.id && other.label !== null)
+      near(`label:${other.id}`, boxToBox(label, other.label));
+    near(`path:${other.id}`, pathToBox(other.path, label));
+    near(`arrow:${other.id}`, boxToBox(label, other.arrow));
   }
-  for (const node of rest.nodes) near(node.part, boxToBox(one.label, node.box));
-  for (const entry of rest.entries) near(entry.part, pathToBox(entry.line, one.label));
+  for (const node of rest.nodes) near(node.part, boxToBox(label, node.box));
+  for (const entry of rest.entries) near(entry.part, pathToBox(entry.line, label));
   for (const region of rest.regions) {
-    near(region.part, pathToBox(region.border, one.label));
-    near(region.title, boxToBox(one.label, region.titleBox));
+    near(region.part, pathToBox(region.border, label));
+    near(region.title, boxToBox(label, region.titleBox));
   }
-  const inset = insetIn(one.label, rest.canvas);
+  const inset = insetIn(label, rest.canvas);
   if (!(inset >= 0)) add("outside", part, "canvas", inset);
 }
 

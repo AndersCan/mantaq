@@ -71,11 +71,21 @@ export interface PlacedRegion {
   title: LabelBox;
 }
 
+/** A message line: no label, never clicked. */
+export interface PlacedMessage {
+  from: string;
+  to: string;
+  path: string;
+  points: Point[];
+  dotGap: number;
+}
+
 export interface MachineLayout {
   width: number;
   height: number;
   nodes: Array<PlacedState | PlacedUnknown | PlacedAny>;
   edges: PlacedEdge[];
+  messages: PlacedMessage[];
   regions: PlacedRegion[];
   /** Entry arrows: into the machine's start state, then into each region's, sorted by state id. */
   entries: Array<{ from: Point; to: Point }>;
@@ -248,7 +258,65 @@ interface LabelBox {
   height: number;
 }
 
+/** One message between the root and a machine returned next to it: the line runs from `from` to `to`. */
+export interface Message {
+  /** The state the sender is in after sending: the sending arrow's `to`. */
+  from: string;
+  /** The source state of the arrow in the other machine that takes it. */
+  to: string;
+  event: string;
+}
+
+/** Messages between the root and the machines the factory returns next to it, matched by event name. One line per (from, to) and per (from, event, receiving machine). */
+export function messagesOf(machine: VizMachine): Message[] {
+  const scopes = new Set(["", ...machine.actors]);
+  const takes = (sender: VizEdge, event: string) => (receiver: VizEdge) =>
+    receiver.event === event &&
+    isDrawn(receiver) &&
+    !isAnyState(receiver.from) &&
+    scopes.has(scopeOf(receiver.from)) &&
+    scopeOf(receiver.from) !== scopeOf(sender.from);
+  const found: Message[] = [];
+  const seen = new Set<string>();
+  for (const sender of machine.edges) {
+    if (sender.to === null || !scopes.has(scopeOf(sender.from))) continue;
+    for (const event of sender.emits) {
+      for (const receiver of machine.edges.filter(takes(sender, event))) {
+        const pair = `${sender.to}>${receiver.from}`;
+        const delivery = `${sender.to}|${event}|${scopeOf(receiver.from)}`;
+        if (seen.has(pair) || seen.has(delivery)) continue;
+        seen.add(pair);
+        seen.add(delivery);
+        found.push({ from: sender.to, to: receiver.from, event });
+      }
+    }
+  }
+  return found;
+}
+
+function messageEdge(message: Message): VizEdge {
+  return {
+    id: `message:${message.from}>${message.to}`,
+    from: message.from,
+    to: message.to,
+    event: message.event,
+    kind: "transition",
+    origin: "declared",
+    emits: [],
+    contexts: [],
+    explanation: null,
+    doc: null,
+    coverage: null,
+    tested: null,
+  };
+}
+
+function isMessage(edge: VizEdge): boolean {
+  return edge.id.startsWith("message:");
+}
+
 function labelSize(edge: VizEdge): { width: number; height: number } {
+  if (isMessage(edge)) return { width: 0, height: 0 };
   const lines = edgeLines(edge);
   const widest = Math.max(
     ...lines.map((line, index) => textWidth(line, index === 0 ? 12 : CONDITION_FONT)),
@@ -813,7 +881,11 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
  * Layered layout (dagre, left to right). Pure: same machine in, same
  * coordinates out. The initial edge is drawn as an entry arrow, not a graph edge.
  */
-export function placeMachine(machine: VizMachine): MachineLayout {
+export function placeMachine(base: VizMachine): MachineLayout {
+  const machine = {
+    ...base,
+    edges: [...base.edges, ...messagesOf(base).map(messageEdge)],
+  };
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
   const regions = [...machine.regions].sort(
@@ -824,6 +896,15 @@ export function placeMachine(machine: VizMachine): MachineLayout {
   if (built.widen.length > 0) {
     for (const { at, by } of [...built.widen].sort((a, b) => b.at - a.at))
       insertSpace(geo, "x", at, by);
+    built = assemble(machine, specs, geo, regions);
+  }
+  if (built.layout.messages.length > 0) {
+    const ys = [...built.layout.messages, ...built.layout.edges].flatMap((line) =>
+      line.points.map((point) => point.y),
+    );
+    const shift = Math.max(0, LABEL_PAD - Math.min(...ys));
+    insertSpace(geo, "y", -Infinity, shift);
+    geo.height = Math.max(geo.height, Math.max(...ys) + shift + LABEL_PAD);
     built = assemble(machine, specs, geo, regions);
   }
   return built.layout;
@@ -875,7 +956,16 @@ function assemble(
       width: geo.width,
       height: geo.height,
       nodes,
-      edges: laned.edges,
+      edges: laned.edges.filter((placed) => !isMessage(placed.edge)),
+      messages: laned.edges
+        .filter((placed) => isMessage(placed.edge))
+        .map((placed) => ({
+          from: placed.edge.from,
+          to: placed.target,
+          path: placed.path,
+          points: placed.points,
+          dotGap: placed.dotGap,
+        })),
       regions: placedRegions,
       entries: starts.map((id) => {
         const at = boxes.get(id) ?? { x: 0, y: 0, width: 0, height: 0 };

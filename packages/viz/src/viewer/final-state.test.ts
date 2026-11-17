@@ -30,6 +30,7 @@ function machineOf(states: VizState[]): VizMachine {
     edges: [],
     events: [],
     maps: [],
+    actors: [],
     regions: [],
   } as unknown as VizMachine;
 }

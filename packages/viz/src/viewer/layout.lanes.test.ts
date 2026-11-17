@@ -46,6 +46,7 @@ function machineOf(ids: string[], edges: VizEdge[]): VizMachine {
     initial: ids[0] ?? "",
     states: ids.map(state),
     regions: [],
+    actors: [],
     edges,
     findings: [],
   } as unknown as VizMachine;

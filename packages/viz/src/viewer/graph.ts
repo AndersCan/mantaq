@@ -5,7 +5,14 @@ import { edgeCondition, edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
 import { HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
 import { Either } from "@mantaq/utils";
-import type { PlacedAny, PlacedEdge, PlacedRegion, PlacedState, PlacedUnknown } from "./layout.ts";
+import type {
+  PlacedAny,
+  PlacedEdge,
+  PlacedMessage,
+  PlacedRegion,
+  PlacedState,
+  PlacedUnknown,
+} from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
 
 export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: string };
@@ -307,6 +314,26 @@ function graphWidth(units: number): string {
   return `--graph-floor: ${size(LABEL_FLOOR_REM)}rem; width: clamp(var(--graph-floor), 100%, ${size(LABEL_CAP_EM)}em)`;
 }
 
+function messageGroup(doc: Document, message: PlacedMessage): SVGElement {
+  return svg(
+    doc,
+    "g",
+    {
+      class: "message",
+      "aria-hidden": "true",
+      "data-message-from": message.from,
+      "data-message-to": message.to,
+    },
+    [
+      svg(doc, "path", {
+        d: message.path,
+        "marker-end": "url(#viz-arrow)",
+        style: `--viz-dot-gap: ${message.dotGap}`,
+      }),
+    ],
+  );
+}
+
 /** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. */
 export function renderGraph(
   doc: Document,
@@ -336,6 +363,7 @@ export function renderGraph(
       ...placed.regions.map((region) =>
         regionGroup(doc, region, machine.maps.includes(region.region)),
       ),
+      ...placed.messages.map((message) => messageGroup(doc, message)),
       ...placed.edges.flatMap((edge) => [
         edgeGroup(doc, edge, { machine, callbacks }),
         ...(callbacks.details === undefined ? [] : [helpGroup(doc, edge, callbacks.details)]),

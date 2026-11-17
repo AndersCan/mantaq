@@ -203,7 +203,8 @@
   outline: none;
 }
 
-.viz .edge path {
+.viz .edge path,
+.viz .message path {
   fill: none;
   stroke: var(--line);
   stroke-width: 1.5;
@@ -240,9 +241,14 @@
   fill: var(--muted);
 }
 
-.viz .edge.internal path {
+.viz .edge.internal path,
+.viz .message path {
   stroke-dasharray: 1 var(--viz-dot-gap, 3);
   stroke-linecap: round;
+}
+
+.viz .message {
+  pointer-events: none;
 }
 
 .viz .worker-row {
