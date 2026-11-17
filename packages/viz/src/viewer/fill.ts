@@ -53,7 +53,7 @@ function typedSource(
   return values.length === 0 ? null : { values };
 }
 
-/** What a click sends for `event`: per field, the value set in the Context tab, else the latest value this walk sent under that name, else the field's example (required fields), else the fuzzer's first payload's value. Without declared fields: the fuzzer's first payload. undefined = nothing known. */
+/** What a click sends for `event`: per field, the value set in the Context tab, else the latest value this walk sent under that name, else the field's example (required fields); when that example is empty (`[]`, `{}`, `""`), the first non-empty value the fuzzer sent for the field instead. Without declared fields: the fuzzer's first payload. undefined = nothing known. */
 export function knownPayload(
   fields: ReadonlyArray<VizField> | null,
   context: {
@@ -73,7 +73,7 @@ export function knownPayload(
   const typed = typedSource(fields, steps);
   const payload: Record<string, VizJson> = {};
   for (const field of fields) {
-    const value = knownValue(field, { typed, set });
+    const value = knownValue(field, { typed, set, samples });
     if (value !== undefined) payload[field.name] = value;
   }
   return { payload };
@@ -81,13 +81,30 @@ export function knownPayload(
 
 function knownValue(
   field: VizField,
-  from: { typed: FillSource | null; set: Values },
+  from: { typed: FillSource | null; set: Values; samples: ReadonlyArray<VizJson> },
 ): VizJson | undefined {
   const chosen = from.set[field.name];
   if (chosen !== undefined && fits(field, chosen)) return chosen;
   const sent = from.typed?.values.find((each) => each.field === field.name);
   if (sent !== undefined) return sent.value;
-  if (!field.optional) return field.sample;
+  if (field.optional) return undefined;
+  if (!isEmpty(field.sample)) return field.sample;
+  return fuzzedValue(field, from.samples) ?? field.sample;
+}
+
+function isEmpty(value: VizJson): boolean {
+  if (value === "") return true;
+  if (Array.isArray(value)) return value.length === 0;
+  return isObject(value) && Object.keys(value).length === 0;
+}
+
+/** The first value the fuzzer sent for this field that fits it and is not empty. */
+function fuzzedValue(field: VizField, samples: ReadonlyArray<VizJson>): VizJson | undefined {
+  for (const sample of samples) {
+    if (!isObject(sample) || !Object.hasOwn(sample, field.name)) continue;
+    const value = sample[field.name];
+    if (value !== undefined && !isEmpty(value) && fits(field, value)) return value;
+  }
   return undefined;
 }
 

@@ -46,6 +46,27 @@ describe("knownPayload", () => {
     expect(result).toEqual({ payload: { cardNumber: "4242 4242 4242 4242", amount: 42 } });
   });
 
+  test("an empty example gives way to the first non-empty value the fuzzer sent", () => {
+    const friends: VizField = { ...field("friends", "json"), sample: [] };
+    const samples = [{ friends: [] }, { friends: ["a"] }, { friends: ["b"] }];
+    expect(knownPayload([friends], { ...base, samples })).toEqual({ payload: { friends: ["a"] } });
+  });
+
+  test("an empty example with no non-empty fuzz value stays the example", () => {
+    const friends: VizField = { ...field("friends", "json"), sample: [] };
+    expect(knownPayload([friends], { ...base, samples: [{ friends: [] }] })).toEqual({
+      payload: { friends: [] },
+    });
+    expect(knownPayload([friends], base)).toEqual({ payload: { friends: [] } });
+  });
+
+  test("a fuzz value that does not fit the field is not used for an empty example", () => {
+    const kind = { ...field("kind", "choice", ["a", "b"]), sample: "" };
+    expect(knownPayload([kind], { ...base, samples: [{ kind: "z" }, { kind: "b" }] })).toEqual({
+      payload: { kind: "b" },
+    });
+  });
+
   test("what this walk sent under that name, on any event, beats the fuzzer", () => {
     const result = knownPayload([card], {
       ...base,
