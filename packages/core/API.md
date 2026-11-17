@@ -89,6 +89,32 @@ clock.setTimeout(10, () => {});
 clock.advance(10); // fires now, synchronously
 ```
 
+### machine
+
+Names a machine and builds fresh actors. `create` always receives a `clock`: real time unless the caller passes one (tests and tools pass a `VirtualClock`). Every `create` option except `clock` must be optional, so tests and tools can always build the machine.
+
+```ts
+function machine<Id extends string, Made, Options extends object = {}>(
+  id: Id,
+  definition: { create: (options: Options & { clock: Clock }) => Made },
+): Machine<Id, Omit<Options, "clock">, Made>;
+export const meal = machine("meal", { create: () => Actor({/* … */}) });
+const actor = meal.create();
+const timed = light.create({ clock: VirtualClock() });
+```
+
+### Machine
+
+What `machine()` returns: an `id` and a `create` that builds a fresh actor (or `{ actor, ...others }`).
+
+```ts
+interface Machine<Id extends string, Options extends object, Made> {
+  readonly id: Id;
+  create(options?: Options & { clock?: Clock }): Made;
+}
+const id: "meal" = meal.id;
+```
+
 ### state
 
 Factory for `StateRef`. Curried: name first, payload type second via generic call. Literal name preserved for the type layer.
