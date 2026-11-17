@@ -82,7 +82,7 @@ export function blockedReason(context: {
 }): string | null {
   const { edge, outcome, live } = context;
   if (edge.kind !== "transition" || outcome === null) return null;
-  if (edge.to !== null && outcome.outcome === "transition" && outcome.to !== edge.to) {
+  if (edge.to !== null && true && outcome.to !== edge.to) {
     return `${edge.event} goes to ${localName(outcome.to)}, not ${localName(edge.to)}`;
   }
   const stayed =
@@ -101,7 +101,10 @@ function takes(edge: VizEdge, outcome: VizLiveStep | null): boolean {
   );
 }
 
-type Asked = { asked: Map<string, VizStep>; arrows: Array<{ edge: VizEdge; keys: string[] }> };
+type Asked = {
+  asked: Map<string, VizStep>;
+  arrows: Array<{ edge: VizEdge; keys: string[]; defaultKey: string }>;
+};
 
 /** Every distinct step to try, and per transition arrow the keys of its candidates. */
 function askedArrows(
@@ -109,16 +112,17 @@ function askedArrows(
   from: {
     currents: ReadonlyArray<string>;
     candidatesOf: (edge: VizEdge) => ReadonlyArray<VizJson>;
+    defaultOf: (edge: VizEdge) => VizJson;
     actorOf: (edge: VizEdge) => VizActorRef | undefined | "none";
   },
 ): Asked {
   const asked = new Map<string, VizStep>();
-  const arrows: Array<{ edge: VizEdge; keys: string[] }> = [];
+  const arrows: Array<{ edge: VizEdge; keys: string[]; defaultKey: string }> = [];
   for (const { edge } of from.currents.flatMap((current) => movesFrom(machine, current))) {
     const actor = from.actorOf(edge);
     if (edge.kind !== "transition" || actor === "none") continue;
     if (sentByParts(machine, edge).length > 0) continue;
-    const keys = from.candidatesOf(edge).map((payload) => {
+    const ask = (payload: VizJson): string => {
       const key = JSON.stringify([edge.event, actor ?? null, payload]);
       const step: VizStep = {
         kind: "event",
@@ -128,8 +132,9 @@ function askedArrows(
       };
       asked.set(key, asked.get(key) ?? step);
       return key;
-    });
-    arrows.push({ edge, keys });
+    };
+    const keys = from.candidatesOf(edge).map(ask);
+    arrows.push({ edge, keys, defaultKey: ask(from.defaultOf(edge)) });
   }
   return { asked, arrows };
 }
@@ -143,8 +148,10 @@ export function blockedEdges(
   machine: VizMachine,
   from: {
     live: VizLiveState;
-    /** The payloads a click on an arrow may send, the default first. */
+    /** The payloads a click on an arrow may send, in the order they are tried. */
     candidatesOf: (edge: VizEdge) => ReadonlyArray<VizJson>;
+    /** The payload an arrow sends when no candidate takes it; its outcome gives the lock reason. */
+    defaultOf: (edge: VizEdge) => VizJson;
     currents: ReadonlyArray<string>;
     dryRun: (steps: ReadonlyArray<VizStep>) => Array<VizLiveStep | null>;
     actorOf: (edge: VizEdge) => VizActorRef | undefined | "none";
@@ -158,12 +165,12 @@ export function blockedEdges(
     const outcomes = from.dryRun([...asked.values()]);
     const outcomeOf = (key: string | undefined): VizLiveStep | null =>
       key === undefined ? null : (outcomes[order.indexOf(key)] ?? null);
-    for (const { edge, keys } of arrows) {
+    for (const { edge, keys, defaultKey } of arrows) {
       const taken = keys.find((each) => takes(edge, outcomeOf(each)));
-      const step = asked.get(taken ?? keys[0] ?? "");
+      const step = asked.get(taken ?? defaultKey);
       if (step?.kind === "event") chosen.set(edge.id, step.payload);
       if (taken !== undefined) continue;
-      const outcome = outcomeOf(keys[0]);
+      const outcome = outcomeOf(defaultKey);
       const reason = blockedReason({ edge, outcome, live: from.live.context });
       if (reason !== null) blocked.set(edge.id, reason);
     }

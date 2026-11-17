@@ -192,7 +192,7 @@ function sortedJson(value: VizJson | undefined): string {
 }
 
 /** True when two steps are the same, whatever order their payload keys came in. */
-export function sameStep(a: VizStep, b: VizStep): boolean {
+function sameStep(a: VizStep, b: VizStep): boolean {
   return sortedJson(a as unknown as VizJson) === sortedJson(b as unknown as VizJson);
 }
 

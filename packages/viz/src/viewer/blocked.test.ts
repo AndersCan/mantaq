@@ -274,6 +274,7 @@ describe("edge cases", () => {
     blockedEdges(team, {
       live: liveAt("workersBusy", { context: {} } as Partial<VizLiveState>),
       candidatesOf: () => [null],
+      defaultOf: () => null,
       currents: ["workersBusy"],
       dryRun: (steps) => {
         asked.push(...steps.map((step) => (step.kind === "event" ? step.event : "")));
@@ -352,6 +353,7 @@ describe("blockedEdges chooses a payload per arrow", () => {
     const { blocked, chosen } = blockedEdges(machine, {
       ...base,
       candidatesOf: () => [0, 1, 2],
+      defaultOf: () => 0,
       dryRun,
     });
     expect(blocked.size).toBe(0);
@@ -363,6 +365,7 @@ describe("blockedEdges chooses a payload per arrow", () => {
     const { blocked, chosen } = blockedEdges(machine, {
       ...base,
       candidatesOf: () => [0, 1],
+      defaultOf: () => 0,
       dryRun,
     });
     expect(blocked.has("cart-pay-one")).toBe(false);
@@ -371,7 +374,12 @@ describe("blockedEdges chooses a payload per arrow", () => {
   });
 
   test("a locked arrow names where the default goes", () => {
-    const { blocked } = blockedEdges(machine, { ...base, candidatesOf: () => [1], dryRun });
+    const { blocked } = blockedEdges(machine, {
+      ...base,
+      candidatesOf: () => [1],
+      defaultOf: () => 1,
+      dryRun,
+    });
     expect(blocked.get("cart-pay-two")).toBe("go goes to one, not two");
   });
 
@@ -379,6 +387,7 @@ describe("blockedEdges chooses a payload per arrow", () => {
     const found = blockedEdges(machine, {
       ...base,
       candidatesOf: () => [1],
+      defaultOf: () => 1,
       dryRun: () => {
         throw new Error("no");
       },

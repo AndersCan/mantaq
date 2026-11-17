@@ -727,6 +727,8 @@ function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver |
   const found = blockedEdges(machine, {
     live,
     currents: currentsOf(live, view.picked),
+    defaultOf: (edge) =>
+      payloadFor(machine, edge.event, { set: view.values, live, afters: view.afters }),
     candidatesOf: (edge) => {
       const actor = actorFor(edge);
       return arrowCandidates(machine, edge, {
