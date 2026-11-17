@@ -166,7 +166,7 @@ describe("mantaqViz for Astro", () => {
     const notRun = [...document.querySelectorAll("ul.not-run li")].map((li) => li.textContent);
     expect(notRun).toHaveLength(1);
     expect(notRun[0]).toMatch(
-      /^sketch is not run by the app: no app code calls sketch \(.*wired\/sketch\.ts\)$/,
+      /^sketch is not run by the app: no app code calls sketchDraft \(.*wired\/sketch\.ts\)$/,
     );
     expect(document.querySelector("figcaption")?.textContent).toContain(
       "A dashed machine is not run by the app.",

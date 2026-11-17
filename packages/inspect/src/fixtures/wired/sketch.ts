@@ -4,7 +4,8 @@ import { Actor, event, machine, state } from "@mantaq/core";
 const idle = state("idle")();
 const start = event("start")();
 
-export const sketch = machine("sketch", {
+// Exported under another name than its id: not-run is matched by the id.
+export const sketchDraft = machine("sketch", {
   create: ({ clock }) => {
     return Actor({
       inputs: [start],
@@ -18,4 +19,4 @@ export const sketch = machine("sketch", {
   },
 });
 
-export type SketchActor = ReturnType<typeof sketch.create>;
+export type SketchActor = ReturnType<typeof sketchDraft.create>;

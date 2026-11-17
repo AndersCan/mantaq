@@ -6,6 +6,7 @@ import { lockout } from "./fixtures/lockout.ts";
 import { timerThrow } from "./fixtures/timer-throw.ts";
 import { inspect, inspectModule } from "./inspect.ts";
 import { join } from "node:path";
+import { machineFindings } from "@mantaq/viz";
 import { describe, expect, test } from "vite-plus/test";
 
 const FIXTURES = join(EXAMPLE_ROOT, "packages/inspect/src/fixtures");
@@ -160,9 +161,20 @@ describe("inspectModule: machine(...) exports", () => {
 });
 
 describe("inspectModule: a machine export named apart from its id", () => {
-  test("is known by its machine id, and <id>Expectations is claimed by it", async () => {
+  test("is known by its machine id, and the expectations naming that id are applied", async () => {
     const result = await inspectModule(join(FIXTURES, "machine-renamed.ts"), { load });
     expect(result.machines.map((machine) => machine.id)).toEqual(["lamp"]);
-    expect(result.warnings.filter((warning) => warning.includes("matches no machine"))).toEqual([]);
+    expect(machineFindings(result.machines[0]!).map((each) => each.kind)).toContain("neverSee");
+  });
+
+  test("an export naming the id without a states object is skipped for the expectations", async () => {
+    const result = await inspectModule(join(FIXTURES, "machine-renamed.ts"), {
+      load: async (path) => {
+        const loaded = await load(path);
+        return { lampNotes: { machine: "lamp", states: "none" }, ...loaded };
+      },
+    });
+    expect(result.machines.map((machine) => machine.id)).toEqual(["lamp"]);
+    expect(machineFindings(result.machines[0]!).map((each) => each.kind)).toContain("neverSee");
   });
 });

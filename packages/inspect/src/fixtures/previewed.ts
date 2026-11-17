@@ -8,7 +8,8 @@ const open = state("open")();
 /** Someone pushed it. */
 const toggle = event("toggle")();
 
-export const door = machine("door", {
+// Exported under another name than its id: the preview is keyed by the id.
+export const frontDoor = machine("door", {
   create: ({ clock }) => {
     return Actor({
       inputs: [toggle],

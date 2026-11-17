@@ -3,7 +3,7 @@ import { sender as senderMachine } from "../fixtures/wired/sender.ts";
 import { inspectModule } from "../inspect.ts";
 import { duo as duoMachine } from "../fixtures/wired-unheard/duo.ts";
 import { quiet as quietMachine } from "../fixtures/wired/quiet.ts";
-import { sketch as sketchMachine } from "../fixtures/wired/sketch.ts";
+import { sketchDraft as sketchMachine } from "../fixtures/wired/sketch.ts";
 import { findWires, scanAppCode } from "./wires.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -40,19 +40,21 @@ function readLines(): string[] {
 describe("scanAppCode", () => {
   test("lists the machine only a test and a type use mention, and keeps the wires", async () => {
     const sketched = await inspectModule(sketch, {
-      load: async () => ({ sketch: sketchMachine }),
+      load: async () => ({ sketchDraft: sketchMachine }),
       fuzz: false,
     });
     const all = [...(await machines()), ...sketched.machines];
     const scanned = scanAppCode({ root: ROOT, files: [...files, sketch], machines: all });
-    expect(scanned.notRun).toEqual([{ id: "sketch", factory: "sketch", file: "wired/sketch.ts" }]);
+    expect(scanned.notRun).toEqual([
+      { id: "sketch", factory: "sketchDraft", file: "wired/sketch.ts" },
+    ]);
     expect(scanned.wires).toEqual(findWires({ root: ROOT, files, machines: all }));
     expect(scanned.wires).toHaveLength(3);
   });
 
   test("lists the output no listener hears, hearing every output of an unguarded listener", async () => {
     const sketched = await inspectModule(sketch, {
-      load: async () => ({ sketch: sketchMachine }),
+      load: async () => ({ sketchDraft: sketchMachine }),
       fuzz: false,
     });
     const quieted = await inspectModule(quiet, {
@@ -62,14 +64,33 @@ describe("scanAppCode", () => {
     const all = [...(await machines()), ...sketched.machines, ...quieted.machines];
     const scanned = scanAppCode({ root: ROOT, files: [...files, sketch, quiet], machines: all });
     expect(scanned.unheard).toEqual([{ id: "quiet", outputs: ["unheard"] }]);
-    expect(scanned.notRun).toEqual([{ id: "sketch", factory: "sketch", file: "wired/sketch.ts" }]);
+    expect(scanned.notRun).toEqual([
+      { id: "sketch", factory: "sketchDraft", file: "wired/sketch.ts" },
+    ]);
     expect(scanned.wires).toHaveLength(3);
   });
 
-  test("a machine exported only as an instance is never listed", async () => {
-    const edges = join(ROOT, "wired-edges", "edges.ts");
-    const scanned = scanAppCode({ root: ROOT, files: [edges], machines: await machines() });
-    expect(scanned.notRun).toEqual([]);
+  test("an export is listed only when it has a create and an id of a known machine", async () => {
+    const dir = mkdtempSync(join(ROOT, "wired", "tmp-"));
+    try {
+      writeFileSync(
+        join(dir, "lookalikes.ts"),
+        'export const noCreate = { id: "sketch" } as const;\nexport const unknown = { id: "nope", create: () => 1 } as const;\n',
+      );
+      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
+      const sketched = await inspectModule(sketch, {
+        load: async () => ({ sketchDraft: sketchMachine }),
+        fuzz: false,
+      });
+      const scanned = scanAppCode({
+        root: ROOT,
+        files: [join(dir, "lookalikes.ts")],
+        machines: sketched.machines,
+      });
+      expect(scanned.notRun).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("a factory passed as a value counts as run", async () => {
@@ -77,11 +98,11 @@ describe("scanAppCode", () => {
     try {
       writeFileSync(
         join(dir, "use.ts"),
-        'import { sketch as make } from "../sketch.ts";\nexport const list = [1].map(() => make.create());\n',
+        'import { sketchDraft as make } from "../sketch.ts";\nexport const list = [1].map(() => make.create());\n',
       );
       writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
       const sketched = await inspectModule(sketch, {
-        load: async () => ({ sketch: sketchMachine }),
+        load: async () => ({ sketchDraft: sketchMachine }),
         fuzz: false,
       });
       const scanned = scanAppCode({

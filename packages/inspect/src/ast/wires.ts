@@ -431,7 +431,7 @@ function samePlace(a: ts.Symbol, b: ts.Symbol): boolean {
 }
 
 /** The literal id of a `machine(id, …)` export, or undefined when the export is not one. */
-function machineIdOf(
+function literalIdOf(
   checker: ts.TypeChecker,
   symbol: ts.Symbol,
   node: ts.Node,
@@ -456,7 +456,7 @@ function machinesIn(
     const symbol = resolved(checker, each);
     const declaration = symbol?.valueDeclaration;
     if (symbol === undefined || declaration === undefined) return [];
-    const id = machineIdOf(checker, symbol, declaration);
+    const id = literalIdOf(checker, symbol, declaration);
     if (id === undefined || !ids.has(id)) return [];
     return [{ id, factory: each.getName(), file: locationOf(sourceFile, root).file, symbol }];
   });
