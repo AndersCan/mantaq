@@ -1,5 +1,5 @@
 import type { AnalysisSource } from "./ast/program.ts";
-import type { AnyActor, Clock } from "@mantaq/core";
+import type { AnyActor, Clock, Machine } from "@mantaq/core";
 import type { AnyExpectations, CheckedExpectation } from "./expectations.ts";
 import type { FuzzOptions, FuzzStop, LostMessage } from "./fuzz/fuzz.ts";
 import type { FuzzTarget, MissingPayload } from "./fuzz/run.ts";
@@ -90,13 +90,7 @@ function fuzzWarnings(
   return [...never, ...unsampled];
 }
 
-export interface InspectTarget {
-  id: string;
-  /**
-   * A fresh actor on every call, or `{ actor, ... }` with the actor maps next to it
-   * (`return { actor, photos }`). Fuzzing needs the actor to run on a VirtualClock.
-   */
-  create: () => AnyActor<unknown> | { actor: AnyActor<unknown> };
+interface TargetOptions {
   /** File with the `m.on` calls: edge explanations, and payload samples from the event types. */
   source?: AnalysisSource;
   /** Sample payloads per event; replace the ones read from types. */
@@ -108,6 +102,24 @@ export interface InspectTarget {
   /** Contexts that are a bug in a state (`neverSee`) or that some run must reach (`mustSee`). */
   expectations?: AnyExpectations;
 }
+
+/**
+ * A `machine(id, { create })` value, which inspect builds on its own
+ * VirtualClock, or a plain factory (`id`, `create`) that must run on a
+ * VirtualClock to be fuzzed.
+ */
+export type InspectTarget = TargetOptions &
+  (
+    | { machine: Machine }
+    | {
+        id: string;
+        /**
+         * A fresh actor on every call, or `{ actor, ... }` with the actor maps next to it
+         * (`return { actor, photos }`). Fuzzing needs the actor to run on a VirtualClock.
+         */
+        create: () => AnyActor<unknown> | { actor: AnyActor<unknown> };
+      }
+  );
 
 export interface Inspected {
   machine: VizMachine;
@@ -154,17 +166,52 @@ function warningsOf(machine: VizMachine): string[] {
   return [...routing, ...sends];
 }
 
+function idOf(target: InspectTarget): string {
+  return "machine" in target ? target.machine.id : target.id;
+}
+
+/** A fresh actor from the target; a machine is built on a VirtualClock of its own. */
+function createdFrom(target: InspectTarget): ReturnType<typeof createdOf> {
+  return createdOf(
+    "machine" in target ? target.machine.create({ clock: VirtualClock() }) : target.create(),
+  );
+}
+
+const NOT_ON_GIVEN_CLOCK =
+  "not fuzzed: create() built an actor on a clock it was not given, so fuzzing and the page cannot move its time. Pass the clock create() gets to Actor({ clock }).";
+
+/** The machine as the fuzzer drives it: inspect's own clock goes in, and it is never read back from the actor. */
+function machineRunner(machine: Machine): Either<string, FuzzTarget["create"]> {
+  const create: FuzzTarget["create"] = () => {
+    const clock = VirtualClock();
+    const { actor, made } = createdOf(machine.create({ clock }));
+    return { actor, clock, ...(made === undefined ? {} : { made }) };
+  };
+  const { actor, clock } = create();
+  const elsewhere = isVirtualClock(actor.clock) && actor.clock !== clock;
+  return elsewhere ? Either.left(NOT_ON_GIVEN_CLOCK) : Either.right(create);
+}
+
 /** The target as the fuzzer drives it, or why it cannot run on a virtual clock. */
 function runner(
   target: InspectTarget,
   payloads: Readonly<Record<string, ReadonlyArray<VizJson>>>,
   expectations: ReadonlyArray<CheckedExpectation>,
 ): Either<string, FuzzTarget> {
+  const id = idOf(target);
+  const extras = {
+    payloads,
+    ...(expectations.length === 0 ? {} : { expectations }),
+  };
+  if ("machine" in target) {
+    const create = machineRunner(target.machine);
+    return Either.isLeft(create) ? create : Either.right({ id, create: create[1], ...extras });
+  }
   if (!isVirtualClock(createdOf(target.create()).actor.clock)) {
     return Either.left("not fuzzed: the actor does not run on a VirtualClock");
   }
   return Either.right({
-    id: target.id,
+    id,
     create: () => {
       const { actor, made } = createdOf(target.create());
       return {
@@ -173,8 +220,7 @@ function runner(
         ...(made === undefined ? {} : { made }),
       };
     },
-    payloads,
-    ...(expectations.length === 0 ? {} : { expectations }),
+    ...extras,
   });
 }
 
@@ -260,8 +306,8 @@ function inspectWith(
     ...fromTypes,
     ...Either.getRight(analysis ?? Either.left("none"))?.payloads,
   };
-  const created = createdOf(target.create());
-  const structure = annotate(toVizMachine({ id: target.id, ...created }));
+  const created = createdFrom(target);
+  const structure = annotate(toVizMachine({ id: idOf(target), ...created }));
   const expected = checkExpectations(
     target.expectations,
     structure.states.filter((each) => each.region === null).map((each) => each.id),
@@ -328,6 +374,11 @@ export function machineId(exportName: string): string {
   return core === "" ? exportName : core.charAt(0).toLowerCase() + core.slice(1);
 }
 
+/** The id a machine export goes by: its `machine(id, …)` id, else the export name minus `create`/`Actor`. */
+export function exportId(found: MachineExport): string {
+  return found.id ?? machineId(found.name);
+}
+
 /** Call an export the way its type says, and take the actor out of what it returns. */
 function factoryOf(found: MachineExport, value: unknown): (() => unknown) | null {
   if (found.call === "instance") return () => value;
@@ -341,7 +392,18 @@ function factoryOf(found: MachineExport, value: unknown): (() => unknown) | null
   return () => Reflect.apply(value, undefined, argument());
 }
 
-function actorFactory(found: MachineExport, value: unknown): InspectTarget["create"] | null {
+type FactoryTarget = Extract<InspectTarget, { create: unknown }>;
+
+function isMachine(value: unknown): value is Machine {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof Reflect.get(value, "id") === "string" &&
+    typeof Reflect.get(value, "create") === "function"
+  );
+}
+
+function actorFactory(found: MachineExport, value: unknown): FactoryTarget["create"] | null {
   const factory = factoryOf(found, value);
   if (factory === null) return null;
   const unwrap = (result: unknown): unknown =>
@@ -361,15 +423,21 @@ function actorFactory(found: MachineExport, value: unknown): InspectTarget["crea
   return () => made(factory()) ?? sample;
 }
 
+/** The target an export stands for, or null when the loaded value is not what its type said. */
+function baseTarget(found: MachineExport, value: unknown): InspectTarget | null {
+  if (found.call === "machine") return isMachine(value) ? { machine: value } : null;
+  const create = actorFactory(found, value);
+  return create === null ? null : { id: exportId(found), create };
+}
+
 /** The recorded runs of one machine that replay faithfully, and a warning for each that does not. */
 function replayedRuns(
-  id: string,
-  create: InspectTarget["create"],
+  target: InspectTarget,
   recorded: RecordedRuns,
 ): { runs: VizRun[]; warnings: string[] } {
-  const found = recorded[id] ?? [];
+  const found = recorded[idOf(target)] ?? [];
   if (found.length === 0) return { runs: [], warnings: [] };
-  const run = runner({ id, create }, {}, []);
+  const run = runner(target, {}, []);
   if (Either.isLeft(run)) return { runs: [], warnings: [`runs not shown: ${run[0]}`] };
   const results = found.map((each) => ({ each, result: normalizeRun(run[1], each) }));
   return {
@@ -423,9 +491,10 @@ export async function inspectModule(
   const exports = await options.load(file);
   const { runs: recorded, warnings: runWarnings } = readRuns(dirname(file));
   const results = chosen.map((each) => {
-    const id = machineId(each.name);
-    const create = actorFactory(each, exports[each.name]);
-    if (create === null)
+    const id = exportId(each);
+    const value = exports[each.name];
+    const base = baseTarget(each, value);
+    if (base === null)
       return { machine: null, warnings: [`${id}: ${each.name} did not return an actor`] };
     const fuzzSettings: false | FuzzSettings =
       each.call === "instance" ? false : (options.fuzz ?? {});
@@ -438,12 +507,11 @@ export async function inspectModule(
                 ? []
                 : ["runs not shown: exported as one actor, so they cannot be replayed safely"],
           }
-        : replayedRuns(id, create, recorded);
+        : replayedRuns(base, recorded);
     const claimed = exports[`${id}Expectations`];
     const inspected = inspectWith(
       {
-        id,
-        create,
+        ...base,
         source,
         fuzz: fuzzSettings,
         ...(claimed === undefined || !isExpectations(claimed) ? {} : { expectations: claimed }),
@@ -477,11 +545,7 @@ export async function inspectModule(
     machines: results.flatMap((result) => (result.machine === null ? [] : [result.machine])),
     warnings: [
       ...runWarnings.map((warning) => `${file}: ${warning}`),
-      ...unclaimed(
-        file,
-        exports,
-        chosen.map((each) => machineId(each.name)),
-      ),
+      ...unclaimed(file, exports, chosen.map(exportId)),
       ...results.flatMap((result) => result.warnings),
     ],
   };

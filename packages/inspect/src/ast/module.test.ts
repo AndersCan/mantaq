@@ -62,6 +62,24 @@ describe("analyzeModule: machine exports", () => {
     ]);
   });
 
+  test("machine(...) exports are read by their literal id and nothing is called", () => {
+    expect(
+      analysis("machine-values")?.machines.map((found) => [found.name, found.call, found.id]),
+    ).toEqual([
+      ["deadline", "machine", "deadline"],
+      ["sleeper", "machine", "sleeper"],
+      ["stubborn", "machine", "stubborn"],
+    ]);
+  });
+
+  test("a machine export wins over legacy factories in the same file", () => {
+    expect(analysis("machine-and-factory")?.machines.map((found) => found.name)).toEqual(["solo"]);
+  });
+
+  test("a machine whose id is not a literal is not a machine export", () => {
+    expect(analysis("machine-gated")?.machines.map((found) => found.name)).toEqual(["gated"]);
+  });
+
   test("a file without machines has none", () => {
     expect(analysis("no-machines")?.machines).toEqual([]);
   });

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { createAnswerActor } from "./fixtures/answer.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { stubborn } from "./fixtures/machine-values.ts";
 import { createTimedActor } from "./fixtures/timed.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven, mountLiveDriven, takeTargets } from "./live-page.ts";
@@ -576,5 +577,33 @@ describe("a link naming several machines", () => {
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: second, targets: { second: create } });
     expect(current(root)).toBe("shippingAddress");
+  });
+});
+
+describe("mountDriven: a machine(...) built on a clock it was not given", () => {
+  test("is drawn but not live, so no time control moves the wrong clock", async () => {
+    const inspected = await inspectModule(
+      join(import.meta.dirname, "fixtures", "machine-values.ts"),
+      {
+        load: async () => ({ stubborn }),
+        fuzz: false,
+      },
+    );
+    // The target exactly as targetsSource emits it for a machine export.
+    const target = () => {
+      const clock = VirtualClock();
+      const made = stubborn.create({ clock });
+      return { actor: made, clock, made };
+    };
+    history.replaceState(null, "", "?machine=stubborn");
+    const root = document.createElement("div");
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: { stubborn: target },
+    });
+    history.replaceState(null, "", "?");
+    expect(root.querySelector(".explore")).toBeNull();
+    expect(root.querySelector("[data-tab=details]")).not.toBeNull();
   });
 });
