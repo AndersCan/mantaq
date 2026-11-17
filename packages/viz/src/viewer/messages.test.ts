@@ -147,6 +147,18 @@ describe("messagesOf", () => {
     });
     expect(messagesOf(both)).toHaveLength(2);
   });
+
+  test("two events from one state into two states of one machine keep both lines", () => {
+    const split = machineOf({
+      states: ["paid"],
+      edges: [],
+      messages: [
+        { from: "paid", event: "ONE", to: "stock.holding" },
+        { from: "paid", event: "TWO", to: "stock.free" },
+      ],
+    });
+    expect(messagesOf(split)).toEqual(split.fuzz?.messages);
+  });
 });
 
 describe("placeMachine with messages", () => {
