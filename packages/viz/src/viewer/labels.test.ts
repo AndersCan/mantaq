@@ -83,6 +83,9 @@ describe("edgeCondition", () => {
       edgeCondition(edgeWith([branch([guard], "payment"), branch(["x"], null)]));
     expect(text("!(!a && b)")).toBe("!(!a && b)");
     expect(text("!(a && b)")).toBe("!(a && b)");
+    expect(text("!(isA(x) || isB(y))")).toBe("!(isA(x) || isB(y))");
+    expect(text("!(f(a) && g(b))")).toBe("!(f(a) && g(b))");
+    expect(text("!(-x)")).toBe("!(-x)");
   });
 
   test("null when every branch goes", () => {
