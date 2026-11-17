@@ -4,38 +4,52 @@ import type { MachineExport } from "./discover.ts";
 import { explainRegistration } from "./handler.ts";
 import { payloadFields, payloadSamples } from "./payloads.ts";
 import { loadSource } from "./program.ts";
-import type { AnalysisSource, LoadedSource } from "./program.ts";
+import type { AnalysisSource, FileRead, LoadedSource } from "./program.ts";
 import { Either } from "@mantaq/utils";
 
 /** One explained registration, keyed the way runtime edges are: state + event. */
 export interface HandlerSite {
   /** null = onAny. */
   state: string | null;
+  /** "" when the event is only known by `eventPattern`. */
   event: string;
+  /** Regex source matching the events of a template-literal event type; null = exact `event`. */
+  eventPattern: string | null;
+  /** JSDoc of the event the registration names. null = undocumented. */
+  eventDoc: string | null;
   explanation: VizExplanation;
   /** Leading JSDoc of the registration. null = undocumented. */
   doc: string | null;
 }
 
-/** Everything annotation reads from one source file. */
-export interface SourceDocs {
+/** Handlers and descriptions of one source file. */
+export interface FileDocs {
   sites: HandlerSite[];
   stateDocs: ReadonlyMap<string, string>;
   eventDocs: ReadonlyMap<string, string>;
   effectDocs: ReadonlyMap<string, ReadonlyArray<string>>;
-  eventPayloads: ReadonlyMap<string, VizField[]>;
 }
 
-function sitesOf(loaded: LoadedSource): HandlerSite[] {
-  return loaded.registrations.flatMap((registration): HandlerSite[] => {
-    if (registration.event === null) return [];
+/** Everything annotation reads from one source file. */
+export interface SourceDocs extends FileDocs {
+  eventPayloads: ReadonlyMap<string, VizField[]>;
+  /** Other files of the program that register handlers (a pool from a library), by file. */
+  elsewhere: Array<FileDocs & { file: string }>;
+}
+
+function sitesOf(options: { loaded: LoadedSource; read: FileRead }): HandlerSite[] {
+  const { loaded, read } = options;
+  return read.registrations.flatMap((registration): HandlerSite[] => {
+    if (registration.event === null && registration.eventPattern === null) return [];
     const explanation = Either.from(() =>
       explainRegistration(registration, { checker: loaded.checker, root: loaded.root }),
     );
     return [
       {
         state: registration.state,
-        event: registration.event,
+        event: registration.event ?? "",
+        eventPattern: registration.eventPattern,
+        eventDoc: registration.eventDoc,
         doc: registration.doc,
         explanation: Either.getOrElse(explanation, {
           onLeft: (error): VizExplanation => ({
@@ -50,23 +64,25 @@ function sitesOf(loaded: LoadedSource): HandlerSite[] {
   });
 }
 
+function fileDocs(loaded: LoadedSource, read: FileRead): FileDocs {
+  return {
+    sites: sitesOf({ loaded, read }),
+    stateDocs: read.stateDocs,
+    eventDocs: read.eventDocs,
+    effectDocs: read.effectDocs,
+  };
+}
+
 function docsOf(loaded: LoadedSource): SourceDocs {
   return {
-    sites: sitesOf(loaded),
-    stateDocs: loaded.stateDocs,
-    eventDocs: loaded.eventDocs,
-    effectDocs: loaded.effectDocs,
+    ...fileDocs(loaded, loaded),
     eventPayloads: payloadFields(loaded),
+    elsewhere: loaded.elsewhere.map((other) => ({ file: other.file, ...fileDocs(loaded, other) })),
   };
 }
 
 /** Everything one type-check of a machine file yields. */
-export interface ModuleAnalysis {
-  sites: HandlerSite[];
-  stateDocs: ReadonlyMap<string, string>;
-  eventDocs: ReadonlyMap<string, string>;
-  effectDocs: ReadonlyMap<string, ReadonlyArray<string>>;
-  eventPayloads: ReadonlyMap<string, VizField[]>;
+export interface ModuleAnalysis extends SourceDocs {
   payloads: Record<string, VizJson[]>;
   machines: MachineExport[];
 }
@@ -88,35 +104,93 @@ function localState(id: string): string {
   return id.slice(id.lastIndexOf(".") + 1);
 }
 
+function eventMatches(site: HandlerSite, event: string): boolean {
+  return (
+    site.event === event ||
+    (site.eventPattern !== null && new RegExp(site.eventPattern).test(event))
+  );
+}
+
+function siteFor(sites: ReadonlyArray<HandlerSite>, edge: VizEdge): HandlerSite | undefined {
+  const state = localState(edge.from);
+  return (
+    sites.find((site) => site.state === state && eventMatches(site, edge.event)) ??
+    sites.find((site) => site.state === null && eventMatches(site, edge.event))
+  );
+}
+
+function eventDocFrom(options: { other: FileDocs; id: string }): string | null {
+  const { other, id } = options;
+  return (
+    other.eventDocs.get(id) ??
+    other.sites.find((site) => site.eventDoc !== null && eventMatches(site, id))?.eventDoc ??
+    null
+  );
+}
+
+/** The one other file that registers (state, event), or why there is not exactly one. */
+function elsewhereSite(
+  edge: VizEdge,
+  context: { docs: SourceDocs; file: string },
+): { supplier: FileDocs; site: HandlerSite } | string {
+  const found = context.docs.elsewhere.flatMap((other) => {
+    const site = siteFor(other.sites, edge);
+    return site ? [{ file: other.file, site, supplier: other }] : [];
+  });
+  const [first, second] = found;
+  if (first && second === undefined) return first;
+  const state = localState(edge.from);
+  return first
+    ? `handlers for (${state}, ${edge.event}) found in more than one file: ${found.map((entry) => entry.file).join(", ")}`
+    : `no m.on/m.onAny registration for (${state}, ${edge.event}) found in ${context.file}`;
+}
+
 function explain(
   edge: VizEdge,
-  context: {
-    sites: ReadonlyArray<HandlerSite>;
-    effectDocs: ReadonlyMap<string, ReadonlyArray<string>>;
-    file: string;
-  },
-): { explanation: VizExplanation | null; doc: string | null } {
-  if (edge.kind === "initial") return { explanation: null, doc: null };
+  context: { docs: SourceDocs; file: string },
+): { explanation: VizExplanation | null; doc: string | null; supplier: FileDocs | null } {
+  if (edge.kind === "initial") return { explanation: null, doc: null, supplier: null };
   if (edge.kind === "effect") {
-    const docs = context.effectDocs.get(localState(edge.from));
-    return { explanation: null, doc: docs === undefined ? null : docs.join("\n\n") };
+    const name = localState(edge.from);
+    const own = context.docs.effectDocs.get(name);
+    if (own !== undefined) return { explanation: null, doc: own.join("\n\n"), supplier: null };
+    const lender = context.docs.elsewhere.find((other) => other.effectDocs.has(name));
+    return {
+      explanation: null,
+      doc: lender?.effectDocs.get(name)?.join("\n\n") ?? null,
+      supplier: lender ?? null,
+    };
   }
-  const state = localState(edge.from);
-  const site =
-    context.sites.find(
-      (candidate) => candidate.state === state && candidate.event === edge.event,
-    ) ??
-    context.sites.find((candidate) => candidate.state === null && candidate.event === edge.event);
-  if (site) return { explanation: site.explanation, doc: site.doc };
-  return {
-    explanation: {
-      status: "not_analyzed",
-      location: null,
-      reason: `no m.on/m.onAny registration for (${state}, ${edge.event}) found in ${context.file}`,
-      snippet: null,
-    },
-    doc: null,
-  };
+  const own = siteFor(context.docs.sites, edge);
+  if (own) return { explanation: own.explanation, doc: own.doc, supplier: null };
+  const other = elsewhereSite(edge, context);
+  if (typeof other === "string") {
+    return {
+      explanation: { status: "not_analyzed", location: null, reason: other, snippet: null },
+      doc: null,
+      supplier: null,
+    };
+  }
+  return { explanation: other.site.explanation, doc: other.site.doc, supplier: other.supplier };
+}
+
+/**
+ * One handler can serve several states (a pool's resize loop): keep, per edge,
+ * the branches that reach a state the machine declares for that from + event.
+ */
+function declaredBranches(options: { edge: VizEdge; edges: ReadonlyArray<VizEdge> }): VizEdge {
+  const { edge, edges } = options;
+  const { explanation } = edge;
+  if (explanation === null || explanation.status !== "analyzed") return edge;
+  const declared = new Set(
+    edges
+      .filter((other) => other.from === edge.from && other.event === edge.event)
+      .map((other) => (other.to === null ? null : localState(other.to))),
+  );
+  const branches = explanation.branches.filter(
+    (branch) => branch.target.kind !== "state" || declared.has(branch.target.state),
+  );
+  return { ...edge, explanation: { ...explanation, branches } };
 }
 
 /** A fuzz-found stay that the handler's own analyzed `stay` branch already explains. */
@@ -150,6 +224,7 @@ export function annotateWith(
 ): VizMachine {
   const { analysis, source } = context;
   const file = source.file.slice(source.root.length).replace(/^[\\/]/, "");
+  const suppliers = new Set<FileDocs>();
   const edges = machine.edges.map((edge) => {
     if (Either.isLeft(analysis)) {
       const handlerDriven = edge.kind === "transition" || edge.kind === "stay";
@@ -158,23 +233,31 @@ export function annotateWith(
         : null;
       return { ...edge, explanation, doc: null };
     }
-    return {
-      ...edge,
-      ...explain(edge, { sites: analysis[1].sites, effectDocs: analysis[1].effectDocs, file }),
-    };
+    const { supplier, ...explained } = explain(edge, { docs: analysis[1], file });
+    if (supplier !== null) suppliers.add(supplier);
+    return declaredBranches({ edge: { ...edge, ...explained }, edges: machine.edges });
   });
   if (Either.isLeft(analysis)) return { ...machine, edges };
   const drawn = edges.filter((edge) => !explainedStay(edge));
   const { stateDocs, eventDocs, eventPayloads } = analysis[1];
+  const lent = [...suppliers];
   return {
     ...machine,
     states: machine.states.map((state) => ({
       ...state,
-      doc: stateDocs.get(localState(state.id)) ?? null,
+      doc:
+        stateDocs.get(localState(state.id)) ??
+        lent
+          .find((other) => other.stateDocs.has(localState(state.id)))
+          ?.stateDocs.get(localState(state.id)) ??
+        null,
     })),
     events: machine.events.map((event) => ({
       ...event,
-      doc: eventDocs.get(event.id) ?? null,
+      doc:
+        eventDocs.get(event.id) ??
+        lent.map((other) => eventDocFrom({ other, id: event.id })).find((doc) => doc !== null) ??
+        null,
       payload: eventPayloads.get(event.id) ?? null,
     })),
     edges: drawn,

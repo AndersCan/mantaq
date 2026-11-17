@@ -107,7 +107,9 @@ const allWorkersFree = state("allWorkersFree")();
 const workersBusy = state("workersBusy")();
 /** Items wait in line: every worker is running. */
 const workWaiting = state("workWaiting")();
+/** The worker waits for an assignment. */
 const free = state("free")();
+/** The worker runs its items. */
 const working = state("working")();
 
 /** Hand the first waiting items to the first free worker, until one side runs out. */
@@ -273,6 +275,7 @@ function buildInbox<T, N extends string>(shared: Shared<T, N>) {
           return { state: next.waits ? workWaiting : workersBusy, emit: next.emit };
         },
       });
+      /** Failed items go to the front of the line; the freed worker takes the front at once. */
       m.on(workWaiting, {
         event: events.ITEMS_FAILED,
         to: [workWaiting, workersBusy],
@@ -293,6 +296,7 @@ function buildInbox<T, N extends string>(shared: Shared<T, N>) {
         { from: workWaiting, to: [workWaiting, workersBusy] },
       ];
       for (const { from, to } of resizeFrom) {
+        /** Keep `count` workers; new free ones take waiting items at once. */
         m.on(from, {
           event: events.WORKERS_RESIZED,
           to,
