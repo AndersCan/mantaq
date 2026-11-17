@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { createAnswerActor } from "./fixtures/answer.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { createTimedActor } from "./fixtures/timed.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven, mountLiveDriven, takeTargets } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
@@ -162,6 +163,119 @@ describe("mountDriven targets", () => {
     });
     expect(root.querySelector(".explore")).toBeNull();
     expect(root.querySelector("[data-send], [data-send-edge]")).toBeNull();
+  });
+});
+
+describe("mountDriven machines without timers", () => {
+  function realClockTarget() {
+    return () => {
+      const actor = createAnswerActor(RealClock() as unknown as ReturnType<typeof VirtualClock>);
+      return { actor, clock: actor.clock as unknown as ReturnType<typeof VirtualClock> };
+    };
+  }
+
+  async function answerText(): Promise<string> {
+    const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "answer.ts"), {
+      load: async () => ({ createAnswerActor }),
+      fuzz: false,
+    });
+    return serializeViz(vizDocument(inspected.machines));
+  }
+
+  test("an actor on a real clock runs live and marks its current state", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: await answerText(),
+      targets: { answer: realClockTarget() },
+    });
+    expect(root.querySelector("[data-live-note]")).not.toBeNull();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("noAskYet");
+    root.remove();
+  });
+
+  test("a timer set on that real clock throws the VirtualClock message", async () => {
+    const root = document.createElement("div");
+    const made: Array<ReturnType<ReturnType<typeof realClockTarget>>> = [];
+    const create = realClockTarget();
+    mountDriven(root, {
+      source: "test",
+      text: await answerText(),
+      targets: {
+        answer: () => {
+          const each = create();
+          made.push(each);
+          return each;
+        },
+      },
+    });
+    const clock = made.at(-1)?.actor.clock;
+    expect(() => clock?.setTimeout(1, { cb: () => {} })).toThrow(
+      "needs a factory that takes a VirtualClock",
+    );
+    expect(() => clock?.setInterval(1, { cb: () => {} })).toThrow(
+      "needs a factory that takes a VirtualClock",
+    );
+  });
+});
+
+describe("mountDriven timers when effects run", () => {
+  async function timedText(): Promise<string> {
+    const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "timed.ts"), {
+      load: async () => ({ createTimedActor }),
+      fuzz: false,
+    });
+    return serializeViz(vizDocument(inspected.machines));
+  }
+
+  function mountRoot(): HTMLElement {
+    history.replaceState(null, "", "/");
+    const root = document.createElement("div");
+    document.body.append(root);
+    return root;
+  }
+
+  test("a timer machine on a real clock says it needs a VirtualClock once its timer starts", async () => {
+    const root = mountRoot();
+    mountDriven(root, {
+      source: "test",
+      text: await timedText(),
+      effectMode: "real",
+      targets: {
+        timed: () => {
+          const actor = createTimedActor(RealClock() as unknown as VirtualClock);
+          return { actor, clock: actor.clock as unknown as VirtualClock };
+        },
+      },
+    });
+    root
+      .querySelector<SVGElement>("g.edge.next")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.textContent).toContain("needs a factory that takes a VirtualClock");
+    root.remove();
+  });
+
+  test("a timer machine on a VirtualClock starts its timer and does not throw", async () => {
+    const root = mountRoot();
+    mountDriven(root, {
+      source: "test",
+      text: await timedText(),
+      effectMode: "real",
+      targets: {
+        timed: () => {
+          const clock = VirtualClock();
+          return { actor: createTimedActor(clock), clock };
+        },
+      },
+    });
+    root
+      .querySelector<SVGElement>("g.edge.next")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.textContent).toContain("start: idle → waiting");
+    expect(root.textContent).not.toContain("VirtualClock");
+    expect(root.querySelector("[data-advance-timer]")).not.toBeNull();
+    root.remove();
   });
 });
 
