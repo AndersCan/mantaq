@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.35.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_
+  A click on an arrow sends the first fuzz payload that takes that arrow, so arrows from the start open their states; a value typed in the Context box is now always kept and sent
+- _(patch)_ Clicking an arrow or its ? no longer scrolls the page; a state click still brings the panel into view
+
 ## 0.34.0
 
 <sub>2026-11-17</sub>
