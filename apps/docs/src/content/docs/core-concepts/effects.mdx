@@ -22,7 +22,7 @@ Calls to a payment API or a timer do not belong in a transition handler. An effe
   event: InternalEvent;
   context: Context<ActorContext>;
   emit: (event) => void;
-  clock: Clock;
+  clock?: Clock; // present only when the actor has a clock
 }
 ```
 

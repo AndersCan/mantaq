@@ -1,28 +1,28 @@
 ---
 title: Machines in an application
-description: Build machines from factories that take ports and a clock, so the app and every test get their own.
+description: Build a machine with machine(id, { create }), so the app and every test get their own actor, ports and clock.
 ---
 
 ## What
 
-Build a machine from a factory that takes its ports and a clock as options.
+A machine is `machine(id, { create })`: a name and a `create` that builds a fresh actor. Ports are options with defaults.
 
 ## Why
 
-A machine in an app talks to the outside world: a payment provider, a timer. If the machine imports them, every test hits the real provider and waits on real time. Passed in, the app gets the real ones and each test gets a fake and a `VirtualClock`.
+A machine in an app talks to the outside world: a payment provider, a timer. If the machine imports them, every test hits the real provider and waits on real time. Passed to `create`, the app gets the real ones and each test gets a fake and a `VirtualClock`.
 
 ## How
 
-### A factory with ports and a clock
+### A machine with ports and a clock
 
 ```ts
 import { checkoutMachine, chargeCard } from "./checkout";
 
-// app: one singleton, real port, real clock
+// app: one actor, real port, real time
 export const checkout = checkoutMachine.create({ chargeCard }).actor;
 ```
 
-`checkoutMachine.create({ clock, chargeCard })` returns `{ actor }`. Both options are optional: the port defaults to the real provider, the clock to real time. The app builds one actor at module scope. Each test calls the factory again and gets a fresh actor with its own state.
+`checkoutMachine` is `machine("checkout", { create })`. `create({ clock, chargeCard })` returns `{ actor }`. Both options are optional: the port defaults to the real provider, the clock to real time. The app calls `checkoutMachine.create({ chargeCard })` once at module scope. Each test calls it again and gets a fresh actor with its own state.
 
 ### Test with a fake port and a virtual clock
 
@@ -85,6 +85,12 @@ When an event arrives in a state with a running effect or timer, the handler pic
 
 Use `{}` to record data without disturbing the work. Use the self-transition to restart it, for example to reset a timer. Core pins both in `packages/core/src/reentry.test.ts`.
 
-### Export the factory
+### Export the machine
 
-The inspect Vite plugin draws and fuzzes what your file exports. A factory that takes a clock gives it a fresh actor per run and a `VirtualClock` to drive. A file that only exports a singleton is drawn but not fuzzed. See [what inspect needs from your file](https://github.com/AndersCan/mantaq/tree/main/packages/inspect#what-it-needs-from-your-file).
+The inspect Vite plugin draws and fuzzes every `machine(...)` your file exports. It calls `create` with its own `VirtualClock`, so each run gets a fresh actor. Three rules:
+
+- Export `machine("<id>", { create })`; the id is the name on the board and in `?machine=<id>`.
+- Give every option of `create` except `clock` a default, so tools can build it.
+- A machine with a timer takes `clock` in `create` and passes it to `Actor`. A machine without timers never mentions a clock.
+
+A bare actor export is not a machine for the tools. See [what inspect needs from your file](https://github.com/AndersCan/mantaq/tree/main/packages/inspect#what-it-needs-from-your-file).

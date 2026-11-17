@@ -28,7 +28,7 @@ export default defineConfig({
 });
 ```
 
-Run `npx vite` and open `http://localhost:5173/__mantaq/?machine=<id>`. The id is the export name without `create` / `Actor`: `createCheckoutActor` → `checkout`. Export a factory that takes a `VirtualClock` so the page can run and fuzz it. See [`@mantaq/inspect`](https://www.npmjs.com/package/@mantaq/inspect).
+Run `npx vite` and open `http://localhost:5173/__mantaq/?machine=<id>`. The id is the string you gave `machine("<id>", { create })`. Export the machine so the page can run and fuzz it with its own `VirtualClock`. See [`@mantaq/inspect`](https://www.npmjs.com/package/@mantaq/inspect).
 
 ## Quick Reference
 
@@ -88,8 +88,16 @@ const actor = Actor({
   states: [idle, active],
   initial: idle,
   setup: (m) => {
-    m.on(idle, { event: toggle, to: [active], handler: () => ({ state: active }) });
-    m.on(active, { event: toggle, to: [idle], handler: () => ({ state: idle }) });
+    m.on(idle, {
+      event: toggle,
+      to: [active],
+      handler: () => ({ state: active }),
+    });
+    m.on(active, {
+      event: toggle,
+      to: [idle],
+      handler: () => ({ state: idle }),
+    });
   },
 });
 
@@ -209,7 +217,9 @@ const actor = Actor({
     m.on(idleState, {
       event: fetchEvent,
       to: [loadingState],
-      handler: (event) => ({ state: loadingState.create({ url: event.payload.url }) }),
+      handler: (event) => ({
+        state: loadingState.create({ url: event.payload.url }),
+      }),
     });
     m.on(loadingState, {
       event: doneEvent,
@@ -275,7 +285,7 @@ actor.send(tickEvent.create());
 Effects run on state entry. They receive the typed context, an `AbortSignal`, the clock, and an `emit` function. Each effect carries a required camelCase `name` describing what it does. Tests can assert on it (`harness.assertEffectRan(stateName, effectName)`), and executed effects appear in history as `{ stateName, effectName }`. `sends` lists the internal events the effect may emit; `emit` then only accepts those.
 
 ```ts
-import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { Actor, machine, state, event } from "@mantaq/core";
 
 type MyContext = { retryCount: number; maxRetries: number };
 
@@ -288,53 +298,60 @@ const startEvent = event("START")();
 const doneEvent = event("WORK_DONE")();
 const failedEvent = event("WORK_FAILED")<{ error: string }>();
 
-export function createWorkerActor(clock = VirtualClock()) {
-  const initialContext: MyContext = { retryCount: 0, maxRetries: 3 };
-  return Actor({
-    inputs: [startEvent],
-    internal: [doneEvent, failedEvent],
-    states: [idleState, workingState, doneState, errorState],
-    initial: idleState,
-    context: initialContext,
-    clock,
-    setup: (m) => {
-      m.effect(workingState, {
-        name: "attemptWork",
-        sends: [doneEvent, failedEvent],
-        fn: ({ signal, context, emit, clock }) => {
-          const { retryCount, maxRetries } = context.get();
-          if (retryCount >= maxRetries) {
-            emit(failedEvent.create({ error: "Max retries exceeded" }));
-            return;
-          }
-          // ✅ signal clears the timer when the state exits
-          clock.setTimeout(2000, { signal, cb: () => emit(doneEvent.create()) });
-        },
-      });
-      m.on(idleState, {
-        event: startEvent,
-        to: [workingState],
-        handler: () => ({ state: workingState }),
-      });
-      m.on(workingState, {
-        event: doneEvent,
-        to: [doneState],
-        handler: () => ({ state: doneState }),
-      });
-      m.on(workingState, {
-        event: failedEvent,
-        to: [errorState],
-        handler: (_event, { context }) => {
-          const s = context.get();
-          s.retryCount += 1;
-          context.set(s);
-          return { state: errorState };
-        },
-      });
-    },
-  });
-}
+export const worker = machine("worker", {
+  create: ({ clock }) => {
+    const initialContext: MyContext = { retryCount: 0, maxRetries: 3 };
+    return Actor({
+      inputs: [startEvent],
+      internal: [doneEvent, failedEvent],
+      states: [idleState, workingState, doneState, errorState],
+      initial: idleState,
+      context: initialContext,
+      clock,
+      setup: (m) => {
+        m.effect(workingState, {
+          name: "attemptWork",
+          sends: [doneEvent, failedEvent],
+          fn: ({ signal, context, emit, clock }) => {
+            const { retryCount, maxRetries } = context.get();
+            if (retryCount >= maxRetries) {
+              emit(failedEvent.create({ error: "Max retries exceeded" }));
+              return;
+            }
+            // ✅ signal clears the timer when the state exits
+            clock.setTimeout(2000, {
+              signal,
+              cb: () => emit(doneEvent.create()),
+            });
+          },
+        });
+        m.on(idleState, {
+          event: startEvent,
+          to: [workingState],
+          handler: () => ({ state: workingState }),
+        });
+        m.on(workingState, {
+          event: doneEvent,
+          to: [doneState],
+          handler: () => ({ state: doneState }),
+        });
+        m.on(workingState, {
+          event: failedEvent,
+          to: [errorState],
+          handler: (_event, { context }) => {
+            const s = context.get();
+            s.retryCount += 1;
+            context.set(s);
+            return { state: errorState };
+          },
+        });
+      },
+    });
+  },
+});
 ```
+
+In a test, `worker.create({ clock })` with a `VirtualClock()` builds a fresh actor on that clock; `worker.create()` uses real time.
 
 **Anti-pattern. Timers without `signal`.** `clock.setTimeout(2000, { cb })` still fires after the state exits. Pass `signal`, or check `signal.aborted` in the callback, or `clock.clearTimeout(id)` in an abort listener.
 
@@ -492,7 +509,9 @@ Actor({
     m.on(workingState, {
       event: failedEvent,
       to: [errorState],
-      handler: (event) => ({ state: errorState.create({ error: event.payload.error }) }),
+      handler: (event) => ({
+        state: errorState.create({ error: event.payload.error }),
+      }),
     });
   },
 });
@@ -511,7 +530,12 @@ declare function show(name: string): void;
 
 const idle = state("idle")();
 const toggle = event("TOGGLE")();
-const actor = Actor({ inputs: [toggle], states: [idle], initial: idle, setup: () => {} });
+const actor = Actor({
+  inputs: [toggle],
+  states: [idle],
+  initial: idle,
+  setup: () => {},
+});
 
 const render = () => show(actor.state.name); // "idle" | "__error"
 actor.on("change", { fn: render });
@@ -588,7 +612,7 @@ Actor({
 
 ### Testing with VirtualClock
 
-`VirtualClock()` replaces real timers for deterministic tests. Advance time manually, verify state instantly. Without `clock`, an actor uses the real clock.
+`VirtualClock()` replaces real timers for deterministic tests. Advance time manually, verify state instantly. Without `clock`, an actor has no time: a timer without a clock does not compile. `machine(...).create()` passes real time unless you hand it a clock.
 
 #### Basic Usage
 
@@ -616,7 +640,11 @@ const actor = Actor({
         clock.setTimeout(5000, { signal, cb: () => emit(timer.create()) });
       },
     });
-    m.on(idle, { event: timer, to: [timedOut], handler: () => ({ state: timedOut }) });
+    m.on(idle, {
+      event: timer,
+      to: [timedOut],
+      handler: () => ({ state: timedOut }),
+    });
   },
 });
 
@@ -657,8 +685,16 @@ const actor = Actor({
         clock.setTimeout(5000, { signal, cb: () => emit(done.create()) });
       },
     });
-    m.on(loading, { event: cancel, to: [success], handler: () => ({ state: success }) });
-    m.on(loading, { event: done, to: [success], handler: () => ({ state: success }) });
+    m.on(loading, {
+      event: cancel,
+      to: [success],
+      handler: () => ({ state: success }),
+    });
+    m.on(loading, {
+      event: done,
+      to: [success],
+      handler: () => ({ state: success }),
+    });
   },
 });
 

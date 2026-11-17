@@ -24,7 +24,7 @@ The checkout machine below has one happy path, a `back` edge and an error state;
 ### The machine
 
 ```ts
-import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { Actor, VirtualClock, machine, state, event } from "@mantaq/core";
 
 type CheckoutContext = {
   basicInfo?: { email: string; name: string };
@@ -40,64 +40,85 @@ const submitting = state("submitting")();
 const success = state("success")().final();
 const error = state("error")();
 
-const submitBasicInfo = event("submitBasicInfo")<{ email: string; name: string }>();
-const submitShipping = event("submitShipping")<{ street: string; city: string; zip: string }>();
+const submitBasicInfo = event("submitBasicInfo")<{
+  email: string;
+  name: string;
+}>();
+const submitShipping = event("submitShipping")<{
+  street: string;
+  city: string;
+  zip: string;
+}>();
 const submitPayment = event("submitPayment")<{ cardNumber: string }>();
 const back = event("back")();
 const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
 const paymentTimeout = event("paymentTimeout")();
 
-function createCheckoutActor() {
-  const initialContext: CheckoutContext = {};
-  return Actor({
-    inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, paymentTimeout],
-    states: [basicInfo, shippingAddress, payment, submitting, success, error],
-    initial: basicInfo,
-    context: initialContext,
-    setup: (m) => {
-      m.on(basicInfo, {
-        event: submitBasicInfo,
-        to: [shippingAddress],
-        handler: (e, { context }) => {
-          context.set({ ...context.get(), basicInfo: e.payload });
-          return { state: shippingAddress };
-        },
-      });
-      m.on(shippingAddress, {
-        event: submitShipping,
-        to: [payment],
-        handler: (e, { context }) => {
-          context.set({ ...context.get(), shippingAddress: e.payload });
-          return { state: payment };
-        },
-      });
-      m.on(payment, {
-        event: submitPayment,
-        to: [submitting],
-        handler: (e, { context }) => {
-          context.set({ ...context.get(), paymentInfo: e.payload });
-          return { state: submitting };
-        },
-      });
-      m.on(payment, {
-        event: back,
-        to: [shippingAddress],
-        handler: () => ({ state: shippingAddress }),
-      });
-      m.on(submitting, { event: paymentOk, to: [success], handler: () => ({ state: success }) });
-      m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
-      m.on(submitting, { event: paymentTimeout, to: [error], handler: () => ({ state: error }) });
-    },
-  });
-}
+const checkoutMachine = machine("checkout", {
+  create: () => {
+    const initialContext: CheckoutContext = {};
+    return Actor({
+      inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+      internal: [paymentOk, paymentFail, paymentTimeout],
+      states: [basicInfo, shippingAddress, payment, submitting, success, error],
+      initial: basicInfo,
+      context: initialContext,
+      setup: (m) => {
+        m.on(basicInfo, {
+          event: submitBasicInfo,
+          to: [shippingAddress],
+          handler: (e, { context }) => {
+            context.set({ ...context.get(), basicInfo: e.payload });
+            return { state: shippingAddress };
+          },
+        });
+        m.on(shippingAddress, {
+          event: submitShipping,
+          to: [payment],
+          handler: (e, { context }) => {
+            context.set({ ...context.get(), shippingAddress: e.payload });
+            return { state: payment };
+          },
+        });
+        m.on(payment, {
+          event: submitPayment,
+          to: [submitting],
+          handler: (e, { context }) => {
+            context.set({ ...context.get(), paymentInfo: e.payload });
+            return { state: submitting };
+          },
+        });
+        m.on(payment, {
+          event: back,
+          to: [shippingAddress],
+          handler: () => ({ state: shippingAddress }),
+        });
+        m.on(submitting, {
+          event: paymentOk,
+          to: [success],
+          handler: () => ({ state: success }),
+        });
+        m.on(submitting, {
+          event: paymentFail,
+          to: [error],
+          handler: () => ({ state: error }),
+        });
+        m.on(submitting, {
+          event: paymentTimeout,
+          to: [error],
+          handler: () => ({ state: error }),
+        });
+      },
+    });
+  },
+});
 ```
 
 ### Happy path
 
 ```ts
-const checkout = createCheckoutActor();
+const checkout = checkoutMachine.create();
 expect(checkout.snapshot().path[0]).toBe("basicInfo");
 
 checkout.send(submitBasicInfo.create({ email: "a@b.com", name: "A" }));
@@ -145,11 +166,18 @@ const checkout = Actor({
       to: [submitting],
       handler: () => ({ state: submitting }),
     });
-    m.on(submitting, { event: paymentTimeout, to: [error], handler: () => ({ state: error }) });
+    m.on(submitting, {
+      event: paymentTimeout,
+      to: [error],
+      handler: () => ({ state: error }),
+    });
     m.effect(submitting, {
       name: "startSubmitTimeout",
       fn: ({ signal, emit, clock }) => {
-        clock.setTimeout(800, { signal, cb: () => emit(paymentTimeout.create()) });
+        clock.setTimeout(800, {
+          signal,
+          cb: () => emit(paymentTimeout.create()),
+        });
       },
     });
   },
@@ -192,7 +220,11 @@ const checkout = Actor({
       to: [submitting],
       handler: () => ({ state: submitting }),
     });
-    m.on(submitting, { event: paymentOk, to: [success], handler: () => ({ state: success }) });
+    m.on(submitting, {
+      event: paymentOk,
+      to: [success],
+      handler: () => ({ state: success }),
+    });
     m.effect(submitting, {
       name: "chargeCard",
       fn: ({ signal, emit }) => {

@@ -268,7 +268,7 @@ broadcast(map, { type: "ping" });
 
 Works with any object implementing `{ keys(): string[]; send(key, event): void }`.
 
-### `createPool({ name, workers, run, keep?, key?, batch?, clock? })`
+### `createPool({ name, workers, run, keep?, key?, batch? })`
 
 One inbox and `workers` workers (`w1`..`wn`) that pull work. The inbox hands items to free workers only; a failed run puts its items back at the front. Event ids are `${name}.ITEM_ARRIVED` and so on, so two pools with different names never cross.
 
