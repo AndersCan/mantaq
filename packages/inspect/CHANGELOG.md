@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.41.3
+
+<sub>2026-11-17</sub>
+
+- _(patch)_ The Screen frame fits inside the Screen tab, so a state far down a tall graph shows its whole screen in a laptop window.
+
 ## 0.41.2
 
 <sub>2026-11-17</sub>
