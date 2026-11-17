@@ -1,4 +1,4 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 /** The actor waits for a request. */
 const waitingForRequest = state("waitingForRequest")();
@@ -9,25 +9,30 @@ const requestArrived = event("requestArrived")();
 /** The request was handled. */
 const requestHandled = event("requestHandled")();
 
-export function createBadExpectationsActor(clock: VirtualClock = VirtualClock()) {
-  return Actor({
-    clock,
-    inputs: [requestArrived, requestHandled],
-    states: [waitingForRequest, handlingRequest],
-    initial: waitingForRequest,
-    setup: (m) => {
-      m.on(waitingForRequest, {
-        event: requestArrived,
-        to: [handlingRequest],
-        handler: () => ({ state: handlingRequest }),
-      });
-      m.on(handlingRequest, {
-        event: requestHandled,
-        to: [waitingForRequest],
-        handler: () => ({ state: waitingForRequest }),
-      });
-    },
-  });
-}
+export const badExpectations = machine("badExpectations", {
+  create: ({ clock }) => {
+    return Actor({
+      clock,
+      inputs: [requestArrived, requestHandled],
+      states: [waitingForRequest, handlingRequest],
+      initial: waitingForRequest,
+      setup: (m) => {
+        m.on(waitingForRequest, {
+          event: requestArrived,
+          to: [handlingRequest],
+          handler: () => ({ state: handlingRequest }),
+        });
+        m.on(handlingRequest, {
+          event: requestHandled,
+          to: [waitingForRequest],
+          handler: () => ({ state: waitingForRequest }),
+        });
+      },
+    });
+  },
+});
 
-export const badExpectationsExpectations = { handlingRequest: { neverSee: "none" } };
+export const badExpectationsExpectations = {
+  machine: "badExpectations",
+  states: { handlingRequest: { neverSee: "none" } },
+};

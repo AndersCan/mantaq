@@ -1,1 +1,1 @@
-export { createRetryActor } from "./retry.ts";
+export { retry } from "./retry.ts";

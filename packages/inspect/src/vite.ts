@@ -14,9 +14,8 @@
  */
 import { UPDATE_EVENT, livePageHtml, serializeViz } from "@mantaq/viz";
 import type { FuzzSettings } from "./inspect.ts";
-import { vizDocument, exportId, projectRoot } from "./inspect.ts";
+import { projectRoot, vizDocument } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
-import type { MachineExport } from "./ast/discover.ts";
 import { entryId, inspectEntry, inspectFile, runOf } from "./load.ts";
 import { Either } from "@mantaq/utils";
 import { existsSync, globSync, readFileSync } from "node:fs";
@@ -63,9 +62,7 @@ function previewsOf(files: ReadonlyArray<string>): Map<string, string> {
     if (preview === undefined) continue;
     const analysis = analyzeModule({ file, root: projectRoot(file) });
     if (Either.isLeft(analysis)) continue;
-    for (const found of analysis[1].machines.filter((each) => each.call !== "instance")) {
-      previews.set(exportId(found), preview);
-    }
+    for (const found of analysis[1].machines) previews.set(found.id, preview);
   }
   return previews;
 }
@@ -78,23 +75,9 @@ function previewsSource(files: ReadonlyArray<string>): string {
   return ["export const previews = {", ...entries, "};"].join("\n");
 }
 
-function createExpression(found: MachineExport, index: number): string {
-  if (found.call === "machine") return `m${index}[${JSON.stringify(found.name)}].create({ clock })`;
-  const callee = `m${index}[${JSON.stringify(found.name)}]`;
-  const call =
-    found.call === "clock"
-      ? `${callee}(VirtualClock())`
-      : found.call === "options"
-        ? `${callee}({ clock: VirtualClock() })`
-        : `${callee}()`;
-  return call;
-}
-
 /**
- * Source of `virtual:mantaq/targets`: one factory per exported actor factory,
- * shaped by its type (`call`, `clock`, `options`). A bare actor export cannot
- * be recreated, so it gets none. Like the server-side inspection, plain actors
- * are skipped when a file has factories.
+ * Source of `virtual:mantaq/targets`: one entry per `machine(...)` export.
+ * The page owns the clock: it hands a VirtualClock to `create({ clock })`.
  */
 export function targetsSource(files: ReadonlyArray<string>): string {
   const core = fileURLToPath(import.meta.resolve("@mantaq/core"));
@@ -103,12 +86,12 @@ export function targetsSource(files: ReadonlyArray<string>): string {
   files.forEach((file, index) => {
     const analysis = analyzeModule({ file, root: projectRoot(file) });
     if (Either.isLeft(analysis)) return;
-    const factories = analysis[1].machines.filter((found) => found.call !== "instance");
-    if (factories.length === 0) return;
+    const machines = analysis[1].machines;
+    if (machines.length === 0) return;
     imports.push(`import * as m${index} from ${JSON.stringify(file)};`);
-    for (const found of factories) {
+    for (const found of machines) {
       entries.push(
-        `  ${JSON.stringify(exportId(found))}: () => { ${found.call === "machine" ? "const clock = VirtualClock(); " : ""}const made = ${createExpression(found, index)}; const actor = ${found.unwrap === "actor" ? "made.actor" : "made"}; return { actor, clock${found.call === "machine" ? "" : ": actor.clock"}, made }; },`,
+        `  ${JSON.stringify(found.id)}: () => { const clock = VirtualClock(); const made = m${index}[${JSON.stringify(found.name)}].create({ clock }); const actor = ${found.unwrap === "actor" ? "made.actor" : "made"}; return { actor, clock, made }; },`,
       );
     }
   });

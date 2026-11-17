@@ -3,8 +3,8 @@ import { createActorMap, onOutput } from "@mantaq/sugar";
 import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
 import { expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createDroppedMessage } from "./fixtures/dropped-message.ts";
-import { createKitchen } from "./fixtures/kitchen.ts";
+import { droppedMessage } from "./fixtures/dropped-message.ts";
+import { kitchen as kitchenMachine } from "./fixtures/kitchen.ts";
 
 const send = (name: string, options: { payload?: VizJson; actor?: VizActorRef } = {}): VizStep => ({
   kind: "event",
@@ -18,7 +18,7 @@ const dishes = () =>
     id: "kitchen",
     create: () => {
       const clock = VirtualClock();
-      const made = createDroppedMessage({ clock });
+      const made = droppedMessage.create({ clock });
       return { actor: made.actor, clock, made };
     },
   });
@@ -63,7 +63,7 @@ const kitchen = (effectMode: "held" | "real") =>
       id: "kitchen",
       create: () => {
         const clock = VirtualClock();
-        const made = createKitchen({ clock });
+        const made = kitchenMachine.create({ clock });
         return { actor: made.actor, clock, made };
       },
     },

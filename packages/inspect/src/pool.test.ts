@@ -1,13 +1,13 @@
 import { VirtualClock } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createTeamInbox } from "./fixtures/pool.ts";
-import { createUploadRegionsActor } from "./fixtures/upload-regions.ts";
+import { teamInbox as teamInboxMachine } from "./fixtures/pool.ts";
+import { uploadRegions } from "./fixtures/upload-regions.ts";
 import { toViz } from "./structure.ts";
 
 function teamInbox() {
   const clock = VirtualClock();
-  const made = createTeamInbox({ clock });
+  const made = teamInboxMachine.create({ clock });
   return { actor: made.actor, clock, made };
 }
 
@@ -38,7 +38,9 @@ describe("a step on a pool names the part that moved after it", () => {
 
 describe("regions record their outputs too", () => {
   test("the upload region's photoUploaded reaches its parent", () => {
-    const machine = toViz([{ id: "photoUpload", actor: createUploadRegionsActor() }]).machines[0];
+    const machine = toViz([
+      { id: "photoUpload", actor: uploadRegions.create({ clock: VirtualClock() }) },
+    ]).machines[0];
     expect(machine?.partOutputs).toEqual({ upload: ["photoUploaded"] });
   });
 });

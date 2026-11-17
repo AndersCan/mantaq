@@ -1,9 +1,9 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, machine as asMachine, event, state } from "@mantaq/core";
 import { createActorMap } from "@mantaq/sugar";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createPhotoQueue } from "./fixtures/photo-queue.ts";
-import { createPhotoQueueDeadEnd } from "./fixtures/photo-queue-dead-end.ts";
+import { photoQueue } from "./fixtures/photo-queue.ts";
+import { photoQueueDeadEnd } from "./fixtures/photo-queue-dead-end.ts";
 import { actorMapsOf } from "./maps.ts";
 import { inspect } from "./inspect.ts";
 import { toViz, toVizMachine } from "./structure.ts";
@@ -23,7 +23,7 @@ const target: FuzzTarget = {
   id: "photoQueue",
   create: () => {
     const clock = VirtualClock();
-    const made = createPhotoQueue({ clock });
+    const made = photoQueue.create({ clock });
     return { actor: made.actor, clock, made };
   },
 };
@@ -40,7 +40,7 @@ const confirm = (key: string) =>
 
 describe("actorMapsOf", () => {
   test("finds maps next to the actor, sorted, and ignores the rest", () => {
-    const made = createPhotoQueue();
+    const made = photoQueue.create({ clock: VirtualClock() });
     const found = actorMapsOf({ ...made, zeta: made.photos, other: 3 });
     expect(Object.keys(found.maps)).toEqual(
       ["other".length ? "photos" : "", "zeta"].filter(Boolean),
@@ -82,7 +82,7 @@ describe("structure", () => {
   });
 
   test("the probe child is removed again", () => {
-    const made = createPhotoQueue();
+    const made = photoQueue.create({ clock: VirtualClock() });
     toVizMachine({ id: "q", actor: made.actor, made });
     expect(made.photos.keys()).toEqual([]);
   });
@@ -93,13 +93,15 @@ describe("structure", () => {
   });
 
   test("a machine without maps has none", () => {
-    expect(toVizMachine({ id: "q", actor: createPhotoQueue().actor }).maps).toEqual([]);
+    expect(
+      toVizMachine({ id: "q", actor: photoQueue.create({ clock: VirtualClock() }).actor }).maps,
+    ).toEqual([]);
   });
 });
 
 describe("inspect", () => {
   test("map states and edges get fuzz coverage and child states count toward coverage", () => {
-    const { machine, warnings } = inspect({ id: "photoQueue", create: () => createPhotoQueue() });
+    const { machine, warnings } = inspect({ machine: photoQueue });
     const child = (id: string) => machine.states.find((each) => each.id === id);
     expect(child("photos.sendingPhoto")?.coverage?.hits).toBeGreaterThan(0);
     expect(child("photos.photoSent")?.coverage).toEqual({ hits: 0 });
@@ -111,16 +113,15 @@ describe("inspect", () => {
   test("the coverage goal counts child states and edges as still to reach", () => {
     const clear = { kind: "event", event: "queueCleared", payload: null } as const;
     const { machine } = inspect({
-      id: "photoQueue",
+      machine: photoQueue,
       fuzz: false,
-      create: () => createPhotoQueue(),
     });
     const trace = execute(target, [add("p1"), clear, add("p1")]);
     expect(coverageGoal(machine)(trace)).toBe(false);
   });
 
   test("a child that throws gives a warning and no compartment", () => {
-    const made = createPhotoQueue();
+    const made = photoQueue.create({ clock: VirtualClock() });
     const broken = {
       ...made.photos,
       spawn: () => {
@@ -128,21 +129,19 @@ describe("inspect", () => {
       },
     };
     const { machine, warnings } = inspect({
-      id: "q",
+      machine: asMachine("q", { create: () => ({ actor: made.actor, photos: broken }) }),
       fuzz: false,
-      create: () => ({ actor: made.actor, photos: broken }),
     });
     expect(machine.maps).toEqual([]);
     expect(warnings).toContain("actor map photos: could not start a child to draw it: boom");
   });
 
   test("children that are not actors give a warning", () => {
-    const made = createPhotoQueue();
+    const made = photoQueue.create({ clock: VirtualClock() });
     const fake = { ...made.photos, get: () => ({}) };
     const { machine, warnings } = inspect({
-      id: "q",
+      machine: asMachine("q", { create: () => ({ actor: made.actor, photos: fake }) }),
       fuzz: false,
-      create: () => ({ actor: made.actor, photos: fake }),
     });
     expect(machine.maps).toEqual([]);
     expect(warnings).toContain(
@@ -151,7 +150,7 @@ describe("inspect", () => {
   });
 
   test("a map without get warns about an older sugar", () => {
-    const made = createPhotoQueue();
+    const made = photoQueue.create({ clock: VirtualClock() });
     const old = {
       keys: made.photos.keys,
       spawn: made.photos.spawn,
@@ -159,9 +158,8 @@ describe("inspect", () => {
       send: made.photos.send,
     };
     const { warnings } = inspect({
-      id: "q",
+      machine: asMachine("q", { create: () => ({ actor: made.actor, photos: old }) as never }),
       fuzz: false,
-      create: () => ({ actor: made.actor, photos: old }) as never,
     });
     expect(warnings).toContain(
       "photos looks like an actor map from an older @mantaq/sugar (no get): update @mantaq/sugar to draw its children",
@@ -169,7 +167,7 @@ describe("inspect", () => {
   });
 
   test("the dead-end fixture has a child state without a way out", () => {
-    const { machine } = inspect({ id: "q", create: () => createPhotoQueueDeadEnd() });
+    const { machine } = inspect({ machine: photoQueueDeadEnd });
     expect(machine.maps).toEqual(["photos"]);
     const paused = machine.states.find((each) => each.id === "photos.pausedPhoto");
     expect(paused?.final).toBe(false);
@@ -274,7 +272,7 @@ describe("driver", () => {
       id: "respawn",
       create: () => {
         const clock = VirtualClock();
-        const made = createPhotoQueue({ clock });
+        const made = photoQueue.create({ clock });
         const spawn = made.photos.spawn.bind(made.photos);
         made.photos.ensure = (key) => spawn(key);
         return { actor: made.actor, clock, made };
@@ -294,7 +292,7 @@ describe("driver", () => {
       id: "reaping",
       create: () => {
         const clock = VirtualClock();
-        const made = createPhotoQueue({ clock, autoReap: true });
+        const made = photoQueue.create({ clock, autoReap: true });
         return { actor: made.actor, clock, made };
       },
     };
@@ -413,12 +411,12 @@ describe("driver effects and reset", () => {
   });
 });
 
-function capturedQueue(seen: Array<ReturnType<typeof createPhotoQueue>>): FuzzTarget {
+function capturedQueue(seen: Array<ReturnType<typeof photoQueue.create>>): FuzzTarget {
   return {
     id: "photoQueue",
     create: () => {
       const clock = VirtualClock();
-      const made = createPhotoQueue({ clock });
+      const made = photoQueue.create({ clock });
       seen.push(made);
       return { actor: made.actor, clock, made };
     },
@@ -427,7 +425,7 @@ function capturedQueue(seen: Array<ReturnType<typeof createPhotoQueue>>): FuzzTa
 
 describe("child disposal", () => {
   test("reset disposes the old session's children", () => {
-    const seen: Array<ReturnType<typeof createPhotoQueue>> = [];
+    const seen: Array<ReturnType<typeof photoQueue.create>> = [];
     const driver = createDriver(capturedQueue(seen));
     driver.step(add("p1"));
     const old = seen[seen.length - 1];
@@ -437,7 +435,7 @@ describe("child disposal", () => {
   });
 
   test("a replay disposes its children", () => {
-    const seen: Array<ReturnType<typeof createPhotoQueue>> = [];
+    const seen: Array<ReturnType<typeof photoQueue.create>> = [];
     const steps = [add("p1"), confirm("p1")];
     const result = normalizeRun(capturedQueue(seen), { name: "t", end: "open", steps });
     expect(result).toEqual(Either.right(steps));
@@ -447,7 +445,7 @@ describe("child disposal", () => {
 
 describe("test coverage", () => {
   test("map states and edges get a tested field", () => {
-    const { machine } = inspect({ id: "photoQueue", create: () => createPhotoQueue() });
+    const { machine } = inspect({ machine: photoQueue });
     const covered = withTestCoverage(target, machine, [[add("p1"), confirm("p1")]]);
     const tested = (id: string) => covered.states.find((each) => each.id === id)?.tested;
     expect(tested("photos.sendingPhoto")).toEqual({ hits: 1 });
@@ -477,18 +475,16 @@ const sentS = state("photoSent")().final();
 const openS = state("open")();
 
 /** A photo queue with a custom root handler for photoAdded and an optional throwing child. */
-function inlineQueue(options: {
+function inlineMachine(options: {
   onAdded: (photos: ReturnType<typeof createActorMap>, id: string) => void;
   childThrows?: boolean;
   /** Changes the map the factory returns, after the root has closed over the real one. */
   expose?: (photos: ReturnType<typeof createActorMap>) => ReturnType<typeof createActorMap>;
   /** Keys spawned before the first step. */
   before?: string;
-}): FuzzTarget {
-  return {
-    id: "inline",
-    create: () => {
-      const clock = VirtualClock();
+}) {
+  return asMachine("inline", {
+    create: ({ clock }) => {
       const photos = createActorMap(() =>
         Actor({
           clock,
@@ -530,11 +526,19 @@ function inlineQueue(options: {
         },
       });
       if (options.before !== undefined) photos.spawn(options.before);
-      return {
-        actor,
-        clock,
-        made: { actor, photos: (options.expose ?? ((each) => each))(photos) },
-      };
+      return { actor, photos: (options.expose ?? ((each) => each))(photos) };
+    },
+  });
+}
+
+/** The inline queue as the fuzz driver runs it: on a VirtualClock of its own. */
+function inlineQueue(options: Parameters<typeof inlineMachine>[0]): FuzzTarget {
+  return {
+    id: "inline",
+    create: () => {
+      const clock = VirtualClock();
+      const made = inlineMachine(options).create({ clock });
+      return { actor: made.actor, clock, made };
     },
   };
 }
@@ -608,8 +612,10 @@ describe("execute records map children", () => {
       { from: "photos.sendingPhoto", event: "uploadConfirmed", message: "Error: boom", step: 1 },
     ]);
     const { machine } = inspect({
-      id: "inline",
-      create: () => throwing.create().made as ReturnType<typeof createPhotoQueue>,
+      machine: inlineMachine({
+        onAdded: (photos, id) => photos.ensure(id),
+        childThrows: true,
+      }),
       payloads: { photoAdded: [{ photoId: "p1" }] },
       tests: [{ name: "t", steps: [add("p1"), confirm("p1")] }],
     });
@@ -663,14 +669,19 @@ describe("fuzzing sends to map children", () => {
   const withPayloads: FuzzTarget = { ...target, payloads: { photoAdded: [{ photoId: "p1" }] } };
 
   test("childEvents lists the events a child handles", () => {
-    expect(childEvents(createPhotoQueue())).toEqual([{ map: "photos", event: "uploadConfirmed" }]);
-    expect(childEvents({ actor: createPhotoQueue().actor })).toEqual([]);
+    expect(childEvents(photoQueue.create({ clock: VirtualClock() }))).toEqual([
+      { map: "photos", event: "uploadConfirmed" },
+    ]);
+    expect(childEvents({ actor: photoQueue.create({ clock: VirtualClock() }).actor })).toEqual([]);
     const throwing = {
       spawn: () => {
         throw new Error("no");
       },
     };
-    const broken = { ...createPhotoQueue(), photos: { ...createPhotoQueue().photos, ...throwing } };
+    const broken = {
+      ...photoQueue.create({ clock: VirtualClock() }),
+      photos: { ...photoQueue.create({ clock: VirtualClock() }).photos, ...throwing },
+    };
     expect(childEvents(broken)).toEqual([]);
   });
 
@@ -708,15 +719,14 @@ describe("fuzzing sends to map children", () => {
 
   test("a child dead end gets replay steps", () => {
     const { machine } = inspect({
-      id: "photoQueue",
-      create: () => createPhotoQueueDeadEnd(),
+      machine: photoQueueDeadEnd,
       payloads: { photoAdded: [{ photoId: "p1" }] },
     });
     const deadEnd: FuzzTarget = {
       id: "photoQueue",
       create: () => {
         const clock = VirtualClock();
-        const made = createPhotoQueueDeadEnd({ clock });
+        const made = photoQueueDeadEnd.create({ clock });
         return { actor: made.actor, clock, made };
       },
     };
@@ -730,8 +740,7 @@ describe("fuzzing sends to map children", () => {
   test("every state of the photo queue is reached", () => {
     expect(() =>
       expectAllStatesReached({
-        id: "photoQueue",
-        create: () => createPhotoQueue(),
+        machine: photoQueue,
         payloads: { photoAdded: [{ photoId: "p1" }] },
       }),
     ).not.toThrow();

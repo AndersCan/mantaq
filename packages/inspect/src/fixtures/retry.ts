@@ -3,7 +3,7 @@
  * eleventh locks out. Reaching `lockedOut` needs the same event 11 times in a
  * row, which no single-event mutation finds by luck.
  */
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 type RetryContext = { attempts: number };
 
@@ -25,48 +25,50 @@ const failed = event("failed")<{ reason: string }>();
 /** The connection opened. */
 const opened = event("opened")();
 
-export function createRetryActor(clock: VirtualClock = VirtualClock()) {
-  const initialContext: RetryContext = { attempts: 0 };
-  return Actor({
-    inputs: [connect, reset],
-    internal: [failed, opened],
-    states: [idle, connecting, connected, lockedOut],
-    initial: idle,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      m.on(idle, { event: connect, to: [connecting], handler: () => ({ state: connecting }) });
-      m.on(connecting, {
-        event: failed,
-        to: [lockedOut],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.attempts += 1;
-          context.set(current);
-          if (current.attempts > 10) return { state: lockedOut };
-          return {};
-        },
-      });
-      m.on(connecting, {
-        event: opened,
-        to: [connected],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.attempts = 0;
-          context.set(current);
-          return { state: connected };
-        },
-      });
-      m.on(lockedOut, {
-        event: reset,
-        to: [idle],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.attempts = 0;
-          context.set(current);
-          return { state: idle };
-        },
-      });
-    },
-  });
-}
+export const retry = machine("retry", {
+  create: ({ clock }) => {
+    const initialContext: RetryContext = { attempts: 0 };
+    return Actor({
+      inputs: [connect, reset],
+      internal: [failed, opened],
+      states: [idle, connecting, connected, lockedOut],
+      initial: idle,
+      clock,
+      context: initialContext,
+      setup: (m) => {
+        m.on(idle, { event: connect, to: [connecting], handler: () => ({ state: connecting }) });
+        m.on(connecting, {
+          event: failed,
+          to: [lockedOut],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.attempts += 1;
+            context.set(current);
+            if (current.attempts > 10) return { state: lockedOut };
+            return {};
+          },
+        });
+        m.on(connecting, {
+          event: opened,
+          to: [connected],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.attempts = 0;
+            context.set(current);
+            return { state: connected };
+          },
+        });
+        m.on(lockedOut, {
+          event: reset,
+          to: [idle],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.attempts = 0;
+            context.set(current);
+            return { state: idle };
+          },
+        });
+      },
+    });
+  },
+});

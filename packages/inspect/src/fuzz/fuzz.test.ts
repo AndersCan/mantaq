@@ -1,10 +1,10 @@
 import { exampleTargets, handWrittenBaselines } from "../examples.ts";
 import { coverageGoal, unreached, withTestCoverage } from "./coverage.ts";
-import { createCheckoutActor } from "../fixtures/checkout.ts";
+import { checkout as checkoutMachine } from "../fixtures/checkout.ts";
 import { toVizMachine } from "../structure.ts";
-import { createConditionalActor } from "../fixtures/conditional.ts";
-import { createLockoutActor } from "../fixtures/lockout.ts";
-import { createStateRoutingActor } from "../fixtures/state-routing.ts";
+import { conditional as conditionalMachine } from "../fixtures/conditional.ts";
+import { lockout as lockoutMachine } from "../fixtures/lockout.ts";
+import { stateRouting } from "../fixtures/state-routing.ts";
 import { serializeViz, VIZ_SCHEMA_VERSION, parseViz } from "@mantaq/viz";
 import type { VizStep } from "@mantaq/viz";
 import { fuzz, shrink } from "./fuzz.ts";
@@ -73,7 +73,7 @@ describe("fuzz write-back", () => {
       id: "routing",
       create: () => {
         const clock = VirtualClock();
-        return { actor: createStateRoutingActor(clock), clock };
+        return { actor: stateRouting.create({ clock }), clock };
       },
       payloads: {},
     };
@@ -101,7 +101,7 @@ describe("fuzz write-back", () => {
       id: "conditional",
       create: () => {
         const clock = VirtualClock();
-        return { actor: createConditionalActor(clock), clock };
+        return { actor: conditionalMachine.create({ clock }), clock };
       },
       payloads: { review: [{ amount: 50 }] },
     };
@@ -206,7 +206,7 @@ describe("loops over context-changing steps", () => {
       id: "lockout",
       create: () => {
         const clock = VirtualClock();
-        return { actor: createLockoutActor(clock), clock };
+        return { actor: lockoutMachine.create({ clock }), clock };
       },
     };
     const step = (event: string) => ({ kind: "event" as const, event, payload: null });
@@ -281,7 +281,7 @@ describe("fuzz budget", () => {
     id: "checkout",
     create: () => {
       const clock = VirtualClock();
-      return { actor: createCheckoutActor(clock), clock };
+      return { actor: checkoutMachine.create({ clock }), clock };
     },
     payloads: { paymentOk: [{ orderId: "o1" }] },
   };
@@ -317,7 +317,10 @@ describe("fuzz budget", () => {
   });
 
   test("coverageGoal stops once every state and edge is hit", () => {
-    const structure = toVizMachine({ id: "checkout", actor: createCheckoutActor() });
+    const structure = toVizMachine({
+      id: "checkout",
+      actor: checkoutMachine.create({ clock: VirtualClock() }),
+    });
     const result = fuzz(checkout, {
       seed: DEFAULT_SEED,
       iterations: 100_000,

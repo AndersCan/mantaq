@@ -1,4 +1,5 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
+import { Actor, machine, event, state } from "@mantaq/core";
 import { createActorMap } from "@mantaq/sugar";
 
 /** The queue is open. */
@@ -16,7 +17,7 @@ const sendingPhoto = state("sendingPhoto")();
 /** The photo was sent. */
 const photoSent = state("photoSent")().final();
 
-function createPhoto(clock: VirtualClock) {
+function createPhoto(clock: Clock) {
   return Actor({
     clock,
     inputs: [uploadConfirmed],
@@ -33,32 +34,31 @@ function createPhoto(clock: VirtualClock) {
 }
 
 /** One photo upload actor per queued photo, kept in the `photos` map. */
-export function createPhotoQueue({
-  clock = VirtualClock(),
-  autoReap = false,
-}: { clock?: VirtualClock; autoReap?: boolean } = {}) {
-  const photos = createActorMap(() => createPhoto(clock), { autoReap });
-  const actor = Actor({
-    clock,
-    inputs: [photoAdded, queueCleared],
-    states: [open],
-    initial: open,
-    setup: (m) => {
-      m.on(open, {
-        event: photoAdded,
-        handler: (added) => {
-          photos.ensure(added.payload.photoId);
-          return {};
-        },
-      });
-      m.on(open, {
-        event: queueCleared,
-        handler: () => {
-          for (const key of photos.keys()) photos.kill(key);
-          return {};
-        },
-      });
-    },
-  });
-  return { actor, photos };
-}
+export const photoQueue = machine("photoQueue", {
+  create: ({ clock, autoReap = false }: { clock: Clock; autoReap?: boolean }) => {
+    const photos = createActorMap(() => createPhoto(clock), { autoReap });
+    const actor = Actor({
+      clock,
+      inputs: [photoAdded, queueCleared],
+      states: [open],
+      initial: open,
+      setup: (m) => {
+        m.on(open, {
+          event: photoAdded,
+          handler: (added) => {
+            photos.ensure(added.payload.photoId);
+            return {};
+          },
+        });
+        m.on(open, {
+          event: queueCleared,
+          handler: () => {
+            for (const key of photos.keys()) photos.kill(key);
+            return {};
+          },
+        });
+      },
+    });
+    return { actor, photos };
+  },
+});

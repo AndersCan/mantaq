@@ -3,7 +3,7 @@
  * verbatim; effects are stubbed, so sign-in results, monitor ticks and the
  * sign-out timer arrive as injected internal events.
  */
-import { Actor, VirtualClock, event } from "@mantaq/core";
+import { Actor, event, machine } from "@mantaq/core";
 import { events, states } from "@mantaq/sugar";
 
 interface User {
@@ -33,124 +33,126 @@ type AuthContext = {
   error?: string;
 };
 
-export function createAuthActor(clock: VirtualClock = VirtualClock()) {
-  const initialContext: AuthContext = {};
-  return Actor({
-    inputs: [signInEvent, authEvents.SIGN_OUT, authEvents.RETRY],
-    outputs: [],
-    internal: [
-      userSignedInEvent,
-      signInDoneEvent,
-      signInErrorEvent,
-      authEvents.MONITOR_TICK,
-      authEvents.SIGNING_OUT_DONE,
-    ],
-    states: [
-      authStates.checkingAuth,
-      authStates.loggedOut,
-      authStates.signingIn,
-      authStates.loggedIn,
-      authStates.signingOut,
-      authStates.signInError,
-    ],
-    initial: authStates.checkingAuth,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      m.effect(authStates.checkingAuth, {
-        name: "monitorCheckingAuth",
-        sends: [authEvents.MONITOR_TICK],
-        fn: () => undefined,
-      });
-      m.effect(authStates.loggedIn, {
-        name: "monitorLoggedIn",
-        sends: [authEvents.MONITOR_TICK],
-        fn: () => undefined,
-      });
-      m.effect(authStates.signingIn, {
-        name: "signInWithPhone",
-        sends: [signInDoneEvent, signInErrorEvent],
-        fn: () => undefined,
-      });
-      m.effect(authStates.signingOut, {
-        name: "signOut",
-        sends: [authEvents.SIGNING_OUT_DONE],
-        fn: () => undefined,
-      });
-      m.onAny({ event: authEvents.MONITOR_TICK, handler: () => ({}) });
-      m.on(authStates.checkingAuth, {
-        event: signInEvent,
-        to: [authStates.signingIn],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.phoneNumber = event.payload.phoneNumber;
-          context.set(current);
-          return { state: authStates.signingIn };
-        },
-      });
-      m.on(authStates.loggedOut, {
-        event: signInEvent,
-        to: [authStates.signingIn],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.phoneNumber = event.payload.phoneNumber;
-          context.set(current);
-          return { state: authStates.signingIn };
-        },
-      });
-      m.on(authStates.signingIn, {
-        event: signInDoneEvent,
-        to: [authStates.loggedIn],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.user = event.payload.user;
-          context.set(current);
-          return { state: authStates.loggedIn };
-        },
-      });
-      m.on(authStates.signingIn, {
-        event: signInErrorEvent,
-        to: [authStates.signInError],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.error = event.payload.error;
-          context.set(current);
-          return { state: authStates.signInError };
-        },
-      });
-      m.on(authStates.loggedIn, {
-        event: authEvents.SIGN_OUT,
-        to: [authStates.signingOut],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.user = undefined;
-          current.phoneNumber = undefined;
-          context.set(current);
-          return { state: authStates.signingOut };
-        },
-      });
-      m.on(authStates.signingOut, {
-        event: authEvents.SIGNING_OUT_DONE,
-        to: [authStates.loggedOut],
-        handler: () => ({
-          state: authStates.loggedOut,
-        }),
-      });
-      m.on(authStates.signInError, {
-        event: authEvents.RETRY,
-        to: [authStates.signingIn],
-        handler: () => ({ state: authStates.signingIn }),
-      });
-      m.on(authStates.signInError, {
-        event: signInEvent,
-        to: [authStates.signingIn],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.phoneNumber = event.payload.phoneNumber;
-          context.set(current);
-          return { state: authStates.signingIn };
-        },
-      });
-    },
-  });
-}
+export const auth = machine("auth", {
+  create: ({ clock }) => {
+    const initialContext: AuthContext = {};
+    return Actor({
+      inputs: [signInEvent, authEvents.SIGN_OUT, authEvents.RETRY],
+      outputs: [],
+      internal: [
+        userSignedInEvent,
+        signInDoneEvent,
+        signInErrorEvent,
+        authEvents.MONITOR_TICK,
+        authEvents.SIGNING_OUT_DONE,
+      ],
+      states: [
+        authStates.checkingAuth,
+        authStates.loggedOut,
+        authStates.signingIn,
+        authStates.loggedIn,
+        authStates.signingOut,
+        authStates.signInError,
+      ],
+      initial: authStates.checkingAuth,
+      clock,
+      context: initialContext,
+      setup: (m) => {
+        m.effect(authStates.checkingAuth, {
+          name: "monitorCheckingAuth",
+          sends: [authEvents.MONITOR_TICK],
+          fn: () => undefined,
+        });
+        m.effect(authStates.loggedIn, {
+          name: "monitorLoggedIn",
+          sends: [authEvents.MONITOR_TICK],
+          fn: () => undefined,
+        });
+        m.effect(authStates.signingIn, {
+          name: "signInWithPhone",
+          sends: [signInDoneEvent, signInErrorEvent],
+          fn: () => undefined,
+        });
+        m.effect(authStates.signingOut, {
+          name: "signOut",
+          sends: [authEvents.SIGNING_OUT_DONE],
+          fn: () => undefined,
+        });
+        m.onAny({ event: authEvents.MONITOR_TICK, handler: () => ({}) });
+        m.on(authStates.checkingAuth, {
+          event: signInEvent,
+          to: [authStates.signingIn],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.phoneNumber = event.payload.phoneNumber;
+            context.set(current);
+            return { state: authStates.signingIn };
+          },
+        });
+        m.on(authStates.loggedOut, {
+          event: signInEvent,
+          to: [authStates.signingIn],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.phoneNumber = event.payload.phoneNumber;
+            context.set(current);
+            return { state: authStates.signingIn };
+          },
+        });
+        m.on(authStates.signingIn, {
+          event: signInDoneEvent,
+          to: [authStates.loggedIn],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.user = event.payload.user;
+            context.set(current);
+            return { state: authStates.loggedIn };
+          },
+        });
+        m.on(authStates.signingIn, {
+          event: signInErrorEvent,
+          to: [authStates.signInError],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.error = event.payload.error;
+            context.set(current);
+            return { state: authStates.signInError };
+          },
+        });
+        m.on(authStates.loggedIn, {
+          event: authEvents.SIGN_OUT,
+          to: [authStates.signingOut],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.user = undefined;
+            current.phoneNumber = undefined;
+            context.set(current);
+            return { state: authStates.signingOut };
+          },
+        });
+        m.on(authStates.signingOut, {
+          event: authEvents.SIGNING_OUT_DONE,
+          to: [authStates.loggedOut],
+          handler: () => ({
+            state: authStates.loggedOut,
+          }),
+        });
+        m.on(authStates.signInError, {
+          event: authEvents.RETRY,
+          to: [authStates.signingIn],
+          handler: () => ({ state: authStates.signingIn }),
+        });
+        m.on(authStates.signInError, {
+          event: signInEvent,
+          to: [authStates.signingIn],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.phoneNumber = event.payload.phoneNumber;
+            context.set(current);
+            return { state: authStates.signingIn };
+          },
+        });
+      },
+    });
+  },
+});

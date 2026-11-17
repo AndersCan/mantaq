@@ -7,7 +7,6 @@ import { basename, dirname, join } from "node:path";
 import { afterEach, expect } from "vite-plus/test";
 import { isActor, messageOf } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
-import { machineId } from "./inspect.ts";
 import { RUN_DROPPED, normalizeRun } from "./runs.ts";
 
 interface Recorded {
@@ -94,15 +93,6 @@ function flush(testPath: string, id: string, run: Recorded, runs: Map<string, Re
   writeFileSync(file, textOf(runs));
 }
 
-function extraKeys(args: readonly unknown[]): string[] {
-  const [only] = args;
-  if (args.length !== 1 || typeof only !== "object" || only === null) return [];
-  const proto = Object.getPrototypeOf(only);
-  if (proto !== Object.prototype && proto !== null) return [];
-  if ("now" in only && "advance" in only) return []; // a bare clock, not options
-  return Object.keys(only).filter((key) => key !== "clock");
-}
-
 /** Empty when the run replays to the same end on `{ clock }` alone, else the reason. */
 function replayProblem(each: Pending, run: Recorded): string {
   if (each.extra.length === 0) return "";
@@ -162,42 +152,17 @@ afterEach(({ task }) => {
 });
 
 /**
- * Wrap a machine factory in a vitest test file so every passing test that
+ * Wrap a `machine(...)` in a vitest test file so every passing test that
  * builds an actor with it is recorded to `__runs__/<test file>.json` next to
  * the test: the events it handled and how far its clock moved. Run the whole
  * file to refresh it; with `CI` set a stale file fails the test instead.
- * The factory may be called in the test or in `beforeEach`. A retried test is
- * recorded once, from the attempt that passed. A test that passes options
- * besides `clock` is replayed on the factory with only `{ clock }`, as the
- * page does; if it ends elsewhere, the run is not recorded and the test fails.
- */
-export function recordRuns<F extends (...args: never[]) => Made>(factory: F): F;
-/**
- * Wrap a `machine(...)` the same way: `create` runs on a VirtualClock unless
- * the test passes one, and a run replays as `machine.create({ clock })`.
+ * `create` runs on a VirtualClock unless the test passes one. The machine may
+ * be built in the test or in `beforeEach`. A retried test is recorded once,
+ * from the attempt that passed. A test that passes options besides `clock` is
+ * replayed as `machine.create({ clock })`, as the page does; if it ends
+ * elsewhere, the run is not recorded and the test fails.
  */
 export function recordRuns<Id extends string, Options extends object, M extends Made>(
-  machine: Machine<Id, Options, M>,
-): Machine<Id, Options, M>;
-export function recordRuns(
-  source: ((...args: never[]) => Made) | Machine,
-): ((...args: never[]) => Made) | Machine {
-  if (typeof source !== "function") return recordedMachine(source);
-  const id = machineId(source.name);
-  const wrapped = (...args: never[]) => {
-    const made = source(...args);
-    track(made, {
-      id,
-      extra: extraKeys(args),
-      replay: (clock) => Reflect.apply(source, undefined, [{ clock }]),
-    });
-    return made;
-  };
-  Object.defineProperty(wrapped, "name", { value: source.name });
-  return wrapped;
-}
-
-function recordedMachine<Id extends string, Options extends object, M extends Made>(
   machine: Machine<Id, Options, M>,
 ): Machine<Id, Options, M> {
   const untyped: Machine = machine;

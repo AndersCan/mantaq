@@ -1,6 +1,6 @@
 // Place in packages/inspect/src/vite.test.ts (or as its own file in packages/inspect/src).
 // Fails when the `.preview.ts` filter in machineFiles is removed:
-// the dev server then SSR-loads the preview file and warns "no exported actor or actor factory found".
+// the dev server then SSR-loads the preview file and warns "no exported machine(...) found".
 import { mantaqViz } from "./vite.ts";
 import { join } from "node:path";
 import { createLogger, createServer } from "vite";

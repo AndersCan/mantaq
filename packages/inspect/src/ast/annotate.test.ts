@@ -1,10 +1,11 @@
+import { VirtualClock } from "@mantaq/core";
 import { toVizMachine } from "../structure.ts";
 import { EXAMPLE_ROOT, exampleTargets } from "../examples.ts";
-import { createCheckoutActor } from "../fixtures/checkout.ts";
-import { createCreditActor } from "../fixtures/credit.ts";
-import { createDocumentedActor } from "../fixtures/documented.ts";
-import { createSagaActor } from "../fixtures/saga.ts";
-import { createStateRoutingActor } from "../fixtures/state-routing.ts";
+import { checkout } from "../fixtures/checkout.ts";
+import { credit } from "../fixtures/credit.ts";
+import { documented } from "../fixtures/documented.ts";
+import { saga as sagaMachine } from "../fixtures/saga.ts";
+import { stateRouting } from "../fixtures/state-routing.ts";
 import type { VizExplanation, VizMachine } from "@mantaq/viz";
 import { annotateMachine } from "./annotate.ts";
 import { join } from "node:path";
@@ -24,7 +25,7 @@ function analyzed(explanation: VizExplanation | null | undefined) {
 }
 
 describe("AST: conditional handler (credit)", () => {
-  const machine = annotated("credit", createCreditActor());
+  const machine = annotated("credit", credit.create({ clock: VirtualClock() }));
   const apply = machine.edges.find((edge) => edge.event === "apply");
 
   test("the graph has every declared branch; the AST explains all three", () => {
@@ -49,7 +50,7 @@ describe("AST: conditional handler (credit)", () => {
     expect(explanation?.location).toEqual({
       file: "packages/inspect/src/fixtures/credit.ts",
       line: expect.any(Number),
-      column: 7,
+      column: 9,
     });
     expect(explanation?.registration).toBe("on");
     expect(explanation?.payloadReads).toEqual(["amount", "score"]);
@@ -91,7 +92,7 @@ describe("AST: conditional handler (credit)", () => {
 
 describe("AST: examples", () => {
   test("onAny handler reading live actor state is flagged, explained on the any-state edges", () => {
-    const machine = annotated("state-routing", createStateRoutingActor());
+    const machine = annotated("state-routing", stateRouting.create({ clock: VirtualClock() }));
     const back = machine.edges.filter((edge) => edge.event === "back");
     expect(back.map((edge) => edge.from)).toEqual(["*", "*"]);
     for (const edge of back) {
@@ -108,7 +109,7 @@ describe("AST: examples", () => {
   });
 
   test("checkout back: per-state handlers read no actor state", () => {
-    const machine = annotated("checkout", createCheckoutActor());
+    const machine = annotated("checkout", checkout.create({ clock: VirtualClock() }));
     const back = machine.edges.filter((edge) => edge.event === "back");
     expect(back.length).toBe(3);
     for (const edge of back) {
@@ -118,7 +119,7 @@ describe("AST: examples", () => {
   });
 
   test("saga: specific `on` wins over onAny; payload paths are dotted", () => {
-    const machine = annotated("saga", createSagaActor());
+    const machine = annotated("saga", sagaMachine.create({ clock: VirtualClock() }));
     const reserved = machine.edges.find((edge) => edge.event === "INVENTORY_RESERVED");
     expect(analyzed(reserved?.explanation)?.payloadReads).toEqual(["result.reservationId"]);
     expect(analyzed(reserved?.explanation)?.registration).toBe("on");
@@ -142,7 +143,7 @@ describe("AST: examples", () => {
 });
 
 describe("AST: JSDoc becomes doc", () => {
-  const machine = annotated("documented", createDocumentedActor());
+  const machine = annotated("documented", documented.create({ clock: VirtualClock() }));
 
   test("documented state, event and handler carry their text", () => {
     expect(machine.states.find((state) => state.id === "waiting")?.doc).toBe(

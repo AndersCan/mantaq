@@ -3,7 +3,7 @@ import { expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
 import { execute } from "./fuzz/run.ts";
 import { normalizeRun } from "./runs.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { checkout } from "./fixtures/checkout.ts";
 import { withTimeout } from "@mantaq/sugar";
 
 const idle = state("idle")();
@@ -35,9 +35,9 @@ function create() {
     },
   });
   return {
-    actor: createCheckoutActor(clock),
+    actor: checkout.create({ clock }),
     clock,
-    made: { actor: createCheckoutActor(clock), timer },
+    made: { actor: checkout.create({ clock }), timer },
   };
 }
 
@@ -96,7 +96,7 @@ test("replaying a recorded run disposes the returned machine", () => {
   clocks.length = 0;
   normalizeRun(
     { id: "x", create },
-    { name: "r", steps: [startTimer], end: createCheckoutActor().state.name },
+    { name: "r", steps: [startTimer], end: checkout.create({ clock: VirtualClock() }).state.name },
   );
   expect(pending()).toEqual([0]);
 });

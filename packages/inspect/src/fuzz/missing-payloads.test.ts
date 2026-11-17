@@ -1,4 +1,5 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, event, machine, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { fuzz } from "./fuzz.ts";
 import { execute } from "./run.ts";
@@ -13,7 +14,7 @@ const probe = event("probe")<{ flag?: boolean }>();
 const go = event("go")();
 const keep = event("keep")<{ x?: number }>();
 
-function createLockActor(clock: VirtualClock = VirtualClock()) {
+function createLockActor(clock: Clock) {
   return Actor({
     clock,
     inputs: [lockSet, probe, go],
@@ -34,6 +35,8 @@ function createLockActor(clock: VirtualClock = VirtualClock()) {
     },
   });
 }
+
+const lockMachine = machine("lock", { create: ({ clock }) => createLockActor(clock) });
 
 function lockTarget(payloads?: FuzzTarget["payloads"]): FuzzTarget {
   return {
@@ -115,7 +118,7 @@ describe("fuzz and inspect collect them", () => {
   });
 
   test("inspect: one exact warning per event, and the same list on the result", () => {
-    const { warnings, missingPayloads } = inspect({ id: "lock", create: () => createLockActor() });
+    const { warnings, missingPayloads } = inspect({ machine: lockMachine });
     expect(missingPayloads).toEqual([
       { event: "lockSet", fields: ["lockOn"] },
       { event: "probe", fields: ["flag"] },
@@ -128,8 +131,7 @@ describe("fuzz and inspect collect them", () => {
 
   test("inspect with payloads: neither warning nor list", () => {
     const { warnings, missingPayloads } = inspect({
-      id: "lock",
-      create: () => createLockActor(),
+      machine: lockMachine,
       payloads: { lockSet: [{ lockOn: true }], probe: [{ flag: true }] },
     });
     expect(missingPayloads).toEqual([]);
@@ -138,8 +140,7 @@ describe("fuzz and inspect collect them", () => {
 
   test("inspect with fuzzing off: nothing missing", () => {
     const { missingPayloads } = inspect({
-      id: "lock",
-      create: () => createLockActor(),
+      machine: lockMachine,
       fuzz: false,
     });
     expect(missingPayloads).toEqual([]);

@@ -1,7 +1,7 @@
 import { VirtualClock } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createKitchen } from "./fixtures/kitchen.ts";
+import { kitchen as kitchenMachine } from "./fixtures/kitchen.ts";
 import { toViz } from "./structure.ts";
 import { normalizeRun } from "./runs.ts";
 import { execute } from "./fuzz/run.ts";
@@ -9,7 +9,7 @@ import { Either } from "@mantaq/utils";
 
 function kitchen() {
   const clock = VirtualClock();
-  const made = createKitchen({ clock });
+  const made = kitchenMachine.create({ clock });
   return { actor: made.actor, clock, made };
 }
 

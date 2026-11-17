@@ -1,12 +1,12 @@
 import { VirtualClock } from "@mantaq/core";
 import { createDriver } from "./drive.ts";
-import { createKitchen } from "./fixtures/kitchen-typed.ts";
+import { kitchen as kitchenMachine } from "./fixtures/kitchen-typed.ts";
 import { inspectModule } from "./inspect.ts";
 import { expect, test } from "vite-plus/test";
 
 function kitchen() {
   const clock = VirtualClock();
-  const made = createKitchen({ clock });
+  const made = kitchenMachine.create({ clock });
   return { actor: made.actor, clock, made };
 }
 

@@ -1,4 +1,4 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 /** The actor waits for a request. */
 const waitingForRequest = state("waitingForRequest")();
@@ -9,25 +9,27 @@ const requestArrived = event("requestArrived")();
 /** The request was handled. */
 const requestHandled = event("requestHandled")();
 
-export function createCleanActor(clock: VirtualClock = VirtualClock()) {
-  return Actor({
-    clock,
-    inputs: [requestArrived, requestHandled],
-    states: [waitingForRequest, handlingRequest],
-    initial: waitingForRequest,
-    setup: (m) => {
-      /** The request is handled now. */
-      m.on(waitingForRequest, {
-        event: requestArrived,
-        to: [handlingRequest],
-        handler: () => ({ state: handlingRequest }),
-      });
-      /** The actor waits for the next request. */
-      m.on(handlingRequest, {
-        event: requestHandled,
-        to: [waitingForRequest],
-        handler: () => ({ state: waitingForRequest }),
-      });
-    },
-  });
-}
+export const clean = machine("clean", {
+  create: ({ clock }) => {
+    return Actor({
+      clock,
+      inputs: [requestArrived, requestHandled],
+      states: [waitingForRequest, handlingRequest],
+      initial: waitingForRequest,
+      setup: (m) => {
+        /** The request is handled now. */
+        m.on(waitingForRequest, {
+          event: requestArrived,
+          to: [handlingRequest],
+          handler: () => ({ state: handlingRequest }),
+        });
+        /** The actor waits for the next request. */
+        m.on(handlingRequest, {
+          event: requestHandled,
+          to: [waitingForRequest],
+          handler: () => ({ state: waitingForRequest }),
+        });
+      },
+    });
+  },
+});

@@ -1,4 +1,5 @@
-/** Only an actor instance: drawn, never fuzzed. */
-import { createRetryActor } from "./retry.ts";
+/** Only an actor instance: it cannot be recreated, so it is not a machine. */
+import { VirtualClock } from "@mantaq/core";
+import { retry as retryMachine } from "./retry.ts";
 
-export const retry = createRetryActor();
+export const retry = retryMachine.create({ clock: VirtualClock() });

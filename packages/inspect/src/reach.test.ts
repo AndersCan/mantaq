@@ -1,4 +1,5 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, state, machine as asMachine } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { inspect } from "./inspect.ts";
 import { expectAllStatesReached, expectReached, missedReach, reachedStates } from "./reach.ts";
@@ -9,9 +10,9 @@ const done = state("done")();
 const go = event("go")();
 const finish = event("finish")();
 
-function createActor() {
+function createActor(clock: Clock) {
   return Actor({
-    clock: VirtualClock(),
+    clock,
     inputs: [go, finish],
     states: [idle, running, done],
     initial: idle,
@@ -25,9 +26,9 @@ function createActor() {
 const evA = event("a")<{ x: number; z: number }>();
 const evB = event("b")<{ y: number }>();
 
-function createTwoActor() {
+function createTwoActor(clock: Clock) {
   return Actor({
-    clock: VirtualClock(),
+    clock,
     inputs: [evA, evB],
     states: [idle],
     initial: idle,
@@ -42,17 +43,23 @@ function createTwoActor() {
   });
 }
 
-const target = { id: "flow", create: () => createActor(), fuzz: { iterations: 300 } };
-const structureOnly = { id: "flow", create: () => createActor(), fuzz: false as const };
+const target = {
+  machine: asMachine("flow", { create: ({ clock }) => createActor(clock) }),
+  fuzz: { iterations: 300 },
+};
+const structureOnly = {
+  machine: asMachine("flow", { create: ({ clock }) => createActor(clock) }),
+  fuzz: false as const,
+};
 const goOnly = [{ name: "go", steps: [{ kind: "event" as const, event: "go", payload: null }] }];
 
 const lockOn = event("lockSet")<{ lockOn: boolean }>();
 const off = state("off")();
 const on = state("on")();
 
-function createLockActor(handler: (lockOn: boolean | undefined) => boolean) {
+function createLockActor(clock: Clock, handler: (lockOn: boolean | undefined) => boolean) {
   return Actor({
-    clock: VirtualClock(),
+    clock,
     inputs: [lockOn],
     states: [off, on],
     initial: off,
@@ -73,32 +80,38 @@ const lockPayloads = { lockSet: [{ lockOn: true }, { lockOn: false }] };
 
 describe("a check whose events were fuzzed without a payload", () => {
   test("a state only an empty payload reaches is the refusal, not a pass", () => {
-    const create = () => createLockActor((flag) => flag === false);
-    expect(() => expectAllStatesReached({ id: "lock", create })).toThrow(refusal);
-    expect(() =>
-      expectAllStatesReached({ id: "lock", create, payloads: lockPayloads }),
-    ).not.toThrow();
+    const create = asMachine("lock", {
+      create: ({ clock }) => createLockActor(clock, (flag) => flag === false),
+    });
+    expect(() => expectAllStatesReached({ machine: create })).toThrow(refusal);
+    expect(() => expectAllStatesReached({ machine: create, payloads: lockPayloads })).not.toThrow();
   });
 
   test("a miss follows the refusal after a blank line", () => {
-    const create = () => createLockActor((flag) => flag === true);
-    expect(() => expectAllStatesReached({ id: "lock", create })).toThrow(
+    const create = asMachine("lock", {
+      create: ({ clock }) => createLockActor(clock, (flag) => flag === true),
+    });
+    expect(() => expectAllStatesReached({ machine: create })).toThrow(
       new RegExp(
         `^${refusal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\n\nlock missed 1 expected reach:`,
       ),
     );
-    expect(() =>
-      expectAllStatesReached({ id: "lock", create, payloads: lockPayloads }),
-    ).not.toThrow();
+    expect(() => expectAllStatesReached({ machine: create, payloads: lockPayloads })).not.toThrow();
   });
 
   test("expectReached stops the same way", () => {
-    const create = () => createLockActor((flag) => flag === false);
-    expect(() => expectReached({ id: "lock", create }, { states: ["on"] })).toThrow(refusal);
+    const create = asMachine("lock", {
+      create: ({ clock }) => createLockActor(clock, (flag) => flag === false),
+    });
+    expect(() => expectReached({ machine: create }, { states: ["on"] })).toThrow(refusal);
   });
 
   test("names every event, in event order, when there are several", () => {
-    expect(() => expectAllStatesReached({ id: "two", create: createTwoActor })).toThrow(
+    expect(() =>
+      expectAllStatesReached({
+        machine: asMachine("two", { create: ({ clock }) => createTwoActor(clock) }),
+      }),
+    ).toThrow(
       "two: fuzzing had no payload for 2 events the machine reads, so this check proves nothing yet:\n  - a: read x, z\n  - b: read y\nPass `source` (payloads from the event types) or `payloads: { a: [...], b: [...] }` with a real payload for each case.",
     );
   });

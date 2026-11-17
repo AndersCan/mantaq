@@ -1,5 +1,5 @@
 /** Context and payload fields of every input kind the live page asks for. */
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 interface LinkContext {
   /** The album. */
@@ -22,24 +22,26 @@ const choose = event("choose")<{
 const submit = event("submit")<{ code: string }>();
 const touch = event("touch")();
 
-export function createFieldsActor(clock: VirtualClock = VirtualClock()) {
-  const initialContext: LinkContext = {
-    folderId: "f1",
-    validFor: "10m",
-    count: 0,
-    enabled: true,
-    fn: () => undefined,
-  };
-  return Actor({
-    inputs: [choose, submit, touch],
-    states: [idle, done],
-    initial: idle,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      m.on(idle, { event: choose, handler: () => ({}) });
-      m.on(idle, { event: submit, to: [done], handler: () => ({ state: done }) });
-      m.on(idle, { event: touch, handler: () => ({}) });
-    },
-  });
-}
+export const fields = machine("fields", {
+  create: ({ clock }) => {
+    const initialContext: LinkContext = {
+      folderId: "f1",
+      validFor: "10m",
+      count: 0,
+      enabled: true,
+      fn: () => undefined,
+    };
+    return Actor({
+      inputs: [choose, submit, touch],
+      states: [idle, done],
+      initial: idle,
+      clock,
+      context: initialContext,
+      setup: (m) => {
+        m.on(idle, { event: choose, handler: () => ({}) });
+        m.on(idle, { event: submit, to: [done], handler: () => ({ state: done }) });
+        m.on(idle, { event: touch, handler: () => ({}) });
+      },
+    });
+  },
+});

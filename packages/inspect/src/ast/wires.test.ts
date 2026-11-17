@@ -1,9 +1,9 @@
-import { createReceiverActor } from "../fixtures/wired/receiver.ts";
-import { createSenderActor } from "../fixtures/wired/sender.ts";
+import { receiverMachine } from "../fixtures/wired/receiver.ts";
+import { sender as senderMachine } from "../fixtures/wired/sender.ts";
 import { inspectModule } from "../inspect.ts";
-import { createDuoActor } from "../fixtures/wired-unheard/duo.ts";
-import { createQuietActor } from "../fixtures/wired/quiet.ts";
-import { createSketchActor } from "../fixtures/wired/sketch.ts";
+import { duo as duoMachine } from "../fixtures/wired-unheard/duo.ts";
+import { quiet as quietMachine } from "../fixtures/wired/quiet.ts";
+import { sketch as sketchMachine } from "../fixtures/wired/sketch.ts";
 import { findWires, scanAppCode } from "./wires.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,11 +18,11 @@ const quiet = join(DIR, "quiet.ts");
 
 async function machines() {
   const sender = await inspectModule(files[0] ?? "", {
-    load: async () => ({ createSenderActor }),
+    load: async () => ({ sender: senderMachine }),
     fuzz: false,
   });
   const receiver = await inspectModule(files[1] ?? "", {
-    load: async () => ({ createReceiverActor }),
+    load: async () => ({ receiverMachine }),
     fuzz: false,
   });
   return [...sender.machines, ...receiver.machines];
@@ -40,33 +40,29 @@ function readLines(): string[] {
 describe("scanAppCode", () => {
   test("lists the machine only a test and a type use mention, and keeps the wires", async () => {
     const sketched = await inspectModule(sketch, {
-      load: async () => ({ createSketchActor }),
+      load: async () => ({ sketch: sketchMachine }),
       fuzz: false,
     });
     const all = [...(await machines()), ...sketched.machines];
     const scanned = scanAppCode({ root: ROOT, files: [...files, sketch], machines: all });
-    expect(scanned.notRun).toEqual([
-      { id: "sketch", factory: "createSketchActor", file: "wired/sketch.ts" },
-    ]);
+    expect(scanned.notRun).toEqual([{ id: "sketch", factory: "sketch", file: "wired/sketch.ts" }]);
     expect(scanned.wires).toEqual(findWires({ root: ROOT, files, machines: all }));
     expect(scanned.wires).toHaveLength(3);
   });
 
   test("lists the output no listener hears, hearing every output of an unguarded listener", async () => {
     const sketched = await inspectModule(sketch, {
-      load: async () => ({ createSketchActor }),
+      load: async () => ({ sketch: sketchMachine }),
       fuzz: false,
     });
     const quieted = await inspectModule(quiet, {
-      load: async () => ({ createQuietActor }),
+      load: async () => ({ quiet: quietMachine }),
       fuzz: false,
     });
     const all = [...(await machines()), ...sketched.machines, ...quieted.machines];
     const scanned = scanAppCode({ root: ROOT, files: [...files, sketch, quiet], machines: all });
     expect(scanned.unheard).toEqual([{ id: "quiet", outputs: ["unheard"] }]);
-    expect(scanned.notRun).toEqual([
-      { id: "sketch", factory: "createSketchActor", file: "wired/sketch.ts" },
-    ]);
+    expect(scanned.notRun).toEqual([{ id: "sketch", factory: "sketch", file: "wired/sketch.ts" }]);
     expect(scanned.wires).toHaveLength(3);
   });
 
@@ -81,11 +77,11 @@ describe("scanAppCode", () => {
     try {
       writeFileSync(
         join(dir, "use.ts"),
-        'import { createSketchActor as make } from "../sketch.ts";\nexport const list = [1].map(() => make());\n',
+        'import { sketch as make } from "../sketch.ts";\nexport const list = [1].map(() => make.create());\n',
       );
       writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
       const sketched = await inspectModule(sketch, {
-        load: async () => ({ createSketchActor }),
+        load: async () => ({ sketch: sketchMachine }),
         fuzz: false,
       });
       const scanned = scanAppCode({
@@ -104,7 +100,7 @@ describe("scanAppCode unheard outputs", () => {
   const UNHEARD = join(ROOT, "wired-unheard");
   const duo = join(UNHEARD, "duo.ts");
   const header =
-    'import { createDuoActor } from "../duo.ts";\nconst actor = createDuoActor();\nfunction note(): void {}\n';
+    'import { duo } from "../duo.ts";\nconst actor = duo.create();\nfunction note(): void {}\n';
 
   async function unheardWith(listeners: string | null) {
     const dir = mkdtempSync(join(UNHEARD, "tmp-"));
@@ -112,7 +108,7 @@ describe("scanAppCode unheard outputs", () => {
       writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
       if (listeners !== null) writeFileSync(join(dir, "use.ts"), header + listeners);
       const duoed = await inspectModule(duo, {
-        load: async () => ({ createDuoActor }),
+        load: async () => ({ duo: duoMachine }),
         fuzz: false,
       });
       const used = listeners === null ? [] : [join(dir, "use.ts")];

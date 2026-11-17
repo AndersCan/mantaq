@@ -1,9 +1,10 @@
+import { VirtualClock } from "@mantaq/core";
 // @vitest-environment happy-dom
 import { toViz } from "../structure.ts";
 import { exampleInputs, exampleTargets } from "../examples.ts";
 import { DEFAULT_SEED } from "@mantaq/pbt";
 
-import { createCheckoutActor } from "../fixtures/checkout.ts";
+import { checkout as checkoutMachine } from "../fixtures/checkout.ts";
 import type { VizDocument } from "@mantaq/viz";
 import { fuzz } from "../fuzz/fuzz.ts";
 import { fuzzedMachine } from "../fuzz/to-viz.ts";
@@ -19,7 +20,7 @@ function mount(viz: VizDocument, options: Parameters<typeof mountViewer>[2] = {}
 }
 
 function checkout(): VizDocument {
-  return toViz([{ id: "checkout", actor: createCheckoutActor() }]);
+  return toViz([{ id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) }]);
 }
 
 /** Checkout as an undeclared actor would export it: `back` targets unknown. */

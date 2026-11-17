@@ -1,11 +1,11 @@
 /** App code that connects the sender to the receiver. */
 import { poke, receiver, receiverActor, take } from "./receiver.ts";
-import type { createReceiverActor } from "./receiver.ts";
+import type { receiverMachine } from "./receiver.ts";
 import { senderActor } from "./sender.ts";
-import type { createSenderActor } from "./sender.ts";
+import type { sender } from "./sender.ts";
 
 function onOutput(
-  actor: ReturnType<typeof createSenderActor>,
+  actor: ReturnType<typeof sender.create>,
   listener: (output: { type: string }) => void,
 ): void {
   actor.on("output", { fn: listener });
@@ -26,8 +26,8 @@ function relay() {
 senderActor.on("change", { fn: () => relay() });
 
 export function wire(
-  s: ReturnType<typeof createSenderActor>,
-  r: ReturnType<typeof createReceiverActor>,
+  s: ReturnType<typeof sender.create>,
+  r: ReturnType<typeof receiverMachine.create>,
 ) {
   s.on("output", { fn: () => r.send(take.create()) });
 }

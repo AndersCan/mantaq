@@ -21,7 +21,7 @@ afterAll(() => rmSync(SCRATCH, { recursive: true, force: true }));
 function testFile(
   dir: string,
   body: string,
-  { fixture, factory } = { fixture: join(HERE, "fixtures/timed.ts"), factory: "createTimedActor" },
+  { fixture, factory } = { fixture: join(HERE, "fixtures/timed.ts"), factory: "timed" },
 ): string {
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -52,19 +52,19 @@ function run(dir: string, env: Record<string, string>): { ok: boolean; output: s
 const PASSING = `
 test("one", () => {
   const clock = VirtualClock();
-  const actor = make(clock);
+  const actor = make.create({ clock });
   actor.send({ type: "start" });
   clock.advance(800);
   expect(actor.state.name).toBe("error");
 });
 test("fails", () => {
-  const actor = make();
+  const actor = make.create();
   actor.send({ type: "start" });
   expect(actor.state.name).toBe("idle");
 });
 test("two actors", () => {
-  make();
-  make().send({ type: "start" });
+  make.create();
+  make.create().send({ type: "start" });
 });
 `;
 
@@ -105,7 +105,7 @@ describe("recordRuns", () => {
     const file = testFile(
       dir,
       `test("loop", () => {
-  const actor = make();
+  const actor = make.create();
   actor.send({ type: "start", payload: 10n } as never);
 });`,
     );
@@ -119,8 +119,8 @@ describe("recordRuns", () => {
     const file = testFile(
       dir,
       `import { beforeEach } from "vitest";
-let actor: ReturnType<typeof make>;
-beforeEach(() => { actor = make(); });
+let actor: ReturnType<typeof make.create>;
+beforeEach(() => { actor = make.create(); });
 test("hooked", () => { actor.send({ type: "start" }); });`,
     );
     const result = run(dir, {});
@@ -135,7 +135,7 @@ test("hooked", () => { actor.send({ type: "start" }); });`,
       dir,
       `let tries = 0;
 test("flaky", { retry: 2 }, () => {
-  make().send({ type: "start" });
+  make.create().send({ type: "start" });
   tries += 1;
   expect(tries).toBe(2);
 });`,
@@ -149,8 +149,8 @@ test("flaky", { retry: 2 }, () => {
     const dir = join(SCRATCH, "lossy");
     const file = testFile(
       dir,
-      `test("map", () => { make().send({ type: "start", payload: new Map() } as never); });
-test("empty", () => { make().send({ type: "start", payload: {} } as never); });`,
+      `test("map", () => { make.create().send({ type: "start", payload: new Map() } as never); });
+test("empty", () => { make.create().send({ type: "start", payload: {} } as never); });`,
     );
     const result = run(dir, {});
     expect(result.output).toContain('"map" not recorded, payload is not JSON');
@@ -218,15 +218,15 @@ test("empty", () => { make().send({ type: "start", payload: {} } as never); });`
 describe("recordRuns replays a test that passes options", () => {
   const door = {
     fixture: join(HERE, "fixtures/locked-door.ts"),
-    factory: "createLockedDoorActor",
+    factory: "lockedDoor",
   };
-  const unlocked = `test("unlocked", () => { const actor = make({ clock: VirtualClock() }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("openedDoor"); });`;
+  const unlocked = `test("unlocked", () => { const actor = make.create({ clock: VirtualClock() }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("openedDoor"); });`;
 
   test("ends elsewhere on the defaults: the test fails and the run is not recorded", () => {
     const dir = join(SCRATCH, "replay-differs");
     const file = testFile(
       dir,
-      `test("locked", () => { const actor = make({ clock: VirtualClock(), locked: true }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("lockedOut"); });
+      `test("locked", () => { const actor = make.create({ clock: VirtualClock(), locked: true }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("lockedOut"); });
 ${unlocked}`,
       door,
     );
@@ -246,7 +246,7 @@ ${unlocked}`,
     const dir = join(SCRATCH, "replay-same");
     const file = testFile(
       dir,
-      `test("open", () => { const actor = make({ clock: VirtualClock(), locked: false }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("openedDoor"); });`,
+      `test("open", () => { const actor = make.create({ clock: VirtualClock(), locked: false }); actor.send({ type: "pushDoor" }); expect(actor.state.name).toBe("openedDoor"); });`,
       door,
     );
     expect(run(dir, {}).ok).toBe(true);

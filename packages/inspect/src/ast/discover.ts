@@ -4,23 +4,16 @@ import { fieldsOf, samplesOf } from "./payloads.ts";
 import type { LoadedSource } from "./program.ts";
 
 /**
- * How to get a fresh actor from an export, read from its type alone (nothing
- * is called to find out):
- * - `instance`: the export is an actor. It cannot be recreated, so it is
- *   drawn but not fuzzed.
- * - `call`: call it with no arguments.
- * - `clock`: call it with a VirtualClock.
- * - `options`: call it with `{ clock: VirtualClock }`.
- * - `machine`: a `machine(id, { create })` value; `id` is its literal id and
- *   `create({ clock })` builds the actor on the clock inspect hands in.
+ * A `machine(id, { create })` export, read from its type alone (nothing is
+ * called to find out): `id` is its literal id and `create({ clock })` builds
+ * the actor on the clock inspect hands in.
  *
  * `unwrap`: the result is the actor (`self`) or carries it as `.actor`.
  */
 export interface MachineExport {
   name: string;
-  call: "instance" | "call" | "clock" | "options" | "machine";
-  /** The literal id of a `machine(id, …)` export. Absent for the other kinds. */
-  id?: string;
+  /** The literal id of the `machine(id, …)` export. */
+  id: string;
   unwrap: "self" | "actor";
   /** Fields of the actor's context type. null = no declared fields, or not an object type. */
   context: VizField[] | null;
@@ -31,7 +24,6 @@ export interface MachineExport {
 }
 
 const ACTOR_KEYS = ["send", "snapshot", "inject", "settled"];
-const CLOCK_KEYS = ["setTimeout", "clearTimeout", "now"];
 
 function hasAll(type: ts.Type, keys: ReadonlyArray<string>): boolean {
   return keys.every((key) => type.getProperty(key) !== undefined);
@@ -170,36 +162,6 @@ function fieldsFromTypes(
   return Object.fromEntries(entries);
 }
 
-function isRequired(parameter: ts.Symbol): boolean {
-  const declaration = parameter.valueDeclaration;
-  return (
-    declaration !== undefined &&
-    ts.isParameter(declaration) &&
-    declaration.questionToken === undefined &&
-    declaration.initializer === undefined &&
-    declaration.dotDotDotToken === undefined
-  );
-}
-
-/** How to call a factory so its actor runs on a clock we control, or null when it cannot be called bare. */
-function callOf(
-  checker: ts.TypeChecker,
-  signature: ts.Signature,
-  node: ts.Node,
-): MachineExport["call"] | null {
-  const [first, ...rest] = signature.parameters;
-  if (rest.some(isRequired)) return null;
-  if (first === undefined) return "call";
-  const type = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(first, node));
-  if (hasAll(type, CLOCK_KEYS)) return "clock";
-  const clock = type.getProperty("clock");
-  if (clock !== undefined) {
-    const clockType = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(clock, node));
-    if (hasAll(clockType, CLOCK_KEYS)) return "options";
-  }
-  return isRequired(first) ? null : "call";
-}
-
 /** A `machine(id, { create })` value, read from the literal `id` and the actor `create` returns. */
 function machineValue(
   checker: ts.TypeChecker,
@@ -220,7 +182,6 @@ function machineValue(
   const at = { type: returned, unwrap, node };
   return {
     name,
-    call: "machine",
     id: id.value,
     unwrap,
     context: contextOf(checker, at),
@@ -237,45 +198,15 @@ function machineExport(
   const target =
     symbol.getFlags() & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
   const type = checker.getTypeOfSymbolAtLocation(target, node);
-  const name = symbol.getName();
-  const made = machineValue(checker, { type, name, node });
-  if (made !== undefined) return made;
-  const self = unwrapOf(checker, type, node);
-  if (self !== null) {
-    return {
-      name,
-      call: "instance",
-      unwrap: self,
-      context: contextOf(checker, { type, unwrap: self, node }),
-      samples: samplesFromTypes(checker, { type, unwrap: self, node }),
-      fields: fieldsFromTypes(checker, { type, unwrap: self, node }),
-    };
-  }
-  for (const signature of checker.getSignaturesOfType(type, ts.SignatureKind.Call)) {
-    const unwrap = unwrapOf(checker, signature.getReturnType(), node);
-    const call = unwrap === null ? null : callOf(checker, signature, node);
-    if (unwrap !== null && call !== null) {
-      const returned = signature.getReturnType();
-      const at = { type: returned, unwrap, node };
-      return {
-        name,
-        call,
-        unwrap,
-        context: contextOf(checker, at),
-        samples: samplesFromTypes(checker, at),
-        fields: fieldsFromTypes(checker, at),
-      };
-    }
-  }
-  return null;
+  return machineValue(checker, { type, name: symbol.getName(), node }) ?? null;
 }
 
-/** Exports of the file that are actors or build one, in source order. When any is a `machine(...)`, only those count. */
+/** The `machine(...)` exports of the file, in source order. Nothing else counts: no factory, no bare actor. */
 export function machineExports(loaded: LoadedSource): MachineExport[] {
   const { checker, sourceFile } = loaded;
   const module = checker.getSymbolAtLocation(sourceFile);
   if (module === undefined) return [];
-  const all = checker
+  return checker
     .getExportsOfModule(module)
     .flatMap((symbol) => {
       const found = machineExport(checker, symbol, sourceFile);
@@ -283,6 +214,4 @@ export function machineExports(loaded: LoadedSource): MachineExport[] {
     })
     .sort((left, right) => left.at - right.at)
     .map(({ found }) => found);
-  const machines = all.filter((found) => found.call === "machine");
-  return machines.length > 0 ? machines : all;
 }

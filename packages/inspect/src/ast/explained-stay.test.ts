@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { meal9 } from "../../../../apps/docs/src/tutorial/meal-09.ts";
 import { EXAMPLE_ROOT } from "../examples.ts";
-import { createCreditActor } from "../fixtures/credit.ts";
+import { credit as creditMachine } from "../fixtures/credit.ts";
 import { toVizMachine } from "../structure.ts";
 import { annotateMachine } from "./annotate.ts";
 
@@ -52,14 +52,20 @@ describe("a fuzz stay the handler explains", () => {
   });
 
   test("stays when the handler is not found in the source", () => {
-    const credit = toVizMachine({ id: "credit", actor: createCreditActor() });
+    const credit = toVizMachine({
+      id: "credit",
+      actor: creditMachine.create({ clock: VirtualClock() }),
+    });
     const first = credit.edges.find((edge) => edge.kind === "transition") as VizEdge;
     const machine = annotateMachine(fuzzStay(credit, first.from, first.event), MEAL);
     expect(machine.edges.filter((edge) => edge.origin === "fuzz")).toHaveLength(1);
   });
 
   test("stays when the source cannot be analyzed", () => {
-    const credit = toVizMachine({ id: "credit", actor: createCreditActor() });
+    const credit = toVizMachine({
+      id: "credit",
+      actor: creditMachine.create({ clock: VirtualClock() }),
+    });
     const first = credit.edges.find((edge) => edge.kind === "transition") as VizEdge;
     const machine = annotateMachine(fuzzStay(credit, first.from, first.event), {
       file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/does-not-exist.ts"),

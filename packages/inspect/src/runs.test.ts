@@ -5,7 +5,7 @@ import { Either } from "@mantaq/utils";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { EXAMPLE_ROOT } from "./examples.ts";
-import { createTimedActor } from "./fixtures/timed.ts";
+import { timed as timedMachine } from "./fixtures/timed.ts";
 import { inspectModule } from "./inspect.ts";
 import { normalizeRun, readRuns } from "./runs.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -16,7 +16,7 @@ const timed: FuzzTarget = {
   id: "timed",
   create: () => {
     const clock = VirtualClock();
-    return { actor: createTimedActor(clock), clock };
+    return { actor: timedMachine.create({ clock }), clock };
   },
 };
 
@@ -141,28 +141,13 @@ describe("recorded runs that cannot be trusted", () => {
     );
   });
 
-  test("an instance export is left untouched and its runs are not shown", async () => {
+  test("an actor instance is not a machine: it is left untouched and its runs are not shown", async () => {
     const file = join(FIXTURES, "instance.ts");
-    const dir = mkdtempSync(join(tmpdir(), "runs-"));
-    mkdirSync(join(dir, "__runs__"));
-    writeFileSync(
-      join(dir, "__runs__", "a.json"),
-      JSON.stringify({
-        retry: [
-          {
-            name: "c",
-            end: "connecting",
-            steps: [{ kind: "event", event: "connect", payload: null }],
-          },
-        ],
-      }),
-    );
-    writeFileSync(join(dir, "instance.ts"), `export * from ${JSON.stringify(file)};\n`);
     const exported = await import(file);
     const before = exported.retry.state.name;
-    const result = await inspectModule(join(dir, "instance.ts"), { load });
+    const result = await inspectModule(file, { load });
     expect(exported.retry.state.name).toBe(before);
-    expect(result.machines[0]?.runs ?? []).toEqual([]);
-    expect(result.warnings.join("\n")).toContain("retry: runs not shown");
+    expect(result.machines).toEqual([]);
+    expect(result.warnings).toEqual([`${file}: no exported machine(...) found`]);
   });
 });

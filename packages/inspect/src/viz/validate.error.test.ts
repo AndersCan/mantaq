@@ -1,13 +1,16 @@
+import { VirtualClock } from "@mantaq/core";
 import { toViz } from "../structure.ts";
-import { createCheckoutActor } from "../fixtures/checkout.ts";
-import { createRenamedCheckout } from "../fixtures/renamed-wire.ts";
+import { checkout } from "../fixtures/checkout.ts";
+import { renamedCheckout } from "../fixtures/renamed-wire.ts";
 import { inspect } from "../inspect.ts";
 import { parseViz, validateViz } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 
 function valid(): unknown {
-  return JSON.parse(JSON.stringify(toViz([{ id: "checkout", actor: createCheckoutActor() }])));
+  return JSON.parse(
+    JSON.stringify(toViz([{ id: "checkout", actor: checkout.create({ clock: VirtualClock() }) }])),
+  );
 }
 
 function issues(value: unknown): string[] {
@@ -269,8 +272,7 @@ describe("validateViz refuses actors that cannot be parts", () => {
 
 describe("validateViz refuses a recorded message that does not fit the machine", () => {
   const wired = inspect({
-    id: "renamedCheckout",
-    create: () => createRenamedCheckout(),
+    machine: renamedCheckout,
     fuzz: { seed: 1, iterations: 300 },
   }).machine;
   const entry = { from: "waitingForPayment", event: "START", to: "payment.ready" };

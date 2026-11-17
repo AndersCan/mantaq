@@ -3,7 +3,7 @@
  * never-see), and cannot reach a negative count (a must-see).
  */
 import type { Expectations } from "../expectations.ts";
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 /** Nothing has started yet. */
 const idle = state("idle")();
@@ -21,42 +21,45 @@ const tag = event("tag")<{ note: string }>();
 /** The counter was stopped. */
 const finish = event("finish")();
 
-export function createExpectedActor(clock: VirtualClock = VirtualClock()) {
-  const initialContext: { count: number; note?: string } = { count: 0 };
-  return Actor({
-    inputs: [begin, bump, tag, finish],
-    internal: [],
-    states: [idle, counting, done],
-    initial: idle,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      /** Counting begins. */
-      m.on(idle, { event: begin, to: [counting], handler: () => ({ state: counting }) });
-      /** The count goes up. */
-      m.on(counting, {
-        event: bump,
-        to: [counting],
-        handler: (_event, { context }) => {
-          context.set({ count: context.get().count + 1 });
-          return { state: counting };
-        },
-      });
-      /** A tag is added. */
-      m.on(counting, {
-        event: tag,
-        to: [counting],
-        handler: (received, { context }) => {
-          context.set({ ...context.get(), note: received.payload.note });
-          return { state: counting };
-        },
-      });
-      /** The count is finished. */
-      m.on(counting, { event: finish, to: [done], handler: () => ({ state: done }) });
-    },
-  });
-}
+export const expected = machine("expected", {
+  create: ({ clock }) => {
+    const initialContext: { count: number; note?: string } = { count: 0 };
+    return Actor({
+      inputs: [begin, bump, tag, finish],
+      internal: [],
+      states: [idle, counting, done],
+      initial: idle,
+      clock,
+      context: initialContext,
+      setup: (m) => {
+        /** Counting begins. */
+        m.on(idle, { event: begin, to: [counting], handler: () => ({ state: counting }) });
+        /** The count goes up. */
+        m.on(counting, {
+          event: bump,
+          to: [counting],
+          handler: (_event, { context }) => {
+            context.set({ count: context.get().count + 1 });
+            return { state: counting };
+          },
+        });
+        /** A tag is added. */
+        m.on(counting, {
+          event: tag,
+          to: [counting],
+          handler: (received, { context }) => {
+            context.set({ ...context.get(), note: received.payload.note });
+            return { state: counting };
+          },
+        });
+        /** The count is finished. */
+        m.on(counting, { event: finish, to: [done], handler: () => ({ state: done }) });
+      },
+    });
+  },
+});
 
-export const expectedExpectations: Expectations<typeof createExpectedActor> = {
-  counting: { neverSee: [{ count: 3 }], mustSee: [{ count: -1 }] },
+export const expectedExpectations: Expectations<typeof expected> = {
+  machine: "expected",
+  states: { counting: { neverSee: [{ count: 3 }], mustSee: [{ count: -1 }] } },
 };

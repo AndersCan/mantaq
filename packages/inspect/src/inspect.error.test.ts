@@ -1,9 +1,9 @@
 import { EXAMPLE_ROOT } from "./examples.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
-import { createDoorActor } from "./fixtures/factories.ts";
-import { createExpectedActor } from "./fixtures/expected.ts";
-import { createLockoutActor } from "./fixtures/lockout.ts";
-import { createTimerThrowActor } from "./fixtures/timer-throw.ts";
+import { checkout } from "./fixtures/checkout.ts";
+import { door as doorMachine } from "./fixtures/factories.ts";
+import { expected } from "./fixtures/expected.ts";
+import { lockout } from "./fixtures/lockout.ts";
+import { timerThrow } from "./fixtures/timer-throw.ts";
 import { inspect, inspectModule } from "./inspect.ts";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
@@ -15,8 +15,7 @@ describe("inspect: what cannot be done is a warning, never a guess", () => {
   test("a source that cannot be analyzed leaves handler edges not_analyzed", () => {
     const missing = join(FIXTURES, "missing.ts");
     const { machine, warnings } = inspect({
-      id: "door",
-      create: () => createDoorActor(),
+      machine: doorMachine,
       source: { file: missing, root: EXAMPLE_ROOT },
       fuzz: false,
     });
@@ -29,34 +28,35 @@ describe("inspect: what cannot be done is a warning, never a guess", () => {
     const file = join(FIXTURES, "no-machines.ts");
     expect(await inspectModule(file, { load })).toEqual({
       machines: [],
-      warnings: [`${file}: no exported actor or actor factory found`],
+      warnings: [`${file}: no exported machine(...) found`],
     });
   });
 
-  test("an actor instance is drawn but not fuzzed", async () => {
-    const result = await inspectModule(join(FIXTURES, "instance.ts"), { load });
-    expect(result.machines.map((machine) => [machine.id, machine.fuzz])).toEqual([["retry", null]]);
-    expect(result.warnings).toEqual(["retry: not fuzzed: exported as one actor, not a factory"]);
+  test("an actor instance is not a machine", async () => {
+    const file = join(FIXTURES, "instance.ts");
+    expect(await inspectModule(file, { load })).toEqual({
+      machines: [],
+      warnings: [`${file}: no exported machine(...) found`],
+    });
   });
 
-  test("an export that does not return an actor at runtime is skipped", async () => {
+  test("an export that is not a machine at runtime is skipped", async () => {
     const result = await inspectModule(join(FIXTURES, "factories.ts"), {
       load: async (file) => ({
         ...(await load(file)),
-        createDoorActor: () => ({ not: "an actor" }),
+        door: { id: "door", create: "not a function" },
       }),
       fuzz: false,
     });
-    expect(result.machines.map((machine) => machine.id)).toEqual(["gate", "realDoor"]);
-    expect(result.warnings[0]).toBe("door: createDoorActor did not return an actor");
+    expect(result.machines.map((machine) => machine.id)).toEqual(["gate"]);
+    expect(result.warnings[0]).toBe("door: door is not a machine(...) value");
   });
 });
 
 describe("inspect: fuzz that cannot finish or crashes is reported, not fatal", () => {
   test("a timer callback that throws under clock.advance is a fuzz error; fuzzing goes on", () => {
     const { machine, warnings } = inspect({
-      id: "pay",
-      create: () => createTimerThrowActor(),
+      machine: timerThrow,
       // `{}` is the payload the type forbids but fuzz may send: `card` is undefined.
       payloads: { pay: [{ card: "4111" }, { card: "5500" }, {}], ok: [null], no: [null] },
     });
@@ -78,28 +78,27 @@ describe("inspect: fuzz that cannot finish or crashes is reported, not fatal", (
   });
 
   test("no source: an event whose fields the machine reads is named", () => {
-    const { warnings } = inspect({ id: "expected", create: () => createExpectedActor() });
+    const { warnings } = inspect({ machine: expected });
     expect(warnings).toContain(
       "fuzz sent tag without a payload and the machine read note. Pass `source` (samples from the event types) or `payloads` with a sample for tag.",
     );
   });
 
   test("no source: a field read later by a timer callback is named", () => {
-    const { warnings } = inspect({ id: "pay", create: () => createTimerThrowActor() });
+    const { warnings } = inspect({ machine: timerThrow });
     expect(warnings.filter((each) => each.startsWith("fuzz sent "))).toEqual([
       "fuzz sent pay without a payload and the machine read card. Pass `source` (samples from the event types) or `payloads` with a sample for pay.",
     ]);
   });
 
   test("no source: events nobody reads from get no warning", () => {
-    const { warnings } = inspect({ id: "lockout", create: () => createLockoutActor() });
+    const { warnings } = inspect({ machine: lockout });
     expect(warnings.filter((each) => each.startsWith("fuzz sent "))).toEqual([]);
   });
 
   test("timeLimitMs 0 runs no iterations and names the time limit as the reason", () => {
     const { machine, warnings } = inspect({
-      id: "checkout",
-      create: () => createCheckoutActor(),
+      machine: checkout,
       source: { file: join(FIXTURES, "checkout.ts"), root: EXAMPLE_ROOT },
       fuzz: { timeLimitMs: 0 },
     });
@@ -156,7 +155,7 @@ describe("inspectModule: machine(...) exports", () => {
       fuzz: false,
     });
     expect(result.machines.map((machine) => machine.id)).toEqual(["deadline", "stubborn"]);
-    expect(result.warnings).toContain("sleeper: sleeper did not return an actor");
+    expect(result.warnings).toContain("sleeper: sleeper is not a machine(...) value");
   });
 });
 

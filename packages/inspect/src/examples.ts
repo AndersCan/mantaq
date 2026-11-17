@@ -1,14 +1,14 @@
 import type { VizInput } from "./structure.ts";
-import { createAuthActor } from "./fixtures/auth.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
-import { createCreditActor } from "./fixtures/credit.ts";
-import { createRetryActor } from "./fixtures/retry.ts";
-import { createSagaActor } from "./fixtures/saga.ts";
+import { auth } from "./fixtures/auth.ts";
+import { checkout } from "./fixtures/checkout.ts";
+import { credit } from "./fixtures/credit.ts";
+import { retry } from "./fixtures/retry.ts";
+import { saga } from "./fixtures/saga.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import type { VizJson, VizStep } from "@mantaq/viz";
 import { VirtualClock } from "@mantaq/core";
 import { join, resolve } from "node:path";
-import type { AnyActor } from "@mantaq/core";
+import type { AnyActor, Machine } from "@mantaq/core";
 
 /**
  * Sample payloads are copied from the example tests. They are the fuzzer's
@@ -64,7 +64,7 @@ export interface Example extends FuzzTarget {
 
 function target(
   id: string,
-  create: (clock: VirtualClock) => AnyActor<unknown>,
+  machine: Machine<string, object, AnyActor<unknown>>,
   payloads: Record<string, VizJson[]>,
 ): Example {
   return {
@@ -72,7 +72,7 @@ function target(
     source: join(FIXTURES, `${id}.ts`),
     create: () => {
       const clock = VirtualClock();
-      return { actor: create(clock), clock };
+      return { actor: machine.create({ clock }), clock };
     },
     payloads,
   };
@@ -80,11 +80,11 @@ function target(
 
 export function exampleTargets(): Example[] {
   return [
-    target("checkout", createCheckoutActor, checkoutPayloads),
-    target("auth", createAuthActor, authPayloads),
-    target("saga", createSagaActor, sagaPayloads),
-    target("credit", createCreditActor, creditPayloads),
-    target("retry", createRetryActor, retryPayloads),
+    target("checkout", checkout, checkoutPayloads),
+    target("auth", auth, authPayloads),
+    target("saga", saga, sagaPayloads),
+    target("credit", credit, creditPayloads),
+    target("retry", retry, retryPayloads),
   ];
 }
 
