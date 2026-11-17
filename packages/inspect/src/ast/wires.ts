@@ -2,7 +2,6 @@ import type { VizMachine } from "@mantaq/viz";
 import { dirname } from "node:path";
 import ts from "typescript";
 import { locationOf } from "./program.ts";
-import { machineId } from "../inspect.ts";
 
 /** App code that can send an event to one machine when another machine's output or change fires. */
 export interface Wire {
@@ -407,11 +406,11 @@ function heardIn(scan: Scan, sourceFile: ts.SourceFile): Array<[string, string[]
   });
 }
 
-/** A listed machine whose factory no app code uses. */
+/** A listed machine no app code uses. */
 export interface NotRun {
   /** Machine id. */
   id: string;
-  /** Factory export name, e.g. "createMembershipActor". */
+  /** Export name of the `machine(...)`, e.g. "membership". */
   factory: string;
   /** Machine file relative to root, "/" separators. */
   file: string;
@@ -431,7 +430,20 @@ function samePlace(a: ts.Symbol, b: ts.Symbol): boolean {
   return path !== undefined && a.getName() === b.getName() && path === pathOf(b);
 }
 
-function factoriesIn(
+/** The literal id of a `machine(id, …)` export, or undefined when the export is not one. */
+function literalIdOf(
+  checker: ts.TypeChecker,
+  symbol: ts.Symbol,
+  node: ts.Node,
+): string | undefined {
+  const type = checker.getTypeOfSymbolAtLocation(symbol, node);
+  const id = type.getProperty("id");
+  if (id === undefined || type.getProperty("create") === undefined) return undefined;
+  const literal = checker.getTypeOfSymbolAtLocation(id, node);
+  return literal.isStringLiteral() ? literal.value : undefined;
+}
+
+function machinesIn(
   checker: ts.TypeChecker,
   root: string,
   sourceFile: ts.SourceFile,
@@ -441,12 +453,11 @@ function factoriesIn(
   if (module === undefined) return [];
   const ids = new Set(machines.map((machine) => machine.id));
   return checker.getExportsOfModule(module).flatMap((each) => {
-    const id = machineId(each.getName());
     const symbol = resolved(checker, each);
     const declaration = symbol?.valueDeclaration;
-    if (symbol === undefined || declaration === undefined || !ids.has(id)) return [];
-    if (checker.getTypeOfSymbolAtLocation(symbol, declaration).getCallSignatures().length === 0)
-      return [];
+    if (symbol === undefined || declaration === undefined) return [];
+    const id = literalIdOf(checker, symbol, declaration);
+    if (id === undefined || !ids.has(id)) return [];
     return [{ id, factory: each.getName(), file: locationOf(sourceFile, root).file, symbol }];
   });
 }
@@ -526,7 +537,7 @@ function unheardOf(
  * App-code wires, the listed machines no app code runs, and the outputs no
  * app-code listener hears, from one set of
  * programs. A machine is run when app code (the machine's tsconfig minus test
- * files) uses its factory export as a value. Read with the TypeScript
+ * files) uses its `machine(...)` export as a value. Read with the TypeScript
  * checker; nothing is run.
  */
 export function scanAppCode(context: {
@@ -559,7 +570,7 @@ export function scanAppCode(context: {
     for (const file of files) {
       const sourceFile = program.getSourceFile(file);
       if (sourceFile === undefined) continue;
-      for (const target of factoriesIn(checker, root, sourceFile, machines)) {
+      for (const target of machinesIn(checker, root, sourceFile, machines)) {
         const key = JSON.stringify([target.id, target.file, target.factory]);
         if (!found.has(key)) found.set(key, target);
       }

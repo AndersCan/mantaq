@@ -13,7 +13,6 @@ describe("inspectFile", () => {
     expect(result.machines.map((machine) => [machine.id, machine.initial])).toEqual([
       ["door", "closed"],
       ["gate", "closed"],
-      ["realDoor", "closed"],
     ]);
     const door = result.machines[0];
     expect(door?.edges.find((edge) => edge.event === "open")?.explanation?.status).toBe("analyzed");

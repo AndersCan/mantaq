@@ -2,9 +2,9 @@ import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { withTimeout } from "@mantaq/sugar";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
-import { createSenderActor } from "./fixtures/wired/sender.ts";
-import { createThrowingActor } from "./fixtures/throwing.ts";
+import { checkout as checkoutMachine } from "./fixtures/checkout.ts";
+import { sender as senderMachine } from "./fixtures/wired/sender.ts";
+import { throwing } from "./fixtures/throwing.ts";
 import { meal6 } from "../../../apps/docs/src/tutorial/meal-06.ts";
 import type { VizJson } from "@mantaq/viz";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -13,7 +13,7 @@ const checkout: FuzzTarget = {
   id: "checkout",
   create: () => {
     const clock = VirtualClock();
-    return { actor: createCheckoutActor(clock), clock };
+    return { actor: checkoutMachine.create({ clock }), clock };
   },
 };
 
@@ -75,7 +75,7 @@ describe("createDriver", () => {
       id: "sender",
       create: () => {
         const clock = VirtualClock();
-        return { actor: createSenderActor(clock), clock };
+        return { actor: senderMachine.create({ clock }), clock };
       },
     };
     const driver = createDriver(sender);
@@ -140,7 +140,7 @@ describe("createDriver", () => {
       id: "throwing",
       create: () => {
         const clock = VirtualClock();
-        return { actor: createThrowingActor(clock), clock };
+        return { actor: throwing.create({ clock }), clock };
       },
     });
     const live = driver.step({ kind: "event", event: "pick", payload: { side: "b" } });

@@ -11,7 +11,7 @@ if (doc === undefined) {
   );
 }
 if (doc.machines.length === 0) {
-  throw new Error(`<Machine src="${src}">: no exported actor or actor factory found in ${abs}`);
+  throw new Error(`<Machine src="${src}">: no exported machine(...) found in ${abs}`);
 }
 const docRoutes = Object.fromEntries(
   doc.machines.flatMap((id) => (routes[id] === undefined ? [] : [[id, routes[id]]])),

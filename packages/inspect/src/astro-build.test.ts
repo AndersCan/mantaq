@@ -24,7 +24,7 @@ const wiredReceiver = "../fixtures/wired/receiver.ts";
 const wiredSketch = "../fixtures/wired/sketch.ts";
 const wiredQuiet = "../fixtures/wired/quiet.ts";
 const deadEnd = "../fixtures/dead-end.ts";
-const instance = "../fixtures/instance.ts";
+const timeBlind = "../fixtures/clock-blind.ts";
 const badExpectations = "../fixtures/bad-expectations.ts";
 
 function page(sources: string[]): string {
@@ -166,7 +166,7 @@ describe("mantaqViz for Astro", () => {
     const notRun = [...document.querySelectorAll("ul.not-run li")].map((li) => li.textContent);
     expect(notRun).toHaveLength(1);
     expect(notRun[0]).toMatch(
-      /^sketch is not run by the app: no app code calls createSketchActor \(.*wired\/sketch\.ts\)$/,
+      /^sketch is not run by the app: no app code calls sketchDraft \(.*wired\/sketch\.ts\)$/,
     );
     expect(document.querySelector("figcaption")?.textContent).toContain(
       "A dashed machine is not run by the app.",
@@ -247,7 +247,7 @@ describe("mantaqViz for Astro", () => {
   test("a file with no exported machines fails the build", async () => {
     const root = makeSite([empty]);
     try {
-      await expect(buildSite(root, [empty])).rejects.toThrow(/no exported actor or actor factory/);
+      await expect(buildSite(root, [empty])).rejects.toThrow(/no exported machine\(\.\.\.\) found/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -313,11 +313,11 @@ describe("mantaqViz for Astro", () => {
     }, 120_000);
 
     test("a machine that cannot be fuzzed fails, unless fuzz is off", async () => {
-      await withSite([instance], async (root) => {
+      await withSite([timeBlind], async (root) => {
         await expect(
-          buildSite(root, [instance], { fuzz: {}, failOnFindings: true }),
-        ).rejects.toThrow(/  - not fuzzed: exported as one actor, not a factory/);
-        await buildSite(root, [instance], { fuzz: false, failOnFindings: true });
+          buildSite(root, [timeBlind], { fuzz: {}, failOnFindings: true }),
+        ).rejects.toThrow(/  - not fuzzed: create\(\) built an actor on a clock it was not given/);
+        await buildSite(root, [timeBlind], { fuzz: false, failOnFindings: true });
       });
     }, 120_000);
 

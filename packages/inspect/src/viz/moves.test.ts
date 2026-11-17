@@ -1,12 +1,13 @@
+import { VirtualClock } from "@mantaq/core";
 import { toVizMachine } from "../structure.ts";
-import { createCheckoutActor } from "../fixtures/checkout.ts";
-import { createSagaActor } from "../fixtures/saga.ts";
+import { checkout as checkoutMachine } from "../fixtures/checkout.ts";
+import { saga as sagaMachine } from "../fixtures/saga.ts";
 import { movesFrom, unhandledSends } from "@mantaq/viz";
 import type { VizMachine } from "@mantaq/viz";
 import { describe, expect, test } from "vite-plus/test";
 
 function checkout(): VizMachine {
-  return toVizMachine({ id: "checkout", actor: createCheckoutActor() });
+  return toVizMachine({ id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) });
 }
 
 function summary(machine: VizMachine, state: string): string[] {
@@ -35,7 +36,7 @@ describe("movesFrom", () => {
   });
 
   test("onAny edges are offered from every non-final state, and stays keep the state", () => {
-    const saga = toVizMachine({ id: "saga", actor: createSagaActor() });
+    const saga = toVizMachine({ id: "saga", actor: sagaMachine.create({ clock: VirtualClock() }) });
     expect(summary(saga, "idle")).toEqual([
       "input CANCEL -> compensatingRelease",
       "input CANCEL -> failed",

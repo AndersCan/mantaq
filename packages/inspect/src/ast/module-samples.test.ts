@@ -10,7 +10,7 @@ const OPEN = [
   { by: "key", code: "sample", tags: ["sample"], at: { floor: 1, urgent: true } },
 ];
 
-test("each factory shape, the instance one included, carries the samples of its send type", () => {
+test("each machine(...) shape carries the samples of its send type", () => {
   const found = Either.getRight(
     analyzeModule({
       file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/factories.ts"),
@@ -18,9 +18,7 @@ test("each factory shape, the instance one included, carries the samples of its 
     }),
   );
   expect(found?.machines.map((machine) => [machine.name, machine.samples])).toEqual([
-    ["createDoorActor", { open: OPEN }],
-    ["createGate", { open: OPEN }],
-    ["createRealDoor", { open: OPEN }],
-    ["sharedDoor", { open: OPEN }],
+    ["door", { open: OPEN }],
+    ["gate", { open: OPEN }],
   ]);
 });

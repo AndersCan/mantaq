@@ -10,9 +10,9 @@ test("send shapes without a type, an unknown event or no parameter give no sampl
   });
   expect(Either.getLeft(found)).toBeUndefined();
   expect(Either.getRight(found)?.machines.map((m) => [m.name, m.samples])).toEqual([
-    ["createOdd", { "odd.GO": [{ k: "sample" }] }],
-    ["createLoose", {}],
-    ["createNone", {}],
-    ["createWrapped", { "wrapped.GO": [{ k: "sample" }] }],
+    ["odd", { "odd.GO": [{ k: "sample" }] }],
+    ["loose", {}],
+    ["none", {}],
+    ["wrapped", { "wrapped.GO": [{ k: "sample" }] }],
   ]);
 });

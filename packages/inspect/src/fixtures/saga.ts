@@ -3,7 +3,7 @@
  * verbatim (payload reads, context writes, context-dependent routing); effects
  * are stubbed, so service responses arrive as injected internal events.
  */
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 import { events, states } from "@mantaq/sugar";
 
 interface OrderRequest {
@@ -50,215 +50,217 @@ type SagaContext = {
   completedSteps: string[];
 };
 
-export function createSagaActor(clock: VirtualClock = VirtualClock()) {
-  const initialContext: SagaContext = { completedSteps: [] };
-  return Actor({
-    inputs: [START, CANCEL],
-    outputs: [],
-    internal: [
-      INVENTORY_RESERVED,
-      INVENTORY_FAILED,
-      PAYMENT_PROCESSED,
-      PAYMENT_FAILED,
-      SHIPMENT_CREATED,
-      SHIPMENT_FAILED,
-      NOTIFICATION_SENT,
-      NOTIFICATION_FAILED,
-      REFUND_DONE,
-      REFUND_FAILED,
-      RELEASE_DONE,
-      RELEASE_FAILED,
-    ],
-    states: [
-      sagaStates.idle,
-      sagaStates.reservingInventory,
-      sagaStates.processingPayment,
-      sagaStates.creatingShipment,
-      sagaStates.notifying,
-      completed,
-      failed,
-      sagaStates.compensatingRefund,
-      sagaStates.compensatingRelease,
-    ],
-    initial: sagaStates.idle,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      m.effect(sagaStates.reservingInventory, {
-        name: "reserveInventory",
-        sends: [INVENTORY_RESERVED, INVENTORY_FAILED],
-        fn: () => undefined,
-      });
-      m.effect(sagaStates.processingPayment, {
-        name: "processPayment",
-        sends: [PAYMENT_PROCESSED, PAYMENT_FAILED],
-        fn: () => undefined,
-      });
-      m.effect(sagaStates.creatingShipment, {
-        name: "createShipment",
-        sends: [SHIPMENT_CREATED, SHIPMENT_FAILED],
-        fn: () => undefined,
-      });
-      m.effect(sagaStates.notifying, {
-        name: "sendNotification",
-        sends: [NOTIFICATION_SENT, NOTIFICATION_FAILED],
-        fn: () => undefined,
-      });
-      m.effect(sagaStates.compensatingRefund, {
-        name: "runRefund",
-        sends: [REFUND_DONE, REFUND_FAILED],
-        fn: () => undefined,
-      });
-      m.effect(sagaStates.compensatingRelease, {
-        name: "releaseInventory",
-        sends: [RELEASE_DONE, RELEASE_FAILED],
-        fn: () => undefined,
-      });
-      m.onAny({
-        event: CANCEL,
-        to: [failed, sagaStates.compensatingRelease],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          if (current.completedSteps.includes("inventory")) {
-            current.error = "Cancelled by user";
+export const saga = machine("saga", {
+  create: ({ clock }) => {
+    const initialContext: SagaContext = { completedSteps: [] };
+    return Actor({
+      inputs: [START, CANCEL],
+      outputs: [],
+      internal: [
+        INVENTORY_RESERVED,
+        INVENTORY_FAILED,
+        PAYMENT_PROCESSED,
+        PAYMENT_FAILED,
+        SHIPMENT_CREATED,
+        SHIPMENT_FAILED,
+        NOTIFICATION_SENT,
+        NOTIFICATION_FAILED,
+        REFUND_DONE,
+        REFUND_FAILED,
+        RELEASE_DONE,
+        RELEASE_FAILED,
+      ],
+      states: [
+        sagaStates.idle,
+        sagaStates.reservingInventory,
+        sagaStates.processingPayment,
+        sagaStates.creatingShipment,
+        sagaStates.notifying,
+        completed,
+        failed,
+        sagaStates.compensatingRefund,
+        sagaStates.compensatingRelease,
+      ],
+      initial: sagaStates.idle,
+      clock,
+      context: initialContext,
+      setup: (m) => {
+        m.effect(sagaStates.reservingInventory, {
+          name: "reserveInventory",
+          sends: [INVENTORY_RESERVED, INVENTORY_FAILED],
+          fn: () => undefined,
+        });
+        m.effect(sagaStates.processingPayment, {
+          name: "processPayment",
+          sends: [PAYMENT_PROCESSED, PAYMENT_FAILED],
+          fn: () => undefined,
+        });
+        m.effect(sagaStates.creatingShipment, {
+          name: "createShipment",
+          sends: [SHIPMENT_CREATED, SHIPMENT_FAILED],
+          fn: () => undefined,
+        });
+        m.effect(sagaStates.notifying, {
+          name: "sendNotification",
+          sends: [NOTIFICATION_SENT, NOTIFICATION_FAILED],
+          fn: () => undefined,
+        });
+        m.effect(sagaStates.compensatingRefund, {
+          name: "runRefund",
+          sends: [REFUND_DONE, REFUND_FAILED],
+          fn: () => undefined,
+        });
+        m.effect(sagaStates.compensatingRelease, {
+          name: "releaseInventory",
+          sends: [RELEASE_DONE, RELEASE_FAILED],
+          fn: () => undefined,
+        });
+        m.onAny({
+          event: CANCEL,
+          to: [failed, sagaStates.compensatingRelease],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            if (current.completedSteps.includes("inventory")) {
+              current.error = "Cancelled by user";
+              context.set(current);
+              return { state: sagaStates.compensatingRelease };
+            }
+            return { state: failed };
+          },
+        });
+        m.on(sagaStates.idle, {
+          event: START,
+          to: [sagaStates.reservingInventory],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.order = event.payload.order;
             context.set(current);
-            return { state: sagaStates.compensatingRelease };
-          }
-          return { state: failed };
-        },
-      });
-      m.on(sagaStates.idle, {
-        event: START,
-        to: [sagaStates.reservingInventory],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.order = event.payload.order;
-          context.set(current);
-          return { state: sagaStates.reservingInventory };
-        },
-      });
-      m.on(sagaStates.reservingInventory, {
-        event: INVENTORY_RESERVED,
-        to: [sagaStates.processingPayment],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.reservationId = event.payload.result.reservationId;
-          current.completedSteps = [...current.completedSteps, "inventory"];
-          context.set(current);
-          return { state: sagaStates.processingPayment };
-        },
-      });
-      m.on(sagaStates.reservingInventory, {
-        event: INVENTORY_FAILED,
-        to: [failed],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.error = event.payload.error;
-          context.set(current);
-          return { state: failed };
-        },
-      });
-      m.on(sagaStates.processingPayment, {
-        event: PAYMENT_PROCESSED,
-        to: [sagaStates.creatingShipment],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.transactionId = event.payload.result.transactionId;
-          current.completedSteps = [...current.completedSteps, "payment"];
-          context.set(current);
-          return { state: sagaStates.creatingShipment };
-        },
-      });
-      m.on(sagaStates.processingPayment, {
-        event: PAYMENT_FAILED,
-        to: [sagaStates.compensatingRefund],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.error = event.payload.error;
-          current.completedSteps = [...current.completedSteps, "payment_failed"];
-          context.set(current);
-          return { state: sagaStates.compensatingRefund };
-        },
-      });
-      m.on(sagaStates.creatingShipment, {
-        event: SHIPMENT_CREATED,
-        to: [sagaStates.notifying],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.trackingNumber = event.payload.result.trackingNumber;
-          current.completedSteps = [...current.completedSteps, "shipment"];
-          context.set(current);
-          return { state: sagaStates.notifying };
-        },
-      });
-      m.on(sagaStates.creatingShipment, {
-        event: SHIPMENT_FAILED,
-        to: [sagaStates.compensatingRefund],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.error = event.payload.error;
-          context.set(current);
-          return { state: sagaStates.compensatingRefund };
-        },
-      });
-      m.on(sagaStates.notifying, {
-        event: NOTIFICATION_SENT,
-        to: [completed],
-        handler: () => ({ state: completed }),
-      });
-      m.on(sagaStates.notifying, {
-        event: NOTIFICATION_FAILED,
-        to: [completed],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.error = "Notification failed";
-          context.set(current);
-          return { state: completed };
-        },
-      });
-      m.on(sagaStates.compensatingRefund, {
-        event: REFUND_DONE,
-        to: [failed, sagaStates.compensatingRelease],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.completedSteps = [...current.completedSteps, "refunded"];
-          context.set(current);
-          if (current.completedSteps.includes("inventory")) {
-            return { state: sagaStates.compensatingRelease };
-          }
-          return { state: failed };
-        },
-      });
-      m.on(sagaStates.compensatingRefund, {
-        event: REFUND_FAILED,
-        to: [failed],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.error = `Refund failed: ${event.payload.error}`;
-          context.set(current);
-          return { state: failed };
-        },
-      });
-      m.on(sagaStates.compensatingRelease, {
-        event: RELEASE_DONE,
-        to: [failed],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.completedSteps = [...current.completedSteps, "released"];
-          context.set(current);
-          return { state: failed };
-        },
-      });
-      m.on(sagaStates.compensatingRelease, {
-        event: RELEASE_FAILED,
-        to: [failed],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.error = `Release failed: ${event.payload.error}`;
-          context.set(current);
-          return { state: failed };
-        },
-      });
-    },
-  });
-}
+            return { state: sagaStates.reservingInventory };
+          },
+        });
+        m.on(sagaStates.reservingInventory, {
+          event: INVENTORY_RESERVED,
+          to: [sagaStates.processingPayment],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.reservationId = event.payload.result.reservationId;
+            current.completedSteps = [...current.completedSteps, "inventory"];
+            context.set(current);
+            return { state: sagaStates.processingPayment };
+          },
+        });
+        m.on(sagaStates.reservingInventory, {
+          event: INVENTORY_FAILED,
+          to: [failed],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.error = event.payload.error;
+            context.set(current);
+            return { state: failed };
+          },
+        });
+        m.on(sagaStates.processingPayment, {
+          event: PAYMENT_PROCESSED,
+          to: [sagaStates.creatingShipment],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.transactionId = event.payload.result.transactionId;
+            current.completedSteps = [...current.completedSteps, "payment"];
+            context.set(current);
+            return { state: sagaStates.creatingShipment };
+          },
+        });
+        m.on(sagaStates.processingPayment, {
+          event: PAYMENT_FAILED,
+          to: [sagaStates.compensatingRefund],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.error = event.payload.error;
+            current.completedSteps = [...current.completedSteps, "payment_failed"];
+            context.set(current);
+            return { state: sagaStates.compensatingRefund };
+          },
+        });
+        m.on(sagaStates.creatingShipment, {
+          event: SHIPMENT_CREATED,
+          to: [sagaStates.notifying],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.trackingNumber = event.payload.result.trackingNumber;
+            current.completedSteps = [...current.completedSteps, "shipment"];
+            context.set(current);
+            return { state: sagaStates.notifying };
+          },
+        });
+        m.on(sagaStates.creatingShipment, {
+          event: SHIPMENT_FAILED,
+          to: [sagaStates.compensatingRefund],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.error = event.payload.error;
+            context.set(current);
+            return { state: sagaStates.compensatingRefund };
+          },
+        });
+        m.on(sagaStates.notifying, {
+          event: NOTIFICATION_SENT,
+          to: [completed],
+          handler: () => ({ state: completed }),
+        });
+        m.on(sagaStates.notifying, {
+          event: NOTIFICATION_FAILED,
+          to: [completed],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.error = "Notification failed";
+            context.set(current);
+            return { state: completed };
+          },
+        });
+        m.on(sagaStates.compensatingRefund, {
+          event: REFUND_DONE,
+          to: [failed, sagaStates.compensatingRelease],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.completedSteps = [...current.completedSteps, "refunded"];
+            context.set(current);
+            if (current.completedSteps.includes("inventory")) {
+              return { state: sagaStates.compensatingRelease };
+            }
+            return { state: failed };
+          },
+        });
+        m.on(sagaStates.compensatingRefund, {
+          event: REFUND_FAILED,
+          to: [failed],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.error = `Refund failed: ${event.payload.error}`;
+            context.set(current);
+            return { state: failed };
+          },
+        });
+        m.on(sagaStates.compensatingRelease, {
+          event: RELEASE_DONE,
+          to: [failed],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.completedSteps = [...current.completedSteps, "released"];
+            context.set(current);
+            return { state: failed };
+          },
+        });
+        m.on(sagaStates.compensatingRelease, {
+          event: RELEASE_FAILED,
+          to: [failed],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.error = `Release failed: ${event.payload.error}`;
+            context.set(current);
+            return { state: failed };
+          },
+        });
+      },
+    });
+  },
+});

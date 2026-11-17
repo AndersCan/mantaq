@@ -1,4 +1,5 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 import { createActorMap } from "@mantaq/sugar";
 
 /** The queue is open. */
@@ -12,7 +13,7 @@ const pausedPhoto = state("pausedPhoto")();
 /** The upload was paused. */
 const uploadPaused = event("uploadPaused")();
 
-function createPhoto(clock: VirtualClock) {
+function createPhoto(clock: Clock) {
   return Actor({
     clock,
     inputs: [uploadPaused],
@@ -29,22 +30,24 @@ function createPhoto(clock: VirtualClock) {
 }
 
 /** A queue whose photo upload can pause and never leave the pause. */
-export function createPhotoQueueDeadEnd({ clock = VirtualClock() } = {}) {
-  const photos = createActorMap(() => createPhoto(clock));
-  const actor = Actor({
-    clock,
-    inputs: [photoAdded],
-    states: [open],
-    initial: open,
-    setup: (m) => {
-      m.on(open, {
-        event: photoAdded,
-        handler: (added) => {
-          photos.ensure(added.payload.photoId);
-          return {};
-        },
-      });
-    },
-  });
-  return { actor, photos };
-}
+export const photoQueueDeadEnd = machine("photoQueueDeadEnd", {
+  create: ({ clock }) => {
+    const photos = createActorMap(() => createPhoto(clock));
+    const actor = Actor({
+      clock,
+      inputs: [photoAdded],
+      states: [open],
+      initial: open,
+      setup: (m) => {
+        m.on(open, {
+          event: photoAdded,
+          handler: (added) => {
+            photos.ensure(added.payload.photoId);
+            return {};
+          },
+        });
+      },
+    });
+    return { actor, photos };
+  },
+});

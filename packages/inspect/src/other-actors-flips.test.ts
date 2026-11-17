@@ -1,9 +1,9 @@
 import { Either } from "@mantaq/utils";
 import { normalizeRun } from "./runs.ts";
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, event, machine as asMachine, state } from "@mantaq/core";
 import { expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { checkout } from "./fixtures/checkout.ts";
 import { withTimeout } from "@mantaq/sugar";
 import { inspect, inspectModule } from "./inspect.ts";
 
@@ -31,7 +31,7 @@ function create() {
       m.on(waiting, { event: expired, to: [timedOut], handler: () => ({ state: timedOut }) });
     },
   });
-  const actor = createCheckoutActor(clock);
+  const actor = checkout.create({ clock });
   return { actor, clock, made: { actor, timer } };
 }
 
@@ -82,17 +82,19 @@ test("a replay sends a step to the returned machine", () => {
 test("an input the returned machine declares but never handles is still an event of the machine", async () => {
   const quiet = state("quiet")();
   const ping = event("ping")();
-  const part = Actor({
-    inputs: [ping],
-    states: [quiet],
-    initial: quiet,
-    clock: VirtualClock(),
-    setup: () => {},
-  });
-  const root = createCheckoutActor();
   const result = inspect({
-    id: "m",
-    create: () => ({ actor: root, part }),
+    machine: asMachine("m", {
+      create: ({ clock }) => ({
+        actor: checkout.create({ clock }),
+        part: Actor({
+          inputs: [ping],
+          states: [quiet],
+          initial: quiet,
+          clock,
+          setup: () => {},
+        }),
+      }),
+    }),
     fuzz: false,
   });
   expect(result.machine.events.map((each) => each.id)).toContain("ping");

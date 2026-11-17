@@ -12,67 +12,44 @@ function analysis(name: string): ModuleAnalysis | undefined {
 }
 
 describe("analyzeModule: machine exports", () => {
-  test("each factory shape is called the way its type allows", () => {
+  test("a machine(...) export is read by its literal id, and a result with `actor` is unwrapped", () => {
     expect(analysis("factories")?.machines).toEqual([
       {
-        name: "createDoorActor",
-        call: "clock",
+        name: "door",
+        id: "door",
         unwrap: "self",
         context: null,
         samples: { open: expect.any(Array) },
         fields: expect.any(Object),
       },
       {
-        name: "createGate",
-        call: "options",
+        name: "gate",
+        id: "gate",
         unwrap: "actor",
         context: null,
         samples: { open: expect.any(Array) },
         fields: expect.any(Object),
       },
-      {
-        name: "createRealDoor",
-        call: "call",
-        unwrap: "self",
-        context: null,
-        samples: { open: expect.any(Array) },
-        fields: expect.any(Object),
-      },
-      {
-        name: "sharedDoor",
-        call: "instance",
-        unwrap: "self",
-        context: null,
-        samples: { open: expect.any(Array) },
-        fields: expect.any(Object),
-      },
     ]);
   });
 
-  test("an actor instance is found when it is the only export", () => {
-    expect(analysis("instance")?.machines).toEqual([
-      {
-        name: "retry",
-        call: "instance",
-        unwrap: "self",
-        context: [expect.objectContaining({ name: "attempts", input: "number" })],
-        samples: {},
-        fields: {},
-      },
-    ]);
+  test("a plain function that returns an actor, and an actor instance, are not machines", () => {
+    expect(analysis("factories")?.machines.map((found) => found.name)).not.toContain(
+      "createLegacyDoor",
+    );
+    expect(analysis("factories")?.machines.map((found) => found.name)).not.toContain("sharedDoor");
+    expect(analysis("instance")?.machines).toEqual([]);
   });
 
   test("machine(...) exports are read by their literal id and nothing is called", () => {
-    expect(
-      analysis("machine-values")?.machines.map((found) => [found.name, found.call, found.id]),
-    ).toEqual([
-      ["deadline", "machine", "deadline"],
-      ["sleeper", "machine", "sleeper"],
-      ["stubborn", "machine", "stubborn"],
+    expect(analysis("machine-values")?.machines.map((found) => [found.name, found.id])).toEqual([
+      ["deadline", "deadline"],
+      ["sleeper", "sleeper"],
+      ["stubborn", "stubborn"],
     ]);
   });
 
-  test("a machine export wins over legacy factories in the same file", () => {
+  test("a machine export next to a plain factory is the only one found", () => {
     expect(analysis("machine-and-factory")?.machines.map((found) => found.name)).toEqual(["solo"]);
   });
 

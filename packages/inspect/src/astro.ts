@@ -70,7 +70,7 @@ function failureReport(
       if (fuzzed && machine.fuzz === null) {
         const reason = warnings.find((w) => NOT_FUZZED.test(w))?.replace(NOT_FUZZED, "");
         items.push(
-          `  - not fuzzed: ${reason ?? "no fuzz run"}; handler throws, never-see and must-see cannot be found. Export a factory on a VirtualClock, or pass fuzz: false to mantaqViz`,
+          `  - not fuzzed: ${reason ?? "no fuzz run"}; handler throws, never-see and must-see cannot be found. Pass the clock create() gets to Actor({ clock }), or pass fuzz: false to mantaqViz`,
         );
       }
       items.push(...droppedRuns(machine.id, warnings));

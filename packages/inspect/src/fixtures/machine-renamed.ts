@@ -17,4 +17,4 @@ export const deskLamp = machine("lamp", {
     }),
 });
 
-export const lampExpectations = { on: { mustSee: [{}] } };
+export const lampExpectations = { machine: "lamp", states: { on: { neverSee: [{}] } } };

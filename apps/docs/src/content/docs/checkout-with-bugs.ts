@@ -124,5 +124,6 @@ export const checkoutWithBugsMachine = machine("checkoutWithBugs", {
 
 /** What the fuzzer must never see. Delete the line to see the bug go unreported. */
 export const checkoutWithBugsExpectations: Expectations<typeof checkoutWithBugsMachine> = {
-  payment: { neverSee: [{ address: "" }] },
+  machine: "checkoutWithBugs",
+  states: { payment: { neverSee: [{ address: "" }] } },
 };

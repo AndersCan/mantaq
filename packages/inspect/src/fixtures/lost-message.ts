@@ -1,5 +1,5 @@
 /** A checkout that tells a payment machine when payment starts and when the wait ran out. */
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, machine, event, state } from "@mantaq/core";
 import type { AnyActor } from "@mantaq/core";
 import { onOutput, withTimeout } from "@mantaq/sugar";
 
@@ -30,61 +30,69 @@ const ready = state("ready")();
 /** Payment is charging the card. */
 const charging = state("charging")();
 
-export function createCheckout({ clock = VirtualClock() }: { clock?: VirtualClock } = {}): {
-  actor: AnyActor<unknown>;
-  payment: AnyActor<unknown>;
-} {
-  const payment = Actor({
-    inputs: [paymentStarted, cardCharged, paymentTimedOut],
-    states: [ready, charging],
-    initial: ready,
+export const checkout = machine("checkout", {
+  create: ({
     clock,
-    setup: (m) => {
-      /** Checkout asked for the charge, so payment starts charging the card. */
-      m.on(ready, { event: paymentStarted, to: [charging], handler: () => ({ state: charging }) });
-      /** The card was charged, so payment is idle again. */
-      m.on(charging, { event: cardCharged, to: [ready], handler: () => ({ state: ready }) });
-      /** Checkout stopped waiting, so payment drops the charge. */
-      m.on(charging, { event: paymentTimedOut, to: [ready], handler: () => ({ state: ready }) });
-    },
-  });
-  const checkout = Actor({
-    inputs: [payClicked, paymentConfirmed],
-    internal: [waitedTooLong],
-    outputs: [paymentStarted, paymentTimedOut],
-    states: [browsing, waitingForPayment, paid, gaveUp],
-    initial: browsing,
-    clock,
-    setup: (m) => {
-      /** The shopper clicked pay, so checkout waits and tells payment to start. */
-      m.on(browsing, {
-        event: payClicked,
-        to: [waitingForPayment],
-        handler: () => ({ state: waitingForPayment, emit: [paymentStarted.create()] }),
-      });
-      /** Waiting for payment starts a 30 second deadline. */
-      m.effect(waitingForPayment, {
-        name: "paymentDeadline",
-        sends: [waitedTooLong],
-        fn: (input) => withTimeout(30_000, { input, event: () => waitedTooLong.create() }),
-      });
-      /** Payment confirmed the charge, so the order is paid. */
-      m.on(waitingForPayment, {
-        event: paymentConfirmed,
-        to: [paid],
-        handler: () => ({ state: paid }),
-      });
-      /** The deadline passed, so checkout gives up and tells payment. */
-      m.on(waitingForPayment, {
-        event: waitedTooLong,
-        to: [gaveUp],
-        handler: () => ({ state: gaveUp, emit: [paymentTimedOut.create()] }),
-      });
-    },
-  });
-  onOutput(checkout, (out) => {
-    if (out.type === paymentStarted.type) payment.send(paymentStarted.create());
-    if (out.type === paymentTimedOut.type) payment.send(paymentTimedOut.create());
-  });
-  return { actor: checkout, payment };
-}
+  }): {
+    actor: AnyActor<unknown>;
+    payment: AnyActor<unknown>;
+  } => {
+    const payment = Actor({
+      inputs: [paymentStarted, cardCharged, paymentTimedOut],
+      states: [ready, charging],
+      initial: ready,
+      clock,
+      setup: (m) => {
+        /** Checkout asked for the charge, so payment starts charging the card. */
+        m.on(ready, {
+          event: paymentStarted,
+          to: [charging],
+          handler: () => ({ state: charging }),
+        });
+        /** The card was charged, so payment is idle again. */
+        m.on(charging, { event: cardCharged, to: [ready], handler: () => ({ state: ready }) });
+        /** Checkout stopped waiting, so payment drops the charge. */
+        m.on(charging, { event: paymentTimedOut, to: [ready], handler: () => ({ state: ready }) });
+      },
+    });
+    const checkout = Actor({
+      inputs: [payClicked, paymentConfirmed],
+      internal: [waitedTooLong],
+      outputs: [paymentStarted, paymentTimedOut],
+      states: [browsing, waitingForPayment, paid, gaveUp],
+      initial: browsing,
+      clock,
+      setup: (m) => {
+        /** The shopper clicked pay, so checkout waits and tells payment to start. */
+        m.on(browsing, {
+          event: payClicked,
+          to: [waitingForPayment],
+          handler: () => ({ state: waitingForPayment, emit: [paymentStarted.create()] }),
+        });
+        /** Waiting for payment starts a 30 second deadline. */
+        m.effect(waitingForPayment, {
+          name: "paymentDeadline",
+          sends: [waitedTooLong],
+          fn: (input) => withTimeout(30_000, { input, event: () => waitedTooLong.create() }),
+        });
+        /** Payment confirmed the charge, so the order is paid. */
+        m.on(waitingForPayment, {
+          event: paymentConfirmed,
+          to: [paid],
+          handler: () => ({ state: paid }),
+        });
+        /** The deadline passed, so checkout gives up and tells payment. */
+        m.on(waitingForPayment, {
+          event: waitedTooLong,
+          to: [gaveUp],
+          handler: () => ({ state: gaveUp, emit: [paymentTimedOut.create()] }),
+        });
+      },
+    });
+    onOutput(checkout, (out) => {
+      if (out.type === paymentStarted.type) payment.send(paymentStarted.create());
+      if (out.type === paymentTimedOut.type) payment.send(paymentTimedOut.create());
+    });
+    return { actor: checkout, payment };
+  },
+});

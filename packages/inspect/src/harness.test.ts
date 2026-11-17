@@ -145,13 +145,11 @@ test("a failed open leaves no temp directory behind", async () => {
   expect(count()).toBe(before);
 }, 60_000);
 
-test("an export on a real clock with no timers is live", async () => {
-  const result = await openViz({ file: fixture("factories.ts"), machine: "realDoor" });
-  expect(Either.getLeft(result)).toBeUndefined();
-  if (Either.isRight(result)) {
-    expect(await result[1].state()).toBe("closed");
-    await result[1].close();
-  }
+test("a machine that ignores the clock it is given is not live, and the page says why", async () => {
+  const result = await openViz({ file: fixture("clock-blind.ts"), machine: "clockBlind" });
+  expect(Either.getLeft(result)).toBe(
+    "clockBlind is not live: create() built its actor on a clock it was not given. Pass the clock create() gets to Actor({ clock }).",
+  );
 }, 60_000);
 
 test("collects console errors", async () => {

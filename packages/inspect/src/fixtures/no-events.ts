@@ -1,8 +1,10 @@
-import { Actor, VirtualClock, state } from "@mantaq/core";
+import { Actor, machine, state } from "@mantaq/core";
 
 /** Just showing. */
 const shown = state("shown")();
 
-export function createNoEventsActor(clock: VirtualClock = VirtualClock()) {
-  return Actor({ clock, inputs: [], states: [shown], initial: shown, setup: () => {} });
-}
+export const noEvents = machine("noEvents", {
+  create: ({ clock }) => {
+    return Actor({ clock, inputs: [], states: [shown], initial: shown, setup: () => {} });
+  },
+});

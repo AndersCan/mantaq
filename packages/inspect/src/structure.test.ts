@@ -1,16 +1,18 @@
 import { toViz } from "./structure.ts";
 import { exampleInputs } from "./examples.ts";
-import { createAuthActor } from "./fixtures/auth.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
-import { createSagaActor } from "./fixtures/saga.ts";
-import { createConditionalActor } from "./fixtures/conditional.ts";
+import { auth } from "./fixtures/auth.ts";
+import { checkout as checkoutMachine } from "./fixtures/checkout.ts";
+import { saga } from "./fixtures/saga.ts";
+import { conditional } from "./fixtures/conditional.ts";
 import { serializeViz } from "@mantaq/viz";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 
 describe("toViz structure", () => {
   test("checkout: states, initial and final flags", () => {
-    const doc = toViz([{ id: "checkout", actor: createCheckoutActor() }]);
+    const doc = toViz([
+      { id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) },
+    ]);
     const machine = doc.machines[0];
     expect(machine?.initial).toBe("basicInfo");
     expect(machine?.states.map((s) => s.id)).toEqual([
@@ -26,7 +28,9 @@ describe("toViz structure", () => {
   });
 
   test("checkout: internal events flagged, effect edge present", () => {
-    const machine = toViz([{ id: "checkout", actor: createCheckoutActor() }]).machines[0];
+    const machine = toViz([
+      { id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) },
+    ]).machines[0];
     expect(machine?.events.find((e) => e.id === "paymentOk")?.internal).toBe(true);
     expect(machine?.events.find((e) => e.id === "back")?.internal).toBe(false);
     expect(machine?.edges.some((e) => e.kind === "effect" && e.from === "submitting")).toBe(true);
@@ -34,7 +38,9 @@ describe("toViz structure", () => {
   });
 
   test("per-state handlers give exact source/target pairs", () => {
-    const machine = toViz([{ id: "checkout", actor: createCheckoutActor() }]).machines[0];
+    const machine = toViz([
+      { id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) },
+    ]).machines[0];
     const back = machine?.edges.filter((e) => e.event === "back").map((e) => `${e.from}->${e.to}`);
     expect(back?.sort()).toEqual([
       "error->payment",
@@ -44,7 +50,8 @@ describe("toViz structure", () => {
   });
 
   test("onAny edges leave the any-state source once per declared target", () => {
-    const machine = toViz([{ id: "saga", actor: createSagaActor() }]).machines[0];
+    const machine = toViz([{ id: "saga", actor: saga.create({ clock: VirtualClock() }) }])
+      .machines[0];
     const cancel = machine?.edges.filter((e) => e.event === "CANCEL") ?? [];
     expect(cancel.map((e) => `${e.from}->${e.to}`).sort()).toEqual([
       "*->compensatingRelease",
@@ -54,14 +61,17 @@ describe("toViz structure", () => {
   });
 
   test("payload-dependent branch shows every declared target, not only the probed one", () => {
-    const machine = toViz([{ id: "cond", actor: createConditionalActor() }]).machines[0];
+    const machine = toViz([{ id: "cond", actor: conditional.create({ clock: VirtualClock() }) }])
+      .machines[0];
     const targets = machine?.edges.filter((e) => e.event === "review").map((e) => e.to);
     expect(targets).toEqual(["approved", "rejected"]);
     expect(machine?.edges.find((e) => e.event === "review")?.explanation).toBeNull();
   });
 
   test("no history means null coverage and null payload types", () => {
-    const machine = toViz([{ id: "checkout", actor: createCheckoutActor() }]).machines[0];
+    const machine = toViz([
+      { id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) },
+    ]).machines[0];
     expect(machine?.states.every((s) => s.coverage === null)).toBe(true);
     expect(machine?.edges.every((e) => e.coverage === null)).toBe(true);
     expect(machine?.events.every((e) => e.payload === null)).toBe(true);
@@ -70,28 +80,38 @@ describe("toViz structure", () => {
 
 describe("determinism", () => {
   test("same machine serializes to byte-identical JSON", () => {
-    const first = serializeViz(toViz([{ id: "checkout", actor: createCheckoutActor() }]));
-    const second = serializeViz(toViz([{ id: "checkout", actor: createCheckoutActor() }]));
+    const first = serializeViz(
+      toViz([{ id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) }]),
+    );
+    const second = serializeViz(
+      toViz([{ id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) }]),
+    );
     expect(first).toBe(second);
   });
 
   test("input order does not change output", () => {
-    const a = { id: "a", actor: createCheckoutActor() };
-    const b = { id: "b", actor: createConditionalActor() };
+    const a = { id: "a", actor: checkoutMachine.create({ clock: VirtualClock() }) };
+    const b = { id: "b", actor: conditional.create({ clock: VirtualClock() }) };
     expect(serializeViz(toViz([a, b]))).toBe(serializeViz(toViz([b, a])));
   });
 
   test("auth snapshot", () => {
-    expect(serializeViz(toViz([{ id: "auth", actor: createAuthActor() }]))).toMatchSnapshot();
+    expect(
+      serializeViz(toViz([{ id: "auth", actor: auth.create({ clock: VirtualClock() }) }])),
+    ).toMatchSnapshot();
   });
 
   test("saga snapshot", () => {
-    expect(serializeViz(toViz([{ id: "saga", actor: createSagaActor() }]))).toMatchSnapshot();
+    expect(
+      serializeViz(toViz([{ id: "saga", actor: saga.create({ clock: VirtualClock() }) }])),
+    ).toMatchSnapshot();
   });
 
   test("checkout snapshot", () => {
     expect(
-      serializeViz(toViz([{ id: "checkout", actor: createCheckoutActor() }])),
+      serializeViz(
+        toViz([{ id: "checkout", actor: checkoutMachine.create({ clock: VirtualClock() }) }]),
+      ),
     ).toMatchSnapshot();
   });
 });

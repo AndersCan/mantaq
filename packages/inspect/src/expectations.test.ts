@@ -5,10 +5,10 @@ import type { VizStep } from "@mantaq/viz";
 import { describe, expect, expectTypeOf, test } from "vite-plus/test";
 import { checkExpectations, matches, printPattern } from "./expectations.ts";
 import type { Expectations } from "./expectations.ts";
-import { createChainedActor } from "./fixtures/chained.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
-import { createExpectedActor, expectedExpectations } from "./fixtures/expected.ts";
-import { createThrowingActor } from "./fixtures/throwing.ts";
+import { chained as chainedMachine } from "./fixtures/chained.ts";
+import { checkout } from "./fixtures/checkout.ts";
+import { expected, expectedExpectations } from "./fixtures/expected.ts";
+import { throwing } from "./fixtures/throwing.ts";
 import { fuzz } from "./fuzz/fuzz.ts";
 import { execute } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -19,13 +19,13 @@ import { join } from "node:path";
 
 const EXPECTED = join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/expected.ts");
 
-function target(expectations: unknown = expectedExpectations): FuzzTarget {
+function target(expectations: unknown = expectedExpectations.states): FuzzTarget {
   const checked = checkExpectations(expectations, ["idle", "counting", "done"]).checked;
   return {
     id: "expected",
     create: () => {
       const clock = VirtualClock();
-      return { actor: createExpectedActor(clock), clock };
+      return { actor: expected.create({ clock }), clock };
     },
     expectations: checked,
   };
@@ -179,7 +179,7 @@ describe("expectations during a step", () => {
     id: "chained",
     create: () => {
       const clock = VirtualClock();
-      return { actor: createChainedActor(clock), clock };
+      return { actor: chainedMachine.create({ clock }), clock };
     },
     expectations: checkExpectations(expectations, ["idle", "first", "second", "last"]).checked,
   });
@@ -216,8 +216,7 @@ const NO_SOURCE =
 describe("inspect with expectations", () => {
   test("the findings show up on the machine", () => {
     const { machine, warnings } = inspect({
-      id: "expected",
-      create: () => createExpectedActor(),
+      machine: expected,
       expectations: expectedExpectations,
       fuzz: { iterations: 500 },
     });
@@ -227,8 +226,7 @@ describe("inspect with expectations", () => {
 
   test("fuzzing off: warns and finds nothing", () => {
     const { machine, warnings } = inspect({
-      id: "expected",
-      create: () => createExpectedActor(),
+      machine: expected,
       expectations: expectedExpectations,
       fuzz: false,
     });
@@ -238,9 +236,11 @@ describe("inspect with expectations", () => {
 
   test("a bad entry is ignored with a warning, the rest still checked", () => {
     const { warnings, machine } = inspect({
-      id: "expected",
-      create: () => createExpectedActor(),
-      expectations: JSON.parse('{"counting":{"neverSee":[{"count":3}],"neverse":[]},"paymnt":{}}'),
+      machine: expected,
+      expectations: {
+        machine: "expected",
+        states: JSON.parse('{"counting":{"neverSee":[{"count":3}],"neverse":[]},"paymnt":{}}'),
+      },
       fuzz: { iterations: 500 },
     });
     expect(warnings).toEqual([
@@ -251,7 +251,7 @@ describe("inspect with expectations", () => {
     expect(machineFindings(machine).map((each) => each.kind)).toEqual(["neverSee"]);
   });
 
-  test("the module lookup finds <machine id>Expectations", async () => {
+  test("the module lookup finds the export whose `machine` names the id", async () => {
     const result = await inspectModule(EXPECTED, {
       load: async (file) => import(file),
       fuzz: { iterations: 500 },
@@ -265,14 +265,26 @@ describe("inspect with expectations", () => {
     ]);
   });
 
-  test("an export no machine claims gets a warning that names the expected export", async () => {
+  test("the export may have any name: `machine` ties it to its machine", async () => {
     const result = await inspectModule(EXPECTED, {
-      load: async (file) => ({ ...(await import(file)), wrongExpectations: {} }),
-      fuzz: { iterations: 100 },
+      load: async (file) => {
+        const { expectedExpectations: _named, ...rest } = await import(file);
+        return { ...rest, anyName: _named };
+      },
+      fuzz: { iterations: 500 },
     });
-    expect(result.warnings).toEqual([
-      `${EXPECTED}: wrongExpectations matches no machine; name it <machine id>Expectations (machines: expected)`,
-    ]);
+    expect(machineFindings(result.machines[0]!).map((each) => each.kind)).toContain("neverSee");
+  });
+
+  test("an export naming a machine the file lacks is not applied", async () => {
+    const result = await inspectModule(EXPECTED, {
+      load: async (file) => {
+        const { expectedExpectations: named, ...rest } = await import(file);
+        return { ...rest, other: { ...named, machine: "someoneElse" } };
+      },
+      fuzz: { iterations: 500 },
+    });
+    expect(machineFindings(result.machines[0]!).map((each) => each.kind)).not.toContain("neverSee");
   });
 });
 
@@ -280,9 +292,8 @@ describe("expectNoDesignErrors with expectations", () => {
   test("lists the never-see with the events that reach it", () => {
     expect(() =>
       expectNoDesignErrors({
-        id: "expected",
-        create: () => createExpectedActor(),
-        expectations: { counting: { neverSee: [{ count: 3 }] } },
+        machine: expected,
+        expectations: { machine: "expected", states: { counting: { neverSee: [{ count: 3 }] } } },
         fuzz: { iterations: 500 },
       }),
     ).toThrow(
@@ -293,9 +304,8 @@ describe("expectNoDesignErrors with expectations", () => {
   test("a must-see miss says how many runs looked", () => {
     expect(() =>
       expectNoDesignErrors({
-        id: "expected",
-        create: () => createExpectedActor(),
-        expectations: { counting: { mustSee: [{ count: -1 }] } },
+        machine: expected,
+        expectations: { machine: "expected", states: { counting: { mustSee: [{ count: -1 }] } } },
         fuzz: { iterations: 200 },
       }),
     ).toThrow(
@@ -306,8 +316,7 @@ describe("expectNoDesignErrors with expectations", () => {
   test("a handler error gets its after: line too", () => {
     expect(() =>
       expectNoDesignErrors({
-        id: "throwing",
-        create: () => createThrowingActor(),
+        machine: throwing,
         payloads: { pick: [{ side: "a" }, { side: "b" }] },
       }),
     ).toThrow(/- pick in idle throws[^\n]*\n {4}after: pick \{"side":"b"\}/);
@@ -316,12 +325,22 @@ describe("expectNoDesignErrors with expectations", () => {
 
 describe("Expectations type", () => {
   test("is keyed by the machine's states and typed by its context", () => {
-    type Checkout = Expectations<typeof createCheckoutActor>;
-    expectTypeOf<{ payment: { neverSee: [{ orderId: string }] } }>().toExtend<Checkout>();
-    expectTypeOf<{ payment: { neverSee: [{ orderId: undefined }] } }>().toExtend<Checkout>();
-    expectTypeOf<{ paymnt: object }>().not.toExtend<Checkout>();
-    expectTypeOf<{ payment: { neverSee: [{ orderId: number }] } }>().not.toExtend<Checkout>();
-    expectTypeOf<{ __error: object }>().not.toExtend<Checkout>();
+    type Checkout = Expectations<typeof checkout>;
+    expectTypeOf<{
+      machine: "checkout";
+      states: { payment: { neverSee: [{ orderId: string }] } };
+    }>().toExtend<Checkout>();
+    expectTypeOf<{
+      machine: "checkout";
+      states: { payment: { neverSee: [{ orderId: undefined }] } };
+    }>().toExtend<Checkout>();
+    expectTypeOf<{ machine: "checkout"; states: { paymnt: object } }>().not.toExtend<Checkout>();
+    expectTypeOf<{
+      machine: "checkout";
+      states: { payment: { neverSee: [{ orderId: number }] } };
+    }>().not.toExtend<Checkout>();
+    expectTypeOf<{ machine: "checkout"; states: { __error: object } }>().not.toExtend<Checkout>();
+    expectTypeOf<{ machine: "other"; states: object }>().not.toExtend<Checkout>();
   });
 });
 
@@ -329,7 +348,10 @@ describe("Expectations type: machine(...) values", () => {
   test("Expectations<typeof m> is keyed by the machine's states, not never", () => {
     type Deadline = Expectations<typeof deadline>;
     expectTypeOf<Deadline>().not.toBeNever();
-    expectTypeOf<{ error: { neverSee: [object] } }>().toExtend<Deadline>();
-    expectTypeOf<{ eror: object }>().not.toExtend<Deadline>();
+    expectTypeOf<{
+      machine: "deadline";
+      states: { error: { neverSee: [object] } };
+    }>().toExtend<Deadline>();
+    expectTypeOf<{ machine: "deadline"; states: { eror: object } }>().not.toExtend<Deadline>();
   });
 });

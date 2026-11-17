@@ -3,7 +3,7 @@
  * a clock, `{ clock }` options or nothing, an actor instance, and exports
  * that are not machines.
  */
-import { Actor, RealClock, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, event, machine, state } from "@mantaq/core";
 import type { Clock } from "@mantaq/core";
 
 const closed = state("closed")();
@@ -16,7 +16,7 @@ const open = event("open")<{
 }>();
 const knock = event("knock")();
 
-function door(clock: Clock) {
+function doorOn(clock: Clock) {
   return Actor({
     clock,
     inputs: [open, knock],
@@ -33,23 +33,21 @@ function door(clock: Clock) {
   });
 }
 
-export function createDoorActor(clock: VirtualClock = VirtualClock()) {
-  return door(clock);
+export const door = machine("door", {
+  create: ({ clock }) => doorOn(clock),
+});
+
+export const gate = machine("gate", {
+  create: ({ clock }) => ({ actor: doorOn(clock), clock }),
+});
+
+/** Not a machine: a plain function that returns an actor is never discovered. */
+export function createLegacyDoor(clock: VirtualClock = VirtualClock()) {
+  return doorOn(clock);
 }
 
-export function createGate(options: { clock?: VirtualClock } = {}) {
-  const clock = options.clock ?? VirtualClock();
-  return { actor: door(clock), clock };
-}
-
-/** Runs on wall time: drawn, but cannot be fuzzed. */
-export const createRealDoor = () => door(RealClock());
-
-export const sharedDoor = createDoorActor();
-
-export function createNamedDoor(name: string) {
-  return { name, actor: door(VirtualClock()) };
-}
+/** Not a machine: a bare actor cannot be recreated, so it is never discovered. */
+export const sharedDoor = doorOn(VirtualClock());
 
 export function notAMachine(): number {
   return 1;

@@ -1,4 +1,5 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, event, machine, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import type { VizStep } from "@mantaq/viz";
 import { onOutput, withTimeout } from "@mantaq/sugar";
 import { expect, test } from "vite-plus/test";
@@ -17,8 +18,7 @@ const busy = state("busy")();
 const started = event("PAYMENT_STARTED")();
 const strayed = event("STRAY")();
 
-function create(options: { receiver: "none" | "busy-only" | "any"; stray?: true }) {
-  const clock = VirtualClock();
+function create(options: { receiver: "none" | "busy-only" | "any"; stray?: true }, clock: Clock) {
   const checkout = Actor({
     inputs: [payClicked],
     internal: [waitedTooLong],
@@ -62,21 +62,25 @@ function create(options: { receiver: "none" | "busy-only" | "any"; stray?: true 
     });
   }
   onOutput(checkout, (out) => payment.send(out as never));
-  return { actor: checkout, payment, clock };
+  return { actor: checkout, payment };
 }
 
 const pay: VizStep = { kind: "event", event: "PAY_CLICKED", payload: null };
 const injected: VizStep = { kind: "event", event: "WAITED_TOO_LONG", payload: null };
 const advance: VizStep = { kind: "advance", ms: 30_000 };
 
-const withMade = (created: ReturnType<typeof create>) => ({
-  actor: created.actor,
-  clock: created.clock,
-  made: created,
+/** The fuzz driver's view of the machine: it hands its own VirtualClock to `create`. */
+const driven = (options: Parameters<typeof create>[0]) => ({
+  id: "checkout",
+  create: () => {
+    const clock = VirtualClock();
+    const created = create(options, clock);
+    return { actor: created.actor, clock, made: created };
+  },
 });
 
 const lostOf = (receiver: "none" | "busy-only" | "any", steps: VizStep[]) =>
-  execute({ id: "checkout", create: () => withMade(create({ receiver })) }, steps).lost;
+  execute(driven({ receiver }), steps).lost;
 
 test("an injected internal event whose output the receiver handles nowhere is a lost message", () => {
   expect(lostOf("none", [pay, injected])).toEqual([
@@ -109,10 +113,7 @@ test("the fuzzer's own step to a machine that handles it nowhere is not a messag
 });
 
 test("a send from a timer that no machine moved for is not noted", () => {
-  const target = {
-    id: "checkout",
-    create: () => withMade(create({ receiver: "none", stray: true })),
-  };
+  const target = driven({ receiver: "none", stray: true });
   const late: VizStep = { kind: "advance", ms: 10_000 };
   expect(execute(target, [{ kind: "advance", ms: 40_000 }]).lost).toEqual([]);
   // The timeout at 30 s moved checkout in the step before; the stray send is a later step's.
@@ -125,8 +126,10 @@ test("a repeated lost send is noted once", () => {
 });
 
 test("inspect returns the lost message with steps that replay from a fresh actor", () => {
-  const target = { id: "checkout", create: () => create({ receiver: "none" }) };
-  const { lostMessages } = inspect(target);
+  const target = machine("checkout", {
+    create: ({ clock }) => create({ receiver: "none" }, clock),
+  });
+  const { lostMessages } = inspect({ machine: target });
   expect(lostMessages).toHaveLength(1);
   const [found] = lostMessages;
   expect(found).toMatchObject({
@@ -134,11 +137,12 @@ test("inspect returns the lost message with steps that replay from a fresh actor
     receiver: "payment",
     event: "PAYMENT_TIMED_OUT",
   });
-  const fuzzTarget = { id: target.id, create: () => withMade(target.create()) };
-  expect(execute(fuzzTarget, found?.steps ?? []).lost).toHaveLength(1);
+  expect(execute(driven({ receiver: "none" }), found?.steps ?? []).lost).toHaveLength(1);
 });
 
 test("inspect returns no lost message when the receiver handles it", () => {
-  const { lostMessages } = inspect({ id: "checkout", create: () => create({ receiver: "any" }) });
+  const { lostMessages } = inspect({
+    machine: machine("checkout", { create: ({ clock }) => create({ receiver: "any" }, clock) }),
+  });
   expect(lostMessages).toEqual([]);
 });

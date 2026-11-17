@@ -1,7 +1,7 @@
 import { fuzz } from "./fuzz.ts";
 import { execute } from "./run.ts";
 import type { FuzzTarget } from "./run.ts";
-import { createTimerThrowActor } from "../fixtures/timer-throw.ts";
+import { timerThrow } from "../fixtures/timer-throw.ts";
 import type { VizStep } from "@mantaq/viz";
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
@@ -79,7 +79,7 @@ describe("fuzz failure paths", () => {
       id: "pay",
       create: () => {
         const clock = VirtualClock();
-        return { actor: createTimerThrowActor(clock), clock };
+        return { actor: timerThrow.create({ clock }), clock };
       },
     };
     const steps: VizStep[] = [

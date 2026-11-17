@@ -18,7 +18,7 @@ export { branchDistance, branchDistanceGuide, guidance, literalPool } from "./fu
 export { annotateMachine } from "./ast/annotate.ts";
 export type { HandlerSite } from "./ast/annotate.ts";
 export type { AnalysisSource } from "./ast/program.ts";
-export { inspect, inspectModule, machineId, vizDocument } from "./inspect.ts";
+export { inspect, inspectModule, vizDocument } from "./inspect.ts";
 export type {
   FuzzSettings,
   Inspected,

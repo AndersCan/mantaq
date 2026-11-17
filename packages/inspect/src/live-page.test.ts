@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-import { RealClock, VirtualClock } from "@mantaq/core";
+import { VirtualClock } from "@mantaq/core";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { createAnswerActor } from "./fixtures/answer.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
+import { answer as answerMachine } from "./fixtures/answer.ts";
+import { checkout as checkoutMachine } from "./fixtures/checkout.ts";
 import { stubborn } from "./fixtures/machine-values.ts";
-import { createTimedActor } from "./fixtures/timed.ts";
+import { timed as timedMachine } from "./fixtures/timed.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven, mountLiveDriven, takeTargets } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
@@ -15,7 +15,7 @@ const file = join(import.meta.dirname, "fixtures", "checkout.ts");
 
 async function documentText(fuzz = false): Promise<string> {
   const inspected = await inspectModule(file, {
-    load: async () => ({ createCheckoutActor }),
+    load: async () => ({ checkout: checkoutMachine }),
     fuzz: fuzz ? {} : false,
   });
   return serializeViz(vizDocument(inspected.machines));
@@ -27,7 +27,7 @@ describe("mountDriven", () => {
     document.body.append(root);
     const create = () => {
       const clock = VirtualClock();
-      return { actor: createCheckoutActor(clock), clock };
+      return { actor: checkoutMachine.create({ clock }), clock };
     };
     mountDriven(root, {
       source: "test",
@@ -52,7 +52,7 @@ describe("mountDriven", () => {
     const text = await documentText();
     const create = () => {
       const clock = VirtualClock();
-      return { actor: createCheckoutActor(clock), clock };
+      return { actor: checkoutMachine.create({ clock }), clock };
     };
     const modeOf = (effectMode?: "real") => {
       const root = document.createElement("div");
@@ -94,7 +94,7 @@ describe("takeTargets", () => {
 describe("mountDriven preview", () => {
   const create = () => {
     const clock = VirtualClock();
-    return { actor: createCheckoutActor(clock), clock };
+    return { actor: checkoutMachine.create({ clock }), clock };
   };
   const frameOf = async (preview?: { path: string; machines: string[] }) => {
     const root = document.createElement("div");
@@ -150,81 +150,41 @@ describe("mountDriven preview", () => {
   });
 });
 
-describe("mountDriven targets", () => {
-  test("a target on a real clock shows the diagram and Details instead of throwing", async () => {
-    const root = document.createElement("div");
-    const create = () => ({
-      actor: createCheckoutActor(VirtualClock()),
-      clock: RealClock() as unknown as ReturnType<typeof VirtualClock>,
-    });
-    mountDriven(root, {
-      source: "test",
-      text: await documentText(),
-      targets: { checkout: create },
-    });
-    expect(root.querySelector(".explore")).toBeNull();
-    expect(root.querySelector("[data-send], [data-send-edge]")).toBeNull();
-  });
-});
-
 describe("mountDriven machines without timers", () => {
-  function realClockTarget() {
+  /** The target the page builds for a machine: the page's clock goes into `create`. */
+  function target() {
     return () => {
-      const actor = createAnswerActor(RealClock() as unknown as ReturnType<typeof VirtualClock>);
-      return { actor, clock: actor.clock as unknown as ReturnType<typeof VirtualClock> };
+      const clock = VirtualClock();
+      return { actor: answerMachine.create({ clock }), clock };
     };
   }
 
   async function answerText(): Promise<string> {
     const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "answer.ts"), {
-      load: async () => ({ createAnswerActor }),
+      load: async () => ({ answer: answerMachine }),
       fuzz: false,
     });
     return serializeViz(vizDocument(inspected.machines));
   }
 
-  test("an actor on a real clock runs live and marks its current state", async () => {
+  test("a machine on the clock the page gives it runs live and marks its current state", async () => {
     const root = document.createElement("div");
     document.body.append(root);
     mountDriven(root, {
       source: "test",
       text: await answerText(),
-      targets: { answer: realClockTarget() },
+      targets: { answer: target() },
     });
     expect(root.querySelector("[data-live-note]")).not.toBeNull();
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("noAskYet");
     root.remove();
-  });
-
-  test("a timer set on that real clock throws the VirtualClock message", async () => {
-    const root = document.createElement("div");
-    const made: Array<ReturnType<ReturnType<typeof realClockTarget>>> = [];
-    const create = realClockTarget();
-    mountDriven(root, {
-      source: "test",
-      text: await answerText(),
-      targets: {
-        answer: () => {
-          const each = create();
-          made.push(each);
-          return each;
-        },
-      },
-    });
-    const clock = made.at(-1)?.actor.clock;
-    expect(() => clock?.setTimeout(1, { cb: () => {} })).toThrow(
-      "needs a factory that takes a VirtualClock",
-    );
-    expect(() => clock?.setInterval(1, { cb: () => {} })).toThrow(
-      "needs a factory that takes a VirtualClock",
-    );
   });
 });
 
 describe("mountDriven timers when effects run", () => {
   async function timedText(): Promise<string> {
     const inspected = await inspectModule(join(import.meta.dirname, "fixtures", "timed.ts"), {
-      load: async () => ({ createTimedActor }),
+      load: async () => ({ timed: timedMachine }),
       fuzz: false,
     });
     return serializeViz(vizDocument(inspected.machines));
@@ -237,26 +197,6 @@ describe("mountDriven timers when effects run", () => {
     return root;
   }
 
-  test("a timer machine on a real clock says it needs a VirtualClock once its timer starts", async () => {
-    const root = mountRoot();
-    mountDriven(root, {
-      source: "test",
-      text: await timedText(),
-      effectMode: "real",
-      targets: {
-        timed: () => {
-          const actor = createTimedActor(RealClock() as unknown as VirtualClock);
-          return { actor, clock: actor.clock as unknown as VirtualClock };
-        },
-      },
-    });
-    root
-      .querySelector<SVGElement>("g.edge.next")
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.textContent).toContain("needs a factory that takes a VirtualClock");
-    root.remove();
-  });
-
   test("a timer machine on a VirtualClock starts its timer and does not throw", async () => {
     const root = mountRoot();
     mountDriven(root, {
@@ -266,7 +206,7 @@ describe("mountDriven timers when effects run", () => {
       targets: {
         timed: () => {
           const clock = VirtualClock();
-          return { actor: createTimedActor(clock), clock };
+          return { actor: timedMachine.create({ clock }), clock };
         },
       },
     });
@@ -284,7 +224,7 @@ describe("mountDriven values", () => {
   test("the answer events send the code the machine is waiting on and the value set in the Context tab", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
-      load: async () => ({ createAnswerActor }),
+      load: async () => ({ answer: answerMachine }),
       fuzz: false,
     });
     const root = document.createElement("div");
@@ -295,7 +235,7 @@ describe("mountDriven values", () => {
       targets: {
         answer: () => {
           const clock = VirtualClock();
-          return { actor: createAnswerActor(clock), clock };
+          return { actor: answerMachine.create({ clock }), clock };
         },
       },
     });
@@ -312,7 +252,7 @@ describe("mountDriven arrows that land elsewhere", () => {
   test("an arrow whose guard picks another branch is locked and says where it goes", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
-      load: async () => ({ createAnswerActor }),
+      load: async () => ({ answer: answerMachine }),
       fuzz: false,
     });
     history.replaceState(null, "", "/");
@@ -324,7 +264,7 @@ describe("mountDriven arrows that land elsewhere", () => {
       targets: {
         answer: () => {
           const clock = VirtualClock();
-          return { actor: createAnswerActor(clock), clock };
+          return { actor: answerMachine.create({ clock }), clock };
         },
       },
     });
@@ -345,7 +285,7 @@ describe("mountDriven dry run payload", () => {
   test("the dry run sends the code the walk is waiting on, as Send does, once the Context box is cleared", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
-      load: async () => ({ createAnswerActor }),
+      load: async () => ({ answer: answerMachine }),
       fuzz: false,
     });
     history.replaceState(null, "", "/");
@@ -357,7 +297,7 @@ describe("mountDriven dry run payload", () => {
       targets: {
         answer: () => {
           const clock = VirtualClock();
-          return { actor: createAnswerActor(clock), clock };
+          return { actor: answerMachine.create({ clock }), clock };
         },
       },
     });
@@ -444,7 +384,7 @@ describe("mountDriven with several machines", () => {
 describe("mountDriven walk ownership", () => {
   const create = () => {
     const clock = VirtualClock();
-    return { actor: createCheckoutActor(clock), clock };
+    return { actor: checkoutMachine.create({ clock }), clock };
   };
   const current = (root: HTMLElement) =>
     root.querySelector<HTMLElement>(".explore")?.dataset["current"];
@@ -477,7 +417,7 @@ describe("mountDriven walk ownership", () => {
 describe("mountDriven runs by name", () => {
   const create = () => {
     const clock = VirtualClock();
-    return { actor: createCheckoutActor(clock), clock };
+    return { actor: checkoutMachine.create({ clock }), clock };
   };
   const current = (root: HTMLElement) =>
     root.querySelector<HTMLElement>(".explore")?.dataset["current"];
@@ -531,7 +471,7 @@ describe("mountDriven runs by name", () => {
 describe("a link naming several machines", () => {
   const create = () => {
     const clock = VirtualClock();
-    return { actor: createCheckoutActor(clock), clock };
+    return { actor: checkoutMachine.create({ clock }), clock };
   };
   const current = (root: HTMLElement) =>
     root.querySelector<HTMLElement>(".explore")?.dataset["current"];

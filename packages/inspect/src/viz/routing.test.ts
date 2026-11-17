@@ -1,7 +1,8 @@
+import { VirtualClock } from "@mantaq/core";
 import { annotateMachine } from "../ast/annotate.ts";
 import { toVizMachine } from "../structure.ts";
 import { EXAMPLE_ROOT, exampleTargets } from "../examples.ts";
-import { createStateRoutingActor } from "../fixtures/state-routing.ts";
+import { stateRouting } from "../fixtures/state-routing.ts";
 import { routingWarnings } from "@mantaq/viz";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
@@ -9,7 +10,7 @@ import { describe, expect, test } from "vite-plus/test";
 describe("routingWarnings", () => {
   test("flags an onAny handler that picks its target from actor state", () => {
     const machine = annotateMachine(
-      toVizMachine({ id: "routing", actor: createStateRoutingActor() }),
+      toVizMachine({ id: "routing", actor: stateRouting.create({ clock: VirtualClock() }) }),
       {
         file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/state-routing.ts"),
         root: EXAMPLE_ROOT,
@@ -29,7 +30,10 @@ describe("routingWarnings", () => {
   });
 
   test("without AST explanations there is nothing to warn about", () => {
-    const machine = toVizMachine({ id: "routing", actor: createStateRoutingActor() });
+    const machine = toVizMachine({
+      id: "routing",
+      actor: stateRouting.create({ clock: VirtualClock() }),
+    });
     expect(routingWarnings(machine)).toEqual([]);
   });
 });

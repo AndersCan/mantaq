@@ -1,7 +1,8 @@
+import { VirtualClock } from "@mantaq/core";
 import { toVizMachine } from "../structure.ts";
 import { EXAMPLE_ROOT } from "../examples.ts";
-import { createCreditActor } from "../fixtures/credit.ts";
-import { createSwitchyActor } from "../fixtures/switchy.ts";
+import { credit } from "../fixtures/credit.ts";
+import { switchy } from "../fixtures/switchy.ts";
 import { annotateMachine } from "./annotate.ts";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
@@ -10,10 +11,13 @@ const FIXTURES = join(EXAMPLE_ROOT, "packages/inspect/src/fixtures");
 
 describe("AST never fails the run", () => {
   test("missing source: handler edges become not_analyzed with the reason", () => {
-    const machine = annotateMachine(toVizMachine({ id: "credit", actor: createCreditActor() }), {
-      file: join(FIXTURES, "does-not-exist.ts"),
-      root: EXAMPLE_ROOT,
-    });
+    const machine = annotateMachine(
+      toVizMachine({ id: "credit", actor: credit.create({ clock: VirtualClock() }) }),
+      {
+        file: join(FIXTURES, "does-not-exist.ts"),
+        root: EXAMPLE_ROOT,
+      },
+    );
     const handlerEdges = machine.edges.filter((edge) => edge.kind === "transition");
     expect(handlerEdges.length).toBeGreaterThan(0);
     for (const edge of handlerEdges) {
@@ -27,10 +31,13 @@ describe("AST never fails the run", () => {
   });
 
   test("returns inside a switch: not analyzed, with snippet, never guessed", () => {
-    const machine = annotateMachine(toVizMachine({ id: "switchy", actor: createSwitchyActor() }), {
-      file: join(FIXTURES, "switchy.ts"),
-      root: EXAMPLE_ROOT,
-    });
+    const machine = annotateMachine(
+      toVizMachine({ id: "switchy", actor: switchy.create({ clock: VirtualClock() }) }),
+      {
+        file: join(FIXTURES, "switchy.ts"),
+        root: EXAMPLE_ROOT,
+      },
+    );
     const dial = machine.edges.find((edge) => edge.event === "dial");
     expect(dial?.explanation?.status).toBe("not_analyzed");
     if (dial?.explanation?.status !== "not_analyzed") return;
@@ -39,10 +46,13 @@ describe("AST never fails the run", () => {
   });
 
   test("source without a matching registration: not_analyzed names the pair", () => {
-    const machine = annotateMachine(toVizMachine({ id: "credit", actor: createCreditActor() }), {
-      file: join(FIXTURES, "switchy.ts"),
-      root: EXAMPLE_ROOT,
-    });
+    const machine = annotateMachine(
+      toVizMachine({ id: "credit", actor: credit.create({ clock: VirtualClock() }) }),
+      {
+        file: join(FIXTURES, "switchy.ts"),
+        root: EXAMPLE_ROOT,
+      },
+    );
     const apply = machine.edges.find((edge) => edge.event === "apply");
     expect(apply?.explanation).toEqual({
       status: "not_analyzed",

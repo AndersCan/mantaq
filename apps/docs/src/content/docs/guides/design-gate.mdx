@@ -91,7 +91,7 @@ Before: an event named LOADED. After: one named photosLoaded, with a comment say
 
 ### Tell the fuzzer what to expect
 
-Some bugs are not crashes: the machine runs fine and holds the wrong data. Say what must never happen in a block next to the factory, named `<machine id>Expectations`. It is a partial object per state: list only the context keys you care about.
+Some bugs are not crashes: the machine runs fine and holds the wrong data. Say what must never happen in a block next to the machine. Its `machine` field names the machine it is about, and the export may have any name. `states` is a partial object per state: list only the context keys you care about.
 
 `neverSee` lists contexts that are a bug in that state, and fuzzing fails when a run reaches one. `mustSee` lists contexts some run has to reach, and fuzzing fails when none does.
 
@@ -100,11 +100,12 @@ import type { Expectations } from "@mantaq/inspect";
 
 /** What the fuzzer must never see. Delete the line to see the bug go unreported. */
 export const checkoutWithBugsExpectations: Expectations<typeof checkoutWithBugsMachine> = {
-  payment: { neverSee: [{ address: "" }] },
+  machine: "checkoutWithBugs",
+  states: { payment: { neverSee: [{ address: "" }] } },
 };
 ```
 
-This block makes the gate report `payment was reached with {"address":""}`, with the events that got there. Editor completion offers state names and context keys, and a typo fails to compile.
+This block makes the gate report `payment was reached with {"address":""}`, with the events that got there. Editor completion offers state names and context keys, and a typo fails to compile. A block whose `machine` names no machine in the file is not applied.
 
 - `undefined` means "not set": `{ note: undefined }` matches a context without `note`.
 - A must-see miss says no fuzz run reached the context. Add a recorded run to `tests` (see "Assert what gets reached") or raise `fuzz.iterations`.

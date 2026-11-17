@@ -1,10 +1,11 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, VirtualClock, event, machine as asMachine, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import { VIZ_SCHEMA_VERSION, parseViz } from "@mantaq/viz";
 import type { VizStep } from "@mantaq/viz";
 import { onOutput } from "@mantaq/sugar";
 import { expect, test } from "vite-plus/test";
-import { createCheckout } from "../fixtures/lost-message.ts";
-import { createRenamedCheckout } from "../fixtures/renamed-wire.ts";
+import { checkout } from "../fixtures/lost-message.ts";
+import { renamedCheckout } from "../fixtures/renamed-wire.ts";
 import { inspect } from "../inspect.ts";
 import { fuzz } from "./fuzz.ts";
 import { execute } from "./run.ts";
@@ -22,7 +23,7 @@ const wait: VizStep = { kind: "event", event: "WAITED_TOO_LONG", payload: null }
 const renamed = {
   id: "renamedCheckout",
   create: () => {
-    const made = createRenamedCheckout();
+    const made = renamedCheckout.create({ clock: VirtualClock() });
     return { actor: made.actor, clock: VirtualClock(), made };
   },
 };
@@ -117,7 +118,7 @@ test("a message the lost-message checkout sends is listed with the arrow that to
   const lost = {
     id: "checkout",
     create: () => {
-      const made = createCheckout();
+      const made = checkout.create({ clock: VirtualClock() });
       return { actor: made.actor, clock: VirtualClock(), made };
     },
   };
@@ -525,7 +526,7 @@ test("every wire of the renamed checkout gets a line on every seed", () => {
     started,
   ];
   for (let seed = 1; seed <= 100; seed += 1) {
-    const target = { id: "renamedCheckout", create: () => createRenamedCheckout(), fuzz: { seed } };
+    const target = { machine: renamedCheckout, fuzz: { seed } };
     expect({ seed, messages: inspect(target).machine.fuzz?.messages }).toEqual({
       seed,
       messages: expected,
@@ -539,8 +540,7 @@ test("a wire never taken stops at the budget", () => {
   const ready = state("ready")();
   const pinged = state("pinged")().final();
   const open = event("OPEN")();
-  function create() {
-    const clock = VirtualClock();
+  function create(clock: Clock) {
     const b = Actor({
       inputs: [open, ping],
       states: [waiting, ready, pinged],
@@ -570,14 +570,13 @@ test("a wire never taken stops at the budget", () => {
     });
     return { actor: a, clock, made: { b } };
   }
-  const { machine } = inspect({
-    id: "a",
-    create,
+  const { machine: inspected } = inspect({
+    machine: asMachine("a", { create: ({ clock }) => create(clock) }),
     fuzz: { seed: 1, iterations: 0 },
     tests: [{ name: "go", steps: [{ kind: "event", event: "GO", payload: null }] }],
   });
-  expect(machine.fuzz?.iterations).toBe(0);
-  expect(machine.fuzz?.messages).toEqual([]);
+  expect(inspected.fuzz?.iterations).toBe(0);
+  expect(inspected.fuzz?.messages).toEqual([]);
 });
 
 test("fuzzing stops once a wire was taken in any send, even when a later send was not", () => {

@@ -1,3 +1,5 @@
+import type { Machine } from "@mantaq/core";
+
 /** Listed keys must match; unlisted keys are ignored. Nested objects match the same way. Arrays and other values must be equal. `undefined`: the key is not set. */
 export type ContextMatch<C> =
   C extends ReadonlyArray<unknown>
@@ -13,25 +15,28 @@ export interface StateExpectations<C> {
   readonly mustSee?: ReadonlyArray<ContextMatch<C>>;
 }
 
-/** The actor a machine's `create` or a factory returns, or the actor itself. */
-type ActorOf<M> = M extends { create: (...args: never[]) => infer R }
-  ? R extends { actor: infer A }
-    ? A
-    : R
-  : M extends (...args: never[]) => infer R
-    ? R extends { actor: infer A }
-      ? A
-      : R
-    : M;
+/** The actor a machine's `create` returns, or its `{ actor, ... }` result's actor. */
+type ActorOf<M extends Machine> =
+  ReturnType<M["create"]> extends { actor: infer A } ? A : ReturnType<M["create"]>;
 
-/** Expectations for one machine, keyed by its state names. `Expectations<typeof createCheckoutActor>`. */
-export type Expectations<M> =
+/**
+ * Expectations for one machine, keyed by its state names. The export may have
+ * any name: `machine` ties it to the `machine("<id>", …)` it is about.
+ * `Expectations<typeof checkout>`.
+ */
+export type Expectations<M extends Machine> =
   ActorOf<M> extends { state: { name: infer N extends string }; context: infer C }
-    ? { readonly [S in Exclude<N, "__error">]?: StateExpectations<C> }
+    ? {
+        readonly machine: M["id"];
+        readonly states: { readonly [S in Exclude<N, "__error">]?: StateExpectations<C> };
+      }
     : never;
 
 /** What `inspect` accepts at runtime; `Expectations<…>` is assignable to it. */
-export type AnyExpectations = Readonly<Record<string, StateExpectations<unknown>>>;
+export interface AnyExpectations {
+  readonly machine: string;
+  readonly states: Readonly<Record<string, StateExpectations<unknown>>>;
+}
 
 export type JsonPattern =
   | null

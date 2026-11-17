@@ -1,4 +1,5 @@
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import { onOutput } from "@mantaq/sugar";
 import { expect, test } from "vite-plus/test";
 import { inspect } from "../inspect.ts";
@@ -11,8 +12,7 @@ const zap = event("Z_EVENT")();
 const ant = event("A_EVENT")();
 const bee = event("B_EVENT")();
 
-function create() {
-  const clock = VirtualClock();
+function create(clock: Clock) {
   const c = Actor({
     inputs: [known],
     states: [idle],
@@ -59,8 +59,8 @@ function create() {
 }
 
 test("lost messages are sorted by sender, then receiver, then event", () => {
-  const found = inspect({ id: "a", create }).lostMessages.map(
-    ({ sender, receiver, event: name }) => `${sender} ${receiver} ${name}`,
-  );
+  const found = inspect({
+    machine: machine("a", { create: ({ clock }) => create(clock) }),
+  }).lostMessages.map(({ sender, receiver, event: name }) => `${sender} ${receiver} ${name}`);
   expect(found).toEqual(["a b A_EVENT", "a b Z_EVENT", "a c Y_EVENT", "b c B_EVENT"]);
 });

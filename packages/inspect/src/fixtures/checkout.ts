@@ -4,7 +4,7 @@
  * handlers are copied verbatim here; the `chargeCard` effect is stubbed, so
  * payment results arrive as injected internal events.
  */
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 type BasicInfo = { email: string; name: string };
 type ShippingAddress = { street: string; city: string; zip: string };
@@ -32,89 +32,91 @@ const paymentOk = event("paymentOk")<{ orderId: string }>();
 const paymentFail = event("paymentFail")<{ reason: string }>();
 const paymentTimeout = event("paymentTimeout")();
 
-export function createCheckoutActor(clock: VirtualClock = VirtualClock()) {
-  const initialContext: CheckoutContext = {};
-  const actor = Actor({
-    inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, paymentTimeout],
-    states: [basicInfo, shippingAddress, payment, submitting, success, error],
-    initial: basicInfo,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      m.effect(submitting, {
-        name: "chargeCard",
-        sends: [paymentOk, paymentFail, paymentTimeout],
-        fn: () => undefined,
-      });
-      m.on(payment, {
-        event: back,
-        to: [shippingAddress],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.paymentInfo = undefined;
-          context.set(current);
-          return { state: shippingAddress };
-        },
-      });
-      m.on(shippingAddress, {
-        event: back,
-        to: [basicInfo],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.shippingAddress = undefined;
-          context.set(current);
-          return { state: basicInfo };
-        },
-      });
-      m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
-      m.on(basicInfo, {
-        event: submitBasicInfo,
-        to: [shippingAddress],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.basicInfo = event.payload;
-          context.set(current);
-          return { state: shippingAddress };
-        },
-      });
-      m.on(shippingAddress, {
-        event: submitShipping,
-        to: [payment],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.shippingAddress = event.payload;
-          context.set(current);
-          return { state: payment };
-        },
-      });
-      m.on(payment, {
-        event: submitPayment,
-        to: [submitting],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.paymentInfo = event.payload;
-          context.set(current);
-          return { state: submitting };
-        },
-      });
-      m.on(submitting, {
-        event: paymentOk,
-        to: [success],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.orderId = event.payload.orderId;
-          context.set(current);
-          return { state: success };
-        },
-      });
-      m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
-      m.on(submitting, {
-        event: paymentTimeout,
-        to: [error],
-        handler: () => ({ state: error }),
-      });
-    },
-  });
-  return actor;
-}
+export const checkout = machine("checkout", {
+  create: ({ clock }) => {
+    const initialContext: CheckoutContext = {};
+    const actor = Actor({
+      inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+      internal: [paymentOk, paymentFail, paymentTimeout],
+      states: [basicInfo, shippingAddress, payment, submitting, success, error],
+      initial: basicInfo,
+      clock,
+      context: initialContext,
+      setup: (m) => {
+        m.effect(submitting, {
+          name: "chargeCard",
+          sends: [paymentOk, paymentFail, paymentTimeout],
+          fn: () => undefined,
+        });
+        m.on(payment, {
+          event: back,
+          to: [shippingAddress],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.paymentInfo = undefined;
+            context.set(current);
+            return { state: shippingAddress };
+          },
+        });
+        m.on(shippingAddress, {
+          event: back,
+          to: [basicInfo],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.shippingAddress = undefined;
+            context.set(current);
+            return { state: basicInfo };
+          },
+        });
+        m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
+        m.on(basicInfo, {
+          event: submitBasicInfo,
+          to: [shippingAddress],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.basicInfo = event.payload;
+            context.set(current);
+            return { state: shippingAddress };
+          },
+        });
+        m.on(shippingAddress, {
+          event: submitShipping,
+          to: [payment],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.shippingAddress = event.payload;
+            context.set(current);
+            return { state: payment };
+          },
+        });
+        m.on(payment, {
+          event: submitPayment,
+          to: [submitting],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.paymentInfo = event.payload;
+            context.set(current);
+            return { state: submitting };
+          },
+        });
+        m.on(submitting, {
+          event: paymentOk,
+          to: [success],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.orderId = event.payload.orderId;
+            context.set(current);
+            return { state: success };
+          },
+        });
+        m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
+        m.on(submitting, {
+          event: paymentTimeout,
+          to: [error],
+          handler: () => ({ state: error }),
+        });
+      },
+    });
+    return actor;
+  },
+});

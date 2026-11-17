@@ -1,5 +1,5 @@
 /** Payload fields with `@example` tags, fitting and not. */
-import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 const idle = state("idle")();
 const done = state("done")();
@@ -27,15 +27,17 @@ const save = event("save")<{
   size: "s" | "m";
 }>();
 
-export function createExamplesActor(clock: VirtualClock = VirtualClock()) {
-  return Actor({
-    inputs: [save],
-    states: [idle, done],
-    initial: idle,
-    clock,
-    context: {},
-    setup: (m) => {
-      m.on(idle, { event: save, to: [done], handler: () => ({ state: done }) });
-    },
-  });
-}
+export const examples = machine("examples", {
+  create: ({ clock }) => {
+    return Actor({
+      inputs: [save],
+      states: [idle, done],
+      initial: idle,
+      clock,
+      context: {},
+      setup: (m) => {
+        m.on(idle, { event: save, to: [done], handler: () => ({ state: done }) });
+      },
+    });
+  },
+});

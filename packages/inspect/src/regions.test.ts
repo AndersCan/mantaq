@@ -3,8 +3,8 @@ import { DEFAULT_SEED } from "@mantaq/pbt";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createUploadRegionsActor } from "./fixtures/upload-regions.ts";
-import { createNestedRegionsActor } from "./fixtures/nested-regions.ts";
+import { uploadRegions } from "./fixtures/upload-regions.ts";
+import { nestedRegions } from "./fixtures/nested-regions.ts";
 import { fuzz } from "./fuzz/fuzz.ts";
 import { execute } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
@@ -15,7 +15,7 @@ const target: FuzzTarget = {
   id: "uploadRegions",
   create: () => {
     const clock = VirtualClock();
-    return { actor: createUploadRegionsActor({ clock }), clock };
+    return { actor: uploadRegions.create({ clock }), clock };
   },
 };
 
@@ -153,7 +153,7 @@ describe("nested regions", () => {
     id: "nested",
     create: () => {
       const clock = VirtualClock();
-      return { actor: createNestedRegionsActor({ clock, ran }), clock };
+      return { actor: nestedRegions.create({ clock, ran }), clock };
     },
   };
   const toWorker = {

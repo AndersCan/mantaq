@@ -1,7 +1,7 @@
 import { EXAMPLE_ROOT } from "./examples.ts";
-import { createCheckoutActor } from "./fixtures/checkout.ts";
-import { createDoorActor } from "./fixtures/factories.ts";
-import { inspect, inspectModule, machineId } from "./inspect.ts";
+import { checkout as checkoutMachine } from "./fixtures/checkout.ts";
+import { door } from "./fixtures/factories.ts";
+import { inspect, inspectModule } from "./inspect.ts";
 import type { VizStep } from "@mantaq/viz";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
@@ -11,7 +11,7 @@ const source = { file: FACTORIES, root: EXAMPLE_ROOT };
 
 describe("inspect", () => {
   test("payloads read from the event types let fuzzing reach a payload-guarded state", () => {
-    const { machine, warnings } = inspect({ id: "door", create: () => createDoorActor(), source });
+    const { machine, warnings } = inspect({ machine: door, source });
     expect(warnings).toEqual([]);
     // Full coverage ends the run before the 2000 cap.
     expect(machine.fuzz?.iterations).toBeLessThan(2000);
@@ -24,8 +24,7 @@ describe("inspect", () => {
 
   test("structure only, with no source: nothing to warn about", () => {
     const { machine, warnings } = inspect({
-      id: "door",
-      create: () => createDoorActor(),
+      machine: door,
       fuzz: false,
     });
     expect(warnings).toEqual([]);
@@ -36,8 +35,7 @@ describe("inspect", () => {
 
   test("test sequences fill `tested`", () => {
     const { machine } = inspect({
-      id: "door",
-      create: () => createDoorActor(),
+      machine: door,
       fuzz: false,
       tests: [{ name: "knock", steps: [{ kind: "event", event: "knock", payload: null }] }],
     });
@@ -50,8 +48,7 @@ describe("inspect", () => {
   test("example tests seed the fuzz corpus", () => {
     const knock: VizStep[] = [{ kind: "event", event: "knock", payload: null }];
     const { machine } = inspect({
-      id: "door",
-      create: () => createDoorActor(),
+      machine: door,
       fuzz: { iterations: 0 },
       tests: [{ name: "knock", steps: knock }],
     });
@@ -61,8 +58,7 @@ describe("inspect", () => {
   test("given payloads replace the ones read from types", () => {
     const given = { by: "code", code: "given", tags: [], at: { floor: 7, urgent: true } };
     const { machine } = inspect({
-      id: "door",
-      create: () => createDoorActor(),
+      machine: door,
       source,
       payloads: { open: [given] },
       fuzz: { iterations: 200 },
@@ -77,8 +73,7 @@ describe("inspect", () => {
 
 describe("inspect: fuzz budget", () => {
   const checkout = {
-    id: "checkout",
-    create: () => createCheckoutActor(),
+    machine: checkoutMachine,
     source: {
       file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/checkout.ts"),
       root: EXAMPLE_ROOT,
@@ -142,24 +137,13 @@ describe("inspect: fuzz budget", () => {
 });
 
 describe("inspectModule", () => {
-  test("every factory becomes a machine; the instance export is left out", async () => {
+  test("every machine(...) export becomes a machine; a plain function and an actor instance are left out", async () => {
     const result = await inspectModule(FACTORIES, {
       load: async (file) => import(file),
       fuzz: { iterations: 100 },
     });
-    expect(result.machines.map((machine) => machine.id)).toEqual(["door", "gate", "realDoor"]);
+    expect(result.machines.map((machine) => machine.id)).toEqual(["door", "gate"]);
     expect(result.machines.find((machine) => machine.id === "gate")?.fuzz).not.toBeNull();
-    expect(result.warnings).toEqual([
-      "realDoor: not fuzzed: the actor does not run on a VirtualClock",
-    ]);
-  });
-});
-
-describe("machineId", () => {
-  test("drops create… and …Actor, keeps other names", () => {
-    expect(machineId("createCheckoutActor")).toBe("checkout");
-    expect(machineId("createGate")).toBe("gate");
-    expect(machineId("sharedDoor")).toBe("sharedDoor");
-    expect(machineId("create")).toBe("create");
+    expect(result.warnings).toEqual([]);
   });
 });

@@ -324,7 +324,7 @@ async function drawPanel(page: Page, id: string, problems: string[]): Promise<st
     return `${id} did not draw a panel. Page problems: ${problems.length === 0 ? "none" : problems.join("; ")}.`;
   }
   if ((await page.$("[data-live-note]")) === null) {
-    return `${id} is not live: export a factory that takes a VirtualClock (see the @mantaq/inspect README).`;
+    return `${id} is not live: create() built its actor on a clock it was not given. Pass the clock create() gets to Actor({ clock }).`;
   }
   return undefined;
 }

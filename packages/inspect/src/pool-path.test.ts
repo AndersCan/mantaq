@@ -4,12 +4,12 @@ import { VIZ_SCHEMA_VERSION } from "@mantaq/viz";
 import { mountViewer } from "@mantaq/viz/viewer";
 import { expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
-import { createTeamInbox } from "./fixtures/pool.ts";
+import { teamInbox } from "./fixtures/pool.ts";
 import { toViz } from "./structure.ts";
 
 const create = () => {
   const clock = VirtualClock();
-  const made = createTeamInbox({ clock });
+  const made = teamInbox.create({ clock });
   return { actor: made.actor, clock, made };
 };
 const machine = toViz([{ id: "teamInbox", ...create() }]).machines[0]!;

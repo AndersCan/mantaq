@@ -1,6 +1,7 @@
-import { createSketchActor } from "./sketch.ts";
+import { VirtualClock } from "@mantaq/core";
+import { sketchDraft as sketch } from "./sketch.ts";
 import { expect, test } from "vite-plus/test";
 
 test("the sketch starts idle", () => {
-  expect(createSketchActor().state.name).toBe("idle");
+  expect(sketch.create({ clock: VirtualClock() }).state.name).toBe("idle");
 });
