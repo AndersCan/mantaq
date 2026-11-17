@@ -27,3 +27,8 @@ export function addedLines(before: string, after: string): number[] {
   }
   return added;
 }
+
+/** The tutorial source as the page shows it: step numbers in names are dropped. */
+export function shownStep(source: string): string {
+  return source.replace(/\bmeal\d\b/g, "meal");
+}

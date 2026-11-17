@@ -2,12 +2,11 @@ import { VirtualClock } from "@mantaq/core";
 import { expectNoDesignErrors } from "@mantaq/inspect";
 import { createDriver } from "@mantaq/inspect/drive";
 import { expect, test } from "vite-plus/test";
-import { createCheckout } from "./talking-machines.ts";
+import { checkoutMachine } from "./talking-machines.ts";
 
 test("checkout and stock have no design errors", () => {
   expectNoDesignErrors({
-    id: "checkout",
-    create: () => createCheckout({ clock: VirtualClock() }),
+    machine: checkoutMachine,
     payloads: {},
   });
 });
@@ -17,7 +16,7 @@ test("one click on CHECKOUT_STARTED goes into stock and back", () => {
     id: "checkout",
     create: () => {
       const clock = VirtualClock();
-      const made = createCheckout({ clock });
+      const made = checkoutMachine.create({ clock });
       return { actor: made.actor, clock, made };
     },
   });

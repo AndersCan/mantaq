@@ -1,13 +1,13 @@
 import { VirtualClock } from "@mantaq/core";
 import { recordRuns } from "@mantaq/inspect/record";
 import { expect, test } from "vite-plus/test";
-import { createTeamInbox } from "./team-inbox.ts";
+import { teamInboxMachine } from "./team-inbox.ts";
 
-const make = recordRuns(createTeamInbox);
+const make = recordRuns(teamInboxMachine);
 
 test("Four items, three workers", async () => {
   const clock = VirtualClock();
-  const pool = make({ clock });
+  const pool = make.create({ clock });
   for (const item of ["a", "b", "c", "d"]) {
     pool.actor.send(pool.events.ITEM_ARRIVED.create({ item }));
     await pool.actor.settled();
@@ -21,7 +21,7 @@ test("Four items, three workers", async () => {
 
 test("A worker runs an item for one second on the pool's clock", async () => {
   const clock = VirtualClock();
-  const pool = createTeamInbox({ clock });
+  const pool = teamInboxMachine.create({ clock });
   pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
   await pool.actor.settled();
   expect(pool.workers.get("w1")?.state.name).toBe("working");
@@ -35,7 +35,7 @@ test("A worker runs an item for one second on the pool's clock", async () => {
 
 test("Disposing the workers mid-run stops the one-second wait", async () => {
   const clock = VirtualClock();
-  const pool = createTeamInbox({ clock });
+  const pool = teamInboxMachine.create({ clock });
   pool.actor.send(pool.events.ITEM_ARRIVED.create({ item: "a" }));
   await pool.actor.settled();
   expect(pool.workers.get("w1")?.state.name).toBe("working");

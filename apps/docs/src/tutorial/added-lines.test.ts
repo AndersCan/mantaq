@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vite-plus/test";
-import { addedLines } from "./added-lines.ts";
+import { addedLines, shownStep } from "./added-lines.ts";
+
+describe("shownStep", () => {
+  test("drops the step number from names", () => {
+    expect(shownStep("const meal3 = 1; meal3.x; meal10; xmeal3")).toBe(
+      "const meal = 1; meal.x; meal10; xmeal3",
+    );
+  });
+});
 
 describe("addedLines", () => {
   test("identical text has no added lines", () => {
@@ -29,12 +37,9 @@ describe("addedLines", () => {
   });
   test("tutorial page 3 highlights exactly what step 3 adds", () => {
     const shown = (name: string) =>
-      readFileSync(new URL(`./${name}`, import.meta.url), "utf8").replace(
-        /createMeal\d+/g,
-        "createMeal",
-      );
+      shownStep(readFileSync(new URL(`./${name}`, import.meta.url), "utf8"));
     expect(addedLines(shown("meal-02.ts"), shown("meal-03.ts"))).toEqual([
-      1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+      1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
     ]);
   });
 });

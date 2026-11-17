@@ -1,9 +1,8 @@
-import { VirtualClock } from "@mantaq/core";
 import { createTestHarness } from "@mantaq/test";
 import { Either } from "@mantaq/utils";
 import {
-  createMemberList,
-  createMembership,
+  memberListMachine,
+  membershipMachine,
   initialStateFromRecords,
   type MembershipPort,
   type MembershipRecords,
@@ -37,10 +36,9 @@ function fakePort(verdict: "ok" | "no" | "reject"): {
 
 function setup(records: MembershipRecords, options: { verdict?: "ok" | "no" | "reject" } = {}) {
   const verdict = options.verdict ?? "ok";
-  const clock = VirtualClock();
   const { port, seen } = fakePort(verdict);
-  const { actor } = createMembership({ port, clock, records });
-  const list = createMemberList({ clock, sources: [{ actor }] });
+  const { actor } = membershipMachine.create({ port, records });
+  const list = memberListMachine.create({ sources: [{ actor }] });
   return { actor, list, seen, harness: createTestHarness(actor) };
 }
 

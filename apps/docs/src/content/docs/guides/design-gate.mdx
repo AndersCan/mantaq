@@ -19,12 +19,11 @@ Vitest helpers from `@mantaq/inspect` that fail a test on design errors and on s
 import { expectAllStatesReached, expectNoDesignErrors, expectReached } from "@mantaq/inspect";
 ```
 
-Each helper takes an inspect target: an `id` and a `create` function that returns a fresh actor on a `VirtualClock`.
+Each helper takes an inspect target: a `machine`, which builds a fresh actor on a `VirtualClock`.
 
 ```ts
 const target = {
-  id: "checkout",
-  create: () => createCheckoutActor(),
+  machine: checkoutMachine,
   source: {
     file: join(import.meta.dirname, "checkout.ts"),
     root: import.meta.dirname,
@@ -100,7 +99,7 @@ Some bugs are not crashes: the machine runs fine and holds the wrong data. Say w
 import type { Expectations } from "@mantaq/inspect";
 
 /** What the fuzzer must never see. Delete the line to see the bug go unreported. */
-export const checkoutWithBugsExpectations: Expectations<typeof createCheckoutWithBugsActor> = {
+export const checkoutWithBugsExpectations: Expectations<typeof checkoutWithBugsMachine> = {
   payment: { neverSee: [{ address: "" }] },
 };
 ```
@@ -141,8 +140,7 @@ Fix a miss by adding an example run, or by raising `fuzz.iterations` (default 20
 
 ```ts
 const target = {
-  id: "checkout",
-  create: () => createCheckoutActor(),
+  machine: checkoutMachine,
   tests: [
     {
       name: "basic info, then shipping",

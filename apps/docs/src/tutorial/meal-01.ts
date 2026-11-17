@@ -1,13 +1,15 @@
-import { Actor, state } from "@mantaq/core";
+import { Actor, machine, state } from "@mantaq/core";
 
 /** The person wants food. */
 const hungry = state("hungry")();
 
-export function createMeal1() {
-  return Actor({
-    inputs: [],
-    states: [hungry],
-    initial: hungry,
-    setup: () => {},
-  });
-}
+export const meal1 = machine("meal1", {
+  create: () => {
+    return Actor({
+      inputs: [],
+      states: [hungry],
+      initial: hungry,
+      setup: () => {},
+    });
+  },
+});

@@ -13,7 +13,8 @@
  *                                      ^ (back) v                  v (back)
  *                                                               error
  */
-import { Actor, VirtualClock, state, event } from "@mantaq/core";
+import { Actor, machine, state, event } from "@mantaq/core";
+import type { Clock } from "@mantaq/core";
 import { withTimeout, withPromise } from "@mantaq/sugar";
 
 export type BasicInfo = {
@@ -83,120 +84,124 @@ export function chargeCard(cardNumber: string): Promise<string> {
   return Promise.resolve(`ord_${cardNumber.slice(-4)}`);
 }
 
-export function createCheckoutActor(
-  options: { clock?: VirtualClock; chargeCard?: typeof chargeCard } = {},
-) {
-  const chargeCardImpl = options.chargeCard ?? chargeCard;
-  const c = options.clock ?? VirtualClock();
-  const initialContext: CheckoutContext = {};
-  const actor = Actor({
-    inputs: [submitBasicInfo, submitShipping, submitPayment, back],
-    internal: [paymentOk, paymentFail, paymentTimeout],
-    states: [basicInfo, shippingAddress, payment, submitting, success, error],
-    initial: basicInfo,
-    clock: c,
-    context: initialContext,
-    setup: (m) => {
-      /** Charges the card; the answer comes back as paymentOk, paymentFail or paymentTimeout. */
-      m.effect(submitting, {
-        name: "chargeCard",
-        sends: [paymentOk, paymentFail, paymentTimeout],
-        fn: (input) => {
-          const snapshot = input.context.get();
-          if (!snapshot.paymentInfo) {
-            return;
-          }
-          withTimeout(800, { input: input, event: () => paymentTimeout.create() });
-          return withPromise({
-            promise: chargeCardImpl(snapshot.paymentInfo.cardNumber),
-            signal: input.signal,
-            emit: input.emit,
-            events: {
-              success: (orderId) => paymentOk.create({ orderId }),
-              error: (reason) => paymentFail.create({ reason: String(reason) }),
-            },
-          });
-        },
-      });
-      /** The visitor went back from payment, so the card details are cleared. */
-      m.on(payment, {
-        event: back,
-        to: [shippingAddress],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.paymentInfo = undefined;
-          context.set(current);
-          return { state: shippingAddress };
-        },
-      });
-      /** The visitor went back from shipping, so the address is cleared. */
-      m.on(shippingAddress, {
-        event: back,
-        to: [basicInfo],
-        handler: (_event, { context }) => {
-          const current = context.get();
-          current.shippingAddress = undefined;
-          context.set(current);
-          return { state: basicInfo };
-        },
-      });
-      /** The visitor went back from the error to try another card. */
-      m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
-      /** The name and email are saved, and the shipping form opens. */
-      m.on(basicInfo, {
-        event: submitBasicInfo,
-        to: [shippingAddress],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.basicInfo = event.payload;
-          context.set(current);
-          return { state: shippingAddress };
-        },
-      });
-      /** The address is saved, and the card form opens. */
-      m.on(shippingAddress, {
-        event: submitShipping,
-        to: [payment],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.shippingAddress = event.payload;
-          context.set(current);
-          return { state: payment };
-        },
-      });
-      /** The card details are saved, and the charge starts. */
-      m.on(payment, {
-        event: submitPayment,
-        to: [submitting],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.paymentInfo = event.payload;
-          context.set(current);
-          return { state: submitting };
-        },
-      });
-      /** The order id is saved, and the order is done. */
-      m.on(submitting, {
-        event: paymentOk,
-        to: [success],
-        handler: (event, { context }) => {
-          const current = context.get();
-          current.orderId = event.payload.orderId;
-          context.set(current);
-          return { state: success };
-        },
-      });
-      /** The card was declined, so the visitor sees why. */
-      m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
-      /** The charge took too long, so the visitor sees an error. */
-      m.on(submitting, {
-        event: paymentTimeout,
-        to: [error],
-        handler: () => ({ state: error }),
-      });
-    },
-  });
-  return { actor, clock: c };
-}
+export const checkoutMachine = machine("checkout", {
+  create: ({
+    clock,
+    chargeCard: chargeCardImpl = chargeCard,
+  }: {
+    clock: Clock;
+    chargeCard?: typeof chargeCard;
+  }) => {
+    const initialContext: CheckoutContext = {};
+    const actor = Actor({
+      inputs: [submitBasicInfo, submitShipping, submitPayment, back],
+      internal: [paymentOk, paymentFail, paymentTimeout],
+      states: [basicInfo, shippingAddress, payment, submitting, success, error],
+      initial: basicInfo,
+      clock,
+      context: initialContext,
+      setup: (m) => {
+        /** Charges the card; the answer comes back as paymentOk, paymentFail or paymentTimeout. */
+        m.effect(submitting, {
+          name: "chargeCard",
+          sends: [paymentOk, paymentFail, paymentTimeout],
+          fn: (input) => {
+            const snapshot = input.context.get();
+            if (!snapshot.paymentInfo) {
+              return;
+            }
+            withTimeout(800, { input: input, event: () => paymentTimeout.create() });
+            return withPromise({
+              promise: chargeCardImpl(snapshot.paymentInfo.cardNumber),
+              signal: input.signal,
+              emit: input.emit,
+              events: {
+                success: (orderId) => paymentOk.create({ orderId }),
+                error: (reason) => paymentFail.create({ reason: String(reason) }),
+              },
+            });
+          },
+        });
+        /** The visitor went back from payment, so the card details are cleared. */
+        m.on(payment, {
+          event: back,
+          to: [shippingAddress],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.paymentInfo = undefined;
+            context.set(current);
+            return { state: shippingAddress };
+          },
+        });
+        /** The visitor went back from shipping, so the address is cleared. */
+        m.on(shippingAddress, {
+          event: back,
+          to: [basicInfo],
+          handler: (_event, { context }) => {
+            const current = context.get();
+            current.shippingAddress = undefined;
+            context.set(current);
+            return { state: basicInfo };
+          },
+        });
+        /** The visitor went back from the error to try another card. */
+        m.on(error, { event: back, to: [payment], handler: () => ({ state: payment }) });
+        /** The name and email are saved, and the shipping form opens. */
+        m.on(basicInfo, {
+          event: submitBasicInfo,
+          to: [shippingAddress],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.basicInfo = event.payload;
+            context.set(current);
+            return { state: shippingAddress };
+          },
+        });
+        /** The address is saved, and the card form opens. */
+        m.on(shippingAddress, {
+          event: submitShipping,
+          to: [payment],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.shippingAddress = event.payload;
+            context.set(current);
+            return { state: payment };
+          },
+        });
+        /** The card details are saved, and the charge starts. */
+        m.on(payment, {
+          event: submitPayment,
+          to: [submitting],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.paymentInfo = event.payload;
+            context.set(current);
+            return { state: submitting };
+          },
+        });
+        /** The order id is saved, and the order is done. */
+        m.on(submitting, {
+          event: paymentOk,
+          to: [success],
+          handler: (event, { context }) => {
+            const current = context.get();
+            current.orderId = event.payload.orderId;
+            context.set(current);
+            return { state: success };
+          },
+        });
+        /** The card was declined, so the visitor sees why. */
+        m.on(submitting, { event: paymentFail, to: [error], handler: () => ({ state: error }) });
+        /** The charge took too long, so the visitor sees an error. */
+        m.on(submitting, {
+          event: paymentTimeout,
+          to: [error],
+          handler: () => ({ state: error }),
+        });
+      },
+    });
+    return { actor };
+  },
+});
 
-export const checkout = createCheckoutActor().actor;
+export const checkout = checkoutMachine.create().actor;

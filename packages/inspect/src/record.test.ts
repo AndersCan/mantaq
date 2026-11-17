@@ -11,7 +11,7 @@ import { normalizeRun } from "./runs.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import { VirtualClock } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
-import { createCheckoutActor } from "../../../apps/docs/src/content/docs/checkout.ts";
+import { checkoutMachine } from "../../../apps/docs/src/content/docs/checkout.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, "..");
@@ -166,7 +166,7 @@ test("empty", () => { make().send({ type: "start", payload: {} } as never); });`
     const file = testFile(
       dir,
       `test("card declined", async () => {
-  const { actor } = make({ clock: VirtualClock() });
+  const { actor } = make.create({ clock: VirtualClock() });
   actor.send({ type: "submitBasicInfo", payload: { email: "a@b.c", name: "Ann" } });
   actor.send({ type: "submitShipping", payload: { street: "1 Main", city: "Oslo", zip: "0150" } });
   actor.send({ type: "submitPayment", payload: { cardNumber: "4242" } });
@@ -176,7 +176,7 @@ test("empty", () => { make().send({ type: "start", payload: {} } as never); });`
 });`,
       {
         fixture: join(EXAMPLE_ROOT, "apps/docs/src/content/docs/checkout.ts"),
-        factory: "createCheckoutActor",
+        factory: "checkoutMachine",
       },
     );
     const ran = run(dir, {});
@@ -200,7 +200,7 @@ test("empty", () => { make().send({ type: "start", payload: {} } as never); });`
       id: "checkout",
       create: () => {
         const clock = VirtualClock();
-        return { actor: createCheckoutActor({ clock }).actor, clock };
+        return { actor: checkoutMachine.create({ clock }).actor, clock };
       },
     };
     expect(normalizeRun(target, walk)).toEqual(Either.right(walk.steps));

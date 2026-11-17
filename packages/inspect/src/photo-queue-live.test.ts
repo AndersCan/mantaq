@@ -3,7 +3,7 @@ import { VirtualClock } from "@mantaq/core";
 import { serializeViz } from "@mantaq/viz";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { createPhotoQueueActor } from "../../../apps/docs/src/content/docs/photo-queue.ts";
+import { photoQueueMachine } from "../../../apps/docs/src/content/docs/photo-queue.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven } from "./live-page.ts";
 import { sendVia } from "./send-via.ts";
@@ -12,7 +12,7 @@ const file = join(import.meta.dirname, "../../../apps/docs/src/content/docs/phot
 
 async function mounted(): Promise<HTMLElement> {
   const inspected = await inspectModule(file, {
-    load: async () => ({ createPhotoQueueActor }),
+    load: async () => ({ photoQueueMachine }),
     fuzz: false,
   });
   history.replaceState(null, "", "?");
@@ -24,7 +24,7 @@ async function mounted(): Promise<HTMLElement> {
     targets: {
       photoQueue: () => {
         const clock = VirtualClock();
-        const made = createPhotoQueueActor({ clock });
+        const made = photoQueueMachine.create();
         return { actor: made.actor, clock, made };
       },
     },

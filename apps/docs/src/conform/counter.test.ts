@@ -1,11 +1,11 @@
 import { assertMatchesModel } from "@mantaq/test";
 import { test } from "vite-plus/test";
 import { createCounter } from "./counter";
-import { createCounterModel } from "./counter-model";
+import { counterModel } from "./counter-model";
 
 test("the counter app matches its model", async () => {
   await assertMatchesModel({
-    model: createCounterModel,
+    model: () => counterModel.create(),
     start: () => createCounter(3),
     events: {
       increment: (app) => app.increment(),

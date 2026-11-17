@@ -18,7 +18,7 @@ Asserting the final state says nothing about the path. The record lets a test as
 ```ts
 import { createTestHarness } from "@mantaq/test";
 
-const { actor } = createCheckoutActor({ chargeCard: async () => "ord_1" });
+const { actor } = checkoutMachine.create({ chargeCard: async () => "ord_1" });
 const harness = createTestHarness(actor);
 ```
 

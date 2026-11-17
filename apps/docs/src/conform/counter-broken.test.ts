@@ -1,13 +1,13 @@
 import { assertMatchesModel } from "@mantaq/test";
 import { expect, test } from "vite-plus/test";
 import { createCounter } from "./counter-broken";
-import { createCounterModel } from "./counter-model";
+import { counterModel } from "./counter-model";
 import failure from "./counter-broken.txt?raw";
 
 test("a counter that passes its maximum fails with the printed sequence", async () => {
   await expect(
     assertMatchesModel({
-      model: createCounterModel,
+      model: () => counterModel.create(),
       start: () => createCounter(3),
       events: {
         increment: (app) => app.increment(),

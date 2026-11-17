@@ -1,12 +1,13 @@
 /** A pool for the design page: one inbox and three workers, to show the pool view. */
-import { VirtualClock } from "@mantaq/core";
+import { machine } from "@mantaq/core";
 import { createPool } from "@mantaq/sugar";
 
-export function createDesignPool({ clock = VirtualClock() }: { clock?: VirtualClock } = {}) {
-  return createPool<string, "team">({
-    name: "team",
-    workers: 3,
-    run: () => Promise.resolve(),
-    clock,
-  });
-}
+export const designPoolMachine = machine("designPool", {
+  create: () => {
+    return createPool<string, "team">({
+      name: "team",
+      workers: 3,
+      run: () => Promise.resolve(),
+    });
+  },
+});

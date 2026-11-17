@@ -1,7 +1,7 @@
 ---
 import { Code } from "@astrojs/starlight/components";
 import Machine from "@mantaq/inspect/astro/Machine.astro";
-import { addedLines } from "../tutorial/added-lines.ts";
+import { addedLines, shownStep } from "../tutorial/added-lines.ts";
 
 const sources = import.meta.glob<string>("../tutorial/meal-*.ts", {
   query: "?raw",
@@ -11,8 +11,10 @@ const sources = import.meta.glob<string>("../tutorial/meal-*.ts", {
 
 const { n } = Astro.props;
 const name = (k: number) => `meal-${String(k).padStart(2, "0")}.ts`;
-const shownOf = (k: number) =>
-  sources[`../tutorial/${name(k)}`]?.replace(/createMeal\d+/g, "createMeal");
+const shownOf = (k: number) => {
+  const source = sources[`../tutorial/${name(k)}`];
+  return source === undefined ? undefined : shownStep(source);
+};
 const shown = Number.isInteger(n) ? shownOf(n) : undefined;
 if (shown === undefined) {
   throw new Error(`<Step n={${n}}>: no src/tutorial/${name(n)}; steps are 1-9`);

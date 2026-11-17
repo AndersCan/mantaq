@@ -16,23 +16,23 @@ A machine in an app talks to the outside world: a payment provider, a timer. If 
 ### A factory with ports and a clock
 
 ```ts
-import { createCheckoutActor, chargeCard } from "./checkout";
+import { checkoutMachine, chargeCard } from "./checkout";
 
 // app: one singleton, real port, real clock
-export const checkout = createCheckoutActor({ chargeCard }).actor;
+export const checkout = checkoutMachine.create({ chargeCard }).actor;
 ```
 
-`createCheckoutActor({ clock, chargeCard })` returns `{ actor, clock }`. Both options are optional: the port defaults to the real provider, the clock to a `VirtualClock`. The app builds one actor at module scope. Each test calls the factory again and gets a fresh actor with its own state.
+`checkoutMachine.create({ clock, chargeCard })` returns `{ actor }`. Both options are optional: the port defaults to the real provider, the clock to real time. The app builds one actor at module scope. Each test calls the factory again and gets a fresh actor with its own state.
 
 ### Test with a fake port and a virtual clock
 
 ```ts
 import { VirtualClock } from "@mantaq/core";
 import { createTestHarness } from "@mantaq/test";
-import { createCheckoutActor, submitBasicInfo, submitShipping, submitPayment } from "./checkout";
+import { checkoutMachine, submitBasicInfo, submitShipping, submitPayment } from "./checkout";
 
 const clock = VirtualClock();
-const { actor } = createCheckoutActor({
+const { actor } = checkoutMachine.create({
   clock,
   chargeCard: (cardNumber) => Promise.resolve(`fake_${cardNumber.slice(-4)}`),
 });
@@ -60,7 +60,7 @@ withTimeout(800, { input: input, event: () => paymentTimeout.create() });
 
 ```ts
 const slow = VirtualClock();
-const { actor: slowActor } = createCheckoutActor({
+const { actor: slowActor } = checkoutMachine.create({
   clock: slow,
   chargeCard: () => new Promise<string>(() => {}),
 });
