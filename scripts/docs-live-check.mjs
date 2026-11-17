@@ -2,10 +2,9 @@
 // and checks its diagram runs live: a current state, a moving next arrow where the
 // diagram has arrows, and on events a click on `eat` moves the walk to `full`.
 // Run after the docs build: node scripts/docs-live-check.mjs
-import { existsSync, readFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { extname, join, normalize } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -22,36 +21,13 @@ const pages = [
   "getting-started/timers/",
   "getting-started/regions/",
 ];
-const types = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".mjs": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".woff2": "font/woff2",
-};
-
 if (!existsSync(join(dist, "index.html"))) {
   console.error("docs-live-check: apps/docs/dist is missing; build the docs first");
   process.exit(1);
 }
 
-const server = createServer((request, response) => {
-  const path = decodeURIComponent((request.url ?? "/").split("?")[0]);
-  const relative = normalize(path.startsWith(base) ? path.slice(base.length) : "404.html");
-  let file = join(dist, relative);
-  if (!file.startsWith(dist)) file = join(dist, "404.html");
-  if (relative.endsWith("/") || relative === ".") file = join(file, "index.html");
-  if (!existsSync(file)) {
-    response.writeHead(404).end();
-    return;
-  }
-  response.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" });
-  response.end(readFileSync(file));
-});
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const origin = `http://127.0.0.1:${server.address().port}`;
+const { serve } = await import("../packages/inspect/src/check-site.ts");
+const { server, origin } = await serve(dist, base);
 
 const require = createRequire(join(root, "packages/inspect/package.json"));
 const { chromium } = require("playwright");
