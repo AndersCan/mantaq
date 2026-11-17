@@ -49,3 +49,42 @@ test("shows the Screen of a state far down a tall graph inside a 1400x800 window
   expect(shown).toEqual({ inWindow: true, inPanel: true });
   await page.close();
 }, 60_000);
+
+test("an arrow's ? and a refused arrow click leave the page where it is", async () => {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 800 } });
+  await page.goto(`${origin}/__mantaq/?machine=tall`);
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  const clickCentre = async (target: ReturnType<typeof page.locator>) => {
+    const box = await target.boundingBox();
+    if (box === null) throw new Error("no box");
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  };
+  const clickPath = (id: string) =>
+    page.evaluate((edgeId) => {
+      const path = document.querySelector<SVGPathElement>(
+        `g[data-edge-id="${edgeId}"] path:not(.hit)`,
+      );
+      const matrix = path?.getScreenCTM();
+      if (path === null || path === undefined || matrix === null || matrix === undefined) {
+        return { x: 0, y: 0 };
+      }
+      const point = path.getPointAtLength(path.getTotalLength() * 0.6);
+      return { x: point.x * matrix.a + matrix.e, y: point.y * matrix.d + matrix.f };
+    }, id);
+  const help = page.locator('[data-details-edge="hub-go17-leaf17"]');
+  await help.scrollIntoViewIfNeeded();
+  const helpBefore = await scrollY();
+  await clickCentre(help);
+  await page.waitForTimeout(300);
+  expect(await scrollY()).toBe(helpBefore);
+  const send = await clickPath("hub-go17-leaf17");
+  await page.mouse.click(send.x, send.y);
+  await page.locator('g[data-edge-id="hub-go15-leaf15"]').scrollIntoViewIfNeeded();
+  const refusedBefore = await scrollY();
+  const refused = await clickPath("hub-go15-leaf15");
+  await page.mouse.click(refused.x, refused.y);
+  await page.waitForTimeout(300);
+  expect(await scrollY()).toBe(refusedBefore);
+  expect(await page.locator("[data-blocked-note]").innerText()).toContain("can't be sent");
+  await page.close();
+}, 60_000);
