@@ -200,7 +200,7 @@ function edgeAria(edge: VizEdge, text: string): string {
   const when =
     condition === null
       ? ""
-      : condition.startsWith("else")
+      : condition === "else" || condition.startsWith("else if ")
         ? `, ${condition}`
         : ` when ${condition}`;
   return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}${when}`;

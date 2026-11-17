@@ -45,19 +45,15 @@ function elseSide(branch: VizBranch, index: number, others: VizBranch[]): boolea
 
 function branchText(
   branch: VizBranch,
-  branches: VizBranch[],
+  others: VizBranch[],
   shared: (condition: string) => boolean,
+  allowElse: boolean,
 ): string | null {
-  const others = branches.filter(
-    (other) =>
-      other.target.kind === "state" &&
-      !(branch.target.kind === "state" && branch.target.state === other.target.state),
-  );
   const kept: string[] = [];
   let isElse = false;
   for (const [index, condition] of branch.conditions.entries()) {
     if (shared(condition)) continue;
-    if (elseSide(branch, index, others)) isElse = true;
+    if (allowElse && elseSide(branch, index, others)) isElse = true;
     else kept.push(tidy(condition));
   }
 
@@ -66,6 +62,18 @@ function branchText(
   );
   if (joined === "") return isElse ? "else" : null;
   return isElse ? `else if ${joined}` : joined;
+}
+
+/** Else arms only when each arrow has one way in; with several, the full conditions stay true. */
+function joinedTexts(
+  going: VizBranch[],
+  others: VizBranch[],
+  shared: (condition: string) => boolean,
+): string[] | null {
+  const texts = going.map((branch) => branchText(branch, others, shared, true));
+  const full = going.length > 1 && texts.some((text) => text?.startsWith("else"));
+  const chosen = full ? going.map((branch) => branchText(branch, others, shared, false)) : texts;
+  return chosen.some((text) => text === null) ? null : (chosen as string[]);
 }
 
 /**
@@ -90,9 +98,9 @@ export function edgeCondition(edge: VizEdge): string | null {
   const reaching = branches.filter((branch) => branch.target.kind === "state");
   const shared = (condition: string): boolean =>
     targets.size >= 2 && reaching.every((branch) => branch.conditions.includes(condition));
-  const texts = going.map((branch) => branchText(branch, branches, shared));
-  if (texts.some((text) => text === null)) return null;
-  return texts.join(" || ");
+  const others = reaching.filter((branch) => !goes(branch, to));
+  const texts = joinedTexts(going, others, shared);
+  return texts === null ? null : texts.join(" || ");
 }
 
 /** The lines drawn on an edge: the event, then its condition in full. */

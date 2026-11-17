@@ -148,6 +148,28 @@ describe("renderGraph guard condition", () => {
     expect(edge?.querySelector(".edge-condition")?.textContent).toBe("else");
     expect(edge?.getAttribute("aria-label")).toBe("idle on go to busy, else");
   });
+
+  test("a condition that only starts with the letters else reads with when", () => {
+    const [first] = guarded.edges;
+    const split = {
+      ...guarded,
+      edges: [
+        {
+          ...first,
+          explanation: {
+            ...analyzed,
+            branches: [
+              { conditions: ["elsewhere"], target: { kind: "state", state: "busy" } },
+              { conditions: ["!(elsewhere)"], target: { kind: "state", state: "done" } },
+            ],
+          },
+        },
+      ],
+    } as unknown as VizMachine;
+    const graph = renderGraph(document, split, { select: () => undefined });
+    const edge = graph.querySelector('g.edge[data-edge-id="idle-go-busy"]');
+    expect(edge?.getAttribute("aria-label")).toBe("idle on go to busy when elsewhere");
+  });
 });
 
 describe("renderGraph transition label", () => {

@@ -196,3 +196,23 @@ describe("edgeCondition when one event leads to several states", () => {
     expect(edgeCondition(edgeWith([branch([], "payment"), branch([], "other")]))).toBeNull();
   });
 });
+
+describe("edgeCondition else side needs the same earlier conditions", () => {
+  test("an arm ruled out only under another outer branch is not else", () => {
+    // if (a) return c ? x : y; if (c) return; return w;
+    const nested = [
+      branch(["a", "c"], "x"),
+      branch(["a", "!(c)"], "y"),
+      branch(["!(a)", "c"], null),
+      branch(["!(a)", "!(c)"], "w"),
+    ];
+    expect(textsOf(nested, ["x", "y", "w"])).toEqual(["a && c", "else if a", "else if !(c)"]);
+  });
+});
+
+describe("edgeCondition when one arrow is reached twice around another", () => {
+  test("if (a) return x; if (b) return y; return x; keeps x's text true", () => {
+    const twice = [branch(["a"], "x"), branch(["!(a)", "b"], "y"), branch(["!(a)", "!(b)"], "x")];
+    expect(textsOf(twice, ["x", "y"])).toEqual(["a || !(a) && !(b)", "else if b"]);
+  });
+});
