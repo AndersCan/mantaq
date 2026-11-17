@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.42.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_ inspect() returns lostMessages: messages one machine sends another that handles them in no state
+- _(minor)_
+  expectNoDesignErrors fails on a message one machine sends another that handles it in none of its states. Breaking: a suite whose machines send such a message now fails; handle the event or stop sending it.
+
 ## 0.41.3
 
 <sub>2026-11-17</sub>
