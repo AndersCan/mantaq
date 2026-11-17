@@ -34,7 +34,7 @@ Skip what is already there: `@mantaq/core` in package.json, `mantaqViz` in the v
 
    One exists: add the import and the plugin to `plugins`, change nothing else. Machines kept elsewhere: change the glob to match.
 
-5. Machine file `src/<name>.machine.ts`. Export a factory, not an instance: `export function create<Name>({ clock }: { clock: Clock } = { clock: VirtualClock() })` returning `Actor({ ..., clock, ... })`. Ports go in the same options object, each with a working default. States, events and JSDoc as in sections 4 and 5.
+5. Machine file `src/<name>.machine.ts`. Export a factory, not an instance: `export function create<Name>({ clock }: { clock: Clock } = { clock: VirtualClock() })` returning `Actor({ ..., clock, ... })`. Import it as `import { Actor, VirtualClock, type Clock } from "@mantaq/core";` (`type`, or `tsc` stops with TS1484 under `verbatimModuleSyntax`). Ports go in the same options object, each with a working default. States, events and JSDoc as in sections 4 and 5.
 6. Typecheck: `npx tsc --noEmit` (or the repo's script). Fix against the types.
 7. Start the server in the background: `npx vite`. Read its output for the `Local:` URL and `mantaq viz: /__mantaq/`.
 8. Check it is drawn: `curl -s <Local URL>__mantaq/viz.json | grep -c '"id": "<id>"'` is at least 1. This request builds the page, so read the server output again: any `[mantaq-viz]` line is a problem to fix.
