@@ -89,7 +89,7 @@ Edit, save, run the test file, then reply in at most 3 lines: changed states and
 ## 8. Done checks and report
 
 - The repo's typecheck passes.
-- A test next to the machine's tests calls `expectNoDesignErrors({ id, create: () => factory({ clock: VirtualClock() }), source })`. If it stops with `fuzzing had no payload for ...`, add `source` or `payloads` for the events it names; do not change the design to get past it.
+- A test next to the machine's tests calls `expectNoDesignErrors({ id, create: () => factory({ clock: VirtualClock() }), source })`. If it stops with `fuzzing had no payload for ...`, add `source` or `payloads` for the events it names; do not change the design to get past it. When machines talk, also call it on the factory that builds, wires and returns them together (`return { actor: checkout, payment }`), so a message the receiver handles in no state fails.
 - The test file passes with `CI=1` and the server output has no `dropped:` warning.
 - Report: the machine file, states and edges in one line each, runs, and one `?machine=&run=` link per journey, on the preview when there is one.
 
