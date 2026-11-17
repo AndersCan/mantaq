@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.38.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_ [user]: Each arrow from one event shows only the condition that sets it apart, in full, with else on the other arm.
+- _(minor)_ Clicking an arrow shows its condition in the Details title and lists the other arrows of the same event with theirs.
+
 ## 0.37.0
 
 <sub>2026-11-17</sub>
