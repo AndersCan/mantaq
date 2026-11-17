@@ -56,7 +56,8 @@ test("checkout has no design errors", () => {
 - an effect that sends an event its state does not handle,
 - a declared state with no path from the initial state,
 - a state that is not final where nothing can happen (no handler, no effect),
-- an input or internal event that no state handles.
+- an input or internal event that no state handles,
+- a message one machine sends another that handles it in none of its states (when the factory returns them together, `{ actor, payment }`).
 
 The message lists one line per error:
 
@@ -64,6 +65,16 @@ The message lists one line per error:
 checkout has 1 design error:
   - archived can never be reached. No transition leads into archived. From basicInfo, the machine can only reach basicInfo, error, payment, shippingAddress, submitting and success. Add a transition into archived, or remove it.
 ```
+
+A lost message names the sender, the receiver and the steps that lead to it:
+
+```
+checkout has 1 design error:
+  - checkout sends PAYMENT_TIMED_OUT to payment, which never handles it. No state of payment has a handler for PAYMENT_TIMED_OUT, so the message is lost. Handle PAYMENT_TIMED_OUT in a state of payment, or stop sending it.
+    after: PAY_CLICKED → WAITED_TOO_LONG
+```
+
+A message dropped because the receiver is in a state without a handler is not an error; the board marks it.
 
 Unreached edges and `onAny` routing warnings are not errors. They show in the Vite plugin's output and do not fail the test.
 
