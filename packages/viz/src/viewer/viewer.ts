@@ -189,7 +189,9 @@ export function mountViewer(
     };
     const openDetails = (selection: Selection) => {
       showDetails(selection);
-      if (panel.isConnected) panel.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (selection.kind === "state" && panel.isConnected) {
+        panel.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
     };
     const graph = renderGraph(doc, machine, {
       // A click on an arrow sends when Details would offer Send, else opens its Details.

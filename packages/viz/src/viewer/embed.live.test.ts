@@ -436,18 +436,22 @@ describe("live controls", () => {
     expect(root.querySelector("[data-send-edge]")).not.toBeNull();
   });
 
-  test("an arrow click that opens Details, and a ?, scroll the panel in; a sending click does not", () => {
+  test("an arrow click and a ? leave the page still; a state click brings the panel in", () => {
     const { root } = mount();
     document.body.append(root);
     const scroll = vi
       .spyOn(HTMLElement.prototype, "scrollIntoView")
       .mockImplementation(() => undefined);
     clickEdge(root, "idle-submit-paying");
-    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll).toHaveBeenCalledTimes(0);
     clickArrow(root, "paying-paymentTimeout-error");
-    expect(scroll).toHaveBeenCalledTimes(2);
+    expect(scroll).toHaveBeenCalledTimes(0);
     clickArrow(root, "idle-submit-paying");
-    expect(scroll).toHaveBeenCalledTimes(2);
+    expect(scroll).toHaveBeenCalledTimes(0);
+    root
+      .querySelector<SVGElement>('[data-node-id="paying"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(scroll).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
     root.remove();
   });
