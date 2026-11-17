@@ -5,7 +5,7 @@ import type { VizJson, VizStep } from "@mantaq/viz";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { afterEach, expect } from "vite-plus/test";
-import { isActor, messageOf } from "./fuzz/run.ts";
+import { isActor, messageOf, otherActorsOf } from "./fuzz/run.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import { RUN_DROPPED, normalizeRun } from "./runs.ts";
 
@@ -160,7 +160,11 @@ afterEach(({ task }) => {
  * be built in the test or in `beforeEach`. A retried test is recorded once,
  * from the attempt that passed. A test that passes options besides `clock` is
  * replayed as `machine.create({ clock })`, as the page does; if it ends
- * elsewhere, the run is not recorded and the test fails.
+ * elsewhere, the run is not recorded and the test fails. When the factory
+ * returns other machines next to `actor` (`{ actor, store }`), their steps are
+ * recorded too, as `actor: { region: "<property name>" }`. Breaking: a test
+ * with such a factory must refresh its committed `__runs__` file once, without
+ * `CI` set.
  */
 export function recordRuns<Id extends string, Options extends object, M extends Made>(
   machine: Machine<Id, Options, M>,
@@ -201,14 +205,25 @@ function track(made: Made, context: Pick<Pending, "id" | "extra" | "replay">): v
     seen: timeOf(actor),
   };
   pending.push(entry);
-  actor.on("transition", {
-    fn: ({ event }) => {
-      const now = timeOf(actor);
-      if (now > entry.seen) entry.steps.push({ kind: "advance", ms: now - entry.seen });
-      entry.seen = now;
-      const payload = jsonPayload(event.payload);
-      if (Either.isLeft(payload)) entry.problem = payload[0];
-      else entry.steps.push({ kind: "event", event: event.type, payload: payload[1] });
-    },
-  });
+  const note = (event: { type: string; payload?: unknown }, region?: string): void => {
+    const now = timeOf(actor);
+    if (now > entry.seen) entry.steps.push({ kind: "advance", ms: now - entry.seen });
+    entry.seen = now;
+    const payload = jsonPayload(event.payload);
+    if (Either.isLeft(payload)) entry.problem = payload[0];
+    else if (region === undefined) {
+      entry.steps.push({ kind: "event", event: event.type, payload: payload[1] });
+    } else {
+      entry.steps.push({
+        kind: "event",
+        event: event.type,
+        payload: payload[1],
+        actor: { region },
+      });
+    }
+  };
+  actor.on("transition", { fn: ({ event }) => note(event) });
+  for (const [name, part] of Object.entries(otherActorsOf(made, actor))) {
+    part.on("transition", { fn: ({ event }) => note(event, name) });
+  }
 }

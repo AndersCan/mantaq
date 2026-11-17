@@ -327,4 +327,29 @@ test("without one", () => {
   test("the wrapped machine keeps its id", () => {
     expect(recordRuns(deadline).id).toBe("deadline");
   });
+
+  test("steps on the other machines the factory returns are recorded with their region", () => {
+    const dir = join(SCRATCH, "parts");
+    const file = testFile(
+      dir,
+      `test("pay", () => {
+  const { actor, payment } = make.create();
+  actor.send({ type: "PAY_CLICKED" });
+  payment.send({ type: "CARD_CHARGED" });
+});`,
+      { fixture: join(HERE, "fixtures/renamed-wire.ts"), factory: "renamedCheckout" },
+    );
+    const result = run(dir, {});
+    expect(result.ok).toBe(true);
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as {
+      renamedCheckout: { steps: { event: string; actor?: { region: string } }[] }[];
+    };
+    const steps = recorded.renamedCheckout[0]?.steps.map((each) => [
+      each.event,
+      each.actor?.region,
+    ]);
+    expect(steps).toContainEqual(["START", "payment"]);
+    expect(steps).toContainEqual(["CARD_CHARGED", "payment"]);
+    expect(steps?.[0]).toEqual(["PAY_CLICKED", undefined]);
+  });
 });
