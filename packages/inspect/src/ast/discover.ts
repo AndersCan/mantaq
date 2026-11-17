@@ -79,6 +79,33 @@ function refShapes(checker: ts.TypeChecker, context: { type: ts.Type; node: ts.N
     });
 }
 
+/** Event shapes the actors' `internal` event refs create, which effects emit and no `send` accepts. */
+function internalShapes(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },
+): ts.Type[] {
+  const { node } = context;
+  return actorTypes(checker, context).flatMap((actorType) => {
+    const options = actorType.getProperty("options");
+    const internal =
+      options === undefined
+        ? undefined
+        : checker.getTypeOfSymbolAtLocation(options, node).getProperty("internal");
+    if (internal === undefined) return [];
+    const list = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(internal, node));
+    const element = checker.getIndexTypeOfType(list, ts.IndexKind.Number);
+    if (element === undefined) return [];
+    return membersOf(element).flatMap((ref) => {
+      const create = ref.getProperty("create");
+      if (create === undefined) return [];
+      const signature = checker
+        .getSignaturesOfType(checker.getTypeOfSymbolAtLocation(create, node), ts.SignatureKind.Call)
+        .at(-1);
+      return signature === undefined ? [] : [signature.getReturnType()];
+    });
+  });
+}
+
 /** Actor types reached by `unwrap`, then every other actor the result carries next to it (a pool's inbox). */
 function actorTypes(
   checker: ts.TypeChecker,
@@ -113,21 +140,23 @@ function payloadTypes(
       ? []
       : membersOf(checker.getTypeOfSymbolAtLocation(parameter, node));
   });
-  return [...sendShapes, ...refShapes(checker, { type, node })].flatMap(
-    (shape): Array<[string, ts.Type]> => {
-      const typeProperty = shape.getProperty("type");
-      const payloadProperty = shape.getProperty("payload");
-      if (typeProperty === undefined || payloadProperty === undefined) return [];
-      const id = checker.getTypeOfSymbolAtLocation(typeProperty, node);
-      if (!id.isStringLiteral()) return [];
-      return [
-        [
-          id.value,
-          checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(payloadProperty, node)),
-        ],
-      ];
-    },
-  );
+  return [
+    ...sendShapes,
+    ...refShapes(checker, { type, node }),
+    ...internalShapes(checker, context),
+  ].flatMap((shape): Array<[string, ts.Type]> => {
+    const typeProperty = shape.getProperty("type");
+    const payloadProperty = shape.getProperty("payload");
+    if (typeProperty === undefined || payloadProperty === undefined) return [];
+    const id = checker.getTypeOfSymbolAtLocation(typeProperty, node);
+    if (!id.isStringLiteral()) return [];
+    return [
+      [
+        id.value,
+        checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(payloadProperty, node)),
+      ],
+    ];
+  });
 }
 
 /**

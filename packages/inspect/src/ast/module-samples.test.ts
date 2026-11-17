@@ -22,3 +22,15 @@ test("each machine(...) shape carries the samples of its send type", () => {
     ["gate", { open: OPEN }],
   ]);
 });
+
+test("an effect result of a machine the factory returns gets samples", () => {
+  const found = Either.getRight(
+    analyzeModule({
+      file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/part-results/app.ts"),
+      root: EXAMPLE_ROOT,
+    }),
+  );
+  expect(found?.machines.find((machine) => machine.name === "shop")?.samples["LOADED"]).toEqual([
+    { items: ["sample"] },
+  ]);
+});

@@ -68,3 +68,15 @@ describe("inspectFile config errors", () => {
     expect(result.failed).toBe(false);
   });
 });
+
+describe("inspectFile on a factory that returns another machine", () => {
+  const SHOP = join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/part-results/app.ts");
+
+  test("the store's effect result carries its payload fields and sample", async () => {
+    const result = await inspectFile(SHOP, { fuzz: { seed: 1, iterations: 200 } });
+    const loaded = result.machines[0]?.events.find((each) => each.id === "LOADED");
+    expect(loaded?.payload?.map((field) => [field.name, field.sample])).toEqual([
+      ["items", ["sample"]],
+    ]);
+  });
+});
