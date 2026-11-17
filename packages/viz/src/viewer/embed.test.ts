@@ -133,20 +133,18 @@ describe("mountVizText", () => {
       { conditions: ['answer === "accepted"'], target: { kind: "state", state: "accepted" } },
       { conditions: ['!(answer === "accepted")'], target: { kind: "state", state: "declined" } },
     ];
-    const explanation = (taken: string): VizEdge["explanation"] => ({
+    const explanation: VizEdge["explanation"] = {
       status: "analyzed",
       location: { file: "a.ts", line: 1, column: 1 },
       registration: "on",
-      branches: branches.sort((a) =>
-        a.target.kind === "state" && a.target.state === taken ? -1 : 1,
-      ),
+      branches,
       payloadReads: [],
       contextReads: [],
       contextWrites: [],
       readsActorState: false,
       comparisons: [],
       literals: [],
-    });
+    };
     const machine: VizMachine = {
       ...door,
       initial: "waiting",
@@ -158,8 +156,8 @@ describe("mountVizText", () => {
       events: [{ id: "answered", internal: false, doc: null, payload: null }],
       edges: [
         edge("__initial__", "", "waiting"),
-        { ...edge("waiting", "answered", "accepted"), explanation: explanation("accepted") },
-        { ...edge("waiting", "answered", "declined"), explanation: explanation("declined") },
+        { ...edge("waiting", "answered", "accepted"), explanation },
+        { ...edge("waiting", "answered", "declined"), explanation },
       ],
     };
     const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
@@ -182,6 +180,64 @@ describe("mountVizText", () => {
     expect(outgoing.map((link) => link.textContent)).toEqual([
       "waiting —answered→ accepted",
       "waiting —answered→ declined",
+    ]);
+  });
+
+  test("same event lists siblings in source order, only this state's transitions of this event", () => {
+    const branches: VizBranch[] = [
+      { conditions: ["score < 600"], target: { kind: "state", state: "rejected" } },
+      {
+        conditions: ["!(score < 600)", "amount > 50000"],
+        target: { kind: "state", state: "review" },
+      },
+      {
+        conditions: ["!(score < 600)", "!(amount > 50000)"],
+        target: { kind: "state", state: "approved" },
+      },
+    ];
+    const explanation: VizEdge["explanation"] = {
+      status: "analyzed",
+      location: { file: "a.ts", line: 1, column: 1 },
+      registration: "on",
+      branches,
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    };
+    const machine: VizMachine = {
+      ...door,
+      initial: "idle",
+      states: [
+        state("idle", { initial: true }),
+        state("review"),
+        state("approved", { final: true }),
+        state("rejected", { final: true }),
+      ],
+      events: [
+        { id: "apply", internal: false, doc: null, payload: null },
+        { id: "reset", internal: false, doc: null, payload: null },
+      ],
+      edges: [
+        edge("__initial__", "", "idle"),
+        { ...edge("idle", "apply", "review"), explanation },
+        { ...edge("idle", "apply", "approved"), explanation },
+        { ...edge("idle", "apply", "rejected"), explanation },
+        { ...edge("idle", "apply", "idle"), kind: "stay" },
+        edge("idle", "reset", "approved"),
+        edge("review", "apply", "rejected"),
+      ],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    root
+      .querySelector('[data-edge-id="idle-apply-review"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
+    expect(links.map((link) => link.textContent)).toEqual([
+      "idle —apply [score < 600]→ rejected",
+      "idle —apply [else]→ approved",
     ]);
   });
 

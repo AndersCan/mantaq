@@ -28,7 +28,7 @@ function edgeLink(
   doc: Document,
   edge: VizEdge,
   select: (selection: Selection) => void,
-  withCondition = false,
+  withCondition: boolean,
 ): HTMLLIElement {
   const condition = withCondition ? edgeCondition(edge) : null;
   const when = condition === null ? "" : ` [${condition}]`;
@@ -43,7 +43,7 @@ function edgeList(
   doc: Document,
   edges: ReadonlyArray<VizEdge>,
   select: (selection: Selection) => void,
-  withCondition = false,
+  withCondition: boolean,
 ): Node | string {
   if (edges.length === 0) return "none";
   return html(
@@ -63,17 +63,25 @@ function edgeTitle(edge: VizEdge): string {
   return edge.kind === "initial" ? `start → ${to}` : `${from} —${edge.event}${when}→ ${to}`;
 }
 
-/** The other arrows of this edge's event from the same state. */
+/** The other arrows of this edge's event from the same state, in the order the code branches. */
 function sameEvent(machine: VizMachine, edge: VizEdge): VizEdge[] {
   if (edgeCondition(edge) === null) return [];
-  return machine.edges.filter(
-    (other) =>
-      other.id !== edge.id &&
-      isDrawn(other) &&
-      other.kind === "transition" &&
-      other.from === edge.from &&
-      other.event === edge.event,
-  );
+  const branches = edge.explanation?.status === "analyzed" ? edge.explanation.branches : [];
+  const rank = (other: VizEdge): number => {
+    const index = branches.findIndex(
+      (branch) => branch.target.kind === "state" && branch.target.state === other.to,
+    );
+    return index === -1 ? branches.length : index;
+  };
+  return machine.edges
+    .filter(
+      (other) =>
+        other.id !== edge.id &&
+        other.kind === "transition" &&
+        other.from === edge.from &&
+        other.event === edge.event,
+    )
+    .sort((a, b) => rank(a) - rank(b) || (a.to ?? "").localeCompare(b.to ?? ""));
 }
 
 function docLine(doc: Document, scope: string, text: string | null): HTMLElement | null {
@@ -117,8 +125,8 @@ function statePanel(
     html(doc, "h2", {}, [`State ${state.id}`]),
     docLine(doc, "state", state.doc),
     list(doc, [
-      ["outgoing", edgeList(doc, outgoing, select)],
-      ["incoming", edgeList(doc, incoming, select)],
+      ["outgoing", edgeList(doc, outgoing, select, false)],
+      ["incoming", edgeList(doc, incoming, select, false)],
     ]),
   ]);
 }
