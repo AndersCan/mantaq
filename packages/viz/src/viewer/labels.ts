@@ -1,8 +1,6 @@
 import type { VizBranch, VizEdge } from "../schema.ts";
 import { localName } from "./compartments.ts";
 
-const MAX_CONDITION = 32;
-
 const FLIP: ReadonlyArray<readonly [string, string]> = [
   ["===", "!=="],
   ["!==", "==="],
@@ -30,39 +28,72 @@ function goes(branch: VizBranch, to: string): boolean {
   return branch.target.kind === "state" && branch.target.state === to;
 }
 
-function allOf(branch: VizBranch): string {
-  const { conditions } = branch;
-  if (conditions.length === 1) return tidy(conditions[0] ?? "");
-  return conditions
-    .map(tidy)
-    .map((c) => (c.includes("||") ? `(${c})` : c))
-    .join(" && ");
+function negated(condition: string | undefined): string | undefined {
+  return /^!\((.*)\)$/.exec(condition ?? "")?.[1];
+}
+
+/** True when `others` holds a branch to another state that took the opposite side at `index`. */
+function elseSide(branch: VizBranch, index: number, others: VizBranch[]): boolean {
+  const inner = negated(branch.conditions[index]);
+  if (inner === undefined) return false;
+  const prefix = branch.conditions.slice(0, index).join("\n");
+  return others.some(
+    (other) =>
+      other.conditions[index] === inner && other.conditions.slice(0, index).join("\n") === prefix,
+  );
+}
+
+function branchText(
+  branch: VizBranch,
+  others: VizBranch[],
+  shared: (condition: string) => boolean,
+  allowElse: boolean,
+): string | null {
+  const kept: string[] = [];
+  let isElse = false;
+  for (const [index, condition] of branch.conditions.entries()) {
+    if (shared(condition)) continue;
+    if (allowElse && elseSide(branch, index, others)) isElse = true;
+    else kept.push(tidy(condition));
+  }
+
+  const joined = (kept.length > 1 ? kept.map((c) => (c.includes("||") ? `(${c})` : c)) : kept).join(
+    " && ",
+  );
+  if (joined === "") return isElse ? "else" : null;
+  return isElse ? `else if ${joined}` : joined;
 }
 
 /**
- * When a handler can also go elsewhere, the condition under which it reaches
- * `edge.to`, read from the analyzed branches. null when it is unconditional,
- * unreadable, or depends on actor state.
+ * When one event can lead to several states, what sets this arrow apart:
+ * its own conditions, `else` for the side the others rule out. Null when the
+ * arrow is the only way the event goes, or its handler is unreadable.
  */
 export function edgeCondition(edge: VizEdge): string | null {
   const { explanation } = edge;
   if (edge.kind !== "transition" || edge.to === null) return null;
-  if (explanation === null || explanation.status !== "analyzed" || explanation.readsActorState) {
-    return null;
-  }
+  if (explanation === null || explanation.status !== "analyzed") return null;
+  const { branches } = explanation;
+  if (branches.some((branch) => branch.target.kind === "unresolved")) return null;
   const to = localName(edge.to);
-  const going = explanation.branches.filter((branch) => goes(branch, to));
-  if (going.length === 0 || going.length === explanation.branches.length) return null;
-  if (going.some((branch) => branch.conditions.length === 0)) return null;
-  if (explanation.branches.some((branch) => branch.target.kind === "unresolved")) return null;
-  return going.map(allOf).join(" || ");
+  const going = branches.filter((branch) => goes(branch, to));
+  if (going.length === 0) return null;
+  const targets = new Set(
+    branches.flatMap((b) => (b.target.kind === "state" ? [b.target.state] : [])),
+  );
+  const hasStay = branches.some((branch) => branch.target.kind === "stay");
+  if (targets.size === 1 && !hasStay) return null;
+  const reaching = branches.filter((branch) => branch.target.kind === "state");
+  const shared = (condition: string): boolean =>
+    targets.size >= 2 && reaching.every((branch) => branch.conditions.includes(condition));
+  const others = reaching.filter((branch) => !goes(branch, to));
+  const texts = going.map((branch) => branchText(branch, others, shared, going.length === 1));
+  if (texts.some((text) => text === null)) return null;
+  return texts.join(" || ");
 }
 
-/** The lines drawn on an edge: the event, then its condition cut to fit. */
+/** The lines drawn on an edge: the event, then its condition in full. */
 export function edgeLines(edge: VizEdge): string[] {
   const condition = edgeCondition(edge);
-  if (condition === null) return [edge.event];
-  const cut =
-    condition.length > MAX_CONDITION ? `${condition.slice(0, MAX_CONDITION - 1)}…` : condition;
-  return [edge.event, cut];
+  return condition === null ? [edge.event] : [edge.event, condition];
 }

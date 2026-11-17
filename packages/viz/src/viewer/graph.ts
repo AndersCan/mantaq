@@ -197,7 +197,12 @@ const LINE_HEIGHT = 16;
 function edgeAria(edge: VizEdge, text: string): string {
   if (edge.kind === "stay") return `${sourceText(edge.from)} on ${text} stays`;
   const condition = edgeCondition(edge);
-  const when = condition === null ? "" : ` when ${condition}`;
+  const when =
+    condition === null
+      ? ""
+      : condition === "else" || condition.startsWith("else if ")
+        ? `, ${condition}`
+        : ` when ${condition}`;
   return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}${when}`;
 }
 
