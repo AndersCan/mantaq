@@ -37,7 +37,7 @@ export interface FuzzOptions {
   deadline?: { ms: number; now: () => number };
 }
 
-/** Why fuzzing stopped: `done` returned true, the iteration cap, or the deadline. */
+/** Why fuzzing stopped: `done` returned true and every seen wire was taken, the iteration cap, or the deadline. */
 export type FuzzStop = "covered" | "iterations" | "time";
 
 export interface CorpusEntry {
@@ -236,10 +236,18 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
 
   const missing: MissingPayload[] = [];
   const progress = { covered: false };
+  let structural = false;
+  /** Each wire seen, and whether any run had the receiver take it. */
+  const taken = new Map<string, boolean>();
   function consider(steps: VizStep[], iteration: number): void {
     const trace = execute(target, steps);
     missing.push(...trace.missingPayloads);
-    if (options.done?.(trace) === true) progress.covered = true;
+    if (options.done?.(trace) === true) structural = true;
+    for (const wire of trace.wires) {
+      const key = `${wire.sender}>${wire.event}>${wire.receiver}`;
+      taken.set(key, taken.get(key) === true || wire.taken);
+    }
+    progress.covered = structural && [...taken.values()].every(Boolean);
     const discovered = trace.features.filter((feature) => !seen.has(feature));
     const guided = options.guide ? options.guide(trace) : false;
     for (const feature of discovered) {
