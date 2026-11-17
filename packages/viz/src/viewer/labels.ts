@@ -12,11 +12,15 @@ const FLIP: ReadonlyArray<readonly [string, string]> = [
   [">", "<="],
 ];
 
-/** `!(a === b)` becomes `a !== b` when the inside is one comparison; anything else is kept. */
+const TERM = /^[\w$]+(\??\.[\w$]+)*(\([^()&|]*\))?$/;
+
+/** `!(!x)` becomes `x`, `!(x)` becomes `!x` for one name or call, `!(a === b)` becomes `a !== b`; anything else is kept. */
 function tidy(condition: string): string {
   const plain = condition.replaceAll("event.payload.", "").replaceAll("context.get().", "");
   const negated = /^!\((.*)\)$/.exec(plain)?.[1];
   if (negated === undefined) return plain;
+  if (TERM.test(negated)) return `!${negated}`;
+  if (negated.startsWith("!") && TERM.test(negated.slice(1))) return negated.slice(1);
   const found = FLIP.find(([from]) => negated.split(from).length === 2 && !/[&|()]/.test(negated));
   if (found === undefined) return plain;
   const [from, to] = found;
