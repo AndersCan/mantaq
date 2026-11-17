@@ -55,10 +55,10 @@ export const meal8 = machine("meal8", {
           event: eat,
           to: [full],
           handler: (event, { context }) => {
-            const noFood = event.payload.food === "";
-            const noPlate = context.get().plates === 0;
-            if (noFood) return {};
-            if (noPlate) return {};
+            const hasFood = event.payload.food !== "";
+            const hasPlate = context.get().plates > 0;
+            if (!hasFood) return {};
+            if (!hasPlate) return {};
             return { state: full };
           },
         });
