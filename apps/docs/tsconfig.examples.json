@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "strict": true },
-  "include": ["src/conform/*.ts", "src/tutorial/*.ts"]
+  "include": ["src/conform/*.ts", "src/tutorial/*.ts", "src/design/talking-machines.ts"]
 }
