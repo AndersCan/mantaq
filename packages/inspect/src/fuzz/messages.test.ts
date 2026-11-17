@@ -1,4 +1,5 @@
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
+import { VIZ_SCHEMA_VERSION, parseViz } from "@mantaq/viz";
 import type { VizStep } from "@mantaq/viz";
 import { onOutput } from "@mantaq/sugar";
 import { expect, test } from "vite-plus/test";
@@ -372,5 +373,98 @@ test("a message sent from the receiver's entry effect does not take over the one
   ).toEqual([
     { from: "b.done", event: "PONG", to: "c.idle" },
     { from: "idle", event: "PING", to: "b.idle" },
+  ]);
+});
+
+test("a receiver that sends itself a message is recorded at the arrow that took the first one", () => {
+  const ready = state("ready")();
+  const mid = state("mid")();
+  const ask = event("ASK")();
+  const again = event("AGAIN")();
+  function create() {
+    const clock = VirtualClock();
+    const b = Actor({
+      inputs: [ask, again],
+      outputs: [again],
+      states: [ready, mid, done],
+      initial: ready,
+      clock,
+      setup: (m) => {
+        m.on(ready, {
+          event: ask,
+          to: [mid],
+          handler: () => ({ state: mid, emit: [again.create()] }),
+        });
+        m.on(mid, { event: again, to: [done], handler: () => ({ state: done }) });
+      },
+    });
+    const a = Actor({
+      inputs: [go],
+      outputs: [ask],
+      states: [idle],
+      initial: idle,
+      clock,
+      setup: (m) => {
+        m.on(idle, {
+          event: go,
+          to: [idle],
+          handler: () => ({ state: idle, emit: [ask.create()] }),
+        });
+      },
+    });
+    onOutput(a, (out) => {
+      if (ask.is(out)) b.send(ask.create());
+    });
+    onOutput(b, (out) => {
+      if (again.is(out)) b.send(again.create());
+    });
+    return { actor: a, clock, made: { b } };
+  }
+  const target = { id: "a", create };
+  const go_: VizStep = { kind: "event", event: "GO", payload: null };
+  expect(execute(target, [go_]).sends).toEqual([{ from: "idle", event: "ASK", to: "b.ready" }]);
+  const machine = fuzzedMachine(
+    target,
+    fuzz(target, { seed: 1, iterations: 50, initial: [[go_]] }),
+  );
+  expect(
+    parseViz(JSON.stringify({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }))[0],
+  ).toBeUndefined();
+});
+
+test("messages with one sender state and event are sorted by receiver", () => {
+  function create() {
+    const clock = VirtualClock();
+    const b = listener([ping], clock);
+    const c = listener([ping], clock);
+    const a = Actor({
+      inputs: [go],
+      outputs: [ping],
+      states: [idle],
+      initial: idle,
+      clock,
+      setup: (m) => {
+        m.on(idle, {
+          event: go,
+          to: [idle],
+          handler: () => ({ state: idle, emit: [ping.create()] }),
+        });
+      },
+    });
+    onOutput(a, (out) => {
+      if (ping.is(out)) {
+        c.send(ping.create());
+        b.send(ping.create());
+      }
+    });
+    return { actor: a, clock, made: { b, c } };
+  }
+  const target = { id: "a", create };
+  const initial = [[{ kind: "event", event: "GO", payload: null } satisfies VizStep]];
+  expect(
+    fuzzedMachine(target, fuzz(target, { seed: 1, iterations: 50, initial })).fuzz?.messages,
+  ).toEqual([
+    { from: "idle", event: "PING", to: "b.idle" },
+    { from: "idle", event: "PING", to: "c.idle" },
   ]);
 });

@@ -72,6 +72,8 @@ export interface Trace {
 
 /** The send a part is taking now, and the state it took it in. */
 interface Receiving {
+  name: string;
+  event: string;
   took: string | null;
 }
 
@@ -405,9 +407,15 @@ function watchSends(context: {
     Either.from(() => {
       part.on("transition", {
         fn: (change) => {
-          // A nested send sets its own `receiving`, so this is the state the
-          // send being run left; a state's entry effect may move it again first.
-          if (receiving !== null) receiving.took = idOf(name, change.from);
+          // The first transition of the send being run is the arrow that took it;
+          // an entry effect or a message the receiver sends itself moves it later.
+          if (
+            receiving !== null &&
+            receiving.name === name &&
+            receiving.event === change.event.type &&
+            receiving.took === null
+          )
+            receiving.took = idOf(name, change.from);
           mover = name;
         },
       });
@@ -425,7 +433,7 @@ function watchSends(context: {
           lost.push({ sender: mover, receiver: name, event: event.type, step: at() });
         }
         const outer = receiving;
-        const now: Receiving = { took: null };
+        const now: Receiving = { name, event: event.type, took: null };
         receiving = now;
         restoring(() => {
           mover = name;

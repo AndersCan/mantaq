@@ -316,4 +316,14 @@ describe("validateViz refuses a recorded message that does not fit the machine",
     (doc.machines[0] as { actors?: string[] }).actors = [];
     expect(issues(doc)).toEqual([`${at}.to: "payment" is not in actors`]);
   });
+
+  test("a sender in a machine that is not a part", () => {
+    const doc = withMessage({
+      from: "payment.ready",
+      event: "PAYMENT_CONFIRMED",
+      to: "waitingForPayment",
+    });
+    (doc.machines[0] as { actors?: string[] }).actors = [];
+    expect(issues(doc)).toEqual([`${at}.from: "payment" is not in actors`]);
+  });
 });
