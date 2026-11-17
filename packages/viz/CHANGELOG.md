@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.37.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_
+  Fuzzing records each message one machine sends another, with the state it was sent from and the arrow that took it, in `machine.fuzz.messages`. Viz documents are schema 18.
+
+  Breaking: viz document schema 17 → 18, a new required `machines[].fuzz.messages`; the validator refuses a 17 document with `schemaVersion: expected 18, got 17`. Rebuild with the matching @mantaq/inspect.
+  Breaking: the board's dotted lines will follow the recorded messages once the viewer reads them; lines for same-named but unwired events then disappear, and lines for renamed wires and `onAny` handlers appear.
+
+- _(patch)_
+  A dotted line between machines is drawn for each message fuzzing saw the code send, so a wire that renames its event or ends in an `onAny` handler gets one and an unwired same-named event does not.
+
 ## 0.36.0
 
 <sub>2026-11-17</sub>

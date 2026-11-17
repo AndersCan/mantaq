@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_
+  Add `machine(id, { create })`: a machine is one typed value; `create` receives a `clock` (real time unless given) and builds a fresh actor.
+
 ## 0.7.2
 
 <sub>2026-11-13</sub>
