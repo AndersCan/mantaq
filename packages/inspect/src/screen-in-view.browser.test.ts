@@ -1,0 +1,51 @@
+import { mantaqViz } from "./vite.ts";
+import { join } from "node:path";
+import { createServer } from "vite";
+import type { ViteDevServer } from "vite";
+import { chromium } from "playwright";
+import type { Browser } from "playwright";
+import { afterAll, beforeAll, expect, test } from "vite-plus/test";
+
+let server: ViteDevServer;
+let browser: Browser;
+let origin = "";
+
+beforeAll(async () => {
+  server = await createServer({
+    root: join(import.meta.dirname, "fixtures"),
+    configFile: false,
+    logLevel: "silent",
+    server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
+    plugins: [mantaqViz({ machines: ["tall.ts", "tall.preview.ts"], fuzz: { iterations: 3000 } })],
+  });
+  await server.listen();
+  const address = server.httpServer?.address();
+  origin = `http://127.0.0.1:${typeof address === "object" && address !== null ? address.port : 0}`;
+  browser = await chromium.launch({ executablePath: process.env["CHROMIUM_PATH"] || undefined });
+}, 60_000);
+
+afterAll(async () => {
+  await browser.close();
+  await server.close();
+});
+
+test("shows the Screen of a state far down a tall graph inside a 1400x800 window", async () => {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 800 } });
+  await page.goto(`${origin}/__mantaq/?machine=tall`);
+  await page.getByRole("tab", { name: "Screen" }).click();
+  await page.locator('g[data-node-id="leaf18"]').first().click();
+  const frame = page.frameLocator("iframe");
+  await frame.getByText("chain is at leaf18").waitFor();
+  // The tab panel scrolls and clips: a frame taller than it is cut off even when its own box is in the window.
+  const shown = await page.evaluate(() => {
+    const box = document.querySelector("iframe")?.getBoundingClientRect();
+    const clip = document.querySelector(".tab-panel")?.getBoundingClientRect();
+    if (box === undefined || clip === undefined) return { inWindow: false, inPanel: false };
+    return {
+      inWindow: box.top >= 0 && box.bottom <= innerHeight,
+      inPanel: box.top >= clip.top && box.bottom <= clip.bottom,
+    };
+  });
+  expect(shown).toEqual({ inWindow: true, inPanel: true });
+  await page.close();
+}, 60_000);

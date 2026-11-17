@@ -67,7 +67,7 @@ function screenFrame(
     frame.title = `Screen of ${context.id}: ${live.state}`;
     frame.tabIndex = -1;
     frame.style.cssText =
-      "display:block;width:min(100%,360px);height:640px;border:0;pointer-events:none";
+      "display:block;width:min(100%,360px);height:min(640px,calc(60vh - 56px));border:0;pointer-events:none";
     return frame;
   };
 }
