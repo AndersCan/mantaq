@@ -6,8 +6,8 @@
  *          pages exists in the canonical registry (checkout example).
  * Gate B — API truth. Every @mantaq/* import in docs is a real package export.
  * Gate C — Canonical example typechecks (packages/examples).
- * Gate D — README snippets typecheck. Every ```ts block in README.md and
- *          packages/<pkg>/README.md compiles against the workspace packages.
+ * Gate D — README and skill snippets typecheck. Every ```ts block in README.md,
+ *          packages/<pkg>/README.md and skills/mantaq/*.md compiles against the workspace packages.
  *          Opt out (rare: intentionally partial snippets) with
  *          `<!-- docs-check: skip -->` on the line before the fence.
  *
@@ -159,6 +159,11 @@ for (const dir of readdirSync(join(ROOT, "packages"))) {
     symlinkSync(pkgDir, join(SNIPPET_DIR, "node_modules", name), "dir");
   }
   if (existsSync(join(pkgDir, "README.md"))) readmes.push(join(pkgDir, "README.md"));
+}
+// The agent skill's code blocks are copied by agents: they compile too.
+const SKILL_DIR = join(ROOT, "skills/mantaq");
+for (const file of readdirSync(SKILL_DIR)) {
+  if (file.endsWith(".md")) readmes.push(join(SKILL_DIR, file));
 }
 // Third-party modules README snippets import, borrowed from the package that depends on them.
 for (const [module, owner] of [

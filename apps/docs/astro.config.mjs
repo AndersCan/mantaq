@@ -69,8 +69,10 @@ export default defineConfig({
             "",
             "1. `npm install @mantaq/core @mantaq/inspect`",
             '2. In `vite.config.ts`: `import { mantaqViz } from "@mantaq/inspect/vite";` and `plugins: [mantaqViz({ machines: "src/**/*.machine.ts" })]`.',
-            "3. Write `src/<name>.machine.ts` that exports `create<Name>Actor()` returning `Actor({ inputs, states, initial, setup })` from `@mantaq/core`. The API is in the Reference pages of llms-full.txt.",
-            "4. Run the dev server and open `/__mantaq/?machine=<id>` on the port it prints. The id is the export name without `create` and `Actor`, first letter lowercase (`createMealActor` → `meal`). `vite build` writes `dist/__mantaq/viz.json`, which lists every id.",
+            "3. Write `src/<name>.machine.ts` that exports `machine(" <
+              name >
+              ", { create })` from `@mantaq/core`, where `create` returns `Actor({ inputs, states, initial, setup })`. Only a machine with timers takes `{ clock }` and passes it to `Actor`. The API is in the Reference pages of llms-full.txt.",
+            "4. Run the dev server and open `/__mantaq/?machine=<id>` on the port it prints. The id is the string you gave `machine`. `vite build` writes `dist/__mantaq/viz.json`, which lists every id.",
             "5. Optional: `npx skills add AndersCan/mantaq -y` installs the mantaq skill for most coding agents.",
           ].join("\n"),
         }),
