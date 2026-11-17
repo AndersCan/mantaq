@@ -22,7 +22,7 @@ import { checkoutMachine, chargeCard } from "./checkout";
 export const checkout = checkoutMachine.create({ chargeCard }).actor;
 ```
 
-`checkoutMachine` is `machine("checkout", { create })`. `create({ clock, chargeCard })` returns `{ actor }`. Both options are optional: the port defaults to the real provider, the clock to real time. The app calls `checkoutMachine.create()` once at module scope. Each test calls it again and gets a fresh actor with its own state.
+`checkoutMachine` is `machine("checkout", { create })`. `create({ clock, chargeCard })` returns `{ actor }`. Both options are optional: the port defaults to the real provider, the clock to real time. The app calls `checkoutMachine.create({ chargeCard })` once at module scope. Each test calls it again and gets a fresh actor with its own state.
 
 ### Test with a fake port and a virtual clock
 

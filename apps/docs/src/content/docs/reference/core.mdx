@@ -172,7 +172,7 @@ class Actor<
 | --------- | ------------------------------ | ---------------------------------- |
 | `state`   | `States[number] \| ErrorState` | Current state (`__error` on error) |
 | `context` | `ActorContext`                 | Current context                    |
-| `clock`   | `Clock`                        | Clock instance                     |
+| `clock`   | `Clock \| undefined`           | Only when the actor was given one  |
 | `regions` | `Record<string, AnyActor>`     | Children                           |
 | `options` | `InternalActorOptions<...>`    | Built options. Semi-internal       |
 
@@ -285,7 +285,7 @@ type EffectInput<ActorContext, Payload = unknown> = {
   event: InternalEvent;
   context: Context<ActorContext>;
   emit: (event: InternalEvent) => void;
-  clock: Clock;
+  clock?: Clock; // present only when the actor has a clock
 };
 ```
 
@@ -312,7 +312,7 @@ type InternalEvent = { type: string; payload?: unknown };
 ```ts
 interface AnyActor<C = Record<string, unknown>> {
   state: AnyStateRef;
-  clock: Clock;
+  clock?: Clock | undefined;
   regions: Record<string, AnyActor>;
   context?: C;
   options?: {
