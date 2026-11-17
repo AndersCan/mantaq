@@ -1,7 +1,7 @@
 // Opens each Getting started page of the built docs site (apps/docs/dist) in Chromium
 // and checks its diagram runs live: a current state, a moving next arrow where the
 // diagram has arrows, on events a click on `eat` moves the walk to `full`, and on timers
-// `cook`, then the `overcooked` arrow (the timer firing), brings the walk back to `hungry`.
+// `cook`, then the `overcooked` arrow (a click sends it now), brings the walk back to `hungry`.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -72,7 +72,9 @@ for (const page of pages) {
     await tab.waitForTimeout(200);
     const after = await current();
     if (after.join() !== "hungry") {
-      failures.push(`timers: the time control did not fire overcooked (current: ${after})`);
+      failures.push(
+        `timers: clicking overcooked after cook does not return the walk to hungry (current: ${after})`,
+      );
     }
   }
   for (const error of errors) failures.push(`${page}: page error: ${error}`);
