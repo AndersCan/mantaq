@@ -150,11 +150,19 @@ function pathToBox(path: ReadonlyArray<Point>, box: Box): number {
   const around = boxToBox(boundsOfPath(path), box);
   if (around >= LABEL_PAD) return around;
   let best = Infinity;
-  for (const point of path) best = Math.min(best, pointToBox(point, box));
+  for (const point of path) {
+    // A point `LABEL_PAD` or more away on one axis is that far away: it cannot lower a gap below `LABEL_PAD`.
+    if (Math.abs(point.x - box.x) - box.width / 2 >= LABEL_PAD) continue;
+    if (Math.abs(point.y - box.y) - box.height / 2 >= LABEL_PAD) continue;
+    best = Math.min(best, pointToBox(point, box));
+  }
   return best;
 }
 
+/** Closest point pair; routes whose boxes are `PATH_NODE_CLEAR` or more apart return that box gap, as every caller only looks below it. */
 function pathToPath(a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): number {
+  const around = boxToBox(boundsOfPath(a), boundsOfPath(b));
+  if (around >= PATH_NODE_CLEAR) return around;
   let best = Infinity;
   for (const from of a)
     for (const to of b) best = Math.min(best, Math.hypot(from.x - to.x, from.y - to.y));
@@ -445,6 +453,14 @@ function routesGap(a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): number {
       const b1 = b[j - 1];
       const b2 = b[j];
       if (b1 === undefined || b2 === undefined) continue;
+      // Segments whose boxes are `PATH_GAP` apart are at least that far apart: the result only matters below it.
+      if (
+        Math.min(a1.x, a2.x) - Math.max(b1.x, b2.x) >= PATH_GAP ||
+        Math.min(b1.x, b2.x) - Math.max(a1.x, a2.x) >= PATH_GAP ||
+        Math.min(a1.y, a2.y) - Math.max(b1.y, b2.y) >= PATH_GAP ||
+        Math.min(b1.y, b2.y) - Math.max(a1.y, a2.y) >= PATH_GAP
+      )
+        continue;
       const near = crossingGap(a1, a2, b1, b2) ?? segmentGap(a1, a2, b1, b2);
       best = Math.min(best, near);
     }
@@ -492,8 +508,9 @@ function headOverlaps(shapes: Shapes, add: Add): void {
     })),
   ];
   for (const [index, head] of heads.entries()) {
-    for (const other of heads.slice(index + 1)) {
-      if (other.own === head.own) continue;
+    for (let next = index + 1; next < heads.length; next++) {
+      const other = heads[next];
+      if (other === undefined || other.own === head.own) continue;
       const gap = boxToBox(head.box, other.box);
       if (gap < LABEL_PAD) add("arrowheads", head.part, other.part, gap);
     }
