@@ -62,6 +62,19 @@ export interface FuzzResult {
   expectations: VizExpectation[];
   /** Events sent without a payload whose fields the machine read, over every run. Sorted. */
   missingPayloads: MissingPayload[];
+  /** Messages one machine sent another that handles them in no state, sorted by sender, receiver, event. */
+  lostMessages: LostMessage[];
+}
+
+/** A message one machine sent another that handles its event in none of its states. */
+export interface LostMessage {
+  /** The inspect target's id for `actor`, or the property name of a machine returned next to it. */
+  sender: string;
+  /** Named the same way. */
+  receiver: string;
+  event: string;
+  /** Shortest steps from a fresh actor that send it. */
+  steps: VizStep[];
 }
 
 function covers(target: FuzzTarget, steps: ReadonlyArray<VizStep>, wanted: ReadonlyArray<string>) {
@@ -79,13 +92,20 @@ export function shrink(
   steps: ReadonlyArray<VizStep>,
   wanted: ReadonlyArray<string>,
 ): VizStep[] {
+  return shrinkWhile(steps, (candidate) => covers(target, candidate, wanted));
+}
+
+function shrinkWhile(
+  steps: ReadonlyArray<VizStep>,
+  holds: (candidate: ReadonlyArray<VizStep>) => boolean,
+): VizStep[] {
   let current = [...steps];
   let removed = true;
   while (removed) {
     removed = false;
     for (let at = current.length - 1; at >= 0; at -= 1) {
       const candidate = current.filter((_, index) => index !== at);
-      if (covers(target, candidate, wanted)) {
+      if (holds(candidate)) {
         current = candidate;
         removed = true;
       }
@@ -132,6 +152,26 @@ function collectErrors(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): 
   return [...errors.values()].sort((left, right) =>
     `${left.from}>${left.event}` < `${right.from}>${right.event}` ? -1 : 1,
   );
+}
+
+function collectLost(target: FuzzTarget, corpus: ReadonlyArray<CorpusEntry>): LostMessage[] {
+  const found = new Map<string, LostMessage>();
+  for (const entry of corpus) {
+    for (const lost of execute(target, entry.steps).lost) {
+      const key = `${lost.sender}>${lost.event}>${lost.receiver}`;
+      if (found.has(key)) continue;
+      const sends = (candidate: ReadonlyArray<VizStep>): boolean =>
+        execute(target, candidate).lost.some(
+          (each) =>
+            each.sender === lost.sender &&
+            each.receiver === lost.receiver &&
+            each.event === lost.event,
+        );
+      const steps = shrinkWhile(entry.steps.slice(0, lost.step + 1), sends);
+      found.set(key, { sender: lost.sender, receiver: lost.receiver, event: lost.event, steps });
+    }
+  }
+  return [...found.entries()].sort(([left], [right]) => (left < right ? -1 : 1)).map(([, v]) => v);
 }
 
 function checkExpectations(
@@ -239,5 +279,6 @@ export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
     failedExpectations: checked.flatMap((each) => (each.failed === null ? [] : [each.failed])),
     expectations: checked.map((each) => each.rule),
     missingPayloads: mergeMissing(missing),
+    lostMessages: collectLost(target, kept),
   };
 }

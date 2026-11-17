@@ -1,7 +1,7 @@
 export { toViz, toVizMachine } from "./structure.ts";
 export type { VizInput } from "./structure.ts";
 export { fuzz, shrink } from "./fuzz/fuzz.ts";
-export type { CorpusEntry, FuzzOptions, FuzzResult, FuzzStop } from "./fuzz/fuzz.ts";
+export type { CorpusEntry, FuzzOptions, FuzzResult, FuzzStop, LostMessage } from "./fuzz/fuzz.ts";
 export { eventCatalog, execute } from "./fuzz/run.ts";
 export type {
   FuzzTarget,

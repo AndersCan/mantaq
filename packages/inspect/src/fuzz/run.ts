@@ -64,6 +64,19 @@ export interface Trace {
   missingPayloads: MissingPayload[];
   /** The map children the run started, in start order; a key started twice appears twice. */
   children: SeenChild[];
+  /** First send per (sender, receiver, event) to a machine that handles the event in no state, in send order. */
+  lost: LostSend[];
+}
+
+/** One message a machine sent another that handles its event in no state. */
+export interface LostSend {
+  /** Machine whose run made the send. */
+  sender: string;
+  /** Machine it was sent to. */
+  receiver: string;
+  event: string;
+  /** Index of the step during which it was sent. */
+  step: number;
 }
 
 /** A map child a run started, with the steps it was alive for. */
@@ -338,6 +351,66 @@ export function applyStep(
   } else actor.send(toEvent(step, context.emptyPayload));
 }
 
+/** True when a machine declares transitions and no state, `Any` included, has a row for the event. */
+function handlesNowhere(actor: AnyActor<unknown>, event: string): boolean {
+  const transitions = actor.options?.transitions;
+  if (typeof transitions !== "object" || transitions === null) return false;
+  return Object.values(transitions).every((row) => row?.[event] === undefined);
+}
+
+/**
+ * Note every message one watched machine sends another that handles it in no
+ * state. The sender is the machine whose `send` is running, or the one that
+ * last moved this step (a timer-driven output). With no known sender nothing
+ * is noted. `expect` marks the step's own event, which is the fuzzer's, not a message.
+ */
+function watchSends(context: {
+  parts: Readonly<Record<string, AnyActor<unknown>>>;
+  at: () => number;
+}): { lost: LostSend[]; expect: (own: { name: string; event: string } | null) => void } {
+  const { parts, at } = context;
+  const lost: LostSend[] = [];
+  const stack: string[] = [];
+  let mover: string | null = null;
+  let own: { name: string; event: string } | null = null;
+  for (const [name, part] of Object.entries(parts)) {
+    const send = part.send.bind(part);
+    const moved = { fn: () => void (mover = name) };
+    Either.from(() => {
+      part.on("transition", moved);
+      part.on("error", moved);
+      part.send = (event) => {
+        const sender = stack.at(-1) ?? mover;
+        if (own?.name === name && own.event === event.type) own = null;
+        else if (
+          sender !== null &&
+          handlesNowhere(part, event.type) &&
+          !lost.some(
+            (each) => each.sender === sender && each.receiver === name && each.event === event.type,
+          )
+        ) {
+          lost.push({ sender, receiver: name, event: event.type, step: at() });
+        }
+        const saved = mover;
+        stack.push(name);
+        try {
+          send(event);
+        } finally {
+          stack.pop();
+          mover = saved;
+        }
+      };
+    });
+  }
+  return {
+    lost,
+    expect: (next) => {
+      mover = null;
+      own = next;
+    },
+  };
+}
+
 type Sinks = {
   visited: string[];
   observations: Observation[];
@@ -470,6 +543,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
   let index = 0;
   const sinks = { visited, observations, errors, plain };
   const at = (): number => index;
+  const sends = watchSends({ parts: { [target.id]: actor, ...actors }, at });
   const recorder = recordChildren({
     root: actor,
     maps,
@@ -509,6 +583,7 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     if (actor.state.name === ERROR_STATE) break;
     const before = contextText(actor);
     statesBefore.push(actor.state.name);
+    sends.expect(ownSend(target.id, { root: actor, actors, step }));
     // Core reports handler and effect-body throws via "error"; a throw from
     // user code the step runs outside them (a timer callback under
     // `clock.advance`) ends this run as an error, not the whole fuzz.
@@ -548,5 +623,23 @@ export function execute(target: FuzzTarget, steps: ReadonlyArray<VizStep>): Trac
     features,
     missingPayloads,
     children: recorder.children,
+    lost: sends.lost,
   };
+}
+
+/** The step's own event when `applyStep` sends it to a watched machine; null for a timer or a map child. */
+function ownSend(
+  rootName: string,
+  context: {
+    root: AnyActor<unknown>;
+    actors: Readonly<Record<string, AnyActor<unknown>>>;
+    step: VizStep;
+  },
+): { name: string; event: string } | null {
+  const { root, actors, step } = context;
+  if (step.kind !== "event" || (step.actor !== undefined && "map" in step.actor)) return null;
+  const name = step.actor === undefined ? rootName : step.actor.region;
+  const part = step.actor === undefined ? root : actors[name];
+  if (part === undefined) return null;
+  return { name, event: step.event };
 }
