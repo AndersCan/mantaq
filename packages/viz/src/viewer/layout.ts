@@ -898,17 +898,14 @@ export function placeMachine(base: VizMachine): MachineLayout {
       insertSpace(geo, "x", at, by);
     built = assemble(machine, specs, geo, regions);
   }
-  const drawn = [...built.layout.messages, ...built.layout.edges];
-  const ys =
-    built.layout.messages.length === 0
-      ? []
-      : drawn.flatMap((line) => line.points.map((point) => point.y));
-  if (ys.length > 0) {
+  if (built.layout.messages.length > 0) {
+    const ys = [...built.layout.messages, ...built.layout.edges].flatMap((line) =>
+      line.points.map((point) => point.y),
+    );
     const shift = Math.max(0, LABEL_PAD - Math.min(...ys));
     insertSpace(geo, "y", -Infinity, shift);
     geo.height = Math.max(geo.height, Math.max(...ys) + shift + LABEL_PAD);
-    if (shift > 0 || geo.height > built.layout.height)
-      built = assemble(machine, specs, geo, regions);
+    built = assemble(machine, specs, geo, regions);
   }
   return built.layout;
 }
