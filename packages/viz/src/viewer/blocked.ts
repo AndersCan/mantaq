@@ -82,7 +82,7 @@ export function blockedReason(context: {
 }): string | null {
   const { edge, outcome, live } = context;
   if (edge.kind !== "transition" || outcome === null) return null;
-  if (edge.to !== null && true && outcome.to !== edge.to) {
+  if (edge.to !== null && outcome.outcome === "transition" && outcome.to !== edge.to) {
     return `${edge.event} goes to ${localName(outcome.to)}, not ${localName(edge.to)}`;
   }
   const stayed =
