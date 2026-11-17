@@ -35,6 +35,8 @@ Use the mantaq skill. Model our checkout: the customer fills in basic info, then
 
 Or describe your own flow in plain words.
 
+A step that can time out: say how long it waits and what happens when time runs out, for example "payment expires after 15 minutes and the customer can pay again". Leave it out and the agent asks.
+
 ### 3. What you get
 
 The agent installs `@mantaq/core` and `@mantaq/inspect` (and `@mantaq/sugar` when the flow has a timer), writes `src/checkout.machine.ts` and the Vite plugin, and starts the dev server. The viewer is at `/__mantaq/?machine=checkout` on the port the dev server prints.
