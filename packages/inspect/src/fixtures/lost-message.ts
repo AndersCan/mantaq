@@ -40,8 +40,11 @@ export function createCheckout({ clock = VirtualClock() }: { clock?: VirtualCloc
     initial: ready,
     clock,
     setup: (m) => {
+      /** Checkout asked for the charge, so payment starts charging the card. */
       m.on(ready, { event: paymentStarted, to: [charging], handler: () => ({ state: charging }) });
+      /** The card was charged, so payment is idle again. */
       m.on(charging, { event: cardCharged, to: [ready], handler: () => ({ state: ready }) });
+      /** Checkout stopped waiting, so payment drops the charge. */
       m.on(charging, { event: paymentTimedOut, to: [ready], handler: () => ({ state: ready }) });
     },
   });
@@ -53,21 +56,25 @@ export function createCheckout({ clock = VirtualClock() }: { clock?: VirtualCloc
     initial: browsing,
     clock,
     setup: (m) => {
+      /** The shopper clicked pay, so checkout waits and tells payment to start. */
       m.on(browsing, {
         event: payClicked,
         to: [waitingForPayment],
         handler: () => ({ state: waitingForPayment, emit: [paymentStarted.create()] }),
       });
+      /** Waiting for payment starts a 30 second deadline. */
       m.effect(waitingForPayment, {
         name: "paymentDeadline",
         sends: [waitedTooLong],
         fn: (input) => withTimeout(30_000, { input, event: () => waitedTooLong.create() }),
       });
+      /** Payment confirmed the charge, so the order is paid. */
       m.on(waitingForPayment, {
         event: paymentConfirmed,
         to: [paid],
         handler: () => ({ state: paid }),
       });
+      /** The deadline passed, so checkout gives up and tells payment. */
       m.on(waitingForPayment, {
         event: waitedTooLong,
         to: [gaveUp],

@@ -286,16 +286,19 @@ const ready = state("ready")();
 const charging = state("charging")();
 
 /** Checkout and payment where payment has no handler for PAYMENT_TIMED_OUT; `declared` also leaves it out of payment's inputs. */
-function createCheckoutWithoutTimeoutHandler(declared: boolean) {
+function createCheckoutWithoutTimeoutHandler(declared: boolean, effectSendsTimeout = false) {
   const clock = VirtualClock();
   const payment = Actor({
     inputs: declared ? [payStarted, charged, timedOut] : [payStarted, charged],
+    internal: effectSendsTimeout ? [timedOut] : [],
     states: [ready, charging],
     initial: ready,
     clock,
     setup: (m) => {
       m.on(ready, { event: payStarted, to: [charging], handler: () => ({ state: charging }) });
       m.on(charging, { event: charged, to: [ready], handler: () => ({ state: ready }) });
+      if (effectSendsTimeout)
+        m.effect(charging, { name: "chargeDeadline", sends: [timedOut], fn: () => undefined });
     },
   });
   const checkout = Actor({
@@ -372,5 +375,30 @@ describe("expectNoDesignErrors on a lost message", () => {
     expect(inspect({ id: "kitchen", create: () => createDroppedMessage() }).lostMessages).toEqual(
       [],
     );
+  });
+
+  test("keeps another kind of finding about the lost event, after the lost line", () => {
+    const message = failureOf(() =>
+      expectNoDesignErrors({
+        id: "checkout",
+        create: () => createCheckoutWithoutTimeoutHandler(false, true),
+      }),
+    );
+    expect(message).toContain(`checkout has 3 design errors:\n${lostLine}\n`);
+    expect(message).toMatch(
+      /\n {2}- chargeDeadline sends PAYMENT_TIMED_OUT, but payment\.charging has no handler for it\./,
+    );
+    expect(message.indexOf(lostLine)).toBeLessThan(message.indexOf("chargeDeadline sends"));
+  });
+
+  test("the checkout example documents every handler and effect", () => {
+    const message = failureOf(() =>
+      expectNoDesignErrors({
+        id: "checkout",
+        create: () => createCheckout(),
+        source: { file: join(FIXTURES, "lost-message.ts"), root: FIXTURES },
+      }),
+    );
+    expect(message).not.toContain("has no description");
   });
 });
