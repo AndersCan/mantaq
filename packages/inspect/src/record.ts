@@ -1,5 +1,5 @@
 import { VirtualClock } from "@mantaq/core";
-import type { AnyActor } from "@mantaq/core";
+import type { AnyActor, Machine } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import type { VizJson, VizStep } from "@mantaq/viz";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -171,36 +171,74 @@ afterEach(({ task }) => {
  * besides `clock` is replayed on the factory with only `{ clock }`, as the
  * page does; if it ends elsewhere, the run is not recorded and the test fails.
  */
-export function recordRuns<F extends (...args: never[]) => Made>(factory: F): F {
-  const id = machineId(factory.name);
-  const wrapped = (...args: Parameters<F>) => {
-    const made = factory(...args);
-    const actor = actorOf(made);
-    const { testPath = "", currentTestName = "" } = expect.getState();
-    const entry: Pending = {
-      actor,
+export function recordRuns<F extends (...args: never[]) => Made>(factory: F): F;
+/**
+ * Wrap a `machine(...)` the same way: `create` runs on a VirtualClock unless
+ * the test passes one, and a run replays as `machine.create({ clock })`.
+ */
+export function recordRuns<Id extends string, Options extends object, M extends Made>(
+  machine: Machine<Id, Options, M>,
+): Machine<Id, Options, M>;
+export function recordRuns(
+  source: ((...args: never[]) => Made) | Machine,
+): ((...args: never[]) => Made) | Machine {
+  if (typeof source !== "function") return recordedMachine(source);
+  const id = machineId(source.name);
+  const wrapped = (...args: never[]) => {
+    const made = source(...args);
+    track(made, {
       id,
-      name: currentTestName,
-      testPath,
-      steps: [],
-      problem: "",
-      seen: actor.clock.now(),
       extra: extraKeys(args),
-      replay: (clock) => Reflect.apply(factory, undefined, [{ clock }]),
-    };
-    pending.push(entry);
-    actor.on("transition", {
-      fn: ({ event }) => {
-        const now = actor.clock.now();
-        if (now > entry.seen) entry.steps.push({ kind: "advance", ms: now - entry.seen });
-        entry.seen = now;
-        const payload = jsonPayload(event.payload);
-        if (Either.isLeft(payload)) entry.problem = payload[0];
-        else entry.steps.push({ kind: "event", event: event.type, payload: payload[1] });
-      },
+      replay: (clock) => Reflect.apply(source, undefined, [{ clock }]),
     });
     return made;
   };
-  Object.defineProperty(wrapped, "name", { value: factory.name });
-  return wrapped as F;
+  Object.defineProperty(wrapped, "name", { value: source.name });
+  return wrapped;
+}
+
+function recordedMachine<Id extends string, Options extends object, M extends Made>(
+  machine: Machine<Id, Options, M>,
+): Machine<Id, Options, M> {
+  const untyped: Machine = machine;
+  return {
+    id: machine.id,
+    create: (options) => {
+      const made = machine.create(
+        Object.assign({}, options, { clock: options?.clock ?? VirtualClock() }),
+      );
+      track(made, {
+        id: machine.id,
+        extra: Object.keys(options ?? {}).filter((key) => key !== "clock"),
+        replay: (clock) => untyped.create({ clock }),
+      });
+      return made;
+    },
+  };
+}
+
+/** Record what the test does to the actor `made` holds, until the test ends. */
+function track(made: Made, context: Pick<Pending, "id" | "extra" | "replay">): void {
+  const actor = actorOf(made);
+  const { testPath = "", currentTestName = "" } = expect.getState();
+  const entry: Pending = {
+    ...context,
+    actor,
+    name: currentTestName,
+    testPath,
+    steps: [],
+    problem: "",
+    seen: actor.clock.now(),
+  };
+  pending.push(entry);
+  actor.on("transition", {
+    fn: ({ event }) => {
+      const now = actor.clock.now();
+      if (now > entry.seen) entry.steps.push({ kind: "advance", ms: now - entry.seen });
+      entry.seen = now;
+      const payload = jsonPayload(event.payload);
+      if (Either.isLeft(payload)) entry.problem = payload[0];
+      else entry.steps.push({ kind: "event", event: event.type, payload: payload[1] });
+    },
+  });
 }

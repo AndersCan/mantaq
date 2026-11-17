@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, test } from "vite-plus/test";
 import { EXAMPLE_ROOT } from "./examples.ts";
 import { inspectModule } from "./inspect.ts";
+import { recordRuns } from "./record.ts";
+import { deadline } from "./fixtures/machine-values.ts";
 import { normalizeRun } from "./runs.ts";
 import type { FuzzTarget } from "./fuzz/run.ts";
 import { VirtualClock } from "@mantaq/core";
@@ -249,5 +251,65 @@ ${unlocked}`,
     );
     expect(run(dir, {}).ok).toBe(true);
     expect(readFileSync(file, "utf8")).toContain('"open"');
+  });
+});
+
+describe("recordRuns on a machine(...) value", () => {
+  const timed = { fixture: join(HERE, "fixtures/machine-values.ts"), factory: "deadline" };
+
+  test("records the events and the clock advance from create({ clock }) and create()", () => {
+    const dir = join(SCRATCH, "machine-value");
+    const file = testFile(
+      dir,
+      `test("with a clock", () => {
+  const clock = VirtualClock();
+  const actor = make.create({ clock });
+  actor.send({ type: "start" });
+  clock.advance(800);
+  expect(actor.state.name).toBe("error");
+});
+test("without one", () => {
+  const actor = make.create();
+  actor.send({ type: "start" });
+  expect(actor.clock.now()).toBe(0);
+  expect(actor.state.name).toBe("waiting");
+});`,
+      timed,
+    );
+    const result = run(dir, {});
+    expect(result.ok).toBe(true);
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as {
+      deadline: { name: string; end: string; steps: unknown[] }[];
+    };
+    expect(recorded.deadline.map((each) => [each.name, each.end])).toEqual([
+      ["with a clock", "error"],
+      ["without one", "waiting"],
+    ]);
+    expect(recorded.deadline[0]?.steps).toEqual([
+      { kind: "event", event: "start", payload: {} },
+      { kind: "advance", ms: 800 },
+      { kind: "event", event: "expired", payload: {} },
+    ]);
+  });
+
+  test("a test that passes a port is replayed on create({ clock }) alone", () => {
+    const dir = join(SCRATCH, "machine-port");
+    const file = testFile(
+      dir,
+      `test("greets", () => {
+  const actor = make.create({ greet: () => "yo" });
+  expect(actor.context.greeting).toBe("yo");
+  actor.send({ type: "wake" });
+  expect(actor.state.name).toBe("awake");
+});`,
+      { fixture: join(HERE, "fixtures/machine-values.ts"), factory: "sleeper" },
+    );
+    expect(run(dir, {}).ok).toBe(true);
+    const recorded = JSON.parse(readFileSync(file, "utf8")) as { sleeper: { end: string }[] };
+    expect(recorded.sleeper.map((each) => each.end)).toEqual(["awake"]);
+  });
+
+  test("the wrapped machine keeps its id", () => {
+    expect(recordRuns(deadline).id).toBe("deadline");
   });
 });

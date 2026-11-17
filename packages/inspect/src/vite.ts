@@ -14,7 +14,7 @@
  */
 import { UPDATE_EVENT, livePageHtml, serializeViz } from "@mantaq/viz";
 import type { FuzzSettings } from "./inspect.ts";
-import { vizDocument, machineId, projectRoot } from "./inspect.ts";
+import { vizDocument, exportId, projectRoot } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
 import type { MachineExport } from "./ast/discover.ts";
 import { entryId, inspectEntry, inspectFile, runOf } from "./load.ts";
@@ -64,7 +64,7 @@ function previewsOf(files: ReadonlyArray<string>): Map<string, string> {
     const analysis = analyzeModule({ file, root: projectRoot(file) });
     if (Either.isLeft(analysis)) continue;
     for (const found of analysis[1].machines.filter((each) => each.call !== "instance")) {
-      previews.set(machineId(found.name), preview);
+      previews.set(exportId(found), preview);
     }
   }
   return previews;
@@ -79,6 +79,7 @@ function previewsSource(files: ReadonlyArray<string>): string {
 }
 
 function createExpression(found: MachineExport, index: number): string {
+  if (found.call === "machine") return `m${index}[${JSON.stringify(found.name)}].create({ clock })`;
   const callee = `m${index}[${JSON.stringify(found.name)}]`;
   const call =
     found.call === "clock"
@@ -107,7 +108,7 @@ export function targetsSource(files: ReadonlyArray<string>): string {
     imports.push(`import * as m${index} from ${JSON.stringify(file)};`);
     for (const found of factories) {
       entries.push(
-        `  ${JSON.stringify(machineId(found.name))}: () => { const made = ${createExpression(found, index)}; const actor = ${found.unwrap === "actor" ? "made.actor" : "made"}; return { actor, clock: actor.clock, made }; },`,
+        `  ${JSON.stringify(exportId(found))}: () => { ${found.call === "machine" ? "const clock = VirtualClock(); " : ""}const made = ${createExpression(found, index)}; const actor = ${found.unwrap === "actor" ? "made.actor" : "made"}; return { actor, clock${found.call === "machine" ? "" : ": actor.clock"}, made }; },`,
       );
     }
   });

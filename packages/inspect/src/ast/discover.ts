@@ -11,12 +11,16 @@ import type { LoadedSource } from "./program.ts";
  * - `call`: call it with no arguments.
  * - `clock`: call it with a VirtualClock.
  * - `options`: call it with `{ clock: VirtualClock }`.
+ * - `machine`: a `machine(id, { create })` value; `id` is its literal id and
+ *   `create({ clock })` builds the actor on the clock inspect hands in.
  *
  * `unwrap`: the result is the actor (`self`) or carries it as `.actor`.
  */
 export interface MachineExport {
   name: string;
-  call: "instance" | "call" | "clock" | "options";
+  call: "instance" | "call" | "clock" | "options" | "machine";
+  /** The literal id of a `machine(id, …)` export. Absent for the other kinds. */
+  id?: string;
   unwrap: "self" | "actor";
   /** Fields of the actor's context type. null = no declared fields, or not an object type. */
   context: VizField[] | null;
@@ -196,6 +200,35 @@ function callOf(
   return isRequired(first) ? null : "call";
 }
 
+/** A `machine(id, { create })` value, read from the literal `id` and the actor `create` returns. */
+function machineValue(
+  checker: ts.TypeChecker,
+  context: { type: ts.Type; name: string; node: ts.Node },
+): MachineExport | undefined {
+  const { type, name, node } = context;
+  const idProperty = type.getProperty("id");
+  const create = type.getProperty("create");
+  if (idProperty === undefined || create === undefined) return undefined;
+  const id = checker.getTypeOfSymbolAtLocation(idProperty, node);
+  const signature = checker
+    .getSignaturesOfType(checker.getTypeOfSymbolAtLocation(create, node), ts.SignatureKind.Call)
+    .at(-1);
+  if (signature === undefined || !id.isStringLiteral()) return undefined;
+  const returned = signature.getReturnType();
+  const unwrap = unwrapOf(checker, returned, node);
+  if (unwrap === null) return undefined;
+  const at = { type: returned, unwrap, node };
+  return {
+    name,
+    call: "machine",
+    id: id.value,
+    unwrap,
+    context: contextOf(checker, at),
+    samples: samplesFromTypes(checker, at),
+    fields: fieldsFromTypes(checker, at),
+  };
+}
+
 function machineExport(
   checker: ts.TypeChecker,
   symbol: ts.Symbol,
@@ -205,6 +238,8 @@ function machineExport(
     symbol.getFlags() & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
   const type = checker.getTypeOfSymbolAtLocation(target, node);
   const name = symbol.getName();
+  const made = machineValue(checker, { type, name, node });
+  if (made !== undefined) return made;
   const self = unwrapOf(checker, type, node);
   if (self !== null) {
     return {
@@ -235,12 +270,12 @@ function machineExport(
   return null;
 }
 
-/** Exports of the file that are actors or build one, in source order. */
+/** Exports of the file that are actors or build one, in source order. When any is a `machine(...)`, only those count. */
 export function machineExports(loaded: LoadedSource): MachineExport[] {
   const { checker, sourceFile } = loaded;
   const module = checker.getSymbolAtLocation(sourceFile);
   if (module === undefined) return [];
-  return checker
+  const all = checker
     .getExportsOfModule(module)
     .flatMap((symbol) => {
       const found = machineExport(checker, symbol, sourceFile);
@@ -248,4 +283,6 @@ export function machineExports(loaded: LoadedSource): MachineExport[] {
     })
     .sort((left, right) => left.at - right.at)
     .map(({ found }) => found);
+  const machines = all.filter((found) => found.call === "machine");
+  return machines.length > 0 ? machines : all;
 }

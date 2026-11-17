@@ -1,4 +1,4 @@
-import { mantaqViz } from "./vite.ts";
+import { mantaqViz, targetsSource } from "./vite.ts";
 import { UPDATE_EVENT, parseViz } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { join } from "node:path";
@@ -167,5 +167,26 @@ describe("mantaqViz fuzz budget", () => {
     expect(logged.find((line) => line.includes("fuzz never reached"))).toMatch(
       /^\[mantaq-viz\] checkout: fuzz never reached: .*\(ran 1 iterations, stopped: iteration cap\)/,
     );
+  });
+});
+
+describe("targetsSource: machine(...) exports", () => {
+  const source = targetsSource([join(import.meta.dirname, "fixtures/machine-values.ts")]);
+
+  test("each is keyed by its id and built on a clock the page owns", () => {
+    expect(source).toContain(
+      '"deadline": () => { const clock = VirtualClock(); const made = m0["deadline"].create({ clock });',
+    );
+    expect(source).toContain(
+      '"sleeper": () => { const clock = VirtualClock(); const made = m0["sleeper"].create({ clock });',
+    );
+    expect(source).toContain("return { actor, clock, made }");
+  });
+
+  test("a legacy factory next to a machine is not a target", () => {
+    const mixed = targetsSource([join(import.meta.dirname, "fixtures/machine-and-factory.ts")]);
+    expect(mixed).toContain('"solo"');
+    expect(mixed).not.toContain("createLegacyActor");
+    expect(mixed).not.toContain('"legacy"');
   });
 });

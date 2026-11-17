@@ -9,6 +9,7 @@ import { createDroppedMessage } from "./fixtures/dropped-message.ts";
 import { onOutput, withTimeout } from "@mantaq/sugar";
 import { designErrors, expectNoDesignErrors, unreachableStates } from "./gate.ts";
 import { inspect } from "./inspect.ts";
+import { deadline, sleeper } from "./fixtures/machine-values.ts";
 import { join } from "node:path";
 
 const picks = { pick: [{ side: "a" as const }, { side: "b" as const }] };
@@ -32,6 +33,15 @@ function createOrphanActor() {
 }
 
 describe("expectNoDesignErrors", () => {
+  test("takes a machine(...) value, timed or not", () => {
+    expect(() =>
+      expectNoDesignErrors({ machine: deadline, fuzz: { iterations: 100 } }),
+    ).not.toThrow();
+    expect(() =>
+      expectNoDesignErrors({ machine: sleeper, fuzz: { iterations: 100 } }),
+    ).not.toThrow();
+  });
+
   test("passes for a machine without design errors", () => {
     expect(() =>
       expectNoDesignErrors({

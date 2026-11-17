@@ -109,3 +109,42 @@ describe("inspect: fuzz that cannot finish or crashes is reported, not fatal", (
     ]);
   });
 });
+
+describe("inspectModule: machine(...) exports", () => {
+  const file = join(FIXTURES, "machine-values.ts");
+
+  test("each machine is built on inspect's own clock and fuzzed, timed or not", async () => {
+    const result = await inspectModule(file, { load });
+    expect(result.machines.map((machine) => machine.id)).toEqual([
+      "deadline",
+      "sleeper",
+      "stubborn",
+    ]);
+    const fuzzed = (id: string) => result.machines.find((machine) => machine.id === id)?.fuzz;
+    expect(fuzzed("deadline")).not.toBeNull();
+    expect(fuzzed("sleeper")).not.toBeNull();
+    expect(result.warnings.filter((warning) => warning.startsWith("sleeper"))).toEqual([]);
+    const deadline = result.machines.find((machine) => machine.id === "deadline");
+    expect(deadline?.states.find((state) => state.id === "error")?.coverage?.hits).toBeGreaterThan(
+      0,
+    );
+  });
+
+  test("a machine that builds its actor on another clock is drawn, not fuzzed, with one warning", async () => {
+    const result = await inspectModule(file, { load });
+    const stubborn = result.machines.find((machine) => machine.id === "stubborn");
+    expect(stubborn?.fuzz).toBeNull();
+    expect(result.warnings.filter((warning) => warning.startsWith("stubborn"))).toEqual([
+      "stubborn: not fuzzed: create() built an actor on a clock it was not given, so fuzzing and the page cannot move its time. Pass the clock create() gets to Actor({ clock }).",
+    ]);
+  });
+
+  test("an export that is not a machine at runtime is skipped", async () => {
+    const result = await inspectModule(file, {
+      load: async (path) => ({ ...(await load(path)), sleeper: { id: "sleeper" } }),
+      fuzz: false,
+    });
+    expect(result.machines.map((machine) => machine.id)).toEqual(["deadline", "stubborn"]);
+    expect(result.warnings).toContain("sleeper: sleeper did not return an actor");
+  });
+});
