@@ -22,12 +22,12 @@ This lists what exists and when to reach for it. Get exact signatures from
 
 - Return the promise from an effect that uses `withPromise` so `settled()` waits for it.
 - `regions` wire child outputs into the parent automatically. `createActorMap` children do not: connect them with `onOutput`.
-- Map children's context must be plain data. Capture parent actors in the `create` closure, not in context.
+- Map children's context must be plain data. Capture parent actors in the factory closure, not in context.
 - Dispose an actor map when its owner is disposed.
-- Return actor maps from `create` next to the actor, `return { actor, photos }`, so the viz draws and drives the children, and fuzzing sends to the ones it started.
+- Return actor maps from the factory next to the actor, `return { actor, photos }`, so the viz draws and drives the children, and fuzzing sends to the ones it started.
 - Fuzzing sends to a child by the key a step started it with, so give the event that starts it a payload sample (`source` or `payloads`).
 - Prefer sugar over raw core where it fits. Reach for the map, broadcast, tag and parts helpers when the need arises, not preemptively.
 
 ## Pool: machines that pass work
 
-`createPool({ name, workers, run })` builds one inbox and `workers` workers (`w1`..`wn`) that pull items. The inbox hands items to free workers with `${name}.ITEMS_ASSIGNED`; a worker reports back with `${name}.ITEMS_FINISHED` or `${name}.ITEMS_FAILED`. The inbox is `allWorkersFree`, `workersBusy` or `workWaiting`. Return the pool's actor and its worker map from `create` so the viz draws and drives the workers. To feed the pool from your own machine, declare `pool.events.ITEM_ARRIVED` as that machine's output, wire it with `onOutput(machine, (out) => pool.actor.send(out))`, and return all three from one `create`, `{ actor: machine, orders: pool.actor, cooks: pool.workers }`: the diagram draws the arrow into the inbox, and steps to the inbox use `{ region: "orders" }`. Size the pool with `pool.resize(n)` or by sending `${name}.WORKERS_RESIZED { count }`. Return a `Pool` flat as above, never `{ actor, pool }`.
+`createPool({ name, workers, run })` builds one inbox and `workers` workers (`w1`..`wn`) that pull items. The inbox hands items to free workers with `${name}.ITEMS_ASSIGNED`; a worker reports back with `${name}.ITEMS_FINISHED` or `${name}.ITEMS_FAILED`. The inbox is `allWorkersFree`, `workersBusy` or `workWaiting`. Return the pool's actor and its worker map from the factory so the viz draws and drives the workers. To feed the pool from your own machine, declare `pool.events.ITEM_ARRIVED` as that machine's output, wire it with `onOutput(machine, (out) => pool.actor.send(out))`, and return all three from one factory, `{ actor: machine, orders: pool.actor, cooks: pool.workers }`: the diagram draws the arrow into the inbox, and steps to the inbox use `{ region: "orders" }`. Size the pool with `pool.resize(n)` or by sending `${name}.WORKERS_RESIZED { count }`. Return a `Pool` flat as above, never `{ actor, pool }`.

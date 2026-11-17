@@ -7,7 +7,7 @@ Proven recipes. Code is a sketch. Start from the shape, then check signatures ag
 State enters "working", effect runs the async job, emits internal event, transition completes.
 
 ```ts
-import { Actor, event, machine, state } from "@mantaq/core";
+import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { withTimeout } from "@mantaq/sugar";
 
 const submit = event("SUBMIT")();
@@ -16,36 +16,27 @@ const submitting = state("submitting")();
 const submitted = state("submitted")().final();
 const submittingDone = event("SUBMITTING_DONE")();
 
-export const form = machine("form", {
-  create: ({ clock }) =>
-    Actor({
-      inputs: [submit],
-      internal: [submittingDone],
-      states: [fillingForm, submitting, submitted],
-      initial: fillingForm,
-      clock,
-      setup: (m) => {
-        m.on(fillingForm, {
-          event: submit,
-          to: [submitting],
-          handler: () => ({ state: submitting }),
-        });
-        m.effect(submitting, {
-          name: "startSubmitTimeout",
-          sends: [submittingDone],
-          fn: (input) => withTimeout(800, { input, event: () => submittingDone.create() }),
-        });
-        m.on(submitting, {
-          event: submittingDone,
-          to: [submitted],
-          handler: () => ({ state: submitted }),
-        });
-      },
-    }),
+Actor({
+  inputs: [submit],
+  internal: [submittingDone],
+  states: [fillingForm, submitting, submitted],
+  initial: fillingForm,
+  clock: VirtualClock(),
+  setup: (m) => {
+    m.on(fillingForm, { event: submit, to: [submitting], handler: () => ({ state: submitting }) });
+    m.effect(submitting, {
+      name: "startSubmitTimeout",
+      sends: [submittingDone],
+      fn: (input) => withTimeout(800, { input, event: () => submittingDone.create() }),
+    });
+    m.on(submitting, {
+      event: submittingDone,
+      to: [submitted],
+      handler: () => ({ state: submitted }),
+    });
+  },
 });
 ```
-
-The timer needs the clock `create` receives. A machine with no timers drops `clock`.
 
 For real promises use `withPromise` (see `sugar.md`) and return it from the
 effect.
