@@ -23,7 +23,7 @@ describe("Getting started step 6", () => {
       select: () => undefined,
     });
     const eat = graph.querySelector('g.edge[data-edge-id="hungry-eat-full"]');
-    expect(eat?.querySelector(".edge-condition")?.textContent).toBe("!noFood && !noPlate");
+    expect(eat?.querySelector(".edge-condition")?.textContent).toBe("hasFood && hasPlate");
   });
 });
 
