@@ -579,3 +579,67 @@ test("a wire never taken stops at the budget", () => {
   expect(machine.fuzz?.iterations).toBe(0);
   expect(machine.fuzz?.messages).toEqual([]);
 });
+
+test("fuzzing stops once a wire was taken in any send, even when a later send was not", () => {
+  const close = event("CLOSE")();
+  const shut = event("SHUT")();
+  function create() {
+    const clock = VirtualClock();
+    const pinged = state("pinged")();
+    const closed = state("closed")();
+    const waiting = state("waiting")();
+    const b = Actor({
+      inputs: [ping, shut],
+      states: [waiting, pinged, closed],
+      initial: waiting,
+      clock,
+      setup: (m) => {
+        m.on(waiting, { event: ping, to: [pinged], handler: () => ({ state: pinged }) });
+        m.on(waiting, { event: shut, to: [closed], handler: () => ({ state: closed }) });
+      },
+    });
+    const a = Actor({
+      inputs: [go, close],
+      outputs: [ping, shut],
+      states: [idle],
+      initial: idle,
+      clock,
+      setup: (m) => {
+        m.on(idle, {
+          event: go,
+          to: [idle],
+          handler: () => ({ state: idle, emit: [ping.create()] }),
+        });
+        m.on(idle, {
+          event: close,
+          to: [idle],
+          handler: () => ({ state: idle, emit: [shut.create()] }),
+        });
+      },
+    });
+    onOutput(a, (out) => {
+      if (ping.is(out)) b.send(ping.create());
+      if (shut.is(out)) b.send(shut.create());
+    });
+    return { actor: a, clock, made: { b } };
+  }
+  const target = { id: "a", create };
+  const go_: VizStep = { kind: "event", event: "GO", payload: null };
+  const close_: VizStep = { kind: "event", event: "CLOSE", payload: null };
+  const done = () => true;
+  // Taken by the first GO, not by the second (b is pinged by then).
+  const inOneRun = fuzz(target, { seed: 1, iterations: 50, initial: [[go_, go_]], done });
+  // Taken in the first run, not in the second (b is closed by then).
+  const acrossRuns = fuzz(target, {
+    seed: 1,
+    iterations: 50,
+    initial: [[go_], [close_, go_]],
+    done,
+  });
+  expect(
+    [inOneRun, acrossRuns].map(({ stopped, iterations }) => ({ stopped, iterations })),
+  ).toEqual([
+    { stopped: "covered", iterations: 0 },
+    { stopped: "covered", iterations: 0 },
+  ]);
+});

@@ -37,7 +37,7 @@ export interface FuzzOptions {
   deadline?: { ms: number; now: () => number };
 }
 
-/** Why fuzzing stopped: `done` returned true, the iteration cap, or the deadline. */
+/** Why fuzzing stopped: `done` returned true and every seen wire was taken, the iteration cap, or the deadline. */
 export type FuzzStop = "covered" | "iterations" | "time";
 
 export interface CorpusEntry {

@@ -398,22 +398,12 @@ function noteDelivery(
   handled: boolean,
 ): void {
   const { sender, senderId, event, receiver, took } = delivery;
-  if (handled) noteWire(into.wires, { sender, event, receiver, taken: took !== null });
+  if (handled) into.wires.push({ sender, event, receiver, taken: took !== null });
   if (took === null) return;
   const seen = into.sent.some(
     (each) => each.from === senderId && each.event === event && each.to === took,
   );
   if (!seen) into.sent.push({ from: senderId, event, to: took });
-}
-
-/** Add a wire, or mark the one already seen as taken when this send was. */
-function noteWire(wires: Wire[], wire: Wire): void {
-  const seen = wires.find(
-    (each) =>
-      each.sender === wire.sender && each.receiver === wire.receiver && each.event === wire.event,
-  );
-  if (seen === undefined) wires.push(wire);
-  else seen.taken = seen.taken || wire.taken;
 }
 
 /**
