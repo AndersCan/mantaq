@@ -1,7 +1,8 @@
 /* oxlint-disable oxlinter/comments-multiline-jsdoc -- ts-strict-casting requires a rationale line comment directly below each @ts-expect-error, and typescript requires line comments between the directive and the code */
 import type { ErrorReason } from "./actor-types.ts";
-import { Actor, state, event, Context, StateRef } from "./index.ts";
+import { Actor, state, event, Context, StateRef, machine } from "./index.ts";
 import type {
+  Machine,
   ActorOptions,
   AnyStateRef,
   ErrorInfo,
@@ -769,5 +770,42 @@ describe("handler state typing", () => {
         });
       },
     });
+  });
+});
+
+describe("type level contract — machine", () => {
+  const idle = state("idle")();
+  const plain = machine("plain", {
+    create: () =>
+      Actor({ inputs: [], states: [idle], initial: idle, context: { n: 1 }, setup: () => {} }),
+  });
+
+  test("keeps the id literal and the exact actor type", () => {
+    expectTypeOf(plain.id).toEqualTypeOf<"plain">();
+    expectTypeOf(plain.create().context.n).toEqualTypeOf<number>();
+  });
+
+  test("machines with different contexts share Machine[]", () => {
+    const other = machine("other", {
+      create: () =>
+        Actor({ inputs: [], states: [idle], initial: idle, context: { s: "" }, setup: () => {} }),
+    });
+    const all: Machine[] = [plain, other];
+    expect(all.length).toBe(2);
+  });
+
+  test("a create option without a default is rejected", () => {
+    // @ts-expect-error every create option except clock needs a default
+    // suppressed: a required port would stop tools from building the machine
+    machine("needs-port", {
+      create: ({ port }: { port: string }) =>
+        Actor({ inputs: [], states: [idle], initial: idle, context: { port }, setup: () => {} }),
+    });
+  });
+
+  test("an unknown option is rejected", () => {
+    // @ts-expect-error nope is not a create option
+    // suppressed: create accepts only its declared options
+    plain.create({ nope: 1 });
   });
 });

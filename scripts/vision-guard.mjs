@@ -46,9 +46,11 @@ const CLOCK_FILE = join(CORE_SRC, "real-clock.ts");
 // the global (Bare), so core runs there. Net +~52 in abort.ts (ceiling 1860).
 // Raised again 2026-11-04: handlers receive the typed current state (`state`), +~19
 // lines of option types and call sites (ceiling 1880).
-const BUDGET_TOTAL_LINES = 1880;
+// Raised again 2026-11-17: machine(), the one typed handle tools and tests build actors from
+// (+~30 lines, ceiling 1910).
+const BUDGET_TOTAL_LINES = 1910;
 const BUDGET_FILE_LINES = 650;
-const BUDGET_EXPORTS = 32;
+const BUDGET_EXPORTS = 34;
 
 const FORBIDDEN = [
   { name: "as any", pattern: /\bas any\b/g },

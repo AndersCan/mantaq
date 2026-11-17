@@ -4,6 +4,8 @@ export { Actor } from "./actor.ts";
 export { RealClock, VirtualClock } from "./actor.ts";
 export type { Clock, Snapshot, AnyActor, ActorOptions, InitialState } from "./actor.ts";
 export { Context } from "./context.ts";
+export { machine } from "./machine.ts";
+export type { Machine } from "./machine.ts";
 export type {
   ActorBuilder,
   SetupFn,
