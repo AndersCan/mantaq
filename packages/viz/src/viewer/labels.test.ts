@@ -76,8 +76,15 @@ describe("edgeCondition", () => {
     expect(edgeCondition(edgeWith([branch([], "payment"), branch(["a"], null)]))).toBeNull();
   });
 
-  test("null when the handler reads actor state", () => {
-    expect(edgeCondition(edgeWith(order6, { readsActorState: true }))).toBeNull();
+  test("a handler that reads actor state still gets its text", () => {
+    const edge = edgeWith(
+      [
+        branch(['actor.state.name === "third"'], "second"),
+        branch(['!(actor.state.name === "third")', 'actor.state.name === "second"'], "first"),
+      ],
+      { readsActorState: true, to: "first" },
+    );
+    expect(edgeCondition(edge)).toBe('else if actor.state.name === "second"');
   });
 
   test("null when the target is undetermined", () => {
@@ -102,10 +109,15 @@ describe("edgeLines", () => {
     expect(edgeLines(edgeWith(order6))).toEqual(["pay", 'email !== "" && items !== 0']);
   });
 
-  test("a long condition is cut to 32 characters", () => {
-    const long = "someLongName === 1 && anotherLongName === 2";
+  test("a long condition is one whole line", () => {
+    const long = 'current.completedSteps.includes("inventory")';
     const [, line] = edgeLines(edgeWith([branch([long], "payment"), branch(["x"], null)]));
-    expect(line).toBe(`${long.slice(0, 31)}…`);
+    expect(line).toBe(long);
+  });
+
+  test("a split edge is two lines, never more", () => {
+    const [, line] = edgeLines(edgeWith(apply, { to: "manualReview" }));
+    expect(line).toBe('else if amount > 50000 && tier !== "gold"');
   });
 
   test("an unconditional edge is the event alone", () => {
@@ -116,5 +128,71 @@ describe("edgeLines", () => {
     const many = [branch(["a"], "x"), branch(["b"], "y"), branch(["c"], "z"), branch(["d"], null)];
     expect(edgeLines(edgeWith(many)).length).toBeLessThanOrEqual(2);
     expect(edgeLines(edgeWith(order6)).length).toBeLessThanOrEqual(2);
+  });
+});
+
+const apply = [
+  branch(["event.payload.score < 600"], "rejected"),
+  branch(
+    [
+      "!(event.payload.score < 600)",
+      'event.payload.amount > 50000 && context.get().tier !== "gold"',
+    ],
+    "manualReview",
+  ),
+  branch(
+    [
+      "!(event.payload.score < 600)",
+      '!(event.payload.amount > 50000 && context.get().tier !== "gold")',
+    ],
+    "approved",
+  ),
+];
+
+function textsOf(branches: VizBranch[], tos: string[]): Array<string | null> {
+  return tos.map((to) => edgeCondition(edgeWith(branches, { to })));
+}
+
+describe("edgeCondition when one event leads to several states", () => {
+  test("two ways: the condition, then else", () => {
+    const answered = [
+      branch(['event.payload.answer === "accepted"'], "accepted"),
+      branch(['!(event.payload.answer === "accepted")'], "declined"),
+    ];
+    expect(textsOf(answered, ["accepted", "declined"])).toEqual(['answer === "accepted"', "else"]);
+  });
+
+  test("three ways: condition, else if, else", () => {
+    expect(textsOf(apply, ["rejected", "manualReview", "approved"])).toEqual([
+      "score < 600",
+      'else if amount > 50000 && tier !== "gold"',
+      "else",
+    ]);
+  });
+
+  test("a guard shared by every arm is left off", () => {
+    const shared = [
+      branch(["a"], "x"),
+      branch(["!(a)", "b"], "y"),
+      branch(["!(a)", "!(b)", "c"], null),
+    ];
+    expect(textsOf(shared, ["x", "y"])).toEqual(["a", "else if b"]);
+    const both = [branch(["g", "a"], "x"), branch(["g", "!(a)"], "y"), branch(["!(g)"], null)];
+    expect(textsOf(both, ["x", "y"])).toEqual(["a", "else"]);
+  });
+
+  test("a ternary reads as the condition and else", () => {
+    const review = [
+      branch(["(e.payload?.amount ?? 0) > 100"], "rejected"),
+      branch(["!((e.payload?.amount ?? 0) > 100)"], "approved"),
+    ];
+    expect(textsOf(review, ["rejected", "approved"])).toEqual([
+      "(e.payload?.amount ?? 0) > 100",
+      "else",
+    ]);
+  });
+
+  test("an arm with no condition of its own and no else side has no text", () => {
+    expect(edgeCondition(edgeWith([branch([], "payment"), branch([], "other")]))).toBeNull();
   });
 });
