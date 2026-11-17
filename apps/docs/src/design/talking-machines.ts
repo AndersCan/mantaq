@@ -96,7 +96,13 @@ export function createCheckout({ clock }: { clock: Clock } = { clock: VirtualClo
       });
     },
   });
-  onOutput(checkout, (out) => stock.send(out as never));
-  onOutput(stock, (out) => checkout.send(out as never));
+  onOutput(checkout, (out) => {
+    if (holdItem.is(out)) stock.send(holdItem.create());
+    if (itemSold.is(out)) stock.send(itemSold.create());
+    if (releaseItem.is(out)) stock.send(releaseItem.create());
+  });
+  onOutput(stock, (out) => {
+    if (itemHeld.is(out)) checkout.send(itemHeld.create());
+  });
   return { actor: checkout, stock };
 }
