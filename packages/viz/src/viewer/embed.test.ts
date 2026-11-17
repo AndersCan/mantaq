@@ -1,6 +1,14 @@
 // @vitest-environment happy-dom
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
-import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
+import type {
+  VizBranch,
+  VizDriver,
+  VizEdge,
+  VizLiveState,
+  VizMachine,
+  VizState,
+  VizStep,
+} from "../schema.ts";
 import { serializeViz } from "../serialize.ts";
 import { mountViewer, mountVizText } from "./embed.ts";
 import { describe, expect, test } from "vite-plus/test";
@@ -118,6 +126,63 @@ describe("mountVizText", () => {
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(root.querySelector("[data-selected-edge]")).not.toBeNull();
     expect(root.querySelector("[data-send-edge]")).toBeNull();
+  });
+
+  test("an arrow's title carries its condition and lists the other arrows of the event", () => {
+    const branches: VizBranch[] = [
+      { conditions: ['answer === "accepted"'], target: { kind: "state", state: "accepted" } },
+      { conditions: ['!(answer === "accepted")'], target: { kind: "state", state: "declined" } },
+    ];
+    const explanation = (taken: string): VizEdge["explanation"] => ({
+      status: "analyzed",
+      location: { file: "a.ts", line: 1, column: 1 },
+      registration: "on",
+      branches: branches.sort((a) =>
+        a.target.kind === "state" && a.target.state === taken ? -1 : 1,
+      ),
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    });
+    const machine: VizMachine = {
+      ...door,
+      initial: "waiting",
+      states: [
+        state("waiting", { initial: true }),
+        state("accepted", { final: true }),
+        state("declined", { final: true }),
+      ],
+      events: [{ id: "answered", internal: false, doc: null, payload: null }],
+      edges: [
+        edge("__initial__", "", "waiting"),
+        { ...edge("waiting", "answered", "accepted"), explanation: explanation("accepted") },
+        { ...edge("waiting", "answered", "declined"), explanation: explanation("declined") },
+      ],
+    };
+    const root = mount(serializeViz({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }));
+    const click = (selector: string) =>
+      root.querySelector(selector)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    click('[data-edge-id="waiting-answered-declined"]');
+    expect(root.querySelector(".details h2")?.textContent).toBe(
+      "waiting —answered [else]→ declined",
+    );
+    const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
+    expect(links.map((link) => link.textContent)).toEqual([
+      'waiting —answered [answer === "accepted"]→ accepted',
+    ]);
+    click('.details [data-edge-link="waiting-answered-accepted"]');
+    expect(root.querySelector(".details h2")?.textContent).toBe(
+      'waiting —answered [answer === "accepted"]→ accepted',
+    );
+    click('[data-node-id="waiting"]');
+    const outgoing = [...root.querySelectorAll('.details dd[data-field="outgoing"] .link')];
+    expect(outgoing.map((link) => link.textContent)).toEqual([
+      "waiting —answered→ accepted",
+      "waiting —answered→ declined",
+    ]);
   });
 
   test("Details hold the title, the doc line and, for a state, only its links", () => {
