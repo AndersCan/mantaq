@@ -108,3 +108,28 @@ Only when the user asks for two designs or alternatives. Otherwise section 1 hol
 5. Reply in at most 4 lines: `Two drafts ready, both typecheck.`, then one line per design (`A (<what it chooses>): <n> states, <m> edges.`), then one link each: `<Local URL>__mantaq/?machine=<feature>DraftA` and `<Local URL>__mantaq/?machine=<feature>DraftB`.
 6. Feedback on one design: edit that draft; the page redraws.
 7. The pick ("keep A", "the first"): move the kept draft into the real machine file (existing feature) or a new file named the repo's way (new feature), rename the export to the real name, fix every caller the typechecker flags, delete both draft files, then run the section 8 checks. Reply in at most 3 lines: the file, the checks that passed, and `<Local URL>__mantaq/?machine=<id>`. If the pick is unclear, ask one question. If the user drops both, delete the drafts and say so in one line. Never leave a draft file behind.
+
+## 11. Machines that talk
+
+Two or more machines that send each other messages ("a checkout, and a stock service that holds the item"):
+
+- One factory, named for the machine the person starts with (`createCheckout` in `src/checkout.machine.ts`), builds every machine with the same `clock`, wires them, and returns them together: `return { actor: checkout, stock }`. The page draws `stock` as a shaded box and each message as a dotted line; the link stays `?machine=checkout`.
+- Event names are unique across the machines (`HOLD_ITEM`, `ITEM_HELD`; never a `DONE` in both), so the page names the right sender.
+- A message is an output of the sender and an input of the receiver. Wire each one with `onOutput`, typed, no cast; a message with a payload passes it on with `x.create(out.payload)`:
+
+```ts
+onOutput(checkout, (out) => {
+  if (holdItem.is(out)) stock.send(holdItem.create());
+  if (itemSold.is(out)) stock.send(itemSold.create());
+  if (releaseItem.is(out)) stock.send(releaseItem.create());
+});
+onOutput(stock, (out) => {
+  if (itemHeld.is(out)) checkout.send(itemHeld.create());
+});
+return { actor: checkout, stock };
+```
+
+- Tests: section 8's design check on this factory, and one recorded walk that crosses: send the first event to `actor` and expect the other machine's state (`expect(made.stock.state.name).toBe("holding")`). The design check passes when nothing is wired; only the walk shows the wire works.
+- Reply: the link, one line of states per machine, and what the design check caught and you fixed, if anything.
+
+Full example: https://github.com/AndersCan/mantaq/blob/main/apps/docs/src/design/talking-machines.ts
