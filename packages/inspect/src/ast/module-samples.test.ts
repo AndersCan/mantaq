@@ -34,3 +34,18 @@ test("an effect result of a machine the factory returns gets samples", () => {
     { items: ["sample"] },
   ]);
 });
+
+test("every internal event of the root and of a returned machine gets samples", () => {
+  const found = Either.getRight(
+    analyzeModule({
+      file: join(EXAMPLE_ROOT, "packages/inspect/src/fixtures/part-results/app.ts"),
+      root: EXAMPLE_ROOT,
+    }),
+  );
+  const samples = found?.machines.find((machine) => machine.name === "shop")?.samples;
+  expect([samples?.["COUNTED"], samples?.["LOADED"], samples?.["FAILED"]]).toEqual([
+    [{ total: 1 }],
+    [{ items: ["sample"] }],
+    [{ reason: "sample" }],
+  ]);
+});

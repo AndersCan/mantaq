@@ -17,7 +17,7 @@ export interface MachineExport {
   unwrap: "self" | "actor";
   /** Fields of the actor's context type. null = no declared fields, or not an object type. */
   context: VizField[] | null;
-  /** Sample payloads per event id, read from the actor's `send` type and the result's `events` refs. */
+  /** Sample payloads per event id, read from the actor's `send` type, its internal events and the result's `events` refs. */
   samples: Record<string, VizJson[]>;
   /** Payload fields per event id, from the same types as `samples`. */
   fields: Record<string, VizField[]>;
@@ -121,7 +121,7 @@ function actorTypes(
   return [main, ...others];
 }
 
-/** Payload type per event id, from the unions the actors' `send` accepts and the refs in the result's `events` map. Each shape needs a literal `type` and a `payload`. */
+/** Payload type per event id, from the unions the actors' `send` accepts, their internal events and the refs in the result's `events` map. Each shape needs a literal `type` and a `payload`. */
 function payloadTypes(
   checker: ts.TypeChecker,
   context: { type: ts.Type; unwrap: MachineExport["unwrap"]; node: ts.Node },

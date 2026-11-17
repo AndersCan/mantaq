@@ -6,17 +6,22 @@ import { makeStore } from "./store.ts";
 const open = state("open")();
 /** Someone looked around. */
 const looked = event("LOOKED")();
+/** The till counted the day. */
+const counted = event("COUNTED")<{ total: number }>();
 
 export const shop = machine("shop", {
   create: ({ clock }) => {
     const root = Actor({
       clock,
       inputs: [looked],
+      internal: [counted],
       states: [open],
       initial: open,
       setup: (m) => {
         /** Looking around changes nothing. */
         m.on(open, { event: looked, handler: () => ({}) });
+        /** Counting changes nothing. */
+        m.on(open, { event: counted, handler: () => ({}) });
       },
     });
     return { actor: root, store: makeStore(clock) };

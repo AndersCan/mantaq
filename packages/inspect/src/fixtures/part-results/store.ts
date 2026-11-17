@@ -13,12 +13,14 @@ const loaded = state("loaded")();
 const loadClicked = event("LOAD_CLICKED")();
 /** The effect found the items. */
 const itemsLoaded = event("LOADED")<{ items: string[] }>();
+/** The effect could not load the items. */
+const loadFailed = event("FAILED")<{ reason: string }>();
 
 export function makeStore(clock: Clock) {
   return Actor({
     clock,
     inputs: [loadClicked],
-    internal: [itemsLoaded],
+    internal: [itemsLoaded, loadFailed],
     states: [empty, loading, loaded],
     initial: empty,
     context: { count: 0 },
@@ -28,7 +30,7 @@ export function makeStore(clock: Clock) {
       /** The effect loads the items. */
       m.effect(loading, {
         name: "loadItems",
-        sends: [itemsLoaded],
+        sends: [itemsLoaded, loadFailed],
         fn: ({ emit }) => emit(itemsLoaded.create({ items: ["a"] })),
       });
       /** The items arrived, so the store counts them. */
@@ -36,6 +38,12 @@ export function makeStore(clock: Clock) {
         event: itemsLoaded,
         to: [loaded],
         handler: (e) => ({ state: loaded, context: { count: e.payload.items.length } }),
+      });
+      /** A failed load leaves the store empty. */
+      m.on(loading, {
+        event: loadFailed,
+        to: [empty],
+        handler: (e) => ({ state: empty, context: { count: e.payload.reason.length } }),
       });
     },
   });
