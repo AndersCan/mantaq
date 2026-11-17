@@ -24,4 +24,16 @@ npm install @mantaq/core @mantaq/sugar
 npm install -D vitest
 ```
 
-Keep `strict` on in `tsconfig.json`; the `vanilla-ts` template already runs strict (TypeScript turns it on by default), so do not set it to `false`. The examples rely on it. Put each file from this guide in `src/`.
+Keep `strict` on; the examples rely on it. `tsconfig.json` has no `strict` line because TypeScript 6 and later turn it on by default. This prints `default: true` to confirm; if it prints `false`, add `"strict": true` under `compilerOptions`:
+
+```sh
+npx tsc --help --all | grep -A3 -x -- --strict | tail -1
+```
+
+The template also turns on `verbatimModuleSyntax`, so a type such as `Clock` needs `type` in its import, or `tsc` stops with TS1484. A machine factory that takes a clock starts with:
+
+```ts
+import { Actor, VirtualClock, type Clock } from "@mantaq/core";
+```
+
+Put each file from this guide in `src/`.
