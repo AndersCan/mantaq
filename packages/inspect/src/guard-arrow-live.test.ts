@@ -3,7 +3,7 @@ import { VirtualClock } from "@mantaq/core";
 import { renderGraph } from "../../viz/src/viewer/graph.ts";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { createMeal6 } from "../../../apps/docs/src/tutorial/meal-06.ts";
+import { meal6 } from "../../../apps/docs/src/tutorial/meal-06.ts";
 import { inspectModule, vizDocument } from "./index.ts";
 import { mountDriven } from "./live-page.ts";
 import { serializeViz } from "@mantaq/viz";
@@ -14,7 +14,7 @@ const file = join(import.meta.dirname, "../../../apps/docs/src/tutorial/meal-06.
 describe("Getting started step 6", () => {
   test("one eat arrow says when it reaches full, and no fuzz loop is drawn", async () => {
     const inspected = await inspectModule(file, {
-      load: async () => ({ createMeal6: () => createMeal6(VirtualClock()) }),
+      load: async () => ({ meal6 }),
     });
     const machine = inspected.machines[0];
     expect(machine).toBeDefined();
@@ -30,7 +30,7 @@ describe("Getting started step 6", () => {
 describe("Getting started step 6, live", () => {
   async function mount(): Promise<HTMLElement> {
     const inspected = await inspectModule(file, {
-      load: async () => ({ createMeal6: () => createMeal6(VirtualClock()) }),
+      load: async () => ({ meal6 }),
       fuzz: false,
     });
     const id = inspected.machines[0]?.id ?? "";
@@ -42,7 +42,7 @@ describe("Getting started step 6, live", () => {
       targets: {
         [id]: () => {
           const clock = VirtualClock();
-          return { actor: createMeal6(clock), clock };
+          return { actor: meal6.create(), clock };
         },
       },
     });

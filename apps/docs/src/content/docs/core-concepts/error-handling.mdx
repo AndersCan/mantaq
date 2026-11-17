@@ -67,9 +67,9 @@ Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/
 Replays to late subscribers.
 
 ```ts
-import { createCheckoutActor, payment } from "./checkout";
+import { checkoutMachine, payment } from "./checkout";
 
-const { actor: checkout } = createCheckoutActor();
+const { actor: checkout } = checkoutMachine.create();
 
 checkout.on("error", {
   fn: (info) => {

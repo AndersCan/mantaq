@@ -16,9 +16,9 @@ Code outside the machine needs one handle to drive it, observe it and wait for i
 ### Create
 
 ```ts
-import { createCheckoutActor } from "./checkout";
+import { checkoutMachine } from "./checkout";
 
-const { actor: checkout } = createCheckoutActor();
+const { actor: checkout } = checkoutMachine.create();
 ```
 
 Needs [checkout.ts](https://github.com/anderscan/mantaq/blob/main/apps/docs/src/content/docs/checkout.ts) and `@mantaq/sugar`.

@@ -114,10 +114,10 @@ m.effect(submitting, {
 ```ts
 import { VirtualClock } from "@mantaq/core";
 import { matches } from "@mantaq/sugar";
-import { createCheckoutActor, submitBasicInfo, submitPayment, submitShipping } from "./checkout";
+import { checkoutMachine, submitBasicInfo, submitPayment, submitShipping } from "./checkout";
 
 const clock = VirtualClock();
-const { actor: checkout } = createCheckoutActor({
+const { actor: checkout } = checkoutMachine.create({
   clock,
   chargeCard: () => new Promise<string>(() => {}), // never answers
 });

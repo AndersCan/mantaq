@@ -1,4 +1,4 @@
-import { RealClock } from "@mantaq/core";
+import { machine } from "@mantaq/core";
 import type { Clock } from "@mantaq/core";
 import { createPool } from "@mantaq/sugar";
 
@@ -10,11 +10,13 @@ function wait(options: { clock: Clock; ms: number; signal: AbortSignal }): Promi
 }
 
 /** A team inbox: one inbox and three workers. Each item takes one second to run. */
-export function createTeamInbox({ clock = RealClock() }: { clock?: Clock } = {}) {
-  return createPool<string, "team">({
-    name: "team",
-    workers: 3,
-    run: (_items, { signal }) => wait({ clock, ms: 1000, signal }),
-    clock,
-  });
-}
+export const teamInboxMachine = machine("teamInbox", {
+  create: ({ clock }) => {
+    return createPool<string, "team">({
+      name: "team",
+      workers: 3,
+      run: (_items, { signal }) => wait({ clock, ms: 1000, signal }),
+      clock,
+    });
+  },
+});

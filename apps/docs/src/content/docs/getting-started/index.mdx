@@ -15,7 +15,10 @@ A system that can be in many conditions at once turns into flags that disagree (
 
 ## How
 
-<Step n={1}>The meal starts in `hungry`.</Step>
+<Step n={1}>
+  The meal starts in `hungry`. `machine` names the machine; `create` builds a fresh one, and the
+  app, your tests and the diagram all call it.
+</Step>
 
 ```sh
 npm create vite@latest my-app -- --template vanilla-ts
@@ -28,12 +31,6 @@ Keep `strict` on; the examples rely on it. `tsconfig.json` has no `strict` line 
 
 ```sh
 npx tsc --help --all | grep -A3 -x -- --strict | tail -1
-```
-
-The template also turns on `verbatimModuleSyntax`, so a type such as `Clock` needs `type` in its import, or `tsc` stops with TS1484. A machine factory that takes a clock starts with:
-
-```ts
-import { Actor, VirtualClock, type Clock } from "@mantaq/core";
 ```
 
 Put each file from this guide in `src/`.

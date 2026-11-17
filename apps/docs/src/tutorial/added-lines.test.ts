@@ -29,12 +29,9 @@ describe("addedLines", () => {
   });
   test("tutorial page 3 highlights exactly what step 3 adds", () => {
     const shown = (name: string) =>
-      readFileSync(new URL(`./${name}`, import.meta.url), "utf8").replace(
-        /createMeal\d+/g,
-        "createMeal",
-      );
+      readFileSync(new URL(`./${name}`, import.meta.url), "utf8").replace(/\bmeal\d\b/g, "meal");
     expect(addedLines(shown("meal-02.ts"), shown("meal-03.ts"))).toEqual([
-      1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+      1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
     ]);
   });
 });

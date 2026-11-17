@@ -2,7 +2,7 @@ import { VirtualClock } from "@mantaq/core";
 import type { VizEdge, VizMachine } from "@mantaq/viz";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { createMeal9 } from "../../../../apps/docs/src/tutorial/meal-09.ts";
+import { meal9 } from "../../../../apps/docs/src/tutorial/meal-09.ts";
 import { EXAMPLE_ROOT } from "../examples.ts";
 import { createCreditActor } from "../fixtures/credit.ts";
 import { toVizMachine } from "../structure.ts";
@@ -30,7 +30,8 @@ function fuzzStay(
   return { ...machine, edges: [...machine.edges, added] };
 }
 
-const meal = () => toVizMachine({ id: "meal", actor: createMeal9(VirtualClock()) as never });
+const meal = () =>
+  toVizMachine({ id: "meal", actor: meal9.create({ clock: VirtualClock() }) as never });
 
 describe("a fuzz stay the handler explains", () => {
   test("is dropped, and the declared edge keeps its three branches", () => {

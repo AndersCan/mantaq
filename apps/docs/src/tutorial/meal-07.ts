@@ -1,5 +1,4 @@
-import { Actor, event, state } from "@mantaq/core";
-import type { Clock } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 type MealContext = { plates: number };
 
@@ -28,57 +27,58 @@ const cooked = event("cooked")();
 /** Stands in for your stove. Here the food is ready at once. */
 async function cookMeal(): Promise<void> {}
 
-export function createMeal7(clock: Clock) {
-  const initialContext: MealContext = { plates: 0 };
-  return Actor({
-    inputs: [serve, eat, cook],
-    internal: [cooked],
-    states: [hungry, cooking, full],
-    initial: hungry,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      /** One more plate is counted, and the person stays hungry. */
-      m.on(hungry, {
-        event: serve,
-        to: [],
-        handler: (_event, { context }) => {
-          context.set({ plates: context.get().plates + 1 });
-          return {};
-        },
-      });
-      /** Food makes a hungry person full, once a plate is on the table. */
-      m.on(hungry, {
-        event: eat,
-        to: [full],
-        handler: (event, { context }) => {
-          if (event.payload.food === "") return {};
-          if (context.get().plates === 0) return {};
-          return { state: full };
-        },
-      });
-      /** The food goes on the stove. */
-      m.on(hungry, { event: cook, to: [cooking], handler: () => ({ state: cooking }) });
-      /** Cooks the food and says when it is ready. */
-      m.effect(cooking, {
-        name: "cookMeal",
-        sends: [cooked],
-        fn: ({ signal, emit }) => {
-          cookMeal().then(() => {
-            if (signal.aborted) return;
-            emit(cooked.create());
-          });
-        },
-      });
-      /** The food is ready: one more plate on the table. */
-      m.on(cooking, {
-        event: cooked,
-        to: [hungry],
-        handler: (_event, { context }) => {
-          context.set({ plates: context.get().plates + 1 });
-          return { state: hungry };
-        },
-      });
-    },
-  });
-}
+export const meal7 = machine("meal7", {
+  create: () => {
+    const initialContext: MealContext = { plates: 0 };
+    return Actor({
+      inputs: [serve, eat, cook],
+      internal: [cooked],
+      states: [hungry, cooking, full],
+      initial: hungry,
+      context: initialContext,
+      setup: (m) => {
+        /** One more plate is counted, and the person stays hungry. */
+        m.on(hungry, {
+          event: serve,
+          to: [],
+          handler: (_event, { context }) => {
+            context.set({ plates: context.get().plates + 1 });
+            return {};
+          },
+        });
+        /** Food makes a hungry person full, once a plate is on the table. */
+        m.on(hungry, {
+          event: eat,
+          to: [full],
+          handler: (event, { context }) => {
+            if (event.payload.food === "") return {};
+            if (context.get().plates === 0) return {};
+            return { state: full };
+          },
+        });
+        /** The food goes on the stove. */
+        m.on(hungry, { event: cook, to: [cooking], handler: () => ({ state: cooking }) });
+        /** Cooks the food and says when it is ready. */
+        m.effect(cooking, {
+          name: "cookMeal",
+          sends: [cooked],
+          fn: ({ signal, emit }) => {
+            cookMeal().then(() => {
+              if (signal.aborted) return;
+              emit(cooked.create());
+            });
+          },
+        });
+        /** The food is ready: one more plate on the table. */
+        m.on(cooking, {
+          event: cooked,
+          to: [hungry],
+          handler: (_event, { context }) => {
+            context.set({ plates: context.get().plates + 1 });
+            return { state: hungry };
+          },
+        });
+      },
+    });
+  },
+});

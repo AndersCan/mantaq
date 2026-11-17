@@ -2,7 +2,7 @@ import { VirtualClock } from "@mantaq/core";
 import { expectNoDesignErrors, inspectModule } from "@mantaq/inspect";
 import { createDriver } from "@mantaq/inspect/drive";
 import { expect, test } from "vite-plus/test";
-import { createCook } from "./dropped-message.ts";
+import { cookMachine } from "./dropped-message.ts";
 
 const file = new URL("./dropped-message.ts", import.meta.url).pathname;
 
@@ -13,8 +13,7 @@ test("the kitchen and waiter board draws the waiter as a part", async () => {
 
 test("the kitchen and waiter fixture has no design errors", () => {
   expectNoDesignErrors({
-    id: "cook",
-    create: () => createCook({ clock: VirtualClock() }),
+    machine: cookMachine,
     payloads: {},
   });
 });
@@ -24,7 +23,7 @@ test("cooking a dish while the waiter is on a break drops exactly one DISH_READY
     id: "cook",
     create: () => {
       const clock = VirtualClock();
-      const made = createCook({ clock });
+      const made = cookMachine.create();
       return { actor: made.actor, clock, made };
     },
   });

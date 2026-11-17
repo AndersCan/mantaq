@@ -1,6 +1,7 @@
 // Opens each Getting started page of the built docs site (apps/docs/dist) in Chromium
 // and checks its diagram runs live: a current state, a moving next arrow where the
-// diagram has arrows, and on events a click on `eat` moves the walk to `full`.
+// diagram has arrows, on events a click on `eat` moves the walk to `full`, and on timers
+// `cook`, then the `overcooked` arrow (the timer firing), brings the walk back to `hungry`.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -58,6 +59,21 @@ for (const page of pages) {
       .locator(".mantaq-tutorial g.state.current")
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id")));
     if (after.join() !== "full") failures.push(`${page}: clicking eat leaves the walk in ${after}`);
+  }
+  if (page === "getting-started/timers/") {
+    const edge = (id) => tab.locator(`.mantaq-tutorial g.edge.next[data-edge-id="${id}"]`);
+    const current = () =>
+      tab
+        .locator(".mantaq-tutorial g.state.current")
+        .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id")));
+    await edge("hungry-cook-cooking").dispatchEvent("click");
+    await tab.waitForTimeout(200);
+    await edge("cooking-overcooked-hungry").dispatchEvent("click");
+    await tab.waitForTimeout(200);
+    const after = await current();
+    if (after.join() !== "hungry") {
+      failures.push(`timers: the time control did not fire overcooked (current: ${after})`);
+    }
   }
   for (const error of errors) failures.push(`${page}: page error: ${error}`);
   await tab.close();

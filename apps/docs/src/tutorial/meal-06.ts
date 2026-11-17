@@ -1,5 +1,4 @@
-import { Actor, event, state } from "@mantaq/core";
-import type { Clock } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 type MealContext = { plates: number };
 
@@ -19,34 +18,35 @@ const eat = event("eat")<{
   food: string;
 }>();
 
-export function createMeal6(clock: Clock) {
-  const initialContext: MealContext = { plates: 0 };
-  return Actor({
-    inputs: [serve, eat],
-    states: [hungry, full],
-    initial: hungry,
-    clock,
-    context: initialContext,
-    setup: (m) => {
-      /** One more plate is counted, and the person stays hungry. */
-      m.on(hungry, {
-        event: serve,
-        to: [],
-        handler: (_event, { context }) => {
-          context.set({ plates: context.get().plates + 1 });
-          return {};
-        },
-      });
-      /** Food makes a hungry person full, once a plate is on the table. */
-      m.on(hungry, {
-        event: eat,
-        to: [full],
-        handler: (event, { context }) => {
-          if (event.payload.food === "") return {};
-          if (context.get().plates === 0) return {};
-          return { state: full };
-        },
-      });
-    },
-  });
-}
+export const meal6 = machine("meal6", {
+  create: () => {
+    const initialContext: MealContext = { plates: 0 };
+    return Actor({
+      inputs: [serve, eat],
+      states: [hungry, full],
+      initial: hungry,
+      context: initialContext,
+      setup: (m) => {
+        /** One more plate is counted, and the person stays hungry. */
+        m.on(hungry, {
+          event: serve,
+          to: [],
+          handler: (_event, { context }) => {
+            context.set({ plates: context.get().plates + 1 });
+            return {};
+          },
+        });
+        /** Food makes a hungry person full, once a plate is on the table. */
+        m.on(hungry, {
+          event: eat,
+          to: [full],
+          handler: (event, { context }) => {
+            if (event.payload.food === "") return {};
+            if (context.get().plates === 0) return {};
+            return { state: full };
+          },
+        });
+      },
+    });
+  },
+});

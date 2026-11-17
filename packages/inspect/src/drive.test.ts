@@ -5,7 +5,7 @@ import { createDriver } from "./drive.ts";
 import { createCheckoutActor } from "./fixtures/checkout.ts";
 import { createSenderActor } from "./fixtures/wired/sender.ts";
 import { createThrowingActor } from "./fixtures/throwing.ts";
-import { createMeal6 } from "../../../apps/docs/src/tutorial/meal-06.ts";
+import { meal6 } from "../../../apps/docs/src/tutorial/meal-06.ts";
 import type { VizJson } from "@mantaq/viz";
 import type { FuzzTarget } from "./fuzz/run.ts";
 
@@ -546,7 +546,7 @@ describe("dryRun", () => {
     id: "meal6",
     create: () => {
       const clock = VirtualClock();
-      return { actor: createMeal6(clock), clock };
+      return { actor: meal6.create(), clock };
     },
   };
   const eat = {
@@ -605,7 +605,7 @@ describe("dryRun", () => {
       id: "meal-counted",
       create: () => {
         const clock = VirtualClock();
-        const actor = createMeal6(clock);
+        const actor = meal6.create();
         const dispose = actor.dispose.bind(actor);
         actor.dispose = () => {
           disposed += 1;
@@ -626,7 +626,7 @@ describe("dryRun", () => {
         clock.advance = () => {
           throw new Error("clock broke");
         };
-        return { actor: createMeal6(clock), clock };
+        return { actor: meal6.create(), clock };
       },
     });
     const walked = driver.dryWalk?.([serve, { kind: "advance", ms: 5 }, serve]);

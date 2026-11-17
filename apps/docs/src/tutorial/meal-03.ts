@@ -1,4 +1,4 @@
-import { Actor, event, state } from "@mantaq/core";
+import { Actor, event, machine, state } from "@mantaq/core";
 
 /** The person wants food. */
 const hungry = state("hungry")();
@@ -14,21 +14,23 @@ const eat = event("eat")<{
   food: string;
 }>();
 
-export function createMeal3() {
-  return Actor({
-    inputs: [eat],
-    states: [hungry, full],
-    initial: hungry,
-    setup: (m) => {
-      /** Food makes a hungry person full. */
-      m.on(hungry, {
-        event: eat,
-        to: [full],
-        handler: (event) => {
-          if (event.payload.food === "") return {};
-          return { state: full };
-        },
-      });
-    },
-  });
-}
+export const meal3 = machine("meal3", {
+  create: () => {
+    return Actor({
+      inputs: [eat],
+      states: [hungry, full],
+      initial: hungry,
+      setup: (m) => {
+        /** Food makes a hungry person full. */
+        m.on(hungry, {
+          event: eat,
+          to: [full],
+          handler: (event) => {
+            if (event.payload.food === "") return {};
+            return { state: full };
+          },
+        });
+      },
+    });
+  },
+});
