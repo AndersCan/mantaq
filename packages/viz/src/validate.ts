@@ -1,4 +1,4 @@
-import { VIZ_SCHEMA_VERSION, isAnyState } from "./schema.ts";
+import { VIZ_SCHEMA_VERSION, isAnyState, scopeOf } from "./schema.ts";
 import type {
   VizDocument,
   VizEdge,
@@ -134,6 +134,33 @@ function checkReferences(reader: Reader, machine: VizMachine, path: string): voi
     const anyStay = edge.kind === "stay" && edge.to === edge.from && isAnyState(edge.from);
     if (edge.to !== null && !stateIds.has(edge.to) && !anyStay) {
       report(reader, { path: `${path}.edges[${index}].to`, message: `unknown state ${edge.to}` });
+    }
+  });
+  machine.fuzz?.messages.forEach((message, index) => {
+    const path_ = `${path}.fuzz.messages[${index}]`;
+    if (!stateIds.has(message.from)) {
+      report(reader, { path: `${path_}.from`, message: `unknown state ${message.from}` });
+    }
+    if (!machine.edges.some((edge) => edge.from === message.to && edge.event === message.event)) {
+      report(reader, {
+        path: `${path_}.to`,
+        message: `no arrow from ${message.to} takes ${message.event}`,
+      });
+    }
+    for (const [key, id] of [
+      ["from", message.from],
+      ["to", message.to],
+    ] as const) {
+      const scope = scopeOf(id);
+      if (scope !== "" && !machine.actors.includes(scope)) {
+        report(reader, {
+          path: `${path_}.${key}`,
+          message: `${JSON.stringify(scope)} is not in actors`,
+        });
+      }
+    }
+    if (scopeOf(message.from) === scopeOf(message.to)) {
+      report(reader, { path: path_, message: "from and to are in the same machine" });
     }
   });
   if (machine.initial !== null && !stateIds.has(machine.initial)) {

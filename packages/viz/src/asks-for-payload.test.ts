@@ -29,6 +29,7 @@ function machineWith(fields: VizField[] | null, samples: VizJson[]): VizMachine 
       errors: [],
       failedExpectations: [],
       expectations: [],
+      messages: [],
     },
   };
 }

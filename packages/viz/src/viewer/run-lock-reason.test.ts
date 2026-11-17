@@ -126,6 +126,7 @@ const machine: VizMachine = {
     errors: [],
     failedExpectations: [],
     expectations: [],
+    messages: [],
     corpus: [{ steps: [go(1), go(7)], discovered: [] }],
   },
 };
