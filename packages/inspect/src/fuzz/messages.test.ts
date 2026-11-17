@@ -468,3 +468,51 @@ test("messages with one sender state and event are sorted by receiver", () => {
     { from: "idle", event: "PING", to: "c.idle" },
   ]);
 });
+
+test("a receiver that sends itself the same event is recorded at the arrow that took the first one", () => {
+  const ready = state("ready")();
+  const mid = state("mid")();
+  const ask = event("ASK")();
+  function create() {
+    const clock = VirtualClock();
+    const b = Actor({
+      inputs: [ask],
+      outputs: [ask],
+      states: [ready, mid, done],
+      initial: ready,
+      clock,
+      setup: (m) => {
+        m.on(ready, {
+          event: ask,
+          to: [mid],
+          handler: () => ({ state: mid, emit: [ask.create()] }),
+        });
+        m.on(mid, { event: ask, to: [done], handler: () => ({ state: done }) });
+      },
+    });
+    const a = Actor({
+      inputs: [go],
+      outputs: [ask],
+      states: [idle],
+      initial: idle,
+      clock,
+      setup: (m) => {
+        m.on(idle, {
+          event: go,
+          to: [idle],
+          handler: () => ({ state: idle, emit: [ask.create()] }),
+        });
+      },
+    });
+    onOutput(a, (out) => {
+      if (ask.is(out)) b.send(ask.create());
+    });
+    onOutput(b, (out) => {
+      if (ask.is(out)) b.send(ask.create());
+    });
+    return { actor: a, clock, made: { b } };
+  }
+  const target = { id: "a", create };
+  const go_: VizStep = { kind: "event", event: "GO", payload: null };
+  expect(execute(target, [go_]).sends).toEqual([{ from: "idle", event: "ASK", to: "b.ready" }]);
+});
