@@ -154,3 +154,20 @@ export const machineArbitrary: fc.Arbitrary<VizMachine> = fc
         } satisfies VizMachine;
       });
   });
+
+/** `machineArbitrary` with its non-map top-level regions made parts and some edges emitting other edges' events. */
+export const talkingArbitrary: fc.Arbitrary<VizMachine> = machineArbitrary.map((machine) => {
+  const count = machine.edges.length;
+  return {
+    ...machine,
+    actors: machine.regions.filter(
+      (region) => !region.includes(".") && !machine.maps.includes(region),
+    ),
+    edges: machine.edges.map((edge, index) => {
+      const emitted = machine.edges[(index * 7 + 1) % count]?.event;
+      return index % 2 === 0 && count > 1 && emitted !== undefined
+        ? { ...edge, emits: [emitted] }
+        : edge;
+    }),
+  };
+});

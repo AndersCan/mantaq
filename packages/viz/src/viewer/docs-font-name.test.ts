@@ -31,6 +31,7 @@ describe("checkout `submitting` (one chargeCard chip) in the docs font", () => {
       edges: [],
       events: [],
       maps: [],
+      actors: [],
       regions: [],
     } as unknown as VizMachine;
     const placed = placeMachine(machine).nodes.find((each) => each.id === "submitting");

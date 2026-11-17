@@ -9,6 +9,7 @@ const machine: VizMachine = {
   initial: "open",
   regions: [],
   maps: [],
+  actors: [],
   states: [
     {
       id: "open",

@@ -67,6 +67,7 @@ function machineOf(names: string[], edges: VizEdge[]): VizMachine {
     edges,
     events: [],
     maps: [],
+    actors: [],
     regions: [],
   } as unknown as VizMachine;
 }

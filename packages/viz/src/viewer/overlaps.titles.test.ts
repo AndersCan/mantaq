@@ -40,6 +40,7 @@ describe("checker: region titles against arrowheads and entry arrows", () => {
     const layout: MachineLayout = {
       width: 500,
       height: 240,
+      messages: [],
       nodes: [
         {
           kind: "state",
@@ -97,6 +98,7 @@ describe("checker: region titles against arrowheads and entry arrows", () => {
     const layout: MachineLayout = {
       width: 500,
       height: 240,
+      messages: [],
       nodes: [
         {
           kind: "state",

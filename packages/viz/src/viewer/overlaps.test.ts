@@ -79,6 +79,7 @@ function layoutOf(parts: Parts): MachineLayout {
     height: 200,
     nodes: [node("A", 100), node("B", 300)],
     edges: [],
+    messages: [],
     entries: [],
     ...parts,
     regions,

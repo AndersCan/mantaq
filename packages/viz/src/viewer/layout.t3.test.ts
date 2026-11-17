@@ -45,6 +45,7 @@ function machineOf(states: VizState[], edges: VizEdge[], regions: string[]): Viz
     edges,
     events: [],
     maps: [],
+    actors: [],
     regions,
   } as unknown as VizMachine;
 }
@@ -62,6 +63,7 @@ describe("region titles have room of their own", () => {
     const layout: MachineLayout = {
       width: 400,
       height: 200,
+      messages: [],
       nodes: [
         {
           kind: "state",
@@ -166,6 +168,7 @@ describe("region titles have room of their own", () => {
     const layout: MachineLayout = {
       width: 400,
       height: 200,
+      messages: [],
       nodes: [
         {
           kind: "state",
