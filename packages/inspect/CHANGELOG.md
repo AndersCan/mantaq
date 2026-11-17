@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.43.0
+
+<sub>2026-11-17</sub>
+
+- _(minor)_
+  Fuzzing records each message one machine sends another, with the state it was sent from and the arrow that took it, in `machine.fuzz.messages`. Viz documents are schema 18.
+
+  Breaking: viz document schema 17 → 18, a new required `machines[].fuzz.messages`; the validator refuses a 17 document with `schemaVersion: expected 18, got 17`. Rebuild with the matching @mantaq/inspect.
+  Breaking: the board's dotted lines will follow the recorded messages once the viewer reads them; lines for same-named but unwired events then disappear, and lines for renamed wires and `onAny` handlers appear.
+
+- _(minor)_
+  The board, fuzzing, `recordRuns` and the design checks read `machine(id, { create })` exports. Each one is built on a virtual clock of its own, so a machine with no timers needs no clock. `InspectTarget` accepts `{ machine }`. A machine that builds its actor on another clock is drawn, not fuzzed, with one warning. Plain factories keep working until the next release.
+- _(patch)_ Fuzzing keeps going until it has seen each message between machines taken once.
+
 ## 0.42.2
 
 <sub>2026-11-17</sub>
