@@ -1,6 +1,9 @@
 import { asksForPayload, payloadSamples } from "../moves.ts";
 import type {
+  VizActorRef,
+  VizEdge,
   VizField,
+  VizFuzzSequence,
   VizJson,
   VizLiveState,
   VizLiveStep,
@@ -175,6 +178,121 @@ export function payloadFor(
         event,
         state: { steps: live.steps, children: live.children, removed: live.removed },
       });
+}
+
+function sortedJson(value: VizJson | undefined): string {
+  if (Array.isArray(value)) return `[${value.map(sortedJson).join(",")}]`;
+  if (isObject(value)) {
+    const body = Object.keys(value)
+      .toSorted()
+      .map((key) => `${JSON.stringify(key)}:${sortedJson(value[key])}`);
+    return `{${body.join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/** True when two steps are the same, whatever order their payload keys came in. */
+function sameStep(a: VizStep, b: VizStep): boolean {
+  return sortedJson(a as unknown as VizJson) === sortedJson(b as unknown as VizJson);
+}
+
+const MOST_CANDIDATES = 16;
+
+/** `payload` with the values set in the Context tab laid over its declared fields. */
+function withSet(fields: ReadonlyArray<VizField> | null, payload: VizJson, set: Values): VizJson {
+  if (fields === null || !isObject(payload)) return payload;
+  const laid: Record<string, VizJson> = { ...payload };
+  for (const field of fields) {
+    const value = set[field.name];
+    if (value !== undefined && fits(field, value)) laid[field.name] = value;
+  }
+  return laid;
+}
+
+function actorKey(actor: VizActorRef | undefined): string {
+  return sortedJson((actor ?? null) as unknown as VizJson);
+}
+
+/** The next payload of each corpus run the walk is on, longest run first. */
+function runPayloads(
+  corpus: ReadonlyArray<VizFuzzSequence>,
+  next: { walk: ReadonlyArray<VizStep>; event: string; actor: VizActorRef | undefined },
+): VizJson[] {
+  const { walk, event } = next;
+  return corpus
+    .filter((sequence) =>
+      walk.every((step, index) => {
+        const there = sequence.steps[index];
+        return there !== undefined && sameStep(there, step);
+      }),
+    )
+    .toSorted((a, b) => b.steps.length - a.steps.length)
+    .flatMap((sequence) => {
+      const step = sequence.steps[walk.length];
+      const same =
+        step?.kind === "event" &&
+        step.event === event &&
+        actorKey(step.actor) === actorKey(next.actor);
+      return same && step.payload !== null ? [step.payload] : [];
+    });
+}
+
+/** The fuzz payloads of the event: those of runs that found `feature` first, then the rest. */
+function fuzzPayloads(machine: VizMachine, event: string, feature: string): VizJson[] {
+  const found = new Set(
+    (machine.fuzz?.corpus ?? [])
+      .filter((sequence) => sequence.discovered.includes(feature))
+      .flatMap((sequence) =>
+        sequence.steps.flatMap((step) =>
+          step.kind === "event" && step.event === event && step.payload !== null
+            ? [sortedJson(step.payload)]
+            : [],
+        ),
+      ),
+  );
+  const samples = payloadSamples(machine, event);
+  return [
+    ...samples.filter((each) => found.has(sortedJson(each))),
+    ...samples.filter((each) => !found.has(sortedJson(each))),
+  ];
+}
+
+/**
+ * The payloads a click on `edge` may send, best first: the default (`payloadFor`), the next step of a
+ * fuzz run the walk is on, and the fuzz payloads of the event (those of runs that found this arrow
+ * first). With an empty walk the default goes first, else the run does. At most 16, no repeats.
+ */
+export function arrowCandidates(
+  machine: VizMachine,
+  edge: VizEdge,
+  from: {
+    set: Values;
+    live: VizLiveState | null;
+    afters: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
+    actor: VizActorRef | undefined;
+  },
+): VizJson[] {
+  const { live, set } = from;
+  const fallback = payloadFor(machine, edge.event, { set, live, afters: from.afters });
+  const corpus = machine.fuzz?.corpus ?? [];
+  if (!asksForPayload(machine, edge.event) || corpus.length === 0) return [fallback];
+  const fields = machine.events.find((each) => each.id === edge.event)?.payload ?? null;
+  const walk = live?.steps ?? [];
+  const runs = runPayloads(corpus, { walk, event: edge.event, actor: from.actor });
+  const feature = `edge:${edge.from}>${edge.event}>${edge.to ?? ""}`;
+  const fuzzed = fuzzPayloads(machine, edge.event, feature);
+  const laid = (list: VizJson[]) => list.map((each) => withSet(fields, each, set));
+  const ordered =
+    walk.length === 0
+      ? [fallback, ...laid(runs), ...laid(fuzzed)]
+      : [...laid(runs), fallback, ...laid(fuzzed)];
+  return distinct(ordered).slice(0, MOST_CANDIDATES);
+}
+
+function distinct(list: ReadonlyArray<VizJson>): VizJson[] {
+  const seen = new Map<string, VizJson>();
+  for (const each of list) seen.set(sortedJson(each), seen.get(sortedJson(each)) ?? each);
+  return [...seen.values()];
 }
 
 /** One field per name across the machine's events, the first event that requires it wins, else the first: the Context tab's rows. */

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
-import type { VizEdge, VizLiveState, VizLiveStep, VizMachine } from "../schema.ts";
+import type { VizEdge, VizLiveState, VizLiveStep, VizMachine, VizStep } from "../schema.ts";
 import { blockedEdges, blockedReason, sentByParts, whyNotHere } from "./blocked.ts";
 
 function pay(over: Partial<VizEdge> = {}): VizEdge {
@@ -273,7 +273,8 @@ describe("edge cases", () => {
     const asked: string[] = [];
     blockedEdges(team, {
       live: liveAt("workersBusy", { context: {} } as Partial<VizLiveState>),
-      payloadOf: () => null,
+      candidatesOf: () => [null],
+      defaultOf: () => null,
       currents: ["workersBusy"],
       dryRun: (steps) => {
         asked.push(...steps.map((step) => (step.kind === "event" ? step.event : "")));
@@ -327,5 +328,82 @@ describe("whyNotHere names the part and the source", () => {
     expect(whyNotHere(machine, other, { live: liveAt("workersBusy"), picked: null })).toBe(
       "team.ITEMS_FINISHED can't be sent: the walk is in workersBusy, this arrow leaves workWaiting.",
     );
+  });
+});
+
+describe("blockedEdges chooses a payload per arrow", () => {
+  const to = (target: string): VizEdge =>
+    pay({ id: `cart-pay-${target}`, to: target, explanation: null });
+  const machine = {
+    ...team,
+    maps: [],
+    edges: [to("one"), to("two")].map((each) => ({ ...each, from: "workersBusy", event: "go" })),
+  } as unknown as VizMachine;
+  const live = liveAt("workersBusy", { context: {} } as Partial<VizLiveState>);
+  /** payload 1 goes to "one", 2 to "two", anything else stays. */
+  const dryRun = (steps: ReadonlyArray<VizStep>): VizLiveStep[] =>
+    steps.map((step) => {
+      const payload = step.kind === "event" ? step.payload : null;
+      const target = payload === 1 ? "one" : payload === 2 ? "two" : "workersBusy";
+      return { ...outcome(target === "workersBusy" ? "stay" : "transition"), to: target };
+    });
+  const base = { live, currents: ["workersBusy"], actorOf: () => undefined } as const;
+
+  test("two arrows of one event get different payloads", () => {
+    const { blocked, chosen } = blockedEdges(machine, {
+      ...base,
+      candidatesOf: () => [0, 1, 2],
+      defaultOf: () => 0,
+      dryRun,
+    });
+    expect(blocked.size).toBe(0);
+    expect(chosen.get("cart-pay-one")).toBe(1);
+    expect(chosen.get("cart-pay-two")).toBe(2);
+  });
+
+  test("an arrow no candidate takes is locked with the default's reason, and keeps the default", () => {
+    const { blocked, chosen } = blockedEdges(machine, {
+      ...base,
+      candidatesOf: () => [0, 1],
+      defaultOf: () => 0,
+      dryRun,
+    });
+    expect(blocked.has("cart-pay-one")).toBe(false);
+    expect(blocked.get("cart-pay-two")).toBeUndefined();
+    expect(chosen.get("cart-pay-two")).toBe(0);
+  });
+
+  test("an arrow no candidate takes sends the default, not the first candidate tried", () => {
+    // On a run the run's payload (3) is tried first; neither takes cart-pay-two.
+    const { blocked, chosen } = blockedEdges(machine, {
+      ...base,
+      candidatesOf: () => [3, 0],
+      defaultOf: () => 0,
+      dryRun,
+    });
+    expect(blocked.has("cart-pay-two")).toBe(false);
+    expect(chosen.get("cart-pay-two")).toBe(0);
+  });
+
+  test("a locked arrow names where the default goes", () => {
+    const { blocked } = blockedEdges(machine, {
+      ...base,
+      candidatesOf: () => [1],
+      defaultOf: () => 1,
+      dryRun,
+    });
+    expect(blocked.get("cart-pay-two")).toBe("go goes to one, not two");
+  });
+
+  test("a throwing dryRun blocks and chooses nothing", () => {
+    const found = blockedEdges(machine, {
+      ...base,
+      candidatesOf: () => [1],
+      defaultOf: () => 1,
+      dryRun: () => {
+        throw new Error("no");
+      },
+    });
+    expect(found.blocked.size + found.chosen.size).toBe(0);
   });
 });

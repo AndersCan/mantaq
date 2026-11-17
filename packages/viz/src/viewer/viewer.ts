@@ -29,7 +29,7 @@ import {
 import type { ExploreContext, ExploreParts, SentEvent } from "./explore.ts";
 import { pathTo } from "../findings.ts";
 import { blockedEdges, sentByParts, whyNotHere } from "./blocked.ts";
-import { decodeValues, encodeValues, payloadFor } from "./fill.ts";
+import { arrowCandidates, decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
 import { keepInView } from "./keep-in-view.ts";
 import { drawChildMarkers } from "./markers.ts";
@@ -54,6 +54,8 @@ interface ViewState {
   notice: string | null;
   /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
   blocked: Map<string, string>;
+  /** Live: edge id → the payload a click on that arrow sends (see `blockedEdges`); none = the default. */
+  chosen: Map<string, VizJson>;
   /** Field name → the value set in the Context tab; events are sent with it (kept in `?value=`). */
   values: Values;
   /** What `blocked` was computed for; it is recomputed when any of it changes. */
@@ -443,6 +445,7 @@ function initialView(options: ViewerOptions): ViewState {
     sent: null,
     notice: null,
     blocked: new Map(),
+    chosen: new Map(),
     values: decodeValues(options.values ?? []),
     blockedFor: null,
   };
@@ -597,7 +600,7 @@ function eventSender(context: {
 }): (event: string, actor?: VizActorRef, edge?: string) => void {
   const { machine, view, send } = context;
   return (event, actor, edge) => {
-    const step = eventStep(machine, view, event, actor);
+    const step = eventStep(machine, view, { event, actor, edge });
     send(step, {
       event,
       ...(actor ? { actor } : {}),
@@ -640,14 +643,13 @@ function navigated(options: ViewerOptions, now: { machine: VizMachine; view: Vie
 function eventStep(
   machine: VizMachine,
   view: ViewState,
-  event: string,
-  actor: VizActorRef | undefined,
+  click: { event: string; actor: VizActorRef | undefined; edge: string | undefined },
 ): Extract<VizStep, { kind: "event" }> {
-  const payload = payloadFor(machine, event, {
-    set: view.values,
-    live: view.live,
-    afters: view.afters,
-  });
+  const { event, actor, edge } = click;
+  const chosen = edge === undefined ? undefined : view.chosen.get(edge);
+  const payload =
+    chosen ??
+    payloadFor(machine, event, { set: view.values, live: view.live, afters: view.afters });
   return { kind: "event", event, payload, ...(actor ? { actor } : {}) };
 }
 
@@ -715,19 +717,32 @@ function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver |
   const { live, blockedFor } = view;
   if (live === null || driver?.dryRun === undefined) {
     view.blocked = new Map();
+    view.chosen = new Map();
     view.blockedFor = null;
     return;
   }
   if (blockedFor !== null && sameBlocked(blockedFor, view)) return;
   view.blockedFor = { live, picked: view.picked, values: view.values };
-  view.blocked = blockedEdges(machine, {
+  const actorFor = (edge: VizEdge) => actorOf(machine, edge, { state: live, picked: view.picked });
+  const found = blockedEdges(machine, {
     live,
     currents: currentsOf(live, view.picked),
-    payloadOf: (event) =>
-      payloadFor(machine, event, { set: view.values, live, afters: view.afters }),
+    defaultOf: (edge) =>
+      payloadFor(machine, edge.event, { set: view.values, live, afters: view.afters }),
+    candidatesOf: (edge) => {
+      const actor = actorFor(edge);
+      return arrowCandidates(machine, edge, {
+        set: view.values,
+        live,
+        afters: view.afters,
+        actor: actor === "none" ? undefined : actor,
+      });
+    },
     dryRun: (steps) => driver.dryRun?.(steps) ?? [],
-    actorOf: (edge) => actorOf(machine, edge, { state: live, picked: view.picked }),
+    actorOf: actorFor,
   });
+  view.blocked = found.blocked;
+  view.chosen = found.chosen;
 }
 
 /** Everything drawn over the graph: walk marks and selection. */

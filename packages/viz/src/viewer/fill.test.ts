@@ -1,6 +1,15 @@
 import { describe, expect, test } from "vite-plus/test";
-import type { VizField, VizJson, VizLiveChild, VizMachine, VizStep } from "../schema.ts";
+import type {
+  VizEdge,
+  VizField,
+  VizJson,
+  VizLiveChild,
+  VizLiveState,
+  VizMachine,
+  VizStep,
+} from "../schema.ts";
 import {
+  arrowCandidates,
   decodeValues,
   defaultValue,
   encodeValues,
@@ -344,4 +353,107 @@ test("of two events that both leave a field name optional, the first supplies th
     { id: "b", payload: [second] },
   ];
   expect(valueFields({ events } as never)).toEqual([first]);
+});
+
+describe("arrowCandidates", () => {
+  const go = (payload: VizJson): Extract<VizStep, { kind: "event" }> => ({
+    kind: "event",
+    event: "go",
+    payload,
+  });
+  const num = { ...field("n", "number"), sample: 0 };
+  const edge = (to: string): VizEdge =>
+    ({ id: `a-go-${to}`, from: "a", event: "go", to, kind: "transition" }) as VizEdge;
+  const machineWith = (
+    corpus: Array<{ steps: VizStep[]; discovered: string[] }>,
+    fields: VizField[] | null = [num],
+  ): VizMachine =>
+    ({
+      events: [{ id: "go", internal: false, doc: null, payload: fields }],
+      fuzz: { corpus, errors: [] },
+    }) as unknown as VizMachine;
+  const at = (steps: VizStep[]) =>
+    ({ steps, children: [], removed: [] }) as unknown as VizLiveState;
+  const none = { set: {}, live: null, afters: [], actor: undefined };
+
+  test("with no fuzz, only the default", () => {
+    const machine = { ...machineWith([]), fuzz: null } as VizMachine;
+    expect(arrowCandidates(machine, edge("b"), none)).toEqual([{ n: 0 }]);
+  });
+
+  test("from the start: the default, then runs longest first, then the fuzz payloads", () => {
+    const machine = machineWith([
+      { steps: [go({ n: 1 })], discovered: [] },
+      { steps: [go({ n: 2 }), go({ n: 9 })], discovered: [] },
+      { steps: [go({ n: 3 })], discovered: ["edge:a>go>b"] },
+    ]);
+    expect(arrowCandidates(machine, edge("b"), none)).toEqual([
+      { n: 0 },
+      { n: 2 },
+      { n: 1 },
+      { n: 3 },
+      { n: 9 },
+    ]);
+  });
+
+  test("fuzz payloads of runs that found the arrow come before the rest", () => {
+    const machine = machineWith([
+      { steps: [go({ n: 1 })], discovered: ["edge:a>go>c"] },
+      { steps: [go({ n: 2 })], discovered: ["edge:a>go>b"] },
+    ]);
+    const first = arrowCandidates(machine, edge("b"), { ...none, live: at([go({ n: 5 })]) });
+    expect(first).toEqual([{ n: 5 }, { n: 2 }, { n: 1 }]);
+  });
+
+  test("a walk on a run puts that run's next step first", () => {
+    const machine = machineWith([
+      { steps: [go({ n: 1 }), go({ n: 7 })], discovered: [] },
+      { steps: [go({ n: 2 }), go({ n: 8 })], discovered: [] },
+    ]);
+    const live = at([{ ...go({ n: 2 }), payload: { n: 2 } }]);
+    const [first] = arrowCandidates(machine, edge("b"), { ...none, live });
+    expect(first).toEqual({ n: 8 });
+  });
+
+  test("a walk that matches no run gets the default, then the fuzz payloads", () => {
+    const machine = machineWith([{ steps: [go({ n: 1 }), go({ n: 7 })], discovered: [] }]);
+    const live = at([go({ n: 4 })]);
+    expect(arrowCandidates(machine, edge("b"), { ...none, live })).toEqual([
+      { n: 4 },
+      { n: 1 },
+      { n: 7 },
+    ]);
+  });
+
+  test("a payload key order does not break run matching", () => {
+    const two = [field("a", "number"), field("b", "number")];
+    const machine = machineWith(
+      [{ steps: [go({ b: 1, a: 2 }), go({ a: 5, b: 6 })], discovered: [] }],
+      two,
+    );
+    const live = at([go({ a: 2, b: 1 })]);
+    expect(arrowCandidates(machine, edge("b"), { ...none, live })[0]).toEqual({ a: 5, b: 6 });
+  });
+
+  test("a run's next step for another actor is not a candidate", () => {
+    const machine = machineWith([
+      { steps: [{ ...go({ n: 4 }), actor: { map: "m", key: "k" } }], discovered: [] },
+    ]);
+    const listed = arrowCandidates(machine, edge("b"), { ...none, actor: { map: "m", key: "j" } });
+    expect(listed[0]).toEqual({ n: 0 });
+    const same = arrowCandidates(machine, edge("b"), { ...none, actor: { map: "m", key: "k" } });
+    expect(same).toContainEqual({ n: 4 });
+  });
+
+  test("a set value is laid over run and fuzz payloads that fit", () => {
+    const machine = machineWith([{ steps: [go({ n: 1 })], discovered: [] }]);
+    expect(arrowCandidates(machine, edge("b"), { ...none, set: { n: 6 } })).toEqual([{ n: 6 }]);
+  });
+
+  test("at most 16, none repeated", () => {
+    const corpus = Array.from({ length: 30 }, (_, n) => ({ steps: [go({ n })], discovered: [] }));
+    const listed = arrowCandidates(machineWith(corpus), edge("b"), none);
+    expect(listed).toHaveLength(16);
+    expect(new Set(listed.map((each) => JSON.stringify(each))).size).toBe(16);
+  });
 });
