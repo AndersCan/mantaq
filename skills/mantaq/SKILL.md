@@ -1,7 +1,7 @@
 ---
 name: mantaq
 description: >-
-  Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for any ask to design, plan or rethink a feature or a rule, even when it names no machine ("design this with me", "show me the design", "who can delete photos?", "show me how X works"): the answer is a machine drawn on the live viz page with recorded walks, not a written design. Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
+  Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for any ask to design, plan or rethink a feature or a rule, even when it names no machine ("design this with me", "show me the design", "who can delete photos?", "show me how X works"): the answer is a machine drawn on the live viz page with recorded walks, not a written design. Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also for testing an app or web page that does not use mantaq against a model (`assertMatchesModel`, Playwright). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
 allowed-tools: Read Grep Glob Edit Write Bash Shell
 ---
 
@@ -95,5 +95,5 @@ A design ask that changes what the app does today: your FINAL answer to the pers
 - `designing.md`. Design a machine in the code, with the live page open
 - `sugar.md`. Sugar helpers: what exists and when to use each
 - `patterns.md`. Recipes: async effects, retries, regions, event sourcing
-- `testing.md`. Virtual clock, `@mantaq/test`, coverage
+- `testing.md`. Virtual clock, `@mantaq/test`, coverage, testing an app or a web page against its model
 - `reviewing.md`. Review your actor code against mantaq conventions

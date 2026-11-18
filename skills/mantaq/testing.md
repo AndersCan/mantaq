@@ -90,10 +90,13 @@ Use this for internal failure events (`PAYMENT_FAILED`, timeouts, retries) witho
 
 ```ts
 import { assertMatchesModel } from "@mantaq/test";
+import { test } from "vitest";
+import { createCounter } from "./counter";
+import { counterModel } from "./counter-model";
 
 test("the counter app matches its model", async () => {
   await assertMatchesModel({
-    model: createCounterModel,
+    model: () => counterModel.create(),
     start: () => createCounter(3),
     events: {
       increment: (app) => app.increment(),
@@ -115,6 +118,19 @@ Adapter rules:
 Defaults: a fresh model and app per walk, 100 walks of up to 30 events, fixed seed, state compared after every event. It also fails when a model edge was never taken. Events with data need `payloads: { event: [...] }`.
 
 Guide: https://anderscan.github.io/mantaq/guides/app-without-mantaq/
+
+### A web page
+
+Run `assertMatchesModel` inside a `@playwright/test` test. Every adapter function is async.
+
+- `start` runs `page.goto(url)` and returns the page: a fresh document per walk. Never `page.setContent` on the same page: its scripts run again in the old window.
+- Find controls as a person does (`getByRole`, `getByLabel`) and read only what is on screen (visible text, `isVisible`, `aria-*`). Never page variables or page functions.
+- Name each model event for what a person does (`typeEmail`, `pressSignUp`): the failure table prints these names as the steps to reproduce.
+- An event the page cannot take right now does nothing: when its control can be hidden, check `isVisible()` and return.
+- Each `events` entry ends when the page shows the result. Wait for that result (`await page.getByRole("status").waitFor()`), never a fixed sleep. `state` only reads.
+- `fill("")` on an empty field fires no `input` event: pick payload samples a person would type.
+- `use: { actionTimeout: 5_000 }` in `playwright.config.ts`, so a wrong locator fails in seconds.
+- `test.setTimeout(180_000)`: Playwright's default 30 s is too short for 100 walks of real clicks.
 
 ## Coverage (Harness + Traversal)
 
