@@ -412,10 +412,14 @@
   padding: 6px 10px;
 }
 
-.viz .explore ul,
-.viz .explore ol {
+.viz .explore ul {
   margin: 0;
   padding-left: 18px;
+}
+
+.viz .explore .explore-run {
+  padding-left: 0;
+  list-style: none;
 }
 
 .viz .explore li {
