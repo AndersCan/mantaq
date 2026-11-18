@@ -276,6 +276,61 @@ describe("live controls", () => {
     expect(root.querySelector('[data-step="2"]')?.textContent).not.toContain("paymentTimeout");
   });
 
+  test("a timer clicked on the board that fires nothing keeps its own row and the next step keeps its own", () => {
+    // The real driver reports `last: null` for an advance no timer answered.
+    const steps: VizStep[] = [];
+    const view = (last: VizLiveStep | null): VizLiveState => ({
+      state: "idle",
+      steps: [...steps],
+      last,
+      after: [],
+      timers: [{ id: "t1", ms: 100, deadline: 100, eventName: "paymentTimeout" }],
+      context: null,
+      payload: null,
+      regions: {},
+      children: [],
+      effectMode: "real",
+      waiting: [],
+    });
+    const quiet: VizDriver = {
+      reset: () => {
+        steps.length = 0;
+        return view(null);
+      },
+      step: (step) => {
+        steps.push(step);
+        if (step.kind === "advance") return view(null);
+        return view({
+          from: "idle",
+          event: "submit",
+          to: "idle",
+          outcome: "stay",
+          effects: [],
+          sent: [],
+          context: null,
+          error: null,
+        });
+      },
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      { driver: quiet },
+    );
+    sendSubmit(root);
+    click(root, "[data-advance-timer]");
+    sendSubmit(root);
+    expect(
+      [...root.querySelectorAll("[data-step] [data-live-outcome]")].map((p) => p.textContent),
+    ).toEqual([
+      "Step 1 of 3: submit: stayed in idle",
+      "Step 2 of 3: time passed 100 ms",
+      "Step 3 of 3: submit: stayed in idle",
+    ]);
+    expect(root.querySelector('[data-step="2"] [data-live-after]')).toBeNull();
+  });
+
   test("the timer label counts down the time already advanced", () => {
     const { root } = mount({ steps: ['submit={"amount":5}', "@300"] });
     expect(current(root)).toBe("paying");

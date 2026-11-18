@@ -24,7 +24,6 @@ export interface ExploreContext {
     state: VizLiveState;
     /** Entry i is what moved after `state.steps[i]`, as the driver reported it then. */
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
-    /** Entry i is the step's own entry (`live.last`) when it was taken. */
     lasts: ReadonlyArray<VizLiveStep | null>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
@@ -225,11 +224,10 @@ export function outcomeText(
       : [code(doc, child.key), " is not in ", code(doc, child.map), ". Nothing ran."];
   }
   const names = (id: string) => (region === undefined ? id : localName(id));
-  const who = step.actor === undefined ? "" : ` to ${partName(machine, step.actor)}`;
-  return [code(doc, step.event), `${who}: `, tailText(step, names)];
+  const to = step.actor === undefined ? "" : ` to ${partName(machine, step.actor)}`;
+  return [code(doc, step.event), `${to}: `, tailText(step, names)];
 }
 
-/** Where the part went, or that nobody took the event. */
 function tailText(step: VizLiveStep, names: (id: string) => string): string {
   if (step.outcome === "transition") return `${names(step.from)} → ${names(step.to)}`;
   if (step.outcome === "stay") return `stayed in ${names(step.from)}`;
@@ -249,7 +247,6 @@ function errorLine(doc: Document, step: VizLiveStep): HTMLElement | null {
   ]);
 }
 
-/** Outputs the machine sent out that no message row of the same step carries. */
 function outputRows(
   doc: Document,
   context: {
@@ -302,29 +299,27 @@ function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLive
   ]);
 }
 
-/** A part's move after the step's own: a numbered message from a sender, or a part acting on its own. */
+/** "kitchen sent " when a part is known to have sent it; "" is the machine itself. */
+function sentBy(machine: VizMachine, step: VizLiveStep): string {
+  const sender = step.message?.sender ?? null;
+  return sender === null ? "" : `${sender === "" ? machine.id : sender} sent `;
+}
+
 function afterLine(
   doc: Document,
   context: { machine: VizMachine; step: VizLiveStep; number: number | null },
 ): HTMLElement {
   const { machine, step, number } = context;
   const lost = step.message !== undefined && step.message.dropped !== null;
-  const sent = step.message?.sender ?? null;
-  const sender = sent === "" ? machine.id : sent;
   const receiver = partName(machine, step.actor);
   const tail = tailText(step, localName);
   const lead = number === null ? "" : `${lost ? "! " : ""}${number}. `;
+  const on = number === null ? " on its own" : "";
+  const from = sentBy(machine, step);
   const body =
-    sender !== null
-      ? [`${sender} sent `, code(doc, step.event), ` to ${receiver}: ${tail}`]
-      : lost
-        ? [code(doc, step.event), ` to ${receiver}: ${tail}`]
-        : [
-            `${receiver} took `,
-            code(doc, step.event),
-            number === null ? " on its own" : "",
-            `: ${tail}`,
-          ];
+    from !== "" || lost
+      ? [from, code(doc, step.event), ` to ${receiver}: ${tail}`]
+      : [`${receiver} took `, code(doc, step.event), `${on}: ${tail}`];
   return html(
     doc,
     "p",
@@ -337,7 +332,6 @@ function afterLine(
   );
 }
 
-/** One step of the walk: its head, then what each part did because of it. */
 function stepItem(
   doc: Document,
   context: {
@@ -346,7 +340,6 @@ function stepItem(
     total: number;
     step: VizStep;
     own: VizLiveStep | null;
-    /** What each part did after the head, with its message number if it is a message. */
     rows: ReadonlyArray<{ entry: VizLiveStep; number: number | null }>;
     held: boolean;
     routes: VizOutputRoutes | undefined;
@@ -355,16 +348,16 @@ function stepItem(
   const { machine, step, own, rows, routes } = context;
   const newest = context.index === context.total - 1;
   const taken = new Set(
-    rows.flatMap(({ entry }) => (entry.message === undefined ? [] : [entry.event])),
+    rows.filter(({ number }) => number !== null).map(({ entry }) => entry.event),
   );
+  const notRun = newest && context.held;
   const extras = (entry: VizLiveStep) => [
     errorLine(doc, entry),
     ...outputRows(doc, { machine, step: entry, taken, routes }),
-    newest && context.held && entry.effects.length > 0
-      ? notRunLine(doc, { machine, step: entry })
-      : null,
+    notRun && entry.effects.length > 0 ? notRunLine(doc, { machine, step: entry }) : null,
   ];
   const ignored = own?.outcome === "ignored";
+  const head = step.kind === "advance" ? null : own;
   return html(
     doc,
     "li",
@@ -376,11 +369,11 @@ function stepItem(
     [
       html(doc, "p", { "data-live-outcome": "", "data-live-dropped": ignored ? "" : null }, [
         `${ignored ? "! " : ""}Step ${context.index + 1} of ${context.total}: `,
-        ...(step.kind === "advance" || own === null
+        ...(head === null
           ? [`time passed ${step.kind === "advance" ? step.ms : 0} ms`]
-          : outcomeText(doc, machine, own)),
+          : outcomeText(doc, machine, head)),
       ]),
-      ...(step.kind === "advance" || own === null ? [] : extras(own)),
+      ...(head === null ? [] : extras(head)),
       ...rows.flatMap(({ entry, number }) => [
         afterLine(doc, { machine, step: entry, number }),
         ...extras(entry),
@@ -389,18 +382,12 @@ function stepItem(
   );
 }
 
-/** Every step of the walk, oldest first; messages are numbered over the whole walk. */
 function runList(
   doc: Document,
-  live: {
-    machine: VizMachine;
-    state: VizLiveState;
-    lasts: ReadonlyArray<VizLiveStep | null>;
-    afters: ReadonlyArray<ReadonlyArray<VizLiveStep>> | undefined;
-    routes: VizOutputRoutes | undefined;
-  },
+  machine: VizMachine,
+  live: NonNullable<ExploreContext["live"]>,
 ): HTMLElement {
-  const { machine, state, routes, lasts } = live;
+  const { state, routes, lasts } = live;
   const total = state.steps.length;
   const held = state.effectMode === "held";
   let messages = 1;
@@ -409,21 +396,17 @@ function runList(
     const after = index === total - 1 ? state.after : (live.afters?.[index] ?? []);
     // An advance's own entry is the first move its timer caused: it reads as a row.
     const entries = step.kind === "advance" && own !== null ? [own, ...after] : after;
-    const rows = entries.map((entry) => ({
-      entry,
-      number: entry.message === undefined ? null : messages++,
-    }));
+    const rows = entries.map((entry) => ({ entry, number: entry.message ? messages++ : null }));
     return stepItem(doc, { machine, index, total, step, own, rows, held, routes });
   });
   // A driver that threw reports an entry that no step of the walk owns.
-  const orphan = state.last !== null && state.last !== lasts[total - 1] ? state.last : null;
   return html(doc, "div", { class: "explore-live" }, [
     total === 0
       ? html(doc, "p", { class: "muted", "data-live-empty": "" }, [
           "No steps yet. Click an arrow on the board to send an event.",
         ])
       : html(doc, "ol", { class: "explore-run" }, items),
-    orphan === null ? null : errorLine(doc, orphan),
+    state.last !== null && state.last !== lasts[total - 1] ? errorLine(doc, state.last) : null,
   ]);
 }
 
@@ -447,13 +430,7 @@ function liveParts(
   const { state } = live;
   const moves: LiveMoves = { state, picked: live.picked ?? null, pick: live.pick };
   return [
-    runList(doc, {
-      machine,
-      state,
-      lasts: live.lasts,
-      afters: live.afters,
-      routes: live.routes,
-    }),
+    runList(doc, machine, live),
     ...childrenSections(doc, machine, moves),
     final ? null : timersSection(doc, { state, send: live.send }),
   ];
