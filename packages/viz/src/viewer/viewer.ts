@@ -277,7 +277,14 @@ function canvasOf(from: {
     return (canvas ?? root).clientWidth / BOARD_PX_PER_UNIT || BOARD_UNITS_UNMEASURED;
   };
   let drawnUnits = 0;
-  const swap = () => root.querySelector(".canvas")?.replaceChildren(...drawn());
+  const swap = () => {
+    root.querySelector(".canvas")?.replaceChildren(...drawn());
+    root.querySelector(".part-title")?.remove();
+    if (onBoard()) return;
+    const bar = root.querySelector(".viz-bar") ?? html(doc, "div", { class: "viz-bar" });
+    if (!bar.isConnected) root.prepend(bar);
+    bar.prepend(titleOf());
+  };
   const open = (part: string) => {
     view.zoom = part;
     swap();
@@ -296,12 +303,13 @@ function canvasOf(from: {
   const drawn = (): Node[] => {
     drawnUnits = canvasUnits();
     if (onBoard()) return [renderBoard(doc, machine, { width: drawnUnits, open })];
-    const graph = renderGraph(doc, shown(), from.callbacks());
-    if (partsOf(machine).length === 0) return [graph];
+    return [renderGraph(doc, shown(), from.callbacks())];
+  };
+  const titleOf = () => {
     const title = html(doc, "button", { type: "button", class: "part-title" }, [shown().id]);
     title.setAttribute("aria-label", `${shown().id}: show all machines`);
     title.addEventListener("click", leave);
-    return [title, graph];
+    return title;
   };
   const refit = () => {
     if (!onBoard() || canvasUnits() === drawnUnits) return;

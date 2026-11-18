@@ -574,13 +574,16 @@
   stroke-width: 2;
 }
 
-.viz .part-title {
+/* A machine's name leads back to the board; the bar holding it stays in view while the page scrolls. */
+.viz:has(.part-title) .viz-bar {
   position: sticky;
   top: 0;
-  left: 0;
   z-index: 1;
-  display: block;
-  margin: 0 0 4px;
+  background: var(--bg);
+}
+
+.viz .part-title {
+  margin-right: auto;
   padding: 2px 8px;
   font: inherit;
   font-weight: 600;
