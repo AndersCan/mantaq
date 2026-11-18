@@ -27,7 +27,8 @@ catalog:
   happy-dom: ^21.0.4
   lit: ^3.3.0
   lit-html: ^3.3.0
-  playwright: ^1.62.1
+  playwright: ^1.65.1
+  "@playwright/test": ^1.65.1
   yaml: ^2.8.0
   "@astrojs/sitemap": 3.7.3
 overrides:

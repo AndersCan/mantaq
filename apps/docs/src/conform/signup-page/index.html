@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sign up</title>
+  </head>
+  <body>
+    <form id="signup" novalidate>
+      <h1>Sign up</h1>
+      <label>Email <input name="email" type="email" /></label>
+      <label>Password <input name="password" type="password" /></label>
+      <p id="problem" role="alert" hidden></p>
+      <button type="submit">Sign up</button>
+    </form>
+    <p id="welcome" role="status" hidden></p>
+    <script>
+      const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+      const form = document.getElementById("signup");
+      const problem = document.getElementById("problem");
+      const welcome = document.getElementById("welcome");
+
+      form.addEventListener("input", () => {
+        problem.hidden = true;
+      });
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const email = form.email.value.trim();
+        if (!EMAIL.test(email)) {
+          problem.textContent = "Enter an email address like ada@example.com.";
+          problem.hidden = false;
+        } else if (form.password.value.length < 8) {
+          problem.textContent = "Use at least 8 characters for your password.";
+          problem.hidden = false;
+        } else {
+          form.hidden = true;
+          welcome.textContent = `Welcome, ${email}!`;
+          welcome.hidden = false;
+        }
+      });
+    </script>
+  </body>
+</html>

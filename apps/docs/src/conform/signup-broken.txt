@@ -1,0 +1,6 @@
+The app does not match the model after 2 events (seed 107806).
+  #  event                              model                app
+  0  (start)                            fillingForm          fillingForm
+  1  typeEmail {"email":"ada@example"}  fillingForm          fillingForm
+  2  pressSignUp                        showingEmailProblem  showingPasswordProblem  <- differs
+The app has a bug, or the model is wrong.

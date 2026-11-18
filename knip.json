@@ -18,6 +18,7 @@
     },
     "apps/docs": {
       "entry": ["src/content/docs/*.ts", "src/tutorial/meal-*.ts", "src/design/*.ts"],
+      "ignore": ["src/conform/signup-page/**"],
       "ignoreDependencies": [
         "@fontsource-variable/ibm-plex-sans",
         "@fontsource-variable/space-grotesk",
