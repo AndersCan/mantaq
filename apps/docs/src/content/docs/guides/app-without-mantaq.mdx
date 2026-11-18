@@ -11,6 +11,8 @@ import testSource from "../../../conform/counter.test.ts?raw";
 import briefTestSource from "../../../conform/counter-brief.test.ts?raw";
 import brief from "../../../conform/counter-brief.md?raw";
 import failure from "../../../conform/counter-broken.txt?raw";
+import ask from "../../../conform/signup-ask.txt?raw";
+import signupFailure from "../../../conform/signup-broken.txt?raw";
 
 ## What
 
@@ -34,7 +36,7 @@ The model of a counter app. The app has no mantaq in it.
 
 <Code code={modelSource} lang="ts" title="counter-model.ts" />
 
-`events` does each model event in the app. `state` reads the app back as a model state name.
+The adapter is `events`, which does each model event in the app, and `state`, which reads the app back as a model state name.
 `assertMatchesModel` runs 100 random walks of up to 30 events, compares both states after every event, and fails when a model edge was never taken.
 
 <Code code={testSource.replace('"vite-plus/test"', '"vitest"')} lang="ts" title="counter.test.ts" />
@@ -66,6 +68,30 @@ Adapters may return promises. Write an async result the app waits for as a model
 save: (app) => { app.save(); },
 saveFinished: async (app) => { backend.finish(); await app.saving; },
 ```
+
+### Test a web page
+
+Ask a coding agent to model one feature of a page and check the real page against it in Playwright. Try it on the sample sign-up page:
+
+```bash
+npx degit AndersCan/mantaq/apps/docs/src/conform/signup-page signup-page
+cd signup-page
+npm install
+npx playwright install chromium
+npx skills add AndersCan/mantaq -y
+```
+
+Then paste this to your agent:
+
+<Code code={ask} lang="text" title="The ask" wrap />
+
+The agent writes two files, `signup-model.ts` and `signup.spec.ts`, and `npx playwright test` prints `1 passed`. That means 100 walks of up to 30 actions, with the page and the model compared after each, and every arrow in the model taken. A model with one or two states proves little.
+
+Now break the email check: in `index.html` change `!EMAIL.test(email)` to `!email.includes("@")` and run again. The test fails with the shortest actions that reach it. With our model of the form it prints:
+
+<Code code={signupFailure} lang="text" />
+
+Read the rows as what a person did: typed `ada@example`, pressed Sign up. The page showed the password problem where the model expected the email problem. If the app column did not move on an action's first row, check the adapter's locator before the page. Change the line back and it passes.
 
 ### Hand the model to whoever builds it
 
