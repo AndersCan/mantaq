@@ -2,7 +2,7 @@
 import { resolve } from "node:path";
 import { documents, root, routes } from "virtual:mantaq/documents";
 
-const { src, runEffects, diagramOnly } = Astro.props;
+const { src, runEffects, diagramOnly, run } = Astro.props;
 const abs = resolve(root, src);
 const doc = documents[abs];
 if (doc === undefined) {
@@ -12,6 +12,16 @@ if (doc === undefined) {
 }
 if (doc.machines.length === 0) {
   throw new Error(`<Machine src="${src}">: no exported machine(...) found in ${abs}`);
+}
+if (run !== undefined) {
+  const names: string[] = (JSON.parse(doc.text).machines[0]?.runs ?? []).map(
+    (each: { name: string }) => each.name,
+  );
+  if (!names.includes(run)) {
+    throw new Error(
+      `<Machine src="${src}" run="${run}">: no recorded run "${run}" in ${abs}.`,
+    );
+  }
 }
 const docRoutes = Object.fromEntries(
   doc.machines.flatMap((id) => (routes[id] === undefined ? [] : [[id, routes[id]]])),
@@ -24,6 +34,7 @@ const docRoutes = Object.fromEntries(
   data-mantaq-src={src}
   data-mantaq-routes={JSON.stringify(docRoutes)}
   data-mantaq-effects={runEffects === true ? "run" : undefined}
+  data-mantaq-run={run}
   data-mantaq-diagram-only={diagramOnly === true ? "" : undefined}
 >
   <noscript>The interactive diagram needs JavaScript.</noscript>
