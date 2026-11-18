@@ -32,7 +32,8 @@ import { blockedEdges, sentByParts, whyNotHere } from "./blocked.ts";
 import { arrowCandidates, decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
 import { keepInView } from "./keep-in-view.ts";
-import { drawChildMarkers } from "./markers.ts";
+import { drawChildMarkers, drawQueue } from "./markers.ts";
+import { queueOf } from "./queue.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
@@ -795,6 +796,7 @@ function markDiagram(
       picked: view.picked,
       onPick: context.pick,
     });
+    drawQueue(graph, { state: view.live.state, queue: queueOf(machine, view.live.context) });
   }
   markSelection(root, view.selection);
 }

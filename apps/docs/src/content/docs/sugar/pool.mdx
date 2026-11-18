@@ -26,7 +26,9 @@ Hand-rolling a queue with workers means wiring the inbox, the idle and busy trac
 
 ### Try it
 
-1. Open the run [Four items, three workers](?machine=teamInbox&run=Four%20items%2C%20three%20workers). Three workers take one item each; the fourth waits.
+1. Open the run [Four items, three workers](?machine=teamInbox&run=Four%20items%2C%20three%20workers). Three workers take one item each; the fourth, `d`, waits: the inbox box reads `1 waiting` with `d`.
+2. In the **Context** tab set `item` to `e` and click the `team.ITEM_ARRIVED` arrow; do the same with `f` and `g`. The box reads `4 waiting`, `d e f g`: the leftmost goes next.
+3. Press **advance 1000 ms** in the **Step** tab. The three workers finish together and take `d`, `e` and `f`; the box reads `1 waiting` with `g`.
 
 ### The code
 

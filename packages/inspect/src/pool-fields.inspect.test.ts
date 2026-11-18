@@ -9,4 +9,11 @@ test("a pool returned as is offers its events' fields, so Context can set item a
     result.machines[0]?.events.find((each) => each.id === id)?.payload?.map((field) => field.name);
   expect(fieldsOf("team.ITEM_ARRIVED")).toEqual(["item"]);
   expect(fieldsOf("team.WORKERS_RESIZED")).toEqual(["count"]);
+  // viz queue.ts knows a pool's inbox by these fields
+  expect(result.machines[0]?.context?.map((field) => field.name)).toEqual([
+    "waiting",
+    "free",
+    "workers",
+    "size",
+  ]);
 }, 60_000);
