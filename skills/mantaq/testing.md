@@ -182,7 +182,7 @@ With `@mantaq/test` 2.0 the `*` any-node (`m.onAny`) counts in coverage: it is o
 
 ## Messages Between Machines
 
-To check that no message between your machines was dropped in a run, step it with `createDriver` from `@mantaq/inspect/drive` and read `after[].message`: `sender` is the part that sent it (`""` is the machine itself, `null` is unknown), and `dropped` is `"noHandler"` when the receiver had no handler in its state, else `null`. Needs `@mantaq/inspect` 0.37 or later.
+To check that no message between your machines was dropped in a run, step it with `createDriver` from `@mantaq/inspect/drive` and read `after[].message`: `sender` is the part that sent it (`""` is the machine itself, `null` is unknown, or a part sending itself), and `dropped` is `"noHandler"` when the receiver had no handler in its state, else `null`. Needs `@mantaq/inspect` 0.37 or later.
 
 <!-- docs-check: skip -->
 

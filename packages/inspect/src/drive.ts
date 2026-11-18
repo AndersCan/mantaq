@@ -213,21 +213,14 @@ function startedFollowUp(
 /** Core emits an output right after the transition that caused it: file it on the latest entry. */
 function watchOutputs(
   actor: AnyActor<unknown>,
-  context: { log: VizLiveStep[]; changed: () => void; heard: (event: string) => void },
+  context: { log: VizLiveStep[]; changed: () => void },
 ): void {
   actor.on("output", {
     fn: (event) => {
       context.log.at(-1)?.sent.push(event.type);
-      context.heard(event.type);
       context.changed();
     },
   });
-}
-
-/** A message that arrived before anyone is known to have sent it: the sender is the next other part to output that event. */
-interface Arrival {
-  message: VizMessage;
-  event: string;
 }
 
 /** A part that receives messages: its ref and state-id prefix, as its step entries carry them. */
@@ -236,22 +229,21 @@ interface Part {
   prefix?: string;
 }
 
-/** Messages whose sender is not known yet, and the last part heard to output each event this step. */
+/** The part that last moved in this step or is sending now; "" is the machine, null no part. A wire on a part's `transition` listener registered in `create` runs before the driver's, so its sends stay null. */
 interface Hearing {
-  pending: Arrival[];
-  last: Map<string, string>;
+  mover: string | null;
 }
 
-/** Name the sender of every waiting arrival of this event. */
-function noteOutput(heard: { sender: string; event: string }, at: Hearing): void {
-  at.last.set(heard.event, heard.sender);
-  const { pending } = at;
-  const waiting = pending.splice(0, pending.length);
-  for (const arrival of waiting) {
-    if (arrival.event === heard.event) {
-      arrival.message.sender = heard.sender;
-    } else pending.push(arrival);
-  }
+/** The name a message carries for a part: "" for the machine itself. */
+function nameOf(ref: VizActorRef | undefined): string {
+  if (ref === undefined) return "";
+  return "region" in ref ? ref.region : ref.map;
+}
+
+/** A part that moved is the sender of what app code sends next. */
+function noteMover(hearing: Hearing, entry: VizLiveStep): void {
+  if (entry.outcome === "transition" || entry.outcome === "stay")
+    hearing.mover = nameOf(entry.actor);
 }
 
 /**
@@ -270,7 +262,6 @@ function wrapSend(
   },
 ): void {
   const { root, log, flags, hearing, record } = at;
-  const { pending, last } = hearing;
   const send = actor.send.bind(actor);
   actor.send = (event) => {
     const type = event.type;
@@ -280,18 +271,23 @@ function wrapSend(
       return;
     }
     const known = new Set(log);
-    send(event);
+    const before = hearing.mover;
+    const sender = before === nameOf(part.ref) ? null : before;
+    hearing.mover = nameOf(part.ref);
+    try {
+      send(event);
+    } finally {
+      hearing.mover = before;
+    }
     const taken = log.find(
       (entry) => !known.has(entry) && entry.event === type && entry.message === undefined,
     );
-    const lastSender = last.get(type);
     const payload = "payload" in event ? jsonOf(event.payload) : undefined;
     const message: VizMessage = {
-      sender: lastSender ?? null,
+      sender,
       dropped: taken === undefined ? "noHandler" : null,
       ...(payload === undefined ? {} : { payload }),
     };
-    pending.push({ message, event: type });
     if (taken !== undefined) {
       taken.message = message;
       return;
@@ -422,14 +418,12 @@ function watchActors(
     record: (e: VizLiveStep) => void;
     held: HeldEffect[] | null;
     joined: (actor: AnyActor<unknown>, part: Part) => void;
-    heard: (sender: string) => (event: string) => void;
   },
 ): void {
   for (const [name, part] of Object.entries(actors)) {
     if (at.held !== null) holdEffects(part, at.held);
     const ref = { region: name };
     watchChild(part, { root: at.root, ref, prefix: name, record: at.record });
-    part.on("output", { fn: (out) => at.heard(name)(out.type) });
     at.joined(part, { ref, prefix: name });
   }
 }
@@ -481,7 +475,7 @@ interface Stepping {
     pending: number;
     own: { actor: AnyActor<unknown>; event: string } | null;
   };
-  /** Messages whose sender is not known yet. */
+  /** The part that last moved, for naming a message's sender. */
   hearing: Hearing;
   maps: Record<string, ActorMapLike>;
   actors: Record<string, AnyActor<unknown>>;
@@ -491,8 +485,7 @@ interface Stepping {
 function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
   const { actor, clock, internal, log, steps, flags, maps, actors, hearing } = at;
   log.length = 0;
-  hearing.pending.length = 0;
-  hearing.last.clear();
+  hearing.mover = null;
   flags.segment = 0;
   flags.inside = true;
   flags.pending = 1;
@@ -506,6 +499,7 @@ function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
   } finally {
     flags.inside = false;
     flags.pending = 0;
+    hearing.mover = null;
   }
   steps.push(step);
   if (step.kind !== "event") return undefined;
@@ -609,7 +603,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     const log: VizLiveStep[] = [];
     const steps: VizStep[] = [];
     const flags = newFlags(quiet);
-    const hearing: Hearing = { pending: [], last: new Map() };
+    const hearing: Hearing = { mover: null };
     const held: HeldEffect[] = [];
     const holding = quiet || effectMode === "held";
     if (holding) holdEffects(actor, held);
@@ -619,6 +613,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     });
 
     function record(entry: VizLiveStep): void {
+      noteMover(hearing, entry);
       if (startedFollowUp(entry, { log, flags })) log.splice(flags.segment, 0, entry);
       else log.push(entry);
       changed();
@@ -631,13 +626,12 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     const joined = (receiver: AnyActor<unknown>, part: Part): void => {
       wrapSend(receiver, part, { root: actor, log, flags, hearing, record });
     };
-    const heard = (sender: string) => (event: string) => noteOutput({ sender, event }, hearing);
 
     watchRoot(actor, record);
-    watchOutputs(actor, { log, changed, heard: heard("") });
+    watchOutputs(actor, { log, changed });
     joined(actor, {});
     watchRegions(actor, record);
-    watchActors(actors, { root: actor, record, held: holding ? held : null, joined, heard });
+    watchActors(actors, { root: actor, record, held: holding ? held : null, joined });
 
     const children = new Map<string, MapChild>();
     const removed: VizRemovedChild[] = [];
@@ -653,7 +647,6 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       if (holding) holdEffects(child, held);
       const ref = { map: name, key };
       watchChild(child, { root: actor, ref, prefix: name, record });
-      child.on("output", { fn: (out) => heard(name)(out.type) });
       joined(child, { ref, prefix: name });
     };
     watchMaps(maps, watch, changed);
