@@ -132,7 +132,7 @@ describe("mantaqViz for Astro", () => {
         join(root, "src", "pages", "index.astro"),
         `---\nimport Machine from "@mantaq/inspect/astro/Machine.astro";\n---\n<html><body>\n<Machine src="${timed}" run="nope" />\n</body></html>\n`,
       );
-      await expect(buildSite(root, [timed])).rejects.toThrow(/no recorded run "nope" in .*Runs: /);
+      await expect(buildSite(root, [timed])).rejects.toThrow(/no recorded run "nope" in /);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -166,7 +166,7 @@ export function mountDriven(
     ...(driver === undefined ? {} : { driver }),
     ...screenOption({ doc, preview: context.preview, id }),
     ...(context.diagramOnly === true ? { diagramOnly: true } : {}),
-    ...pageRun(context.run, options),
+    ...(id === viz.machines[0]?.id ? pageRun(context.run, options) : {}),
   });
 }
 

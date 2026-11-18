@@ -19,7 +19,7 @@ if (run !== undefined) {
   );
   if (!names.includes(run)) {
     throw new Error(
-      `<Machine src="${src}" run="${run}">: no recorded run "${run}" in ${abs}. Runs: ${names.join(", ")}`,
+      `<Machine src="${src}" run="${run}">: no recorded run "${run}" in ${abs}.`,
     );
   }
 }

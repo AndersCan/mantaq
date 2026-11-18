@@ -501,6 +501,20 @@ describe("mountDriven runs by name", () => {
     expect(root.querySelector("[data-run-missing]")).not.toBeNull();
   });
 
+  test("picking another machine opens its start, not the run the page names", async () => {
+    history.replaceState(null, "", "?");
+    const root = document.createElement("div");
+    mountDriven(root, {
+      source: "test",
+      text: await withRuns(),
+      targets: { checkout: create },
+      run: "gives basic info",
+    });
+    (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
+    expect(location.search).toBe("?machine=second");
+    expect(root.querySelector("[data-run-missing]")).toBeNull();
+  });
+
   test("run= without machine opens the start with no notice", async () => {
     history.replaceState(null, "", "?run=gives%20basic%20info");
     const root = document.createElement("div");
