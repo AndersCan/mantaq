@@ -65,3 +65,46 @@ export const boardNeeds = machine("boardNeeds", {
     return boardWalk.create({ clock });
   },
 });
+
+const cooking = state("cooking")();
+const serving = state("serving")();
+const carrying = state("carrying")();
+const cooked = event("cooked")();
+const ready = event("ready")();
+const served = event("served")();
+
+/** A kitchen whose `cooked` hands the waiter a dish; a waiter with nothing to serve throws. */
+export const boardRelay = machine("boardRelay", {
+  create: ({ clock }) => {
+    const waiter = Actor({
+      inputs: [ready, served],
+      internal: [],
+      states: [serving, carrying],
+      initial: serving,
+      clock,
+      setup: (m) => {
+        m.on(serving, { event: ready, to: [carrying], handler: () => ({ state: carrying }) });
+        m.on(serving, {
+          event: served,
+          to: [serving],
+          handler: () => {
+            throw new Error("nothing to serve");
+          },
+        });
+        m.on(carrying, { event: served, to: [serving], handler: () => ({ state: serving }) });
+      },
+    });
+    const kitchen = Actor({
+      inputs: [cooked],
+      outputs: [ready],
+      states: [cooking],
+      initial: cooking,
+      clock,
+      setup: (m) => {
+        m.on(cooking, { event: cooked, handler: () => ({ emit: [ready.create()] }) });
+      },
+    });
+    kitchen.on("output", { fn: (out) => waiter.send(out as never) });
+    return { actor: kitchen, waiter };
+  },
+});

@@ -183,3 +183,20 @@ test("a walk the board cannot replay on the factory's defaults is not shown", ()
   );
   expect(throws.lines).toEqual(["on the board: not shown"]);
 });
+
+test("a throw keeps its place among the steps that came after it", () => {
+  const { lines } = boardLines(
+    "relay",
+    `test("served first", () => {
+  const made = make.create();
+  made.waiter.send({ type: "served" } as never);
+  made.actor.send({ type: "cooked" } as never);
+  expect(made.waiter.state.name).toBe("carrying");
+});`,
+    { path: join(HERE, "fixtures/board-walk.ts"), factory: "boardRelay" },
+  );
+  // Swapped, the board hands the waiter a dish first and the throw never happens.
+  expect(lines).toEqual([
+    "on the board: ?machine=boardRelay&step=waiter%3Eserved%3D%7B%7D&step=cooked%3D%7B%7D",
+  ]);
+});

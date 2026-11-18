@@ -26,7 +26,7 @@ interface Pending {
   problem: string;
   seen: number;
   /** The send that made the actor fail (a handler or effect threw). Shown only when the test fails. */
-  threw: VizStep[];
+  threw: Array<{ step: VizStep; at: number }>;
   /** Keys the test passed besides `clock`; empty when the run needs no replay. */
   extra: string[];
   /** The factory called the way the page calls it. */
@@ -134,7 +134,10 @@ function boardLine(each: Pending): string {
   const run = {
     name: each.name,
     end: each.actor.state.name,
-    steps: [...each.steps, ...each.threw],
+    steps: each.threw.reduceRight(
+      (steps, { step, at }) => steps.toSpliced(at, 0, step),
+      each.steps,
+    ),
   };
   const replayed =
     each.problem === "" ? Either.from(() => normalizeRun(pageTarget(each), run)) : undefined;
@@ -263,7 +266,7 @@ function track(made: Made, context: Pick<Pending, "id" | "extra" | "replay">): v
   };
   const threw = (info: ErrorInfo, region?: string): void => {
     const step = eventStep(info.event, region);
-    if (Either.isRight(step)) entry.threw.push(step[1]);
+    if (Either.isRight(step)) entry.threw.push({ step: step[1], at: entry.steps.length });
   };
   actor.on("transition", { fn: ({ event }) => note(event) });
   actor.on("error", { fn: (info) => threw(info) });
