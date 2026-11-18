@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.48.0
+
+<sub>2026-11-18</sub>
+
+- _(minor)_
+  A lost message the design check finds prints `on the board: ?machine=<id>&run=<name>`, and every board of the machine has that run: it plays to the step where the message is lost.
+
+  Breaking: none
+
+- _(minor)_
+  A failed test that builds its actor through `recordRuns` prints `on the board: ?machine=<id>&step=…`: the board address that replays its walk up to where it failed. Nothing is written.
+
+  Breaking: none
+
+- _(patch)_
+  An event that three or more sibling states leave by the same arrows is drawn once, from a node naming those states; clicks, Send, Details and highlights work on it. Every transition is still drawn: a member arrow is no longer its own `g[data-edge-id]` element, the shared arrow carries its ids in `data-members`. The test harness finds shared arrows by member id.
+
+  Breaking: none
+
 ## 0.47.0
 
 <sub>2026-11-18</sub>
