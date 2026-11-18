@@ -1,0 +1,2870 @@
+[
+  {
+    "rule": "arrowheads",
+    "a": "arrow:friends.namingFriend-SAVE-namingFriend",
+    "b": "arrow:friends.namingFriend-TYPE-namingFriend",
+    "gap": 3.5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:friends.namingFriend-SAVE-namingFriend",
+    "b": "path:friends.namingFriend-TYPE-namingFriend",
+    "gap": 7.5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:friends.namingFriend-TYPE-namingFriend",
+    "b": "path:friends.namingFriend-SAVE-namingFriend",
+    "gap": 7.5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:join.linkReplacedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "arrow:join.linkReplacedByAdmin-requestAnswered-linkReplacedByAdmin",
+    "gap": -3
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:join.linkReplacedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkReplacedByAdmin-requestAnswered-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:join.linkReplacedByAdmin-requestAnswered-linkReplacedByAdmin",
+    "b": "path:join.linkReplacedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:join.waitingForAdminToAccept-requestAnswered-waitingForAdminToAccept",
+    "b": "arrow:join.waitingForAdminToAccept-whoMustUpdateChanged-waitingForAdminToAccept",
+    "gap": 1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:join.waitingForAdminToAccept-requestAnswered-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-whoMustUpdateChanged-waitingForAdminToAccept",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:join.waitingForAdminToAccept-whoMustUpdateChanged-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-waitingForAdminToAccept",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "b": "arrow:requests.couldNotLoadRequests-HOLD_DECLINE-stay",
+    "gap": 1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "b": "arrow:requests.couldNotLoadRequests-UNDO_DECLINE-stay",
+    "gap": -1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.couldNotLoadRequests-HOLD_DECLINE-stay",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.couldNotLoadRequests-UNDO_DECLINE-stay",
+    "gap": 3
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.couldNotLoadRequests-HOLD_DECLINE-stay",
+    "b": "path:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.couldNotLoadRequests-UNDO_DECLINE-stay",
+    "b": "path:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "gap": 3
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "b": "arrow:requests.sendingAnswersToAll-HOLD_DECLINE-stay",
+    "gap": 1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "b": "arrow:requests.sendingAnswersToAll-REQUEST_WAS_CANCELLED-sendingAnswersToAll",
+    "gap": -1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "b": "path:requests.sendingAnswersToAll-HOLD_DECLINE-stay",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "b": "path:requests.sendingAnswersToAll-REQUEST_WAS_CANCELLED-sendingAnswersToAll",
+    "gap": 3
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.sendingAnswersToAll-HOLD_DECLINE-stay",
+    "b": "path:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.sendingAnswersToAll-REQUEST_WAS_CANCELLED-sendingAnswersToAll",
+    "b": "path:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "gap": 3
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "b": "arrow:requests.showingRequests-HOLD_DECLINE-stay",
+    "gap": 1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "b": "arrow:requests.showingRequests-UNDO_DECLINE-stay",
+    "gap": -1
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.showingRequests-HOLD_DECLINE-stay",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.showingRequests-UNDO_DECLINE-stay",
+    "gap": 3
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.showingRequests-HOLD_DECLINE-stay",
+    "b": "path:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "gap": 5
+  },
+  {
+    "rule": "arrowheads",
+    "a": "arrow:requests.showingRequests-UNDO_DECLINE-stay",
+    "b": "path:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "gap": 3
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:addFriend.choosingFriends-pickRole-choosingFriends",
+    "b": "path:addFriend.choosingFriends-toggleFriend-choosingFriends",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:appLock.*-STATUS_READ-stay",
+    "b": "node:sync.waitingForAdminApproval",
+    "gap": 6
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:friendOffer.joiningFriendsAlbum-askAnswered-joiningFriendsAlbum",
+    "b": "node:folders.showingAlbums",
+    "gap": -83
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.albumDeletedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.decidingToAsk-openLink-linkTurnedOffByAdmin",
+    "gap": 4.5
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.checkingLink-reopenRequest-declinedByAdmin",
+    "b": "path:join.decidingToAsk-openLink-linkTurnedOffByAdmin",
+    "gap": 4.5
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.linkReplacedByAdmin-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkReplacedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.showingLinkProblem-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.decidingToAsk-openLink-linkTurnedOffByAdmin",
+    "gap": 4.5
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:join.showingLinkProblem-requestAnswered-linkTurnedOffByAdmin",
+    "b": "path:join.decidingToAsk-openLink-linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:people.makingViewer-SHOW_QR-stay",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 4
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:requests.couldNotLoadRequests-DECLINE_FAILED-stay",
+    "b": "path:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "gap": 5
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:requests.sendingAnswersToAll-DECLINE_FAILED-stay",
+    "b": "path:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "gap": 5
+  },
+  {
+    "rule": "label-clear",
+    "a": "label:requests.showingRequests-DECLINE_FAILED-stay",
+    "b": "path:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "gap": 5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:addFriend.showingWhoWasAsked",
+    "b": "node:addFriend.showingWhoWasAsked",
+    "gap": -1280.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:folders.couldNotSaveName",
+    "b": "node:folders.couldNotSaveName",
+    "gap": -6122.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:folders.showingAlbums",
+    "b": "node:folders.showingAlbums",
+    "gap": -8199.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:gallery.addingPhotos",
+    "b": "node:gallery.addingPhotos",
+    "gap": -462.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:gallery.addingPhotos",
+    "b": "node:gallery.addingPhotos",
+    "gap": -486.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:inviteLink.savingLinkTime",
+    "b": "node:inviteLink.savingLinkTime",
+    "gap": -2676.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:inviteLink.savingLinkTime",
+    "b": "node:inviteLink.savingLinkTime",
+    "gap": -2680.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:join.linkExpired",
+    "b": "node:join.linkExpired",
+    "gap": -2131.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:join.showingWelcome",
+    "b": "node:join.showingWelcome",
+    "gap": -7794.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:onboarding.choosingCreateOrJoin",
+    "b": "node:onboarding.choosingCreateOrJoin",
+    "gap": -2302
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:onboarding.choosingCreateOrJoin",
+    "b": "node:onboarding.choosingCreateOrJoin",
+    "gap": -2306
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:people.lettingViewerAddPhotos",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": -4904
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:people.lettingViewerAddPhotos",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": -4908
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:reach.tryingToReachMembers",
+    "b": "node:reach.tryingToReachMembers",
+    "gap": -1234
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:reach.tryingToReachMembers",
+    "b": "node:reach.tryingToReachMembers",
+    "gap": -1238
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:requests.showingRequests",
+    "b": "node:requests.showingRequests",
+    "gap": -7879.5
+  },
+  {
+    "rule": "node-inside",
+    "a": "node:sync.waitingForAdminApproval",
+    "b": "node:sync.waitingForAdminApproval",
+    "gap": -6684.5
+  },
+  {
+    "rule": "nodes",
+    "a": "node:addFriend.showingWhoWasAsked",
+    "b": "node:appLock.savingLockChoice",
+    "gap": -52
+  },
+  {
+    "rule": "nodes",
+    "a": "node:folders.couldNotSaveName",
+    "b": "node:folders.creatingAlbum",
+    "gap": -92
+  },
+  {
+    "rule": "nodes",
+    "a": "node:folders.showingAlbums",
+    "b": "node:friendOffer.joiningFriendsAlbum",
+    "gap": -139
+  },
+  {
+    "rule": "nodes",
+    "a": "node:gallery.addingPhotos",
+    "b": "node:gallery.couldNotLoadPhotos",
+    "gap": -68
+  },
+  {
+    "rule": "nodes",
+    "a": "node:inviteLink.savingLinkTime",
+    "b": "node:inviteLink.turningOff",
+    "gap": -81
+  },
+  {
+    "rule": "nodes",
+    "a": "node:join.linkExpired",
+    "b": "node:join.linkReplacedByAdmin",
+    "gap": -188
+  },
+  {
+    "rule": "nodes",
+    "a": "node:join.showingWelcome",
+    "b": "node:join.waitingForAdminToAccept",
+    "gap": -200
+  },
+  {
+    "rule": "nodes",
+    "a": "node:onboarding.choosingCreateOrJoin",
+    "b": "node:onboarding.offeringAppLock",
+    "gap": -68
+  },
+  {
+    "rule": "nodes",
+    "a": "node:people.lettingViewerAddPhotos",
+    "b": "node:people.makingViewer",
+    "gap": -100
+  },
+  {
+    "rule": "nodes",
+    "a": "node:reach.tryingToReachMembers",
+    "b": "node:reach.waitingBeforeWifiHint",
+    "gap": -57
+  },
+  {
+    "rule": "nodes",
+    "a": "node:requests.showingRequests",
+    "b": "node:seen.holdingSeen",
+    "gap": -65
+  },
+  {
+    "rule": "nodes",
+    "a": "node:sync.waitingForAdminApproval",
+    "b": "node:appLock.*",
+    "gap": -54
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:appLock.*-STATUS_READ-stay",
+    "b": "node:sync.waitingForAdminApproval",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:appLock.savingLockChoice-SAVE_ENDED-showingLockSwitch",
+    "b": "node:addFriend.showingWhoWasAsked",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:appLock.showingLockSwitch-SAVE_STARTED-savingLockChoice",
+    "b": "node:addFriend.showingWhoWasAsked",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.archivingAlbum-ALBUMS_LOADED-showingAlbums",
+    "b": "node:folders.archivingAlbum",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.couldNotChangeAlbum-CREATE_FOLDER-creatingAlbum",
+    "b": "node:folders.couldNotSaveName",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.couldNotCreateAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "b": "node:folders.couldNotCreateAlbum",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.couldNotCreateAlbum-CREATE_FOLDER-creatingAlbum",
+    "b": "node:folders.couldNotSaveName",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.couldNotOpenAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "b": "node:folders.couldNotOpenAlbum",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.couldNotOpenAlbum-CREATE_FOLDER-creatingAlbum",
+    "b": "node:folders.couldNotSaveName",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.couldNotSaveName-CREATE_FOLDER-creatingAlbum",
+    "b": "node:folders.couldNotSaveName",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.couldNotSaveName-DELETE_ALBUM-deletingAlbum",
+    "b": "node:folders.deletingAlbum",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.creatingAlbum-CREATE_FAILED-couldNotCreateAlbum",
+    "b": "node:folders.couldNotSaveName",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "b": "node:folders.couldNotSaveName",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.dismissingDeletedNotice-ALBUMS_LOADED-showingAlbums",
+    "b": "node:folders.dismissingDeletedNotice",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:folders.showingAlbums-CREATE_FOLDER-creatingAlbum",
+    "b": "node:folders.couldNotSaveName",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:friendOffer.joiningFriendsAlbum-askAnswered-joiningFriendsAlbum",
+    "b": "node:folders.showingAlbums",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:friendOffer.joiningFriendsAlbum-askAnswered-showingFriendOffers",
+    "b": "node:friendOffer.showingFriendOffers",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:friendOffer.joiningFriendsAlbum-joinFailed-showingFriendOffers",
+    "b": "node:folders.showingAlbums",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:friendOffer.joiningFriendsAlbum-offerGone-showingFriendOffers",
+    "b": "node:folders.showingAlbums",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:friendOffer.showingFriendOffers-join-joiningFriendsAlbum",
+    "b": "node:folders.showingAlbums",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:friends.showingMember-RENAME-namingFriend",
+    "b": "node:friends.namingFriend",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:gallery.couldNotLoadPhotos-DISMISS_BATCH-stay",
+    "b": "node:gallery.addingPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:gallery.couldNotLoadPhotos-LOAD-loadingPhotos",
+    "b": "node:gallery.addingPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:gallery.couldNotLoadPhotos-RETRY-loadingPhotos",
+    "b": "node:gallery.addingPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:gallery.couldNotLoadPhotos-RETRY-loadingPhotos",
+    "b": "node:gallery.couldNotLoadPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:gallery.loadingPhotos-LOAD_FAILED-couldNotLoadPhotos",
+    "b": "node:gallery.addingPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:gallery.loadingPhotos-LOAD_FAILED-couldNotRemovePhoto",
+    "b": "node:gallery.couldNotRemovePhoto",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:gallery.removingPhoto-REMOVED-showingPhotos",
+    "b": "node:gallery.showingPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:inviteLink.linkMade-linkReplaced-noLinkYet",
+    "b": "node:inviteLink.noLinkYet",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:inviteLink.linkMade-turnOffLink-turningOff",
+    "b": "node:inviteLink.savingLinkTime",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:inviteLink.noLinkYet-turnOffLink-turningOff",
+    "b": "node:inviteLink.savingLinkTime",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:inviteLink.turningOff-linkOff-linkMade",
+    "b": "node:inviteLink.savingLinkTime",
+    "gap": 1
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:inviteLink.turningOff-linkOff-noLinkYet",
+    "b": "node:inviteLink.savingLinkTime",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:inviteLink.turningOff-linkOffFailed-linkMade",
+    "b": "node:inviteLink.turningOff",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:inviteLink.turningOff-linkOffFailed-noLinkYet",
+    "b": "node:inviteLink.savingLinkTime",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.albumDeletedByAdmin-openLink-linkStoppedForUnknownReason",
+    "b": "node:join.linkStoppedForUnknownReason",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-waitingForAdminToAccept",
+    "b": "node:join.albumDeletedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.checkingLink-openLink-joinedAlbum",
+    "b": "node:join.checkingLink",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.checkingLink-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.checkingLink-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.checkingPastedLink-reopenRequest-albumDeletedByAdmin",
+    "b": "node:join.albumDeletedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.decidingToAsk-askToJoin-sendingRequest",
+    "b": "node:join.sendingRequest",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.decidingToAsk-openLink-linkTurnedOffByAdmin",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.decidingToAsk-reopenRequest-waitingForYouToUpdate",
+    "b": "node:join.decidingToAsk",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.declinedByAdmin-openLink-linkExpired",
+    "b": "node:join.declinedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.declinedByAdmin-reopenRequest-linkStoppedForUnknownReason",
+    "b": "node:join.linkStoppedForUnknownReason",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkTurnedOffByAdmin",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.joinedAlbum-openLink-decidingToAsk",
+    "b": "node:join.decidingToAsk",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "b": "node:join.declinedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.joinedAlbum-requestAnswered-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.joinedAlbum-requestAnswered-linkReplacedByAdmin",
+    "b": "node:join.linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkExpired-openLink-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkExpired-openLink-linkReplacedByAdmin",
+    "b": "node:join.linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkReplacedByAdmin-openLink-joinedAlbum",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkReplacedByAdmin-openLink-joinedAlbum",
+    "b": "node:join.linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkReplacedByAdmin-openLink-linkStoppedForUnknownReason",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkReplacedByAdmin-openLink-linkTurnedOffByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkReplacedByAdmin-reopenRequest-linkStoppedForUnknownReason",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkReplacedByAdmin-reopenRequest-linkTurnedOffByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-decidingToAsk",
+    "b": "node:join.linkStoppedForUnknownReason",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-declinedByAdmin",
+    "b": "node:join.linkStoppedForUnknownReason",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.linkTurnedOffByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.noInviteOpen-askWithPastedLink-checkingPastedLink",
+    "b": "node:join.checkingPastedLink",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.sendingRequest-requestSent-waitingForAdminToAccept",
+    "b": "node:join.sendingRequest",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.showingLinkProblem-askWithPastedLink-waitingForYouToUpdate",
+    "b": "node:join.waitingForYouToUpdate",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.showingLinkProblem-openLink-linkTurnedOffByAdmin",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.showingLinkProblem-reopenRequest-waitingForAdminToAccept",
+    "b": "node:join.showingLinkProblem",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "b": "node:join.linkStoppedForUnknownReason",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.waitingForYouToUpdate-openLink-joinedAlbum",
+    "b": "node:join.waitingForYouToUpdate",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkExpired",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "b": "node:join.linkReplacedByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "b": "node:join.linkTurnedOffByAdmin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:lightbox.showingPhoto-TAP_PHOTO-showingPhotoAlone",
+    "b": "node:lightbox.showingPhotoAlone",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:lightbox.showingWhoHasThisPhoto-STEP-showingPhoto",
+    "b": "node:lightbox.showingWhoHasThisPhoto",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:onboarding.offeringAppLock-SKIP_APP_LOCK-choosingCreateOrJoin",
+    "b": "node:onboarding.choosingCreateOrJoin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:onboarding.offeringAppLock-TURN_ON_APP_LOCK-turningOnAppLock",
+    "b": "node:onboarding.choosingCreateOrJoin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:onboarding.savingName-SAVED-offeringAppLock",
+    "b": "node:onboarding.choosingCreateOrJoin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:onboarding.turningOnAppLock-APP_LOCK_FAILED-offeringAppLock",
+    "b": "node:onboarding.choosingCreateOrJoin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:onboarding.turningOnAppLock-APP_LOCK_FAILED-offeringAppLock",
+    "b": "node:onboarding.turningOnAppLock",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:onboarding.turningOnAppLock-APP_LOCK_LEFT_OFF-offeringAppLock",
+    "b": "node:onboarding.choosingCreateOrJoin",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.couldNotLetViewerAddPhotos-MAKE_VIEWER-makingViewer",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.couldNotMakeViewer-MAKE_VIEWER-makingViewer",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.couldNotMakeViewer-REMOVE_MEMBER-removingMember",
+    "b": "node:people.removingMember",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.couldNotRemoveMember-MAKE_VIEWER-makingViewer",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.couldNotTakeBackInvite-MAKE_VIEWER-makingViewer",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.makingViewer-MADE_VIEWER-showingPeople",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.makingViewer-MAKE_VIEWER_FAILED-couldNotMakeViewer",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.makingViewer-SHOW_QR-stay",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.removingMember-REMOVE_FAILED-couldNotRemoveMember",
+    "b": "node:people.couldNotRemoveMember",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:people.showingPeople-MAKE_VIEWER-makingViewer",
+    "b": "node:people.lettingViewerAddPhotos",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:reach.waitingBeforeWifiHint-DUE-showingWifiHint",
+    "b": "node:reach.tryingToReachMembers",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:reach.waitingBeforeWifiHint-REACHED-noWifiHint",
+    "b": "node:reach.noWifiHint",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:reach.waitingBeforeWifiHint-REACHED-noWifiHint",
+    "b": "node:reach.tryingToReachMembers",
+    "gap": 2
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:reach.waitingBeforeWifiHint-UNREACHABLE-stay",
+    "b": "node:reach.tryingToReachMembers",
+    "gap": 1
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:requests.couldNotSendAnswer-RESPOND-sendingAnswer",
+    "b": "node:requests.sendingAnswer",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:requests.requestsNotLoaded-REFRESH-loadingRequests",
+    "b": "node:requests.loadingRequests",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
+    "a": "path:sync.couldNotCheckAlbum-REFRESH-checkingAlbum",
+    "b": "node:sync.couldNotCheckAlbum",
+    "gap": 0
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.archivingAlbum-ALBUM_CHANGE_FAILED-couldNotChangeAlbum",
+    "b": "path:folders.couldNotOpenAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.archivingAlbum-ALBUMS_LOADED-showingAlbums",
+    "b": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.couldNotChangeAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "b": "path:folders.couldNotCreateAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "gap": 5
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.couldNotChangeAlbum-DISMISS_DELETED_NOTICE-dismissingDeletedNotice",
+    "b": "path:folders.couldNotCreateAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.couldNotCreateAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "b": "path:folders.deletingAlbum-ALBUM_CHANGE_FAILED-couldNotChangeAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.couldNotCreateAlbum-DELETE_ALBUM-deletingAlbum",
+    "b": "path:folders.couldNotSaveName-DELETE_ALBUM-deletingAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.couldNotOpenAlbum-ARCHIVE_ALBUM-archivingAlbum",
+    "b": "path:folders.openingAlbum-SWITCH_FAILED-couldNotOpenAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.couldNotSaveName-DELETE_ALBUM-deletingAlbum",
+    "b": "path:folders.couldNotSaveName-DISMISS_DELETED_NOTICE-dismissingDeletedNotice",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.couldNotSaveName-DISMISS_DELETED_NOTICE-dismissingDeletedNotice",
+    "b": "path:folders.dismissingDeletedNotice-ALBUMS_LOADED-showingAlbums",
+    "gap": 3
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.deletingAlbum-ALBUM_CHANGE_FAILED-couldNotChangeAlbum",
+    "b": "path:folders.dismissingDeletedNotice-ALBUMS_LOADED-showingAlbums",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.dismissingDeletedNotice-ALBUMS_LOADED-showingAlbums",
+    "b": "path:folders.savingName-NAME_SAVED-showingAlbums",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.dismissingDeletedNotice-ALBUMS_LOADED-showingAlbums",
+    "b": "path:folders.showingAlbums-SET_ACTIVE-openingAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:friendOffer.joiningFriendsAlbum-askAnswered-showingFriendOffers",
+    "b": "path:friendOffer.joiningFriendsAlbum-joinFailed-showingFriendOffers",
+    "gap": 8
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:friends.namingFriend-SAVE-namingFriend",
+    "b": "path:friends.namingFriend-TYPE-namingFriend",
+    "gap": 11.5
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:friends.showingMember-ADD-namingFriend",
+    "b": "path:friends.showingMember-RENAME-namingFriend",
+    "gap": 3
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:gallery.couldNotLoadPhotos-RETRY-loadingPhotos",
+    "b": "path:gallery.loadingPhotos-LOAD_FAILED-couldNotLoadPhotos",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:gallery.loadingPhotos-LOAD_FAILED-couldNotRemovePhoto",
+    "b": "path:gallery.removingPhoto-REMOVE_FAILED-couldNotRemovePhoto",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:gallery.loadingPhotos-LOAD_FAILED-couldNotRemovePhoto",
+    "b": "path:gallery.removingPhoto-REMOVED-loadingPhotos",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:inviteLink.linkMade-createLink-savingLinkTime",
+    "b": "path:inviteLink.turningOff-linkOffFailed-linkMade",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-checkingPastedLink",
+    "b": "path:join.checkingPastedLink-reopenRequest-albumDeletedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-joinedAlbum",
+    "b": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.albumDeletedByAdmin-openLink-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-albumDeletedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-openLink-waitingForYouToUpdate",
+    "b": "path:join.albumDeletedByAdmin-reopenRequest-waitingForAdminToAccept",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.checkingLink-reopenRequest-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.albumDeletedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.decidingToAsk-reopenRequest-waitingForAdminToAccept",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.linkExpired-reopenRequest-waitingForAdminToAccept",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.albumDeletedByAdmin-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-linkChecked-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-checkingPastedLink",
+    "b": "path:join.checkingLink-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-joinedAlbum",
+    "b": "path:join.checkingPastedLink-openLink-checkingLink",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-joinedAlbum",
+    "b": "path:join.joinedAlbum-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-joinedAlbum",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-joinedAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkExpired",
+    "b": "path:join.joinedAlbum-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkExpired",
+    "b": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkExpired",
+    "b": "path:join.joinedAlbum-requestAnswered-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkExpired",
+    "b": "path:join.linkReplacedByAdmin-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkReplacedByAdmin",
+    "b": "path:join.checkingLink-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.checkingLink-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.sendingRequest-requestSent-waitingForAdminToAccept",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingLink-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-albumDeletedByAdmin",
+    "b": "path:join.checkingPastedLink-reopenRequest-albumDeletedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-decidingToAsk",
+    "b": "path:join.joinedAlbum-openLink-decidingToAsk",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.decidingToAsk-openLink-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-albumDeletedByAdmin",
+    "b": "path:join.showingWelcome-openLink-holdingInviteUntilWelcomeEnds",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-decidingToAsk",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.checkingPastedLink-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-askToJoin-sendingRequest",
+    "b": "path:join.decidingToAsk-openLink-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-askToJoin-sendingRequest",
+    "b": "path:join.decidingToAsk-reopenRequest-linkExpired",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-askToJoin-sendingRequest",
+    "b": "path:join.linkExpired-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-askToJoin-sendingRequest",
+    "b": "path:join.linkExpired-reopenRequest-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-openLink-checkingPastedLink",
+    "b": "path:join.joinedAlbum-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-openLink-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingPastedLink",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-openLink-waitingForYouToUpdate",
+    "b": "path:join.decidingToAsk-reopenRequest-waitingForYouToUpdate",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-declinedByAdmin",
+    "b": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.declinedByAdmin-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-decidingToAsk",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.declinedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.sendingRequest-requestSent-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-openLink-decidingToAsk",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.noInviteOpen-openLink-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.sendingRequest-requestSent-waitingForAdminToAccept",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.waitingForAdminToAccept-openLink-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.decidingToAsk-requestAnswered-joinedAlbum",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-askAgain-sendingRequestAgain",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-askAgain-sendingRequestAgain",
+    "b": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-askAgain-sendingRequestAgain",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-askAgain-sendingRequestAgain",
+    "b": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-askAgain-sendingRequestAgain",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-dismissDecline-noInviteOpen",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-albumDeletedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-checkingLink",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-checkingPastedLink",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-decidingToAsk",
+    "b": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-decidingToAsk",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-joinedAlbum",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-linkExpired",
+    "b": "path:join.declinedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-linkExpired",
+    "b": "path:join.showingLinkProblem-requestAnswered-declinedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.declinedByAdmin-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-showingLinkProblem",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-openLink-waitingForAdminToAccept",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.declinedByAdmin-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.declinedByAdmin-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkReplacedByAdmin",
+    "b": "path:join.linkReplacedByAdmin-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkReplacedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-declinedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.holdingInviteUntilWelcomeEnds-welcomeEnded-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-askWithPastedLink-showingLinkProblem",
+    "b": "path:join.joinedAlbum-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-askWithPastedLink-showingLinkProblem",
+    "b": "path:join.joinedAlbum-requestAnswered-linkReplacedByAdmin",
+    "gap": 3.5
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-askWithPastedLink-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-openLink-joinedAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-checkingLink",
+    "b": "path:join.linkReplacedByAdmin-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-decidingToAsk",
+    "b": "path:join.linkExpired-openLink-checkingLink",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-linkReplacedByAdmin",
+    "b": "path:join.joinedAlbum-requestAnswered-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkReplacedByAdmin-openLink-joinedAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "b": "path:join.joinedAlbum-requestAnswered-albumDeletedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkExpired-openLink-checkingLink",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkExpired-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.joinedAlbum-requestAnswered-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-openLink-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-requestAnswered-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-requestAnswered-linkExpired",
+    "b": "path:join.waitingForYouToUpdate-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-requestAnswered-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-openLink-checkingLink",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-requestAnswered-linkStoppedForUnknownReason",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-requestAnswered-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-requestAnswered-linkTurnedOffByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.joinedAlbum-requestAnswered-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-dismissExpired-noInviteOpen",
+    "b": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-openLink-checkingLink",
+    "b": "path:join.linkReplacedByAdmin-openLink-joinedAlbum",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-openLink-decidingToAsk",
+    "b": "path:join.noInviteOpen-openLink-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-openLink-decidingToAsk",
+    "b": "path:join.waitingForAdminToAccept-openLink-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-openLink-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkExpired-openLink-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-linkExpired",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-albumDeletedByAdmin",
+    "b": "path:join.waitingForAdminToAccept-openLink-linkExpired",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkReplacedByAdmin-openLink-albumDeletedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkReplacedByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkReplacedByAdmin-openLink-checkingPastedLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkReplacedByAdmin-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-albumDeletedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-checkingPastedLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-closeStoppedLink-noInviteOpen",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-showingLinkProblem",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-openLink-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-openLink-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-requestAnswered-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.showingLinkProblem-openLink-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.showingLinkProblem-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.showingLinkProblem-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.showingLinkProblem-requestAnswered-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.showingLinkProblem-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.waitingForAdminToAccept-openLink-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkExpired-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkReplacedByAdmin-openLink-albumDeletedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkReplacedByAdmin-openLink-checkingLink",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkReplacedByAdmin-openLink-checkingPastedLink",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkReplacedByAdmin-openLink-declinedByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkReplacedByAdmin-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-reopenRequest-declinedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkReplacedByAdmin-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.linkReplacedByAdmin-requestAnswered-linkReplacedByAdmin",
+    "gap": 5
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkReplacedByAdmin-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.sendingRequest-requestSent-waitingForAdminToAccept",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-albumDeletedByAdmin",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-checkingLink",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-checkingPastedLink",
+    "b": "path:join.linkStoppedForUnknownReason-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-checkingPastedLink",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-decidingToAsk",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-decidingToAsk",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-joinedAlbum",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-linkReplacedByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-reopenRequest-declinedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-linkReplacedByAdmin",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-openLink-showingLinkProblem",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-declinedByAdmin",
+    "b": "path:join.linkStoppedForUnknownReason-reopenRequest-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkExpired",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkExpired",
+    "b": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkExpired",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkExpired",
+    "b": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkExpired",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.showingLinkProblem-openLink-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkStoppedForUnknownReason-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-closeStoppedLink-noInviteOpen",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-closeStoppedLink-noInviteOpen",
+    "b": "path:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-checkingPastedLink",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-showingLinkProblem",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "path:join.noInviteOpen-openLink-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "path:join.noInviteOpen-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "path:join.showingLinkProblem-reopenRequest-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-checkingLink",
+    "b": "path:join.showingLinkProblem-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-waitingForAdminToAccept",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "b": "path:join.linkTurnedOffByAdmin-reopenRequest-linkExpired",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "b": "path:join.linkTurnedOffByAdmin-reopenRequest-waitingForAdminToAccept",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-openLink-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-openLink-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-reopenRequest-linkExpired",
+    "b": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-reopenRequest-linkExpired",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-reopenRequest-linkExpired",
+    "b": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-reopenRequest-linkExpired",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.linkTurnedOffByAdmin-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-askWithPastedLink-checkingPastedLink",
+    "b": "path:join.noInviteOpen-welcomeStarted-showingWelcome",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-askWithPastedLink-checkingPastedLink",
+    "b": "path:join.showingWelcome-welcomeEnded-noInviteOpen",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-openLink-linkExpired",
+    "b": "path:join.noInviteOpen-openLink-showingLinkProblem",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-openLink-linkExpired",
+    "b": "path:join.noInviteOpen-reopenRequest-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-openLink-linkExpired",
+    "b": "path:join.showingLinkProblem-linkEdited-noInviteOpen",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-openLink-linkExpired",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.noInviteOpen-requestAnswered-linkExpired",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.showingLinkProblem-requestAnswered-linkReplacedByAdmin",
+    "gap": 4
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-reopenRequest-waitingForYouToUpdate",
+    "b": "path:join.showingLinkProblem-askWithPastedLink-waitingForYouToUpdate",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "b": "path:join.waitingForAdminToAccept-openLink-linkTurnedOffByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.noInviteOpen-requestAnswered-linkTurnedOffByAdmin",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 2
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.sendingRequest-requestSent-waitingForAdminToAccept",
+    "b": "path:join.sendingRequest-requestSent-waitingForYouToUpdate",
+    "gap": 8
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.sendingRequest-requestSent-waitingForAdminToAccept",
+    "b": "path:join.sendingRequestAgain-requestSent-waitingForAdminToAccept",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.sendingRequest-requestSent-waitingForAdminToAccept",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-askWithPastedLink-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-openLink-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-askWithPastedLink-waitingForYouToUpdate",
+    "b": "path:join.showingLinkProblem-openLink-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-askWithPastedLink-waitingForYouToUpdate",
+    "b": "path:join.showingLinkProblem-requestAnswered-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-askWithPastedLink-waitingForYouToUpdate",
+    "b": "path:join.waitingForAdminToAccept-openLink-waitingForYouToUpdate",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-askWithPastedLink-waitingForYouToUpdate",
+    "b": "path:join.waitingForYouToUpdate-whoMustUpdateChanged-waitingForAdminToAccept",
+    "gap": 2
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-openLink-joinedAlbum",
+    "b": "path:join.showingLinkProblem-reopenRequest-waitingForAdminToAccept",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-openLink-linkStoppedForUnknownReason",
+    "b": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-reopenRequest-linkExpired",
+    "b": "path:join.waitingForAdminToAccept-openLink-linkExpired",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-openLink-showingLinkProblem",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.showingLinkProblem-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.waitingForYouToUpdate-whoMustUpdateChanged-waitingForAdminToAccept",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-openLink-linkExpired",
+    "b": "path:join.waitingForAdminToAccept-openLink-showingLinkProblem",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-openLink-linkExpired",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-openLink-linkReplacedByAdmin",
+    "b": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-openLink-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-waitingForAdminToAccept",
+    "gap": 7
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-reopenRequest-linkReplacedByAdmin",
+    "b": "path:join.waitingForYouToUpdate-reopenRequest-linkReplacedByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-reopenRequest-linkStoppedForUnknownReason",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-joinedAlbum",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-reopenRequest-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-requestAnswered-waitingForAdminToAccept",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForAdminToAccept-requestAnswered-waitingForAdminToAccept",
+    "b": "path:join.waitingForAdminToAccept-whoMustUpdateChanged-waitingForAdminToAccept",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForYouToUpdate-openLink-linkTurnedOffByAdmin",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:join.waitingForYouToUpdate-reopenRequest-linkTurnedOffByAdmin",
+    "b": "path:join.waitingForYouToUpdate-requestAnswered-linkTurnedOffByAdmin",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:lightbox.showingPhoto-STEP-showingPhotoAlone",
+    "b": "path:lightbox.showingPhoto-TAP_PHOTO-showingPhotoAlone",
+    "gap": 1
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:lightbox.showingWhoHasThisPhoto-OPEN-showingPhoto",
+    "b": "path:lightbox.showingWhoHasThisPhoto-STEP-showingPhoto",
+    "gap": 4
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.couldNotLoadRequests-DECLINE_SENT-stay",
+    "b": "path:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.couldNotLoadRequests-HOLD_DECLINE-stay",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.couldNotLoadRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.couldNotLoadRequests-UNDO_DECLINE-stay",
+    "gap": 7
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.sendingAnswersToAll-DECLINE_SENT-stay",
+    "b": "path:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "b": "path:requests.sendingAnswersToAll-HOLD_DECLINE-stay",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.sendingAnswersToAll-FORGET_ACCEPTED-stay",
+    "b": "path:requests.sendingAnswersToAll-REQUEST_WAS_CANCELLED-sendingAnswersToAll",
+    "gap": 7
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.showingRequests-DECLINE_SENT-stay",
+    "b": "path:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.showingRequests-HOLD_DECLINE-stay",
+    "gap": 9
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:requests.showingRequests-FORGET_ACCEPTED-stay",
+    "b": "path:requests.showingRequests-UNDO_DECLINE-stay",
+    "gap": 7
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:addFriend.showingWhoWasAsked",
+    "b": "region:addFriend",
+    "gap": -189
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:addFriend.showingWhoWasAsked",
+    "b": "region:appLock",
+    "gap": -112
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:folders.showingAlbums",
+    "b": "region:folders",
+    "gap": -6258.5
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:folders.showingAlbums",
+    "b": "region:friendOffer",
+    "gap": -167
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:folders.showingAlbums",
+    "b": "title:friendOffer",
+    "gap": -45
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:inviteLink.savingLinkTime",
+    "b": "region:inviteLink",
+    "gap": -19.5
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:requests.showingRequests",
+    "b": "region:requests",
+    "gap": -7378.5
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:requests.showingRequests",
+    "b": "region:seen",
+    "gap": -117
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:sync.waitingForAdminApproval",
+    "b": "region:appLock",
+    "gap": -62
+  },
+  {
+    "rule": "region-edge",
+    "a": "node:sync.waitingForAdminApproval",
+    "b": "region:sync",
+    "gap": -6284.5
+  }
+]
