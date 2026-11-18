@@ -109,9 +109,9 @@ function shapeOf(doc: Document, item: Item): SVGElement[] {
     ]),
     svg(doc, "rect", {
       class: "marker-hit",
-      x: -HIT_PAD,
+      x: -GAP / 2,
       y: -PILL_H / 2 - HIT_PAD,
-      width: item.width + 2 * HIT_PAD,
+      width: item.width + GAP,
       height: PILL_H + 2 * HIT_PAD,
     }),
   ];

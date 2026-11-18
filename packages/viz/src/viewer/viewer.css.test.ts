@@ -132,3 +132,15 @@ test("a focused arrow or state scrolls clear of the pinned panel", () => {
     /scroll-margin-bottom:\s*calc\(60vh \+ \d+px\)/,
   );
 });
+
+test("a chip's hit rect is transparent, takes the pointer, and no chip paint rule reaches it", () => {
+  const hit = listed(".viz .child-marker .marker-hit");
+  expect(hit).toMatch(/fill:\s*transparent/);
+  expect(hit).toMatch(/stroke:\s*none/);
+  expect(hit).toMatch(/pointer-events:\s*all/);
+  const paints = bare
+    .split("}")
+    .map((block) => block.split("{")[0].trim())
+    .filter((selector) => selector.includes("child-marker") && /\brect\b/.test(selector));
+  for (const selector of paints) expect(selector).toContain("rect:not(.marker-hit)");
+});
