@@ -91,7 +91,11 @@ After any edit to a machine, run every test file that imports its file before yo
 - `"<title>" broke at step <n>: <why>. Fixed: <machine change>.`
 - `"<title>" changes with the ask: <what it does now>. <link>`
 
-None: `Walks: all pass unchanged.` `<link>` is the walk's full published `run=` URL (designing.md section 3), never a bare `?machine=…`.
+For example:
+
+- `"A dish cooked while the waiter is on a break is lost" fails until you decide: remove the break? https://anderscan.github.io/mantaq/guides/design-gate/?machine=cook&run=A%20dish%20cooked%20while%20the%20waiter%20is%20on%20a%20break%20is%20lost`
+
+None: `Walks: all pass unchanged.` Every line except "broke … Fixed" ends with `<link>`; a line without one is wrong. When you stop to ask the person, build the link from the walk's title before you reply. `<link>` is the walk's full published `run=` URL (designing.md section 3), never a bare `?machine=…`.
 
 ## Live design
 
