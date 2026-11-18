@@ -554,16 +554,16 @@ describe("mountViewer with a driver", () => {
   test("a stay outcome keeps the cursor", () => {
     const root = mountLive();
     send(root, "peek");
-    expect(root.querySelector('[data-outcome="stay"]')?.textContent).toContain("stays");
+    expect(root.querySelector('[data-outcome="stay"]')?.textContent).toContain("stayed in open");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 
   test("a handler error is shown", () => {
     const root = mountLive();
     send(root, "boom");
-    expect(root.querySelector("[data-live-error]")?.textContent).toBe(
+    expect([...root.querySelectorAll("[data-live-error]")].map((p) => p.textContent)).toEqual([
       "Handler threw: handler failed",
-    );
+    ]);
   });
 
   test("back and reset replay the log through the driver", () => {
@@ -606,6 +606,33 @@ describe("mountViewer with a driver", () => {
     send(root, "peek");
     expect(root.querySelector("[data-live-error]")?.textContent).toBe("Handler threw: driver down");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
+  });
+
+  test("a driver that throws after a step keeps that step's head and says the error once", () => {
+    const root = document.createElement("div");
+    const inner = fakeDriver();
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEvents] },
+      {
+        driver: {
+          reset: () => inner.reset(),
+          step: (step) => {
+            if (step.kind === "event" && step.event === "boom") throw new Error("driver down");
+            return inner.step(step);
+          },
+        },
+      },
+    );
+    send(root, "peek");
+    send(root, "boom");
+    expect(root.querySelectorAll("[data-step]")).toHaveLength(1);
+    expect(root.querySelector('[data-step="1"] [data-live-outcome]')?.textContent).toBe(
+      "Step 1 of 1: peek: stayed in open",
+    );
+    expect([...root.querySelectorAll("[data-live-error]")].map((line) => line.textContent)).toEqual(
+      ["Handler threw: driver down"],
+    );
   });
 
   test("a link with a step the driver throws on still mounts", () => {

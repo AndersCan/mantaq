@@ -229,6 +229,106 @@ describe("live controls", () => {
     expect(timer?.textContent).toBe("advance 800 ms → paymentTimeout");
     click(root, "[data-advance-timer]");
     expect(current(root)).toBe("error");
+    expect(root.querySelector("[data-step='2'] [data-live-outcome]")?.textContent).toBe(
+      "Step 2 of 2: time passed 800 ms",
+    );
+  });
+
+  test("an advance that fires nothing keeps its own row and later steps keep theirs", () => {
+    // The real driver reports `last: null` for an advance no timer answered.
+    const inner = driver();
+    const quiet = (live: VizLiveState): VizLiveState => {
+      const step = live.steps.at(-1);
+      if (step?.kind === "advance" && live.state === "paying")
+        return { ...live, last: null, after: [] };
+      if (step?.kind === "event" && step.event === "paymentTimeout")
+        return {
+          ...live,
+          last: {
+            from: "paying",
+            event: "paymentTimeout",
+            to: "error",
+            outcome: "transition",
+            effects: [],
+            sent: [],
+            context: null,
+            error: null,
+          },
+        };
+      return live;
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      {
+        driver: { ...inner, reset: () => quiet(inner.reset()), step: (s) => quiet(inner.step(s)) },
+        steps: ['submit={"amount":5}', "@300", "paymentTimeout"],
+      },
+    );
+    expect(
+      [...root.querySelectorAll("[data-step] [data-live-outcome]")].map((p) => p.textContent),
+    ).toEqual([
+      "Step 1 of 3: submit: idle → paying",
+      "Step 2 of 3: time passed 300 ms",
+      "Step 3 of 3: paymentTimeout: paying → error",
+    ]);
+    expect(root.querySelector('[data-step="2"]')?.textContent).not.toContain("paymentTimeout");
+  });
+
+  test("a timer clicked on the board that fires nothing keeps its own row and the next step keeps its own", () => {
+    // The real driver reports `last: null` for an advance no timer answered.
+    const steps: VizStep[] = [];
+    const view = (last: VizLiveStep | null): VizLiveState => ({
+      state: "idle",
+      steps: [...steps],
+      last,
+      after: [],
+      timers: [{ id: "t1", ms: 100, deadline: 100, eventName: "paymentTimeout" }],
+      context: null,
+      payload: null,
+      regions: {},
+      children: [],
+      effectMode: "real",
+      waiting: [],
+    });
+    const quiet: VizDriver = {
+      reset: () => {
+        steps.length = 0;
+        return view(null);
+      },
+      step: (step) => {
+        steps.push(step);
+        if (step.kind === "advance") return view(null);
+        return view({
+          from: "idle",
+          event: "submit",
+          to: "idle",
+          outcome: "stay",
+          effects: [],
+          sent: [],
+          context: null,
+          error: null,
+        });
+      },
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      { driver: quiet },
+    );
+    sendSubmit(root);
+    click(root, "[data-advance-timer]");
+    sendSubmit(root);
+    expect(
+      [...root.querySelectorAll("[data-step] [data-live-outcome]")].map((p) => p.textContent),
+    ).toEqual([
+      "Step 1 of 3: submit: stayed in idle",
+      "Step 2 of 3: time passed 100 ms",
+      "Step 3 of 3: submit: stayed in idle",
+    ]);
+    expect(root.querySelector('[data-step="2"] [data-live-after]')).toBeNull();
   });
 
   test("the timer label counts down the time already advanced", () => {
@@ -1032,7 +1132,7 @@ describe("what ran", () => {
     return { live, push: (state: VizLiveState) => onChange(state) };
   }
 
-  test("Sent out names each output, with where the app takes it when the page knows", () => {
+  test("a root output shows once, with where the app takes it when the page knows", () => {
     const routes: VizOutputRoutes = {
       [branching.id]: { openAlbum: [{ to: "router", event: "NAVIGATED", at: "a.ts:72" }] },
     };
@@ -1041,23 +1141,37 @@ describe("what ran", () => {
     };
     const routed = mountWith(branching, stepped({ sent: ["openAlbum"] }).live, routes);
     send(routed);
-    expect(text(routed, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED");
+    expect(text(routed, "sent")).toBe("checkout sent openAlbum out: router takes NAVIGATED");
 
     const bare = mountWith(branching, stepped({ sent: ["openAlbum"] }).live);
     send(bare);
-    expect(text(bare, "sent")).toBe("Sent out: openAlbum");
-
-    const several = mountWith(
-      branching,
-      stepped({ sent: ["openAlbum", "ANSWER_SENT"] }).live,
-      routes,
-    );
-    send(several);
-    expect(text(several, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED; ANSWER_SENT");
+    expect(text(bare, "sent")).toBe("checkout sent openAlbum out");
 
     const quiet = mountWith(branching, stepped({}).live, routes);
     send(quiet);
     expect(quiet.querySelector("[data-live-sent]")).toBeNull();
+  });
+
+  test("an output a message row already carries is not listed again", () => {
+    const routes: VizOutputRoutes = {
+      [branching.id]: { openAlbum: [{ to: "router", event: "NAVIGATED", at: "a.ts:72" }] },
+    };
+    const taken: VizLiveStep = {
+      from: "idle",
+      event: "NAVIGATED",
+      to: "paying",
+      outcome: "transition",
+      actor: { region: "router" },
+      effects: [],
+      sent: [],
+      context: { amount: 9 },
+      error: null,
+      message: { sender: "", dropped: null },
+    };
+    const root = mountWith(branching, stepped({ sent: ["openAlbum"] }, [taken]).live, routes);
+    sendVia(root, "submit");
+    expect(root.querySelector("[data-live-sent]")).toBeNull();
+    expect(text(root, "after")).toBe("1. checkout sent NAVIGATED to router: idle → paying");
   });
 
   test("an async result renders without another click", () => {
@@ -1099,14 +1213,113 @@ describe("what ran", () => {
       waiting: [],
     });
     const after = root.querySelector("[data-live-after]");
-    expect(after?.textContent).toContain("Then checkout took paymentTimeout");
-    expect(after?.textContent).toContain("paymentTimeout: paying → error");
+    expect(after?.textContent).toBe("checkout took paymentTimeout on its own: paying → error");
+    expect(after?.hasAttribute("data-message")).toBe(false);
+  });
+
+  test("a message with no sender reads `took`, without `on its own`", () => {
+    const root = mountWith(
+      branching,
+      stepped({}, [
+        {
+          from: "idle",
+          event: "NAVIGATED",
+          to: "paying",
+          outcome: "transition",
+          effects: [],
+          sent: [],
+          context: { amount: 9 },
+          error: null,
+          message: { sender: null, dropped: null },
+        },
+      ]).live,
+    );
+    sendVia(root, "submit");
+    expect(text(root, "after")).toBe("1. checkout took NAVIGATED: idle → paying");
+  });
+
+  test("an advance's own message is numbered once and draws its output once", () => {
+    const inner = driver();
+    const message: VizLiveStep = {
+      from: "paying",
+      event: "paymentTimeout",
+      to: "error",
+      outcome: "transition",
+      effects: [],
+      sent: ["openAlbum"],
+      context: null,
+      error: null,
+      message: { sender: "", dropped: null },
+    };
+    const timed = (live: VizLiveState): VizLiveState => {
+      const step = live.steps.at(-1);
+      if (step?.kind === "advance") return { ...live, last: message, after: [] };
+      return live;
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      {
+        driver: { ...inner, reset: () => timed(inner.reset()), step: (s) => timed(inner.step(s)) },
+        steps: ['submit={"amount":5}', "@800", 'submit={"amount":5}'],
+      },
+    );
+    const second = root.querySelector('[data-step="2"]');
+    expect(second?.querySelectorAll("[data-live-sent]")).toHaveLength(1);
+    expect(second?.querySelector("[data-message]")?.getAttribute("data-message")).toBe("1");
+  });
+
+  test("an output named like a row that carries no message is still shown", () => {
+    const inner = driver();
+    const own: VizLiveStep = {
+      from: "paying",
+      event: "paymentTimeout",
+      to: "error",
+      outcome: "transition",
+      effects: [],
+      sent: ["paymentTimeout"],
+      context: null,
+      error: null,
+    };
+    const timed = (live: VizLiveState): VizLiveState => {
+      const step = live.steps.at(-1);
+      if (step?.kind === "advance") return { ...live, last: own, after: [] };
+      return live;
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      {
+        driver: { ...inner, reset: () => timed(inner.reset()), step: (s) => timed(inner.step(s)) },
+        steps: ['submit={"amount":5}', "@800"],
+      },
+    );
+    const second = root.querySelector('[data-step="2"]');
+    expect(second?.querySelector("[data-message]")).toBeNull();
+    expect(
+      [...(second?.querySelectorAll("[data-live-sent]") ?? [])].map((p) => p.textContent),
+    ).toEqual(["checkout sent paymentTimeout out"]);
+  });
+
+  test("Details after a send to a part that is not there says nothing ran", () => {
+    const root = mountWith(
+      branching,
+      stepped({ outcome: "missing", actor: { region: "ghost" } }).live,
+    );
+    clickEdge(root, "idle-submit-paying");
+    root.querySelector<HTMLButtonElement>("[data-send-edge]")?.click();
+    expect(root.querySelector("[data-details-sent]")?.textContent).toBe(
+      'Sent submit with {"amount":5}: No region ghost in this machine. Nothing ran.',
+    );
   });
 
   test("an ignored event says nothing ran", () => {
     const root = mountWith(branching, stepped({ to: "idle", outcome: "ignored" }).live);
     sendVia(root, "submit");
-    expect(text(root, "outcome")).toBe("No handler for submit in idle. Nothing ran.");
+    expect(text(root, "outcome")).toBe("! Step 1 of 1: submit: lost, nobody took it in idle");
+    expect(root.querySelector("[data-live-outcome][data-live-dropped]")).not.toBeNull();
   });
 });
 
@@ -1313,7 +1526,7 @@ describe("live effect reports", () => {
 
     test("a held step that started no effect has no Not run here line", () => {
       const root = mountHeld(fetcher, withEffects([]));
-      expect(line(root, "outcome")).toBe("start: waiting → fetching");
+      expect(line(root, "outcome")).toBe("Step 1 of 1: start: waiting → fetching");
       expect(root.querySelector("[data-live-not-run]")).toBeNull();
     });
 

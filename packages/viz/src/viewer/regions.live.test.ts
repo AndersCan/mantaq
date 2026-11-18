@@ -168,7 +168,7 @@ describe("live regions", () => {
     const { root } = mount();
     sendVia(root, "photoPicked");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
-      "photoPicked: upload: waitingForPhoto → sendingPhoto",
+      "Step 1 of 1: photoPicked to upload: waitingForPhoto → sendingPhoto",
     );
   });
 
@@ -176,7 +176,7 @@ describe("live regions", () => {
     const text = "nope>photoPicked";
     const live = mountWithSteps([text]);
     expect(live.querySelector("[data-live-outcome]")?.textContent).toBe(
-      "No region nope in this machine. Nothing ran.",
+      "Step 1 of 1: No region nope in this machine. Nothing ran.",
     );
   });
 

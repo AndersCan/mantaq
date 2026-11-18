@@ -24,6 +24,7 @@ export interface ExploreContext {
     state: VizLiveState;
     /** Entry i is what moved after `state.steps[i]`, as the driver reported it then. */
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
+    lasts: ReadonlyArray<VizLiveStep | null>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
@@ -66,11 +67,6 @@ export function button(
 }
 
 type ChildRef = { map: string; key: string };
-
-/** The key, with the map name only when the machine has more than one map. */
-function childWho(doc: Document, machine: VizMachine, ref: ChildRef): Array<Node | string> {
-  return [code(doc, childWhoText(machine, ref))];
-}
 
 export function childWhoText(machine: VizMachine, ref: ChildRef): string {
   return machine.maps.length > 1 ? `${ref.map} ${ref.key}` : ref.key;
@@ -227,47 +223,58 @@ export function outcomeText(
       ? ["No region ", code(doc, region ?? ""), " in this machine. Nothing ran."]
       : [code(doc, child.key), " is not in ", code(doc, child.map), ". Nothing ran."];
   }
-  if (step.outcome === "ignored") {
-    return ["No handler for ", code(doc, step.event), ` in ${step.from}. Nothing ran.`];
-  }
   const names = (id: string) => (region === undefined ? id : localName(id));
-  const where =
-    child !== undefined
-      ? [": ", ...childWho(doc, machine, child), " "]
-      : region === undefined
-        ? [": "]
-        : [": ", code(doc, region), ": "];
-  return [
-    code(doc, step.event),
-    ...where,
-    step.outcome === "transition"
-      ? `${names(step.from)} → ${names(step.to)}`
-      : `handled in ${names(step.from)}, stays`,
-  ];
+  const to = step.actor === undefined ? "" : ` to ${partName(machine, step.actor)}`;
+  return [code(doc, step.event), `${to}: `, tailText(step, names)];
 }
 
-function sentLine(
+function tailText(step: VizLiveStep, names: (id: string) => string): string {
+  if (step.outcome === "transition") return `${names(step.from)} → ${names(step.to)}`;
+  if (step.outcome === "stay") return `stayed in ${names(step.from)}`;
+  return `lost, nobody took it in ${names(step.from)}`;
+}
+
+/** What a moved part is called in a sentence: the machine, a region path, or a map child. */
+function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
+  if (actor === undefined) return machine.id;
+  return "region" in actor ? actor.region : childWhoText(machine, actor);
+}
+
+function errorLine(doc: Document, step: VizLiveStep): HTMLElement | null {
+  if (step.error === null) return null;
+  return html(doc, "p", { class: "explore-warning", role: "alert", "data-live-error": "" }, [
+    `Handler threw: ${step.error}`,
+  ]);
+}
+
+function outputRows(
   doc: Document,
-  context: { machine: VizMachine; step: VizLiveStep; routes: VizOutputRoutes | undefined },
-): HTMLElement | null {
-  const { machine, step, routes } = context;
-  if (step.sent.length === 0) return null;
-  return html(doc, "p", { "data-live-sent": "" }, [
-    "Sent out: ",
-    ...step.sent.flatMap((output, index) => {
-      const found = routes?.[machine.id]?.[output] ?? [];
-      return [
-        index === 0 ? "" : "; ",
+  context: {
+    machine: VizMachine;
+    step: VizLiveStep;
+    taken: ReadonlySet<string>;
+    routes: VizOutputRoutes | undefined;
+  },
+): HTMLElement[] {
+  const { machine, step, taken, routes } = context;
+  return step.sent.flatMap((output) => {
+    const routed = routes?.[machine.id]?.[output] ?? [];
+    const found = routed.filter((route) => !taken.has(route.event));
+    if (found.length === 0 && (routed.length > 0 || taken.has(output))) return [];
+    return [
+      html(doc, "p", { "data-live-sent": "" }, [
+        `${partName(machine, step.actor)} sent `,
         code(doc, output),
+        " out",
         ...found.flatMap((route, at) => [
-          at === 0 ? " → " : ", ",
+          at === 0 ? ": " : ", ",
           code(doc, route.to),
           " takes ",
           code(doc, route.event),
         ]),
-      ];
-    }),
-  ]);
+      ]),
+    ];
+  });
 }
 
 function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLiveStep }) {
@@ -292,124 +299,114 @@ function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLive
   ]);
 }
 
-function stepLines(
+/** "kitchen sent " when a part is known to have sent it; "" is the machine itself. */
+function sentBy(machine: VizMachine, step: VizLiveStep): string {
+  const sender = step.message?.sender ?? null;
+  return sender === null ? "" : `${sender === "" ? machine.id : sender} sent `;
+}
+
+function afterLine(
+  doc: Document,
+  context: { machine: VizMachine; step: VizLiveStep; number: number | null },
+): HTMLElement {
+  const { machine, step, number } = context;
+  const lost = step.message !== undefined && step.message.dropped !== null;
+  const receiver = partName(machine, step.actor);
+  const tail = tailText(step, localName);
+  const lead = number === null ? "" : `${lost ? "! " : ""}${number}. `;
+  const on = number === null ? " on its own" : "";
+  const from = sentBy(machine, step);
+  const body =
+    from !== "" || lost
+      ? [from, code(doc, step.event), ` to ${receiver}: ${tail}`]
+      : [`${receiver} took `, code(doc, step.event), `${on}: ${tail}`];
+  return html(
+    doc,
+    "p",
+    {
+      "data-live-after": "",
+      "data-message": number === null ? null : String(number),
+      "data-live-dropped": lost ? "" : null,
+    },
+    [lead, ...body],
+  );
+}
+
+function stepItem(
   doc: Document,
   context: {
     machine: VizMachine;
-    step: VizLiveStep;
+    index: number;
+    total: number;
+    step: VizStep;
+    own: VizLiveStep | null;
+    rows: ReadonlyArray<{ entry: VizLiveStep; number: number | null }>;
     held: boolean;
     routes: VizOutputRoutes | undefined;
   },
-): Array<HTMLElement | null> {
-  const { machine, step } = context;
-  return [
-    html(doc, "p", { "data-live-outcome": "" }, outcomeText(doc, machine, step)),
-    sentLine(doc, { machine, step, routes: context.routes }),
-    step.effects.length > 0 && context.held ? notRunLine(doc, { machine, step }) : null,
+): HTMLElement {
+  const { machine, step, own, rows, routes } = context;
+  const newest = context.index === context.total - 1;
+  const taken = new Set(
+    rows.filter(({ number }) => number !== null).map(({ entry }) => entry.event),
+  );
+  const notRun = newest && context.held;
+  const extras = (entry: VizLiveStep) => [
+    errorLine(doc, entry),
+    ...outputRows(doc, { machine, step: entry, taken, routes }),
+    notRun && entry.effects.length > 0 ? notRunLine(doc, { machine, step: entry }) : null,
   ];
+  const ignored = own?.outcome === "ignored";
+  const head = step.kind === "advance" ? null : own;
+  return html(
+    doc,
+    "li",
+    {
+      "data-step": String(context.index + 1),
+      class: newest ? "explore-outcome" : null,
+      "data-outcome": newest && own !== null ? own.outcome : null,
+    },
+    [
+      html(doc, "p", { "data-live-outcome": "", "data-live-dropped": ignored ? "" : null }, [
+        `${ignored ? "! " : ""}Step ${context.index + 1} of ${context.total}: `,
+        ...(head === null
+          ? [`time passed ${step.kind === "advance" ? step.ms : 0} ms`]
+          : outcomeText(doc, machine, head)),
+      ]),
+      ...(head === null ? [] : extras(head)),
+      ...rows.flatMap(({ entry, number }) => [
+        afterLine(doc, { machine, step: entry, number }),
+        ...extras(entry),
+      ]),
+    ],
+  );
 }
 
-function liveResultSection(
+function runList(
   doc: Document,
-  live: {
-    machine: VizMachine;
-    state: VizLiveState;
-    routes: VizOutputRoutes | undefined;
-  },
+  machine: VizMachine,
+  live: NonNullable<ExploreContext["live"]>,
 ): HTMLElement {
-  const { machine, state, routes } = live;
-  const { last, after } = state;
+  const { state, routes, lasts } = live;
+  const total = state.steps.length;
   const held = state.effectMode === "held";
+  let messages = 1;
+  const items = state.steps.map((step, index) => {
+    const own = lasts[index] ?? null;
+    const after = index === total - 1 ? state.after : (live.afters?.[index] ?? []);
+    // An advance's own entry is the first move its timer caused: it reads as a row.
+    const entries = step.kind === "advance" && own !== null ? [own, ...after] : after;
+    const rows = entries.map((entry) => ({ entry, number: entry.message ? messages++ : null }));
+    return stepItem(doc, { machine, index, total, step, own, rows, held, routes });
+  });
+  // A driver that threw reports an entry that no step of the walk owns.
   return html(doc, "div", { class: "explore-live" }, [
-    last === null
-      ? null
-      : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
-          ...stepLines(doc, { machine, step: last, held, routes }),
-          last.error === null
-            ? null
-            : html(
-                doc,
-                "p",
-                {
-                  class: "explore-warning",
-                  role: "alert",
-                  "data-live-error": "",
-                },
-                [`Handler threw: ${last.error}`],
-              ),
-          ...after.map((step) =>
-            html(doc, "div", { "data-live-after": "" }, [
-              afterLine(doc, { machine, step }),
-              ...stepLines(doc, {
-                machine,
-                step,
-                held,
-                routes,
-              }),
-              step.error === null
-                ? null
-                : html(
-                    doc,
-                    "p",
-                    {
-                      class: "explore-warning",
-                      role: "alert",
-                      "data-live-error": "",
-                    },
-                    [`Handler threw: ${step.error}`],
-                  ),
-            ]),
-          ),
-        ]),
-  ]);
-}
-
-/** What a moved part is called in a sentence: the machine, a region path, or a map child. */
-function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
-  if (actor === undefined) return machine.id;
-  return "region" in actor ? actor.region : childWhoText(machine, actor);
-}
-
-/** Whether a part had no handler for a message another part sent it. */
-function isDropped(step: VizLiveStep): boolean {
-  return step.message !== undefined && step.message.dropped !== null;
-}
-
-/** The sender as the row names it ("" is the machine itself); null when no part is known to have sent it. */
-function senderName(machine: VizMachine, step: VizLiveStep): string | null {
-  const sender = step.message?.sender ?? null;
-  return sender === "" ? machine.id : sender;
-}
-
-/** The line above a later step: who sent it to whom, and where the receiver went; a dropped one says so and why. */
-function afterLine(
-  doc: Document,
-  context: { machine: VizMachine; step: VizLiveStep },
-): HTMLElement {
-  const { machine, step } = context;
-  const sender = senderName(machine, step);
-  const receiver = partName(machine, step.actor);
-  if (sender !== null && isDropped(step)) {
-    return html(doc, "p", { "data-live-dropped": "" }, [
-      "! Then ",
-      `${sender} sent `,
-      code(doc, step.event),
-      ` to ${receiver}: dropped.`,
-    ]);
-  }
-  if (sender !== null) {
-    return html(doc, "p", { class: "muted" }, [
-      `Then ${sender} sent `,
-      code(doc, step.event),
-      step.outcome === "transition"
-        ? ` to ${receiver}: ${localName(step.from)} → ${localName(step.to)}`
-        : ` to ${receiver}`,
-    ]);
-  }
-  return html(doc, "p", { class: "muted" }, [
-    `Then ${receiver} took `,
-    code(doc, step.event),
-    step.outcome === "transition" ? `: ${localName(step.from)} → ${localName(step.to)}` : "",
+    total === 0
+      ? html(doc, "p", { class: "muted", "data-live-empty": "" }, [
+          "No steps yet. Click an arrow on the board to send an event.",
+        ])
+      : html(doc, "ol", { class: "explore-run" }, items),
+    state.last !== null && state.last !== lasts[total - 1] ? errorLine(doc, state.last) : null,
   ]);
 }
 
@@ -433,11 +430,7 @@ function liveParts(
   const { state } = live;
   const moves: LiveMoves = { state, picked: live.picked ?? null, pick: live.pick };
   return [
-    liveResultSection(doc, {
-      machine,
-      state,
-      routes: live.routes,
-    }),
+    runList(doc, machine, live),
     ...childrenSections(doc, machine, moves),
     final ? null : timersSection(doc, { state, send: live.send }),
   ];

@@ -65,7 +65,7 @@ test("a message between two machines is a dotted line, and an arrow's click stil
   if (click === null) throw new Error("no PAY_CLICKED arrow");
   await page.mouse.click(click.x, click.y);
   await page
-    .getByText("Then checkout sent PAYMENT_STARTED to payment: ready → charging")
+    .getByText("1. checkout sent PAYMENT_STARTED to payment: ready → charging")
     .first()
     .waitFor();
   await page.close();

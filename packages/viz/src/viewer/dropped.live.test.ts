@@ -164,7 +164,7 @@ describe("dropped message", () => {
     const { root } = mount();
     walk(root, 1);
     expect(text(root, "[data-live-after]")).toContain(
-      "Then kitchen sent DISH_READY to waiter: serving → carryingDish",
+      "1. kitchen sent DISH_READY to waiter: serving → carryingDish",
     );
     expect(root.querySelector("[data-live-dropped]")).toBeNull();
   });
@@ -173,16 +173,17 @@ describe("dropped message", () => {
     const { root } = mount();
     walk(root, 4);
     expect(text(root, "[data-live-dropped]")).toBe(
-      "! Then kitchen sent DISH_READY to waiter: dropped.",
+      "! 2. kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak",
     );
     expect(root.querySelector("[data-live-dropped]")?.classList.contains("muted")).toBe(false);
   });
 
-  test("a drop with no known sender reads as a taken message", () => {
+  test("a drop with no known sender still reads as lost", () => {
     const { root } = mount(null);
     walk(root, 4);
-    expect(text(root, "[data-live-after]")).toContain("Then waiter took DISH_READY");
-    expect(root.querySelector("[data-live-dropped]")).toBeNull();
+    expect(text(root, "[data-live-dropped]")).toBe(
+      "! 2. DISH_READY to waiter: lost, nobody took it in onBreak",
+    );
   });
 
   test("a stay that took the message reads sent … to … without a move", () => {
@@ -209,8 +210,9 @@ describe("dropped message", () => {
     });
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [kitchen] }, { driver });
     send(root, "DISH_COOKED");
-    expect(text(root, "[data-live-after]")).toContain("Then kitchen sent DISH_READY to waiter");
-    expect(text(root, "[data-live-after]")).not.toContain("→ serving");
+    expect(text(root, "[data-live-after]")).toBe(
+      "1. kitchen sent DISH_READY to waiter: stayed in serving",
+    );
   });
 });
 
@@ -218,7 +220,47 @@ describe("a drop shows its reason once", () => {
   test("the Step tab says why a message was dropped once", () => {
     const { root } = mount();
     walk(root, 4);
-    const step = text(root, "[data-live-after]") ?? "";
-    expect(step.match(/no handler for DISH_READY/gi)).toHaveLength(1);
+    expect(root.textContent?.match(/nobody took it/g)).toHaveLength(1);
+  });
+});
+
+describe("the Step tab lists the whole walk", () => {
+  test("every step shows oldest first", () => {
+    const { root } = mount();
+    walk(root, 5);
+    const steps = [...root.querySelectorAll<HTMLElement>("[data-step]")];
+    expect(steps.map((each) => each.dataset["step"])).toEqual(["1", "2", "3", "4", "5"]);
+    expect(steps[0]?.querySelector("[data-live-outcome]")?.textContent).toMatch(
+      /^Step 1 of 5: DISH_COOKED/,
+    );
+  });
+
+  test("messages are numbered over the whole walk", () => {
+    const { root } = mount();
+    walk(root, 5);
+    const numbers = [...root.querySelectorAll<HTMLElement>("[data-message]")].map((each) => [
+      each.dataset["message"],
+      each.textContent,
+    ]);
+    expect(numbers).toEqual([
+      ["1", "1. kitchen sent DISH_READY to waiter: serving → carryingDish"],
+      ["2", "! 2. kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak"],
+    ]);
+  });
+
+  test("only the newest step carries data-outcome", () => {
+    const { root } = mount();
+    walk(root, 5);
+    const marked = root.querySelectorAll("[data-outcome]");
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toBe(root.querySelector("[data-step='5']"));
+  });
+
+  test("no steps says so", () => {
+    const { root } = mount();
+    expect(text(root, "[data-live-empty]")).toBe(
+      "No steps yet. Click an arrow on the board to send an event.",
+    );
+    expect(root.querySelector("[data-step]")).toBeNull();
   });
 });
