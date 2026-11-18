@@ -115,6 +115,11 @@ export interface Inspected {
   lostMessages: LostMessage[];
 }
 
+/** The run that sends a lost message, named with the design check's own words. */
+export function lostRunName(lost: Pick<LostMessage, "sender" | "event" | "receiver">): string {
+  return `${lost.sender} sends ${lost.event} to ${lost.receiver}`;
+}
+
 /**
  * What a design check throws when fuzzing sent events without a payload that the
  * machine then read, or "" when there is none. Callers add their own text after a blank line.
@@ -280,7 +285,8 @@ function inspectWith(
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
     analysis === null ? [] : [Either.getLeft(analysis)].filter((each) => each !== undefined);
-  const annotated = annotate({ ...machine, runs: [...(target.tests ?? [])] });
+  const lostRuns = lost.map((each) => ({ name: lostRunName(each), steps: each.steps }));
+  const annotated = annotate({ ...machine, runs: [...(target.tests ?? []), ...lostRuns] });
   return {
     machine: annotated,
     missingPayloads: missing,
