@@ -1,5 +1,6 @@
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { createActorMap, onOutput } from "@mantaq/sugar";
+import type { AnyActor } from "@mantaq/core";
 import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
 import { expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
@@ -244,7 +245,7 @@ test("a receiver that sends itself the same event while handling it keeps each m
   );
   const live = driver.step(send("GO"));
   expect(live.after.map((entry) => [entry.from, entry.to, entry.message])).toEqual([
-    ["target.second", "target.second", { sender: "", dropped: null }],
+    ["target.second", "target.second", { sender: null, dropped: null }],
     ["target.first", "target.second", { sender: "", dropped: null }],
   ]);
 });
@@ -629,5 +630,109 @@ test("a map child whose output wiring is added after spawn is still named as the
   const live = driver.step(send("KICK", { actor: { map: "cooks", key: "w1" } }));
   expect(live.after.map((entry) => [entry.event, entry.message?.sender])).toEqual([
     ["PING", "cooks"],
+  ]);
+});
+
+test("a part whose change makes app code send names that part", () => {
+  const driver = createDriver({
+    id: "pair",
+    create: () => {
+      const clock = VirtualClock();
+      const b = Actor({
+        inputs: [ping],
+        outputs: [],
+        states: [idle],
+        initial: idle,
+        clock,
+        setup: (m) => {
+          m.on(idle, { event: ping, handler: () => ({}) });
+        },
+      });
+      const a = Actor({
+        inputs: [kick],
+        outputs: [],
+        states: [idle, second],
+        initial: idle,
+        clock,
+        setup: (m) => {
+          m.on(idle, { event: kick, to: [second], handler: () => ({ state: second }) });
+        },
+      });
+      a.on("change", { fn: () => b.send(ping.create() as never) });
+      const root = Actor({
+        inputs: [go],
+        outputs: [],
+        states: [idle],
+        initial: idle,
+        clock,
+        setup: (m) => {
+          m.on(idle, { event: go, handler: () => ({}) });
+        },
+      });
+      return { actor: root, clock, made: { actor: root, a, b } };
+    },
+  });
+  const live = driver.step(send("KICK", { actor: { region: "a" } }));
+  expect(live.after.map((entry) => [entry.actor, entry.event, entry.message])).toEqual([
+    [{ region: "b" }, "PING", { sender: "a", dropped: null }],
+  ]);
+});
+
+/** Parts a (handles KICK: moves), b and c (handle PING), and a root that handles GO. */
+function trio(options: { onGo?: (parts: { b: AnyActor<unknown> }) => void } = {}) {
+  const clock = VirtualClock();
+  const listener = (input: typeof ping | typeof kick, handler: () => object) =>
+    Actor({
+      inputs: [input],
+      outputs: [],
+      states: [idle, second],
+      initial: idle,
+      clock,
+      setup: (m) => {
+        m.on(idle, { event: input, to: [second], handler });
+      },
+    });
+  const b = listener(ping, () => ({}));
+  const c = listener(ping, () => ({}));
+  const a = listener(kick, () => ({ state: second }));
+  const root = Actor({
+    inputs: [go],
+    outputs: [],
+    states: [idle],
+    initial: idle,
+    clock,
+    setup: (m) => {
+      m.on(idle, { event: go, handler: () => ({}) });
+    },
+  });
+  root.on("transition", { fn: () => options.onGo?.({ b }) });
+  const driver = createDriver({
+    id: "trio",
+    create: () => ({ actor: root, clock, made: { actor: root, a, b, c } }),
+  });
+  return { driver, a, b, c };
+}
+
+test("a second send in the same change still names the part that changed", () => {
+  const { driver, a, b, c } = trio();
+  a.on("change", {
+    fn: () => {
+      b.send(ping.create() as never);
+      c.send(ping.create() as never);
+    },
+  });
+  const live = driver.step(send("KICK", { actor: { region: "a" } }));
+  expect(live.after.map((entry) => [entry.actor, entry.message?.sender])).toEqual([
+    [{ region: "b" }, "a"],
+    [{ region: "c" }, "a"],
+  ]);
+});
+
+test("a part that moved on its own between steps is not named by the next step", () => {
+  const { driver, a } = trio({ onGo: ({ b: to }) => to.send(ping.create() as never) });
+  a.send(kick.create() as never);
+  const live = driver.step(send("GO"));
+  expect(live.after.map((entry) => [entry.actor, entry.message?.sender])).toEqual([
+    [{ region: "b" }, null],
   ]);
 });
