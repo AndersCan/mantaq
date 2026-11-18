@@ -494,7 +494,13 @@
   outline: none;
 }
 
-.viz .child-marker rect {
+.viz .child-marker .marker-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
+
+.viz .child-marker rect:not(.marker-hit) {
   fill: var(--fg);
   stroke: var(--fg);
 }
@@ -505,12 +511,12 @@
   stroke: none;
 }
 
-.viz .child-marker[aria-pressed="true"] rect {
+.viz .child-marker[aria-pressed="true"] rect:not(.marker-hit) {
   stroke: var(--select);
   stroke-width: 2;
 }
 
-.viz .child-marker:focus-visible rect {
+.viz .child-marker:focus-visible rect:not(.marker-hit) {
   stroke: var(--select);
   stroke-width: 3;
 }

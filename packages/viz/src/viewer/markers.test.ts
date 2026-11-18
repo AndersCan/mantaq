@@ -101,6 +101,34 @@ describe("drawChildMarkers", () => {
     ]);
   });
 
+  test("a chip's click area reaches past its pill", () => {
+    const root = board([168, 168]);
+    drawChildMarkers(root, context([child("w1", "s0")]));
+    const pill = markers(root)[0]?.querySelector("rect");
+    const hit = markers(root)[0]?.querySelector("rect.marker-hit");
+    expect(Number(hit?.getAttribute("width"))).toBeGreaterThan(Number(pill?.getAttribute("width")));
+    expect(Number(hit?.getAttribute("height"))).toBeGreaterThan(
+      Number(pill?.getAttribute("height")),
+    );
+  });
+
+  test("a chip's click area stops before its neighbour's pill", () => {
+    const root = board([168]);
+    drawChildMarkers(root, context([child("w1", "s0"), child("w2", "s0")]));
+    const [first, second] = markers(root);
+    const left = (m: SVGGElement | undefined) =>
+      Number(/translate\(([-\d.]+)px/.exec(m?.style.transform ?? "")?.[1]);
+    const attr = (m: SVGGElement | undefined, selector: string, name: string) =>
+      Number(m?.querySelector(selector)?.getAttribute(name));
+    const firstPillEnd = left(first) + attr(first, "rect:not(.marker-hit)", "width");
+    const firstHitEnd =
+      left(first) + attr(first, "rect.marker-hit", "x") + attr(first, "rect.marker-hit", "width");
+    const secondHitStart = left(second) + attr(second, "rect.marker-hit", "x");
+    expect(secondHitStart).toBeGreaterThanOrEqual(firstPillEnd);
+    expect(secondHitStart).toBeGreaterThanOrEqual(firstHitEnd - 0.01);
+    root.remove();
+  });
+
   test("a child that moves keeps its element", () => {
     const root = board([168, 168]);
     drawChildMarkers(root, context([child("w1", "s0")]));
