@@ -1,5 +1,5 @@
 import { VirtualClock } from "@mantaq/core";
-import type { AnyActor, Machine } from "@mantaq/core";
+import type { AnyActor, ErrorInfo, Machine } from "@mantaq/core";
 import { Either } from "@mantaq/utils";
 import type { VizJson, VizStep } from "@mantaq/viz";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -25,6 +25,8 @@ interface Pending {
   steps: VizStep[];
   problem: string;
   seen: number;
+  /** The send that made the actor fail (a handler or effect threw). Shown only when the test fails. */
+  threw: VizStep[];
   /** Keys the test passed besides `clock`; empty when the run needs no replay. */
   extra: string[];
   /** The factory called the way the page calls it. */
@@ -93,10 +95,9 @@ function flush(testPath: string, id: string, run: Recorded, runs: Map<string, Re
   writeFileSync(file, textOf(runs));
 }
 
-/** Empty when the run replays to the same end on `{ clock }` alone, else the reason. */
-function replayProblem(each: Pending, run: Recorded): string {
-  if (each.extra.length === 0) return "";
-  const target: FuzzTarget = {
+/** The factory as the page calls it: `{ clock }` alone. */
+function pageTarget(each: Pending): FuzzTarget {
+  return {
     id: each.id,
     create: () => {
       const clock = VirtualClock();
@@ -104,6 +105,12 @@ function replayProblem(each: Pending, run: Recorded): string {
       return isActor(made) ? { actor: made, clock } : { actor: made.actor, clock, made };
     },
   };
+}
+
+/** Empty when the run replays to the same end on `{ clock }` alone, else the reason. */
+function replayProblem(each: Pending, run: Recorded): string {
+  if (each.extra.length === 0) return "";
+  const target = pageTarget(each);
   const replayed = Either.from(() => normalizeRun(target, run));
   const reason = Either.isLeft(replayed)
     ? `the factory threw with only { clock }: ${messageOf(replayed[0])}.`
@@ -112,6 +119,31 @@ function replayProblem(each: Pending, run: Recorded): string {
       : "";
   if (reason === "") return "";
   return `recordRuns: run "${run.name}"${RUN_DROPPED}${reason} This test passed: ${each.extra.join(", ")}.`;
+}
+
+/** A step as the board's address holds it: `@800`, `go`, `waiter>go={"a":1}`. */
+function stepText(step: VizStep): string {
+  if (step.kind === "advance") return `@${step.ms}`;
+  const ref = step.actor;
+  const head = ref !== undefined && "region" in ref ? `${ref.region}>${step.event}` : step.event;
+  return `${head}=${JSON.stringify(step.payload)}`;
+}
+
+/** The board address that replays a failed test's walk up to where it failed. */
+function boardLine(each: Pending): string {
+  const run = {
+    name: each.name,
+    end: each.actor.state.name,
+    steps: [...each.steps, ...each.threw],
+  };
+  const replayed =
+    each.problem === "" ? Either.from(() => normalizeRun(pageTarget(each), run)) : undefined;
+  if (replayed === undefined || Either.isLeft(replayed) || Either.isLeft(replayed[1])) {
+    return "on the board: not shown";
+  }
+  const query = new URLSearchParams({ machine: each.id });
+  for (const step of replayed[1][1]) query.append("step", stepText(step));
+  return `on the board: ?${query}`;
 }
 
 function finish(attempt: Pending[], passed: boolean): void {
@@ -148,7 +180,9 @@ function finish(attempt: Pending[], passed: boolean): void {
 afterEach(({ task }) => {
   const attempt = pending;
   pending = [];
-  finish(attempt, task.result?.state !== "fail");
+  const failed = task.result?.state === "fail";
+  if (failed) for (const each of attempt) console.log(boardLine(each));
+  finish(attempt, !failed);
 });
 
 /**
@@ -158,7 +192,9 @@ afterEach(({ task }) => {
  * file to refresh it; with `CI` set a stale file fails the test instead.
  * `create` runs on a VirtualClock unless the test passes one. The machine may
  * be built in the test or in `beforeEach`. A retried test is recorded once,
- * from the attempt that passed. A test that passes options besides `clock` is
+ * from the attempt that passed. A failed test is not recorded; it prints
+ * `on the board: ?machine=<id>&step=…`, the board address that replays its
+ * walk up to where it failed, or `on the board: not shown`. A test that passes options besides `clock` is
  * replayed as `machine.create({ clock })`, as the page does; if it ends
  * elsewhere, the run is not recorded and the test fails. When the factory
  * returns other machines next to `actor` (`{ actor, store }`), their steps are
@@ -191,6 +227,17 @@ function timeOf(actor: AnyActor<unknown>): number {
   return actor.clock?.now() ?? 0;
 }
 
+/** The step `event` makes, with `region` when another machine the factory returned took it. */
+function eventStep(
+  event: { type: string; payload?: unknown },
+  region: string | undefined,
+): Either<string, VizStep> {
+  const payload = jsonPayload(event.payload);
+  if (Either.isLeft(payload)) return Either.left(payload[0]);
+  const step: VizStep = { kind: "event", event: event.type, payload: payload[1] };
+  return Either.right(region === undefined ? step : { ...step, actor: { region } });
+}
+
 /** Record what the test does to the actor `made` holds, until the test ends. */
 function track(made: Made, context: Pick<Pending, "id" | "extra" | "replay">): void {
   const actor = actorOf(made);
@@ -203,27 +250,25 @@ function track(made: Made, context: Pick<Pending, "id" | "extra" | "replay">): v
     steps: [],
     problem: "",
     seen: timeOf(actor),
+    threw: [],
   };
   pending.push(entry);
   const note = (event: { type: string; payload?: unknown }, region?: string): void => {
     const now = timeOf(actor);
     if (now > entry.seen) entry.steps.push({ kind: "advance", ms: now - entry.seen });
     entry.seen = now;
-    const payload = jsonPayload(event.payload);
-    if (Either.isLeft(payload)) entry.problem = payload[0];
-    else if (region === undefined) {
-      entry.steps.push({ kind: "event", event: event.type, payload: payload[1] });
-    } else {
-      entry.steps.push({
-        kind: "event",
-        event: event.type,
-        payload: payload[1],
-        actor: { region },
-      });
-    }
+    const step = eventStep(event, region);
+    if (Either.isLeft(step)) entry.problem = step[0];
+    else entry.steps.push(step[1]);
+  };
+  const threw = (info: ErrorInfo, region?: string): void => {
+    const step = eventStep(info.event, region);
+    if (Either.isRight(step)) entry.threw.push(step[1]);
   };
   actor.on("transition", { fn: ({ event }) => note(event) });
+  actor.on("error", { fn: (info) => threw(info) });
   for (const [name, part] of Object.entries(otherActorsOf(made, actor))) {
     part.on("transition", { fn: ({ event }) => note(event, name) });
+    part.on("error", { fn: (info) => threw(info, name) });
   }
 }

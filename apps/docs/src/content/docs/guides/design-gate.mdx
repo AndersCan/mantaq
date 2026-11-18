@@ -83,6 +83,15 @@ A message dropped because the receiver is in a state without a handler is not an
   run="A dish cooked while the waiter is on a break is lost"
 />
 
+When a recorded walk like this one fails, the test prints its steps as a board address under the test's name:
+
+```
+stdout | src/design/dropped-message.inspect.test.ts > A dish cooked while the waiter is on a break is lost
+on the board: ?machine=cook&step=DISH_COOKED%3D%7B%7D&step=waiter%3EDISH_SERVED%3D%7B%7D&step=waiter%3EBREAK_STARTED%3D%7B%7D
+```
+
+Add the `on the board:` line to the address of a page that draws the machine: the walk plays up to the step where the test stopped.
+
 Unreached edges and `onAny` routing warnings are not errors. They show in the Vite plugin's output and do not fail the test.
 
 The reachability check is static. It reads the graph, so it needs no fuzzing: pass `fuzz: false` to skip the fuzz run. When an edge has an unknown target, the check cannot tell and reports nothing.
