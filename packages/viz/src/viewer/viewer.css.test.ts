@@ -68,7 +68,7 @@ test("the panel stays below the graph and in view while the graph scrolls", () =
   expect(panel).not.toMatch(/(^|[\s;{])top:/);
   const tabPanel = rule(".viz .tab-panel {");
   expect(tabPanel).toMatch(/overflow:\s*auto/);
-  expect(tabPanel).toMatch(/max-height:\s*40vh/);
+  expect(tabPanel).toMatch(/max-height:\s*60vh/);
 });
 
 test("a diagram wider than its canvas scrolls sideways, never clips", () => {
@@ -125,4 +125,10 @@ test("the next arrows march one dash period forever; only reduced motion stops t
     ) ?? [];
   expect(reduced).toHaveLength(1);
   expect(bare.replace(reduced[0] ?? "", "")).not.toMatch(/animation:\s*none/);
+});
+
+test("a focused arrow or state scrolls clear of the pinned panel", () => {
+  expect(rule(".viz .canvas [tabindex] {")).toMatch(
+    /scroll-margin-bottom:\s*calc\(60vh \+ \d+px\)/,
+  );
 });

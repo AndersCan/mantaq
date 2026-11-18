@@ -100,7 +100,6 @@
   position: sticky;
   bottom: 0;
   background: var(--bg);
-  z-index: 1;
 }
 
 .viz .panel h2 {
@@ -135,8 +134,12 @@
 }
 
 .viz .tab-panel {
-  max-height: 40vh;
+  max-height: 60vh;
   overflow: auto;
+}
+
+.viz .canvas [tabindex] {
+  scroll-margin-bottom: calc(60vh + 80px);
 }
 
 .viz .panel dl {
