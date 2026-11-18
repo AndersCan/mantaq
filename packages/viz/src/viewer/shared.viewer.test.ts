@@ -195,4 +195,16 @@ describe("an arrow three states share", () => {
     press(root.querySelector('[data-edge-link="c-go-home"]'));
     expect(shared(root)?.classList.contains("selected")).toBe(true);
   });
+
+  test("selecting a member marks the node naming its states", () => {
+    const { root } = mount();
+    press(shared(root));
+    press(root.querySelector('[data-edge-link="c-go-home"]'));
+    expect(root.querySelector("g.any-node")?.classList.contains("selected")).toBe(true);
+    expect(
+      root.querySelector('g.edge[data-edge-id="idle-begin-a"]')?.classList.contains("selected"),
+    ).toBe(false);
+    press(root.querySelector('g.edge[data-edge-id="idle-begin-a"]'));
+    expect(root.querySelector("g.any-node")?.classList.contains("selected")).toBe(false);
+  });
 });

@@ -8,3 +8,8 @@ test("a current shared node is drawn in the accent colour", () => {
   const css = readFileSync(join(import.meta.dirname, "viewer.css"), "utf8");
   expect(css).toMatch(/\.any-node\.current rect\s*\{[^}]*stroke:\s*var\(--accent\)/);
 });
+
+test("a shared node whose member is selected is drawn in the select colour", () => {
+  const css = readFileSync(join(import.meta.dirname, "viewer.css"), "utf8");
+  expect(css).toMatch(/\.any-node\.selected rect\s*[,{][^}]*stroke:\s*var\(--select\)/);
+});

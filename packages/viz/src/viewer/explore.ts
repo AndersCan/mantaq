@@ -505,12 +505,12 @@ export function markExplore(
   markCurrent(root, currents);
 }
 
-/** A node is current when it is a current state, or a shared node standing for one. */
 /** A JSON list written to a `data-` attribute; ids may hold spaces. */
 export function listOf(value: string | undefined): string[] | undefined {
   return value === undefined ? undefined : (JSON.parse(value) as string[]);
 }
 
+/** A node is current when it is a current state, or a shared node standing for one. */
 function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
     const id = element.dataset["nodeId"] ?? "";
