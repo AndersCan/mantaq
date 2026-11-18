@@ -147,6 +147,7 @@ describe("a board of three machines", () => {
     const root = mount(["p", "q"]);
     box(root, "p")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     expect(root.querySelector("g[data-node-id='p.one']")).not.toBeNull();
+    expect(root.querySelector("svg[data-zoom='p']")).not.toBeNull();
   });
 
   test("the machine's name at the top leads back to the board", () => {
@@ -259,5 +260,101 @@ describe("a board of two machines", () => {
     expect(root.querySelectorAll("g.part")).toHaveLength(0);
     expect(root.querySelectorAll("g[data-node-id]").length).toBeGreaterThan(2);
     expect(root.querySelector(".part-title")).toBeNull();
+  });
+});
+
+describe("repro: Show controls while a machine is shown", () => {
+  test("the machine's name still leads back", () => {
+    const actors = ["p", "q"];
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [boardOf(actors)] },
+      { driver: fakeDriver(actors), diagramOnly: true },
+    );
+    press(box(root, "p"));
+    expect(root.querySelector(".part-title")?.textContent).toBe("p");
+    press(root.querySelector("[data-show-controls]"));
+    expect(root.querySelector("g[data-node-id='p.one']")).not.toBeNull();
+    press(root.querySelector(".part-title"));
+    expect(root.querySelectorAll("g.part")).toHaveLength(3);
+  });
+});
+
+describe("repro: a step inside a shown machine", () => {
+  test("scrolls the canvas to that machine's new state", () => {
+    const at: Record<string, number> = { "p.one": 0, "p.two": 3000 };
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains("canvas") ? 6000 : 0;
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const id = this.getAttribute("data-node-id");
+      const canvas = this.closest(".canvas");
+      const x = id !== null && id in at ? at[id]! - (canvas?.scrollLeft ?? 0) : 0;
+      const w = id !== null && id in at ? 120 : 0;
+      return {
+        left: x,
+        right: x + w,
+        top: 0,
+        bottom: 40,
+        width: w,
+        height: 40,
+        x,
+        y: 0,
+      } as DOMRect;
+    });
+    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+    const scrolls: number[] = [];
+    vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(function (
+      this: HTMLElement,
+      options?: ScrollToOptions | number,
+    ) {
+      if (typeof options === "object") scrolls.push(options.left ?? -1);
+    });
+    const actors = ["p", "q"];
+    const drawn = boardOf(actors);
+    const driver: VizDriver = {
+      ...fakeDriver(actors),
+      step: (step) => ({
+        ...fakeDriver(actors).step(step),
+        regions: { p: "p.two", q: "q.two" },
+      }),
+    };
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [drawn] }, { driver });
+    press(box(root, "p"));
+    press(root.querySelector("g.edge"));
+    expect(root.querySelector("g[data-node-id='p.two']")?.classList.contains("current")).toBe(true);
+    expect(scrolls.at(-1)).toBeGreaterThan(2000);
+  });
+});
+
+describe("repro: Back and Reset, and the Details hint, in a shown machine", () => {
+  const buttonNamed = (root: HTMLElement, name: string) =>
+    [...root.querySelectorAll("button")].find((b) => b.textContent === name) ?? null;
+  test("Back and Reset keep the machine", () => {
+    const root = mount(["p", "q"]);
+    press(box(root, "p"));
+    press(root.querySelector("g.edge"));
+    press(buttonNamed(root, "Back"));
+    expect(root.querySelector("g[data-node-id='p.one']")).not.toBeNull();
+    press(root.querySelector("g.edge"));
+    press(buttonNamed(root, "Reset"));
+    expect(root.querySelector("g[data-node-id='p.one']")).not.toBeNull();
+    expect(root.querySelector("g.part")).toBeNull();
+  });
+  test("the Details hint follows what is drawn", () => {
+    const root = mount(["p", "q"]);
+    const hint = () => root.querySelector("[data-tab-panel=details] .muted")?.textContent;
+    press(box(root, "p"));
+    expect(hint()).toBe("Click a state or an arrow in the diagram.");
+    press(root.querySelector(".part-title"));
+    expect(hint()).toBe("Click a machine to see its states.");
   });
 });

@@ -15,7 +15,7 @@ import { currentsOf, walkedChild } from "./compartments.ts";
 import { html } from "./dom.ts";
 import { BOARD_PX_PER_UNIT, renderBoard, renderGraph } from "./graph.ts";
 import type { GraphCallbacks, Selection } from "./graph.ts";
-import { partMachine, partsOf } from "./parts.ts";
+import { partMachine, partOf, partsOf } from "./parts.ts";
 import { renderPanel } from "./panel.ts";
 import { decodeLiveSteps, encodeLiveStep, movesFrom } from "../moves.ts";
 import {
@@ -168,10 +168,7 @@ export function mountViewer(
       markDiagram(root, { machine, view, driver, pick: (child) => pick(child, "chip") });
     const follow = (opening = false) => {
       refresh();
-      if (view.live === null) return;
-      const currents = currentsOf(view.live, view.picked);
-      const child = currents[currents.length - new Set(view.live.children.map((c) => c.map)).size];
-      keepInView(root, opening && child !== undefined ? [child, currents[0]!] : [currents[0]!]);
+      keepCurrentInView(root, { machine, view }, opening);
     };
     redraw = () => follow();
     const walked = (sent?: ViewState["sent"]) => {
@@ -212,11 +209,30 @@ export function mountViewer(
     });
     refit = canvas.refit;
     root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
+    canvas.titled();
     canvas.refit();
     follow(true);
   }
 
   render();
+}
+
+/** Scrolls to the live state; in a shown machine, to a state drawn there. */
+function keepCurrentInView(
+  root: HTMLElement,
+  from: { machine: VizMachine; view: ViewState },
+  opening: boolean,
+): void {
+  const { machine, view } = from;
+  if (view.live === null) return;
+  const live = currentsOf(view.live, view.picked);
+  const currents =
+    view.zoom === null ? live : live.filter((id) => partOf(machine, id) === view.zoom);
+  const child = live[live.length - new Set(view.live.children.map((c) => c.map)).size];
+  keepInView(
+    root,
+    opening && child !== undefined ? [child, ...currents.slice(0, 1)] : currents.slice(0, 1),
+  );
 }
 
 /** Calls `refit` when the window width changes, which entering full screen does too. */
@@ -269,7 +285,7 @@ function canvasOf(from: {
   callbacks: () => GraphCallbacks;
   afterSwap: () => void;
   mark: () => void;
-}): { drawn: () => Node[]; refit: () => void } {
+}): { drawn: () => Node[]; refit: () => void; titled: () => void } {
   const { doc, root, machine, view, shown } = from;
   const onBoard = () => partsOf(machine).length > 0 && view.zoom === null;
   const canvasUnits = () => {
@@ -279,8 +295,11 @@ function canvasOf(from: {
   let drawnUnits = 0;
   const swap = () => {
     root.querySelector(".canvas")?.replaceChildren(...drawn());
+    titled();
+  };
+  const titled = () => {
     root.querySelector(".part-title")?.remove();
-    if (onBoard()) return;
+    if (view.zoom === null) return;
     const bar = root.querySelector(".viz-bar") ?? html(doc, "div", { class: "viz-bar" });
     if (!bar.isConnected) root.prepend(bar);
     bar.prepend(titleOf());
@@ -303,7 +322,9 @@ function canvasOf(from: {
   const drawn = (): Node[] => {
     drawnUnits = canvasUnits();
     if (onBoard()) return [renderBoard(doc, machine, { width: drawnUnits, open })];
-    return [renderGraph(doc, shown(), from.callbacks())];
+    const graph = renderGraph(doc, shown(), from.callbacks());
+    if (view.zoom !== null) graph.setAttribute("data-zoom", view.zoom);
+    return [graph];
   };
   const titleOf = () => {
     const title = html(doc, "button", { type: "button", class: "part-title" }, [shown().id]);
@@ -316,7 +337,7 @@ function canvasOf(from: {
     swap();
     from.mark();
   };
-  return { drawn, refit };
+  return { drawn, refit, titled };
 }
 
 type PickedChild = { map: string; key: string };
