@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.1
+
+<sub>2026-11-18</sub>
+
+- _(patch)_
+  inspect reads handlers registered in another source file of the program (a pool built with createPool), with that file's descriptions; sugar documents its pool states and two handlers
+
 ## 3.0.0
 
 <sub>2026-11-17</sub>
