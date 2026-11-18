@@ -169,6 +169,15 @@ Run the whole test file to refresh the sidecar, and commit it. With `CI` set, a 
 
 A journey through an effect's answer injects that answer right after the send that started the effect: `actor.send(turnOffLink.create(...)); actor.inject({ type: "linkOffFailed", payload: { folderId } });`. Do not await between the two, or the real answer arrives first.
 
+## When a change breaks a walk
+
+After you change a machine, run every test file that imports its file, whole files so `__runs__` stays complete (`rg -l "<file name without .ts>" -g '*.test.ts'`). Use the repo's test runner; not on PATH: `node_modules/.bin/<runner>`. For each failing walk, ask: once the ask is done, are its title and steps still true?
+
+- Yes: your change broke it. Fix the machine, never the walk's test, until it passes with its `__runs__` entry unchanged.
+- No: the ask changes it. Name the walk with its `run=` link and ask before you change or delete it; leave it failing until the person answers.
+
+`git status --short` lists the `__runs__` files you changed; `git diff` on them must show only walks you added or the ask changes. Any other changed walk is a silent re-record, so undo it. The failing test prints `on the board: ?machine=<id>&step=…`, one `step=` per step, the last is where it failed. That address is for you alone, never a link in a reply, docs, an issue or a PR.
+
 ## Design Gate
 
 <!-- docs-check: skip -->

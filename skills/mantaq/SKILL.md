@@ -1,7 +1,7 @@
 ---
 name: mantaq
 description: >-
-  Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for any ask to design, plan or rethink a feature or a rule, even when it names no machine ("design this with me", "show me the design", "who can delete photos?", "show me how X works"): the answer is a machine drawn on the live viz page with recorded walks, not a written design. Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also for testing an app or web page that does not use mantaq against a model (`assertMatchesModel`, Playwright). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
+  Use whenever you edit, fix or finish a mantaq machine (a file calling `machine(`), however small ("send X back to Y", "finish this rule"): its recorded walks must pass or be named in the reply. Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for any ask to design, plan or rethink a feature or a rule, even when it names no machine ("design this with me", "show me the design", "who can delete photos?", "show me how X works"): the answer is a machine drawn on the live viz page with recorded walks, not a written design. Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also for testing an app or web page that does not use mantaq against a model (`assertMatchesModel`, Playwright). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
 allowed-tools: Read Grep Glob Edit Write Bash Shell
 ---
 
@@ -83,6 +83,15 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 ## Hand a machine to a builder
 
 To build an app or feature from a machine, or to give it to another agent, write its brief instead of describing it from memory: `machineBrief` from `@mantaq/inspect` (0.33 or later) turns `inspectFile`'s machines into Markdown (start state, arrows with conditions, entry effects, ignored events, event payloads). Keep it true with a test, `inspectFile` taking an absolute path: `await expect(machines.map(machineBrief).join("\n")).toMatchFileSnapshot("./<machine>-brief.md")`. Paste the brief in the reply; never retype it.
+
+## Change a machine
+
+After any edit to a machine, run every test file that imports its file before you reply (`testing.md` "When a change breaks a walk"). A walk is a test recorded in `__runs__`. End the reply with a `Walks:` block, one line per walk that broke or that the ask changed:
+
+- `"<title>" broke at step <n>: <why>. Fixed: <machine change>.`
+- `"<title>" changes with the ask: <what it does now>. <link>`
+
+None: `Walks: all pass unchanged.` `<link>` is the walk's full published `run=` URL (designing.md section 3), never a bare `?machine=…`.
 
 ## Live design
 
