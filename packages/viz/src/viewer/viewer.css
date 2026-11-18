@@ -172,7 +172,6 @@
 }
 
 .viz .graph {
-  width: 100%;
   height: auto;
 }
 
@@ -561,4 +560,41 @@
 
 .viz .queue .queue-more {
   fill: var(--muted);
+}
+
+.viz .graph .part rect {
+  fill: var(--region-bg);
+  stroke: var(--muted);
+  cursor: pointer;
+}
+
+.viz .graph .part:hover rect,
+.viz .graph .part:focus-visible rect {
+  stroke: var(--fg);
+  stroke-width: 2;
+}
+
+/* A machine's name leads back to the board; the bar holding it stays in view while the page scrolls. */
+.viz:has(.part-title) .viz-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+
+.viz .part-title {
+  margin-right: auto;
+  padding: 2px 8px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.viz .part-title:hover,
+.viz .part-title:focus-visible {
+  border-color: var(--fg);
 }
