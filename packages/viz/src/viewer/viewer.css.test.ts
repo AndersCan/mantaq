@@ -145,3 +145,8 @@ test("a chip's hit rect is transparent, takes the pointer, and no chip paint rul
     .filter((selector) => selector.includes("child-marker") && /\brect\b/.test(selector));
   for (const selector of paints) expect(selector).toContain("rect:not(.marker-hit)");
 });
+
+test("the queue takes the pointer, so its title shows on hover", () => {
+  expect(listed(".viz .queue")).toMatch(/cursor:\s*default/);
+  expect(listed(".viz .queue")).not.toMatch(/pointer-events:\s*none/);
+});

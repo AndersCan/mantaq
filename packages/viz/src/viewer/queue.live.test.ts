@@ -3,6 +3,7 @@ import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizDriver, VizJson, VizLiveChild, VizLiveState, VizMachine } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
 import team from "./reference/team-inbox.json" with { type: "json" };
+import { textWidth } from "./layout.ts";
 import { expect, test } from "vite-plus/test";
 
 const pool = team as unknown as VizMachine;
@@ -79,4 +80,27 @@ test("worker chips are unaffected by the queue", () => {
 
 test("a state with no row for the queue draws none", () => {
   expect(mount(["a"], [], "nowhere").querySelector(".graph g.queue")).toBeNull();
+});
+
+test("a second refresh redraws the queue instead of adding one", () => {
+  const root = mount(["d", "e"]);
+  const state = root.querySelector('.graph g[data-node-id="allWorkersFree"]');
+  state?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(root.querySelector(".graph .selected")).not.toBeNull();
+  expect(root.querySelectorAll(".graph g.queue")).toHaveLength(1);
+});
+
+test("pills and +N stay inside the state's row", () => {
+  const waiting = Array.from({ length: 30 }, (_, n) => `abcdefghij${n}`);
+  const root = mount(waiting);
+  const row = root.querySelector('.graph g[data-node-id="workWaiting"] > rect.worker-row');
+  const right = Number(row?.getAttribute("x")) + Number(row?.getAttribute("width"));
+  const pills = Array.from(root.querySelectorAll(".graph g.queued-item rect"));
+  const last = pills.at(-1);
+  expect(Number(last?.getAttribute("x")) + Number(last?.getAttribute("width"))).toBeLessThanOrEqual(
+    right,
+  );
+  const more = root.querySelector(".graph .queue-more");
+  const moreRight = Number(more?.getAttribute("x")) + textWidth(more?.textContent ?? "", 10);
+  expect(moreRight).toBeLessThanOrEqual(right);
 });
