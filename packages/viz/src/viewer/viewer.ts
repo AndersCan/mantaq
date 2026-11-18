@@ -475,10 +475,12 @@ function newestStepTop(list: HTMLElement): number {
 
 /** Swaps the panel's content; when a step was added the newest step scrolls to the top of the Step tab, else its scroll stays. */
 function replaceKeepingSteps(panel: HTMLElement, tabs: Node, shown: number, steps: number): number {
-  const scrolled = stepList(panel)?.scrollTop ?? 0;
+  const before = stepList(panel);
+  const scrolled = before === null || before.hidden ? null : before.scrollTop;
   panel.replaceChildren(tabs);
   const list = stepList(panel);
-  if (list !== null) list.scrollTop = steps > shown ? newestStepTop(list) : scrolled;
+  if (list !== null)
+    list.scrollTop = steps > shown || scrolled === null ? newestStepTop(list) : scrolled;
   return steps;
 }
 

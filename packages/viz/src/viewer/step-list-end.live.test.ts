@@ -75,6 +75,8 @@ function mountSteps() {
   document.body.append(root);
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    // A browser lays out nothing inside a hidden tab panel.
+    if (this.closest("[hidden]") !== null) return { top: 0 } as DOMRect;
     const top = 100 * Number(this.getAttribute("data-step") ?? 1);
     return { top } as DOMRect;
   });
@@ -92,8 +94,24 @@ test("a refresh without a new step keeps the reader's scroll", () => {
   const { root, list, push } = mountSteps();
   push(live(1));
   list().scrollTop = 120;
+  root.querySelector<HTMLElement>('[data-tab="step"]')!.click();
+  expect(list().scrollTop).toBe(120);
+});
+
+test("steps taken on another tab show the newest step when the Step tab opens", () => {
+  const { root, list, push } = mountSteps();
+  root.querySelector<HTMLElement>('[data-tab="details"]')!.click();
+  push(live(3));
+  root.querySelector<HTMLElement>('[data-tab="step"]')!.click();
+  expect(list().scrollTop).toBe(200);
+});
+
+test("back on the Step tab after selecting a state, the newest step shows", () => {
+  const { root, list, push } = mountSteps();
+  push(live(3));
   root
     .querySelector<HTMLElement>("[data-node-id]")!
     .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  expect(list().scrollTop).toBe(120);
+  root.querySelector<HTMLElement>('[data-tab="step"]')!.click();
+  expect(list().scrollTop).toBe(200);
 });
