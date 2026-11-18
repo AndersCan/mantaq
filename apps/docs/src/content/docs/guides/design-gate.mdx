@@ -73,7 +73,12 @@ checkout has 1 design error:
     after: PAY_CLICKED → WAITED_TOO_LONG
 ```
 
-A message dropped because the receiver is in a state without a handler is not an error; the board marks it.
+A message dropped because the receiver is in a state without a handler is not an error; the board marks it. In the run below, `cook` sends `DISH_READY` while its waiter is on a break, and the Step tab shows `! 2. cook sent DISH_READY to waiter: lost, nobody took it in onBreak`.
+
+<Machine
+  src="src/design/dropped-message.ts"
+  run="A dish cooked while the waiter is on a break is lost"
+/>
 
 Unreached edges and `onAny` routing warnings are not errors. They show in the Vite plugin's output and do not fail the test.
 

@@ -1,0 +1,44 @@
+{
+  "cook": [
+    {
+      "name": "A dish cooked while the waiter is on a break is lost",
+      "end": "cooking",
+      "steps": [
+        {
+          "kind": "event",
+          "event": "DISH_COOKED",
+          "payload": {}
+        },
+        {
+          "kind": "event",
+          "event": "DISH_READY",
+          "payload": {},
+          "actor": {
+            "region": "waiter"
+          }
+        },
+        {
+          "kind": "event",
+          "event": "DISH_SERVED",
+          "payload": {},
+          "actor": {
+            "region": "waiter"
+          }
+        },
+        {
+          "kind": "event",
+          "event": "BREAK_STARTED",
+          "payload": {},
+          "actor": {
+            "region": "waiter"
+          }
+        },
+        {
+          "kind": "event",
+          "event": "DISH_COOKED",
+          "payload": {}
+        }
+      ]
+    }
+  ]
+}
