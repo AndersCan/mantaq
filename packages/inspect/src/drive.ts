@@ -499,6 +499,7 @@ function stepOn(at: Stepping, step: VizStep): VizLiveStep | undefined {
   } finally {
     flags.inside = false;
     flags.pending = 0;
+    hearing.mover = null;
   }
   steps.push(step);
   if (step.kind !== "event") return undefined;

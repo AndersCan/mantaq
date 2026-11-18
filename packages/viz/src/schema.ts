@@ -224,7 +224,7 @@ export type VizDropReason = "noHandler";
 
 /** A message one part sent another during a step. The receiver is the step entry's `actor` (omitted = the machine), the event its `event`. */
 export interface VizMessage {
-  /** "" = the machine itself; else the region path, map name or returned machine's name, as the diagram names parts. null = no part is known to have sent it (app code or a timer). */
+  /** "" = the machine itself; else the region path, map name or returned machine's name, as the diagram names parts. null = no part is known to have sent it (app code, a timer, or a part sending itself). */
   sender: string | null;
   /** null = taken. */
   dropped: VizDropReason | null;

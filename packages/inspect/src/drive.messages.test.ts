@@ -1,7 +1,7 @@
 import { Actor, VirtualClock, event, state } from "@mantaq/core";
 import { createActorMap, onOutput } from "@mantaq/sugar";
 import type { AnyActor } from "@mantaq/core";
-import type { VizActorRef, VizJson, VizStep } from "@mantaq/viz";
+import type { VizActorRef, VizJson, VizLiveState, VizStep } from "@mantaq/viz";
 import { expect, test } from "vite-plus/test";
 import { createDriver } from "./drive.ts";
 import { droppedMessage } from "./fixtures/dropped-message.ts";
@@ -728,11 +728,16 @@ test("a second send in the same change still names the part that changed", () =>
   ]);
 });
 
-test("a part that moved on its own between steps is not named by the next step", () => {
-  const { driver, a } = trio({ onGo: ({ b: to }) => to.send(ping.create() as never) });
-  a.send(kick.create() as never);
-  const live = driver.step(send("GO"));
-  expect(live.after.map((entry) => [entry.actor, entry.message?.sender])).toEqual([
-    [{ region: "b" }, null],
+test("app code that sends after a step ends is not named after the step's last mover", () => {
+  const { driver, b } = trio();
+  let last: VizLiveState | null = null;
+  driver.listen?.((state) => {
+    last = state;
+  });
+  driver.step(send("KICK", { actor: { region: "a" } }));
+  b.send(ping.create() as never);
+  const after = (last as VizLiveState | null)?.after ?? [];
+  expect(after.map((entry) => [entry.actor, entry.event, entry.message?.sender])).toEqual([
+    [{ region: "b" }, "PING", null],
   ]);
 });
