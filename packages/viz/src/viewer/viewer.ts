@@ -43,7 +43,7 @@ interface ViewState {
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
   afters: VizLiveStep[][];
   /** Entry i is the step's own entry (`live.last`) when `live.steps[i]` was taken. */
-  lasts: VizLiveStep[];
+  lasts: Array<VizLiveStep | null>;
   /** Live: the followed child, set by a chip click; null = the lowest key. */
   picked: { map: string; key: string } | null;
   /** The panel tab shown. */
@@ -665,7 +665,7 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   view.live = stepSafely(driver, { before: view.live, step });
   if (view.live.steps.length === length + 1) {
     view.afters.push(view.live.after);
-    if (view.live.last !== null) view.lasts.push(view.live.last);
+    view.lasts.push(view.live.last);
   }
 }
 
@@ -795,16 +795,16 @@ function liveState(view: ViewState): { currents?: string[] } {
 function replay(
   driver: VizDriver,
   steps: ReadonlyArray<VizStep>,
-): { live: VizLiveState; afters: VizLiveStep[][]; lasts: VizLiveStep[] } {
+): { live: VizLiveState; afters: VizLiveStep[][]; lasts: Array<VizLiveStep | null> } {
   let live = driver.reset();
   const afters: VizLiveStep[][] = [];
-  const lasts: VizLiveStep[] = [];
+  const lasts: Array<VizLiveStep | null> = [];
   for (const step of steps) {
     const length = live.steps.length;
     live = stepSafely(driver, { before: live, step });
     if (live.steps.length === length + 1) {
       afters.push(live.after);
-      if (live.last !== null) lasts.push(live.last);
+      lasts.push(live.last);
     }
     if (live.last?.error) return { live, afters, lasts };
   }

@@ -608,6 +608,33 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 
+  test("a driver that throws after a step keeps that step's head and says the error once", () => {
+    const root = document.createElement("div");
+    const inner = fakeDriver();
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [withEvents] },
+      {
+        driver: {
+          reset: () => inner.reset(),
+          step: (step) => {
+            if (step.kind === "event" && step.event === "boom") throw new Error("driver down");
+            return inner.step(step);
+          },
+        },
+      },
+    );
+    send(root, "peek");
+    send(root, "boom");
+    expect(root.querySelectorAll("[data-step]")).toHaveLength(1);
+    expect(root.querySelector('[data-step="1"] [data-live-outcome]')?.textContent).toBe(
+      "Step 1 of 1: peek: stayed in open",
+    );
+    expect([...root.querySelectorAll("[data-live-error]")].map((line) => line.textContent)).toEqual(
+      ["Handler threw: driver down"],
+    );
+  });
+
   test("a link with a step the driver throws on still mounts", () => {
     const root = document.createElement("div");
     const inner = fakeDriver();

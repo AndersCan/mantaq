@@ -25,7 +25,7 @@ export interface ExploreContext {
     /** Entry i is what moved after `state.steps[i]`, as the driver reported it then. */
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
     /** Entry i is the step's own entry (`live.last`) when it was taken. */
-    lasts?: ReadonlyArray<VizLiveStep>;
+    lasts: ReadonlyArray<VizLiveStep | null>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
@@ -261,9 +261,9 @@ function outputRows(
 ): HTMLElement[] {
   const { machine, step, taken, routes } = context;
   return step.sent.flatMap((output) => {
-    const found = (routes?.[machine.id]?.[output] ?? []).filter((route) => !taken.has(route.event));
-    const routed = (routes?.[machine.id]?.[output] ?? []).length > 0;
-    if (routed && found.length === 0) return [];
+    const routed = routes?.[machine.id]?.[output] ?? [];
+    const found = routed.filter((route) => !taken.has(route.event));
+    if (found.length === 0 && (routed.length > 0 || taken.has(output))) return [];
     return [
       html(doc, "p", { "data-live-sent": "" }, [
         `${partName(machine, step.actor)} sent `,
@@ -312,8 +312,7 @@ function afterLine(
   const sent = step.message?.sender ?? null;
   const sender = sent === "" ? machine.id : sent;
   const receiver = partName(machine, step.actor);
-  const names = localName;
-  const tail = tailText(step, names);
+  const tail = tailText(step, localName);
   const lead = number === null ? "" : `${lost ? "! " : ""}${number}. `;
   const body =
     sender !== null
@@ -346,19 +345,17 @@ function stepItem(
     index: number;
     total: number;
     step: VizStep;
-    own: VizLiveStep;
-    after: ReadonlyArray<VizLiveStep>;
-    firstMessage: number;
+    own: VizLiveStep | null;
+    /** What each part did after the head, with its message number if it is a message. */
+    rows: ReadonlyArray<{ entry: VizLiveStep; number: number | null }>;
     held: boolean;
     routes: VizOutputRoutes | undefined;
   },
 ): HTMLElement {
-  const { machine, step, own, routes } = context;
+  const { machine, step, own, rows, routes } = context;
   const newest = context.index === context.total - 1;
-  // An advance's own entry is the first move its timer caused: it reads as a row.
-  const rows = step.kind === "advance" ? [own, ...context.after] : context.after;
   const taken = new Set(
-    rows.flatMap((entry) => (entry.message === undefined ? [] : [entry.event])),
+    rows.flatMap(({ entry }) => (entry.message === undefined ? [] : [entry.event])),
   );
   const extras = (entry: VizLiveStep) => [
     errorLine(doc, entry),
@@ -367,29 +364,25 @@ function stepItem(
       ? notRunLine(doc, { machine, step: entry })
       : null,
   ];
-  let next = context.firstMessage;
+  const ignored = own?.outcome === "ignored";
   return html(
     doc,
     "li",
     {
       "data-step": String(context.index + 1),
       class: newest ? "explore-outcome" : null,
-      "data-outcome": newest ? own.outcome : null,
+      "data-outcome": newest && own !== null ? own.outcome : null,
     },
     [
-      html(doc, "p", { "data-live-outcome": "" }, [
-        `Step ${context.index + 1} of ${context.total}: `,
-        ...(step.kind === "advance"
-          ? [`time passed ${step.ms} ms`]
+      html(doc, "p", { "data-live-outcome": "", "data-live-dropped": ignored ? "" : null }, [
+        `${ignored ? "! " : ""}Step ${context.index + 1} of ${context.total}: `,
+        ...(step.kind === "advance" || own === null
+          ? [`time passed ${step.kind === "advance" ? step.ms : 0} ms`]
           : outcomeText(doc, machine, own)),
       ]),
-      ...(step.kind === "advance" ? [] : extras(own)),
-      ...rows.flatMap((entry) => [
-        afterLine(doc, {
-          machine,
-          step: entry,
-          number: entry.message === undefined ? null : next++,
-        }),
+      ...(step.kind === "advance" || own === null ? [] : extras(own)),
+      ...rows.flatMap(({ entry, number }) => [
+        afterLine(doc, { machine, step: entry, number }),
         ...extras(entry),
       ]),
     ],
@@ -397,42 +390,33 @@ function stepItem(
 }
 
 /** Every step of the walk, oldest first; messages are numbered over the whole walk. */
-function liveResultSection(
+function runList(
   doc: Document,
   live: {
     machine: VizMachine;
     state: VizLiveState;
-    lasts: ReadonlyArray<VizLiveStep> | undefined;
+    lasts: ReadonlyArray<VizLiveStep | null>;
     afters: ReadonlyArray<ReadonlyArray<VizLiveStep>> | undefined;
     routes: VizOutputRoutes | undefined;
   },
 ): HTMLElement {
-  const { machine, state, routes } = live;
+  const { machine, state, routes, lasts } = live;
   const total = state.steps.length;
   const held = state.effectMode === "held";
   let messages = 1;
   const items = state.steps.map((step, index) => {
-    const own = index === total - 1 ? state.last : (live.lasts?.[index] ?? null);
-    if (own === null) return null;
+    const own = lasts[index] ?? null;
     const after = index === total - 1 ? state.after : (live.afters?.[index] ?? []);
-    const item = stepItem(doc, {
-      machine,
-      index,
-      total,
-      step,
-      own,
-      after,
-      firstMessage: messages,
-      held,
-      routes,
-    });
-    messages += [...(step.kind === "advance" ? [own] : []), ...after].filter(
-      (entry) => entry.message !== undefined,
-    ).length;
-    return item;
+    // An advance's own entry is the first move its timer caused: it reads as a row.
+    const entries = step.kind === "advance" && own !== null ? [own, ...after] : after;
+    const rows = entries.map((entry) => ({
+      entry,
+      number: entry.message === undefined ? null : messages++,
+    }));
+    return stepItem(doc, { machine, index, total, step, own, rows, held, routes });
   });
   // A driver that threw reports an entry that no step of the walk owns.
-  const orphan = state.last !== null && state.last !== live.lasts?.[total - 1] ? state.last : null;
+  const orphan = state.last !== null && state.last !== lasts[total - 1] ? state.last : null;
   return html(doc, "div", { class: "explore-live" }, [
     total === 0
       ? html(doc, "p", { class: "muted", "data-live-empty": "" }, [
@@ -463,7 +447,7 @@ function liveParts(
   const { state } = live;
   const moves: LiveMoves = { state, picked: live.picked ?? null, pick: live.pick };
   return [
-    liveResultSection(doc, {
+    runList(doc, {
       machine,
       state,
       lasts: live.lasts,
