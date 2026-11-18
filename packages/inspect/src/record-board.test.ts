@@ -31,7 +31,11 @@ ${body}`,
   const result = spawnSync(
     join(PACKAGE, "node_modules/.bin/vp"),
     ["test", "run", "--root", dir, "--silent=false"],
-    { cwd: PACKAGE, env: { ...process.env, CI: "" }, encoding: "utf8" },
+    {
+      cwd: PACKAGE,
+      env: { ...process.env, CI: "", FORCE_COLOR: "0", NO_COLOR: "1" },
+      encoding: "utf8",
+    },
   );
   const lines = `${result.stdout}${result.stderr}`
     .split("\n")
