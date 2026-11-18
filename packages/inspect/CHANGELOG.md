@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.47.0
+
+<sub>2026-11-18</sub>
+
+- _(minor)_ The live record names the part whose change or send caused a message as its sender.
+- _(minor)_ `<Machine run="name">` opens the diagram on a recorded run.
+
 ## 0.46.0
 
 <sub>2026-11-18</sub>
