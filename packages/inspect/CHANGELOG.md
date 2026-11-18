@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.46.0
+
+<sub>2026-11-18</sub>
+
+- _(minor)_
+  inspect reads handlers registered in another source file of the program (a pool built with createPool), with that file's descriptions; sugar documents its pool states and two handlers
+- _(patch)_
+  [user]: An arrow reads a negated name as written: `if (!hasFood) return` shows `hasFood`, `if (noFood) return` shows `!noFood`.
+
 ## 0.45.0
 
 <sub>2026-11-17</sub>

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.39.0
+
+<sub>2026-11-18</sub>
+
+- _(minor)_
+  [user]: An arrow reads a negated name as written: `if (!hasFood) return` shows `hasFood`, `if (noFood) return` shows `!noFood`.
+- _(patch)_ [user]: The viz overlap check skips shapes that are far apart, so a board with many routes draws in seconds
+
 ## 0.38.0
 
 <sub>2026-11-17</sub>
