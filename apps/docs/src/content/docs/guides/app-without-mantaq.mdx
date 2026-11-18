@@ -85,7 +85,7 @@ Then paste this to your agent:
 
 <Code code={ask} lang="text" title="The ask" wrap />
 
-The agent writes two files, `signup-model.ts` and `signup.spec.ts`, and `npx playwright test` prints `1 passed`. That means 100 walks of up to 30 actions, with the page and the model compared after each, and every arrow in the model taken. A model with one or two states proves little.
+The agent writes `signup-model.ts` and `signup.spec.ts` (the adapter may be a third file), and `npx playwright test` prints `1 passed`. That means 100 walks of up to 30 actions, with the page and the model compared after each, and every arrow in the model taken. A model with one or two states proves little.
 
 Now break the email check: in `index.html` change `!EMAIL.test(email)` to `!email.includes("@")` and run again. The test fails with the shortest actions that reach it. With our model of the form it prints:
 
