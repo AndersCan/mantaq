@@ -63,7 +63,7 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 
 ## Rules
 
-- **Start from the example.** `patterns.md` has a complete machine: imports, states, events, a handler and a timer effect; `testing.md` shows how to test it. Copy its shape first, then check signatures against the installed types.
+- **Start from the example.** `patterns.md` has a complete machine: imports, states, events, a handler and a timer effect; `testing.md` shows how to test it, and how to test a web page against its model. Copy its shape first, then check signatures against the installed types.
 - All timing through the injected clock. No real timers, `Date.now` or `Math.random` in effects.
 - Effects check `signal.aborted` before emitting, and hand the abort signal to any timer they create.
 - Declare payload types at boundaries. Bare `state("x")()` has payload `unknown`.
@@ -95,5 +95,5 @@ A design ask that changes what the app does today: your FINAL answer to the pers
 - `designing.md`. Design a machine in the code, with the live page open
 - `sugar.md`. Sugar helpers: what exists and when to use each
 - `patterns.md`. Recipes: async effects, retries, regions, event sourcing
-- `testing.md`. Virtual clock, `@mantaq/test`, coverage
+- `testing.md`. Virtual clock, `@mantaq/test`, coverage, testing an app or a web page against its model
 - `reviewing.md`. Review your actor code against mantaq conventions
