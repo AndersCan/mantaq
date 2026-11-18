@@ -138,8 +138,12 @@
   overflow: auto;
 }
 
+.viz .tab-panel[data-tab-panel="screen"] {
+  max-height: 60vh;
+}
+
 .viz .canvas [tabindex] {
-  scroll-margin-bottom: calc(25vh + 80px);
+  scroll-margin-bottom: calc(60vh + 80px);
 }
 
 .viz .panel dl {
