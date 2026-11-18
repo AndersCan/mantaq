@@ -561,9 +561,9 @@ describe("mountViewer with a driver", () => {
   test("a handler error is shown", () => {
     const root = mountLive();
     send(root, "boom");
-    expect(root.querySelector("[data-live-error]")?.textContent).toBe(
+    expect([...root.querySelectorAll("[data-live-error]")].map((p) => p.textContent)).toEqual([
       "Handler threw: handler failed",
-    );
+    ]);
   });
 
   test("back and reset replay the log through the driver", () => {

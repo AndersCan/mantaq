@@ -1213,8 +1213,8 @@ describe("what ran", () => {
       waiting: [],
     });
     const after = root.querySelector("[data-live-after]");
-    expect(after?.textContent).toContain("checkout took paymentTimeout");
-    expect(after?.textContent).toContain("paying → error");
+    expect(after?.textContent).toBe("checkout took paymentTimeout on its own: paying → error");
+    expect(after?.hasAttribute("data-message")).toBe(false);
   });
 
   test("a message with no sender reads `took`, without `on its own`", () => {
@@ -1268,6 +1268,39 @@ describe("what ran", () => {
     const second = root.querySelector('[data-step="2"]');
     expect(second?.querySelectorAll("[data-live-sent]")).toHaveLength(1);
     expect(second?.querySelector("[data-message]")?.getAttribute("data-message")).toBe("1");
+  });
+
+  test("an output named like a row that carries no message is still shown", () => {
+    const inner = driver();
+    const own: VizLiveStep = {
+      from: "paying",
+      event: "paymentTimeout",
+      to: "error",
+      outcome: "transition",
+      effects: [],
+      sent: ["paymentTimeout"],
+      context: null,
+      error: null,
+    };
+    const timed = (live: VizLiveState): VizLiveState => {
+      const step = live.steps.at(-1);
+      if (step?.kind === "advance") return { ...live, last: own, after: [] };
+      return live;
+    };
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] },
+      {
+        driver: { ...inner, reset: () => timed(inner.reset()), step: (s) => timed(inner.step(s)) },
+        steps: ['submit={"amount":5}', "@800"],
+      },
+    );
+    const second = root.querySelector('[data-step="2"]');
+    expect(second?.querySelector("[data-message]")).toBeNull();
+    expect(
+      [...(second?.querySelectorAll("[data-live-sent]") ?? [])].map((p) => p.textContent),
+    ).toEqual(["checkout sent paymentTimeout out"]);
   });
 
   test("Details after a send to a part that is not there says nothing ran", () => {
