@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.40.0
+
+<sub>2026-11-18</sub>
+
+- _(minor)_
+  [user]: The Step tab lists every step of the walk, oldest first, and numbers each message under the step that caused it (`3. folders sent STATUS_SEEN to sync: stayed in albumNotChecked`). A message nobody took reads `! 4. kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak`. "Sent out", the second "Handler threw" block and the grey "Then …" rows are gone; `[data-outcome]` is on the newest step only.
+- _(patch)_ The Step panel stays at the bottom of the window while the board scrolls.
+- _(patch)_ Child chips in the Dynamic Children and Pool views are easier to click.
+
 ## 0.39.0
 
 <sub>2026-11-18</sub>
