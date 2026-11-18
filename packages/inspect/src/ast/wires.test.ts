@@ -6,12 +6,27 @@ import { quiet as quietMachine } from "../fixtures/wired/quiet.ts";
 import { sketchDraft as sketchMachine } from "../fixtures/wired/sketch.ts";
 import { findWires, scanAppCode } from "./wires.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ts from "typescript";
 import { describe, expect, test } from "vite-plus/test";
 
 const DIR = join(import.meta.dirname, "..", "fixtures", "wired");
 const ROOT = join(import.meta.dirname, "..", "fixtures");
+
+/**
+ * A scratch app dir outside the package: another test's TypeScript scan reads
+ * every file under the fixtures' tsconfig, so a file written there mid-run
+ * changes which machines it finds run and heard.
+ */
+function scratch(extendsConfig: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "wires-"));
+  writeFileSync(
+    join(dir, "tsconfig.json"),
+    JSON.stringify({ extends: extendsConfig, include: ["."] }),
+  );
+  return dir;
+}
 const files = ["sender.ts", "receiver.ts"].map((name) => join(DIR, name));
 const sketch = join(DIR, "sketch.ts");
 const quiet = join(DIR, "quiet.ts");
@@ -71,13 +86,12 @@ describe("scanAppCode", () => {
   });
 
   test("an export is listed only when it has a create and an id of a known machine", async () => {
-    const dir = mkdtempSync(join(ROOT, "wired", "tmp-"));
+    const dir = scratch(join(DIR, "tsconfig.json"));
     try {
       writeFileSync(
         join(dir, "lookalikes.ts"),
         'export const noCreate = { id: "sketch" } as const;\nexport const unknown = { id: "nope", create: () => 1 } as const;\n',
       );
-      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
       const sketched = await inspectModule(sketch, {
         load: async () => ({ sketchDraft: sketchMachine }),
         fuzz: false,
@@ -94,13 +108,12 @@ describe("scanAppCode", () => {
   });
 
   test("a factory passed as a value counts as run", async () => {
-    const dir = mkdtempSync(join(ROOT, "wired", "tmp-"));
+    const dir = scratch(join(DIR, "tsconfig.json"));
     try {
       writeFileSync(
         join(dir, "use.ts"),
-        'import { sketchDraft as make } from "../sketch.ts";\nexport const list = [1].map(() => make.create());\n',
+        `import { sketchDraft as make } from ${JSON.stringify(sketch)};\nexport const list = [1].map(() => make.create());\n`,
       );
-      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
       const sketched = await inspectModule(sketch, {
         load: async () => ({ sketchDraft: sketchMachine }),
         fuzz: false,
@@ -120,13 +133,11 @@ describe("scanAppCode", () => {
 describe("scanAppCode unheard outputs", () => {
   const UNHEARD = join(ROOT, "wired-unheard");
   const duo = join(UNHEARD, "duo.ts");
-  const header =
-    'import { duo } from "../duo.ts";\nconst actor = duo.create();\nfunction note(): void {}\n';
+  const header = `import { duo } from ${JSON.stringify(duo)};\nconst actor = duo.create();\nfunction note(): void {}\n`;
 
   async function unheardWith(listeners: string | null) {
-    const dir = mkdtempSync(join(UNHEARD, "tmp-"));
+    const dir = scratch(join(UNHEARD, "tsconfig.json"));
     try {
-      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../tsconfig.json","include":["."]}');
       if (listeners !== null) writeFileSync(join(dir, "use.ts"), header + listeners);
       const duoed = await inspectModule(duo, {
         load: async () => ({ duo: duoMachine }),
@@ -294,13 +305,12 @@ describe("findWires", () => {
   });
 
   test("an early-return type guard names the output the listener hears", async () => {
-    const dir = mkdtempSync(join(ROOT, "wired-edges", "tmp-"));
+    const dir = scratch(join(ROOT, "wired-edges", "tsconfig.json"));
     try {
-      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../../../../tsconfig.json"}');
       const file = join(dir, "listen.ts");
       writeFileSync(
         file,
-        'import { receiverActor, take } from "../../wired/receiver.ts";\nimport { senderActor } from "../../wired/sender.ts";\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    if (e.type !== "handedOver") return;\n    receiverActor.send(take.create());\n  },\n});\n',
+        `import { receiverActor, take } from ${JSON.stringify(join(DIR, "receiver.ts"))};\nimport { senderActor } from ${JSON.stringify(join(DIR, "sender.ts"))};\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    if (e.type !== "handedOver") return;\n    receiverActor.send(take.create());\n  },\n});\n`,
       );
       const found = findWires({ root: ROOT, files: [file], machines: await machines() });
       expect(found.map((wire) => wire.trigger)).toEqual(["handedOver"]);
@@ -359,13 +369,12 @@ describe("findWires", () => {
       "handedOver",
     ],
   ])("early-return trigger: %s", async (_name, body, trigger) => {
-    const dir = mkdtempSync(join(ROOT, "wired-edges", "tmp-"));
+    const dir = scratch(join(ROOT, "wired-edges", "tsconfig.json"));
     try {
-      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../../../../tsconfig.json"}');
       const file = join(dir, "listen.ts");
       writeFileSync(
         file,
-        `import { receiverActor, take } from "../../wired/receiver.ts";\nimport { senderActor } from "../../wired/sender.ts";\nconst note = () => {};\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    ${body}\n  },\n});\n`,
+        `import { receiverActor, take } from ${JSON.stringify(join(DIR, "receiver.ts"))};\nimport { senderActor } from ${JSON.stringify(join(DIR, "sender.ts"))};\nconst note = () => {};\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    ${body}\n  },\n});\n`,
       );
       const found = findWires({ root: ROOT, files: [file], machines: await machines() });
       expect([...new Set(found.map((wire) => wire.trigger))]).toEqual([trigger]);
@@ -375,13 +384,12 @@ describe("findWires", () => {
   });
 
   test("ignores listeners in test files", async () => {
-    const dir = mkdtempSync(join(ROOT, "wired-edges", "tmp-"));
+    const dir = scratch(join(ROOT, "wired-edges", "tsconfig.json"));
     try {
-      writeFileSync(join(dir, "tsconfig.json"), '{"extends":"../../../../tsconfig.json"}');
       const file = join(dir, "listen.test.ts");
       writeFileSync(
         file,
-        'import { receiverActor, take } from "../../wired/receiver.ts";\nimport { senderActor } from "../../wired/sender.ts";\nsenderActor.on("change", { fn: () => receiverActor.send(take.create()) });\n',
+        `import { receiverActor, take } from ${JSON.stringify(join(DIR, "receiver.ts"))};\nimport { senderActor } from ${JSON.stringify(join(DIR, "sender.ts"))};\nsenderActor.on("change", { fn: () => receiverActor.send(take.create()) });\n`,
       );
       expect(findWires({ root: ROOT, files: [file], machines: await machines() })).toEqual([]);
     } finally {
