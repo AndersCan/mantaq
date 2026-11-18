@@ -232,8 +232,8 @@ describe("live actor map children", () => {
 
   test.each([
     ["transition", /^Sent uploadConfirmed to p1: .*sendingPhoto → .*waitingForRetry$/],
-    ["stay", /^Sent uploadConfirmed to p1: handled in sendingPhoto, stays$/],
-    ["ignored", /^Sent uploadConfirmed to p1: No handler for uploadConfirmed in .*sendingPhoto/],
+    ["stay", /^Sent uploadConfirmed to p1: stayed in sendingPhoto$/],
+    ["ignored", /^Sent uploadConfirmed to p1: lost, nobody took it in .*sendingPhoto$/],
   ] as const)(
     "after a child arrow's Details send, the Details say who got it and its %s",
     (outcome, text) => {
@@ -476,18 +476,18 @@ describe("live actor map children", () => {
     }));
     sendFrom(root, "p1", "uploadConfirmed");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
-      "uploadConfirmed: p1 sendingPhoto → photoSent",
+      "Step 1 of 1: uploadConfirmed to p1: sendingPhoto → photoSent",
     );
   });
 
-  test("a child that handled the event and stayed reads handled in", () => {
+  test("a child that handled the event and stayed reads stayed in", () => {
     const { root } = mount([child("p1", "waitingForRetry")], photoQueue, () => ({
       ...stepOf("retryPressed", "photos.waitingForRetry", "photos.waitingForRetry", "stay"),
       actor: { map: "photos", key: "p1" },
     }));
     sendFrom(root, "p1", "retryPressed");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
-      "retryPressed: p1 handled in waitingForRetry, stays",
+      "Step 1 of 1: retryPressed to p1: stayed in waitingForRetry",
     );
   });
 
@@ -499,7 +499,7 @@ describe("live actor map children", () => {
     }));
     sendFrom(root, "p1", "uploadConfirmed");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
-      "uploadConfirmed: photos p1 sendingPhoto → photoSent",
+      "Step 1 of 1: uploadConfirmed to photos p1: sendingPhoto → photoSent",
     );
   });
 
@@ -510,7 +510,7 @@ describe("live actor map children", () => {
     }));
     sendFrom(root, "p1", "uploadConfirmed");
     expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
-      "p9 is not in photos. Nothing ran.",
+      "Step 1 of 1: p9 is not in photos. Nothing ran.",
     );
   });
 

@@ -59,8 +59,8 @@ describe("the docs photo queue on the live page", () => {
     root.querySelector<HTMLElement>('li[data-child-key="p1"]')?.click();
     sendVia(root, "uploadConfirmed");
     expect(children(root).find((each) => each.key === "p1")?.state).toBe("photos.photoSent");
-    expect(root.querySelector("[data-live-outcome]")?.textContent).toBe(
-      "uploadConfirmed: p1 sendingPhoto → photoSent",
+    expect(root.querySelector(".explore-outcome [data-live-outcome]")?.textContent).toMatch(
+      /: uploadConfirmed to p1: sendingPhoto → photoSent$/,
     );
   });
 

@@ -24,6 +24,8 @@ export interface ExploreContext {
     state: VizLiveState;
     /** Entry i is what moved after `state.steps[i]`, as the driver reported it then. */
     afters?: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
+    /** Entry i is the step's own entry (`live.last`) when it was taken. */
+    lasts?: ReadonlyArray<VizLiveStep>;
     /** Where each output of the shown machine goes; unset: only the output names show. */
     routes?: VizOutputRoutes;
     send: (step: VizStep) => void;
@@ -66,11 +68,6 @@ export function button(
 }
 
 type ChildRef = { map: string; key: string };
-
-/** The key, with the map name only when the machine has more than one map. */
-function childWho(doc: Document, machine: VizMachine, ref: ChildRef): Array<Node | string> {
-  return [code(doc, childWhoText(machine, ref))];
-}
 
 export function childWhoText(machine: VizMachine, ref: ChildRef): string {
   return machine.maps.length > 1 ? `${ref.map} ${ref.key}` : ref.key;
@@ -227,47 +224,60 @@ export function outcomeText(
       ? ["No region ", code(doc, region ?? ""), " in this machine. Nothing ran."]
       : [code(doc, child.key), " is not in ", code(doc, child.map), ". Nothing ran."];
   }
-  if (step.outcome === "ignored") {
-    return ["No handler for ", code(doc, step.event), ` in ${step.from}. Nothing ran.`];
-  }
   const names = (id: string) => (region === undefined ? id : localName(id));
-  const where =
-    child !== undefined
-      ? [": ", ...childWho(doc, machine, child), " "]
-      : region === undefined
-        ? [": "]
-        : [": ", code(doc, region), ": "];
-  return [
-    code(doc, step.event),
-    ...where,
-    step.outcome === "transition"
-      ? `${names(step.from)} → ${names(step.to)}`
-      : `handled in ${names(step.from)}, stays`,
-  ];
+  const who = step.actor === undefined ? "" : ` to ${partName(machine, step.actor)}`;
+  return [code(doc, step.event), `${who}: `, tailText(step, names)];
 }
 
-function sentLine(
+/** Where the part went, or that nobody took the event. */
+function tailText(step: VizLiveStep, names: (id: string) => string): string {
+  if (step.outcome === "transition") return `${names(step.from)} → ${names(step.to)}`;
+  if (step.outcome === "stay") return `stayed in ${names(step.from)}`;
+  return `lost, nobody took it in ${names(step.from)}`;
+}
+
+/** What a moved part is called in a sentence: the machine, a region path, or a map child. */
+function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
+  if (actor === undefined) return machine.id;
+  return "region" in actor ? actor.region : childWhoText(machine, actor);
+}
+
+function errorLine(doc: Document, step: VizLiveStep): HTMLElement | null {
+  if (step.error === null) return null;
+  return html(doc, "p", { class: "explore-warning", role: "alert", "data-live-error": "" }, [
+    `Handler threw: ${step.error}`,
+  ]);
+}
+
+/** Outputs the machine sent out that no message row of the same step carries. */
+function outputRows(
   doc: Document,
-  context: { machine: VizMachine; step: VizLiveStep; routes: VizOutputRoutes | undefined },
-): HTMLElement | null {
-  const { machine, step, routes } = context;
-  if (step.sent.length === 0) return null;
-  return html(doc, "p", { "data-live-sent": "" }, [
-    "Sent out: ",
-    ...step.sent.flatMap((output, index) => {
-      const found = routes?.[machine.id]?.[output] ?? [];
-      return [
-        index === 0 ? "" : "; ",
+  context: {
+    machine: VizMachine;
+    step: VizLiveStep;
+    taken: ReadonlySet<string>;
+    routes: VizOutputRoutes | undefined;
+  },
+): HTMLElement[] {
+  const { machine, step, taken, routes } = context;
+  return step.sent.flatMap((output) => {
+    const found = (routes?.[machine.id]?.[output] ?? []).filter((route) => !taken.has(route.event));
+    const routed = (routes?.[machine.id]?.[output] ?? []).length > 0;
+    if (routed && found.length === 0) return [];
+    return [
+      html(doc, "p", { "data-live-sent": "" }, [
+        `${partName(machine, step.actor)} sent `,
         code(doc, output),
+        " out",
         ...found.flatMap((route, at) => [
-          at === 0 ? " → " : ", ",
+          at === 0 ? ": " : ", ",
           code(doc, route.to),
           " takes ",
           code(doc, route.event),
         ]),
-      ];
-    }),
-  ]);
+      ]),
+    ];
+  });
 }
 
 function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLiveStep }) {
@@ -292,124 +302,144 @@ function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLive
   ]);
 }
 
-function stepLines(
+/** A part's move after the step's own: a numbered message from a sender, or a part acting on its own. */
+function afterLine(
+  doc: Document,
+  context: { machine: VizMachine; step: VizLiveStep; number: number | null },
+): HTMLElement {
+  const { machine, step, number } = context;
+  const lost = step.message !== undefined && step.message.dropped !== null;
+  const sent = step.message?.sender ?? null;
+  const sender = sent === "" ? machine.id : sent;
+  const receiver = partName(machine, step.actor);
+  const names = localName;
+  const tail = tailText(step, names);
+  const lead = number === null ? "" : `${lost ? "! " : ""}${number}. `;
+  const body =
+    sender !== null
+      ? [`${sender} sent `, code(doc, step.event), ` to ${receiver}: ${tail}`]
+      : lost
+        ? [code(doc, step.event), ` to ${receiver}: ${tail}`]
+        : [
+            `${receiver} took `,
+            code(doc, step.event),
+            number === null ? " on its own" : "",
+            `: ${tail}`,
+          ];
+  return html(
+    doc,
+    "p",
+    {
+      "data-live-after": "",
+      "data-message": number === null ? null : String(number),
+      "data-live-dropped": lost ? "" : null,
+    },
+    [lead, ...body],
+  );
+}
+
+/** One step of the walk: its head, then what each part did because of it. */
+function stepItem(
   doc: Document,
   context: {
     machine: VizMachine;
-    step: VizLiveStep;
+    index: number;
+    total: number;
+    step: VizStep;
+    own: VizLiveStep;
+    after: ReadonlyArray<VizLiveStep>;
+    firstMessage: number;
     held: boolean;
     routes: VizOutputRoutes | undefined;
   },
-): Array<HTMLElement | null> {
-  const { machine, step } = context;
-  return [
-    html(doc, "p", { "data-live-outcome": "" }, outcomeText(doc, machine, step)),
-    sentLine(doc, { machine, step, routes: context.routes }),
-    step.effects.length > 0 && context.held ? notRunLine(doc, { machine, step }) : null,
+): HTMLElement {
+  const { machine, step, own, routes } = context;
+  const newest = context.index === context.total - 1;
+  // An advance's own entry is the first move its timer caused: it reads as a row.
+  const rows = step.kind === "advance" ? [own, ...context.after] : context.after;
+  const taken = new Set(
+    rows.flatMap((entry) => (entry.message === undefined ? [] : [entry.event])),
+  );
+  const extras = (entry: VizLiveStep) => [
+    errorLine(doc, entry),
+    ...outputRows(doc, { machine, step: entry, taken, routes }),
+    newest && context.held && entry.effects.length > 0
+      ? notRunLine(doc, { machine, step: entry })
+      : null,
   ];
+  let next = context.firstMessage;
+  return html(
+    doc,
+    "li",
+    {
+      "data-step": String(context.index + 1),
+      class: newest ? "explore-outcome" : null,
+      "data-outcome": newest ? own.outcome : null,
+    },
+    [
+      html(doc, "p", { "data-live-outcome": "" }, [
+        `Step ${context.index + 1} of ${context.total}: `,
+        ...(step.kind === "advance"
+          ? [`time passed ${step.ms} ms`]
+          : outcomeText(doc, machine, own)),
+      ]),
+      ...(step.kind === "advance" ? [] : extras(own)),
+      ...rows.flatMap((entry) => [
+        afterLine(doc, {
+          machine,
+          step: entry,
+          number: entry.message === undefined ? null : next++,
+        }),
+        ...extras(entry),
+      ]),
+    ],
+  );
 }
 
+/** Every step of the walk, oldest first; messages are numbered over the whole walk. */
 function liveResultSection(
   doc: Document,
   live: {
     machine: VizMachine;
     state: VizLiveState;
+    lasts: ReadonlyArray<VizLiveStep> | undefined;
+    afters: ReadonlyArray<ReadonlyArray<VizLiveStep>> | undefined;
     routes: VizOutputRoutes | undefined;
   },
 ): HTMLElement {
   const { machine, state, routes } = live;
-  const { last, after } = state;
+  const total = state.steps.length;
   const held = state.effectMode === "held";
+  let messages = 1;
+  const items = state.steps.map((step, index) => {
+    const own = index === total - 1 ? state.last : (live.lasts?.[index] ?? null);
+    if (own === null) return null;
+    const after = index === total - 1 ? state.after : (live.afters?.[index] ?? []);
+    const item = stepItem(doc, {
+      machine,
+      index,
+      total,
+      step,
+      own,
+      after,
+      firstMessage: messages,
+      held,
+      routes,
+    });
+    messages += [...(step.kind === "advance" ? [own] : []), ...after].filter(
+      (entry) => entry.message !== undefined,
+    ).length;
+    return item;
+  });
+  // A driver that threw reports an entry that no step of the walk owns.
+  const orphan = state.last !== null && state.last !== live.lasts?.[total - 1] ? state.last : null;
   return html(doc, "div", { class: "explore-live" }, [
-    last === null
-      ? null
-      : html(doc, "div", { class: "explore-outcome", "data-outcome": last.outcome }, [
-          ...stepLines(doc, { machine, step: last, held, routes }),
-          last.error === null
-            ? null
-            : html(
-                doc,
-                "p",
-                {
-                  class: "explore-warning",
-                  role: "alert",
-                  "data-live-error": "",
-                },
-                [`Handler threw: ${last.error}`],
-              ),
-          ...after.map((step) =>
-            html(doc, "div", { "data-live-after": "" }, [
-              afterLine(doc, { machine, step }),
-              ...stepLines(doc, {
-                machine,
-                step,
-                held,
-                routes,
-              }),
-              step.error === null
-                ? null
-                : html(
-                    doc,
-                    "p",
-                    {
-                      class: "explore-warning",
-                      role: "alert",
-                      "data-live-error": "",
-                    },
-                    [`Handler threw: ${step.error}`],
-                  ),
-            ]),
-          ),
-        ]),
-  ]);
-}
-
-/** What a moved part is called in a sentence: the machine, a region path, or a map child. */
-function partName(machine: VizMachine, actor: VizActorRef | undefined): string {
-  if (actor === undefined) return machine.id;
-  return "region" in actor ? actor.region : childWhoText(machine, actor);
-}
-
-/** Whether a part had no handler for a message another part sent it. */
-function isDropped(step: VizLiveStep): boolean {
-  return step.message !== undefined && step.message.dropped !== null;
-}
-
-/** The sender as the row names it ("" is the machine itself); null when no part is known to have sent it. */
-function senderName(machine: VizMachine, step: VizLiveStep): string | null {
-  const sender = step.message?.sender ?? null;
-  return sender === "" ? machine.id : sender;
-}
-
-/** The line above a later step: who sent it to whom, and where the receiver went; a dropped one says so and why. */
-function afterLine(
-  doc: Document,
-  context: { machine: VizMachine; step: VizLiveStep },
-): HTMLElement {
-  const { machine, step } = context;
-  const sender = senderName(machine, step);
-  const receiver = partName(machine, step.actor);
-  if (sender !== null && isDropped(step)) {
-    return html(doc, "p", { "data-live-dropped": "" }, [
-      "! Then ",
-      `${sender} sent `,
-      code(doc, step.event),
-      ` to ${receiver}: dropped.`,
-    ]);
-  }
-  if (sender !== null) {
-    return html(doc, "p", { class: "muted" }, [
-      `Then ${sender} sent `,
-      code(doc, step.event),
-      step.outcome === "transition"
-        ? ` to ${receiver}: ${localName(step.from)} → ${localName(step.to)}`
-        : ` to ${receiver}`,
-    ]);
-  }
-  return html(doc, "p", { class: "muted" }, [
-    `Then ${receiver} took `,
-    code(doc, step.event),
-    step.outcome === "transition" ? `: ${localName(step.from)} → ${localName(step.to)}` : "",
+    total === 0
+      ? html(doc, "p", { class: "muted", "data-live-empty": "" }, [
+          "No steps yet. Click an arrow on the board to send an event.",
+        ])
+      : html(doc, "ol", { class: "explore-run" }, items),
+    orphan === null ? null : errorLine(doc, orphan),
   ]);
 }
 
@@ -436,6 +466,8 @@ function liveParts(
     liveResultSection(doc, {
       machine,
       state,
+      lasts: live.lasts,
+      afters: live.afters,
       routes: live.routes,
     }),
     ...childrenSections(doc, machine, moves),

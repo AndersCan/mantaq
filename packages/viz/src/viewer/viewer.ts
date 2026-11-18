@@ -42,6 +42,8 @@ interface ViewState {
   live: VizLiveState | null;
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
   afters: VizLiveStep[][];
+  /** Entry i is the step's own entry (`live.last`) when `live.steps[i]` was taken. */
+  lasts: VizLiveStep[];
   /** Live: the followed child, set by a chip click; null = the lowest key. */
   picked: { map: string; key: string } | null;
   /** The panel tab shown. */
@@ -326,8 +328,7 @@ function sentOutcome(
     if (last === null) return null;
     const text = outcomeText(doc, machine, last);
     // A move's text opens with the event and who ran it, which the sent line already names.
-    const moved = last.outcome === "transition" || last.outcome === "stay";
-    const tail = moved ? [": ", ...text.slice(-1)] : [": ", ...text];
+    const tail = last.outcome === "missing" ? [": ", ...text] : [": ", ...text.slice(-1)];
     return last.error === null ? tail : [...tail, `. It threw: ${last.error}`];
   }
   return null;
@@ -441,6 +442,7 @@ function initialView(options: ViewerOptions): ViewState {
     selection: null,
     live: null,
     afters: [],
+    lasts: [],
     picked: null,
     tab: options.screen !== undefined ? "screen" : "step",
     diagramOnly: options.diagramOnly ?? false,
@@ -542,6 +544,7 @@ function liveOf(
     live: {
       state: view.live,
       afters: view.afters,
+      lasts: view.lasts,
       picked: view.picked,
       values: view.values,
       ...handlers,
@@ -572,6 +575,7 @@ function watchDriver(
     view.live = state;
     if (view.afters.length > 0 && view.afters.length === state.steps.length) {
       view.afters[view.afters.length - 1] = state.after;
+      if (state.last !== null) view.lasts[view.lasts.length - 1] = state.last;
     }
     context.redraw();
   });
@@ -661,6 +665,7 @@ function stepInto(view: ViewState, driver: VizDriver, step: VizStep): void {
   view.live = stepSafely(driver, { before: view.live, step });
   if (view.live.steps.length === length + 1) {
     view.afters.push(view.live.after);
+    if (view.live.last !== null) view.lasts.push(view.live.last);
   }
 }
 
@@ -669,6 +674,7 @@ function replayInto(view: ViewState, driver: VizDriver, steps: ReadonlyArray<Viz
   const played = replay(driver, steps);
   view.live = played.live;
   view.afters = played.afters;
+  view.lasts = played.lasts;
 }
 
 /** A driver that throws leaves the state where it was and shows the message as a handler error. */
@@ -789,16 +795,18 @@ function liveState(view: ViewState): { currents?: string[] } {
 function replay(
   driver: VizDriver,
   steps: ReadonlyArray<VizStep>,
-): { live: VizLiveState; afters: VizLiveStep[][] } {
+): { live: VizLiveState; afters: VizLiveStep[][]; lasts: VizLiveStep[] } {
   let live = driver.reset();
   const afters: VizLiveStep[][] = [];
+  const lasts: VizLiveStep[] = [];
   for (const step of steps) {
     const length = live.steps.length;
     live = stepSafely(driver, { before: live, step });
     if (live.steps.length === length + 1) {
       afters.push(live.after);
+      if (live.last !== null) lasts.push(live.last);
     }
-    if (live.last?.error) return { live, afters };
+    if (live.last?.error) return { live, afters, lasts };
   }
-  return { live, afters };
+  return { live, afters, lasts };
 }

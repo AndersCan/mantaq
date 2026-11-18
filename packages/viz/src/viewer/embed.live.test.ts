@@ -229,6 +229,9 @@ describe("live controls", () => {
     expect(timer?.textContent).toBe("advance 800 ms → paymentTimeout");
     click(root, "[data-advance-timer]");
     expect(current(root)).toBe("error");
+    expect(root.querySelector("[data-step='2'] [data-live-outcome]")?.textContent).toBe(
+      "Step 2 of 2: time passed 800 ms",
+    );
   });
 
   test("the timer label counts down the time already advanced", () => {
@@ -1032,7 +1035,7 @@ describe("what ran", () => {
     return { live, push: (state: VizLiveState) => onChange(state) };
   }
 
-  test("Sent out names each output, with where the app takes it when the page knows", () => {
+  test("a root output shows once, with where the app takes it when the page knows", () => {
     const routes: VizOutputRoutes = {
       [branching.id]: { openAlbum: [{ to: "router", event: "NAVIGATED", at: "a.ts:72" }] },
     };
@@ -1041,23 +1044,37 @@ describe("what ran", () => {
     };
     const routed = mountWith(branching, stepped({ sent: ["openAlbum"] }).live, routes);
     send(routed);
-    expect(text(routed, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED");
+    expect(text(routed, "sent")).toBe("checkout sent openAlbum out: router takes NAVIGATED");
 
     const bare = mountWith(branching, stepped({ sent: ["openAlbum"] }).live);
     send(bare);
-    expect(text(bare, "sent")).toBe("Sent out: openAlbum");
-
-    const several = mountWith(
-      branching,
-      stepped({ sent: ["openAlbum", "ANSWER_SENT"] }).live,
-      routes,
-    );
-    send(several);
-    expect(text(several, "sent")).toBe("Sent out: openAlbum → router takes NAVIGATED; ANSWER_SENT");
+    expect(text(bare, "sent")).toBe("checkout sent openAlbum out");
 
     const quiet = mountWith(branching, stepped({}).live, routes);
     send(quiet);
     expect(quiet.querySelector("[data-live-sent]")).toBeNull();
+  });
+
+  test("an output a message row already carries is not listed again", () => {
+    const routes: VizOutputRoutes = {
+      [branching.id]: { openAlbum: [{ to: "router", event: "NAVIGATED", at: "a.ts:72" }] },
+    };
+    const taken: VizLiveStep = {
+      from: "idle",
+      event: "NAVIGATED",
+      to: "paying",
+      outcome: "transition",
+      actor: { region: "router" },
+      effects: [],
+      sent: [],
+      context: { amount: 9 },
+      error: null,
+      message: { sender: "", dropped: null },
+    };
+    const root = mountWith(branching, stepped({ sent: ["openAlbum"] }, [taken]).live, routes);
+    sendVia(root, "submit");
+    expect(root.querySelector("[data-live-sent]")).toBeNull();
+    expect(text(root, "after")).toBe("1. checkout sent NAVIGATED to router: idle → paying");
   });
 
   test("an async result renders without another click", () => {
@@ -1099,14 +1116,14 @@ describe("what ran", () => {
       waiting: [],
     });
     const after = root.querySelector("[data-live-after]");
-    expect(after?.textContent).toContain("Then checkout took paymentTimeout");
-    expect(after?.textContent).toContain("paymentTimeout: paying → error");
+    expect(after?.textContent).toContain("checkout took paymentTimeout");
+    expect(after?.textContent).toContain("paying → error");
   });
 
   test("an ignored event says nothing ran", () => {
     const root = mountWith(branching, stepped({ to: "idle", outcome: "ignored" }).live);
     sendVia(root, "submit");
-    expect(text(root, "outcome")).toBe("No handler for submit in idle. Nothing ran.");
+    expect(text(root, "outcome")).toBe("Step 1 of 1: submit: lost, nobody took it in idle");
   });
 });
 
@@ -1313,7 +1330,7 @@ describe("live effect reports", () => {
 
     test("a held step that started no effect has no Not run here line", () => {
       const root = mountHeld(fetcher, withEffects([]));
-      expect(line(root, "outcome")).toBe("start: waiting → fetching");
+      expect(line(root, "outcome")).toBe("Step 1 of 1: start: waiting → fetching");
       expect(root.querySelector("[data-live-not-run]")).toBeNull();
     });
 

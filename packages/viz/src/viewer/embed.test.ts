@@ -554,7 +554,7 @@ describe("mountViewer with a driver", () => {
   test("a stay outcome keeps the cursor", () => {
     const root = mountLive();
     send(root, "peek");
-    expect(root.querySelector('[data-outcome="stay"]')?.textContent).toContain("stays");
+    expect(root.querySelector('[data-outcome="stay"]')?.textContent).toContain("stayed in open");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("open");
   });
 
