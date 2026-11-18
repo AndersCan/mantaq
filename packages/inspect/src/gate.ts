@@ -1,7 +1,7 @@
 import { machineFindings } from "@mantaq/viz";
 import type { VizFinding, VizMachine, VizStep } from "@mantaq/viz";
 export { unreachableStates } from "@mantaq/viz";
-import { inspect, missingPayloadBlock } from "./inspect.ts";
+import { inspect, lostRunName, missingPayloadBlock } from "./inspect.ts";
 import type { InspectTarget } from "./inspect.ts";
 import type { LostMessage } from "./fuzz/fuzz.ts";
 
@@ -28,10 +28,11 @@ export function findingLines(machine: VizMachine): string[] {
   return linesOf(machineFindings(machine));
 }
 
-function lostLines(lost: ReadonlyArray<LostMessage>): string[] {
+function lostLines(id: string, lost: ReadonlyArray<LostMessage>): string[] {
   return lost.flatMap(({ sender, receiver, event, steps }) => [
     `  - ${sender} sends ${event} to ${receiver}, which never handles it. No state of ${receiver} has a handler for ${event}, so the message is lost. Handle ${event} in a state of ${receiver}, or stop sending it.`,
     `    after: ${steps.map(stepText).join(" → ")}`,
+    `    on the board: ?${new URLSearchParams({ machine: id, run: lostRunName({ sender, event, receiver }) })}`,
   ]);
 }
 
@@ -52,7 +53,7 @@ export function expectNoDesignErrors(target: InspectTarget): void {
   const count = lostMessages.length + findings.length;
   if (count === 0 && block === "") return;
   if (count === 0) throw new Error(block);
-  const lines = [...lostLines(lostMessages), ...linesOf(findings)];
+  const lines = [...lostLines(machine.id, lostMessages), ...linesOf(findings)];
   const found = `${machine.id} has ${count} design error${count === 1 ? "" : "s"}:\n${lines.join("\n")}`;
   throw new Error(block === "" ? found : `${block}\n\n${found}`);
 }

@@ -71,7 +71,10 @@ A lost message names the sender, the receiver and the steps that lead to it:
 checkout has 1 design error:
   - checkout sends PAYMENT_TIMED_OUT to payment, which never handles it. No state of payment has a handler for PAYMENT_TIMED_OUT, so the message is lost. Handle PAYMENT_TIMED_OUT in a state of payment, or stop sending it.
     after: PAY_CLICKED → WAITED_TOO_LONG
+    on the board: ?machine=checkout&run=checkout+sends+PAYMENT_TIMED_OUT+to+payment
 ```
+
+Add the `on the board:` line to the address of a page that draws the machine and the run plays; its last step is the `!` row.
 
 A message dropped because the receiver is in a state without a handler is not an error; the board marks it. In the run below, `cook` sends `DISH_READY` while its waiter is on a break, and the Step tab shows `! 2. cook sent DISH_READY to waiter: lost, nobody took it in onBreak`.
 
