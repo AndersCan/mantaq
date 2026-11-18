@@ -1,7 +1,7 @@
 ---
 name: mantaq
 description: >-
-  Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for any ask to design, plan or rethink a feature or a rule, even when it names no machine ("design this with me", "show me the design", "who can delete photos?", "show me how X works"): the answer is a machine drawn on the live viz page with recorded walks, not a written design. Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
+  Create and use actor-model state machines with @mantaq/core in your own project. Philosophy, mental model, conventions. Also for any ask to design, plan or rethink a feature or a rule, even when it names no machine ("design this with me", "show me the design", "who can delete photos?", "show me how X works"): the answer is a machine drawn on the live viz page with recorded walks, not a written design. Also for drafting two designs of one feature to compare side by side ("draft two designs for Z"). Also for testing an app or web page that does not use mantaq against a model (`assertMatchesModel`, Playwright). Also sets mantaq up in a Vite project and opens the live viewer on a machine. Read sibling files (designing.md, sugar.md, patterns.md, testing.md, reviewing.md) when the task touches those areas.
 allowed-tools: Read Grep Glob Edit Write Bash Shell
 ---
 
@@ -63,7 +63,7 @@ Rule of thumb: a question about _where we go_ belongs in a transition; a questio
 
 ## Rules
 
-- **Start from the example.** `patterns.md` has a complete machine: imports, states, events, a handler and a timer effect; `testing.md` shows how to test it, and how to test a web page against its model. Copy its shape first, then check signatures against the installed types.
+- **Start from the example.** `patterns.md` has a complete machine: imports, states, events, a handler and a timer effect; `testing.md` shows how to test it. Copy its shape first, then check signatures against the installed types.
 - All timing through the injected clock. No real timers, `Date.now` or `Math.random` in effects.
 - Effects check `signal.aborted` before emitting, and hand the abort signal to any timer they create.
 - Declare payload types at boundaries. Bare `state("x")()` has payload `unknown`.
