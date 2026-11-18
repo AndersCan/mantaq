@@ -494,7 +494,7 @@ export function markExplore(
   const sources = new Map(machine.edges.map((edge) => [edge.id, edge.from]));
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
-    const members = element.dataset["members"]?.split(" ") ?? [id];
+    const members = listOf(element.dataset["members"]) ?? [id];
     const here = members.find((member) => currents.includes(sources.get(member) ?? ""));
     element.classList.toggle(
       "next",
@@ -506,10 +506,15 @@ export function markExplore(
 }
 
 /** A node is current when it is a current state, or a shared node standing for one. */
+/** A JSON list written to a `data-` attribute; ids may hold spaces. */
+export function listOf(value: string | undefined): string[] | undefined {
+  return value === undefined ? undefined : (JSON.parse(value) as string[]);
+}
+
 function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
     const id = element.dataset["nodeId"] ?? "";
-    const states = element.dataset["states"]?.split(" ") ?? [];
+    const states = listOf(element.dataset["states"]) ?? [];
     element.classList.toggle(
       "current",
       [id, ...states].some((state) => currents.includes(state)),

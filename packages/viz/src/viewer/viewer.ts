@@ -22,6 +22,7 @@ import {
   code,
   elapsed,
   explorePanel,
+  listOf,
   markExplore,
   outcomeText,
   sentEventLine,
@@ -370,8 +371,7 @@ function focusEdge(root: HTMLElement, id: string): void {
   edges
     .find(
       (each) =>
-        each.getAttribute("data-edge-id") === id ||
-        each.dataset["members"]?.split(" ").includes(id),
+        each.getAttribute("data-edge-id") === id || listOf(each.dataset["members"])?.includes(id),
     )
     ?.focus({ preventScroll: true });
 }
@@ -836,13 +836,21 @@ function markDiagram(
 
 function markSelection(root: HTMLElement, selection: Selection | null): void {
   const attribute = selection?.kind === "edge" ? "edgeId" : "nodeId";
+  const arrowNodes = new Set(
+    selection?.kind === "edge"
+      ? [...root.querySelectorAll<SVGGElement>(".graph g[data-members]")]
+          .filter((arrow) => listOf(arrow.dataset["members"])?.includes(selection.id))
+          .map((arrow) => arrow.dataset["from"])
+      : [],
+  );
   for (const element of root.querySelectorAll<SVGGElement>(".graph g")) {
-    const members = element.dataset["members"]?.split(" ") ?? [];
+    const members = listOf(element.dataset["members"]) ?? [];
     element.classList.toggle(
       "selected",
       selection !== null &&
         (element.dataset[attribute] === selection.id ||
-          (selection.kind === "edge" && members.includes(selection.id))),
+          (selection.kind === "edge" && members.includes(selection.id)) ||
+          (element.dataset["states"] !== undefined && arrowNodes.has(element.dataset["nodeId"]))),
     );
   }
 }

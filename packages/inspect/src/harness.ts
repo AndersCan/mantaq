@@ -226,7 +226,7 @@ async function pressFirstSend(
   for (const edge of from.edges) {
     await page
       .locator(
-        `.graph g[data-details-edge=${quoted(edge.id)}], .graph g.edge-help[data-members~=${quoted(edge.id)}]`,
+        `.graph g[data-details-edge=${quoted(edge.id)}], .graph g.edge-help[data-members*=${quoted(quoted(edge.id))}]`,
       )
       .dispatchEvent("click");
     const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
@@ -257,7 +257,7 @@ function makeSend(
       "map" in actor
         ? [await pressRow(page, actor)]
         : await page
-            .locator(".graph g.current[data-node-id]:not([data-states])")
+            .locator(".graph g.current[data-node-id]")
             .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));
     const edges = currents
       .flatMap((current) => movesFrom(machine, current))

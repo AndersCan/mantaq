@@ -116,7 +116,9 @@ describe("an arrow three states share", () => {
   test("is drawn once, from a node naming its states", () => {
     const { root } = mount();
     expect(root.querySelectorAll("g.edge[data-edge-id]")).toHaveLength(2);
-    expect(shared(root)?.getAttribute("data-members")).toBe("a-go-home b-go-home c-go-home");
+    expect(shared(root)?.getAttribute("data-members")).toBe(
+      JSON.stringify(["a-go-home", "b-go-home", "c-go-home"]),
+    );
     expect(shared(root)?.getAttribute("aria-label")).toBe("3 states on go to home");
     expect(root.querySelector("g.any-node text")?.textContent).toBe("a, b, c");
     expect(root.querySelector("g.any-node")?.getAttribute("aria-label")).toBe(

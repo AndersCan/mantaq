@@ -175,7 +175,7 @@ function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
     {
       class: "any-node",
       "data-node-id": placed.id,
-      "data-states": placed.states.length === 0 ? null : placed.states.join(" "),
+      "data-states": placed.states.length === 0 ? null : JSON.stringify(placed.states),
       "aria-label": anyAria(placed),
     },
     [
@@ -258,7 +258,7 @@ function edgeGroup(
         internal: internal === true,
       }),
       "data-edge-id": edge.id,
-      "data-members": placed.members?.join(" ") ?? null,
+      "data-members": placed.members === undefined ? null : JSON.stringify(placed.members),
       "data-from": edge.from,
       "data-to": placed.target,
       "aria-label": edgeAria(edge, text, placed.members),
@@ -291,7 +291,7 @@ function helpGroup(doc: Document, placed: PlacedEdge, details: (id: string) => v
     {
       class: "edge-help",
       "data-details-edge": placed.edge.id,
-      "data-members": placed.members?.join(" ") ?? null,
+      "data-members": placed.members === undefined ? null : JSON.stringify(placed.members),
       "aria-label": `Details of ${edgeAria(placed.edge, placed.edge.event, placed.members)}`,
     },
     [
