@@ -59,3 +59,7 @@ test("a part keeps only its own regions and messages, and starts from its region
 test("a part of a machine that was not fuzzed stays unfuzzed", () => {
   expect(partMachine({ ...whole, fuzz: null }, "join").fuzz).toBeNull();
 });
+
+test("a board of three machines has parts", () => {
+  expect(partsOf({ ...whole, actors: ["join", "sync"] })).toEqual(["", "join", "sync"]);
+});

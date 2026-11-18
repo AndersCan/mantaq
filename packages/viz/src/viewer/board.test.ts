@@ -133,3 +133,21 @@ test("a width narrower than the wired block still fills rows to the block's widt
   expect(rows).toBeLessThan(loose.length);
   for (const box of board.parts) expect(box.x + box.width / 2).toBeLessThanOrEqual(board.width);
 });
+
+test("the whole app fits the width asked for, with its five wires drawn as they run", () => {
+  const board = placeBoard(whole, 702);
+  expect(board.width).toBeLessThanOrEqual(702);
+  expect(board.wires.map((wire) => `${wire.from}${wire.both ? "<>" : ">"}${wire.to}`)).toEqual([
+    "folders<>sync",
+    "folders>join",
+    "onboarding>folders",
+    "people>requests",
+    "sync>reach",
+  ]);
+});
+
+test("a box wider than the board still takes the first row", () => {
+  const board = placeBoard({ ...whole, fuzz: null }, 10);
+  expect(board.parts[0]?.y).toBe(12 + 28 / 2);
+  expect(new Set(board.parts.map((box) => box.y)).size).toBe(board.parts.length);
+});
