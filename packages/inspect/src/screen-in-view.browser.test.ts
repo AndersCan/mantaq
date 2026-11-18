@@ -50,6 +50,17 @@ test("shows the Screen of a state far down a tall graph inside a 1400x800 window
   await page.close();
 }, 60_000);
 
+test("the Screen tab is exempt from the Step panel's quarter-window cap", async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await page.goto(`${origin}/__mantaq/?machine=tall`);
+  await page.getByRole("tab", { name: "Screen" }).click();
+  const height = await page.evaluate(
+    () => document.querySelector("iframe")?.getBoundingClientRect().height ?? 0,
+  );
+  expect(height).toBeGreaterThan(800 / 4);
+  await page.close();
+}, 60_000);
+
 test("an arrow's ? and a refused arrow click leave the page where it is", async () => {
   const page = await browser.newPage({ viewport: { width: 1400, height: 800 } });
   await page.goto(`${origin}/__mantaq/?machine=tall`);

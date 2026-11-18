@@ -126,6 +126,7 @@ export function mountViewer(
     root.classList.toggle("diagram-only", view.diagramOnly);
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
+    let shownSteps = 0;
     const refresh = () => {
       dropGonePick(view);
       const stepTab = explorePanel(doc, {
@@ -144,7 +145,8 @@ export function mountViewer(
         send: sendFor({ root, doc, machine, view, driver }, { sendEvent }),
       });
       const screen = screenOf(doc, options, { machine, view, driver });
-      panel.replaceChildren(panelTabs(doc, { view, parts: stepTab, details, screen, refresh }));
+      const tabs = panelTabs(doc, { view, parts: stepTab, details, screen, refresh });
+      shownSteps = replaceKeepingSteps(panel, tabs, shownSteps, view.live?.steps.length ?? 0);
       mark();
     };
     const pick = (child: { map: string; key: string }, from: "row" | "chip") => {
@@ -460,6 +462,26 @@ function noticeOf(doc: Document, view: ViewState): HTMLElement[] {
   return [
     html(doc, "p", { class: "run-notice", role: "status", "data-run-missing": "" }, [view.notice]),
   ];
+}
+
+function stepList(panel: HTMLElement): HTMLElement | null {
+  return panel.querySelector<HTMLElement>('[data-tab-panel="step"]');
+}
+
+function newestStepTop(list: HTMLElement): number {
+  const newest = [...list.querySelectorAll("[data-step]")].at(-1) ?? list;
+  return Math.ceil(newest.getBoundingClientRect().top - list.getBoundingClientRect().top);
+}
+
+/** Swaps the panel's content; when a step was added the newest step scrolls to the top of the Step tab, else its scroll stays. */
+function replaceKeepingSteps(panel: HTMLElement, tabs: Node, shown: number, steps: number): number {
+  const before = stepList(panel);
+  const scrolled = before === null || before.hidden ? null : before.scrollTop;
+  panel.replaceChildren(tabs);
+  const list = stepList(panel);
+  if (list !== null)
+    list.scrollTop = steps > shown || scrolled === null ? newestStepTop(list) : scrolled;
+  return steps;
 }
 
 /** Opens on the named run when it can replay, else on the start with a notice; with no run, on `steps`. */

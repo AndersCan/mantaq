@@ -134,8 +134,12 @@
 }
 
 .viz .tab-panel {
-  max-height: 60vh;
+  max-height: 25vh;
   overflow: auto;
+}
+
+.viz .tab-panel[data-tab-panel="screen"] {
+  max-height: 60vh;
 }
 
 .viz .canvas [tabindex] {

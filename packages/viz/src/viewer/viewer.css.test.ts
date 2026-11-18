@@ -68,7 +68,8 @@ test("the panel stays below the graph and in view while the graph scrolls", () =
   expect(panel).not.toMatch(/(^|[\s;{])top:/);
   const tabPanel = rule(".viz .tab-panel {");
   expect(tabPanel).toMatch(/overflow:\s*auto/);
-  expect(tabPanel).toMatch(/max-height:\s*60vh/);
+  expect(tabPanel).toMatch(/max-height:\s*25vh/);
+  expect(rule('.viz .tab-panel[data-tab-panel="screen"]')).toMatch(/max-height:\s*60vh/);
 });
 
 test("a diagram wider than its canvas scrolls sideways, never clips", () => {
