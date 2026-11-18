@@ -259,6 +259,7 @@ describe("the Step tab lists the whole walk", () => {
     walk(root, 5);
     const list = root.querySelector(".explore-run");
     expect(list && getComputedStyle(list).paddingLeft).toBe("0px");
+    expect(list && getComputedStyle(list).listStyle).toBe("none");
     root.remove();
     style.remove();
   });
