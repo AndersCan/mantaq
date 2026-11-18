@@ -57,11 +57,18 @@ test("a dropped message's Step line uses the banner colour", () => {
   expect(bareRule(".viz [data-live-dropped]")).toMatch(/color:\s*var\(--banner-fg\)/);
 });
 
-test("the panel stays below the graph at every width", () => {
+test("the panel stays below the graph and in view while the graph scrolls", () => {
   expect(css).not.toContain("@container");
   const main = bare.split("}").find((b) => b.trim().startsWith(".viz .viz-main {")) ?? "";
   expect(main).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\);/);
-  expect(rule(".viz .panel {")).not.toMatch(/sticky/);
+  const panel = rule(".viz .panel {");
+  expect(panel).toMatch(/position:\s*sticky/);
+  expect(panel).toMatch(/bottom:\s*0/);
+  expect(panel).toMatch(/background:\s*var\(--bg\)/);
+  expect(panel).not.toMatch(/(^|[\s;{])top:/);
+  const tabPanel = rule(".viz .tab-panel {");
+  expect(tabPanel).toMatch(/overflow:\s*auto/);
+  expect(tabPanel).toMatch(/max-height:\s*40vh/);
 });
 
 test("a diagram wider than its canvas scrolls sideways, never clips", () => {

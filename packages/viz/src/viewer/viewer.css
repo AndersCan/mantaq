@@ -80,7 +80,8 @@
     color-scheme: dark;
   }
 }
-/* Panel always below the graph, so the graph keeps the full width. */
+/* Panel always below the graph, so the graph keeps the full width,
+   and in view while the graph scrolls. */
 .viz .viz-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -96,6 +97,10 @@
   border-top: 1px solid var(--region-bg);
   padding-top: 8px;
   min-width: 0;
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  z-index: 1;
 }
 
 .viz .panel h2 {
@@ -130,7 +135,7 @@
 }
 
 .viz .tab-panel {
-  max-height: 60vh;
+  max-height: 40vh;
   overflow: auto;
 }
 
