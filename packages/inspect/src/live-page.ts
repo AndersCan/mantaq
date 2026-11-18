@@ -37,6 +37,12 @@ function ownWalk(viz: VizDocument): ReturnType<typeof linkOptions> {
   return held === undefined ? { onNavigate: linked.onNavigate } : { ...linked, machine: held };
 }
 
+/** The run the page names, unless the address already holds a run or steps. */
+function pageRun(run: string | undefined, walk: ReturnType<typeof linkOptions>): { run?: string } {
+  const walked = walk.run !== undefined || (walk.steps ?? []).length > 0;
+  return run === undefined || walked ? {} : { run };
+}
+
 /** The target for `id` when the page can run it: its actor runs on the clock the page hands in (or on none that needs moving). */
 function liveCreate(targets: LiveTargets, id: string): FuzzTarget["create"] | undefined {
   const target = targets[id];
@@ -114,6 +120,8 @@ export function mountDriven(
     effectMode?: "held" | "real";
     /** Open with only the diagram and a "Show controls" button. */
     diagramOnly?: boolean;
+    /** The recorded run this viewer opens on when the address names none. */
+    run?: string;
   },
 ): void {
   const parsed = parseViz(context.text);
@@ -158,6 +166,7 @@ export function mountDriven(
     ...(driver === undefined ? {} : { driver }),
     ...screenOption({ doc, preview: context.preview, id }),
     ...(context.diagramOnly === true ? { diagramOnly: true } : {}),
+    ...pageRun(context.run, options),
   });
 }
 

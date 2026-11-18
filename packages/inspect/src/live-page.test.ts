@@ -459,6 +459,48 @@ describe("mountDriven runs by name", () => {
     (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
     expect(location.search).toBe("?machine=second");
   });
+  test("the run the page names opens at its end", async () => {
+    history.replaceState(null, "", "?");
+    const root = document.createElement("div");
+    mountDriven(root, {
+      source: "test",
+      text: await withRuns(),
+      targets: { checkout: create },
+      run: "gives basic info",
+    });
+    expect(current(root)).toBe("shippingAddress");
+  });
+
+  test("a step in the address wins over the run the page names", async () => {
+    history.replaceState(null, "", "?");
+    const first = document.createElement("div");
+    mountDriven(first, { source: "test", text: await withRuns(), targets: { checkout: create } });
+    sendVia(first);
+    const walked = current(first);
+    const root = document.createElement("div");
+    mountDriven(root, {
+      source: "test",
+      text: await withRuns(),
+      targets: { checkout: create },
+      run: "nope",
+    });
+    expect(current(root)).toBe(walked);
+    expect(root.querySelector("[data-run-missing]")).toBeNull();
+  });
+
+  test("a run in the address wins over the run the page names", async () => {
+    history.replaceState(null, "", "?machine=checkout&run=other");
+    const root = document.createElement("div");
+    mountDriven(root, {
+      source: "test",
+      text: await withRuns(),
+      targets: { checkout: create },
+      run: "gives basic info",
+    });
+    expect(current(root)).toBe("basicInfo");
+    expect(root.querySelector("[data-run-missing]")).not.toBeNull();
+  });
+
   test("run= without machine opens the start with no notice", async () => {
     history.replaceState(null, "", "?run=gives%20basic%20info");
     const root = document.createElement("div");

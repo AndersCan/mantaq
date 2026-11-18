@@ -15,6 +15,7 @@ let site = "";
 let wiredSite = "";
 const retry = "../fixtures/retry.ts";
 const clean = "../fixtures/clean.ts";
+const timed = "../fixtures/timed.ts";
 const orphan = "../fixtures/orphan.ts";
 const retryAgain = "../fixtures/retry-again.ts";
 const empty = "../fixtures/no-machines.ts";
@@ -102,6 +103,36 @@ describe("mantaqViz for Astro", () => {
       expect(
         document.querySelector(".mantaq-machine")?.hasAttribute("data-mantaq-diagram-only"),
       ).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  test("run writes the run's name on the Machine", async () => {
+    const root = makeSite([timed]);
+    try {
+      writeFileSync(
+        join(root, "src", "pages", "index.astro"),
+        `---\nimport Machine from "@mantaq/inspect/astro/Machine.astro";\n---\n<html><body>\n<Machine src="${timed}" run="times out" />\n</body></html>\n`,
+      );
+      await buildSite(root, [timed]);
+      document.documentElement.innerHTML = readFileSync(join(root, "dist", "index.html"), "utf8");
+      expect(document.querySelector(".mantaq-machine")?.getAttribute("data-mantaq-run")).toBe(
+        "times out",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  test("a run name the machine has not recorded fails the build", async () => {
+    const root = makeSite([timed]);
+    try {
+      writeFileSync(
+        join(root, "src", "pages", "index.astro"),
+        `---\nimport Machine from "@mantaq/inspect/astro/Machine.astro";\n---\n<html><body>\n<Machine src="${timed}" run="nope" />\n</body></html>\n`,
+      );
+      await expect(buildSite(root, [timed])).rejects.toThrow(/no recorded run "nope" in .*Runs: /);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

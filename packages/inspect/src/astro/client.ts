@@ -7,12 +7,14 @@ for (const root of document.querySelectorAll<HTMLElement>(".mantaq-machine")) {
   if (text !== undefined) {
     const raw = root.dataset["mantaqRoutes"];
     const src = root.dataset["mantaqSrc"];
+    const run = root.dataset["mantaqRun"];
     mountDriven(root, {
       source: src ?? "machine",
       text,
       targets,
       effectMode: root.dataset["mantaqEffects"] === "run" ? "real" : "held",
       diagramOnly: root.dataset["mantaqDiagramOnly"] !== undefined,
+      ...(run === undefined ? {} : { run }),
       ...(raw === undefined ? {} : { routes: JSON.parse(raw) }),
     });
   }
