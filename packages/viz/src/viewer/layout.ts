@@ -4,6 +4,8 @@ import { edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { hasQueue } from "./queue.ts";
+import { isSharedNode, shareArrows } from "./shared.ts";
+import type { Shared } from "./shared.ts";
 import type { Overlap } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
@@ -40,6 +42,10 @@ export interface PlacedUnknown {
 export interface PlacedAny {
   kind: "any";
   id: string;
+  /** `any state`, or the first source states of a shared arrow. */
+  label: string;
+  /** The states a shared node stands for; empty for an `onAny` node. */
+  states: string[];
   x: number;
   y: number;
   width: number;
@@ -58,6 +64,8 @@ export interface PlacedEdge {
   label: LabelBox;
   /** Centre of the text lines: the label centre, shifted right by half the lock slot for transitions. */
   text: Point;
+  /** Ids of the edges a shared arrow stands for; absent when it is one edge. */
+  members?: string[];
   /** Gap between the dots of a dotted edge: grows with the edge so dots never merge into a line. */
   dotGap: number;
 }
@@ -173,8 +181,18 @@ const MAX_DOT_GAP = 12;
 const DOT_GAP_PER_LENGTH = 1 / 24;
 const ANY_LABEL = "any state";
 
+/** A machine with the shared arrows already swapped in for the edges they stand for. */
+interface Drawing extends VizMachine {
+  shared: Shared;
+}
+
 function anyIds(machine: VizMachine): string[] {
-  return [...new Set(machine.edges.map((edge) => edge.from).filter(isAnyState))].sort();
+  const from = machine.edges.map((edge) => edge.from);
+  return [...new Set(from.filter((id) => isAnyState(id) || isSharedNode(id)))].sort();
+}
+
+function anyLabel(machine: Drawing, id: string): string {
+  return machine.shared.nodes.find((node) => node.id === id)?.label ?? ANY_LABEL;
 }
 
 function unknownNodeId(edge: VizEdge): string {
@@ -395,7 +413,7 @@ function startIds(machine: VizMachine): string[] {
 }
 
 /** `heights` raises a node's box to the room its ports need. */
-function specsOf(machine: VizMachine, heights: ReadonlyMap<string, number>): Map<string, Spec> {
+function specsOf(machine: Drawing, heights: ReadonlyMap<string, number>): Map<string, Spec> {
   const starts = new Set(startIds(machine));
   const specs = new Map<string, Spec>();
   const tall = (id: string, height: number): number => Math.max(height, heights.get(id) ?? 0);
@@ -411,7 +429,7 @@ function specsOf(machine: VizMachine, heights: ReadonlyMap<string, number>): Map
     specs.set(state.id, specOf(state.id, size, loops, starts.has(state.id) ? ENTRY_STUB : 0));
   }
   for (const id of anyIds(machine)) {
-    const size = { width: textWidth(ANY_LABEL) + 24, height: tall(id, NODE_HEIGHT) };
+    const size = { width: textWidth(anyLabel(machine, id)) + 24, height: tall(id, NODE_HEIGHT) };
     specs.set(id, specOf(id, size, loopsAt(id), 0));
   }
   for (const edge of machine.edges) {
@@ -814,7 +832,7 @@ function assignPorts(
 }
 
 /** Runs dagre until every node's box is tall enough for its ports (at most 3 passes). */
-function laidOut(machine: VizMachine): { graph: LayoutGraph; specs: Map<string, Spec>; geo: Geo } {
+function laidOut(machine: Drawing): { graph: LayoutGraph; specs: Map<string, Spec>; geo: Geo } {
   const starts = new Set(startIds(machine));
   const heights = new Map<string, number>();
   for (let pass = 0; ; pass++) {
@@ -863,9 +881,11 @@ function loopPlaced(edge: VizEdge, loop: Loop, at: LabelBox): PlacedEdge {
  * coordinates out. The initial edge is drawn as an entry arrow, not a graph edge.
  */
 export function placeMachine(base: VizMachine): MachineLayout {
-  const machine = {
+  const shared = shareArrows(base);
+  const machine: Drawing = {
     ...base,
-    edges: [...base.edges, ...messagesOf(base).map(messageEdge)],
+    edges: [...shared.edges, ...messagesOf(base).map(messageEdge)],
+    shared,
   };
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
@@ -892,7 +912,7 @@ export function placeMachine(base: VizMachine): MachineLayout {
 }
 
 function assemble(
-  machine: VizMachine,
+  machine: Drawing,
   specs: ReadonlyMap<string, Spec>,
   geo: Geo,
   regions: ReadonlyArray<string>,
@@ -925,7 +945,14 @@ function assemble(
     }
     const route = geo.routes.get(edge.id) ?? [];
     const points = levelRoute(edge, route, ports, columns);
-    return placedOf(edge, points, geo.labels.get(edge.id) ?? { x: 0, y: 0 }, pathLength(points));
+    const placed = placedOf(
+      edge,
+      points,
+      geo.labels.get(edge.id) ?? { x: 0, y: 0 },
+      pathLength(points),
+    );
+    const members = machine.shared.arrows.find((arrow) => arrow.id === edge.id)?.members;
+    return members === undefined ? placed : { ...placed, members: members.map((m) => m.id) };
   });
   const laned = lanesOf(
     edges,
@@ -989,7 +1016,7 @@ function boxed(edge: VizEdge, centre: Point): Pick<PlacedEdge, "label" | "text">
 }
 
 function placeNodes(
-  machine: VizMachine,
+  machine: Drawing,
   specs: ReadonlyMap<string, Spec>,
   boxes: ReadonlyMap<string, LabelBox>,
 ): Array<PlacedState | PlacedUnknown | PlacedAny> {
@@ -1001,7 +1028,13 @@ function placeNodes(
     ...at(state.id),
     ...insideOf(state, at(state.id), hasRow(machine, state)),
   }));
-  const anys: PlacedAny[] = anyIds(machine).map((id) => ({ kind: "any", id, ...at(id) }));
+  const anys: PlacedAny[] = anyIds(machine).map((id) => ({
+    kind: "any",
+    id,
+    label: anyLabel(machine, id),
+    states: machine.shared.nodes.find((node) => node.id === id)?.states ?? [],
+    ...at(id),
+  }));
   const unknowns: PlacedUnknown[] = machine.edges
     .filter((edge) => isDrawn(edge) && edge.to === null && specs.has(unknownNodeId(edge)))
     .map((edge) => ({

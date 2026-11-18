@@ -35,19 +35,20 @@ On the live page (the Vite plugin) each step runs the real actor, so guards are 
 
 ### Nodes
 
-| Style                                                              | Meaning                                                                                      |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Box                                                                | A state                                                                                      |
-| Double border                                                      | A final state                                                                                |
-| Thick border                                                       | The state the walk is on                                                                     |
-| Dot and arrow on the left                                          | The initial state                                                                            |
-| Dashed box `*`                                                     | An `onAny` registration: any non-final state                                                 |
-| Pill inside a state                                                | An effect the state runs on entry, by name (`chargeCard` in `submitting`)                    |
-| Dashed circle `?`                                                  | An unknown target                                                                            |
-| Shaded rectangle                                                   | A region: its own start arrow and current state                                              |
-| Box titled `<map>: one per key`                                    | An actor map: one child machine                                                              |
-| `3 waiting` and outlined pills at the bottom of a pool's own state | The items waiting in a `createPool` inbox, the next one on the left; `+N` more past the edge |
-| Dark chip with a key at the bottom of a state                      | A live child of an actor map, by key                                                         |
+| Style                                                              | Meaning                                                                                       |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Box                                                                | A state                                                                                       |
+| Double border                                                      | A final state                                                                                 |
+| Thick border                                                       | The state the walk is on                                                                      |
+| Dot and arrow on the left                                          | The initial state                                                                             |
+| Dashed box `any state`                                             | An `onAny` registration, or an event every non-final state leaves by the same arrows          |
+| Dashed box naming states (`a, b, c +2 more`)                       | An event those states leave by the same arrows, drawn once; its arrow's Details list them all |
+| Pill inside a state                                                | An effect the state runs on entry, by name (`chargeCard` in `submitting`)                     |
+| Dashed circle `?`                                                  | An unknown target                                                                             |
+| Shaded rectangle                                                   | A region: its own start arrow and current state                                               |
+| Box titled `<map>: one per key`                                    | An actor map: one child machine                                                               |
+| `3 waiting` and outlined pills at the bottom of a pool's own state | The items waiting in a `createPool` inbox, the next one on the left; `+N` more past the edge  |
+| Dark chip with a key at the bottom of a state                      | A live child of an actor map, by key                                                          |
 
 ### Edges
 
