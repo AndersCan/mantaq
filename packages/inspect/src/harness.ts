@@ -129,7 +129,7 @@ async function setValues(
 /** Local state names of every region, read from the diagram's current states. */
 async function readRegions(page: Page, machine: VizMachine): Promise<Record<string, string>> {
   const ids = await page
-    .locator(".graph g.current[data-node-id]")
+    .locator(".graph g.current[data-node-id]:not([data-states])")
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));
   const entries = ids.flatMap((id) => {
     const dot = id.lastIndexOf(".");
@@ -224,7 +224,11 @@ async function pressFirstSend(
 ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
   let note: string | null = null;
   for (const edge of from.edges) {
-    await page.locator(`.graph g[data-details-edge=${quoted(edge.id)}]`).dispatchEvent("click");
+    await page
+      .locator(
+        `.graph g[data-details-edge=${quoted(edge.id)}], .graph g.edge-help[data-members*=${quoted(quoted(edge.id))}]`,
+      )
+      .dispatchEvent("click");
     const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
     if ((await trigger.count()) > 0) {
       await trigger.click();

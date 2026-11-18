@@ -22,6 +22,7 @@ import {
   code,
   elapsed,
   explorePanel,
+  listOf,
   markExplore,
   outcomeText,
   sentEventLine,
@@ -34,6 +35,7 @@ import type { Values } from "./fill.ts";
 import { keepInView } from "./keep-in-view.ts";
 import { drawChildMarkers, drawQueue } from "./markers.ts";
 import { queueOf } from "./queue.ts";
+import { memberAt, shareArrows } from "./shared.ts";
 import { tabs } from "./tabs.ts";
 import type { Tab } from "./tabs.ts";
 
@@ -150,20 +152,8 @@ export function mountViewer(
       shownSteps = replaceKeepingSteps(panel, tabs, shownSteps, view.live?.steps.length ?? 0);
       mark();
     };
-    const pick = (child: { map: string; key: string }, from: "row" | "chip") => {
-      view.picked = child;
-      view.selection = null;
-      view.tab = "step";
-      refresh();
-      if (from !== "row") return;
-      [...root.querySelectorAll<HTMLElement>("li.explore-child")]
-        .find(
-          (row) =>
-            row.getAttribute("data-child-map") === child.map &&
-            row.getAttribute("data-child-key") === child.key,
-        )
-        ?.focus({ preventScroll: true });
-    };
+    const pick = (child: PickedChild, from: "row" | "chip") =>
+      pickChild({ root, view, refresh }, child, from);
     const mark = () =>
       markDiagram(root, { machine, view, driver, pick: (child) => pick(child, "chip") });
     const follow = (opening = false) => {
@@ -200,20 +190,58 @@ export function mountViewer(
     };
     const graph = renderGraph(doc, machine, {
       // A click on an arrow sends when Details would offer Send, else opens its Details.
-      select: (selection) => {
+      select: (clicked) => {
+        const selection = memberSelection(machine, view, clicked);
         const edge = machine.edges.find((e) => selection.kind === "edge" && e.id === selection.id);
         const decision = edge && arrowSend({ machine, view, driver }, edge);
         if (edge === undefined || decision?.kind !== "send") return openDetails(selection);
         view.selection = selection;
         sendEvent(edge.event, decision.actor, edge.id);
       },
-      ...(view.diagramOnly ? {} : { details: (id: string) => openDetails({ kind: "edge", id }) }),
+      ...(view.diagramOnly
+        ? {}
+        : {
+            details: (id: string) =>
+              openDetails(memberSelection(machine, view, { kind: "edge", id })),
+          }),
     });
     root.append(...layoutOf(doc, { view, showControls, graph, panel, root }));
     follow(true);
   }
 
   render();
+}
+
+type PickedChild = { map: string; key: string };
+
+/** Shows a child machine's own states; from its row, focus returns to the row. */
+function pickChild(
+  from: { root: HTMLElement; view: ViewState; refresh: () => void },
+  child: PickedChild,
+  source: "row" | "chip",
+): void {
+  const { root, view } = from;
+  view.picked = child;
+  view.selection = null;
+  view.tab = "step";
+  from.refresh();
+  if (source !== "row") return;
+  [...root.querySelectorAll<HTMLElement>("li.explore-child")]
+    .find(
+      (row) =>
+        row.getAttribute("data-child-map") === child.map &&
+        row.getAttribute("data-child-key") === child.key,
+    )
+    ?.focus({ preventScroll: true });
+}
+
+/** A shared arrow acts as the member of the current state; with none, it is its own Details. */
+function memberSelection(machine: VizMachine, view: ViewState, selection: Selection): Selection {
+  const arrow = shareArrows(machine).arrows.find(
+    (each) => selection.kind === "edge" && each.id === selection.id,
+  );
+  const member = arrow && view.live && memberAt(arrow, currentsOf(view.live, view.picked));
+  return member ? { kind: "edge", id: member.id } : selection;
 }
 
 type ArrowSend =
@@ -340,7 +368,12 @@ function sentOutcome(
 /** The Send button goes once pressed; focus moves to the selected arrow so keyboard users keep their place. */
 function focusEdge(root: HTMLElement, id: string): void {
   const edges = [...root.querySelectorAll<SVGElement>("g[data-edge-id]")];
-  edges.find((each) => each.getAttribute("data-edge-id") === id)?.focus({ preventScroll: true });
+  edges
+    .find(
+      (each) =>
+        each.getAttribute("data-edge-id") === id || listOf(each.dataset["members"])?.includes(id),
+    )
+    ?.focus({ preventScroll: true });
 }
 
 function setFullscreenLabel(button: HTMLButtonElement, active: boolean): void {
@@ -803,10 +836,21 @@ function markDiagram(
 
 function markSelection(root: HTMLElement, selection: Selection | null): void {
   const attribute = selection?.kind === "edge" ? "edgeId" : "nodeId";
+  const arrowNodes = new Set(
+    selection?.kind === "edge"
+      ? [...root.querySelectorAll<SVGGElement>(".graph g[data-members]")]
+          .filter((arrow) => listOf(arrow.dataset["members"])?.includes(selection.id))
+          .map((arrow) => arrow.dataset["from"])
+      : [],
+  );
   for (const element of root.querySelectorAll<SVGGElement>(".graph g")) {
+    const members = listOf(element.dataset["members"]) ?? [];
     element.classList.toggle(
       "selected",
-      selection !== null && element.dataset[attribute] === selection.id,
+      selection !== null &&
+        (element.dataset[attribute] === selection.id ||
+          (selection.kind === "edge" && members.includes(selection.id)) ||
+          (element.dataset["states"] !== undefined && arrowNodes.has(element.dataset["nodeId"]))),
     );
   }
 }

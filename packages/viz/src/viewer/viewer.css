@@ -400,9 +400,15 @@
   color: var(--banner-fg);
 }
 
+.viz .any-node.current rect {
+  stroke: var(--accent);
+  stroke-width: 3.5;
+}
+
 /* A clicked item stays teal even when it is also on the walk. */
 .viz .graph .selected path,
-.viz .graph .selected .frame {
+.viz .graph .selected .frame,
+.viz .graph .any-node.selected rect {
   stroke: var(--select);
 }
 

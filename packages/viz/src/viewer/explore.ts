@@ -491,14 +491,34 @@ export function markExplore(
   const moves = currents.flatMap((current) => movesFrom(machine, current));
   const open = moves.filter((move) => !blocked.has(move.edge.id));
   const next = new Set(open.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
+  const sources = new Map(machine.edges.map((edge) => [edge.id, edge.from]));
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
-    element.classList.toggle("next", next.has(id));
-    markBlocked(element, blocked.get(id));
+    const members = listOf(element.dataset["members"]) ?? [id];
+    const here = members.find((member) => currents.includes(sources.get(member) ?? ""));
+    element.classList.toggle(
+      "next",
+      members.some((member) => next.has(member)),
+    );
+    markBlocked(element, blocked.get(here ?? id));
   }
+  markCurrent(root, currents);
+}
+
+/** A JSON list written to a `data-` attribute; ids may hold spaces. */
+export function listOf(value: string | undefined): string[] | undefined {
+  return value === undefined ? undefined : (JSON.parse(value) as string[]);
+}
+
+/** A node is current when it is a current state, or a shared node standing for one. */
+function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-node-id]")) {
-    const id = element.dataset["nodeId"];
-    element.classList.toggle("current", id !== undefined && currents.includes(id));
+    const id = element.dataset["nodeId"] ?? "";
+    const states = listOf(element.dataset["states"]) ?? [];
+    element.classList.toggle(
+      "current",
+      [id, ...states].some((state) => currents.includes(state)),
+    );
   }
 }
 

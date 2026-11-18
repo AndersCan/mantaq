@@ -1,6 +1,7 @@
 import { isAnyState } from "../schema.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
 import { activatable, html, svg } from "./dom.ts";
+import { localName } from "./compartments.ts";
 import { edgeCondition, edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET } from "./geometry.ts";
 import { HELP_SLOT, layoutMachine, textWidth } from "./layout.ts";
@@ -161,6 +162,12 @@ function unknownGroup(doc: Document, placed: PlacedUnknown): SVGGElement {
   );
 }
 
+function anyAria(placed: PlacedAny): string {
+  if (placed.states.length === 0) return "any non-final state (onAny handlers)";
+  if (placed.label === "any state") return "any state";
+  return `these ${placed.states.length} states: ${placed.states.map(localName).join(", ")}`;
+}
+
 function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
   return svg(
     doc,
@@ -168,7 +175,8 @@ function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
     {
       class: "any-node",
       "data-node-id": placed.id,
-      "aria-label": "any non-final state (onAny handlers)",
+      "data-states": placed.states.length === 0 ? null : JSON.stringify(placed.states),
+      "aria-label": anyAria(placed),
     },
     [
       svg(doc, "rect", {
@@ -178,7 +186,7 @@ function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
         height: placed.height,
         rx: placed.height / 2,
       }),
-      svg(doc, "text", { x: placed.x, y: placed.y + 4, "text-anchor": "middle" }, ["any state"]),
+      svg(doc, "text", { x: placed.x, y: placed.y + 4, "text-anchor": "middle" }, [placed.label]),
     ],
   );
 }
@@ -194,16 +202,19 @@ function nodeGroup(
 
 const LINE_HEIGHT = 16;
 
-function edgeAria(edge: VizEdge, text: string): string {
+function edgeAria(edge: VizEdge, text: string, members?: ReadonlyArray<string>): string {
+  if (members !== undefined)
+    return `${members.length} states on ${text} to ${edge.to ?? "undetermined"}${whenText(edge)}`;
   if (edge.kind === "stay") return `${sourceText(edge.from)} on ${text} stays`;
+  return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}${whenText(edge)}`;
+}
+
+function whenText(edge: VizEdge): string {
   const condition = edgeCondition(edge);
-  const when =
-    condition === null
-      ? ""
-      : condition === "else" || condition.startsWith("else if ")
-        ? `, ${condition}`
-        : ` when ${condition}`;
-  return `${sourceText(edge.from)} on ${text} to ${edge.to ?? "undetermined"}${when}`;
+  if (condition === null) return "";
+  return condition === "else" || condition.startsWith("else if ")
+    ? `, ${condition}`
+    : ` when ${condition}`;
 }
 
 function edgeLabel(doc: Document, placed: PlacedEdge): SVGElement {
@@ -247,9 +258,10 @@ function edgeGroup(
         internal: internal === true,
       }),
       "data-edge-id": edge.id,
+      "data-members": placed.members === undefined ? null : JSON.stringify(placed.members),
       "data-from": edge.from,
       "data-to": placed.target,
-      "aria-label": edgeAria(edge, text),
+      "aria-label": edgeAria(edge, text, placed.members),
     },
     [
       svg(doc, "path", { class: "hit", d: placed.path, "aria-hidden": "true" }),
@@ -279,7 +291,8 @@ function helpGroup(doc: Document, placed: PlacedEdge, details: (id: string) => v
     {
       class: "edge-help",
       "data-details-edge": placed.edge.id,
-      "aria-label": `Details of ${edgeAria(placed.edge, placed.edge.event)}`,
+      "data-members": placed.members === undefined ? null : JSON.stringify(placed.members),
+      "aria-label": `Details of ${edgeAria(placed.edge, placed.edge.event, placed.members)}`,
     },
     [
       svg(doc, "circle", { class: "hit", cx, cy, r: 10 }),

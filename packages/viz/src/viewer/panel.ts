@@ -5,6 +5,8 @@ import { activatable, html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 import { edgeCondition } from "./labels.ts";
 import { isDrawn } from "./layout.ts";
+import { shareArrows } from "./shared.ts";
+import type { SharedArrow } from "./shared.ts";
 
 type Row = [label: string, value: Node | string];
 
@@ -110,6 +112,24 @@ function edgePanel(
   ]);
 }
 
+/** One arrow several states share: the states, each a link to its own arrow. */
+function sharedPanel(
+  doc: Document,
+  arrow: SharedArrow,
+  select: (selection: Selection) => void,
+): HTMLElement {
+  const { drawn, members } = arrow;
+  const to = drawn.to === null ? "?" : localName(drawn.to);
+  const condition = edgeCondition(drawn);
+  const when = condition === null ? "" : ` [${condition}]`;
+  return html(doc, "section", { class: "details", "data-selected-edge": arrow.id }, [
+    html(doc, "h2", {}, [`${members.length} states —${arrow.event}${when}→ ${to}`]),
+    html(doc, "p", {}, [`From any of these ${members.length} states:`]),
+    edgeList(doc, members, select, false),
+    docLine(doc, "edge", members[0]?.doc ?? null),
+  ]);
+}
+
 function statePanel(
   doc: Document,
   state: VizState,
@@ -146,6 +166,8 @@ export function renderPanel(
   if (selection?.kind === "edge") {
     const edge = machine.edges.find((candidate) => candidate.id === selection.id);
     if (edge) return edgePanel(doc, edge, { machine, select: context.select, send: context.send });
+    const arrow = shareArrows(machine).arrows.find((candidate) => candidate.id === selection.id);
+    if (arrow) return sharedPanel(doc, arrow, context.select);
   }
   if (selection?.kind === "state") {
     const state = machine.states.find((candidate) => candidate.id === selection.id);
