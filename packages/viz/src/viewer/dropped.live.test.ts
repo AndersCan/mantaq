@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type {
   VizDriver,
@@ -246,6 +248,19 @@ describe("the Step tab lists the whole walk", () => {
       ["1", "1. kitchen sent DISH_READY to waiter: serving → carryingDish"],
       ["2", "! 2. kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak"],
     ]);
+  });
+
+  test("the step list shows no numbers of its own", () => {
+    const style = document.createElement("style");
+    style.textContent = readFileSync(join(import.meta.dirname, "viewer.css"), "utf8");
+    document.head.append(style);
+    const { root } = mount();
+    document.body.append(root);
+    walk(root, 5);
+    const list = root.querySelector(".explore-run");
+    expect(list && getComputedStyle(list).paddingLeft).toBe("0px");
+    root.remove();
+    style.remove();
   });
 
   test("only the newest step carries data-outcome", () => {
