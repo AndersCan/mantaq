@@ -160,6 +160,8 @@ export function renderPanel(
     selection: Selection | null;
     select: (selection: Selection) => void;
     send?: (edge: VizEdge) => HTMLElement | null;
+    /** Shown when nothing is selected. */
+    hint?: string;
   },
 ): HTMLElement {
   const { selection } = context;
@@ -173,5 +175,7 @@ export function renderPanel(
     const state = machine.states.find((candidate) => candidate.id === selection.id);
     if (state) return statePanel(doc, state, { machine, select: context.select });
   }
-  return html(doc, "p", { class: "muted" }, ["Click a state or an arrow in the diagram."]);
+  return html(doc, "p", { class: "muted" }, [
+    context.hint ?? "Click a state or an arrow in the diagram.",
+  ]);
 }

@@ -13,8 +13,9 @@ import type {
 import { scopeOf } from "../schema.ts";
 import { currentsOf, walkedChild } from "./compartments.ts";
 import { html } from "./dom.ts";
-import { renderGraph } from "./graph.ts";
-import type { Selection } from "./graph.ts";
+import { BOARD_PX_PER_UNIT, renderBoard, renderGraph } from "./graph.ts";
+import type { GraphCallbacks, Selection } from "./graph.ts";
+import { partMachine, partsOf } from "./parts.ts";
 import { renderPanel } from "./panel.ts";
 import { decodeLiveSteps, encodeLiveStep, movesFrom } from "../moves.ts";
 import {
@@ -41,6 +42,8 @@ import type { Tab } from "./tabs.ts";
 
 interface ViewState {
   selection: Selection | null;
+  /** The machine of a big board shown on its own; null = the board of boxes. Not saved. */
+  zoom: string | null;
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
@@ -109,6 +112,8 @@ export function mountViewer(
   openInitial(view, { machine: first, driver, options });
   let redraw: () => void = () => undefined;
   listenFullscreen(root);
+  let refit: () => void = () => undefined;
+  listenWidth(root, () => refit());
   watchDriver(view, { driver, redraw: () => redraw() });
   function showControls(): void {
     view.diagramOnly = false;
@@ -128,6 +133,8 @@ export function mountViewer(
     }
     root.classList.toggle("diagram-only", view.diagramOnly);
     const panel = html(doc, "aside", { class: "panel", "aria-live": "polite" });
+    const parts = partsOf(machine);
+    const shown = () => (view.zoom === null ? machine : partMachine(machine, view.zoom));
     // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
     let shownSteps = 0;
     const refresh = () => {
@@ -142,9 +149,12 @@ export function mountViewer(
           routes: options.routes,
         }),
       });
-      const details = renderPanel(doc, machine, {
+      const details = renderPanel(doc, shown(), {
         selection: view.selection,
         select: showDetails,
+        ...(parts.length > 0 && view.zoom === null
+          ? { hint: "Click a machine to see its states." }
+          : {}),
         send: sendFor({ root, doc, machine, view, driver }, { sendEvent }),
       });
       const screen = screenOf(doc, options, { machine, view, driver });
@@ -188,28 +198,117 @@ export function mountViewer(
         panel.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
     };
-    const graph = renderGraph(doc, machine, {
-      // A click on an arrow sends when Details would offer Send, else opens its Details.
-      select: (clicked) => {
-        const selection = memberSelection(machine, view, clicked);
-        const edge = machine.edges.find((e) => selection.kind === "edge" && e.id === selection.id);
-        const decision = edge && arrowSend({ machine, view, driver }, edge);
-        if (edge === undefined || decision?.kind !== "send") return openDetails(selection);
-        view.selection = selection;
-        sendEvent(edge.event, decision.actor, edge.id);
-      },
-      ...(view.diagramOnly
-        ? {}
-        : {
-            details: (id: string) =>
-              openDetails(memberSelection(machine, view, { kind: "edge", id })),
-          }),
+    const callbacks = () =>
+      drawCallbacks({ machine, view, driver }, { shown: shown(), openDetails, sendEvent });
+    const canvas = canvasOf({
+      doc,
+      root,
+      machine,
+      view,
+      shown,
+      callbacks,
+      afterSwap: refresh,
+      mark,
     });
-    root.append(...layoutOf(doc, { view, showControls, graph, panel, root }));
+    refit = canvas.refit;
+    root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
+    canvas.refit();
     follow(true);
   }
 
   render();
+}
+
+/** Calls `refit` when the window width changes, which entering full screen does too. */
+function listenWidth(root: HTMLElement, refit: () => void): void {
+  const refitHere = () => {
+    if (root.isConnected) refit();
+  };
+  root.ownerDocument.defaultView?.addEventListener("resize", refitHere);
+  root.addEventListener("fullscreenchange", refitHere);
+}
+
+/** A click on an arrow sends when Details would offer Send, else opens its Details. */
+function drawCallbacks(
+  from: { machine: VizMachine; view: ViewState; driver: VizDriver | undefined },
+  handlers: {
+    shown: VizMachine;
+    openDetails: (selection: Selection) => void;
+    sendEvent: (event: string, actor?: VizActorRef, edge?: string) => void;
+  },
+): GraphCallbacks {
+  const { machine, view } = from;
+  return {
+    select: (clicked) => {
+      const selection = memberSelection(handlers.shown, view, clicked);
+      const edge = machine.edges.find((e) => selection.kind === "edge" && e.id === selection.id);
+      const decision = edge && arrowSend(from, edge);
+      if (edge === undefined || decision?.kind !== "send") return handlers.openDetails(selection);
+      view.selection = selection;
+      handlers.sendEvent(edge.event, decision.actor, edge.id);
+    },
+    ...(view.diagramOnly
+      ? {}
+      : {
+          details: (id: string) =>
+            handlers.openDetails(memberSelection(handlers.shown, view, { kind: "edge", id })),
+        }),
+  };
+}
+
+/** Board width in units where the canvas has no size (not laid out). */
+const BOARD_UNITS_UNMEASURED = 800;
+
+/** What the canvas draws: the board of boxes or one machine of it, and the redraw when the window width changes. */
+function canvasOf(from: {
+  doc: Document;
+  root: HTMLElement;
+  machine: VizMachine;
+  view: ViewState;
+  shown: () => VizMachine;
+  callbacks: () => GraphCallbacks;
+  afterSwap: () => void;
+  mark: () => void;
+}): { drawn: () => Node[]; refit: () => void } {
+  const { doc, root, machine, view, shown } = from;
+  const onBoard = () => partsOf(machine).length > 0 && view.zoom === null;
+  const canvasUnits = () => {
+    const canvas = root.querySelector<HTMLElement>(".canvas");
+    return (canvas ?? root).clientWidth / BOARD_PX_PER_UNIT || BOARD_UNITS_UNMEASURED;
+  };
+  let drawnUnits = 0;
+  const swap = () => root.querySelector(".canvas")?.replaceChildren(...drawn());
+  const open = (part: string) => {
+    view.zoom = part;
+    swap();
+    from.afterSwap();
+    const at =
+      root.querySelector<SVGGElement>(".graph g.state.current") ??
+      root.querySelector<SVGGElement>(".graph g.state.initial");
+    at?.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+    root.querySelector<HTMLElement>(".part-title")?.focus({ preventScroll: true });
+  };
+  const leave = () => {
+    view.zoom = null;
+    swap();
+    from.afterSwap();
+  };
+  const drawn = (): Node[] => {
+    drawnUnits = canvasUnits();
+    if (onBoard()) return [renderBoard(doc, machine, { width: drawnUnits, open })];
+    const graph = renderGraph(doc, shown(), from.callbacks());
+    if (partsOf(machine).length === 0) return [graph];
+    const title = html(doc, "button", { type: "button", class: "part-title" }, [shown().id]);
+    title.setAttribute("aria-label", `${shown().id}: show all machines`);
+    title.addEventListener("click", leave);
+    return [title, graph];
+  };
+  const refit = () => {
+    if (!onBoard() || canvasUnits() === drawnUnits) return;
+    swap();
+    from.mark();
+  };
+  return { drawn, refit };
 }
 
 type PickedChild = { map: string; key: string };
@@ -409,13 +508,13 @@ function layoutOf(
   context: {
     view: ViewState;
     showControls: () => void;
-    graph: Node;
+    graph: Node[];
     panel: HTMLElement;
     root: HTMLElement;
   },
 ): HTMLElement[] {
   const { view } = context;
-  const canvas = html(doc, "div", { class: "canvas" }, [context.graph]);
+  const canvas = html(doc, "div", { class: "canvas" }, context.graph);
   const fullscreen = fullscreenButton(doc, context.root);
   if (!view.diagramOnly) {
     return [
@@ -476,6 +575,7 @@ function previewOf(
 function initialView(options: ViewerOptions): ViewState {
   return {
     selection: null,
+    zoom: null,
     live: null,
     afters: [],
     lasts: [],

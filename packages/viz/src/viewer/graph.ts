@@ -15,6 +15,7 @@ import type {
   PlacedUnknown,
 } from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
+import { placeBoard } from "./board.ts";
 
 export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: string };
 
@@ -323,9 +324,9 @@ const LABEL_FLOOR_REM = 0.6;
 const LABEL_CAP_EM = 1.4;
 
 /**
- * Fills the canvas on every surface; labels never drop under 0.6rem (about
- * 10px) nor grow past 1.4em. A machine too wide for that scrolls sideways by
- * the reader's hand.
+ * Sizes the drawing against its canvas: labels never drop under 0.6rem (about
+ * 10px) nor grow past 1.4em; between those the drawing fills the canvas. A
+ * machine too wide for the floor scrolls sideways by the reader's hand.
  */
 function graphWidth(units: number): string {
   const size = (scale: number) => ((units * scale) / LABEL_UNITS).toFixed(2);
@@ -391,4 +392,69 @@ export function renderGraph(
     ],
   );
   return root;
+}
+
+/** Board pixels per unit: a canvas of `w` px is laid out `w / 0.9` units wide, so names read at 10.8 px or more. */
+export const BOARD_PX_PER_UNIT = 0.9;
+
+/** The machines of a big board as named boxes, dotted wires between those that message each other. */
+export function renderBoard(
+  doc: Document,
+  machine: VizMachine,
+  context: { width: number; open: (part: string) => void },
+): SVGSVGElement {
+  const board = placeBoard(machine, context.width);
+  const wires = board.wires.map((wire) =>
+    svg(
+      doc,
+      "g",
+      {
+        class: "message",
+        "aria-hidden": "true",
+        "data-message-from": wire.from,
+        "data-message-to": wire.to,
+      },
+      [
+        svg(doc, "path", {
+          d: wire.path,
+          "marker-end": "url(#viz-arrow)",
+          "marker-start": wire.both ? "url(#viz-arrow)" : null,
+          style: `--viz-dot-gap: ${wire.dotGap}`,
+        }),
+      ],
+    ),
+  );
+  const boxes = board.parts.map((placed) => {
+    const group = svg(
+      doc,
+      "g",
+      { class: "part", "data-part": placed.part, "aria-label": `machine ${placed.name}` },
+      [
+        svg(doc, "rect", {
+          x: placed.x - placed.width / 2,
+          y: placed.y - placed.height / 2,
+          width: placed.width,
+          height: placed.height,
+          rx: 10,
+        }),
+        svg(doc, "text", { x: placed.x, y: placed.y + 4, "text-anchor": "middle" }, [placed.name]),
+      ],
+    );
+    activatable(group, () => context.open(placed.part));
+    return group;
+  });
+  return svg(
+    doc,
+    "svg",
+    {
+      class: "graph board",
+      viewBox: `0 0 ${Math.ceil(board.width)} ${Math.ceil(board.height)}`,
+      width: Math.ceil(board.width),
+      height: Math.ceil(board.height),
+      style: graphWidth(board.width),
+      role: "group",
+      "aria-label": `machine ${machine.id}: ${board.parts.length} machines`,
+    },
+    [defs(doc), ...wires, ...boxes],
+  );
 }
