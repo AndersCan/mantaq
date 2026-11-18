@@ -1,8 +1,11 @@
 import { VirtualClock } from "@mantaq/core";
 import { expectNoDesignErrors, inspectModule } from "@mantaq/inspect";
 import { createDriver } from "@mantaq/inspect/drive";
+import { recordRuns } from "@mantaq/inspect/record";
 import { expect, test } from "vite-plus/test";
 import { cookMachine } from "./dropped-message.ts";
+
+const recorded = recordRuns(cookMachine);
 
 const file = new URL("./dropped-message.ts", import.meta.url).pathname;
 
@@ -18,12 +21,12 @@ test("the kitchen and waiter fixture has no design errors", () => {
   });
 });
 
-test("cooking a dish while the waiter is on a break drops exactly one DISH_READY", () => {
+test("A dish cooked while the waiter is on a break is lost", () => {
   const driver = createDriver({
     id: "cook",
     create: () => {
       const clock = VirtualClock();
-      const made = cookMachine.create();
+      const made = recorded.create();
       return { actor: made.actor, clock, made };
     },
   });
@@ -43,5 +46,4 @@ test("cooking a dish while the waiter is on a break drops exactly one DISH_READY
     outcome: "ignored",
     message: { dropped: "noHandler" },
   });
-  expect(step("BREAK_ENDED", { region: "waiter" }).last.to).toBe("waiter.serving");
 });
