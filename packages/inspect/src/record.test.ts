@@ -72,7 +72,7 @@ describe("recordRuns", () => {
   test("the fixture records itself into its committed file", () => {
     const committed = readFileSync(join(HERE, "fixtures/__runs__/timed.test.json"), "utf8");
     const result = run(join(HERE, "fixtures"), { CI: "1" });
-    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({ ok: true });
     expect(committed).toContain('"times out"');
   });
 
