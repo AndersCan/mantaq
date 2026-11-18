@@ -3,6 +3,7 @@ import type { VizEdge, VizFuzzMessage, VizMachine, VizState } from "../schema.ts
 import { edgeLines } from "./labels.ts";
 import { ARROW_SIZE, FINAL_INSET, LABEL_PAD, PATH_GAP } from "./geometry.ts";
 import { overlapsOf } from "./overlaps.ts";
+import { hasQueue } from "./queue.ts";
 import type { Overlap } from "./overlaps.ts";
 import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
@@ -187,8 +188,9 @@ function regionNodeId(region: string): string {
 const WORKER_ROW_HEIGHT = 14;
 const MAP_STATE_MIN_WIDTH = 168;
 
-function isMapState(machine: VizMachine, state: VizState): boolean {
-  return state.region !== null && machine.maps.includes(state.region);
+function hasRow(machine: VizMachine, state: VizState): boolean {
+  if (state.region !== null) return machine.maps.includes(state.region);
+  return hasQueue(machine);
 }
 
 function stateWidth(state: VizState, worker: boolean): number {
@@ -401,7 +403,7 @@ function specsOf(machine: VizMachine, heights: ReadonlyMap<string, number>): Map
     loopsOf(machine.edges.filter((edge) => isDrawn(edge) && isLoop(edge) && edge.from === id));
   for (const state of machine.states) {
     const loops = loopsAt(state.id);
-    const worker = isMapState(machine, state);
+    const worker = hasRow(machine, state);
     const size = {
       width: stateWidth(state, worker),
       height: tall(state.id, stateHeight(state, worker)),
@@ -997,7 +999,7 @@ function placeNodes(
     id: state.id,
     state,
     ...at(state.id),
-    ...insideOf(state, at(state.id), isMapState(machine, state)),
+    ...insideOf(state, at(state.id), hasRow(machine, state)),
   }));
   const anys: PlacedAny[] = anyIds(machine).map((id) => ({ kind: "any", id, ...at(id) }));
   const unknowns: PlacedUnknown[] = machine.edges

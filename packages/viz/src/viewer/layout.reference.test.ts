@@ -57,3 +57,10 @@ test("the port check sees ends", () => {
       endsOnSide("team-inbox", "workersBusy", "right").length,
   ).toBeGreaterThan(1);
 });
+
+test("a pool's inbox state has room for the queue row; without the context fields it does not", () => {
+  const base = reference("team-inbox");
+  const sizeOf = (machine: VizMachine) =>
+    placeMachine(machine).nodes.find((each) => each.id === "allWorkersFree");
+  expect(sizeOf(base)?.height).toBeGreaterThan(sizeOf({ ...base, context: null })?.height ?? 0);
+});

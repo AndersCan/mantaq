@@ -2,6 +2,7 @@ import type { VizLiveChild } from "../schema.ts";
 import { compareKeys, localName } from "./compartments.ts";
 import { svg } from "./dom.ts";
 import { textWidth } from "./layout.ts";
+import type { Queue } from "./queue.ts";
 
 export interface MarkerContext {
   children: ReadonlyArray<VizLiveChild>;
@@ -225,4 +226,61 @@ export function drawChildMarkers(svgRoot: SVGSVGElement, context: MarkerContext)
     if ("count" in entry) drawCount(live, layer, id, entry.count);
     else drawMarker(live, layer, entry.item);
   }
+}
+
+/** Draws a pool inbox's waiting items on its current state, next in line on the left; draws nothing when none wait. */
+export function drawQueue(svgRoot: SVGSVGElement, context: { state: string; queue: Queue }): void {
+  for (const old of Array.from(svgRoot.children)) {
+    if (old.classList.contains("queue")) old.remove();
+  }
+  const { queue } = context;
+  const row = rowOf(svgRoot, context.state);
+  if (queue.count === 0 || row === null) return;
+  const doc = svgRoot.ownerDocument;
+  const header = `${queue.count} waiting`;
+  const widths = queue.items.map((text) => textWidth(label(text), FONT) + PILL_PAD);
+  const lead = textWidth(header, FONT) + GAP;
+  const usedBy = (shown: number) => {
+    const rest = queue.count - shown;
+    const pills = widths.slice(0, shown).reduce((sum, w) => sum + w + GAP, 0);
+    return lead + pills + (rest === 0 ? 0 : textWidth(`+${rest}`, FONT));
+  };
+  let shown = queue.items.length;
+  while (shown > 0 && usedBy(shown) > row.width) shown -= 1;
+  const shownTexts = queue.items.slice(0, shown);
+  const group = svg(doc, "g", {
+    class: "queue",
+    role: "group",
+    "aria-label": `${header}, first goes next: ${shownTexts.join(", ")}`,
+  });
+  group.append(svg(doc, "title", {}, [shownTexts.join(", ")]));
+  let at = row.left + (row.width - usedBy(shown)) / 2;
+  group.append(svg(doc, "text", { class: "queue-count", x: at, y: row.cy + 3.5 }, [header]));
+  at += lead;
+  for (const [index, text] of shownTexts.entries()) {
+    const width = widths[index] ?? 0;
+    group.append(
+      svg(doc, "g", { class: "queued-item", "data-queue-item": text }, [
+        svg(doc, "rect", {
+          x: at,
+          y: row.cy - PILL_H / 2,
+          width,
+          height: PILL_H,
+          rx: PILL_H / 2,
+        }),
+        svg(doc, "text", { x: at + width / 2, y: row.cy + 3.5, "text-anchor": "middle" }, [
+          label(text),
+        ]),
+      ]),
+    );
+    at += width + GAP;
+  }
+  if (queue.count > shown) {
+    group.append(
+      svg(doc, "text", { class: "queue-more", x: at, y: row.cy + 3.5 }, [
+        `+${queue.count - shown}`,
+      ]),
+    );
+  }
+  svgRoot.append(group);
 }

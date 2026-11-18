@@ -534,3 +534,22 @@
   border-left: 2px solid var(--select);
   padding-left: 6px;
 }
+
+.viz .queue {
+  cursor: default;
+  pointer-events: none;
+}
+
+.viz .queue text {
+  fill: var(--fg);
+  font-size: 10px;
+}
+
+.viz .queued-item rect {
+  fill: var(--bg);
+  stroke: var(--fg);
+}
+
+.viz .queue .queue-more {
+  fill: var(--muted);
+}

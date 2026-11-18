@@ -114,7 +114,44 @@
   "partOutputs": {
     "workers": ["team.ITEMS_FAILED", "team.ITEMS_FINISHED"]
   },
-  "context": null,
+  "context": [
+    {
+      "name": "waiting",
+      "type": "string[]",
+      "optional": false,
+      "doc": null,
+      "input": "json",
+      "choices": [],
+      "sample": []
+    },
+    {
+      "name": "free",
+      "type": "string[]",
+      "optional": false,
+      "doc": null,
+      "input": "json",
+      "choices": [],
+      "sample": []
+    },
+    {
+      "name": "workers",
+      "type": "string[]",
+      "optional": false,
+      "doc": null,
+      "input": "json",
+      "choices": [],
+      "sample": []
+    },
+    {
+      "name": "size",
+      "type": "number",
+      "optional": false,
+      "doc": null,
+      "input": "number",
+      "choices": [],
+      "sample": 1
+    }
+  ],
   "edges": [
     {
       "id": "__initial__->allWorkersFree",
