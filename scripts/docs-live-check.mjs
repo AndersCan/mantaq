@@ -1,6 +1,7 @@
 // Opens each Getting started page of the built docs site (apps/docs/dist) in Chromium
 // and checks its diagram runs live: a current state, a moving next arrow where the
-// diagram has arrows, on events a click on `eat` moves the walk to `full`, and on timers
+// diagram has arrows, on events a click on `eat` moves the walk to `full`, and on guards a
+// click on `eat` at 0 plates says why under the diagram, on timers
 // `cook`, then the `overcooked` arrow (a click sends it now), brings the walk back to `hungry`.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { existsSync } from "node:fs";
@@ -59,6 +60,19 @@ for (const page of pages) {
       .locator(".mantaq-tutorial g.state.current")
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id")));
     if (after.join() !== "full") failures.push(`${page}: clicking eat leaves the walk in ${after}`);
+  }
+  if (page === "getting-started/guards/") {
+    await tab
+      .locator('.mantaq-tutorial g.edge[data-edge-id="hungry-eat-full"]')
+      .dispatchEvent("click");
+    await tab.waitForTimeout(200);
+    const said = await tab.locator(".mantaq-tutorial .viz-main > .blocked-note").textContent();
+    const controls = await tab.locator(".mantaq-tutorial [data-show-controls]").count();
+    if (said !== "eat is blocked: plates is 0" || controls === 0) {
+      failures.push(
+        `guards: clicking eat at 0 plates says "${said}", not "eat is blocked: plates is 0"`,
+      );
+    }
   }
   if (page === "getting-started/timers/") {
     const edge = (id) => tab.locator(`.mantaq-tutorial g.edge.next[data-edge-id="${id}"]`);

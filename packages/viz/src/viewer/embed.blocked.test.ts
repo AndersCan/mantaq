@@ -157,6 +157,53 @@ function mount(driver: VizDriver, machine: VizMachine = cart) {
   return root;
 }
 
+describe("with only the diagram shown", () => {
+  function mountDiagram(driver: VizDriver) {
+    const root = document.createElement("div");
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [cart] },
+      { driver, diagramOnly: true },
+    );
+    return root;
+  }
+  const clickArrow = (root: HTMLElement, id: string) =>
+    root
+      .querySelector(`g.edge[data-edge-id="${id}"]`)
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const line = (root: HTMLElement) => root.querySelector(".viz-main > .blocked-note");
+
+  test("a status line sits under the diagram, empty before any click", () => {
+    const root = mountDiagram(fakeDriver().driver);
+    expect(line(root)?.getAttribute("role")).toBe("status");
+    expect(line(root)?.textContent).toBe("");
+    expect(root.querySelector(".panel")).toBeNull();
+  });
+
+  test("a click on a blocked arrow says why and keeps the controls hidden", () => {
+    const { driver, sent } = fakeDriver();
+    const root = mountDiagram(driver);
+    clickArrow(root, "cart-pay-payment");
+    expect(sent).toHaveLength(0);
+    expect(line(root)?.textContent).toContain("is blocked:");
+    expect(root.querySelector("[data-show-controls]")).not.toBeNull();
+  });
+
+  test("a click that sends empties the line", () => {
+    const { driver, sent } = fakeDriver();
+    const root = mountDiagram(driver);
+    clickArrow(root, "cart-pay-payment");
+    clickArrow(root, "cart-addItem-cart");
+    expect(sent).toHaveLength(1);
+    expect(line(root)?.textContent).toBe("");
+  });
+
+  test("without diagramOnly there is no line under the diagram", () => {
+    const root = mount(fakeDriver().driver);
+    expect(line(root)).toBeNull();
+  });
+});
+
 describe("a blocked arrow", () => {
   test("is grey with a lock, not a next step, and a click on it sends nothing", () => {
     const { driver, sent } = fakeDriver();
