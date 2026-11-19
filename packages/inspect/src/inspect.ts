@@ -364,6 +364,7 @@ export interface ModuleOptions {
   load: (file: string) => Promise<Record<string, unknown>>;
   /** Locations are relative to this. Default: nearest package.json above the file. */
   root?: string;
+  /** @deprecated No mantaq caller sets this; removed in a later release. */
   tsconfig?: string;
   fuzz?: false | FuzzSettings;
 }
