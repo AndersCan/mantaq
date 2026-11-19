@@ -166,7 +166,7 @@ describe("dropped message", () => {
     const { root } = mount();
     walk(root, 1);
     expect(text(root, "[data-live-after]")).toContain(
-      "1. kitchen sent DISH_READY to waiter: serving → carryingDish",
+      "kitchen sent DISH_READY to waiter: serving → carryingDish",
     );
     expect(root.querySelector("[data-live-dropped]")).toBeNull();
   });
@@ -175,7 +175,7 @@ describe("dropped message", () => {
     const { root } = mount();
     walk(root, 4);
     expect(text(root, "[data-live-dropped]")).toBe(
-      "! 2. kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak",
+      "! kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak",
     );
     expect(root.querySelector("[data-live-dropped]")?.classList.contains("muted")).toBe(false);
   });
@@ -184,7 +184,7 @@ describe("dropped message", () => {
     const { root } = mount(null);
     walk(root, 4);
     expect(text(root, "[data-live-dropped]")).toBe(
-      "! 2. DISH_READY to waiter: lost, nobody took it in onBreak",
+      "! DISH_READY to waiter: lost, nobody took it in onBreak",
     );
   });
 
@@ -213,7 +213,7 @@ describe("dropped message", () => {
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [kitchen] }, { driver });
     send(root, "DISH_COOKED");
     expect(text(root, "[data-live-after]")).toBe(
-      "1. kitchen sent DISH_READY to waiter: stayed in serving",
+      "kitchen sent DISH_READY to waiter: stayed in serving",
     );
   });
 });
@@ -237,16 +237,15 @@ describe("the Step tab lists the whole walk", () => {
     );
   });
 
-  test("messages are numbered over the whole walk", () => {
+  test("a lost message reads ! and a taken one has no number", () => {
     const { root } = mount();
     walk(root, 5);
-    const numbers = [...root.querySelectorAll<HTMLElement>("[data-message]")].map((each) => [
-      each.dataset["message"],
-      each.textContent,
-    ]);
-    expect(numbers).toEqual([
-      ["1", "1. kitchen sent DISH_READY to waiter: serving → carryingDish"],
-      ["2", "! 2. kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak"],
+    const rows = [...root.querySelectorAll<HTMLElement>("[data-live-after]")].map(
+      (each) => each.textContent,
+    );
+    expect(rows).toEqual([
+      "kitchen sent DISH_READY to waiter: serving → carryingDish",
+      "! kitchen sent DISH_READY to waiter: lost, nobody took it in onBreak",
     ]);
   });
 

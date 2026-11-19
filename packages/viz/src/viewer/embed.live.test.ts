@@ -1171,7 +1171,7 @@ describe("what ran", () => {
     const root = mountWith(branching, stepped({ sent: ["openAlbum"] }, [taken]).live, routes);
     sendVia(root, "submit");
     expect(root.querySelector("[data-live-sent]")).toBeNull();
-    expect(text(root, "after")).toBe("1. checkout sent NAVIGATED to router: idle → paying");
+    expect(text(root, "after")).toBe("checkout sent NAVIGATED to router: idle → paying");
   });
 
   test("an async result renders without another click", () => {
@@ -1214,7 +1214,6 @@ describe("what ran", () => {
     });
     const after = root.querySelector("[data-live-after]");
     expect(after?.textContent).toBe("checkout took paymentTimeout on its own: paying → error");
-    expect(after?.hasAttribute("data-message")).toBe(false);
   });
 
   test("a message with no sender reads `took`, without `on its own`", () => {
@@ -1235,10 +1234,10 @@ describe("what ran", () => {
       ]).live,
     );
     sendVia(root, "submit");
-    expect(text(root, "after")).toBe("1. checkout took NAVIGATED: idle → paying");
+    expect(text(root, "after")).toBe("checkout took NAVIGATED: idle → paying");
   });
 
-  test("an advance's own message is numbered once and draws its output once", () => {
+  test("an advance's own message is listed once and draws its output once", () => {
     const inner = driver();
     const message: VizLiveStep = {
       from: "paying",
@@ -1267,7 +1266,7 @@ describe("what ran", () => {
     );
     const second = root.querySelector('[data-step="2"]');
     expect(second?.querySelectorAll("[data-live-sent]")).toHaveLength(1);
-    expect(second?.querySelector("[data-message]")?.getAttribute("data-message")).toBe("1");
+    expect(second?.querySelectorAll("[data-live-after]")).toHaveLength(1);
   });
 
   test("an output named like a row that carries no message is still shown", () => {
@@ -1297,7 +1296,7 @@ describe("what ran", () => {
       },
     );
     const second = root.querySelector('[data-step="2"]');
-    expect(second?.querySelector("[data-message]")).toBeNull();
+    expect(second?.querySelector("[data-live-after]")?.textContent).toContain("on its own");
     expect(
       [...(second?.querySelectorAll("[data-live-sent]") ?? [])].map((p) => p.textContent),
     ).toEqual(["checkout sent paymentTimeout out"]);
@@ -1483,11 +1482,9 @@ describe("live effect reports", () => {
       expect(root.querySelector(".explore-waiting")).toBeNull();
     });
 
-    test("a step into fetching names the effect it did not run and what it would send", () => {
+    test("a step into fetching names the effect it did not run", () => {
       const root = mountFetcher({ mode: "held" });
-      expect(line(root, "not-run")).toBe(
-        "Not run here: fetchList (it would send listFetched or fetchFailed or fetchGone)",
-      );
+      expect(line(root, "not-run")).toBe("Not run here: fetchList");
     });
 
     test("an effect that declares no sends is named alone", () => {
@@ -1546,12 +1543,10 @@ describe("live effect reports", () => {
         ),
       };
       const root = mountHeld(machine, withEffects(["fetchList", "logVisit"]));
-      expect(line(root, "not-run")).toBe(
-        "Not run here: fetchList (it would send listFetched); logVisit",
-      );
+      expect(line(root, "not-run")).toBe("Not run here: fetchList; logVisit");
       expect(
         [...root.querySelectorAll("[data-live-not-run] code")].map((each) => each.textContent),
-      ).toEqual(["fetchList", "listFetched", "logVisit"]);
+      ).toEqual(["fetchList", "logVisit"]);
     });
 
     test("real mode has no Not run here line", () => {

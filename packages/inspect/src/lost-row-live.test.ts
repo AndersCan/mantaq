@@ -31,7 +31,7 @@ test("the design page's lost dish is one row: nobody else is said to have sent i
   sendVia(root, "DISH_COOKED");
   const step = root.querySelector('[data-step="2"]');
   expect(step?.querySelector("[data-live-dropped]")?.textContent).toBe(
-    "! 1. cook sent DISH_READY to waiter: lost, nobody took it in onBreak",
+    "! cook sent DISH_READY to waiter: lost, nobody took it in onBreak",
   );
   expect(step?.querySelectorAll("[data-live-sent]")).toHaveLength(0);
 });
@@ -53,8 +53,8 @@ test("the design gate page quotes the lost row its recorded run shows", async ()
       },
     },
   });
-  const row = root.querySelector("[data-message][data-live-dropped]")?.textContent;
-  expect(row).toBe("! 2. cook sent DISH_READY to waiter: lost, nobody took it in onBreak");
+  const row = root.querySelector("[data-live-after][data-live-dropped]")?.textContent;
+  expect(row).toBe("! cook sent DISH_READY to waiter: lost, nobody took it in onBreak");
   const page = readFileSync(
     join(import.meta.dirname, "../../../apps/docs/src/content/docs/guides/design-gate.mdx"),
     "utf8",

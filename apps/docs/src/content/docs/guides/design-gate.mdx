@@ -76,7 +76,7 @@ checkout has 1 design error:
 
 Add the `on the board:` line to the address of a page that draws the machine and the run plays; its last step is the `!` row.
 
-A message dropped because the receiver is in a state without a handler is not an error; the board marks it. In the run below, `cook` sends `DISH_READY` while its waiter is on a break, and the Step tab shows `! 2. cook sent DISH_READY to waiter: lost, nobody took it in onBreak`.
+A message dropped because the receiver is in a state without a handler is not an error; the board marks it. In the run below, `cook` sends `DISH_READY` while its waiter is on a break, and the Step tab shows `! cook sent DISH_READY to waiter: lost, nobody took it in onBreak`.
 
 <Machine
   src="src/design/dropped-message.ts"
