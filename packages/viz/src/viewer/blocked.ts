@@ -89,9 +89,7 @@ export function blockedReason(context: {
     outcome.outcome === "stay" || (outcome.outcome === "missing" && outcome.error !== null);
   if (!stayed) return null;
   const paths = contextPaths(edge);
-  if (paths.length === 0) {
-    return staysElsewhere(edge, outcome);
-  }
+  if (paths.length === 0) return staysElsewhere(edge, outcome);
   return `${edge.event} is blocked: ${paths.map((path) => `${path} is ${valueAt(live, path)}`).join(", ")}`;
 }
 
