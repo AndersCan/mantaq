@@ -154,14 +154,14 @@ describe("region titles have room of their own", () => {
     expect(overlapsOf(laid)).toEqual([]);
   });
 
-  test("a map region's title reads 'one per key' and sets the width", () => {
+  test("a map region's title is its name and sets the width", () => {
     const name = "poolOfWorkersWithAVeryLongNameThatIsWiderThanAnyStateBox";
     const pool = {
       ...machineOf([{ ...state(`${name}.b`, name), label: "b" }], [], [name]),
       maps: [name],
     };
     const region = placeMachine(pool).regions[0];
-    expect(region?.width).toBe(textWidth(`${name}: one per key`) + 8 + 2 * LABEL_PAD);
+    expect(region?.width).toBe(textWidth(name) + 8 + 2 * LABEL_PAD);
   });
 
   test("checker: a label on a region's title and a state on a region's title are overlaps", () => {

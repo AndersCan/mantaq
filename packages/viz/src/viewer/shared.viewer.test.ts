@@ -131,6 +131,7 @@ describe("an arrow three states share", () => {
     press(shared(root));
     expect(sent).toHaveLength(0);
     expect(details(root)?.querySelector("h2")?.textContent).toBe("3 states —go→ home");
+    expect(details(root)?.textContent).not.toContain("From any of these");
     expect(
       [...root.querySelectorAll("[data-edge-link]")].map((link) =>
         link.getAttribute("data-edge-link"),

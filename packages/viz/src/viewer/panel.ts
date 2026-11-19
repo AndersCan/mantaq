@@ -124,7 +124,6 @@ function sharedPanel(
   const when = condition === null ? "" : ` [${condition}]`;
   return html(doc, "section", { class: "details", "data-selected-edge": arrow.id }, [
     html(doc, "h2", {}, [`${members.length} states —${arrow.event}${when}→ ${to}`]),
-    html(doc, "p", {}, [`From any of these ${members.length} states:`]),
     edgeList(doc, members, select, false),
     docLine(doc, "edge", members[0]?.doc ?? null),
   ]);

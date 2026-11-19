@@ -46,7 +46,7 @@ On the live page (the Vite plugin) each step runs the real actor, so guards are 
 | Pill inside a state                                                | An effect the state runs on entry, by name (`chargeCard` in `submitting`)                     |
 | Dashed circle `?`                                                  | An unknown target                                                                             |
 | Shaded rectangle                                                   | A region: its own start arrow and current state                                               |
-| Box titled `<map>: one per key`                                    | An actor map: one child machine                                                               |
+| Box titled with the map's name                                     | An actor map: its child machine drawn once, each live child a chip                            |
 | `3 waiting` and outlined pills at the bottom of a pool's own state | The items waiting in a `createPool` inbox, the next one on the left; `+N` more past the edge  |
 | Dark chip with a key at the bottom of a state                      | A live child of an actor map, by key                                                          |
 
