@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.41.0
+
+<sub>2026-11-18</sub>
+
+- _(minor)_
+  A pool's inbox shows how many items wait and which, next in line on the left, on its own state.
+
+  Breaking: none
+
+- _(minor)_
+  A board of three or more machines opens as one named box per machine, dotted wires between those that message each other; click a box to see that machine's states, click its name at the top to go back. The board refits when the window width changes.
+
+  Breaking: none
+
+- _(minor)_
+  An event that three or more sibling states leave by the same arrows is drawn once, from a node naming those states; clicks, Send, Details and highlights work on it. Every transition is still drawn: a member arrow is no longer its own `g[data-edge-id]` element, the shared arrow carries its ids in `data-members`. The test harness finds shared arrows by member id.
+
+  Breaking: none
+
+- _(patch)_ The pinned Step panel takes at most a quarter of the window and shows the newest step; the Screen tab keeps its height.
+- _(patch)_
+  The Step tab's run list no longer shows the browser's own numbers beside "Step N of M"; a bare number is always a message.
+
 ## 0.40.0
 
 <sub>2026-11-18</sub>
