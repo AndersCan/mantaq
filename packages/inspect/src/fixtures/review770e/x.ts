@@ -9,6 +9,10 @@ export function label(): string {
   return "x";
 }
 
+export function options(): { retries: number } {
+  return { retries: 3 };
+}
+
 export function xActor() {
   return Actor({
     inputs: [go],

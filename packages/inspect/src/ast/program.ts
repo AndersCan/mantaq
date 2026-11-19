@@ -72,14 +72,14 @@ function declaringFiles(checker: ts.TypeChecker, node: ts.Node): string[] {
   return (target.declarations ?? []).map((declaration) => declaration.getSourceFile().fileName);
 }
 
-const PLAIN_VALUE =
-  ts.TypeFlags.StringLike |
-  ts.TypeFlags.NumberLike |
-  ts.TypeFlags.BooleanLike |
-  ts.TypeFlags.BigIntLike |
-  ts.TypeFlags.Void |
-  ts.TypeFlags.Undefined |
-  ts.TypeFlags.Null;
+/** True when `type` is the `Actor` of `@mantaq/core`. */
+function isCoreActor(type: ts.Type): boolean {
+  const symbol = type.getSymbol() ?? type.aliasSymbol;
+  if (symbol?.name !== "Actor") return false;
+  return (symbol.declarations ?? []).some((declaration) =>
+    /[\\/]core[\\/]/.test(declaration.getSourceFile().fileName),
+  );
+}
 
 /**
  * Files the root's `create` bodies run: where each called function is declared,
@@ -91,9 +91,9 @@ function calledFiles(checker: ts.TypeChecker, root: ts.SourceFile): Set<string> 
   const visit = (node: ts.Node, inCreate: boolean): void => {
     if (inCreate && ts.isCallExpression(node)) {
       const declaration = checker.getResolvedSignature(node)?.declaration;
-      // A helper that returns a plain value (a label, a count) is not an actor.
-      const plain = checker.getTypeAtLocation(node).flags & PLAIN_VALUE;
-      if (declaration !== undefined && !plain) files.add(declaration.getSourceFile().fileName);
+      // Only a helper that returns an actor ranks its file; a label or options object does not.
+      const actor = isCoreActor(checker.getTypeAtLocation(node));
+      if (declaration !== undefined && actor) files.add(declaration.getSourceFile().fileName);
       const callee = node.expression;
       const receivers = ts.isPropertyAccessExpression(callee)
         ? declaringFiles(checker, callee.expression)
