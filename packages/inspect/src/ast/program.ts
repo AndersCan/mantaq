@@ -72,6 +72,15 @@ function declaringFiles(checker: ts.TypeChecker, node: ts.Node): string[] {
   return (target.declarations ?? []).map((declaration) => declaration.getSourceFile().fileName);
 }
 
+const PLAIN_VALUE =
+  ts.TypeFlags.StringLike |
+  ts.TypeFlags.NumberLike |
+  ts.TypeFlags.BooleanLike |
+  ts.TypeFlags.BigIntLike |
+  ts.TypeFlags.Void |
+  ts.TypeFlags.Undefined |
+  ts.TypeFlags.Null;
+
 /**
  * Files the root's `create` bodies run: where each called function is declared,
  * and where the object a method such as `syncMachine.create()` is called on is
@@ -82,10 +91,14 @@ function calledFiles(checker: ts.TypeChecker, root: ts.SourceFile): Set<string> 
   const visit = (node: ts.Node, inCreate: boolean): void => {
     if (inCreate && ts.isCallExpression(node)) {
       const declaration = checker.getResolvedSignature(node)?.declaration;
-      if (declaration !== undefined) files.add(declaration.getSourceFile().fileName);
+      // A helper that returns a plain value (a label, a count) is not an actor.
+      const plain = checker.getTypeAtLocation(node).flags & PLAIN_VALUE;
+      if (declaration !== undefined && !plain) files.add(declaration.getSourceFile().fileName);
       const callee = node.expression;
-      const receiver = ts.isPropertyAccessExpression(callee) ? callee.expression : callee;
-      for (const file of declaringFiles(checker, receiver)) files.add(file);
+      const receivers = ts.isPropertyAccessExpression(callee)
+        ? declaringFiles(checker, callee.expression)
+        : [];
+      for (const file of receivers) files.add(file);
     }
     const creating =
       ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === "create";
