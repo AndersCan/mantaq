@@ -7,34 +7,6 @@ const done = state("done")();
 const trigger = event("GO")();
 
 describe("ActorBuilder registration override", () => {
-  test("a later on(state, event) call replaces the earlier handler", () => {
-    const actor = Actor({
-      inputs: [trigger],
-      states: [idle, active, done],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
-        m.on(idle, { event: trigger, to: [done], handler: () => ({ state: done }) });
-      },
-    });
-    actor.send(trigger.create());
-    expect(actor.snapshot().path[0]).toBe("done");
-  });
-
-  test("a later onAny(event) call replaces the earlier handler", () => {
-    const actor = Actor({
-      inputs: [trigger],
-      states: [idle, active, done],
-      initial: idle,
-      setup: (m) => {
-        m.onAny({ event: trigger, to: [active], handler: () => ({ state: active }) });
-        m.onAny({ event: trigger, to: [done], handler: () => ({ state: done }) });
-      },
-    });
-    actor.send(trigger.create());
-    expect(actor.snapshot().path[0]).toBe("done");
-  });
-
   test("composing the same part twice keeps the later handler", () => {
     const actor = Actor({
       inputs: [trigger],

@@ -9,6 +9,7 @@ describe("VirtualClock directed mutation tests", () => {
     clock.clearTimeout(timerId);
     clock.advance(100);
     expect(fired).toBe(0);
+    expect(clock.hasPending()).toBe(false);
   });
 
   test("clearTimeout on an unknown timerId does not throw", () => {

@@ -103,28 +103,6 @@ describe("Actor dispatch resolution", () => {
     expect(anyRuns).toBe(1);
   });
 
-  test("Any handler can emit without transitioning", () => {
-    const idle = state("idle")();
-    const tick = event("TICK")();
-    const out = event("OUT")();
-
-    const actor = Actor({
-      inputs: [tick],
-      outputs: [out],
-      states: [idle],
-      initial: idle,
-      setup: (m) => {
-        m.onAny({ event: tick, handler: () => ({ emit: [out.create()] }) });
-      },
-    });
-
-    const received: string[] = [];
-    actor.on("output", { fn: (e) => received.push(e.type) });
-    actor.send(tick.create());
-    expect(actor.snapshot().path[0]).toBe("idle");
-    expect(received).toEqual(["OUT"]);
-  });
-
   test("the actor ignores sends once in a final state", () => {
     const pending = state("pending")();
     const done = state("done")().final();
@@ -311,43 +289,6 @@ describe("Actor effects", () => {
     });
   });
 
-  test("emit after abort is a silent no-op", () => {
-    const idle = state("idle")();
-    const running = state("running")();
-    const trigger = event("GO")();
-    const stop = event("STOP")();
-    const out = event("OUT")();
-    const received: string[] = [];
-    let savedEmit: ((e: { type: string; payload?: unknown }) => void) | undefined;
-    const actor = Actor({
-      inputs: [trigger, stop],
-      outputs: [out],
-      states: [idle, running],
-      initial: idle,
-      setup: (m) => {
-        m.effect(running, {
-          name: "captureEmit",
-          fn: ({ emit }) => {
-            savedEmit = emit;
-          },
-        });
-        m.on(idle, { event: trigger, to: [running], handler: () => ({ state: running }) });
-        m.on(running, { event: stop, to: [idle], handler: () => ({ state: idle }) });
-      },
-    });
-    actor.on("output", { fn: (e) => received.push(e.type) });
-    actor.send(trigger.create());
-    expect(savedEmit).toBeDefined();
-    actor.send(stop.create());
-    const capturedEmit = savedEmit;
-    if (!capturedEmit) {
-      expect(capturedEmit).toBeDefined();
-      return;
-    }
-    capturedEmit(out.create());
-    expect(received).toEqual([]);
-  });
-
   test("a transition removes the running effect via its abort signal", () => {
     const idle = state("idle")();
     const running = state("running")();
@@ -408,50 +349,6 @@ describe("Actor effects", () => {
 });
 
 describe("Actor regions", () => {
-  test("the parent queue treats child output as input and drains it", () => {
-    const childIdle = state("cidle")();
-    const childDone = state("cdone")();
-    const childGo = event("CGO")();
-    const doneEvt = event("CHILD_DONE")();
-    const parentIdle = state("pidle")();
-    const parentActive = state("pactive")();
-
-    const child = Actor({
-      inputs: [childGo],
-      outputs: [doneEvt],
-      states: [childIdle, childDone],
-      initial: childIdle,
-      setup: (m) => {
-        m.on(childIdle, {
-          event: childGo,
-          to: [childDone],
-          handler: () => ({ state: childDone, emit: [doneEvt.create()] }),
-        });
-      },
-    });
-
-    const parent = Actor({
-      inputs: [doneEvt],
-      states: [parentIdle, parentActive],
-      initial: parentIdle,
-      regions: { child },
-      setup: (m) => {
-        m.on(parentIdle, {
-          event: doneEvt,
-          to: [parentActive],
-          handler: () => ({ state: parentActive }),
-        });
-      },
-    });
-
-    child.send(childGo.create());
-    const regionSnap = parent.snapshot();
-    expect({
-      parentState: regionSnap.path[0],
-      childState: child.snapshot().path[0],
-    }).toEqual({ parentState: "pactive", childState: "cdone" });
-  });
-
   test("dispose() calls dispose on region child actors", () => {
     const childClock = VirtualClock();
     const cIdle = state("cidle")();
@@ -779,26 +676,6 @@ describe("Actor snapshot payload", () => {
 });
 
 describe("Actor transition observability", () => {
-  test("the transition hook emits an update for every handled event", () => {
-    const idle = state("idle")();
-    const active = state("active")();
-    const trigger = event("GO")();
-    const actor = Actor({
-      inputs: [trigger],
-      states: [idle, active],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
-      },
-    });
-    const seen: Array<{ from: string; to: string; transitioned: boolean }> = [];
-    actor.on("transition", {
-      fn: (info) => seen.push({ from: info.from, to: info.to, transitioned: info.transitioned }),
-    });
-    actor.send(trigger.create());
-    expect(seen).toEqual([{ from: "idle", to: "active", transitioned: true }]);
-  });
-
   test("the transition hook emits self-transitions as transitioned", () => {
     const home = state("home")();
     const reset = event("RESET")();

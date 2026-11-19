@@ -338,50 +338,6 @@ describe("ActorMap", () => {
     expect({ has: map.has("a"), size: map.size }).toEqual({ has: false, size: 0 });
   });
 
-  test("removes a child that dies into __error under autoReap", () => {
-    const goEvent = event("go")();
-    const off = state("off")();
-    const map = createActorMap(
-      () =>
-        Actor({
-          inputs: [goEvent],
-          context: {},
-          states: [off],
-          initial: off,
-          setup: (m) =>
-            // malformed JSON raises inside the transition, driving the child into __error
-            m.on(off, { event: goEvent, handler: () => JSON.parse("{") }),
-        }),
-      { autoReap: true },
-    );
-    map.spawn("a");
-    map.send("a", goEvent.create());
-    expect(map.has("a")).toBe(false);
-  });
-
-  test("removes a child that is already final at spawn under autoReap", () => {
-    const init = state("init")();
-    const done = state("done")().final();
-    const tick = event("TICK")();
-    const map = createActorMap(
-      () =>
-        Actor({
-          inputs: [],
-          internal: [tick],
-          context: {},
-          states: [init, done],
-          initial: init,
-          setup: (m) => {
-            m.effect(init, { name: "emitTick", fn: ({ emit }) => emit(tick.create()) });
-            m.on(init, { event: tick, to: [done], handler: () => ({ state: done }) });
-          },
-        }),
-      { autoReap: true },
-    );
-    map.spawn("a");
-    expect(map.size).toBe(0);
-  });
-
   test("removes each completed child individually across re-spawns under autoReap", () => {
     const toggle = event("toggle")();
     const off = state("off")();

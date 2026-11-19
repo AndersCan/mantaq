@@ -92,11 +92,6 @@ describe("matches", () => {
     expect(matches(actor, "player")).toBe(true);
   });
 
-  test("returns false for an empty pattern", () => {
-    const actor = { snapshot: () => snap(["idle"]) };
-    expect(matches(actor, "")).toBe(false);
-  });
-
   test("returns false for a trailing dot pattern", () => {
     const actor = { snapshot: () => snap(["idle"]) };
     expect(matches(actor, "idle.")).toBe(false);

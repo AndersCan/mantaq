@@ -441,14 +441,14 @@ describe("Actor state entry directed mutation tests", () => {
     expect(actor.pendingEffectCount()).toBe(0);
   });
 
-  test("emit after the effect aborts is a silent no-op", () => {
+  test("emit after abort is a silent no-op", () => {
     const idle = state("idle")();
     const running = state("running")();
     const trigger = event("GO")();
     const stop = event("STOP")();
     const out = event("OUT")();
     const received: string[] = [];
-    let savedEmit: ((e: InternalEvent) => void) | undefined;
+    let savedEmit: ((e: { type: string; payload?: unknown }) => void) | undefined;
     const actor = Actor({
       inputs: [trigger, stop],
       outputs: [out],
@@ -467,8 +467,14 @@ describe("Actor state entry directed mutation tests", () => {
     });
     actor.on("output", { fn: (e) => received.push(e.type) });
     actor.send(trigger.create());
+    expect(savedEmit).toBeDefined();
     actor.send(stop.create());
-    savedEmit?.(out.create());
+    const capturedEmit = savedEmit;
+    if (!capturedEmit) {
+      expect(capturedEmit).toBeDefined();
+      return;
+    }
+    capturedEmit(out.create());
     expect(received).toEqual([]);
   });
 });
@@ -1417,7 +1423,7 @@ describe("Actor error state directed mutation tests", () => {
     expect(actor.snapshot().error?.reason).toBe("effect");
   });
 
-  test("a throwing output handler kills the machine", () => {
+  test("a throwing output handler routes to the error state", () => {
     const idle = state("idle")();
     const out = event("OUT")();
     const trigger = event("GO")();
@@ -1432,7 +1438,11 @@ describe("Actor error state directed mutation tests", () => {
     });
     actor.on("output", { fn: () => isErrorBomb("output boom") });
     expect(() => actor.send(trigger.create())).not.toThrow();
-    expect(actor.snapshot().error?.reason).toBe("output");
+    const outputDeathSnap = actor.snapshot();
+    expect({
+      reason: outputDeathSnap.error?.reason,
+      eventType: outputDeathSnap.error?.event.type,
+    }).toEqual({ reason: "output", eventType: "OUT" });
   });
 
   test("the first error wins — a later throw does not replace it", () => {
@@ -1620,7 +1630,7 @@ describe("Actor error state directed mutation tests", () => {
     });
   });
 
-  test("the machine skips the Any handler after the state handler dies", () => {
+  test("a throwing transition handler routes to the error state and never resurrects", () => {
     const idle = state("idle")();
     const active = state("active")();
     const trigger = event("GO")();
@@ -1642,8 +1652,14 @@ describe("Actor error state directed mutation tests", () => {
       },
     });
     expect(() => actor.send(trigger.create())).not.toThrow();
+    expect(() => actor.send(trigger.create())).not.toThrow();
+    const snap = actor.snapshot();
+    expect(snap).toMatchObject({
+      path: ["__error"],
+      done: true,
+      error: { reason: "transition", event: { type: "GO" }, state: { name: "idle" } },
+    });
     expect(ranAny).toBe(false);
-    expect(actor.snapshot().path[0]).toBe("__error");
   });
 
   test("a successful output handler keeps the drain running", () => {

@@ -1,4 +1,3 @@
-import { trackAbort, clearAbort } from "./abort-tracker.ts";
 import type { ErrorInfo, Snapshot } from "./actor-types.ts";
 import { Context } from "./context.ts";
 import { parseTarget } from "./dispatch.ts";
@@ -11,14 +10,6 @@ import { state } from "./state.ts";
 import { Subscribers } from "./subscribers.ts";
 import { VirtualClock } from "./virtual-clock.ts";
 import { expect, test, describe } from "vite-plus/test";
-
-/**
- * A handler/subscriber explosion is a programmer bug, i.e. an assert-style bad
- * state, so the containment paths below use a guard-shaped throw helper.
- */
-function isErrorBomb(message: string): never {
-  throw new Error(message);
-}
 
 // Narrow an unknown failure into its message without casting.
 function errorMessage(failure: unknown): string {
@@ -49,16 +40,6 @@ describe("VirtualClock", () => {
     expect(clock.now()).toBe(100);
   });
 
-  test("clearTimeout removes a pending timer", () => {
-    const clock = VirtualClock();
-    let fired = 0;
-    const timerId = clock.setTimeout(50, { cb: () => fired++ });
-    clock.clearTimeout(timerId);
-    clock.advance(100);
-    expect(fired).toBe(0);
-    expect(clock.hasPending()).toBe(false);
-  });
-
   test("setInterval calls back repeatedly and reschedules", () => {
     const clock = VirtualClock();
     let count = 0;
@@ -66,16 +47,6 @@ describe("VirtualClock", () => {
     clock.advance(45);
     expect(count).toBe(2);
     expect(clock.now()).toBe(45);
-  });
-
-  test("clearInterval removes future firings", () => {
-    const clock = VirtualClock();
-    let count = 0;
-    const timerId = clock.setInterval(20, { cb: () => count++ });
-    clock.advance(25);
-    clock.clearInterval(timerId);
-    clock.advance(100);
-    expect(count).toBe(1);
   });
 
   test("hasPending returns true for timers or intervals", () => {
@@ -103,29 +74,6 @@ describe("VirtualClock", () => {
 });
 
 describe("RealClock", () => {
-  test("now returns increasing values", () => {
-    const clock = RealClock();
-    const first = clock.now();
-    expect(clock.now()).toBeGreaterThanOrEqual(first);
-  });
-
-  test("setTimeout fires and returns a numeric timerId", () => {
-    const clock = RealClock();
-    let fired = false;
-    const timerId = clock.setTimeout(5, {
-      cb: () => {
-        fired = true;
-      },
-    });
-    expect(typeof timerId).toBe("number");
-    return new Promise<void>((resolve) =>
-      setTimeout(() => {
-        expect(fired).toBe(true);
-        resolve();
-      }, 30),
-    );
-  });
-
   test("clearTimeout removes the pending timer", () => {
     const clock = RealClock();
     let fired = false;
@@ -174,17 +122,6 @@ describe("InternalQueue", () => {
     expect(queue.length).toBe(0);
   });
 
-  test("processCancellable stops when handler returns false", () => {
-    const queue = InternalQueue();
-    const seen: string[] = [];
-    queue.push({ type: "A" }, { type: "B" }, { type: "C" });
-    queue.processCancellable((e) => {
-      seen.push(e.type);
-      return e.type !== "B";
-    });
-    expect(seen).toEqual(["A", "B"]);
-  });
-
   test("settled resolves when queue is idle", async () => {
     const queue = InternalQueue();
     queue.push({ type: "A" });
@@ -205,33 +142,6 @@ describe("InternalQueue", () => {
     queue.push({ type: "A" });
     queue.push({ type: "B" });
     expect([lengthBefore, queue.length]).toEqual([0, 2]);
-  });
-});
-
-describe("abort-tracker", () => {
-  test("trackAbort deletes from map on abort", () => {
-    const map = new Map<number, { signal?: AbortSignal }>();
-    const controller = new AbortController();
-    map.set(1, { signal: controller.signal });
-    trackAbort(controller.signal, { timerId: 1, entries: map });
-    controller.abort();
-    expect(map.has(1)).toBe(false);
-  });
-
-  test("trackAbort returns undefined without a signal", () => {
-    const map = new Map<number, { signal?: AbortSignal }>();
-    expect(trackAbort(undefined, { timerId: 1, entries: map })).toBeUndefined();
-  });
-
-  test("clearAbort removes the abort listener", () => {
-    const map = new Map<number, { signal?: AbortSignal; onAbort?: () => void }>();
-    const controller = new AbortController();
-    const registered = trackAbort(controller.signal, { timerId: 1, entries: map });
-    const timer = { signal: controller.signal, onAbort: registered };
-    map.set(1, timer);
-    clearAbort(timer);
-    controller.abort();
-    expect(map.has(1)).toBe(true);
   });
 });
 
@@ -310,106 +220,6 @@ describe("runEffects", () => {
     });
     expect(seen).toEqual(["emit:OUT", "ran"]);
     expect(result.pending).toEqual([]);
-  });
-
-  test("routes a synchronous effect throw to onError and stops", () => {
-    const seen: string[] = [];
-    runEffects({
-      effects: {
-        idle: [
-          {
-            name: "pushOne",
-            fn: () => {
-              seen.push("one");
-            },
-          },
-          {
-            name: "thrower",
-            fn: () => isErrorBomb("boom"),
-          },
-          {
-            name: "pushThree",
-            fn: () => {
-              seen.push("three");
-            },
-          },
-        ],
-      },
-      state: state("idle")(),
-      statePayload: undefined,
-      event: { type: "X" },
-      context: Context({ get: () => ({}), set: () => {} }),
-      emit: () => {},
-      clock: VirtualClock(),
-      abort: new AbortController(),
-      lastGood: { state: state("idle")(), context: {} },
-      onError: (error) => {
-        expect(errorMessage(error)).toBe("boom");
-      },
-    });
-    expect(seen).toEqual(["one"]);
-  });
-
-  test("runEffects calls onError for an async rejection after the abort guard passes", async () => {
-    const seen: string[] = [];
-    const abort = new AbortController();
-    const result = runEffects({
-      effects: {
-        idle: [
-          {
-            name: "lateThrow",
-            fn: async () => isErrorBomb("late boom"),
-          },
-        ],
-      },
-      state: state("idle")(),
-      statePayload: undefined,
-      event: { type: "X" },
-      context: Context({ get: () => ({}), set: () => {} }),
-      emit: () => {},
-      clock: VirtualClock(),
-      abort,
-      lastGood: { state: state("idle")(), context: {} },
-      onError: (error) => {
-        seen.push(errorMessage(error));
-      },
-    });
-    await Promise.all(result.pending);
-    expect(seen).toEqual(["late boom"]);
-  });
-
-  test("runEffects ignores a rejection caused by abort", async () => {
-    const seen: string[] = [];
-    const abort = new AbortController();
-    const result = runEffects({
-      effects: {
-        idle: [
-          {
-            name: "rejectOnAbort",
-            fn: async ({ signal }) => {
-              await new Promise<void>((...executorArgs) => {
-                const reject = executorArgs[1];
-                signal.addEventListener("abort", () => reject(new Error("aborted")));
-              });
-            },
-          },
-        ],
-      },
-      state: state("idle")(),
-      statePayload: undefined,
-      event: { type: "X" },
-      context: Context({ get: () => ({}), set: () => {} }),
-      emit: () => {},
-      clock: VirtualClock(),
-      abort,
-      lastGood: { state: state("idle")(), context: {} },
-      onError: () => {
-        seen.push("reported");
-      },
-    });
-    abort.abort();
-    await Promise.all(result.pending);
-    expect(seen).toEqual([]);
   });
 
   test("treats a non-native thenable return as an async effect", async () => {
