@@ -25,7 +25,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { searchForWorkspaceRoot } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 
-/** @deprecated Unused; removed in a later release. */
+/** @deprecated No mantaq code imports this export; removed in a later release. */
 export const STYLESHEETS = ["@mantaq/viz/viewer.css", "@mantaq/viz/page.css"];
 
 export interface MantaqVizOptions {

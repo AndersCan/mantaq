@@ -19,7 +19,10 @@ export interface FuzzOptions {
   /** Longest sequence the mutator will grow. Default 24. */
   maxLength?: number;
   literals?: LiteralPool;
-  /** @deprecated Unused; removed in a later release. */
+  /**
+   * Loop context-changing steps (default true). False reproduces plain Phase 3 mutation.
+   * @deprecated No mantaq caller sets this; removed in a later release.
+   */
   repeat?: boolean;
   /**
    * Optional search guidance (Phase 5). Sees every run; returning true keeps

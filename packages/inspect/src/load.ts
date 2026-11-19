@@ -18,7 +18,7 @@ const ANSI = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
 /** Which Vite config and mode load the file; without a config, no project config is read. */
 export interface LoadOptions {
   config?: string;
-  /** @deprecated Unused; removed in a later release. */
+  /** @deprecated No mantaq caller sets this; removed in a later release. */
   mode?: string;
 }
 
