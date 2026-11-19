@@ -376,9 +376,81 @@ describe("arrowCandidates", () => {
     ({ steps, children: [], removed: [] }) as unknown as VizLiveState;
   const none = { set: {}, live: null, afters: [], actor: undefined };
 
-  test("with no fuzz, only the default", () => {
+  const answer = { ...field("answer", "choice", ["accepted", "declined"]), sample: "accepted" };
+
+  test("with no fuzz and no choice field, only the default", () => {
     const machine = { ...machineWith([]), fuzz: null } as VizMachine;
     expect(arrowCandidates(machine, edge("b"), none)).toEqual([{ n: 0 }]);
+  });
+
+  test("with no fuzz, the default then each other choice", () => {
+    const machine = { ...machineWith([], [answer]), fuzz: null } as VizMachine;
+    expect(arrowCandidates(machine, edge("b"), none)).toEqual([
+      { answer: "accepted" },
+      { answer: "declined" },
+    ]);
+  });
+
+  test("a set value wins over every choice", () => {
+    const machine = { ...machineWith([], [answer]), fuzz: null } as VizMachine;
+    const set = { ...none, set: { answer: "declined" } };
+    expect(arrowCandidates(machine, edge("b"), set)).toEqual([{ answer: "declined" }]);
+  });
+
+  test("a fuzz value outside the declared choices is never a candidate", () => {
+    const machine = machineWith(
+      [
+        { steps: [go({ answer: "ACCEPTED" })], discovered: [] },
+        { steps: [go({ answer: "accepted" }), go({ answer: "NOPE" })], discovered: [] },
+      ],
+      [answer],
+    );
+    const walked = at([go({ answer: "accepted" })]);
+    const lists = [
+      arrowCandidates(machine, edge("b"), none),
+      arrowCandidates(machine, edge("b"), { ...none, live: walked }),
+    ];
+    for (const list of lists) {
+      expect(list).toEqual([{ answer: "accepted" }, { answer: "declined" }]);
+    }
+  });
+
+  test("each declared choice, in choices order, comes before runs and fuzz payloads", () => {
+    const pick = { ...field("answer", "choice", ["a", "b", "c"]), sample: "b" };
+    const machine = machineWith(
+      [
+        { steps: [go({ answer: "c", n: 5 })], discovered: [] },
+        { steps: [go({ answer: "b", n: 1 }), go({ answer: "c", n: 7 })], discovered: [] },
+      ],
+      [pick, num],
+    );
+    expect(arrowCandidates(machine, edge("b"), none)).toEqual([
+      { answer: "b", n: 0 },
+      { answer: "a", n: 0 },
+      { answer: "c", n: 0 },
+      { answer: "b", n: 1 },
+      { answer: "c", n: 5 },
+      { answer: "c", n: 7 },
+    ]);
+    const live = at([go({ answer: "b", n: 1 })]);
+    expect(arrowCandidates(machine, edge("b"), { ...none, live })).toEqual([
+      { answer: "c", n: 7 },
+      { answer: "b", n: 1 },
+      { answer: "a", n: 1 },
+      { answer: "c", n: 1 },
+      { answer: "c", n: 5 },
+    ]);
+  });
+
+  test("fuzz values of other inputs, and a missing optional choice, are kept", () => {
+    const maybe = { ...answer, optional: true };
+    const machine = machineWith(
+      [{ steps: [go({ name: "" }), go({ name: "x" })], discovered: [] }],
+      [field("name", "text"), maybe],
+    );
+    const list = arrowCandidates(machine, edge("b"), none);
+    expect(list).toContainEqual({ name: "" });
+    expect(list).toContainEqual({ name: "x" });
   });
 
   test("from the start: the default, then runs longest first, then the fuzz payloads", () => {

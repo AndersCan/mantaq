@@ -258,9 +258,9 @@ function fuzzPayloads(machine: VizMachine, event: string, feature: string): VizJ
 }
 
 /**
- * The payloads a click on `edge` may send, best first: the default (`payloadFor`), the next step of a
+ * The payloads a click on `edge` may send, best first: the default (`payloadFor`), the default with each other declared choice, the next step of a
  * fuzz run the walk is on, and the fuzz payloads of the event (those of runs that found this arrow
- * first). With an empty walk the default goes first, else the run does. At most 16, no repeats.
+ * first); fuzz values outside a declared choice are dropped. With an empty walk the default goes first, else the run does. At most 16, no repeats.
  */
 export function arrowCandidates(
   machine: VizMachine,
@@ -275,17 +275,32 @@ export function arrowCandidates(
   const { live, set } = from;
   const fallback = payloadFor(machine, edge.event, { set, live, afters: from.afters });
   const corpus = machine.fuzz?.corpus ?? [];
-  if (!asksForPayload(machine, edge.event) || corpus.length === 0) return [fallback];
+  if (!asksForPayload(machine, edge.event)) return [fallback];
   const fields = machine.events.find((each) => each.id === edge.event)?.payload ?? null;
   const walk = live?.steps ?? [];
   const runs = runPayloads(corpus, { walk, event: edge.event, actor: from.actor });
   const feature = `edge:${edge.from}>${edge.event}>${edge.to ?? ""}`;
   const fuzzed = fuzzPayloads(machine, edge.event, feature);
-  const laid = (list: VizJson[]) => list.map((each) => withSet(fields, each, set));
+  const declared = (each: VizJson) =>
+    (fields ?? []).every(
+      (field) =>
+        field.input !== "choice" ||
+        !isObject(each) ||
+        each[field.name] === undefined ||
+        fits(field, each[field.name]),
+    );
+  const laid = (list: VizJson[]) => list.filter(declared).map((each) => withSet(fields, each, set));
+  const variants = isObject(fallback)
+    ? (fields ?? []).flatMap((field) =>
+        field.input === "choice"
+          ? field.choices.map((choice) => ({ ...fallback, [field.name]: choice }))
+          : [],
+      )
+    : [];
   const ordered =
     walk.length === 0
-      ? [fallback, ...laid(runs), ...laid(fuzzed)]
-      : [...laid(runs), fallback, ...laid(fuzzed)];
+      ? [fallback, ...laid(variants), ...laid(runs), ...laid(fuzzed)]
+      : [...laid(runs), fallback, ...laid(variants), ...laid(fuzzed)];
   return distinct(ordered).slice(0, MOST_CANDIDATES);
 }
 
