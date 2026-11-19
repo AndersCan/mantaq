@@ -49,7 +49,7 @@ export interface LoadedSource extends FileRead {
   elsewhere: Array<
     FileRead & {
       file: string;
-      /** Imports from the root to a file declaring a function the root calls; the farthest value for a file it does not call. */
+      /** Imports from the root to a file its `create` bodies run; the farthest value for a file it does not call. */
       depth: number;
     }
   >;
@@ -64,17 +64,34 @@ function moduleSpecifiers(file: ts.SourceFile): string[] {
   });
 }
 
-/** Files declaring a function the root calls, resolved through the type checker (aliases followed). */
+/** Declaring files of a symbol, aliases (imports, re-exports) followed. */
+function declaringFiles(checker: ts.TypeChecker, node: ts.Node): string[] {
+  const symbol = checker.getSymbolAtLocation(node);
+  if (symbol === undefined) return [];
+  const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  return (target.declarations ?? []).map((declaration) => declaration.getSourceFile().fileName);
+}
+
+/**
+ * Files the root's `create` bodies run: where each called function is declared,
+ * and where the object a method such as `syncMachine.create()` is called on is
+ * declared. Calls outside a `create` (a title, a name) do not count.
+ */
 function calledFiles(checker: ts.TypeChecker, root: ts.SourceFile): Set<string> {
   const files = new Set<string>();
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node)) {
+  const visit = (node: ts.Node, inCreate: boolean): void => {
+    if (inCreate && ts.isCallExpression(node)) {
       const declaration = checker.getResolvedSignature(node)?.declaration;
       if (declaration !== undefined) files.add(declaration.getSourceFile().fileName);
+      const callee = node.expression;
+      const receiver = ts.isPropertyAccessExpression(callee) ? callee.expression : callee;
+      for (const file of declaringFiles(checker, receiver)) files.add(file);
     }
-    ts.forEachChild(node, visit);
+    const creating =
+      ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === "create";
+    ts.forEachChild(node, (child) => visit(child, inCreate || creating));
   };
-  visit(root);
+  visit(root, false);
   return files;
 }
 
@@ -315,9 +332,9 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
       )
       .map((other) => ({
         file: relative(source.root, other.fileName).split(sep).join("/"),
-        depth: called.has(other.fileName)
-          ? (depths.get(other.fileName) ?? Number.MAX_SAFE_INTEGER - 1)
-          : Number.MAX_SAFE_INTEGER,
+        depth:
+          (called.has(other.fileName) ? depths.get(other.fileName) : undefined) ??
+          Number.MAX_SAFE_INTEGER,
         ...readFile(checker, other),
       }))
       .filter((other) => other.registrations.length > 0);
