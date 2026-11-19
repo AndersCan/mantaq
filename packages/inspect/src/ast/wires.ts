@@ -592,17 +592,3 @@ export function scanAppCode(context: {
   const unheard = unheardOf(programs, machines, notRun);
   return { wires, notRun, unheard };
 }
-
-/**
- * Connections between machines made in app code: a listener on one machine's
- * output or change that can send an event to another machine, at most two
- * calls away. Read with the TypeScript checker; nothing is run.
- */
-export function findWires(context: {
-  root: string;
-  /** Absolute machine files given to mantaqViz. */
-  files: ReadonlyArray<string>;
-  machines: ReadonlyArray<VizMachine>;
-}): Wire[] {
-  return scanAppCode(context).wires;
-}

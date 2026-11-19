@@ -4,7 +4,7 @@ import { inspectModule } from "../inspect.ts";
 import { duo as duoMachine } from "../fixtures/wired-unheard/duo.ts";
 import { quiet as quietMachine } from "../fixtures/wired/quiet.ts";
 import { sketchDraft as sketchMachine } from "../fixtures/wired/sketch.ts";
-import { findWires, scanAppCode } from "./wires.ts";
+import { scanAppCode } from "./wires.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -63,7 +63,7 @@ describe("scanAppCode", () => {
     expect(scanned.notRun).toEqual([
       { id: "sketch", factory: "sketchDraft", file: "wired/sketch.ts" },
     ]);
-    expect(scanned.wires).toEqual(findWires({ root: ROOT, files, machines: all }));
+    expect(scanned.wires).toEqual(scanAppCode({ root: ROOT, files, machines: all }).wires);
     expect(scanned.wires).toHaveLength(3);
   });
 
@@ -229,9 +229,9 @@ describe("scanAppCode unheard outputs", () => {
   });
 });
 
-describe("findWires", () => {
+describe("scanAppCode wires", () => {
   test("finds the guarded, two-hop change and typed-parameter connections between two machines", async () => {
-    const found = findWires({ root: ROOT, files, machines: await machines() });
+    const found = scanAppCode({ root: ROOT, files, machines: await machines() }).wires;
     const base = { from: "sender", to: "receiver" };
     expect(found).toEqual(
       [
@@ -259,7 +259,7 @@ describe("findWires", () => {
 
   test("returns no wires when the receiver is not in the machine list", async () => {
     const only = (await machines()).filter((machine) => machine.id !== "receiver");
-    expect(findWires({ root: ROOT, files, machines: only })).toEqual([]);
+    expect(scanAppCode({ root: ROOT, files, machines: only }).wires).toEqual([]);
   });
 
   test("prefers the machine whose inputs equal the actor's over one that also handles more", async () => {
@@ -271,13 +271,13 @@ describe("findWires", () => {
         id: "wider",
         events: [...machine.events, { id: "extra", internal: false, doc: null, payload: null }],
       }));
-    const found = findWires({ root: ROOT, files, machines: [...all, ...wider] });
+    const found = scanAppCode({ root: ROOT, files, machines: [...all, ...wider] }).wires;
     expect(found.map((wire) => wire.to)).toEqual(["receiver", "receiver", "receiver"]);
   });
 
   test("skips sends more than two calls away, mutual recursion, self wires and the else branch", async () => {
     const edges = join(ROOT, "wired-edges", "edges.ts");
-    const found = findWires({ root: ROOT, files: [edges], machines: await machines() });
+    const found = scanAppCode({ root: ROOT, files: [edges], machines: await machines() }).wires;
     const text = ts.sys.readFile(edges)?.split("\n") ?? [];
     const at = (needle: string, nth: number) =>
       `wired-edges/edges.ts:${text.flatMap((line, index) => (line.includes(needle) ? [index + 1] : []))[nth]}`;
@@ -312,7 +312,7 @@ describe("findWires", () => {
         file,
         `import { receiverActor, take } from ${JSON.stringify(join(DIR, "receiver.ts"))};\nimport { senderActor } from ${JSON.stringify(join(DIR, "sender.ts"))};\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    if (e.type !== "handedOver") return;\n    receiverActor.send(take.create());\n  },\n});\n`,
       );
-      const found = findWires({ root: ROOT, files: [file], machines: await machines() });
+      const found = scanAppCode({ root: ROOT, files: [file], machines: await machines() }).wires;
       expect(found.map((wire) => wire.trigger)).toEqual(["handedOver"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -376,7 +376,7 @@ describe("findWires", () => {
         file,
         `import { receiverActor, take } from ${JSON.stringify(join(DIR, "receiver.ts"))};\nimport { senderActor } from ${JSON.stringify(join(DIR, "sender.ts"))};\nconst note = () => {};\nsenderActor.on("output", {\n  fn: (e: { type: string }) => {\n    ${body}\n  },\n});\n`,
       );
-      const found = findWires({ root: ROOT, files: [file], machines: await machines() });
+      const found = scanAppCode({ root: ROOT, files: [file], machines: await machines() }).wires;
       expect([...new Set(found.map((wire) => wire.trigger))]).toEqual([trigger]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -391,7 +391,9 @@ describe("findWires", () => {
         file,
         `import { receiverActor, take } from ${JSON.stringify(join(DIR, "receiver.ts"))};\nimport { senderActor } from ${JSON.stringify(join(DIR, "sender.ts"))};\nsenderActor.on("change", { fn: () => receiverActor.send(take.create()) });\n`,
       );
-      expect(findWires({ root: ROOT, files: [file], machines: await machines() })).toEqual([]);
+      expect(scanAppCode({ root: ROOT, files: [file], machines: await machines() }).wires).toEqual(
+        [],
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -407,7 +409,7 @@ describe("findWires", () => {
           }
         : machine,
     );
-    const found = findWires({ root: ROOT, files, machines: wider });
+    const found = scanAppCode({ root: ROOT, files, machines: wider }).wires;
     expect(found.map((wire) => wire.to)).toEqual(["wider", "wider", "wider"]);
   });
 });
