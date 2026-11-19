@@ -40,6 +40,12 @@ test("with the Screen tab open, a step inside an opened machine keeps the new st
   await page.locator('g.part[data-part="tall"]').click();
   await page.locator('svg[data-zoom="tall"]').waitFor();
   await page.getByRole("tab", { name: "Screen" }).waitFor();
+  const opened = await page.evaluate(() => ({
+    bar: document.querySelector(".viz-bar")?.getBoundingClientRect().bottom ?? 0,
+    hub: document.querySelector('g.state[data-node-id="tall.hub"]')?.getBoundingClientRect().top,
+  }));
+  // The hub is taller than the gap above the Screen panel: its top stays at the bar, not under it (1px for whole-pixel scrolling).
+  expect(opened.hub).toBeGreaterThanOrEqual(opened.bar - 1);
   await page.locator('g.edge[data-to="tall.leaf19"]').dispatchEvent("click");
   await page.locator('g.state.current[data-node-id="tall.leaf19"]').waitFor();
   const shown = await page.evaluate(() => {

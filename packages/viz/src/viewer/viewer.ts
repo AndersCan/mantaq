@@ -320,7 +320,7 @@ function canvasOf(from: {
       root.querySelector<SVGGElement>(".graph g.state.initial");
     view.followed = at?.getAttribute("data-node-id") ?? null;
     at?.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
-    if (at !== null && at !== undefined && view.followed !== null) keepInBand(root, view.followed);
+    if (view.followed !== null) keepInBand(root, view.followed);
     root.querySelector<HTMLElement>(".part-title")?.focus({ preventScroll: true });
   };
   const leave = () => {
