@@ -63,10 +63,11 @@ export function keepInBand(root: HTMLElement, id: string): void {
     top: Math.max(bar?.getBoundingClientRect().bottom ?? 0, 0),
     bottom: Math.min(panel?.getBoundingClientRect().top ?? view, view),
   };
-  if (insideBand(node.getBoundingClientRect(), band)) return;
-  // The canvas gives a state a tall scroll-margin-bottom for the Step panel; a state of its own height centres without it.
-  const target = node as SVGElement;
-  target.style.scrollMarginBottom = "0";
-  target.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
-  target.style.removeProperty("scroll-margin-bottom");
+  const rect = node.getBoundingClientRect();
+  if (insideBand(rect, band)) return;
+  const room = band.bottom - band.top - rect.height;
+  root.ownerDocument.defaultView?.scrollBy({
+    top: rect.top - band.top - Math.max(room / 2, 0),
+    behavior: "instant",
+  });
 }

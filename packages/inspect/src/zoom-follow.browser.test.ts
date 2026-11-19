@@ -44,6 +44,7 @@ test("a step inside an opened machine keeps the new state between the name bar a
       };
       return { hub: at('g.state[data-node-id="tall.hub"]'), leaf: at("g.state.current") };
     });
+  expect((await band()).hub).toBe(true);
   const point = await page.evaluate(() => {
     const path = document.querySelector<SVGPathElement>(
       'g.edge[data-to="tall.leaf19"] path:not(.hit)',

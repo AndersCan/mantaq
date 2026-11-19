@@ -360,7 +360,7 @@ describe("repro: Back and Reset, and the Details hint, in a shown machine", () =
 });
 
 describe("a step inside a shown machine", () => {
-  const stubRects = (below: boolean) => {
+  const stubRects = (below: boolean, belowId = "p.two") => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
       this: Element,
     ) {
@@ -368,7 +368,7 @@ describe("a step inside a shown machine", () => {
         ? 0
         : this.classList.contains("panel") || this.classList.contains("canvas")
           ? 500
-          : this.getAttribute("data-node-id") === "p.two" && below
+          : this.getAttribute("data-node-id") === belowId && below
             ? 900
             : 200;
       return {
@@ -384,14 +384,14 @@ describe("a step inside a shown machine", () => {
     });
     vi.stubGlobal("innerHeight", 800);
   };
-  const mountPushable = () => {
+  const mountPushable = (actors = ["p", "q"]) => {
     let push: (state: VizLiveState) => void = () => {};
-    const driver = fakeDriver(["p", "q"]);
+    const driver = fakeDriver(actors);
     const root = document.createElement("div");
     document.body.append(root);
     mountViewer(
       root,
-      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [boardOf(["p", "q"])] },
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [boardOf(actors)] },
       {
         driver: {
           ...driver,
@@ -408,9 +408,9 @@ describe("a step inside a shown machine", () => {
     return { root, push: (p: string, q: string) => push(at(p, q)), at };
   };
   const spy = () => {
-    const scrolled: string[] = [];
-    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (this: Element) {
-      scrolled.push(this.getAttribute("data-node-id") ?? "");
+    const scrolled: number[] = [];
+    vi.spyOn(window, "scrollBy").mockImplementation((...args: unknown[]) => {
+      scrolled.push(Number((args[0] as { top?: number } | undefined)?.top ?? 0));
     });
     return scrolled;
   };
@@ -422,9 +422,9 @@ describe("a step inside a shown machine", () => {
     press(box(root, "p"));
     scrolled.length = 0;
     push("p.two", "q.two");
-    expect(scrolled).toEqual(["p.two"]);
+    expect(scrolled).toHaveLength(1);
     push("p.two", "q.two");
-    expect(scrolled).toEqual(["p.two"]);
+    expect(scrolled).toHaveLength(1);
   });
 
   test("leaves the page alone when the state shows, or the step is in another machine", () => {
@@ -446,6 +446,26 @@ describe("a step inside a shown machine", () => {
     scrolled.length = 0;
     push("p.one", "q.one");
     expect(scrolled).toEqual([]);
+  });
+
+  test("a machine without parts never scrolls the page on a step", () => {
+    stubRects(true);
+    const scrolled = spy();
+    const { root, push } = mountPushable(["p"]);
+    expect(root.querySelector("g.part")).toBeNull();
+    expect(root.querySelector("g[data-node-id='p.two']")).not.toBeNull();
+    push("p.two", "q.two");
+    expect(scrolled).toEqual([]);
+  });
+
+  test("opening on a state outside the band scrolls once, then a step in another machine does not", () => {
+    stubRects(true, "p.one");
+    const scrolled = spy();
+    const { root, push } = mountPushable();
+    press(box(root, "p"));
+    expect(scrolled).toHaveLength(1);
+    push("p.one", "q.one");
+    expect(scrolled).toHaveLength(1);
   });
 
   test("an unzoomed board never scrolls the page", () => {
