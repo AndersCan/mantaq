@@ -162,6 +162,7 @@ describe("region titles have room of their own", () => {
     };
     const region = placeMachine(pool).regions[0];
     expect(region?.width).toBe(textWidth(name) + 8 + 2 * LABEL_PAD);
+    expect(region?.title.width).toBe(textWidth(name) + 8);
   });
 
   test("checker: a label on a region's title and a state on a region's title are overlaps", () => {
