@@ -249,7 +249,7 @@ describe("mountDriven values", () => {
 });
 
 describe("mountDriven arrows that land elsewhere", () => {
-  test("an arrow whose guard picks another branch is locked and says where it goes", async () => {
+  test("the declined arrow fires and sends answer declined", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
       load: async () => ({ answer: answerMachine }),
@@ -272,12 +272,9 @@ describe("mountDriven arrows that land elsewhere", () => {
     const arrow = (to: string) =>
       root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
     arrow("declined")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
-      "answered goes to accepted, not declined",
-    );
-    expect(root.querySelector("[data-send-edge]")).toBeNull();
-    expect(arrow("declined")?.querySelector(".blocked-lock")).not.toBeNull();
-    expect(arrow("accepted")?.querySelector(".blocked-lock")).toBeNull();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
+    expect(root.querySelector("[data-details-sent]")?.textContent).toContain('"answer":"declined"');
+    expect(root.querySelector(".blocked-lock")).toBeNull();
   });
 });
 
@@ -313,11 +310,38 @@ describe("mountDriven dry run payload", () => {
     const arrow = (to: string) =>
       root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
     arrow("declined")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
-      "answered goes to accepted, not declined",
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
+    expect(root.querySelector("[data-details-sent]")?.textContent).toContain(
+      '"code":"zz-not-the-example"',
     );
-    expect(arrow("declined")?.querySelector(".blocked-lock")).not.toBeNull();
-    setValue("answer", "declined");
+  });
+
+  test("a value set in the Context tab keeps the other arrow locked", async () => {
+    const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
+    const inspected = await inspectModule(answerFile, {
+      load: async () => ({ answer: answerMachine }),
+      fuzz: false,
+    });
+    history.replaceState(null, "", "/");
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: {
+        answer: () => {
+          const clock = VirtualClock();
+          return { actor: answerMachine.create({ clock }), clock };
+        },
+      },
+    });
+    sendVia(root, "ask");
+    const box = root.querySelector<HTMLInputElement>('[data-value="answer"]');
+    if (box === null) throw new Error("no answer box");
+    box.value = "declined";
+    box.dispatchEvent(new Event("change", { bubbles: true }));
+    const arrow = (to: string) =>
+      root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
     arrow("accepted")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
       "answered goes to declined, not accepted",

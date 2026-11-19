@@ -376,9 +376,43 @@ describe("arrowCandidates", () => {
     ({ steps, children: [], removed: [] }) as unknown as VizLiveState;
   const none = { set: {}, live: null, afters: [], actor: undefined };
 
-  test("with no fuzz, only the default", () => {
+  const answer = { ...field("answer", "choice", ["accepted", "declined"]), sample: "accepted" };
+
+  test("with no fuzz and no choice field, only the default", () => {
     const machine = { ...machineWith([]), fuzz: null } as VizMachine;
     expect(arrowCandidates(machine, edge("b"), none)).toEqual([{ n: 0 }]);
+  });
+
+  test("with no fuzz, the default then each other choice", () => {
+    const machine = { ...machineWith([], [answer]), fuzz: null } as VizMachine;
+    expect(arrowCandidates(machine, edge("b"), none)).toEqual([
+      { answer: "accepted" },
+      { answer: "declined" },
+    ]);
+  });
+
+  test("a set value wins over every choice", () => {
+    const machine = { ...machineWith([], [answer]), fuzz: null } as VizMachine;
+    const set = { ...none, set: { answer: "declined" } };
+    expect(arrowCandidates(machine, edge("b"), set)).toEqual([{ answer: "declined" }]);
+  });
+
+  test("a fuzz value outside the declared choices is never a candidate", () => {
+    const machine = machineWith(
+      [
+        { steps: [go({ answer: "ACCEPTED" })], discovered: [] },
+        { steps: [go({ answer: "accepted" }), go({ answer: "NOPE" })], discovered: [] },
+      ],
+      [answer],
+    );
+    const walked = at([go({ answer: "accepted" })]);
+    const lists = [
+      arrowCandidates(machine, edge("b"), none),
+      arrowCandidates(machine, edge("b"), { ...none, live: walked }),
+    ];
+    for (const list of lists) {
+      expect(list).toEqual([{ answer: "accepted" }, { answer: "declined" }]);
+    }
   });
 
   test("from the start: the default, then runs longest first, then the fuzz payloads", () => {
