@@ -502,6 +502,10 @@
   color: var(--muted);
 }
 
+.viz .viz-main > .blocked-note {
+  margin: 0;
+}
+
 .viz .child-marker {
   cursor: pointer;
   outline: none;

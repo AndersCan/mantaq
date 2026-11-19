@@ -162,6 +162,7 @@ export function mountViewer(
       const screen = screenOf(doc, options, { machine, view, driver });
       const tabs = panelTabs(doc, { view, parts: stepTab, details, screen, refresh });
       shownSteps = replaceKeepingSteps(panel, tabs, shownSteps, view.live?.steps.length ?? 0);
+      if (view.diagramOnly) sayWhy(root, { machine, view, driver });
       mark();
     };
     const pick = (child: PickedChild, from: "row" | "chip") =>
@@ -249,6 +250,18 @@ function listenWidth(root: HTMLElement, refit: () => void): void {
   };
   root.ownerDocument.defaultView?.addEventListener("resize", refitHere);
   root.addEventListener("fullscreenchange", refitHere);
+}
+
+/** Diagram only: the line under the board says why the selected arrow's click sent nothing. */
+function sayWhy(
+  root: HTMLElement,
+  from: { machine: VizMachine; view: ViewState; driver: VizDriver | undefined },
+): void {
+  const { selection, sent } = from.view;
+  const edge = from.machine.edges.find((e) => selection?.kind === "edge" && e.id === selection.id);
+  const decision = edge === undefined || sent?.edge === edge.id ? undefined : arrowSend(from, edge);
+  const line = root.querySelector(".viz-main > .blocked-note");
+  if (line !== null) line.textContent = decision?.kind === "refuse" ? decision.text : "";
 }
 
 /** A click on an arrow sends when Details would offer Send, else opens its Details. */
@@ -567,7 +580,10 @@ function layoutOf(
   show.addEventListener("click", () => context.showControls());
   return [
     html(doc, "div", { class: "viz-bar" }, fullscreen === null ? [show] : [show, fullscreen]),
-    html(doc, "div", { class: "viz-main" }, [canvas]),
+    html(doc, "div", { class: "viz-main" }, [
+      canvas,
+      html(doc, "p", { class: "blocked-note", role: "status" }),
+    ]),
   ];
 }
 
