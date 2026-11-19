@@ -46,6 +46,6 @@ test("the board's run opens by the printed name and ends on the lost message", a
     },
   });
   expect(root.querySelector("[data-live-dropped]")?.textContent).toBe(
-    "! 1. cook sent DISH_READY to waiter: lost, nobody took it in serving",
+    "! cook sent DISH_READY to waiter: lost, nobody took it in serving",
   );
 });

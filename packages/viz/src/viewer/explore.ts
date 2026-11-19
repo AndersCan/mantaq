@@ -277,25 +277,10 @@ function outputRows(
   });
 }
 
-function notRunLine(doc: Document, context: { machine: VizMachine; step: VizLiveStep }) {
-  const { machine, step } = context;
-  const declared = machine.states.find((each) => each.id === step.to)?.effects ?? [];
+function notRunLine(doc: Document, step: VizLiveStep): HTMLElement {
   return html(doc, "p", { "data-live-not-run": "" }, [
     "Not run here: ",
-    ...step.effects.flatMap((name, index) => {
-      const sends = declared.find((each) => each.name === name)?.sends ?? [];
-      return [
-        index === 0 ? "" : "; ",
-        code(doc, name),
-        ...(sends.length === 0
-          ? []
-          : [
-              " (it would send ",
-              ...sends.flatMap((event, at) => [at === 0 ? "" : " or ", code(doc, event)]),
-              ")",
-            ]),
-      ];
-    }),
+    ...step.effects.flatMap((name, index) => [index === 0 ? "" : "; ", code(doc, name)]),
   ]);
 }
 
@@ -307,14 +292,14 @@ function sentBy(machine: VizMachine, step: VizLiveStep): string {
 
 function afterLine(
   doc: Document,
-  context: { machine: VizMachine; step: VizLiveStep; number: number | null },
+  context: { machine: VizMachine; step: VizLiveStep },
 ): HTMLElement {
-  const { machine, step, number } = context;
+  const { machine, step } = context;
   const lost = step.message !== undefined && step.message.dropped !== null;
   const receiver = partName(machine, step.actor);
   const tail = tailText(step, localName);
-  const lead = number === null ? "" : `${lost ? "! " : ""}${number}. `;
-  const on = number === null ? " on its own" : "";
+  const lead = lost ? "! " : "";
+  const on = step.message === undefined ? " on its own" : "";
   const from = sentBy(machine, step);
   const body =
     from !== "" || lost
@@ -325,7 +310,6 @@ function afterLine(
     "p",
     {
       "data-live-after": "",
-      "data-message": number === null ? null : String(number),
       "data-live-dropped": lost ? "" : null,
     },
     [lead, ...body],
@@ -340,21 +324,19 @@ function stepItem(
     total: number;
     step: VizStep;
     own: VizLiveStep | null;
-    rows: ReadonlyArray<{ entry: VizLiveStep; number: number | null }>;
+    rows: ReadonlyArray<VizLiveStep>;
     held: boolean;
     routes: VizOutputRoutes | undefined;
   },
 ): HTMLElement {
   const { machine, step, own, rows, routes } = context;
   const newest = context.index === context.total - 1;
-  const taken = new Set(
-    rows.filter(({ number }) => number !== null).map(({ entry }) => entry.event),
-  );
+  const taken = new Set(rows.filter((entry) => entry.message).map((entry) => entry.event));
   const notRun = newest && context.held;
   const extras = (entry: VizLiveStep) => [
     errorLine(doc, entry),
     ...outputRows(doc, { machine, step: entry, taken, routes }),
-    notRun && entry.effects.length > 0 ? notRunLine(doc, { machine, step: entry }) : null,
+    notRun && entry.effects.length > 0 ? notRunLine(doc, entry) : null,
   ];
   const ignored = own?.outcome === "ignored";
   const head = step.kind === "advance" ? null : own;
@@ -374,10 +356,7 @@ function stepItem(
           : outcomeText(doc, machine, head)),
       ]),
       ...(head === null ? [] : extras(head)),
-      ...rows.flatMap(({ entry, number }) => [
-        afterLine(doc, { machine, step: entry, number }),
-        ...extras(entry),
-      ]),
+      ...rows.flatMap((entry) => [afterLine(doc, { machine, step: entry }), ...extras(entry)]),
     ],
   );
 }
@@ -390,13 +369,11 @@ function runList(
   const { state, routes, lasts } = live;
   const total = state.steps.length;
   const held = state.effectMode === "held";
-  let messages = 1;
   const items = state.steps.map((step, index) => {
     const own = lasts[index] ?? null;
     const after = index === total - 1 ? state.after : (live.afters?.[index] ?? []);
     // An advance's own entry is the first move its timer caused: it reads as a row.
-    const entries = step.kind === "advance" && own !== null ? [own, ...after] : after;
-    const rows = entries.map((entry) => ({ entry, number: entry.message ? messages++ : null }));
+    const rows = step.kind === "advance" && own !== null ? [own, ...after] : after;
     return stepItem(doc, { machine, index, total, step, own, rows, held, routes });
   });
   // A driver that threw reports an entry that no step of the walk owns.
