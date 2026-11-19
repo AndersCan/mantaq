@@ -190,7 +190,7 @@ The user compares two whole apps, so each design is a copy of the root that buil
 
 1. Files per design (A shown; B the same with `b`/`B`). Real files stay untouched until the pick.
    - Root: copy the root file to `<root file>.design-a.ts`, export `<root>DraftA = machine("<root>DraftA", …)`.
-   - Each machine the design changes or adds: copy its file to `<file>.design-a.ts` (`<name>.design-a.machine.ts` when the real one ends `.machine.ts`), export `<name>DraftA`, build it in the draft root instead of the real one. A wire the design changes: copy the wire function into the draft root and call the copy.
+   - Each machine the design changes or adds: copy its file to `<file>.design-a.ts`, export `<name>DraftA`, build it in the draft root instead of the real one. A wire the design changes: copy the wire function into the draft root and call the copy.
    - The draft root returns each changed or added machine under its key plus the letter (`uploader` becomes `uploaderA`); the rest keep their keys. Boxes and Step text use these keys, so the user finds the change by its letter.
    - No draft name may end like the repo's real machine files (a test may count them).
 2. One walk per design: `<root file>.design-a.test.ts`, one top-level test through `recordRuns(<root>DraftA)`, titled the same in A and B with the story the ask names. Same events where the domain is the same; each asserts where its own design ends. The one exception to "No tests for drafts"; deleted at the pick. Run it once to record it.
@@ -208,7 +208,7 @@ The user compares two whole apps, so each design is a copy of the root that buil
    - Move B's walk into the real root's walk test file: a top-level test through its `recordRuns`, after the existing tests, real keys. Run the file to record it. This walk stays.
    - Delete every draft file of A and B, both draft walk tests and their `__runs__` files, the page and its entries.
    - Run section 8's checks and every test file that imports the real root.
-   - `git status --short` and `rg -l "DraftA|DraftB|design-a|design-b"` list nothing; only then reply in at most 3 lines: files changed, checks passed, `Left behind: nothing.`, and the real root's link with `run=<story>`.
+   - `git status --short | rg "design-[ab]|<page>"` and `rg -l "DraftA|DraftB|design-a|design-b" -g '!*.md'` print nothing; only then reply in at most 3 lines: files changed, checks passed, `Left behind: nothing.`, and the real root's link with `run=<story>`.
 
 ## 11. Machines that talk
 
