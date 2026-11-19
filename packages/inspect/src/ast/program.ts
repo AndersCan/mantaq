@@ -46,7 +46,13 @@ export interface LoadedSource extends FileRead {
   sourceFile: ts.SourceFile;
   root: string;
   /** Other files of the program (not declarations) that register handlers, e.g. a pool built in a library. */
-  elsewhere: Array<FileRead & { file: string; depth: number }>;
+  elsewhere: Array<
+    FileRead & {
+      file: string;
+      /** Imports from the root to a file declaring a function the root calls; the farthest value for a file it does not call. */
+      depth: number;
+    }
+  >;
 }
 
 /** The module specifiers a file imports or re-exports from. */
@@ -56,6 +62,20 @@ function moduleSpecifiers(file: ts.SourceFile): string[] {
     const from = named ? statement.moduleSpecifier : undefined;
     return from !== undefined && ts.isStringLiteral(from) ? [from.text] : [];
   });
+}
+
+/** Files declaring a function the root calls, resolved through the type checker (aliases followed). */
+function calledFiles(checker: ts.TypeChecker, root: ts.SourceFile): Set<string> {
+  const files = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const declaration = checker.getResolvedSignature(node)?.declaration;
+      if (declaration !== undefined) files.add(declaration.getSourceFile().fileName);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(root);
+  return files;
 }
 
 /** Import distance from `root` to every file it reaches (the root is 0, a direct import 1). */
@@ -284,6 +304,7 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
     if (sourceFile === undefined) return `source not found: ${source.file}`;
     const checker = program.getTypeChecker();
     const depths = importDepths(program, { root: sourceFile, options });
+    const called = calledFiles(checker, sourceFile);
     const elsewhere = program
       .getSourceFiles()
       .filter(
@@ -294,7 +315,9 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
       )
       .map((other) => ({
         file: relative(source.root, other.fileName).split(sep).join("/"),
-        depth: depths.get(other.fileName) ?? Number.MAX_SAFE_INTEGER,
+        depth: called.has(other.fileName)
+          ? (depths.get(other.fileName) ?? Number.MAX_SAFE_INTEGER - 1)
+          : Number.MAX_SAFE_INTEGER,
         ...readFile(checker, other),
       }))
       .filter((other) => other.registrations.length > 0);

@@ -88,4 +88,27 @@ describe("handlers registered in another file of the program", () => {
     expect(edge?.doc).toBe("The draft starts the work.");
     expect(edge?.explanation?.status).toBe("analyzed");
   });
+
+  const goEdge = async (file: string) => {
+    const result = await inspectModule(join(FIXTURES, file), {
+      load: (path) => import(path),
+      fuzz: false,
+    });
+    return result.machines[0]?.edges.find((e) => e.event === "go");
+  };
+
+  test("an unrelated actor the root only names a constant of does not lend its handler", async () => {
+    const edge = await goEdge("unrelated/app.ts");
+    expect(edge?.doc).toBe("Y starts the work.");
+  });
+
+  test("a file reached through a re-export counts as that many imports away", async () => {
+    const edge = await goEdge("barrel/app.ts");
+    expect(edge?.doc).toBe("The original starts the work.");
+  });
+
+  test("a file the import walk never reaches ranks after one it does", async () => {
+    const edge = await goEdge("barrel/app.dynamic.ts");
+    expect(edge?.doc).toBe("The original starts the work.");
+  });
 });
