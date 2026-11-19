@@ -150,6 +150,12 @@ describe("blockedReason", () => {
     ).toBe("pay stays in cart, not payment");
   });
 
+  test("a handler that throws, reading no context, is not locked: a click shows the error", () => {
+    expect(
+      blockedReason({ edge: payloadOnly(), outcome: outcome("stay", "Error: boom"), live: {} }),
+    ).toBeNull();
+  });
+
   test("a stay on a self-loop or an arrow with no target is not blocked", () => {
     const live = { items: 0 };
     expect(

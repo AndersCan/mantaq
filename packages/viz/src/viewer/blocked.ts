@@ -90,10 +90,14 @@ export function blockedReason(context: {
   if (!stayed) return null;
   const paths = contextPaths(edge);
   if (paths.length === 0) {
-    if (edge.to === null || edge.to === outcome.from) return null;
-    return `${edge.event} stays in ${localName(outcome.from)}, not ${localName(edge.to)}`;
+    return staysElsewhere(edge, outcome);
   }
   return `${edge.event} is blocked: ${paths.map((path) => `${path} is ${valueAt(live, path)}`).join(", ")}`;
+}
+
+function staysElsewhere(edge: VizEdge, outcome: VizLiveStep): string | null {
+  if (edge.to === null || edge.to === outcome.from || outcome.error !== null) return null;
+  return `${edge.event} stays in ${localName(outcome.from)}, not ${localName(edge.to)}`;
 }
 
 function takes(edge: VizEdge, outcome: VizLiveStep | null): boolean {
