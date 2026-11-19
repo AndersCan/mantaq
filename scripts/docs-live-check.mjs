@@ -95,10 +95,30 @@ for (const page of pages) {
   await tab.close();
 }
 
+const pool = await browser.newPage();
+await pool.goto(
+  `${origin}${base}sugar/pool/?machine=teamInbox&run=Four%20items%2C%20three%20workers`,
+);
+try {
+  await pool.locator(".viz g.state.current").first().waitFor({ timeout: 10_000 });
+  const inside = await pool
+    .locator(".viz")
+    .first()
+    .evaluate((viz) => {
+      const canvas = viz.querySelector(".canvas").getBoundingClientRect();
+      const box = viz.querySelector('g[data-node-id="workWaiting"]').getBoundingClientRect();
+      return box.left >= canvas.left && box.right <= canvas.right;
+    });
+  if (!inside) failures.push("pool: the run opens with the waiting box off the canvas");
+} catch {
+  failures.push("pool: the run does not open live");
+}
+await pool.close();
+
 await browser.close();
 server.close();
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   process.exit(1);
 }
-console.log(`docs-live-check: ${pages.length} Getting started pages run live`);
+console.log(`docs-live-check: ${pages.length} Getting started pages and the pool box run live`);

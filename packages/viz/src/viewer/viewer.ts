@@ -169,9 +169,9 @@ export function mountViewer(
       pickChild({ root, view, refresh }, child, from);
     const mark = () =>
       markDiagram(root, { machine, view, driver, pick: (child) => pick(child, "chip") });
-    const follow = (opening = false) => {
+    const follow = () => {
       refresh();
-      keepCurrentInView(root, { machine, view }, opening);
+      keepCurrentInView(root, { machine, view });
     };
     redraw = () => follow();
     const walked = (sent?: ViewState["sent"]) => {
@@ -214,7 +214,7 @@ export function mountViewer(
     root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
     canvas.titled();
     canvas.refit();
-    follow(true);
+    follow();
   }
 
   render();
@@ -224,19 +224,14 @@ export function mountViewer(
 function keepCurrentInView(
   root: HTMLElement,
   from: { machine: VizMachine; view: ViewState },
-  opening: boolean,
 ): void {
   const { machine, view } = from;
   if (view.live === null) return;
   const live = currentsOf(view.live, view.picked);
   const currents =
     view.zoom === null ? live : live.filter((id) => partOf(machine, id) === view.zoom);
-  const child = live[live.length - new Set(view.live.children.map((c) => c.map)).size];
-  keepInView(
-    root,
-    opening && child !== undefined ? [child, ...currents.slice(0, 1)] : currents.slice(0, 1),
-  );
   const now = currents[0];
+  if (now !== undefined) keepInView(root, now);
   if (view.zoom !== null && now !== undefined && now !== view.followed) {
     view.followed = now;
     keepInBand(root, now);
