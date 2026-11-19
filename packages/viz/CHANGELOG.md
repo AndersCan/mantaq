@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.41.1
+
+<sub>2026-11-19</sub>
+
+- _(patch)_ Clicking an arrow whose event carries a choice sends that choice, never a value outside the declared choices.
+- _(patch)_
+  An arrow whose event leaves the walk where it is, while pointing at another state, shows the lock and says where the walk stays.
+
 ## 0.41.0
 
 <sub>2026-11-18</sub>
