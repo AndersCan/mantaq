@@ -16,12 +16,14 @@ const deaf = "../fixtures/deaf.ts";
 const orphan = "../fixtures/orphan.ts";
 const stay = "../fixtures/stay.ts";
 const timed = "../fixtures/timed.ts";
+const parts = "../fixtures/parts.ts";
 
 let good = "";
 let broken = "";
 let quiet = "";
 let empty = "";
 let walks = "";
+let boxes = "";
 let story = "";
 const roots: string[] = [];
 
@@ -76,6 +78,7 @@ beforeAll(async () => {
     "blank.astro": `<html><body><div class="mantaq-machine" data-mantaq-src="blank.ts"></div></body></html>\n`,
     "machines.astro": overviewPage({ "": [retry, orphan], deaf: [deaf], gone: [linked] }),
   });
+  boxes = await makeSite([parts], { "index.astro": viewerPage(parts) });
   walks = await makeSite([timed, retry], {
     "index.astro": viewerPage(timed),
     "other.astro": viewerPage(retry),
@@ -128,6 +131,10 @@ describe("checkSite", () => {
 
   test("ignores console logs, warnings and a missing favicon, and counts a staying handler as handled", async () => {
     expect(await checkSite(quiet, "/")).toEqual(Either.right({ pages: 1, failures: [] }));
+  }, 120_000);
+
+  test("opens a box on a board of three machines before it sends", async () => {
+    expect(await checkSite(boxes, "/")).toEqual(Either.right({ pages: 1, failures: [] }));
   }, 120_000);
 
   test("a wrong base says so", async () => {

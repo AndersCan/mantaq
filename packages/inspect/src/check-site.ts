@@ -139,6 +139,11 @@ async function handlesAnEvent(root: PwLocator, page: PwPage): Promise<string | u
   if ((await explore.count()) === 0) {
     return undefined;
   }
+  const board = root.locator(".graph g.part");
+  if ((await board.count()) > 0) {
+    await board.first().dispatchEvent("click");
+    await root.locator(".graph[data-zoom]").waitFor();
+  }
   const before = await explore.first().getAttribute("data-current");
   const arrows = root.locator(".graph g.edge.next");
   const count = await arrows.count();
