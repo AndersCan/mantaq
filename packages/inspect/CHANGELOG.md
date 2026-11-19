@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.48.1
+
+<sub>2026-11-19</sub>
+
+- _(patch)_ check-site opens a machine's box before it sends an event, so a board of three or more machines passes
+
 ## 0.48.0
 
 <sub>2026-11-18</sub>
