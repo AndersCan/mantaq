@@ -266,7 +266,7 @@ test("the current state stays inside the box on a phone after every send", async
   }
 }, 60_000);
 
-test("a pool opens with its working workers in the box", async () => {
+test("a pool opens with its waiting box in the box", async () => {
   const file = join(import.meta.dirname, "../../../apps/docs/src/pool/team-inbox.ts");
   const opened = await openViz({
     file,
@@ -297,7 +297,8 @@ test("a pool opens with its working workers in the box", async () => {
     expect(
       await viz.page.evaluate(() => document.querySelector<HTMLElement>(".canvas")!.clientWidth),
     ).toBeLessThan(805);
-    expect(await hidden()).toEqual(["workWaiting"]);
+    expect(await hidden()).not.toContain("workWaiting");
+    expect(await hidden()).toContain("workers.working");
     await viz.send("team.ITEM_ARRIVED", { item: "e" });
     expect(await hidden()).not.toContain("workWaiting");
   } finally {
