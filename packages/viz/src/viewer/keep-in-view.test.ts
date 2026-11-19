@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { scrollToShow } from "./keep-in-view.ts";
+import { insideBand, scrollToShow } from "./keep-in-view.ts";
 
 const box = (left: number, max = 5700) => ({ left, width: 300, max });
 
@@ -53,4 +53,14 @@ test.each([
 
 test("no spans moves nothing", () => {
   expect(scrollToShow(box(40), [])).toBe(40);
+});
+
+test.each([
+  [{ top: 100, bottom: 200 }, true],
+  [{ top: 120, bottom: 180 }, true],
+  [{ top: 99, bottom: 150 }, false],
+  [{ top: 150, bottom: 201 }, false],
+  [{ top: 50, bottom: 300 }, false],
+])("insideBand %j is %s in 100..200", (rect, expected) => {
+  expect(insideBand(rect, { top: 100, bottom: 200 })).toBe(expected);
 });
