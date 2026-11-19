@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.41.2
+
+<sub>2026-11-19</sub>
+
+- _(patch)_ A step inside a machine opened from a board keeps the new state in view above the Step panel. Breaking: none
+
 ## 0.41.1
 
 <sub>2026-11-19</sub>
