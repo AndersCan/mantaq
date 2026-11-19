@@ -34,7 +34,7 @@ interface FileDocs {
 export interface SourceDocs extends FileDocs {
   eventPayloads: ReadonlyMap<string, VizField[]>;
   /** Other files of the program that register handlers (a pool from a library), by file. */
-  elsewhere: Array<FileDocs & { file: string }>;
+  elsewhere: Array<FileDocs & { file: string; depth: number }>;
 }
 
 function sitesOf(options: { loaded: LoadedSource; read: FileRead }): HandlerSite[] {
@@ -77,7 +77,11 @@ function docsOf(loaded: LoadedSource): SourceDocs {
   return {
     ...fileDocs(loaded, loaded),
     eventPayloads: payloadFields(loaded),
-    elsewhere: loaded.elsewhere.map((other) => ({ file: other.file, ...fileDocs(loaded, other) })),
+    elsewhere: loaded.elsewhere.map((other) => ({
+      file: other.file,
+      depth: other.depth,
+      ...fileDocs(loaded, other),
+    })),
   };
 }
 
@@ -128,20 +132,26 @@ function eventDocFrom(options: { other: FileDocs; id: string }): string | null {
   );
 }
 
-/** The one other file that registers (state, event), or why there is not exactly one. */
+/**
+ * The one other file that registers (state, event), or why there is not exactly one.
+ * Several files: the one nearest the machine file by imports wins, so a copied
+ * draft is read instead of the original another file still imports.
+ */
 function elsewhereSite(
   edge: VizEdge,
   context: { docs: SourceDocs; file: string },
 ): { supplier: FileDocs; site: HandlerSite } | string {
   const found = context.docs.elsewhere.flatMap((other) => {
     const site = siteFor(other.sites, edge);
-    return site ? [{ file: other.file, site, supplier: other }] : [];
+    return site ? [{ file: other.file, depth: other.depth, site, supplier: other }] : [];
   });
-  const [first, second] = found;
+  const nearest = Math.min(...found.map((entry) => entry.depth));
+  const closest = found.filter((entry) => entry.depth === nearest);
+  const [first, second] = closest;
   if (first && second === undefined) return first;
   const state = localState(edge.from);
   return first
-    ? `handlers for (${state}, ${edge.event}) found in more than one file: ${found.map((entry) => entry.file).join(", ")}`
+    ? `handlers for (${state}, ${edge.event}) found in more than one file: ${closest.map((entry) => entry.file).join(", ")}`
     : `no m.on/m.onAny registration for (${state}, ${edge.event}) found in ${context.file}`;
 }
 

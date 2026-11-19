@@ -46,7 +46,95 @@ export interface LoadedSource extends FileRead {
   sourceFile: ts.SourceFile;
   root: string;
   /** Other files of the program (not declarations) that register handlers, e.g. a pool built in a library. */
-  elsewhere: Array<FileRead & { file: string }>;
+  elsewhere: Array<
+    FileRead & {
+      file: string;
+      /** Imports from the root to a file its `create` bodies run; the farthest value for a file it does not call. */
+      depth: number;
+    }
+  >;
+}
+
+/** The module specifiers a file imports or re-exports from. */
+function moduleSpecifiers(file: ts.SourceFile): string[] {
+  return file.statements.flatMap((statement) => {
+    const named = ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement);
+    const from = named ? statement.moduleSpecifier : undefined;
+    return from !== undefined && ts.isStringLiteral(from) ? [from.text] : [];
+  });
+}
+
+/** Declaring files of a symbol, aliases (imports, re-exports) followed. */
+function declaringFiles(checker: ts.TypeChecker, node: ts.Node): string[] {
+  const symbol = checker.getSymbolAtLocation(node);
+  if (symbol === undefined) return [];
+  const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  return (target.declarations ?? []).map((declaration) => declaration.getSourceFile().fileName);
+}
+
+/** True when `type` is the `Actor` of `@mantaq/core`. */
+function isCoreActor(type: ts.Type): boolean {
+  const symbol = type.getSymbol();
+  if (symbol?.name !== "Actor") return false;
+  return (symbol.declarations ?? []).some((declaration) =>
+    /[\\/]core[\\/]/.test(declaration.getSourceFile().fileName),
+  );
+}
+
+/**
+ * Files the root's `create` bodies run: where each called function is declared,
+ * and where the object a method such as `syncMachine.create()` is called on is
+ * declared. Calls outside a `create` (a title, a name) do not count.
+ */
+function calledFiles(checker: ts.TypeChecker, root: ts.SourceFile): Set<string> {
+  const files = new Set<string>();
+  const visit = (node: ts.Node, inCreate: boolean): void => {
+    if (inCreate && ts.isCallExpression(node)) {
+      const declaration = checker.getResolvedSignature(node)?.declaration;
+      // Only a helper that returns an actor ranks its file; a label or options object does not.
+      const actor = isCoreActor(checker.getTypeAtLocation(node));
+      if (declaration !== undefined && actor) files.add(declaration.getSourceFile().fileName);
+      const callee = node.expression;
+      const receivers =
+        actor && ts.isPropertyAccessExpression(callee)
+          ? declaringFiles(checker, callee.expression)
+          : [];
+      for (const file of receivers) files.add(file);
+    }
+    const creating =
+      ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === "create";
+    ts.forEachChild(node, (child) => visit(child, inCreate || creating));
+  };
+  visit(root, false);
+  return files;
+}
+
+/** Import distance from `root` to every file it reaches (the root is 0, a direct import 1). */
+function importDepths(
+  program: ts.Program,
+  context: { root: ts.SourceFile; options: ts.CompilerOptions },
+): Map<string, number> {
+  const depths = new Map([[context.root.fileName, 0]]);
+  let frontier = [context.root];
+  for (let depth = 1; frontier.length > 0; depth += 1) {
+    const next: ts.SourceFile[] = [];
+    for (const file of frontier) {
+      for (const specifier of moduleSpecifiers(file)) {
+        const resolved = ts.resolveModuleName(
+          specifier,
+          file.fileName,
+          context.options,
+          ts.sys,
+        ).resolvedModule;
+        const target = resolved && program.getSourceFile(resolved.resolvedFileName);
+        if (!target || depths.has(target.fileName)) continue;
+        depths.set(target.fileName, depth);
+        next.push(target);
+      }
+    }
+    frontier = next;
+  }
+  return depths;
 }
 
 /**
@@ -241,10 +329,13 @@ function readFile(checker: ts.TypeChecker, sourceFile: ts.SourceFile): FileRead 
  */
 export function loadSource(source: AnalysisSource): Either<string, LoadedSource> {
   const loaded = Either.from(() => {
-    const program = ts.createProgram([source.file], compilerOptions(source));
+    const options = compilerOptions(source);
+    const program = ts.createProgram([source.file], options);
     const sourceFile = program.getSourceFile(source.file);
     if (sourceFile === undefined) return `source not found: ${source.file}`;
     const checker = program.getTypeChecker();
+    const depths = importDepths(program, { root: sourceFile, options });
+    const called = calledFiles(checker, sourceFile);
     const elsewhere = program
       .getSourceFiles()
       .filter(
@@ -255,6 +346,9 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
       )
       .map((other) => ({
         file: relative(source.root, other.fileName).split(sep).join("/"),
+        depth:
+          (called.has(other.fileName) ? depths.get(other.fileName) : undefined) ??
+          Number.MAX_SAFE_INTEGER,
         ...readFile(checker, other),
       }))
       .filter((other) => other.registrations.length > 0);
