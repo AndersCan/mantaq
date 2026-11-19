@@ -74,7 +74,7 @@ function declaringFiles(checker: ts.TypeChecker, node: ts.Node): string[] {
 
 /** True when `type` is the `Actor` of `@mantaq/core`. */
 function isCoreActor(type: ts.Type): boolean {
-  const symbol = type.getSymbol() ?? type.aliasSymbol;
+  const symbol = type.getSymbol();
   if (symbol?.name !== "Actor") return false;
   return (symbol.declarations ?? []).some((declaration) =>
     /[\\/]core[\\/]/.test(declaration.getSourceFile().fileName),
@@ -95,9 +95,10 @@ function calledFiles(checker: ts.TypeChecker, root: ts.SourceFile): Set<string> 
       const actor = isCoreActor(checker.getTypeAtLocation(node));
       if (declaration !== undefined && actor) files.add(declaration.getSourceFile().fileName);
       const callee = node.expression;
-      const receivers = ts.isPropertyAccessExpression(callee)
-        ? declaringFiles(checker, callee.expression)
-        : [];
+      const receivers =
+        actor && ts.isPropertyAccessExpression(callee)
+          ? declaringFiles(checker, callee.expression)
+          : [];
       for (const file of receivers) files.add(file);
     }
     const creating =
