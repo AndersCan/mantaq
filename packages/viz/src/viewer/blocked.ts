@@ -72,8 +72,8 @@ function contextPaths(edge: VizEdge): string[] {
 /**
  * Why a transition arrow is blocked, tried with the payload Send would send. Its handler stayed
  * put (or threw) and it reads the context: the reason names those context values. Or the guard
- * took the walk to another state than the one drawn: the reason names where it goes. null = not
- * blocked, including when only the payload could be the cause.
+ * took the walk to another state than the one drawn: the reason names where it goes. A stay on an
+ * arrow that points elsewhere is a lock too, naming where the walk stays. null = not blocked.
  */
 export function blockedReason(context: {
   edge: VizEdge;
@@ -89,8 +89,13 @@ export function blockedReason(context: {
     outcome.outcome === "stay" || (outcome.outcome === "missing" && outcome.error !== null);
   if (!stayed) return null;
   const paths = contextPaths(edge);
-  if (paths.length === 0) return null;
+  if (paths.length === 0) return staysElsewhere(edge, outcome);
   return `${edge.event} is blocked: ${paths.map((path) => `${path} is ${valueAt(live, path)}`).join(", ")}`;
+}
+
+function staysElsewhere(edge: VizEdge, outcome: VizLiveStep): string | null {
+  if (edge.to === null || edge.to === outcome.from || outcome.error !== null) return null;
+  return `${edge.event} stays in ${localName(outcome.from)}, not ${localName(edge.to)}`;
 }
 
 function takes(edge: VizEdge, outcome: VizLiveStep | null): boolean {

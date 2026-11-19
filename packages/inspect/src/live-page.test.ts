@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { answer as answerMachine } from "./fixtures/answer.ts";
 import { checkout as checkoutMachine } from "./fixtures/checkout.ts";
+import { stateRouting } from "./fixtures/state-routing.ts";
+import { nestedRegions } from "./fixtures/nested-regions.ts";
 import { stubborn } from "./fixtures/machine-values.ts";
 import { timed as timedMachine } from "./fixtures/timed.ts";
 import { inspectModule, vizDocument } from "./index.ts";
@@ -275,6 +277,73 @@ describe("mountDriven arrows that land elsewhere", () => {
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
     expect(root.querySelector("[data-details-sent]")?.textContent).toContain('"answer":"declined"');
     expect(root.querySelector(".blocked-lock")).toBeNull();
+  });
+});
+
+describe("mountDriven stateRouting", () => {
+  test("an arrow that stays in first is locked and says where it stays", async () => {
+    const inspected = await inspectModule(
+      join(import.meta.dirname, "fixtures", "state-routing.ts"),
+      {
+        load: async () => ({ stateRouting }),
+        fuzz: false,
+      },
+    );
+    history.replaceState(null, "", "/");
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: {
+        stateRouting: () => {
+          const clock = VirtualClock();
+          return { actor: stateRouting.create({ clock }), clock };
+        },
+      },
+    });
+    const arrow = (to: string) =>
+      root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-back-${to}"]`);
+    expect(arrow("second")?.querySelector(".blocked-lock")).not.toBeNull();
+    arrow("second")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
+      "back stays in first, not second",
+    );
+    expect(root.querySelector("[data-send-edge]")).toBeNull();
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("first");
+    expect(arrow("first")?.querySelector(".blocked-lock")).toBeNull();
+    arrow("first")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("first");
+    expect(root.textContent).toContain("Sent back: stayed in first");
+  });
+
+  test("an arrow whose handler throws stays open and a click shows the error", async () => {
+    const inspected = await inspectModule(
+      join(import.meta.dirname, "fixtures", "nested-regions.ts"),
+      {
+        load: async () => ({ nestedRegions }),
+        fuzz: false,
+      },
+    );
+    history.replaceState(null, "", "/");
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountDriven(root, {
+      source: "test",
+      text: serializeViz(vizDocument(inspected.machines)),
+      targets: {
+        nestedRegions: () => {
+          const clock = VirtualClock();
+          return { actor: nestedRegions.create({ clock }), clock };
+        },
+      },
+    });
+    const boom = root.querySelector<SVGGElement>(
+      '.graph g[data-edge-id="worker.ready-boom-worker.running"]',
+    );
+    expect(boom?.querySelector(".blocked-lock")).toBeNull();
+    boom?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.textContent).toContain("worker exploded");
   });
 });
 

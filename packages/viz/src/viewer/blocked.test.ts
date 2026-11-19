@@ -133,7 +133,7 @@ describe("blockedReason", () => {
     ).toBe("pay is blocked: items is 0");
   });
 
-  test("no outcome, a stay edge, or an unanalyzed edge is not blocked", () => {
+  test("no outcome or a stay edge is not blocked; an unanalyzed stay names where it stays", () => {
     const live = { items: 0 };
     expect(blockedReason({ edge: pay(), outcome: null, live })).toBeNull();
     expect(
@@ -141,12 +141,28 @@ describe("blockedReason", () => {
     ).toBeNull();
     expect(
       blockedReason({ edge: pay({ explanation: null }), outcome: outcome("stay"), live }),
+    ).toBe("pay stays in cart, not payment");
+  });
+
+  test("a payload-only guard that stays names where it stays", () => {
+    expect(
+      blockedReason({ edge: payloadOnly(), outcome: outcome("stay"), live: { items: 0 } }),
+    ).toBe("pay stays in cart, not payment");
+  });
+
+  test("a handler that throws, reading no context, is not locked: a click shows the error", () => {
+    expect(
+      blockedReason({ edge: payloadOnly(), outcome: outcome("stay", "Error: boom"), live: {} }),
     ).toBeNull();
   });
 
-  test("a payload-only guard is not blocked", () => {
+  test("a stay on a self-loop or an arrow with no target is not blocked", () => {
+    const live = { items: 0 };
     expect(
-      blockedReason({ edge: payloadOnly(), outcome: outcome("stay"), live: { items: 0 } }),
+      blockedReason({ edge: { ...payloadOnly(), to: "cart" }, outcome: outcome("stay"), live }),
+    ).toBeNull();
+    expect(
+      blockedReason({ edge: { ...payloadOnly(), to: null }, outcome: outcome("stay"), live }),
     ).toBeNull();
   });
 
@@ -369,7 +385,7 @@ describe("blockedEdges chooses a payload per arrow", () => {
       dryRun,
     });
     expect(blocked.has("cart-pay-one")).toBe(false);
-    expect(blocked.get("cart-pay-two")).toBeUndefined();
+    expect(blocked.get("cart-pay-two")).toBe("go stays in cart, not two");
     expect(chosen.get("cart-pay-two")).toBe(0);
   });
 
@@ -381,7 +397,7 @@ describe("blockedEdges chooses a payload per arrow", () => {
       defaultOf: () => 0,
       dryRun,
     });
-    expect(blocked.has("cart-pay-two")).toBe(false);
+    expect(blocked.get("cart-pay-two")).toBe("go stays in cart, not two");
     expect(chosen.get("cart-pay-two")).toBe(0);
   });
 
