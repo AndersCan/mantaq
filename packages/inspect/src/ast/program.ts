@@ -46,7 +46,44 @@ export interface LoadedSource extends FileRead {
   sourceFile: ts.SourceFile;
   root: string;
   /** Other files of the program (not declarations) that register handlers, e.g. a pool built in a library. */
-  elsewhere: Array<FileRead & { file: string }>;
+  elsewhere: Array<FileRead & { file: string; depth: number }>;
+}
+
+/** The module specifiers a file imports or re-exports from. */
+function moduleSpecifiers(file: ts.SourceFile): string[] {
+  return file.statements.flatMap((statement) => {
+    const named = ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement);
+    const from = named ? statement.moduleSpecifier : undefined;
+    return from !== undefined && ts.isStringLiteral(from) ? [from.text] : [];
+  });
+}
+
+/** Import distance from `root` to every file it reaches (the root is 0, a direct import 1). */
+function importDepths(
+  program: ts.Program,
+  context: { root: ts.SourceFile; options: ts.CompilerOptions },
+): Map<string, number> {
+  const depths = new Map([[context.root.fileName, 0]]);
+  let frontier = [context.root];
+  for (let depth = 1; frontier.length > 0; depth += 1) {
+    const next: ts.SourceFile[] = [];
+    for (const file of frontier) {
+      for (const specifier of moduleSpecifiers(file)) {
+        const resolved = ts.resolveModuleName(
+          specifier,
+          file.fileName,
+          context.options,
+          ts.sys,
+        ).resolvedModule;
+        const target = resolved && program.getSourceFile(resolved.resolvedFileName);
+        if (!target || depths.has(target.fileName)) continue;
+        depths.set(target.fileName, depth);
+        next.push(target);
+      }
+    }
+    frontier = next;
+  }
+  return depths;
 }
 
 /**
@@ -241,10 +278,12 @@ function readFile(checker: ts.TypeChecker, sourceFile: ts.SourceFile): FileRead 
  */
 export function loadSource(source: AnalysisSource): Either<string, LoadedSource> {
   const loaded = Either.from(() => {
-    const program = ts.createProgram([source.file], compilerOptions(source));
+    const options = compilerOptions(source);
+    const program = ts.createProgram([source.file], options);
     const sourceFile = program.getSourceFile(source.file);
     if (sourceFile === undefined) return `source not found: ${source.file}`;
     const checker = program.getTypeChecker();
+    const depths = importDepths(program, { root: sourceFile, options });
     const elsewhere = program
       .getSourceFiles()
       .filter(
@@ -255,6 +294,7 @@ export function loadSource(source: AnalysisSource): Either<string, LoadedSource>
       )
       .map((other) => ({
         file: relative(source.root, other.fileName).split(sep).join("/"),
+        depth: depths.get(other.fileName) ?? Number.MAX_SAFE_INTEGER,
         ...readFile(checker, other),
       }))
       .filter((other) => other.registrations.length > 0);

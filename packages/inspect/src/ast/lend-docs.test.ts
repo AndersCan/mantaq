@@ -72,9 +72,9 @@ function docs(overrides: Partial<SourceDocs>): SourceDocs {
   };
 }
 
-function other(file: string, overrides: Partial<SourceDocs>) {
+function other(file: string, overrides: Partial<SourceDocs>, depth = 1) {
   const { sites, stateDocs, eventDocs, effectDocs } = docs(overrides);
-  return { file, sites, stateDocs, eventDocs, effectDocs };
+  return { file, depth, sites, stateDocs, eventDocs, effectDocs };
 }
 
 function annotate(analysis: SourceDocs) {
@@ -92,6 +92,18 @@ test("two other files registering the same state and event are not analyzed, nam
     reason: "handlers for (idle, go) found in more than one file: a.ts, b.ts",
   });
   expect(result.edges[0]?.doc).toBe(null);
+});
+
+test("of two other files registering the same state and event, the one nearer by imports is read", () => {
+  const result = annotate(
+    docs({
+      elsewhere: [
+        other("far.ts", { sites: [site("Far")] }, 3),
+        other("near.ts", { sites: [site("Near")] }, 1),
+      ],
+    }),
+  );
+  expect(result.edges[0]?.doc).toBe("Near");
 });
 
 test("the machine file's own registration wins over another file's", () => {

@@ -78,4 +78,14 @@ describe("handlers registered in another file of the program", () => {
       ["go", null, null],
     ]);
   });
+
+  test("a copied draft is read from the file the root imports, not the original another file imports", async () => {
+    const result = await inspectModule(join(FIXTURES, "drafts/app.design-a.ts"), {
+      load: (path) => import(path),
+      fuzz: false,
+    });
+    const edge = result.machines[0]?.edges.find((e) => e.event === "go");
+    expect(edge?.doc).toBe("The draft starts the work.");
+    expect(edge?.explanation?.status).toBe("analyzed");
+  });
 });
