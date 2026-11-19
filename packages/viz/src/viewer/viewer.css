@@ -506,6 +506,10 @@
   margin: 0;
 }
 
+.viz .viz-main > .blocked-note:empty {
+  display: none;
+}
+
 .viz .child-marker {
   cursor: pointer;
   outline: none;

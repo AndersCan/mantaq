@@ -279,7 +279,10 @@ function drawCallbacks(
       const selection = memberSelection(handlers.shown, view, clicked);
       const edge = machine.edges.find((e) => selection.kind === "edge" && e.id === selection.id);
       const decision = edge && arrowSend(from, edge);
-      if (edge === undefined || decision?.kind !== "send") return handlers.openDetails(selection);
+      if (edge === undefined || decision?.kind !== "send") {
+        if (edge !== undefined) view.sent = null;
+        return handlers.openDetails(selection);
+      }
       view.selection = selection;
       handlers.sendEvent(edge.event, decision.actor, edge.id);
     },
