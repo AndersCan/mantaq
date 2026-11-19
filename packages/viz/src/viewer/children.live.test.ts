@@ -207,10 +207,10 @@ describe("live actor map children", () => {
   const walkedKey = (root: HTMLElement) =>
     root.querySelector("[data-child-key][data-followed]")?.getAttribute("data-child-key");
 
-  test("each child is a chip on the state it is in; the frame title says one per key", () => {
+  test("each child is a chip on the state it is in; the frame title is the map's name", () => {
     const { root } = mount([child("p1", "waitingForRetry"), child("p2", "sendingPhoto")]);
     expect(chips(root)).toEqual(["p1@photos.waitingForRetry", "p2@photos.sendingPhoto"]);
-    expect(title(root)).toBe("photos: one per key");
+    expect(title(root)).toBe("photos");
     expect(chips(mount([]).root)).toEqual([]);
   });
 
@@ -384,10 +384,10 @@ describe("live actor map children", () => {
     ]);
   });
 
-  test("the frame title stays one per key without a driver", () => {
+  test("the frame title is the map's name without a driver", () => {
     const root = document.createElement("div");
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [photoQueue] });
-    expect(title(root)).toBe("photos: one per key");
+    expect(title(root)).toBe("photos");
     expect(root.querySelector(".graph g.child-marker")).toBeNull();
     click(box(root, "sendingPhoto"));
     expect(root.querySelector('[data-tab="details"]')?.getAttribute("aria-selected")).toBe("true");

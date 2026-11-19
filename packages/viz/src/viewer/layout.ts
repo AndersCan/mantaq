@@ -608,11 +608,6 @@ function within(region: string, owner: string | null | undefined): boolean {
   );
 }
 
-/** A map's title says one machine runs per key; the children are chips on the states. */
-function regionTitle(machine: VizMachine, region: string): string {
-  return machine.maps.includes(region) ? `${region}: one per key` : region;
-}
-
 interface Context {
   machine: VizMachine;
   specs: ReadonlyMap<string, Spec>;
@@ -681,7 +676,7 @@ function contentOrPoint(region: string, geo: Geo, context: Context): Sides {
 function fitRegion(region: string, geo: Geo, context: Context): void {
   const dagreBox = geo.regions.get(region);
   if (dagreBox === undefined) return;
-  const tw = textWidth(regionTitle(context.machine, region)) + 8;
+  const tw = textWidth(region) + 8;
   const fit = (): Sides => {
     const c = contentOrPoint(region, geo, context);
     const left = c.left - LABEL_PAD;
@@ -926,7 +921,7 @@ function assemble(
   const placedRegions = regions
     .map((region) => {
       const sides = geo.regions.get(region) ?? { left: 0, right: 0, top: 0, bottom: 0 };
-      const tw = textWidth(regionTitle(machine, region)) + 8;
+      const tw = textWidth(region) + 8;
       return {
         region,
         x: (sides.left + sides.right) / 2,

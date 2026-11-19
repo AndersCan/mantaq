@@ -74,7 +74,7 @@ function regionGroup(doc: Document, placed: PlacedRegion, isMap: boolean): SVGGE
         rx: 10,
       }),
       svg(doc, "text", { x: placed.title.x - placed.title.width / 2 + 4, y: placed.title.y + 4 }, [
-        isMap ? `${placed.region}: one per key` : placed.region,
+        placed.region,
       ]),
     ],
   );
