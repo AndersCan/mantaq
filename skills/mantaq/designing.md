@@ -174,15 +174,41 @@ If the machine is a built instance, offer to wrap it in `machine(...)` first (on
 
 ## 10. Two designs
 
-Only when the user asks for two designs or alternatives. Otherwise section 1 holds.
+Only when the user asks for two designs, two ways or alternatives. Otherwise section 1 holds. A change inside one machine: steps 1-7. A change across machines (it touches a wire or two or more machines): "Across machines" below.
 
-1. Files: `<feature>.design-a.machine.ts` and `<feature>.design-b.machine.ts`, next to where the real machine lives or will live. Export `<feature>DraftA = machine("<feature>DraftA", …)` and `<feature>DraftB = machine("<feature>DraftB", …)`. Changing an existing machine: both drafts start as copies of it, and the real file stays untouched until the pick. No tests for drafts.
+1. Files: `<feature>.design-a.machine.ts` and `<feature>.design-b.machine.ts`, next to where the real machine lives or will live. Export `<feature>DraftA = machine("<feature>DraftA", …)` and `<feature>DraftB = machine("<feature>DraftB", …)`. Changing an existing machine: both drafts start as copies of it, and the real file stays untouched until the pick. No tests for one-machine drafts.
 2. Two real designs, equal effort, that differ in a decision the user cares about (who approves, what happens on expiry). Use the same state and event names wherever the domain is the same, so the user compares decisions, not names. JSDoc on both, as in section 4. Never recommend one unless asked.
 3. Serve both: pass both files to the repo's live-page script, or check that the `machines` glob matches them (widen the glob; do not move the files).
 4. Before sending the link: the typecheck passes, the server output has no `[mantaq-viz]` line for either file, and `curl -s <Local URL>__mantaq/viz.json` lists both ids. Otherwise fix first.
 5. Reply in at most 4 lines: `Two drafts ready, both typecheck.`, then one line per design (`A (<what it chooses>): <n> states, <m> edges.`), then one link each: `<Local URL>__mantaq/?machine=<feature>DraftA` and `<Local URL>__mantaq/?machine=<feature>DraftB`.
 6. Feedback on one design: edit that draft; the page redraws.
 7. The pick ("keep A", "the first"): move the kept draft into the real machine file (existing feature) or a new file named the repo's way (new feature), rename the export to the real name, fix every caller the typechecker flags, delete both draft files, then run the section 8 checks. Reply in at most 3 lines: the file, the checks that passed, and `<Local URL>__mantaq/?machine=<id>`. If the pick is unclear, ask one question. If the user drops both, delete the drafts and say so in one line. Never leave a draft file behind.
+
+### Across machines
+
+The user compares two whole apps, so each design is a copy of the root that builds every machine (section 11), with its changes in place.
+
+1. Files per design (A shown; B the same with `b`/`B`). Real files stay untouched until the pick.
+   - Root: copy the root file to `<root file>.design-a.ts`, export `<root>DraftA = machine("<root>DraftA", …)`.
+   - Each machine the design changes or adds: copy its file to `<file>.design-a.ts` (`<name>.design-a.machine.ts` when the real one ends `.machine.ts`), export `<name>DraftA`, build it in the draft root instead of the real one. A wire the design changes: copy the wire function into the draft root and call the copy.
+   - The draft root returns each changed or added machine under its key plus the letter (`uploader` becomes `uploaderA`); the rest keep their keys. Boxes and Step text use these keys, so the user finds the change by its letter.
+   - No draft name may end like the repo's real machine files (a test may count them).
+2. One walk per design: `<root file>.design-a.test.ts`, one top-level test through `recordRuns(<root>DraftA)`, titled the same in A and B with the story the ask names. Same events where the domain is the same; each asserts where its own design ends. The one exception to "No tests for drafts"; deleted at the pick. Run it once to record it.
+3. Two real designs, equal effort, as in the one-machine step 2. A design finding in a draft is a mistake: fix it. A walk that still fails is a fact: report it, never weaken or shorten it.
+4. One page for both: a page with one `<Machine src>` per draft root, no `run` prop (a failed walk would break the build), each under a heading `A: <what it chooses>` / `B: …` in plain words. Where it goes: the repo's flow docs. `<page URL>?machine=<root>DraftA&machine=<root>DraftB&run=<story>` opens both, one under the other, each on its walk.
+5. Before sending: typecheck passes; both walks pass, or the failing one is reported; the page builds with no finding and holds both roots.
+6. Reply: the `Today:` block ("First reply"), then at most 5 lines:
+   `Two designs of <the ask>, both typecheck. Changed machines end in A or B.`
+   `A (<what it chooses>): changes <keys>. Walk "<story>" ends with <where>. <link>`
+   `B (<what it chooses>): changes <keys>. Walk "<story>" ends with <where>. <link>`
+   `Both, one under the other: <link>`
+   A design's link is `<page URL>?machine=<root>DraftA&run=<story>`. Never recommend one.
+7. The pick ("B"):
+   - Rebase on the default branch. Move each B machine draft into its real file with the real export and id. Apply the draft root's differences (keys without the letter, wires, added machines) to the real root by hand; never copy the draft root over it.
+   - Move B's walk into the real root's walk test file: a top-level test through its `recordRuns`, after the existing tests, real keys. Run the file to record it. This walk stays.
+   - Delete every draft file of A and B, both draft walk tests and their `__runs__` files, the page and its entries.
+   - Run section 8's checks and every test file that imports the real root.
+   - `git status --short` and `rg -l "DraftA|DraftB|design-a|design-b"` list nothing; only then reply in at most 3 lines: files changed, checks passed, `Left behind: nothing.`, and the real root's link with `run=<story>`.
 
 ## 11. Machines that talk
 
