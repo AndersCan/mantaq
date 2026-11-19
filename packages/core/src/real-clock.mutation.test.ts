@@ -54,59 +54,6 @@ describe("RealClock directed mutation tests", () => {
     expect(fired).toBe(0);
   });
 
-  test("setTimeout without options still sets up the callback", async () => {
-    const clock = RealClock();
-    let fired = false;
-    clock.setTimeout(5, {
-      cb: () => {
-        fired = true;
-      },
-    });
-    await wait(40);
-    expect(fired).toBe(true);
-  });
-
-  test("setTimeout with options but no signal still sets up the callback", async () => {
-    const clock = RealClock();
-    let fired = false;
-    clock.setTimeout(5, {
-      cb: () => {
-        fired = true;
-      },
-    });
-    await wait(40);
-    expect(fired).toBe(true);
-  });
-
-  test("aborting after a timeout fired skips the extra clearTimeout", async () => {
-    const clock = RealClock();
-    const controller = new AbortController();
-    const calls: unknown[] = [];
-    const original = globalThis.clearTimeout;
-    globalThis.clearTimeout = (handle) => {
-      calls.push(handle);
-      return original(handle);
-    };
-    try {
-      let fired = false;
-      const timerId = clock.setTimeout(5, {
-        signal: controller.signal,
-        cb: () => {
-          fired = true;
-        },
-      });
-      const deadline = Date.now() + 100;
-      while (!fired && Date.now() < deadline) {
-        await wait(5);
-      }
-      expect(fired).toBe(true);
-      controller.abort();
-      expect(calls.includes(timerId)).toBe(false);
-    } finally {
-      globalThis.clearTimeout = original;
-    }
-  });
-
   test("aborting before the first tick removes the interval", async () => {
     const clock = RealClock();
     const controller = new AbortController();

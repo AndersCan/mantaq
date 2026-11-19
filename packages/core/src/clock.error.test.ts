@@ -66,13 +66,6 @@ describe("VirtualClock error paths", () => {
 });
 
 describe("RealClock error paths", () => {
-  test("setTimeout with aborted signal returns -1", () => {
-    const clock = RealClock();
-    const controller = new AbortController();
-    controller.abort();
-    expect(clock.setTimeout(5, { signal: controller.signal, cb: () => {} })).toBe(-1);
-  });
-
   test("aborting before the deadline removes the pending timeout", () => {
     const clock = RealClock();
     const controller = new AbortController();

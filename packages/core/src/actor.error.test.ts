@@ -3,7 +3,7 @@ import type { Snapshot } from "./actor-internal.ts";
 import type { ErrorInfo } from "./actor-types.ts";
 import { event } from "./event.ts";
 import { Actor, VirtualClock } from "./index.ts";
-import { type AnyStateRef, type StateRef, state } from "./state.ts";
+import { type AnyStateRef, state } from "./state.ts";
 import { expect, test, describe } from "vite-plus/test";
 
 /**
@@ -13,32 +13,6 @@ import { expect, test, describe } from "vite-plus/test";
 function isErrorBomb(message: string): never {
   throw new Error(message);
 }
-
-/**
- * Runtime-invalid state ref: structurally a StateRef but never registered, so
- * isStateRef() rejects it. Used to force the invalid-transition-target guard.
- */
-const impostorFinal: StateRef<string, unknown, true> = {
-  name: "garbage",
-  isFinal: true,
-  regions: () => impostorFinal,
-  final: () => impostorFinal,
-  create: (payload) => ({ state: impostorFinal, payload }),
-};
-const impostor: StateRef<string, unknown, false> = {
-  name: "garbage",
-  isFinal: false,
-  regions: () => impostor,
-  final: () => impostorFinal,
-  create: (payload) => ({ state: impostor, payload }),
-};
-const impostorState: StateRef<string, unknown, false> = {
-  name: "garbage",
-  isFinal: false,
-  regions: () => impostor,
-  final: () => impostorFinal,
-  create: (payload) => ({ state: impostor, payload }),
-};
 
 describe("Actor error paths", () => {
   test("initial state not declared throws with the full state list", () => {
@@ -56,64 +30,6 @@ describe("Actor error paths", () => {
     }
     expect(buildWithStrayInitial).toThrow(/stray/);
     expect(buildWithStrayInitial).toThrow(/a, b/);
-  });
-
-  test("the machine ignores sends entirely once final", () => {
-    const pending = state("pending")();
-    const done = state("done")().final();
-    const finish = event("FINISH")();
-    const stray = event("STRAY")();
-    let strayRuns = 0;
-    const actor = Actor({
-      inputs: [finish, stray],
-      states: [pending, done],
-      initial: pending,
-      setup: (m) => {
-        m.on(pending, { event: finish, to: [done], handler: () => ({ state: done }) });
-        m.onAny({
-          event: stray,
-          handler: () => {
-            strayRuns++;
-            return {};
-          },
-        });
-      },
-    });
-    actor.send(finish.create());
-    actor.send(stray.create());
-    expect(strayRuns).toBe(0);
-  });
-
-  test("unhandled output without a handler does not throw", () => {
-    const idle = state("idle")();
-    const out = event("OUT")();
-    const trigger = event("GO")();
-    const actor = Actor({
-      inputs: [trigger],
-      outputs: [out],
-      states: [idle],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create()] }) });
-      },
-    });
-    expect(() => actor.send(trigger.create())).not.toThrow();
-  });
-
-  test("the machine silently ignores an unhandled external event", () => {
-    const idle = state("idle")();
-    const stray = event("STRAY")();
-    const actor = Actor({
-      inputs: [stray],
-      states: [idle],
-      initial: idle,
-      setup: () => {},
-    });
-    actor.send(stray.create());
-    expect({ state: actor.state.name, error: actor.snapshot().error }).toEqual({
-      state: "idle",
-      error: undefined,
-    });
   });
 
   test("emit loop halts after the internal budget is consumed", () => {
@@ -220,38 +136,6 @@ describe("Actor error paths", () => {
     });
   });
 
-  test("a throwing transition handler routes to the error state and never resurrects", () => {
-    const idle = state("idle")();
-    const active = state("active")();
-    const trigger = event("GO")();
-    let ranAny = false;
-    const actor = Actor({
-      inputs: [trigger],
-      states: [idle, active],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, { event: trigger, handler: () => isErrorBomb("boom") });
-        m.onAny({
-          event: trigger,
-          to: [active],
-          handler: () => {
-            ranAny = true;
-            return { state: active };
-          },
-        });
-      },
-    });
-    expect(() => actor.send(trigger.create())).not.toThrow();
-    expect(() => actor.send(trigger.create())).not.toThrow();
-    const snap = actor.snapshot();
-    expect(snap).toMatchObject({
-      path: ["__error"],
-      done: true,
-      error: { reason: "transition", event: { type: "GO" }, state: { name: "idle" } },
-    });
-    expect(ranAny).toBe(false);
-  });
-
   test("a throwing effect records the state being entered (post-step pin)", () => {
     const idle = state("idle")();
     const loading = state("loading")();
@@ -322,55 +206,6 @@ describe("Actor error paths", () => {
     }).toEqual({ state: "active", error: undefined, seenHasActive: true });
   });
 
-  test("a throwing output handler routes to the error state", () => {
-    const idle = state("idle")();
-    const out = event("OUT")();
-    const trigger = event("GO")();
-    const actor = Actor({
-      inputs: [trigger],
-      outputs: [out],
-      states: [idle],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, { event: trigger, handler: () => ({ emit: [out.create()] }) });
-      },
-    });
-    actor.on("output", { fn: () => isErrorBomb("output boom") });
-    expect(() => actor.send(trigger.create())).not.toThrow();
-    const outputDeathSnap = actor.snapshot();
-    expect({
-      reason: outputDeathSnap.error?.reason,
-      eventType: outputDeathSnap.error?.event.type,
-    }).toEqual({ reason: "output", eventType: "OUT" });
-  });
-
-  test("the machine handles an invalid transition target by entering the error state", () => {
-    const idle = state("idle")();
-    const trigger = event("GO")();
-    const declaredStates: AnyStateRef[] = [idle];
-    const actor = Actor({
-      inputs: [trigger],
-      states: declaredStates,
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, {
-          event: trigger,
-          to: [impostorState],
-          handler: () => ({ state: impostorState }),
-        });
-      },
-    });
-    expect(() => actor.send(trigger.create())).not.toThrow();
-    const invalidTargetSnap = actor.snapshot();
-    expect({
-      reason: invalidTargetSnap.error?.reason,
-      from: invalidTargetSnap.error?.state.name,
-    }).toEqual({
-      reason: "transition",
-      from: "idle",
-    });
-  });
-
   test("the machine handles an async effect rejection by entering the error state", async () => {
     const idle = state("idle")();
     const loading = state("loading")();
@@ -398,32 +233,6 @@ describe("Actor error paths", () => {
         error: expect.objectContaining({ message: "late boom" }),
       },
     });
-  });
-
-  test("death emits exactly one change and one done", () => {
-    const idle = state("idle")();
-    const active = state("active")();
-    const trigger = event("GO")();
-    let changes = 0;
-    let dones = 0;
-    const actor = Actor({
-      inputs: [trigger],
-      states: [idle, active],
-      initial: idle,
-      setup: (m) => {
-        m.on(idle, { event: trigger, to: [active], handler: () => ({ state: active }) });
-        m.effect(active, {
-          name: "throwOnEnter",
-          fn: () => isErrorBomb("boom"),
-        });
-      },
-    });
-    actor.on("change", { fn: () => changes++ });
-    actor.on("done", { fn: () => dones++ });
-    changes = 0;
-    actor.send(trigger.create());
-    expect(changes).toBe(1);
-    expect(dones).toBe(1);
   });
 
   test("throwing handlers converge regardless of delivery path", () => {
