@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { insideBand, scrollToShow } from "./keep-in-view.ts";
+import { scrollToShow } from "./keep-in-view.ts";
 
 const box = (left: number, max = 5700) => ({ left, width: 300, max });
 
@@ -21,12 +21,15 @@ test("a box with no width moves nothing", () => {
   expect(scrollToShow({ left: 7, width: 0, max: 100 }, { left: 900, right: 990 })).toBe(7);
 });
 
+// The vertical axis: a 400px band that starts at content offset `top`.
+const band = (top: number, max = 1600) => ({ left: top, width: 400, max });
+
 test.each([
-  [{ top: 100, bottom: 200 }, true],
-  [{ top: 120, bottom: 180 }, true],
-  [{ top: 99, bottom: 150 }, false],
-  [{ top: 150, bottom: 201 }, false],
-  [{ top: 50, bottom: 300 }, false],
-])("insideBand %j is %s in 100..200", (rect, expected) => {
-  expect(insideBand(rect, { top: 100, bottom: 200 })).toBe(expected);
+  [{ left: 100, right: 140 }, 0, 0],
+  [{ left: 900, right: 940 }, 0, 556],
+  [{ left: 100, right: 140 }, 800, 84],
+  [{ left: 900, right: 940 }, 800, 800],
+  [{ left: 1990, right: 2030 }, 0, 1600],
+])("shows rows %j from top %d at %d", (span, top, expected) => {
+  expect(scrollToShow(band(top), span)).toBe(expected);
 });

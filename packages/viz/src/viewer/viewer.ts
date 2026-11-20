@@ -33,7 +33,7 @@ import { pathTo } from "../findings.ts";
 import { blockedEdges, sentByParts, whyNotHere } from "./blocked.ts";
 import { arrowCandidates, decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
-import { keepInBand, keepInView } from "./keep-in-view.ts";
+import { keepInView } from "./keep-in-view.ts";
 import { drawChildMarkers, drawQueue } from "./markers.ts";
 import { queueOf } from "./queue.ts";
 import { memberAt, shareArrows } from "./shared.ts";
@@ -44,8 +44,6 @@ interface ViewState {
   selection: Selection | null;
   /** The machine of a big board shown on its own; null = the board of boxes. Not saved. */
   zoom: string | null;
-  /** The state of the shown machine last scrolled into the band; null when none. Not saved. */
-  followed: string | null;
   /** Set while a driver runs the actor. */
   live: VizLiveState | null;
   /** Entry i is what the driver reported moving after `live.steps[i]` (its `after`) when that step was taken. */
@@ -220,7 +218,7 @@ export function mountViewer(
   render();
 }
 
-/** Scrolls to the live state; in a shown machine, to a state drawn there, and the page up or down when a step moves it out of view. */
+/** Scrolls to the live state; in a shown machine, to a state drawn there, never the page. */
 function keepCurrentInView(
   root: HTMLElement,
   from: { machine: VizMachine; view: ViewState },
@@ -232,10 +230,6 @@ function keepCurrentInView(
     view.zoom === null ? live : live.filter((id) => partOf(machine, id) === view.zoom);
   const now = currents[0];
   if (now !== undefined) keepInView(root, now);
-  if (view.zoom !== null && now !== undefined && now !== view.followed) {
-    view.followed = now;
-    keepInBand(root, now);
-  }
 }
 
 /** Calls `refit` when the window width changes, which entering full screen does too. */
@@ -329,14 +323,12 @@ function canvasOf(from: {
     const at =
       root.querySelector<SVGGElement>(".graph g.state.current") ??
       root.querySelector<SVGGElement>(".graph g.state.initial");
-    view.followed = at?.getAttribute("data-node-id") ?? null;
-    at?.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
-    if (view.followed !== null) keepInBand(root, view.followed);
+    const id = at?.getAttribute("data-node-id");
+    if (typeof id === "string") keepInView(root, id);
     root.querySelector<HTMLElement>(".part-title")?.focus({ preventScroll: true });
   };
   const leave = () => {
     view.zoom = null;
-    view.followed = null;
     swap();
     from.afterSwap();
   };
@@ -629,7 +621,6 @@ function initialView(options: ViewerOptions): ViewState {
   return {
     selection: null,
     zoom: null,
-    followed: null,
     live: null,
     afters: [],
     lasts: [],

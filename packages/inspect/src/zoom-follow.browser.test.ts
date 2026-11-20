@@ -45,6 +45,7 @@ test("a step inside an opened machine keeps the new state between the name bar a
       return { hub: at('g.state[data-node-id="tall.hub"]'), leaf: at("g.state.current") };
     });
   expect((await band()).hub).toBe(true);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
   const point = await page.evaluate(() => {
     const path = document.querySelector<SVGPathElement>(
       'g.edge[data-to="tall.leaf19"] path:not(.hit)',
@@ -58,6 +59,7 @@ test("a step inside an opened machine keeps the new state between the name bar a
   await page.mouse.click(point.x, point.y);
   await page.locator('g.state.current[data-node-id="tall.leaf19"]').waitFor();
   expect((await band()).leaf).toBe(true);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
   await page.getByRole("button", { name: "Reset" }).click();
   await page.locator('g.state.current[data-node-id="tall.hub"]').waitFor();
   expect((await band()).hub).toBe(true);
