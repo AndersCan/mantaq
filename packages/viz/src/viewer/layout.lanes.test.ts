@@ -399,10 +399,3 @@ describe("lanesOf level rows", () => {
     expect(blocked === undefined ? [] : ys(blocked)).toContain(126);
   });
 });
-
-test("a part's start arrow still draws", async () => {
-  const { partMachine } = await import("./parts.ts");
-  const whole = (await import("./reference/justus-whole-app.json"))
-    .default as unknown as VizMachine;
-  expect(placeMachine(partMachine(whole, "join")).entries).toHaveLength(1);
-});

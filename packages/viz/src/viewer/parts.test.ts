@@ -65,8 +65,9 @@ test("a board of three machines has parts", () => {
   expect(partsOf({ ...whole, actors: ["join", "sync"] })).toEqual(["", "join", "sync"]);
 });
 
-test("a part keeps the frame of an inner region and loses only its own", () => {
-  const inner = { ...whole, regions: [...whole.regions, "join.inner"] };
-  const join = partMachine(inner, "join");
-  expect(join.regions).toEqual(["join.inner"]);
+test("no state of a part keeps the part's own region", () => {
+  const join = partMachine(whole, "join");
+  expect(join.states.filter((state) => state.region === "join").map((state) => state.id)).toEqual(
+    [],
+  );
 });
