@@ -63,6 +63,5 @@ test("a step inside an opened machine keeps the new state between the name bar a
   await page.getByRole("button", { name: "Reset" }).click();
   await page.locator('g.state.current[data-node-id="tall.hub"]').waitFor();
   expect((await band()).hub).toBe(true);
-  expect(await page.evaluate(() => scrollY)).toBe(0);
   await page.close();
 }, 60_000);

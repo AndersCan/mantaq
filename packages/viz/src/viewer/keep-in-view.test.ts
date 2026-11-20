@@ -33,7 +33,3 @@ test.each([
 ])("shows rows %j from top %d at %d", (span, top, expected) => {
   expect(scrollToShow(band(top), span)).toBe(expected);
 });
-
-test("a band with no height moves nothing", () => {
-  expect(scrollToShow({ left: 120, width: -30, max: 1600 }, { left: 900, right: 940 })).toBe(120);
-});

@@ -445,6 +445,46 @@ describe("a step inside a shown machine", () => {
     expect(pageScrolls()).toBe(0);
   });
 
+  test("keeps the new state below the name bar and above a Step panel that covers the canvas", () => {
+    stubRects(true);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const scrolled = this.closest(".canvas")?.scrollTop ?? 0;
+      const top = this.classList.contains("viz-bar")
+        ? 160
+        : this.classList.contains("panel")
+          ? 300
+          : this.classList.contains("canvas")
+            ? 100
+            : this.getAttribute("data-node-id") === "p.two"
+              ? 900 - scrolled
+              : 200 - scrolled;
+      return { top, bottom: top + 40, left: 0, right: 0, width: 0, height: 40 } as DOMRect;
+    });
+    const { tops, pageScrolls } = spy();
+    const { root, push } = mountPushable();
+    press(box(root, "p"));
+    tops.length = 0;
+    push("p.two", "q.two");
+    push("p.one", "q.one");
+    expect(tops).toEqual([656, 0]);
+    expect(pageScrolls()).toBe(0);
+  });
+
+  test("keeps the new state inside the window when the canvas runs past its bottom", () => {
+    stubRects(true);
+    vi.stubGlobal("innerHeight", 300);
+    const { tops, pageScrolls } = spy();
+    const { root, push } = mountPushable();
+    press(box(root, "p"));
+    tops.length = 0;
+    push("p.two", "q.two");
+    push("p.one", "q.one");
+    expect(tops).toEqual([656, 84]);
+    expect(pageScrolls()).toBe(0);
+  });
+
   test("leaves the page alone when the state shows, or the step is in another machine", () => {
     stubRects(false);
     const { tops: scrolled, pageScrolls } = spy();
