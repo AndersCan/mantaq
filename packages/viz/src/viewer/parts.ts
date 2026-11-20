@@ -20,6 +20,7 @@ export function partMachine(machine: VizMachine, part: string): VizMachine {
   const messages = machine.fuzz?.messages.filter(
     (message) => inPart(message.from) && inPart(message.to),
   );
+  const edges = machine.edges.filter((edge) => inPart(edge.from));
   return {
     ...machine,
     id: partName(machine, part),
@@ -33,7 +34,8 @@ export function partMachine(machine: VizMachine, part: string): VizMachine {
     states: machine.states
       .filter((state) => inPart(state.id))
       .map((state) => (state.region === part ? { ...state, region: null } : state)),
-    edges: machine.edges.filter((edge) => inPart(edge.from)),
+    edges,
+    events: machine.events.filter((event) => edges.some((edge) => edge.event === event.id)),
     fuzz:
       machine.fuzz === null || messages === undefined
         ? machine.fuzz

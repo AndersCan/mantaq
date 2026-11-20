@@ -71,3 +71,11 @@ test("no state of a part keeps the part's own region", () => {
     [],
   );
 });
+
+test("a part's events are those on its own arrows", () => {
+  const join = partMachine(whole, "join");
+  const used = new Set(join.edges.map((edge) => edge.event));
+  expect(join.events.length).toBeGreaterThan(0);
+  expect(join.events.every((event) => used.has(event.id))).toBe(true);
+  expect(whole.events.length).toBeGreaterThan(join.events.length);
+});

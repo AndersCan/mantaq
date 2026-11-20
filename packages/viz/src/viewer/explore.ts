@@ -11,12 +11,15 @@ import type {
   VizStep,
 } from "../schema.ts";
 import { activatable, html, svg } from "./dom.ts";
+import { partMachine } from "./parts.ts";
 import { defaultValue, parseValue, valueFields, valueText } from "./fill.ts";
 import type { Values } from "./fill.ts";
 import { LOCK_SLOT, textWidth } from "./layout.ts";
 
 export interface ExploreContext {
   machine: VizMachine;
+  /** The opened part's actor ("" for the machine's own); null on the board. The Context tab lists only its fields. */
+  zoom: string | null;
   /** Keep the first `length` steps. */
   rewind: (length: number) => void;
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
@@ -442,7 +445,10 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
   );
   return {
     step,
-    context: valuesList(doc, { machine, live }),
+    context: valuesList(doc, {
+      machine: context.zoom === null ? machine : partMachine(machine, context.zoom),
+      live,
+    }),
   };
 }
 
