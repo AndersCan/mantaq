@@ -947,8 +947,15 @@ function updateBlocked(machine: VizMachine, view: ViewState, driver: VizDriver |
     currents: currentsOf(live, view.picked),
     defaultOf: (edge) =>
       payloadFor(machine, edge.event, { set: view.values, live, afters: view.afters }),
-    candidatesOf: (edge) =>
-      arrowCandidates(machine, edge, { set: view.values, live, afters: view.afters }),
+    candidatesOf: (edge) => {
+      const actor = actorFor(edge);
+      return arrowCandidates(machine, edge, {
+        set: view.values,
+        live,
+        afters: view.afters,
+        actor: actor === "none" ? undefined : actor,
+      });
+    },
     dryRun: (steps) => driver.dryRun?.(steps) ?? [],
     actorOf: actorFor,
   });

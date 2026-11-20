@@ -1,7 +1,9 @@
 import { asksForPayload, payloadSamples } from "../moves.ts";
 import type {
+  VizActorRef,
   VizEdge,
   VizField,
+  VizFuzzSequence,
   VizJson,
   VizLiveState,
   VizLiveStep,
@@ -189,6 +191,11 @@ function sortedJson(value: VizJson | undefined): string {
   return JSON.stringify(value) ?? "null";
 }
 
+/** True when two steps are the same, whatever order their payload keys came in. */
+function sameStep(a: VizStep, b: VizStep): boolean {
+  return sortedJson(a as unknown as VizJson) === sortedJson(b as unknown as VizJson);
+}
+
 const MOST_CANDIDATES = 16;
 
 /** `payload` with the values set in the Context tab laid over its declared fields. */
@@ -200,6 +207,34 @@ function withSet(fields: ReadonlyArray<VizField> | null, payload: VizJson, set: 
     if (value !== undefined && fits(field, value)) laid[field.name] = value;
   }
   return laid;
+}
+
+function actorKey(actor: VizActorRef | undefined): string {
+  return sortedJson((actor ?? null) as unknown as VizJson);
+}
+
+/** The next payload of each corpus run the walk is on, longest run first. */
+function runPayloads(
+  corpus: ReadonlyArray<VizFuzzSequence>,
+  next: { walk: ReadonlyArray<VizStep>; event: string; actor: VizActorRef | undefined },
+): VizJson[] {
+  const { walk, event } = next;
+  return corpus
+    .filter((sequence) =>
+      walk.every((step, index) => {
+        const there = sequence.steps[index];
+        return there !== undefined && sameStep(there, step);
+      }),
+    )
+    .toSorted((a, b) => b.steps.length - a.steps.length)
+    .flatMap((sequence) => {
+      const step = sequence.steps[walk.length];
+      const same =
+        step?.kind === "event" &&
+        step.event === event &&
+        actorKey(step.actor) === actorKey(next.actor);
+      return same && step.payload !== null ? [step.payload] : [];
+    });
 }
 
 /** The fuzz payloads of the event: those of runs that found `feature` first, then the rest. */
@@ -223,8 +258,9 @@ function fuzzPayloads(machine: VizMachine, event: string, feature: string): VizJ
 }
 
 /**
- * The payloads a click on `edge` may send, best first: the default (`payloadFor`), the default with each other declared choice, and the fuzz payloads of the event (those of runs that found this arrow
- * first); fuzz values outside a declared choice are dropped. At most 16, no repeats.
+ * The payloads a click on `edge` may send, best first: the default (`payloadFor`), the default with each other declared choice, the next step of a
+ * fuzz run the walk is on, and the fuzz payloads of the event (those of runs that found this arrow
+ * first); fuzz values outside a declared choice are dropped. With an empty walk the default goes first, else the run does. At most 16, no repeats.
  */
 export function arrowCandidates(
   machine: VizMachine,
@@ -233,12 +269,16 @@ export function arrowCandidates(
     set: Values;
     live: VizLiveState | null;
     afters: ReadonlyArray<ReadonlyArray<VizLiveStep>>;
+    actor: VizActorRef | undefined;
   },
 ): VizJson[] {
   const { live, set } = from;
   const fallback = payloadFor(machine, edge.event, { set, live, afters: from.afters });
+  const corpus = machine.fuzz?.corpus ?? [];
   if (!asksForPayload(machine, edge.event)) return [fallback];
   const fields = machine.events.find((each) => each.id === edge.event)?.payload ?? null;
+  const walk = live?.steps ?? [];
+  const runs = runPayloads(corpus, { walk, event: edge.event, actor: from.actor });
   const feature = `edge:${edge.from}>${edge.event}>${edge.to ?? ""}`;
   const fuzzed = fuzzPayloads(machine, edge.event, feature);
   const declared = (each: VizJson) =>
@@ -257,7 +297,11 @@ export function arrowCandidates(
           : [],
       )
     : [];
-  return distinct([fallback, ...laid(variants), ...laid(fuzzed)]).slice(0, MOST_CANDIDATES);
+  const ordered =
+    walk.length === 0
+      ? [fallback, ...laid(variants), ...laid(runs), ...laid(fuzzed)]
+      : [...laid(runs), fallback, ...laid(variants), ...laid(fuzzed)];
+  return distinct(ordered).slice(0, MOST_CANDIDATES);
 }
 
 function distinct(list: ReadonlyArray<VizJson>): VizJson[] {

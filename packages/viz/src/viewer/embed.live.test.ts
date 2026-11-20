@@ -979,6 +979,12 @@ describe("field forms and the context table", () => {
     ]);
   });
 
+  test("a Context row reads the field name only, with no type text", () => {
+    const { root } = mountFields(requiredMachine);
+    const rows = [...root.querySelectorAll(".explore-field")].map((row) => row.textContent?.trim());
+    expect(rows).toEqual(["amount", "label"]);
+  });
+
   test("values from the address are sent, and clearing the box sends the example again", () => {
     const { root, live } = mountFields(requiredMachine, { values: ['label="from url"', "bad"] });
     expect(valueBox(root, "label")?.value).toBe("from url");
