@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.41.3
+
+<sub>2026-11-20</sub>
+
+- _(patch)_ Step rows drop the message number; Not run here names the effect only.
+- _(patch)_ A map's frame shows its name; a shared arrow's Details drop the 'From any of these N states' line.
+- _(patch)_ [user]: With controls hidden, a click on an arrow that cannot fire says why under the diagram.
+- _(patch)_ The diagram box follows the machine's own state on open too, so a pool's waiting box stays in view.
+- _(patch)_ Context rows show only the name.
+
 ## 0.41.2
 
 <sub>2026-11-19</sub>
