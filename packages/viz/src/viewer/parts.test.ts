@@ -1,5 +1,6 @@
 import type { VizMachine } from "../schema.ts";
 import { partMachine, partName, partOf, partsOf } from "./parts.ts";
+import { valueFields } from "./fill.ts";
 import { readFileSync } from "node:fs";
 import { expect, test } from "vite-plus/test";
 
@@ -78,4 +79,19 @@ test("a part's events are those on its own arrows", () => {
   expect(join.events.length).toBeGreaterThan(0);
   expect(join.events.every((event) => used.has(event.id))).toBe(true);
   expect(whole.events.length).toBeGreaterThan(join.events.length);
+});
+
+test("join's part lists its own 10 fields, internal events' included", () => {
+  expect(valueFields(partMachine(whole, "join")).map((field) => field.name)).toEqual([
+    "text",
+    "turnedOff",
+    "code",
+    "album",
+    "ownerName",
+    "ask",
+    "answer",
+    "why",
+    "message",
+    "who",
+  ]);
 });
