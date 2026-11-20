@@ -35,7 +35,7 @@ function edgeLink(
   const condition = withCondition ? edgeCondition(edge) : null;
   const when = condition === null ? "" : ` [${condition}]`;
   const link = html(doc, "span", { class: "link", "data-edge-link": edge.id }, [
-    `${sourceText(edge.from)} —${edge.event || "initial"}${when}→ ${edge.to ?? "?"}`,
+    `${sourceText(edge.from)} —${edge.event}${when}→ ${edge.to ?? "?"}`,
   ]);
   activatable(link, () => select({ kind: "edge", id: edge.id }));
   return html(doc, "li", {}, [link]);
@@ -62,7 +62,7 @@ function edgeTitle(edge: VizEdge): string {
   const to = edge.to === null ? "?" : localName(edge.to);
   const condition = edgeCondition(edge);
   const when = condition === null ? "" : ` [${condition}]`;
-  return edge.kind === "initial" ? `start → ${to}` : `${from} —${edge.event}${when}→ ${to}`;
+  return `${from} —${edge.event}${when}→ ${to}`;
 }
 
 /** The other arrows of this edge's event from the same state, in the order the code branches. */

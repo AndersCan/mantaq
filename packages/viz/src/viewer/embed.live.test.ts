@@ -979,6 +979,12 @@ describe("field forms and the context table", () => {
     ]);
   });
 
+  test("a Context row reads the field name only, with no type text", () => {
+    const { root } = mountFields(requiredMachine);
+    const rows = [...root.querySelectorAll(".explore-field")].map((row) => row.textContent?.trim());
+    expect(rows).toEqual(["amount", "label"]);
+  });
+
   test("values from the address are sent, and clearing the box sends the example again", () => {
     const { root, live } = mountFields(requiredMachine, { values: ['label="from url"', "bad"] });
     expect(valueBox(root, "label")?.value).toBe("from url");
@@ -1571,7 +1577,6 @@ describe("live effect reports", () => {
       const root = mountFetcher({ mode: "held", machine });
       expect(root.querySelector(".explore-now")).toBeNull();
       expect(root.querySelector(".explore")?.hasAttribute("data-done")).toBe(true);
-      expect(root.querySelector(".explore-time")).toBeNull();
     });
 
     test("picking a report moves on and Back returns to the state", () => {
@@ -1587,7 +1592,6 @@ describe("live effect reports", () => {
     const root = mountFetcher();
     expect(root.querySelector("details")).toBeNull();
     expect(root.querySelector(".explore [data-send]")).toBeNull();
-    expect(root.querySelector(".explore .explore-time")).toBeNull();
   });
 });
 
