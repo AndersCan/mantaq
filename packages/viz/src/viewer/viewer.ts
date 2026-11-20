@@ -141,6 +141,7 @@ export function mountViewer(
       dropGonePick(view);
       const stepTab = explorePanel(doc, {
         machine,
+        zoom: view.zoom,
         rewind,
         ...liveOf(view, {
           send,
