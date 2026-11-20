@@ -93,6 +93,10 @@
   position: relative;
 }
 
+.viz:has(.part-title) .canvas {
+  max-height: calc(75dvh - 5rem);
+}
+
 .viz .panel {
   border-top: 1px solid var(--region-bg);
   padding-top: 8px;

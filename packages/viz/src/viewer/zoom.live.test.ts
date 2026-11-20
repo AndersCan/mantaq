@@ -114,6 +114,13 @@ const box = (root: HTMLElement, part: string) =>
 const viewBox = (root: HTMLElement) => root.querySelector("svg")?.getAttribute("viewBox");
 const viewBoxWidth = (root: HTMLElement) => Number(viewBox(root)?.split(" ")[2]);
 
+/** Counts calls to the two ways a page can be scrolled: `window.scrollBy` and `scrollIntoView`. */
+function spyPageScroll(): () => number {
+  const by = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+  const into = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+  return () => by.mock.calls.length + into.mock.calls.length;
+}
+
 describe("a board of three machines", () => {
   test("opens as one box per machine, with no states and a hint", () => {
     const root = mount(["p", "q"]);
@@ -128,18 +135,15 @@ describe("a board of three machines", () => {
     );
   });
 
-  test("a click on a box shows only that machine, scrolled to its current state", () => {
-    const scrolled: Element[] = [];
-    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (this: Element) {
-      scrolled.push(this);
-    });
+  test("a click on a box shows only that machine and never scrolls the page", () => {
+    const pageScrolls = spyPageScroll();
     const root = mount(["p", "q"]);
     press(box(root, "q"));
     expect(root.querySelectorAll("g.part")).toHaveLength(0);
     expect(
       [...root.querySelectorAll("g[data-node-id]")].map((g) => g.getAttribute("data-node-id")),
     ).toEqual(["q.one", "q.two"]);
-    expect(scrolled.map((node) => node.getAttribute("data-node-id"))).toEqual(["q.two"]);
+    expect(pageScrolls()).toBe(0);
     expect(document.activeElement?.textContent).toBe("q");
   });
 
@@ -241,16 +245,13 @@ describe("the wires of a board", () => {
 });
 
 describe("a machine with no live state", () => {
-  test("opens scrolled to its start state", () => {
-    const scrolled: Element[] = [];
-    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (this: Element) {
-      scrolled.push(this);
-    });
+  test("opens without scrolling the page", () => {
+    const pageScrolls = spyPageScroll();
     const root = document.createElement("div");
     document.body.append(root);
     mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [boardOf(["p", "q"])] });
     press(box(root, "p"));
-    expect(scrolled.map((node) => node.getAttribute("data-node-id"))).toEqual(["p.one"]);
+    expect(pageScrolls()).toBe(0);
   });
 });
 
@@ -308,7 +309,6 @@ describe("repro: a step inside a shown machine", () => {
         y: 0,
       } as DOMRect;
     });
-    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
     const scrolls: number[] = [];
     vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(function (
       this: HTMLElement,
@@ -364,13 +364,16 @@ describe("a step inside a shown machine", () => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
       this: Element,
     ) {
+      const scrolled = this.closest(".canvas")?.scrollTop ?? 0;
       const top = this.classList.contains("viz-bar")
         ? 0
-        : this.classList.contains("panel") || this.classList.contains("canvas")
+        : this.classList.contains("panel")
           ? 500
-          : this.getAttribute("data-node-id") === belowId && below
-            ? 900
-            : 200;
+          : this.classList.contains("canvas")
+            ? 100
+            : this.getAttribute("data-node-id") === belowId && below
+              ? 900 - scrolled
+              : 200 - scrolled;
       return {
         top,
         bottom: top + 40,
@@ -383,6 +386,16 @@ describe("a step inside a shown machine", () => {
       } as DOMRect;
     });
     vi.stubGlobal("innerHeight", 800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains("canvas") ? 400 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.classList.contains("canvas") ? 2000 : 0;
+    });
   };
   const mountPushable = (actors = ["p", "q"]) => {
     let push: (state: VizLiveState) => void = () => {};
@@ -408,39 +421,45 @@ describe("a step inside a shown machine", () => {
     return { root, push: (p: string, q: string) => push(at(p, q)), at };
   };
   const spy = () => {
-    const scrolled: number[] = [];
-    vi.spyOn(window, "scrollBy").mockImplementation((...args: unknown[]) => {
-      scrolled.push(Number((args[0] as { top?: number } | undefined)?.top ?? 0));
+    const tops: number[] = [];
+    const pageScrolls = spyPageScroll();
+    vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(function (
+      this: HTMLElement,
+      options?: ScrollToOptions | number,
+    ) {
+      if (typeof options !== "object") return;
+      tops.push(options.top ?? -1);
+      this.scrollTop = options.top ?? 0;
     });
-    return scrolled;
+    return { tops, pageScrolls };
   };
 
-  test("scrolls the page once to the new state below the Step panel", () => {
+  test("scrolls the canvas once to the new state below the band, never the page", () => {
     stubRects(true);
-    const scrolled = spy();
+    const { tops, pageScrolls } = spy();
     const { root, push } = mountPushable();
     press(box(root, "p"));
-    scrolled.length = 0;
+    tops.length = 0;
     push("p.two", "q.two");
-    expect(scrolled).toHaveLength(1);
-    push("p.two", "q.two");
-    expect(scrolled).toHaveLength(1);
+    expect(tops).toEqual([456]);
+    expect(pageScrolls()).toBe(0);
   });
 
   test("leaves the page alone when the state shows, or the step is in another machine", () => {
     stubRects(false);
-    const scrolled = spy();
+    const { tops: scrolled, pageScrolls } = spy();
     const { root, push } = mountPushable();
     press(box(root, "p"));
     scrolled.length = 0;
     push("p.two", "q.two");
     push("p.one", "q.one");
     expect(scrolled).toEqual([]);
+    expect(pageScrolls()).toBe(0);
   });
 
   test("a step in another machine never scrolls", () => {
     stubRects(true);
-    const scrolled = spy();
+    const { tops: scrolled } = spy();
     const { root, push } = mountPushable();
     press(box(root, "p"));
     scrolled.length = 0;
@@ -450,7 +469,7 @@ describe("a step inside a shown machine", () => {
 
   test("a machine without parts never scrolls the page on a step", () => {
     stubRects(true);
-    const scrolled = spy();
+    const { tops: scrolled } = spy();
     const { root, push } = mountPushable(["p"]);
     expect(root.querySelector("g.part")).toBeNull();
     expect(root.querySelector("g[data-node-id='p.two']")).not.toBeNull();
@@ -458,19 +477,20 @@ describe("a step inside a shown machine", () => {
     expect(scrolled).toEqual([]);
   });
 
-  test("opening on a state outside the band scrolls once, then a step in another machine does not", () => {
+  test("opening on a state outside the band scrolls the canvas once, then a step in another machine does not", () => {
     stubRects(true, "p.one");
-    const scrolled = spy();
+    const { tops: scrolled, pageScrolls } = spy();
     const { root, push } = mountPushable();
     press(box(root, "p"));
-    expect(scrolled).toHaveLength(1);
+    expect(scrolled).toEqual([456]);
     push("p.one", "q.one");
-    expect(scrolled).toHaveLength(1);
+    expect(scrolled).toEqual([456]);
+    expect(pageScrolls()).toBe(0);
   });
 
   test("an unzoomed board never scrolls the page", () => {
     stubRects(true);
-    const scrolled = spy();
+    const { tops: scrolled } = spy();
     const { push } = mountPushable();
     push("p.two", "q.one");
     expect(scrolled).toEqual([]);

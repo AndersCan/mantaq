@@ -33,7 +33,7 @@ import { pathTo } from "../findings.ts";
 import { blockedEdges, sentByParts, whyNotHere } from "./blocked.ts";
 import { arrowCandidates, decodeValues, encodeValues, payloadFor } from "./fill.ts";
 import type { Values } from "./fill.ts";
-import { keepInBand, keepInView } from "./keep-in-view.ts";
+import { keepInView } from "./keep-in-view.ts";
 import { drawChildMarkers, drawQueue } from "./markers.ts";
 import { queueOf } from "./queue.ts";
 import { memberAt, shareArrows } from "./shared.ts";
@@ -232,10 +232,7 @@ function keepCurrentInView(
     view.zoom === null ? live : live.filter((id) => partOf(machine, id) === view.zoom);
   const now = currents[0];
   if (now !== undefined) keepInView(root, now);
-  if (view.zoom !== null && now !== undefined && now !== view.followed) {
-    view.followed = now;
-    keepInBand(root, now);
-  }
+  if (view.zoom !== null && now !== undefined) view.followed = now;
 }
 
 /** Calls `refit` when the window width changes, which entering full screen does too. */
@@ -330,8 +327,7 @@ function canvasOf(from: {
       root.querySelector<SVGGElement>(".graph g.state.current") ??
       root.querySelector<SVGGElement>(".graph g.state.initial");
     view.followed = at?.getAttribute("data-node-id") ?? null;
-    at?.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
-    if (view.followed !== null) keepInBand(root, view.followed);
+    if (view.followed !== null) keepInView(root, view.followed);
     root.querySelector<HTMLElement>(".part-title")?.focus({ preventScroll: true });
   };
   const leave = () => {
