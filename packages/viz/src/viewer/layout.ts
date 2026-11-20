@@ -171,9 +171,9 @@ const TITLE_ROW = LABEL_PAD + TITLE_HEIGHT + LABEL_PAD;
 const UNKNOWN_SIZE = 28;
 /** Shortest drawn edge between two nodes, and the closest two nodes may sit. */
 export const MIN_EDGE_LENGTH = 72;
-export const NODE_SEPARATION = 36;
+export const NODE_SEPARATION = 24;
 /** Room between ranks: wide enough that arrows into one state fan out gently and labels fit beside them. */
-const RANK_SEPARATION = 140;
+const RANK_SEPARATION = 70;
 const MARGIN_X = 48;
 const MARGIN_Y = 32;
 const MIN_DOT_GAP = 3;

@@ -120,7 +120,7 @@ describe("an arrow three states share", () => {
       JSON.stringify(["a-go-home", "b-go-home", "c-go-home"]),
     );
     expect(shared(root)?.getAttribute("aria-label")).toBe("3 states on go to home");
-    expect(root.querySelector("g.any-node text")?.textContent).toBe("a, b, c");
+    expect(root.querySelector("g.any-node text")?.textContent).toBe("3 states");
     expect(root.querySelector("g.any-node")?.getAttribute("aria-label")).toBe(
       "these 3 states: a, b, c",
     );

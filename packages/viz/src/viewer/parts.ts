@@ -23,11 +23,16 @@ export function partMachine(machine: VizMachine, part: string): VizMachine {
   return {
     ...machine,
     id: partName(machine, part),
-    initial: part === "" ? machine.initial : null,
-    regions: machine.regions.filter(inPart),
+    initial:
+      part === ""
+        ? machine.initial
+        : (machine.states.find((s) => s.region === part && s.initial)?.id ?? null),
+    regions: machine.regions.filter((r) => inPart(r) && r !== part),
     maps: machine.maps.filter(inPart),
     actors: [],
-    states: machine.states.filter((state) => inPart(state.id)),
+    states: machine.states
+      .filter((state) => inPart(state.id))
+      .map((state) => (state.region === part ? { ...state, region: null } : state)),
     edges: machine.edges.filter((edge) => inPart(edge.from)),
     fuzz:
       machine.fuzz === null || messages === undefined

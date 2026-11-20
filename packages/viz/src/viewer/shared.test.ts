@@ -71,21 +71,21 @@ describe("shareArrows", () => {
     expect(shared.edges.map((edge) => edge.from)).toEqual(["*"]);
   });
 
-  test("three of four states name themselves; five or more add `+n more`", () => {
+  test("a shared node reads the count of its states", () => {
     const three = shareArrows(
       machineOf(
         names("a", "b", "c", "d"),
         ["a", "b", "c"].map((from) => edgeOf(from, "go", "d")),
       ),
     );
-    expect(three.nodes.map((node) => [node.id, node.label])).toEqual([["*1", "a, b, c"]]);
+    expect(three.nodes.map((node) => [node.id, node.label])).toEqual([["*1", "3 states"]]);
     const four = shareArrows(
       machineOf(
         names("a", "b", "c", "d", "e"),
         ["a", "b", "c", "d"].map((from) => edgeOf(from, "go", "e")),
       ),
     );
-    expect(four.nodes.map((node) => [node.id, node.label])).toEqual([["*1", "a, b, c +1 more"]]);
+    expect(four.nodes.map((node) => [node.id, node.label])).toEqual([["*1", "4 states"]]);
     expect(isSharedNode("*1")).toBe(true);
     expect(isSharedNode("r.*12")).toBe(true);
     expect(isSharedNode("*")).toBe(false);
@@ -120,11 +120,6 @@ describe("shareArrows", () => {
     expect(shared.edges).toHaveLength(420);
     expect(shared.arrows).toHaveLength(55);
     const labels = shared.nodes.filter((node) => node.scope === "join").map((node) => node.label);
-    expect(labels.sort()).toEqual([
-      "albumDeletedByAdmin, checkingLink, checkingPastedLink +11 more",
-      "albumDeletedByAdmin, linkReplacedByAdmin, linkStoppedForUnknownReason +1 more",
-      "joinedAlbum, noInviteOpen, showingLinkProblem",
-      "sendingPastedRequest, sendingRequest, sendingRequestAgain",
-    ]);
+    expect(labels.sort()).toEqual(["14 states", "3 states", "3 states", "4 states"]);
   });
 });

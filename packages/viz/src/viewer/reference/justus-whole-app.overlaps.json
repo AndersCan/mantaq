@@ -117,13 +117,13 @@
     "rule": "label-clear",
     "a": "label:join.waitingForAdminToAccept-requestAnswered-waitingForAdminToAccept",
     "b": "node:join.*1",
-    "gap": -25.5
+    "gap": -28.5
   },
   {
     "rule": "label-clear",
     "a": "label:join.waitingForAdminToAccept-whoMustUpdateChanged-waitingForAdminToAccept",
     "b": "node:join.*1",
-    "gap": -63.5
+    "gap": -66.5
   },
   {
     "rule": "label-clear",
@@ -141,43 +141,43 @@
     "rule": "node-inside",
     "a": "node:addFriend.showingWhoWasAsked",
     "b": "node:addFriend.showingWhoWasAsked",
-    "gap": -1289
+    "gap": -1156.5
   },
   {
     "rule": "node-inside",
     "a": "node:folders.couldNotSaveName",
     "b": "node:folders.couldNotSaveName",
-    "gap": -1562.5
+    "gap": -1377
   },
   {
     "rule": "node-inside",
     "a": "node:folders.showingAlbums",
     "b": "node:folders.showingAlbums",
-    "gap": -7050
+    "gap": -6207.5
   },
   {
     "rule": "node-inside",
     "a": "node:gallery.addingPhotos",
     "b": "node:gallery.addingPhotos",
-    "gap": -341.5
+    "gap": -331.5
   },
   {
     "rule": "node-inside",
     "a": "node:gallery.addingPhotos",
     "b": "node:gallery.addingPhotos",
-    "gap": -365.5
+    "gap": -355.5
   },
   {
     "rule": "node-inside",
     "a": "node:inviteLink.savingLinkTime",
     "b": "node:inviteLink.savingLinkTime",
-    "gap": -2682
+    "gap": -2426
   },
   {
     "rule": "node-inside",
     "a": "node:inviteLink.savingLinkTime",
     "b": "node:inviteLink.savingLinkTime",
-    "gap": -2686
+    "gap": -2430
   },
   {
     "rule": "node-inside",
@@ -189,55 +189,55 @@
     "rule": "node-inside",
     "a": "node:join.showingWelcome",
     "b": "node:join.showingWelcome",
-    "gap": -1627.5
+    "gap": -1443.5
   },
   {
     "rule": "node-inside",
     "a": "node:onboarding.choosingCreateOrJoin",
     "b": "node:onboarding.choosingCreateOrJoin",
-    "gap": -2845.5
+    "gap": -2356
   },
   {
     "rule": "node-inside",
     "a": "node:onboarding.choosingCreateOrJoin",
     "b": "node:onboarding.choosingCreateOrJoin",
-    "gap": -2849.5
+    "gap": -2360
   },
   {
     "rule": "node-inside",
     "a": "node:people.lettingViewerAddPhotos",
     "b": "node:people.lettingViewerAddPhotos",
-    "gap": -100
+    "gap": -88
   },
   {
     "rule": "node-inside",
     "a": "node:people.lettingViewerAddPhotos",
     "b": "node:people.lettingViewerAddPhotos",
-    "gap": -124
+    "gap": -112
   },
   {
     "rule": "node-inside",
     "a": "node:reach.tryingToReachMembers",
     "b": "node:reach.tryingToReachMembers",
-    "gap": -959
+    "gap": -775
   },
   {
     "rule": "node-inside",
     "a": "node:reach.tryingToReachMembers",
     "b": "node:reach.tryingToReachMembers",
-    "gap": -963
+    "gap": -779
   },
   {
     "rule": "node-inside",
     "a": "node:requests.showingRequests",
     "b": "node:requests.showingRequests",
-    "gap": -7765
+    "gap": -7486
   },
   {
     "rule": "node-inside",
     "a": "node:sync.waitingForAdminApproval",
     "b": "node:sync.waitingForAdminApproval",
-    "gap": -10072
+    "gap": -9709.5
   },
   {
     "rule": "nodes",
@@ -273,7 +273,7 @@
     "rule": "nodes",
     "a": "node:join.*1",
     "b": "node:join.*2",
-    "gap": -184
+    "gap": -71
   },
   {
     "rule": "nodes",
@@ -595,6 +595,12 @@
   },
   {
     "rule": "path-through-node",
+    "a": "path:shared:join.*2>closeStoppedLink#0",
+    "b": "node:join.*1",
+    "gap": 0
+  },
+  {
+    "rule": "path-through-node",
     "a": "path:shared:lightbox.*1>PHOTO_LIST_CHANGED#0",
     "b": "node:lightbox.noPhotoOpen",
     "gap": 0
@@ -610,6 +616,36 @@
     "a": "path:shared:sync.*2>ENROLL#0",
     "b": "node:sync.addingMemberByKey",
     "gap": 0
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "b": "path:folders.openingAlbum-SWITCH_FAILED-couldNotOpenAlbum",
+    "gap": 7
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "b": "path:folders.openingAlbum-SWITCHED-showingAlbums",
+    "gap": 5
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "b": "path:folders.savingName-NAME_SAVED-showingAlbums",
+    "gap": 5
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "b": "path:folders.savingName-RENAME_FAILED-couldNotSaveName",
+    "gap": 11
+  },
+  {
+    "rule": "paths-near",
+    "a": "path:folders.creatingAlbum-CREATED-showingAlbums",
+    "b": "path:shared:folders.*2>ALBUMS_LOADED#0",
+    "gap": 11
   },
   {
     "rule": "paths-near",
@@ -927,7 +963,7 @@
     "rule": "paths-near",
     "a": "path:requests.confirmingAcceptAll-CANCEL_ACCEPT_ALL-loadingRequests",
     "b": "path:requests.showingRequests-ACCEPT_ALL_AS_VIEWERS-confirmingAcceptAll",
-    "gap": 5
+    "gap": 2
   },
   {
     "rule": "paths-near",
@@ -1039,6 +1075,12 @@
   },
   {
     "rule": "paths-near",
+    "a": "path:shared:lightbox.*1>CLOSE#0",
+    "b": "path:shared:lightbox.*1>PHOTO_LIST_CHANGED#0",
+    "gap": 11.5
+  },
+  {
+    "rule": "paths-near",
     "a": "path:sync.waitingForAdminApproval-STATUS_SEEN-showingAlbum",
     "b": "path:message:folders.showingAlbums>sync.*",
     "gap": 1
@@ -1047,7 +1089,7 @@
     "rule": "region-edge",
     "a": "node:addFriend.showingWhoWasAsked",
     "b": "region:addFriend",
-    "gap": -214.5
+    "gap": -208.5
   },
   {
     "rule": "region-edge",
@@ -1059,7 +1101,7 @@
     "rule": "region-edge",
     "a": "node:folders.showingAlbums",
     "b": "region:folders",
-    "gap": -3778
+    "gap": -3614
   },
   {
     "rule": "region-edge",
@@ -1077,7 +1119,7 @@
     "rule": "region-edge",
     "a": "node:people.*2",
     "b": "region:people",
-    "gap": -6529
+    "gap": -6313
   },
   {
     "rule": "region-edge",
@@ -1095,7 +1137,7 @@
     "rule": "region-edge",
     "a": "node:requests.showingRequests",
     "b": "region:requests",
-    "gap": -7280
+    "gap": -7013
   },
   {
     "rule": "region-edge",
@@ -1113,6 +1155,6 @@
     "rule": "region-edge",
     "a": "node:sync.waitingForAdminApproval",
     "b": "region:sync",
-    "gap": -9776.5
+    "gap": -9428
   }
 ]
