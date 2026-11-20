@@ -38,27 +38,12 @@ const machineWith = (corpus: Array<{ steps: VizStep[]; discovered: string[] }>):
 const edge = { id: "a-go-b", from: "a", event: "go", to: "b", kind: "transition" } as VizEdge;
 const at = (steps: VizStep[]) => ({ steps, children: [], removed: [] }) as unknown as VizLiveState;
 
-test("on a run, the run's next step for another actor does not go first", () => {
-  const k = { map: "m", key: "k" };
-  const machine = machineWith([
-    { steps: [ev("go", { n: 1 }, k), ev("go", { n: 7 }, k)], discovered: [] },
-  ]);
-  const live = at([ev("go", { n: 1 }, k)]);
-  const listed = arrowCandidates(machine, edge, {
-    set: {},
-    live,
-    afters: [],
-    actor: { map: "m", key: "j" },
-  });
-  expect(listed[0]).not.toEqual({ n: 7 });
-});
-
 test("on a run, a next step of another event is not a candidate", () => {
   const machine = machineWith([
     { steps: [ev("go", { n: 1 }), ev("other", { n: 7 })], discovered: [] },
   ]);
   const live = at([ev("go", { n: 1 })]);
-  const listed = arrowCandidates(machine, edge, { set: {}, live, afters: [], actor: undefined });
+  const listed = arrowCandidates(machine, edge, { set: {}, live, afters: [] });
   expect(listed).not.toContainEqual({ n: 7 });
 });
 
@@ -68,7 +53,6 @@ test("a set value that does not fit its field is not laid over a run's payload",
     set: { n: "x" },
     live: null,
     afters: [],
-    actor: undefined,
   });
   expect(listed).toContainEqual({ n: 1 });
 });

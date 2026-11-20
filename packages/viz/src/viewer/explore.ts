@@ -83,22 +83,20 @@ function timersSection(
 ): HTMLElement | null {
   const now = elapsed(context.state.steps);
   if (context.state.timers.length === 0) return null;
-  return html(doc, "div", { class: "explore-time" }, [
-    html(
-      doc,
-      "ul",
-      { "data-group": "timers" },
-      context.state.timers.map((timer: VizLiveTimer) => {
-        const remaining = Math.max(0, timer.deadline - now);
-        return html(doc, "li", { "data-timer": timer.id }, [
-          button(doc, [`advance ${remaining} ms → ${timer.eventName ?? timer.id}`], {
-            onClick: () => context.send({ kind: "advance", ms: remaining }),
-            attrs: { "data-advance-timer": timer.id },
-          }),
-        ]);
-      }),
-    ),
-  ]);
+  return html(
+    doc,
+    "ul",
+    { "data-group": "timers" },
+    context.state.timers.map((timer: VizLiveTimer) => {
+      const remaining = Math.max(0, timer.deadline - now);
+      return html(doc, "li", { "data-timer": timer.id }, [
+        button(doc, [`advance ${remaining} ms → ${timer.eventName ?? timer.id}`], {
+          onClick: () => context.send({ kind: "advance", ms: remaining }),
+          attrs: { "data-advance-timer": timer.id },
+        }),
+      ]);
+    }),
+  );
 }
 
 interface LiveMoves {
@@ -181,11 +179,7 @@ function valuesList(
       live.setValue(field.name, value);
     });
     return html(doc, "label", { class: "explore-field" }, [
-      html(doc, "span", {}, [
-        html(doc, "strong", {}, [field.name]),
-        " ",
-        html(doc, "span", { class: "muted" }, [field.type]),
-      ]),
+      html(doc, "strong", {}, [field.name]),
       input,
     ]);
   });
@@ -394,7 +388,7 @@ export interface ExploreParts {
   context: HTMLElement | null;
 }
 
-/** Live Step tab, below the root's state: regions, held effects, outcome, Send lists, time. */
+/** Live Step tab, below the root's state: regions, held effects, outcome, time. */
 function liveParts(
   doc: Document,
   machine: VizMachine,

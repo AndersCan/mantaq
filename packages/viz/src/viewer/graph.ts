@@ -370,7 +370,7 @@ export function renderGraph(
     {
       class: "graph",
       viewBox: `0 0 ${Math.ceil(placed.width)} ${Math.ceil(placed.height)}`,
-      // Natural size; the standalone page scales to fit, embeds may scroll instead.
+      // Natural size; graphWidth clamps the drawn width.
       width: Math.ceil(placed.width),
       height: Math.ceil(placed.height),
       style: graphWidth(placed.width),

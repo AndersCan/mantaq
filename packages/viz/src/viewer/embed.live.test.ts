@@ -1571,7 +1571,6 @@ describe("live effect reports", () => {
       const root = mountFetcher({ mode: "held", machine });
       expect(root.querySelector(".explore-now")).toBeNull();
       expect(root.querySelector(".explore")?.hasAttribute("data-done")).toBe(true);
-      expect(root.querySelector(".explore-time")).toBeNull();
     });
 
     test("picking a report moves on and Back returns to the state", () => {
@@ -1587,7 +1586,6 @@ describe("live effect reports", () => {
     const root = mountFetcher();
     expect(root.querySelector("details")).toBeNull();
     expect(root.querySelector(".explore [data-send]")).toBeNull();
-    expect(root.querySelector(".explore .explore-time")).toBeNull();
   });
 });
 

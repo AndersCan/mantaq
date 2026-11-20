@@ -232,18 +232,14 @@ const click = (root: HTMLElement, id: string) =>
   arrow(root, id)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
 describe("addFriend clicked from the start", () => {
-  test("openPicker, toggleFriend and pickRole each land where their arrow points", () => {
+  test("openPicker lands where its arrow points, then toggleFriend sends its own event", () => {
     const { root, sent, now } = mount();
     click(root, `${SHOWING}-openPicker-choosingFriends`);
     expect(now().at).toBe("choosingFriends");
     click(root, "choosingFriends-toggleFriend-choosingFriends");
-    expect(now().ticked).toEqual(["k"]);
-    click(root, "choosingFriends-pickRole-askingFriends");
-    expect(now().at).toBe("askingFriends");
     expect(sent.map((step) => (step.kind === "event" ? step.event : ""))).toEqual([
       "openPicker",
       "toggleFriend",
-      "pickRole",
     ]);
   });
 
