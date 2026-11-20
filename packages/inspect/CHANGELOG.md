@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.48.4
+
+<sub>2026-11-20</sub>
+
+- _(patch)_
+  A machine copied as a draft (`a.design-a.ts`) is explained from the draft's handlers even when another file still imports the original, instead of `found in more than one file`.
+- _(patch)_
+  [user]: `inspectModule`'s `tsconfig`, `inspectFile`'s `mode`, `fuzz`'s `repeat` and the `STYLESHEETS` export are deprecated; mantaq itself never sets them, and a later release removes them.
+
 ## 0.48.3
 
 <sub>2026-11-19</sub>
