@@ -356,10 +356,10 @@ describe("a split arrow's path", () => {
     const e5 = placed.edges.find((placedEdge) => placedEdge.edge.id === "e5");
     expect(e5?.points).toEqual(
       expect.arrayContaining([
-        { x: 506, y: 906.5 },
-        { x: 506, y: 842 },
-        { x: 530, y: 842 },
-        { x: 530, y: 774 },
+        { x: 471, y: 828.5 },
+        { x: 471, y: 770 },
+        { x: 495, y: 770 },
+        { x: 495, y: 708 },
       ]),
     );
   });
@@ -398,4 +398,11 @@ describe("lanesOf level rows", () => {
     expect(blocked === undefined ? [] : ys(blocked)).not.toContain(86);
     expect(blocked === undefined ? [] : ys(blocked)).toContain(126);
   });
+});
+
+test("a part's start arrow still draws", async () => {
+  const { partMachine } = await import("./parts.ts");
+  const whole = (await import("./reference/justus-whole-app.json"))
+    .default as unknown as VizMachine;
+  expect(placeMachine(partMachine(whole, "join")).entries).toHaveLength(1);
 });

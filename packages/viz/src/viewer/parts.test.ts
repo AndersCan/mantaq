@@ -33,7 +33,7 @@ test("an id belongs to the actor it is, or is under; else to the machine", () =>
 test("every state and edge is in exactly one part", () => {
   const parts = partsOf(whole).map((part) => partMachine(whole, part));
   for (const state of whole.states) {
-    expect(parts.filter((part) => part.states.includes(state))).toHaveLength(1);
+    expect(parts.filter((part) => part.states.some((own) => own.id === state.id))).toHaveLength(1);
   }
   for (const edge of whole.edges) {
     expect(parts.filter((part) => part.edges.includes(edge))).toHaveLength(1);
@@ -42,9 +42,10 @@ test("every state and edge is in exactly one part", () => {
 
 test("a part keeps only its own regions and messages, and starts from its region", () => {
   const join = partMachine(whole, "join");
-  expect(join.regions).toEqual(["join"]);
+  expect(join.regions).toEqual([]);
   expect(join.actors).toEqual([]);
-  expect(join.initial).toBeNull();
+  expect(join.initial).toBe("join.noInviteOpen");
+  expect(join.states.find((state) => state.id === join.initial)?.region).toBeNull();
   expect(join.id).toBe("join");
   for (const message of join.fuzz?.messages ?? []) {
     expect(partOf(whole, message.from)).toBe("join");
@@ -62,4 +63,10 @@ test("a part of a machine that was not fuzzed stays unfuzzed", () => {
 
 test("a board of three machines has parts", () => {
   expect(partsOf({ ...whole, actors: ["join", "sync"] })).toEqual(["", "join", "sync"]);
+});
+
+test("a part keeps the frame of an inner region and loses only its own", () => {
+  const inner = { ...whole, regions: [...whole.regions, "join.inner"] };
+  const join = partMachine(inner, "join");
+  expect(join.regions).toEqual(["join.inner"]);
 });

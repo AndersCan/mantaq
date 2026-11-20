@@ -1,6 +1,5 @@
 import { isAnyState, scopeOf } from "../schema.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
-import { localName } from "./compartments.ts";
 import { edgeLines } from "./labels.ts";
 
 /** Fewest sibling states that take an event alike before it is drawn once. */
@@ -78,9 +77,7 @@ function groupsOf(machine: VizMachine): Group[] {
 }
 
 function labelOf(states: ReadonlyArray<string>): string {
-  const names = states.map(localName);
-  const more = names.length > 3 ? ` +${names.length - 3} more` : "";
-  return `${names.slice(0, 3).join(", ")}${more}`;
+  return `${states.length} states`;
 }
 
 /** The edges to draw: arrows several sibling states take alike are replaced by one from a shared node. */
