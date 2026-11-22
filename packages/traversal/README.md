@@ -104,6 +104,8 @@ import { reachable, allPaths, findCycles, unreachableNodes, shortestPath } from 
 | `findCycles(graph)`                     | `string[][]`            | Every cycle in the graph, as node-id loops.          |
 | `unreachableNodes(graph, { fromId })`   | `string[]`              | Nodes no walk from `fromId` can ever reach.          |
 | `shortestPath(graph, { fromId, toId })` | `string[] \| undefined` | The fewest-edge path, or `undefined` if unreachable. |
+| `sendableEdges(graph)`                  | `GraphEdge[]`           | The edges an outside sender can take.                |
+| `coveringWalks(graph)`                  | `CoveringWalks`         | Event walks that take every sendable edge once.      |
 
 A common check is "every declared state is reachable from the initial state":
 

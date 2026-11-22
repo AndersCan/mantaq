@@ -152,6 +152,22 @@ function shortestPath(
 
 Shortest path by edge count. `undefined` if unreachable.
 
+### `sendableEdges(graph)`
+
+```ts
+function sendableEdges(graph: ActorGraph): GraphEdge[];
+```
+
+The edges an outside sender can take: root-level, with a declared target, not internal.
+
+### `coveringWalks(graph)`
+
+```ts
+function coveringWalks(graph: ActorGraph): CoveringWalks;
+```
+
+Walks from the initial state that together take every sendable edge at least once. A walk ends where no untaken edge can be reached; the next one starts from a fresh actor. An any-state edge is taken from a state with no handler of its own for the event.
+
 ---
 
 ## Types
@@ -192,6 +208,24 @@ interface GraphEdge {
   contexts?: string[];
 }
 ```
+
+### `CoveringWalks`
+
+```ts
+interface WalkStep {
+  edgeId: string;
+  from: string;
+  event: string;
+  to: string;
+}
+
+interface CoveringWalks {
+  walks: WalkStep[][];
+  unreachable: string[];
+}
+```
+
+`unreachable` holds the ids of sendable edges no walk can take from the initial state.
 
 ### `HistoryEntry`
 
