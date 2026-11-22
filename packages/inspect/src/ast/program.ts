@@ -193,13 +193,19 @@ function collectEffectDoc(
   effectDocs.set(state, [...(effectDocs.get(state) ?? []), doc]);
 }
 
+/** Compiler options of the tsconfig at `configPath`; strict defaults when there is none. */
+export function tsconfigOptions(configPath: string | undefined): ts.CompilerOptions {
+  if (configPath === undefined) {
+    return { strict: true, allowImportingTsExtensions: true, noEmit: true };
+  }
+  const read = ts.readConfigFile(configPath, (path) => ts.sys.readFile(path));
+  return ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(configPath)).options;
+}
+
 function compilerOptions(source: AnalysisSource): ts.CompilerOptions {
   const configPath =
     source.tsconfig ?? ts.findConfigFile(dirname(source.file), (path) => ts.sys.fileExists(path));
-  if (configPath === undefined)
-    return { strict: true, allowImportingTsExtensions: true, noEmit: true };
-  const read = ts.readConfigFile(configPath, (path) => ts.sys.readFile(path));
-  return ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(configPath)).options;
+  return tsconfigOptions(configPath);
 }
 
 /** Literal string type of `expr.<property>` (e.g. a StateRef's `name`), or null. */
