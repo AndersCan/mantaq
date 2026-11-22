@@ -1,12 +1,15 @@
 import type { ActorGraph, GraphEdge, GraphNode } from "../types.ts";
 import { INITIAL_NODE_ID, isAnyNode } from "../graph-ids.ts";
 
-/** One event sent during a walk: the state it is sent in and the state its edge leads to. */
+/** One planned event of a walk: the state it happens in and the state its edge leads to. */
 export interface WalkStep {
   edgeId: string;
   from: string;
   event: string;
+  /** The planned target. The handler picks the real one, so a runner compares it with the actual state. */
   to: string;
+  /** `outside`: the runner sends the event. `machine`: the machine raises it itself and the runner waits. */
+  sender: "outside" | "machine";
 }
 
 export interface CoveringWalks {
@@ -16,47 +19,76 @@ export interface CoveringWalks {
   unreachable: string[];
 }
 
+function isRootEvent(edge: GraphEdge): boolean {
+  const isRootLevel = edge.source !== INITIAL_NODE_ID && !edge.source.includes(".");
+  return isRootLevel && edge.isUndetermined !== true && edge.effects === undefined;
+}
+
 /** The edges an outside sender can take: root-level, with a declared target, not internal. */
 export function sendableEdges(graph: ActorGraph): GraphEdge[] {
   const sendable: GraphEdge[] = [];
   for (const edge of graph.edges) {
-    const isRootLevel = edge.source !== INITIAL_NODE_ID && !edge.source.includes(".");
-    const isOutsideSend = edge.isInternal !== true && edge.isUndetermined !== true;
-    if (isRootLevel && isOutsideSend) sendable.push(edge);
+    if (isRootEvent(edge) && edge.isInternal !== true) sendable.push(edge);
   }
   return sendable;
 }
 
-interface StateMovesOptions {
-  sendable: GraphEdge[];
+interface StepRoute {
+  from: string;
+  to: string;
 }
 
-/** A state's own edges first, then the any-state edges for events it has no handler for. */
+function toStep(edge: GraphEdge, route: StepRoute): WalkStep {
+  const sender = edge.isInternal === true ? "machine" : "outside";
+  return { edgeId: edge.id, from: route.from, event: edge.label, to: route.to, sender };
+}
+
+interface AnyTargetOptions {
+  anyEdges: GraphEdge[];
+}
+
+/** Where the any-state handler for `event` moves the machine, when it moves it at all. */
+function anyTarget(event: string, options: AnyTargetOptions): string | undefined {
+  for (const edge of options.anyEdges) {
+    if (edge.label === event && !isAnyNode(edge.target)) return edge.target;
+  }
+  return undefined;
+}
+
+interface StateMovesOptions {
+  edges: GraphEdge[];
+}
+
+/**
+ * A state's own edges, then the any-state edges. An own handler that moves the
+ * machine keeps the any-state handler from moving it; one that stays does not.
+ */
 function stateMoves(node: GraphNode, options: StateMovesOptions): WalkStep[] {
   const moves: WalkStep[] = [];
-  const handled = new Set<string>();
-  for (const edge of options.sendable) {
+  const moved = new Set<string>();
+  const anyEdges = node.isFinal ? [] : options.edges.filter((edge) => isAnyNode(edge.source));
+  for (const edge of options.edges) {
     if (edge.source !== node.id) continue;
-    handled.add(edge.label);
-    moves.push({ edgeId: edge.id, from: node.id, event: edge.label, to: edge.target });
+    let target = edge.target;
+    if (edge.isStay === true) target = anyTarget(edge.label, { anyEdges }) ?? node.id;
+    else moved.add(edge.label);
+    moves.push(toStep(edge, { from: node.id, to: target }));
   }
-  if (node.isFinal) return moves;
-  for (const edge of options.sendable) {
-    const isUnhandledAny = isAnyNode(edge.source) && !handled.has(edge.label);
-    if (!isUnhandledAny) continue;
+  for (const edge of anyEdges) {
+    if (moved.has(edge.label)) continue;
     const target = isAnyNode(edge.target) ? node.id : edge.target;
-    moves.push({ edgeId: edge.id, from: node.id, event: edge.label, to: target });
+    moves.push(toStep(edge, { from: node.id, to: target }));
   }
   return moves;
 }
 
 function movesByState(graph: ActorGraph): Map<string, WalkStep[]> {
-  const sendable = sendableEdges(graph);
+  const edges = graph.edges.filter(isRootEvent);
   const moves = new Map<string, WalkStep[]>();
   for (const node of graph.nodes) {
     const isMarker = node.isInitial === true || node.isAny === true;
     if (isMarker || node.id.includes(".")) continue;
-    moves.set(node.id, stateMoves(node, { sendable }));
+    moves.set(node.id, stateMoves(node, { edges }));
   }
   return moves;
 }
@@ -104,7 +136,10 @@ function initialState(graph: ActorGraph): string | undefined {
   return undefined;
 }
 
-/** Walks from the initial state that together take every sendable edge at least once. */
+/**
+ * Walks from the initial state that together take every sendable edge at least
+ * once. Events the machine raises itself are followed, not counted.
+ */
 export function coveringWalks(graph: ActorGraph): CoveringWalks {
   const remaining = new Set<string>();
   for (const edge of sendableEdges(graph)) remaining.add(edge.id);
