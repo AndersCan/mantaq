@@ -1,7 +1,7 @@
+import { locationOf, tsconfigOptions } from "./program.ts";
 import type { VizMachine } from "@mantaq/viz";
 import { dirname } from "node:path";
 import ts from "typescript";
-import { locationOf } from "./program.ts";
 
 /** App code that can send an event to one machine when another machine's output or change fires. */
 export interface Wire {
@@ -45,12 +45,6 @@ function groups(
     const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(config));
     return { config, names: [...new Set([...parsed.fileNames, ...own])].filter(keep) };
   });
-}
-
-function optionsOf(config: string | undefined): ts.CompilerOptions {
-  if (config === undefined) return { strict: true, allowImportingTsExtensions: true, noEmit: true };
-  const read = ts.readConfigFile(config, (path) => ts.sys.readFile(path));
-  return ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(config)).options;
 }
 
 function callsIn(node: ts.Node): ts.CallExpression[] {
@@ -549,7 +543,7 @@ export function scanAppCode(context: {
   const { root, files, machines } = context;
   if (machines.length === 0) return { wires: [], notRun: [], unheard: [] };
   const programs = groups(files).map(({ config, names }) => {
-    const program = ts.createProgram(names, optionsOf(config));
+    const program = ts.createProgram(names, tsconfigOptions(config));
     return { program, names, checker: program.getTypeChecker() };
   });
   const all = programs.flatMap(({ program, names, checker }) => {

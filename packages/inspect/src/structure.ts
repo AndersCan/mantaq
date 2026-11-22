@@ -199,18 +199,14 @@ export function toVizMachine(input: VizInput): VizMachine {
   ]);
   const mapNames = new Set(children.map((each) => each.name));
   const actorNames = new Set(otherActors.map((each) => each.name));
-  const inMap = (id: string): boolean => mapNames.has(regionOf(id) ?? "");
 
   const effectEdges = graph.edges.filter((edge) => edgeKind(edge) === "effect");
   const states = graph.nodes
     .filter((node) => node.id !== INITIAL_NODE_ID && node.isAny !== true)
     .map((node) => toState(node, { initialIds, effects: effectEdges }))
-    .map((state) => (inMap(state.id) ? { ...state, coverage: null, tested: null } : state))
     .sort(byId);
-  const edges = graph.edges
-    .map((edge) => toEdge(edge))
-    .map((edge) => (inMap(edge.from) ? { ...edge, coverage: null, tested: null } : edge))
-    .sort(byId);
+  const edges = graph.edges.map((edge) => toEdge(edge));
+  edges.sort(byId);
   const declaredInputs = [
     ...eventTypes(input.actor.options, "inputs"),
     ...[...children, ...otherActors].flatMap((each) => each.inputs),

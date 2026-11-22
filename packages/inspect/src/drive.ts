@@ -106,42 +106,7 @@ export interface DriverOptions {
   effectMode?: "held" | "real";
 }
 
-/** Record every transition and error of the regions, tagged with the region and prefixed ids. */
-function watchRegions(root: AnyActor<unknown>, record: (entry: VizLiveStep) => void): void {
-  for (const { path, actor: region } of regionActors(root)) {
-    const ref: VizActorRef = { region: path };
-    region.on("transition", {
-      fn: ({ event, from: before, to, transitioned, effects }) => {
-        record({
-          from: `${path}.${before}`,
-          event: event.type,
-          to: `${path}.${to}`,
-          outcome: transitioned ? "transition" : "stay",
-          actor: ref,
-          effects,
-          context: json(contextText(root)),
-          error: null,
-          sent: [],
-        });
-      },
-    });
-    region.on("error", {
-      fn: (info) => {
-        record({
-          from: `${path}.${info.state.name}`,
-          event: info.event.type,
-          to: `${path}.${region.state.name}`,
-          outcome: "stay",
-          actor: ref,
-          effects: [],
-          context: json(contextText(root)),
-          error: messageOf(info.error),
-          sent: [],
-        });
-      },
-    });
-  }
-}
+type MapChildRef = Extract<VizActorRef, { map: string }>;
 
 interface MapChild {
   map: string;
@@ -183,16 +148,18 @@ function sweepRemoved(
   }
 }
 
-/** The children still in their maps: maps by name, then the map's key order. */
-function liveChildren(live: {
+interface LiveChildrenOptions {
   maps: Readonly<Record<string, ActorMapLike>>;
   children: Map<string, MapChild>;
-  watch: (name: string, key: string) => void;
-}): VizLiveChild[] {
-  const { maps, children, watch } = live;
+  watch: (ref: MapChildRef) => void;
+}
+
+/** The children still in their maps: maps by name, then the map's key order. */
+function liveChildren(options: LiveChildrenOptions): VizLiveChild[] {
+  const { maps, children, watch } = options;
   return Object.entries(maps).flatMap(([name, map]) =>
     map.keys().flatMap((key) => {
-      watch(name, key);
+      watch({ map: name, key });
       const entry = children.get(`${name}\u0000${key}`);
       return entry === undefined
         ? []
@@ -223,10 +190,15 @@ function watchOutputs(
   });
 }
 
-/** A part that receives messages: its ref and state-id prefix, as its step entries carry them. */
+/** A part of the running machine: its ref and state-id prefix, as its step entries carry them. */
 interface Part {
   ref?: VizActorRef;
   prefix?: string;
+}
+
+/** What a part's state names start with in its step entries: nothing for the machine itself. */
+function prefixOf(part: Part): string {
+  return part.prefix === undefined ? "" : `${part.prefix}.`;
 }
 
 /** The part that last moved in this step or is sending now; "" is the machine, null no part. A wire on a part's `transition` listener registered in `create` runs before the driver's, so its sends stay null. */
@@ -292,8 +264,7 @@ function wrapSend(
       taken.message = message;
       return;
     }
-    const state =
-      part.prefix === undefined ? actor.state.name : `${part.prefix}.${actor.state.name}`;
+    const state = `${prefixOf(part)}${actor.state.name}`;
     record({
       from: state,
       event: type,
@@ -309,44 +280,14 @@ function wrapSend(
   };
 }
 
-/** Record the root actor's own transitions and errors. */
-function watchRoot(actor: AnyActor<unknown>, record: (entry: VizLiveStep) => void): void {
-  actor.on("transition", {
-    fn: ({ event, from: before, to, transitioned, effects }) => {
-      record({
-        from: before,
-        event: event.type,
-        to,
-        outcome: transitioned ? "transition" : "stay",
-        effects,
-        context: json(contextText(actor)),
-        error: null,
-        sent: [],
-      });
-    },
-  });
-  actor.on("error", {
-    fn: (info) => {
-      record({
-        from: info.state.name,
-        event: info.event.type,
-        to: actor.state.name,
-        outcome: "stay",
-        effects: [],
-        context: json(contextText(actor)),
-        error: messageOf(info.error),
-        sent: [],
-      });
-    },
-  });
+interface WatchMapsOptions {
+  watch: (ref: MapChildRef) => void;
+  changed: () => void;
 }
 
 /** Wrap spawn and ensure so every new child is watched, kill so a removed child redraws, and watch the ones already there. */
-function watchMaps(
-  maps: Readonly<Record<string, ActorMapLike>>,
-  watch: (name: string, key: string) => void,
-  changed: () => void,
-): void {
+function watchMaps(maps: Readonly<Record<string, ActorMapLike>>, options: WatchMapsOptions): void {
+  const { watch, changed } = options;
   for (const [name, map] of Object.entries(maps)) {
     const spawn = map.spawn.bind(map);
     const ensure = map.ensure.bind(map);
@@ -357,35 +298,36 @@ function watchMaps(
     };
     map.spawn = (key) => {
       spawn(key);
-      watch(name, key);
+      watch({ map: name, key });
     };
     map.ensure = (key) => {
       ensure(key);
-      watch(name, key);
+      watch({ map: name, key });
     };
-    for (const key of map.keys()) watch(name, key);
+    for (const key of map.keys()) watch({ map: name, key });
   }
 }
 
-/** Record every transition and error of one actor, tagged with its ref and prefixed ids. */
-function watchChild(
-  child: AnyActor<unknown>,
-  at: {
-    root: AnyActor<unknown>;
-    ref: VizActorRef;
-    prefix: string;
-    record: (e: VizLiveStep) => void;
-  },
-): void {
-  const { root, ref, prefix, record } = at;
-  child.on("transition", {
+interface WatchPartOptions {
+  /** The machine whose context every entry carries. */
+  root: AnyActor<unknown>;
+  part: Part;
+  record: (entry: VizLiveStep) => void;
+}
+
+/** Record every transition and error of one part: the machine itself, a region, another machine or a map child. */
+function watchPart(actor: AnyActor<unknown>, options: WatchPartOptions): void {
+  const { root, part, record } = options;
+  const tag = part.ref === undefined ? {} : { actor: part.ref };
+  const prefix = prefixOf(part);
+  actor.on("transition", {
     fn: ({ event, from: before, to, transitioned, effects }) => {
       record({
-        from: `${prefix}.${before}`,
+        from: `${prefix}${before}`,
         event: event.type,
-        to: `${prefix}.${to}`,
+        to: `${prefix}${to}`,
         outcome: transitioned ? "transition" : "stay",
-        actor: ref,
+        ...tag,
         effects,
         context: json(contextText(root)),
         error: null,
@@ -393,14 +335,14 @@ function watchChild(
       });
     },
   });
-  child.on("error", {
+  actor.on("error", {
     fn: (info) => {
       record({
-        from: `${prefix}.${info.state.name}`,
+        from: `${prefix}${info.state.name}`,
         event: info.event.type,
-        to: `${prefix}.${child.state.name}`,
+        to: `${prefix}${actor.state.name}`,
         outcome: "stay",
-        actor: ref,
+        ...tag,
         effects: [],
         context: json(contextText(root)),
         error: messageOf(info.error),
@@ -422,9 +364,9 @@ function watchActors(
 ): void {
   for (const [name, part] of Object.entries(actors)) {
     if (at.held !== null) holdEffects(part, at.held);
-    const ref = { region: name };
-    watchChild(part, { root: at.root, ref, prefix: name, record: at.record });
-    at.joined(part, { ref, prefix: name });
+    const joining: Part = { ref: { region: name }, prefix: name };
+    watchPart(part, { root: at.root, part: joining, record: at.record });
+    at.joined(part, joining);
   }
 }
 
@@ -435,7 +377,7 @@ function unhandled(
 ): VizLiveStep {
   const ref = step.actor;
   const gone = ref !== undefined && at.target === undefined;
-  const scope = ref === undefined ? "" : "region" in ref ? ref.region : ref.map;
+  const scope = nameOf(ref);
   const here = ref === undefined ? at.root : `${scope}.${at.target?.state.name ?? ""}`;
   const state = gone ? "" : here;
   return {
@@ -583,7 +525,7 @@ interface Session extends Stepping {
   held: HeldEffect[];
   children: Map<string, MapChild>;
   removed: VizRemovedChild[];
-  watch: (name: string, key: string) => void;
+  watch: (ref: MapChildRef) => void;
 }
 
 /**
@@ -627,29 +569,31 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
       wrapSend(receiver, part, { root: actor, log, flags, hearing, record });
     };
 
-    watchRoot(actor, record);
+    watchPart(actor, { root: actor, part: {}, record });
     watchOutputs(actor, { log, changed });
     joined(actor, {});
-    watchRegions(actor, record);
+    for (const { path, actor: region } of regionActors(actor)) {
+      watchPart(region, { root: actor, part: { ref: { region: path }, prefix: path }, record });
+    }
     watchActors(actors, { root: actor, record, held: holding ? held : null, joined });
 
     const children = new Map<string, MapChild>();
     const removed: VizRemovedChild[] = [];
-    const watch = (name: string, key: string): void => {
-      const child = maps[name]?.get(key);
-      const id = `${name}\u0000${key}`;
+    function watch(ref: MapChildRef): void {
+      const child = maps[ref.map]?.get(ref.key);
+      const id = `${ref.map}\u0000${ref.key}`;
       if (!isActor(child)) return;
       const old = children.get(id);
       if (old?.child === child) return;
-      if (old !== undefined)
-        dropChild({ children, removed }, { id, until: steps.length + flags.pending });
-      children.set(id, { map: name, key, child, since: steps.length + flags.pending });
+      const since = steps.length + flags.pending;
+      if (old !== undefined) dropChild({ children, removed }, { id, until: since });
+      children.set(id, { ...ref, child, since });
       if (holding) holdEffects(child, held);
-      const ref = { map: name, key };
-      watchChild(child, { root: actor, ref, prefix: name, record });
-      joined(child, { ref, prefix: name });
-    };
-    watchMaps(maps, watch, changed);
+      const part: Part = { ref, prefix: ref.map };
+      watchPart(child, { root: actor, part, record });
+      joined(child, part);
+    }
+    watchMaps(maps, { watch, changed });
     flags.inside = false;
     return {
       actor,
@@ -694,8 +638,7 @@ export function createDriver(target: FuzzTarget, options: DriverOptions = {}): V
     },
     reset() {
       session.flags.disposed = true;
-      disposeParts(session);
-      session.actor.dispose();
+      retire(session);
       session = start(target);
       return view();
     },
