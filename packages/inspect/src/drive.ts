@@ -190,7 +190,7 @@ function watchOutputs(
   });
 }
 
-/** A part that receives messages: its ref and state-id prefix, as its step entries carry them. */
+/** A part of the running machine: its ref and state-id prefix, as its step entries carry them. */
 interface Part {
   ref?: VizActorRef;
   prefix?: string;

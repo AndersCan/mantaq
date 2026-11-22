@@ -226,9 +226,9 @@ function stopper(options: FuzzOptions): (iteration: number, covered: boolean) =>
 /**
  * Coverage-guided fuzzing. Each iteration mutates a corpus entry, runs it on a
  * fresh actor and keeps it if it reaches a feature (state, edge, stay, error,
- * send, expectation) no earlier run reached. Same target + options =>
- * identical result; with a `deadline`, the same runs in the same order, cut
- * off where time ran out.
+ * send, expectation) no earlier run reached, or when `guide` asks to keep it.
+ * Same target + options => identical result; with a `deadline`, the same runs
+ * in the same order, cut off where time ran out.
  */
 export function fuzz(target: FuzzTarget, options: FuzzOptions): FuzzResult {
   const context = mutationContext(target, options);
