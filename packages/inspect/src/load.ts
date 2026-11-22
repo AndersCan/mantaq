@@ -98,7 +98,7 @@ function projectEnv(env: Record<string, string>, mode: string): Plugin {
 }
 
 /**
- * The inline config for a load: empty without `--config`; otherwise the
+ * The inline config for a load: empty without `config`; otherwise the
  * project's Vite config (plugins, aliases, define) plus its env files.
  */
 async function inlineConfig({ config, mode }: LoadOptions): Promise<InlineConfig> {

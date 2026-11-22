@@ -185,10 +185,10 @@ async function missingActor(
       .map((child) => child.key);
     return `no child ${quoted(actor.key)} in ${quoted(actor.map)} of ${id}. Children: ${keys.join(", ")}.`;
   }
-  if (path === "" || Object.keys(await readRegions(page, machine)).includes(path)) {
-    return undefined;
-  }
-  const names = Object.keys(await readRegions(page, machine)).join(", ");
+  if (path === "") return undefined;
+  const regions = Object.keys(await readRegions(page, machine));
+  if (regions.includes(path)) return undefined;
+  const names = regions.join(", ");
   return `no region ${quoted(path)} in ${id}. Regions: ${names}.`;
 }
 

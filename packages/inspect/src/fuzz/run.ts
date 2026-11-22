@@ -57,7 +57,9 @@ export interface Trace {
   loopStarts: number[];
   /**
    * Coverage features, sorted: `state:x`, `edge:a>e>b` (state changed or
-   * re-entered), `stay:a>e` (handled, no change), `error:a>e` (handler threw).
+   * re-entered), `stay:a>e` (handled, no change), `error:a>e` (handler threw),
+   * `send:a>e>b` (a machine in state a sent e, state b took it) and
+   * `never:x:i` / `must:x:i` (the context matched that expectation in state x).
    */
   features: string[];
   /** Events sent without a payload whose fields the machine then read, sorted by event. */
@@ -407,8 +409,9 @@ function noteDelivery(
 }
 
 /**
- * Note every message one watched machine sends another that handles it in no
- * state. The sender is the machine whose `send` is running, or the one that
+ * Note the messages watched machines send each other: lost when the receiver
+ * handles the event in no state, else the wire, and the message when a state
+ * took it. The sender is the machine whose `send` is running, or the one that
  * last moved this step (a timer-driven output). With no known sender nothing
  * is noted. `step` starts a step: the fuzzer's own send has no sender.
  */

@@ -232,7 +232,6 @@ function uncheckedExpectations(
   context: {
     expected: { checked: ReadonlyArray<CheckedExpectation> };
     run: Either<string, FuzzTarget>;
-    structure: VizMachine;
   },
 ): string[] {
   if (context.expected.checked.length === 0) return [];
@@ -281,7 +280,7 @@ function inspectWith(
   );
   const run = runner(target, { ...inferred, ...target.payloads }, expected.checked);
   const { machine, notes, missing, lost } = driven(target, { structure, run });
-  const unchecked = uncheckedExpectations(target, { expected, run, structure });
+  const unchecked = uncheckedExpectations(target, { expected, run });
   const quiet = target.fuzz === false && target.tests === undefined;
   const unanalyzed =
     analysis === null ? [] : [Either.getLeft(analysis)].filter((each) => each !== undefined);
@@ -413,18 +412,16 @@ export async function inspectModule(
       analysis,
       each.samples,
     );
-    const withContext: VizMachine | null =
-      inspected.machine === null
-        ? null
-        : {
-            ...inspected.machine,
-            context: each.context,
-            events: inspected.machine.events.map((event) =>
-              event.payload === null && each.fields[event.id] !== undefined
-                ? { ...event, payload: each.fields[event.id] ?? null }
-                : event,
-            ),
-          };
+    const withContext: VizMachine = {
+      ...inspected.machine,
+      context: each.context,
+      events: inspected.machine.events.map((event) => {
+        const fields = each.fields[event.id];
+        return event.payload === null && fields !== undefined
+          ? { ...event, payload: fields }
+          : event;
+      }),
+    };
     return {
       machine: withContext,
       warnings: [...replayed.warnings, ...inspected.warnings].map((warning) => `${id}: ${warning}`),
