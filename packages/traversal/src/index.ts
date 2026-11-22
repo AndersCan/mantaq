@@ -31,3 +31,5 @@ export {
 export { instrument } from "./instrument.ts";
 export type { InstrumentedActor } from "./instrument.ts";
 export { reachable, allPaths, findCycles, unreachableNodes, shortestPath } from "./algorithms.ts";
+export { coveringWalks, sendableEdges } from "./walks/covering-walks.ts";
+export type { CoveringWalks, WalkStep } from "./walks/covering-walks.ts";
