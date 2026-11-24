@@ -23,7 +23,6 @@ import {
 import { LABEL_PAD } from "./geometry.ts";
 import type { PlacedState } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
-import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
 
@@ -484,7 +483,7 @@ describe("placeMachine speed", () => {
     });
     const started = performance.now();
     const laid = layoutMachine(machineOf(names, edges));
-    expect(Either.isRight(laid)).toBe(true);
+    expect(laid[1]?.overlaps).toEqual([]);
     expect(performance.now() - started).toBeLessThan(1000);
   }, 60_000);
 });
