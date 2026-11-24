@@ -83,6 +83,13 @@ describe("mantaqViz", () => {
     expect(sent).toEqual([]);
   });
 
+  test("after a save the document is the same, rebuilt or kept", async () => {
+    const before = await (await fetch(`${origin}/__mantaq/viz.json`)).text();
+    server.watcher.emit("all", "change", join(import.meta.dirname, "fixtures", "retry.ts"));
+    const after = await (await fetch(`${origin}/__mantaq/viz.json`)).text();
+    expect(after).toBe(before);
+  });
+
   test("other paths fall through to Vite", async () => {
     expect((await fetch(`${origin}/__mantaq/nope`)).status).toBe(404);
   });

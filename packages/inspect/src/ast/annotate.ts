@@ -1,10 +1,10 @@
+import type { AnalysisSource, FileRead, LoadedSource, LoadSourceOptions } from "./program.ts";
 import type { VizEdge, VizExplanation, VizField, VizJson, VizMachine } from "@mantaq/viz";
 import { machineExports } from "./discover.ts";
 import type { MachineExport } from "./discover.ts";
 import { explainRegistration } from "./handler.ts";
 import { payloadFields, payloadSamples } from "./payloads.ts";
 import { loadSource } from "./program.ts";
-import type { AnalysisSource, FileRead, LoadedSource } from "./program.ts";
 import { Either } from "@mantaq/utils";
 
 /** One explained registration, keyed the way runtime edges are: state + event. */
@@ -92,8 +92,11 @@ export interface ModuleAnalysis extends SourceDocs {
 }
 
 /** Handlers, payload samples and machine exports of a file, from one TypeScript program. */
-export function analyzeModule(source: AnalysisSource): Either<string, ModuleAnalysis> {
-  return Either.chain(loadSource(source), {
+export function analyzeModule(
+  source: AnalysisSource,
+  options: LoadSourceOptions = {},
+): Either<string, ModuleAnalysis> {
+  return Either.chain(loadSource(source, options), {
     onRight: (loaded) =>
       Either.right({
         ...docsOf(loaded),

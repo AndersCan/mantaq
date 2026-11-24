@@ -1,7 +1,9 @@
+import { createProgramStore, programFor } from "./programs/program-store.ts";
 import type { VizLocation } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { dirname, relative, sep } from "node:path";
 import ts from "typescript";
+import type { ProgramStore } from "./programs/program-store.ts";
 
 export interface AnalysisSource {
   /** Absolute path of the file that registers the handlers (`m.on` / `m.onAny`). */
@@ -328,19 +330,28 @@ function readFile(checker: ts.TypeChecker, sourceFile: ts.SourceFile): FileRead 
   return { registrations, stateDocs, eventDocs, effectDocs };
 }
 
+export interface LoadSourceOptions {
+  /** Programs shared by one build or dev server. Default: a program for this call only. */
+  programs?: ProgramStore | undefined;
+}
+
 /**
  * Type-check one file and collect its handler registrations, plus those of the
  * program's other source files. Any compiler failure becomes a Left reason; it
  * never throws.
  */
-export function loadSource(source: AnalysisSource): Either<string, LoadedSource> {
+export function loadSource(
+  source: AnalysisSource,
+  options: LoadSourceOptions = {},
+): Either<string, LoadedSource> {
+  const store = options.programs ?? createProgramStore();
   const loaded = Either.from(() => {
-    const options = compilerOptions(source);
-    const program = ts.createProgram([source.file], options);
+    const compiler = compilerOptions(source);
+    const program = programFor(store, { file: source.file, compilerOptions: compiler });
     const sourceFile = program.getSourceFile(source.file);
     if (sourceFile === undefined) return `source not found: ${source.file}`;
     const checker = program.getTypeChecker();
-    const depths = importDepths(program, { root: sourceFile, options });
+    const depths = importDepths(program, { root: sourceFile, options: compiler });
     const called = calledFiles(checker, sourceFile);
     const elsewhere = program
       .getSourceFiles()

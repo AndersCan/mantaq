@@ -59,6 +59,11 @@ export function entryId(file: string): string {
   return `${ENTRY}?${new URLSearchParams({ file }).toString()}`;
 }
 
+/** The module graph id of the entry of `file`, once resolved. */
+export function entryModuleId(file: string): string {
+  return `\0${entryId(file)}`;
+}
+
 /** The `run` export of an entry module, checked: module objects are untyped. */
 export function runOf(
   module: unknown,
