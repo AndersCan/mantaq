@@ -260,7 +260,8 @@ function machineGroup(placed: PlacedMachine, options: NodeOptions): SVGGElement 
   const { doc } = options;
   const state = stateGroup(placed, options);
   state.classList.add("machine");
-  state.setAttribute("aria-label", `state ${placed.id}, embeds machine ${placed.machine}`);
+  const label = state.getAttribute("aria-label");
+  state.setAttribute("aria-label", `${label}, embeds machine ${placed.machine}`);
   const name = svg(
     doc,
     "text",
