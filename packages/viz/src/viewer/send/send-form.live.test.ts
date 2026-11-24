@@ -11,8 +11,8 @@ import type {
   VizState,
   VizStep,
 } from "../../schema.ts";
-import { VIZ_SCHEMA_VERSION } from "../../schema.ts";
 import { mountViewer } from "../embed.ts";
+import { VIZ_SCHEMA_VERSION } from "../../schema.ts";
 import type { ViewerOptions } from "../mount/viewer-options.ts";
 
 interface StateOptions {

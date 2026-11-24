@@ -13,10 +13,6 @@ function isFields(value: VizJson): value is Record<string, VizJson> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function code(doc: Document, text: string): HTMLElement {
-  return html(doc, "code", {}, [text]);
-}
-
 function rowList(doc: Document, rows: ReadonlyArray<Row>): HTMLElement {
   return html(
     doc,
@@ -42,7 +38,10 @@ function liveRows(doc: Document, options: LiveRowsOptions): Row[] {
   ];
   return names.map((name) => {
     const held = fields[name];
-    return { name, value: held === undefined ? ["not set"] : [code(doc, JSON.stringify(held))] };
+    return {
+      name,
+      value: held === undefined ? ["not set"] : [html(doc, "code", {}, [JSON.stringify(held)])],
+    };
   });
 }
 
@@ -50,7 +49,7 @@ function declaredRows(doc: Document, declared: ReadonlyArray<VizField>): Row[] {
   return declared.map((field) => ({
     name: field.name,
     value: [
-      code(doc, field.type),
+      html(doc, "code", {}, [field.type]),
       field.optional ? " (optional)" : "",
       field.doc === null ? "" : html(doc, "p", { class: "doc" }, [field.doc]),
     ],
@@ -65,7 +64,7 @@ export function contextView(doc: Document, options: ContextViewOptions): HTMLEle
     const other = !isFields(live) && live !== null;
     if (other) {
       return html(doc, "section", { class: "explore-context", "data-context": "live" }, [
-        code(doc, JSON.stringify(live)),
+        html(doc, "code", {}, [JSON.stringify(live)]),
       ]);
     }
     const rows = liveRows(doc, { live, declared });

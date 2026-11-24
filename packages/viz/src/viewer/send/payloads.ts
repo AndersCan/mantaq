@@ -1,5 +1,5 @@
-import { Either } from "@mantaq/utils";
 import type { VizEvent, VizJson } from "../../schema.ts";
+import { Either } from "@mantaq/utils";
 import type { Values } from "../fill.ts";
 
 /** Event id → the payload fields a person changed in that event's send form; every send of the event uses them. */
