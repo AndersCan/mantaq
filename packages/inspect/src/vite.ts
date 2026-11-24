@@ -323,6 +323,7 @@ function siteBuild(context: SiteBuildContext): Plugin {
         }
         results.push(inspected[1]);
       }
+      context.shared.programs = createProgramStore();
       for (const warning of results.flatMap((result) => result.warnings)) {
         this.warn(`[mantaq-viz] ${warning}`);
       }

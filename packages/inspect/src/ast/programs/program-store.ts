@@ -50,7 +50,11 @@ function sharingHost(
     const key = `${fileName}\0${JSON.stringify(language)}`;
     const known = parsed.get(key);
     if (known !== undefined && known.text === Either.getRight(text)) return known;
-    const sourceFile = host.getSourceFile(...request);
+    const read = Either.getRight(text);
+    const sourceFile =
+      read === undefined
+        ? host.getSourceFile(...request)
+        : ts.createSourceFile(fileName, read, language);
     if (sourceFile !== undefined) parsed.set(key, sourceFile);
     return sourceFile;
   }
