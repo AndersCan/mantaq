@@ -65,6 +65,17 @@ describe("renderGraph width", () => {
     expect(Number(match?.[1])).toBeCloseTo((units * 0.6) / 12, 0);
     expect(Number(match?.[2])).toBeCloseTo((units * 1.4) / 12, 0);
   });
+
+  test("a machine with no overlaps has no warning row", () => {
+    const graph = renderGraph(document, machine, { select: () => undefined });
+    const shown = {
+      warning: graph.querySelector(".overlap-warning") ?? undefined,
+      overlaps: graph.getAttribute("data-overlaps") ?? undefined,
+      height: graph.getAttribute("height"),
+    };
+    const height = String(Math.ceil(placeMachine(machine).height));
+    expect(shown).toStrictEqual({ warning: undefined, overlaps: undefined, height });
+  });
 });
 
 describe("renderGraph guard condition", () => {
