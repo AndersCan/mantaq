@@ -25,13 +25,13 @@ import { existsSync, globSync, readFileSync } from "node:fs";
 import type { FuzzSettings, InspectedModule } from "./inspect.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { livePageHtml, serializeViz, UPDATE_EVENT } from "@mantaq/viz";
+import { normalizePath, searchForWorkspaceRoot } from "vite";
 import { projectRoot, vizDocument } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
 import { Either } from "@mantaq/utils";
 import { fileURLToPath } from "node:url";
 import type { LoadSourceOptions } from "./ast/program.ts";
 import type { ProgramStore } from "./ast/programs/program-store.ts";
-import { searchForWorkspaceRoot } from "vite";
 
 /** @deprecated No mantaq code imports this export; removed in a later release. */
 export const STYLESHEETS = ["@mantaq/viz/viewer.css", "@mantaq/viz/page.css"];
@@ -428,7 +428,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       server.watcher.on("all", (event, path) => {
         if (!/\.[cm]?[jt]sx?$/.test(path) && !/[\\/]__runs__[\\/][^\\/]+\.json$/.test(path)) return;
         cached = null;
-        forgetSave(documents, { event, path, programs: shared.programs });
+        forgetSave(documents, { event, path: normalizePath(path), programs: shared.programs });
         invalidateVirtual(server);
         server.environments.ssr.moduleGraph.invalidateAll();
         server.ws.send({ type: "custom", event: UPDATE_EVENT });
