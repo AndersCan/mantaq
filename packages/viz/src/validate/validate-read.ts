@@ -1,4 +1,4 @@
-import type { VizCoverage, VizJson } from "./schema.ts";
+import type { VizCoverage, VizJson } from "../schema.ts";
 
 /** One problem found while reading a document, with a JSON-path-like location. */
 export interface VizIssue {

@@ -1,3 +1,18 @@
+import type { Field, JsonObject, Reader, VizIssue } from "./validate/validate-read.ts";
+import {
+  isRecord,
+  readBoolean,
+  readCoverage,
+  readEnum,
+  readJson,
+  readList,
+  readNullableString,
+  readNullableStrings,
+  readString,
+  readStrings,
+  report,
+} from "./validate/validate-read.ts";
+import { readFuzz, readRuns } from "./validate/validate-fuzz.ts";
 import { VIZ_SCHEMA_VERSION, isAnyState, scopeOf } from "./schema.ts";
 import type {
   VizDocument,
@@ -11,32 +26,25 @@ import type {
   VizMachine,
   VizState,
 } from "./schema.ts";
-import { readExplanation } from "./validate-explanation.ts";
-import { readFuzz, readRuns } from "./validate-fuzz.ts";
-import {
-  isRecord,
-  readBoolean,
-  readCoverage,
-  readEnum,
-  readJson,
-  readList,
-  readNullableString,
-  readNullableStrings,
-  readString,
-  readStrings,
-  report,
-} from "./validate-read.ts";
-import type { VizIssue, JsonObject, Reader, Field } from "./validate-read.ts";
+import { checkEmbeds } from "./validate/validate-embeds.ts";
 import { Either } from "@mantaq/utils";
+import { readExplanation } from "./validate/validate-explanation.ts";
 
-export type { VizIssue } from "./validate-read.ts";
+export type { VizIssue } from "./validate/validate-read.ts";
 
 const EDGE_KINDS: ReadonlyArray<VizEdgeKind> = ["initial", "transition", "effect", "stay"];
 const FIELD_INPUTS: ReadonlyArray<VizFieldInput> = ["text", "number", "choice", "json"];
 const EDGE_ORIGINS: ReadonlyArray<VizEdgeOrigin> = ["declared", "probe", "fuzz"];
 
-function readState(reader: Reader, record: JsonObject, path: string): VizState {
-  return {
+/** Where one state record sits in the document. */
+interface StateRecord {
+  record: JsonObject;
+  path: string;
+}
+
+function readState(reader: Reader, options: StateRecord): VizState {
+  const { record, path } = options;
+  const state: VizState = {
     id: readString(reader, { record, key: "id", path }),
     label: readString(reader, { record, key: "label", path }),
     region: readNullableString(reader, { record, key: "region", path }),
@@ -50,6 +58,12 @@ function readState(reader: Reader, record: JsonObject, path: string): VizState {
     tested: readCoverage(reader, { record, key: "tested", path }),
     doc: readNullableString(reader, { record, key: "doc", path }),
   };
+  const machine = record["machine"];
+  if (typeof machine === "string") state.machine = machine;
+  if (machine !== undefined && typeof machine !== "string") {
+    report(reader, { path: `${path}.machine`, message: "expected string" });
+  }
+  return state;
 }
 
 function readEvent(reader: Reader, record: JsonObject, path: string): VizEvent {
@@ -192,7 +206,7 @@ function readMachine(reader: Reader, record: JsonObject, path: string): VizMachi
     maps: readStrings(reader, { record, key: "maps", path }),
     actors: readStrings(reader, { record, key: "actors", path }),
     states: readList(reader, { record, key: "states", path }, (item, at) =>
-      readState(reader, item, at),
+      readState(reader, { record: item, path: at }),
     ),
     outputs: readStrings(reader, { record, key: "outputs", path }),
     partOutputs: readPartOutputs(reader, { record, path }),
@@ -228,6 +242,7 @@ export function validateViz(value: unknown): Either<VizIssue[], VizDocument> {
   const machines = readList(reader, { record: value, key: "machines", path: "$" }, (item, at) =>
     readMachine(reader, item, at),
   );
+  if (reader.issues.length === 0) checkEmbeds(reader, machines);
   if (reader.issues.length > 0) return Either.left(reader.issues);
   const document: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines };
   return Either.right(document);
