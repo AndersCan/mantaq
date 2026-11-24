@@ -102,12 +102,11 @@ export function embed<
       return;
     }
     const child = actorOf(machine.create({ clock }));
-    input.signal.addEventListener("abort", () => child.dispose(), { once: true });
+    input.signal.addEventListener("abort", () => child.dispose());
     child.on("output", { fn: (event) => input.emit(event) });
     child.on("change", {
       fn: (snapshot) => {
-        const ended = endEvent(snapshot, { done, error });
-        if (ended !== undefined) input.emit(ended.create());
+        if (snapshot.done === true) input.emit(endEvent(snapshot, { done, error }).create());
       },
     });
   }
@@ -137,9 +136,7 @@ interface Endings<Event> {
   error: Event;
 }
 
-/** A final state the parent did not map (only an untyped child can reach one) also reports `error`. */
-function endEvent<Event>(snapshot: Snapshot, endings: Endings<Event>): Event | undefined {
-  if (snapshot.error !== undefined) return endings.error;
-  if (snapshot.done !== true) return undefined;
-  return endings.done.get(snapshot.path[0] ?? "") ?? endings.error;
+/** `__error` is final and never mapped, so it reports `error`, like a final state only an untyped child can reach. */
+function endEvent<Event>(snapshot: Snapshot, endings: Endings<Event>): Event {
+  return endings.done.get(snapshot.path[0]) ?? endings.error;
 }
