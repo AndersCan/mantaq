@@ -97,7 +97,7 @@ export function embed<
     ...new Set([...Object.values(doneEvents), options.error]),
   ];
 
-  function run(input: EffectInput<ActorContext, unknown, InternalEvent>): void {
+  function run(input: EffectInput<ActorContext, unknown, InternalEvent>): Promise<void> | void {
     const clock: Clock | undefined = Reflect.get(input, "clock");
     if (clock === undefined) {
       input.emit(error.create());
@@ -114,6 +114,7 @@ export function embed<
         input.emit(endEvent(snapshot, { done, error }).create());
       },
     });
+    return child.settled();
   }
 
   const embedded: Embedded = {

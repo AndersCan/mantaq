@@ -91,7 +91,55 @@ function parentOf(check: ReturnType<typeof checkMachine>) {
   return { actor, clock, outputs };
 }
 
+const fetched = machine("fetched", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [],
+      internal: [finish],
+      states: [working, passed, failed],
+      initial: working,
+      clock,
+      setup: (builder) => {
+        builder.effect(working, {
+          name: "fetch",
+          sends: [finish],
+          fn: (input) => Promise.resolve().then(() => input.emit(finish.create())),
+        });
+        builder.on(working, { event: finish, to: [passed], handler: () => ({ state: passed }) });
+      },
+    }),
+});
+
 describe("embed", () => {
+  test("parent settled() waits for the async work of the child", async () => {
+    const actor = Actor({
+      inputs: [start],
+      internal: [checkPassed, checkFailed, checkBroke],
+      states: [idle, checking, accepted, rejected, broken],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
+        embed(builder, {
+          in: checking,
+          machine: fetched,
+          done: { passed: checkPassed, failed: checkFailed },
+          error: checkBroke,
+        });
+        builder.on(checking, {
+          event: checkPassed,
+          to: [accepted],
+          handler: () => ({ state: accepted }),
+        });
+      },
+    });
+    actor.send(start.create());
+
+    await actor.settled();
+
+    expect(actor.state.name).toBe("accepted");
+  });
+
   test("a child final state sends its mapped event, after the child outputs of that step", () => {
     const { actor, clock, outputs } = parentOf(checkMachine({ outcome: "failed", waitMs: 50 }));
     actor.send(start.create());

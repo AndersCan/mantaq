@@ -330,7 +330,7 @@ Dynamic child actor registry: `spawn`, `ensure`, `send`, `kill`, `has`, `keys`, 
 
 ### `embed(m, { in, machine, done, error })`
 
-Run `machine` while the parent is in the state `in`. The pattern above shows a full example. Embed registers one effect on `in`, named `embed:<machine id>`. Its `sends` lists the `done` and `error` events.
+Run `machine` while the parent is in the state `in`. The pattern above shows a full example. Embed registers one effect on `in`, named `embed:<machine id>`. Its `sends` lists the `done` and `error` events. It does not list the child outputs that embed forwards. A tool finds those in `options.outputs` of the child.
 
 The effect fn has an `embedded` property. Tools such as `@mantaq/inspect` read it from `actor.options.effects` with `Reflect.get(entry.fn, "embedded")`, so they do not import sugar. The property has this shape (the `Embedded` type):
 
