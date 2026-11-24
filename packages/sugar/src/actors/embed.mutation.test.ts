@@ -62,7 +62,48 @@ function parentOf(child: typeof wrappedCheck) {
   return { actor, clock };
 }
 
+const settling = state("settling")().final();
+
+const lateFailure = machine("lateFailure", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [],
+      states: [settling],
+      initial: settling,
+      clock,
+      setup: (builder) => {
+        builder.effect(settling, { name: "failLate", fn: () => Promise.reject(new Error("late")) });
+      },
+    }),
+});
+
 describe("embed mutation", () => {
+  test("a child that fails after it ended sends no second event", async () => {
+    const received: string[] = [];
+    const actor = Actor({
+      inputs: [],
+      internal: [checkPassed, checkBroke],
+      states: [checking],
+      initial: checking,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        embed(builder, {
+          in: checking,
+          machine: lateFailure,
+          done: { settling: checkPassed },
+          error: checkBroke,
+        });
+        for (const mapped of [checkPassed, checkBroke]) {
+          builder.on(checking, { event: mapped, handler: (sent) => void received.push(sent.type) });
+        }
+      },
+    });
+
+    await actor.settled();
+
+    expect(received).toEqual(["checkPassed"]);
+  });
+
   test("a factory that returns { actor } runs that actor as the child", () => {
     const { actor, clock } = parentOf(wrappedCheck);
 
