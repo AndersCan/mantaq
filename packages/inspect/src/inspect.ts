@@ -1,4 +1,5 @@
 import type { AnalysisSource } from "./ast/program.ts";
+import type { ProgramStore } from "./ast/programs/program-store.ts";
 import type { AnyActor, Machine } from "@mantaq/core";
 import type { AnyExpectations, CheckedExpectation } from "./expectations.ts";
 import type { FuzzOptions, FuzzStop, LostMessage } from "./fuzz/fuzz.ts";
@@ -366,6 +367,8 @@ export interface ModuleOptions {
   /** @deprecated No mantaq caller sets this; removed in a later release. */
   tsconfig?: string;
   fuzz?: false | FuzzSettings;
+  /** Programs shared by one build or dev server, so each file is type-checked once. */
+  programs?: ProgramStore;
 }
 
 export interface InspectedModule {
@@ -384,7 +387,7 @@ export async function inspectModule(
     root: options.root ?? projectRoot(file),
     ...(options.tsconfig === undefined ? {} : { tsconfig: options.tsconfig }),
   };
-  const analysis = analyzeModule(source);
+  const analysis = analyzeModule(source, { programs: options.programs });
   if (Either.isLeft(analysis)) return { machines: [], warnings: [`${file}: ${analysis[0]}`] };
   const found = analysis[1].machines;
   if (found.length === 0) {

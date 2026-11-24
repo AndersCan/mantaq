@@ -12,18 +12,26 @@
  * Vite config (aliases, tsconfig paths), are inspected on the server, and the
  * page redraws, keeping the walk, when you save a file.
  */
-import { UPDATE_EVENT, livePageHtml, serializeViz } from "@mantaq/viz";
-import type { FuzzSettings } from "./inspect.ts";
+import { basename, dirname, isAbsolute, posix, resolve } from "node:path";
+import {
+  createProgramStore,
+  forgetFile,
+  forgetPrograms,
+  hasProgram,
+} from "./ast/programs/program-store.ts";
+import { entryId, entryModuleId, inspectEntry, inspectFile, runOf } from "./load.ts";
+import type { EnvironmentModuleNode, Plugin, ViteDevServer } from "vite";
+import { existsSync, globSync, readFileSync } from "node:fs";
+import type { FuzzSettings, InspectedModule } from "./inspect.ts";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { livePageHtml, serializeViz, UPDATE_EVENT } from "@mantaq/viz";
+import { normalizePath, searchForWorkspaceRoot } from "vite";
 import { projectRoot, vizDocument } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
-import { entryId, inspectEntry, inspectFile, runOf } from "./load.ts";
 import { Either } from "@mantaq/utils";
-import { existsSync, globSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { searchForWorkspaceRoot } from "vite";
-import type { Plugin, ViteDevServer } from "vite";
+import type { LoadSourceOptions } from "./ast/program.ts";
+import type { ProgramStore } from "./ast/programs/program-store.ts";
 
 /** @deprecated No mantaq code imports this export; removed in a later release. */
 export const STYLESHEETS = ["@mantaq/viz/viewer.css", "@mantaq/viz/page.css"];
@@ -56,12 +64,12 @@ function previewFileOf(machineFile: string): string | undefined {
 }
 
 /** Each machine id of the files that have a preview file, with that file. */
-function previewsOf(files: ReadonlyArray<string>): Map<string, string> {
+function previewsOf(files: ReadonlyArray<string>, options: LoadSourceOptions): Map<string, string> {
   const previews = new Map<string, string>();
   for (const file of files) {
     const preview = previewFileOf(file);
     if (preview === undefined) continue;
-    const analysis = analyzeModule({ file, root: projectRoot(file) });
+    const analysis = analyzeModule({ file, root: projectRoot(file) }, options);
     if (Either.isLeft(analysis)) continue;
     for (const found of analysis[1].machines) previews.set(found.id, preview);
   }
@@ -69,8 +77,8 @@ function previewsOf(files: ReadonlyArray<string>): Map<string, string> {
 }
 
 /** Source of `virtual:mantaq/previews`: a lazy import of each preview file, by machine id. */
-function previewsSource(files: ReadonlyArray<string>): string {
-  const entries = [...previewsOf(files)].map(
+function previewsSource(files: ReadonlyArray<string>, options: LoadSourceOptions): string {
+  const entries = [...previewsOf(files, options)].map(
     ([id, file]) => `  ${JSON.stringify(id)}: () => import(${JSON.stringify(file)}),`,
   );
   return ["export const previews = {", ...entries, "};"].join("\n");
@@ -80,29 +88,32 @@ function previewsSource(files: ReadonlyArray<string>): string {
  * Source of `virtual:mantaq/targets`: one entry per `machine(...)` export.
  * The page owns the clock: it hands a VirtualClock to `create({ clock })`.
  */
-export function targetsSource(files: ReadonlyArray<string>): string {
+export function targetsSource(
+  files: ReadonlyArray<string>,
+  options: LoadSourceOptions = {},
+): string {
   const core = fileURLToPath(import.meta.resolve("@mantaq/core"));
   const imports: string[] = [];
   const entries: string[] = [];
-  files.forEach((file, index) => {
-    const analysis = analyzeModule({ file, root: projectRoot(file) });
-    if (Either.isLeft(analysis)) return;
+  for (const [index, file] of files.entries()) {
+    const analysis = analyzeModule({ file, root: projectRoot(file) }, options);
+    if (Either.isLeft(analysis)) continue;
     const machines = analysis[1].machines;
-    if (machines.length === 0) return;
+    if (machines.length === 0) continue;
     imports.push(`import * as m${index} from ${JSON.stringify(file)};`);
     for (const found of machines) {
       entries.push(
         `  ${JSON.stringify(found.id)}: () => { const clock = VirtualClock(); const made = m${index}[${JSON.stringify(found.name)}].create({ clock }); const actor = ${found.unwrap === "actor" ? "made.actor" : "made"}; return { actor, clock, made }; },`,
       );
     }
-  });
+  }
   return [
     `import { VirtualClock } from ${JSON.stringify(core)};`,
     ...imports,
     "export const targets = {",
     ...entries,
     "};",
-    `export const previewed = ${JSON.stringify([...previewsOf(files).keys()])};`,
+    `export const previewed = ${JSON.stringify([...previewsOf(files, options).keys()])};`,
   ].join("\n");
 }
 
@@ -117,26 +128,137 @@ interface Built {
   text: string;
 }
 
+/** The programs one build or dev server shares; a build replaces them at its start. */
+interface Shared {
+  programs: ProgramStore;
+}
+
+/** One machine file inspected on the dev server, and the files its modules were loaded from. */
+interface FileDocument {
+  inspected: Promise<InspectedModule>;
+  modules: ReadonlySet<string> | undefined;
+}
+
+interface DocumentContext {
+  documents: Map<string, FileDocument>;
+  files: ReadonlyArray<string>;
+  fuzz: false | FuzzSettings;
+  programs: ProgramStore;
+}
+
+interface DocumentFile extends DocumentContext {
+  file: string;
+}
+
+interface MachineFile {
+  file: string;
+}
+
+/** Files of the modules the entry of a machine file imports, followed to the end. */
+function moduleFiles(server: ViteDevServer, options: MachineFile): Set<string> {
+  const graph = server.environments.ssr.moduleGraph;
+  const entry = graph.getModuleById(entryModuleId(options.file));
+  const seen = new Set<EnvironmentModuleNode>();
+  const pending = entry === undefined ? [] : [entry];
+  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
+    if (seen.has(node)) continue;
+    seen.add(node);
+    pending.push(...node.importedModules);
+  }
+  return new Set([...seen].flatMap((node) => (node.file === null ? [] : [node.file])));
+}
+
+interface DevFile {
+  file: string;
+  fuzz: false | FuzzSettings;
+  programs: ProgramStore;
+}
+
+async function inspectDevFile(server: ViteDevServer, options: DevFile): Promise<InspectedModule> {
+  const { file, fuzz, programs } = options;
+  const run = runOf(await server.ssrLoadModule(entryId(file)));
+  return run === null
+    ? { machines: [], warnings: [`${file}: could not load the inspector`] }
+    : run({ fuzz, programs });
+}
+
+/** The document of the dev server for one file, inspected once and kept until a save touches it. */
+function fileDocument(server: ViteDevServer, options: DocumentFile): Promise<InspectedModule> {
+  const { documents, file } = options;
+  const known = documents.get(file);
+  if (known !== undefined) return known.inspected;
+  const document: FileDocument = {
+    inspected: inspectDevFile(server, { file, fuzz: options.fuzz, programs: options.programs }),
+    modules: undefined,
+  };
+  documents.set(file, document);
+  document.inspected.then(
+    () => {
+      document.modules = moduleFiles(server, { file });
+    },
+    () => {
+      if (documents.get(file) === document) documents.delete(file);
+    },
+  );
+  return document.inspected;
+}
+
 async function documentText(
   server: ViteDevServer,
-  context: { files: ReadonlyArray<string>; fuzz: false | FuzzSettings },
+  options: DocumentContext,
 ): Promise<{
   text: string;
   warnings: string[];
 }> {
-  const results = [];
-  for (const file of context.files) {
-    const run = runOf(await server.ssrLoadModule(entryId(file)));
-    const result =
-      run === null
-        ? { machines: [], warnings: [`${file}: could not load the inspector`] }
-        : await run({ fuzz: context.fuzz });
-    results.push(result);
-  }
+  const results = await Promise.all(
+    options.files.map((file) => fileDocument(server, { ...options, file })),
+  );
   return {
     text: serializeViz(vizDocument(results.flatMap((result) => result.machines))),
     warnings: results.flatMap((result) => result.warnings),
   };
+}
+
+interface Save {
+  event: string;
+  path: string;
+  programs: ProgramStore;
+}
+
+interface SavedFile {
+  path: string;
+}
+
+/** Whether the saved file is a recorded runs file, `<dir>/__runs__/<name>.json`, that `file` reads. */
+function readsRuns(file: string, options: SavedFile): boolean {
+  const { path } = options;
+  return (
+    basename(dirname(path)) === "__runs__" &&
+    dirname(dirname(path)) === normalizePath(dirname(file))
+  );
+}
+
+/**
+ * Forget what a save may have changed: the programs that read the file, and
+ * the documents whose program or loaded modules read it. Adding or removing a
+ * file can change what any import finds, so it forgets everything.
+ */
+function forgetSave(documents: Map<string, FileDocument>, save: Save): void {
+  const { event, path, programs } = save;
+  if (event !== "change") {
+    forgetPrograms(programs);
+    documents.clear();
+    return;
+  }
+  forgetFile(programs, { path });
+  for (const [file, document] of documents) {
+    const stale =
+      !hasProgram(programs, { file }) ||
+      document.modules === undefined ||
+      document.modules.has(path) ||
+      readsRuns(file, { path });
+    if (stale) documents.delete(file);
+  }
 }
 
 /** The frame page: the app's preview entry on an empty, inert body. */
@@ -159,15 +281,18 @@ function stylesheets(): string {
   );
 }
 
-/** Build mode: write the page, `viz.json` and the viewer script under `base`. */
-function siteBuild(context: {
+interface SiteBuildContext {
   base: string;
   patterns: ReadonlyArray<string>;
   fuzz: false | FuzzSettings;
   live: string;
   project: { configFile: string | undefined };
   root: () => string;
-}): Plugin {
+  shared: Shared;
+}
+
+/** Build mode: write the page, `viz.json` and the viewer script under `base`. */
+function siteBuild(context: SiteBuildContext): Plugin {
   let standalone = false;
   return {
     name: "mantaq-viz-build",
@@ -183,18 +308,25 @@ function siteBuild(context: {
         : {};
     },
     buildStart() {
+      context.shared.programs = createProgramStore();
       if (!standalone) this.emitFile({ type: "chunk", id: context.live, name: "mantaq-live" });
     },
     async generateBundle(_options, bundle) {
       const results = [];
+      const options = { fuzz: context.fuzz, programs: context.shared.programs };
+      const load = { config: context.project.configFile };
       for (const file of machineFiles(context.root(), context.patterns)) {
-        const load = { config: context.project.configFile };
-        try {
-          results.push(await inspectFile(file, { fuzz: context.fuzz }, load));
-        } catch (error) {
-          this.warn(`[mantaq-viz] ${file}: could not inspect (${String(error)})`);
+        const inspected = await inspectFile(file, options, load).then(
+          (result) => Either.right(result),
+          (error: unknown) => Either.left({ error }),
+        );
+        if (Either.isLeft(inspected)) {
+          this.warn(`[mantaq-viz] ${file}: could not inspect (${String(inspected[0].error)})`);
+          continue;
         }
+        results.push(inspected[1]);
       }
+      context.shared.programs = createProgramStore();
       for (const warning of results.flatMap((result) => result.warnings)) {
         this.warn(`[mantaq-viz] ${warning}`);
       }
@@ -227,9 +359,15 @@ function resolveVirtual(id: string): string | null {
   return id === PREVIEWS ? PREVIEWS_RESOLVED : null;
 }
 
-function loadVirtual(id: string, files: () => ReadonlyArray<string>): string | null {
-  if (id === TARGETS_RESOLVED) return targetsSource(files());
-  return id === PREVIEWS_RESOLVED ? previewsSource(files()) : null;
+interface VirtualContext {
+  files: () => ReadonlyArray<string>;
+  shared: Shared;
+}
+
+function loadVirtual(id: string, context: VirtualContext): string | undefined {
+  const { programs } = context.shared;
+  if (id === TARGETS_RESOLVED) return targetsSource(context.files(), { programs });
+  return id === PREVIEWS_RESOLVED ? previewsSource(context.files(), { programs }) : undefined;
 }
 
 function invalidateVirtual(server: ViteDevServer): void {
@@ -256,6 +394,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
   const live = liveEntry();
   let root = process.cwd();
   const project: { configFile: string | undefined } = { configFile: undefined };
+  const shared: Shared = { programs: createProgramStore() };
   const targets: Plugin = {
     name: "mantaq-viz-targets",
     configResolved: (config) => {
@@ -263,7 +402,7 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
       project.configFile = config.configFile;
     },
     resolveId: resolveVirtual,
-    load: (id) => loadVirtual(id, () => machineFiles(root, patterns)),
+    load: (id) => loadVirtual(id, { files: () => machineFiles(root, patterns), shared }),
   };
   const plugin: Plugin = {
     name: "mantaq-viz",
@@ -282,15 +421,18 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
     }),
     configureServer(server) {
       let cached: Promise<Built> | null = null;
-      const build = async (): Promise<Built> => {
+      const documents = new Map<string, FileDocument>();
+      async function build(): Promise<Built> {
         const files = machineFiles(server.config.root, patterns);
-        const { text, warnings } = await documentText(server, { files, fuzz });
+        const context = { documents, files, fuzz, programs: shared.programs };
+        const { text, warnings } = await documentText(server, context);
         for (const warning of warnings) server.config.logger.warn(`[mantaq-viz] ${warning}`);
         return { text };
-      };
-      server.watcher.on("all", (_event, path) => {
+      }
+      server.watcher.on("all", (event, path) => {
         if (!/\.[cm]?[jt]sx?$/.test(path) && !/[\\/]__runs__[\\/][^\\/]+\.json$/.test(path)) return;
         cached = null;
+        forgetSave(documents, { event, path: normalizePath(path), programs: shared.programs });
         invalidateVirtual(server);
         server.environments.ssr.moduleGraph.invalidateAll();
         server.ws.send({ type: "custom", event: UPDATE_EVENT });
@@ -337,6 +479,6 @@ export function mantaqViz(options: MantaqVizOptions): Plugin[] {
     },
   };
   const built = options.fuzz ?? {};
-  const site = siteBuild({ base, patterns, fuzz: built, live, project, root: () => root });
+  const site = siteBuild({ base, patterns, fuzz: built, live, project, root: () => root, shared });
   return [inspectEntry(), targets, site, plugin];
 }

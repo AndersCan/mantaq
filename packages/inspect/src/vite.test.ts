@@ -2,6 +2,7 @@ import { mantaqViz, targetsSource } from "./vite.ts";
 import { UPDATE_EVENT, parseViz } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { join } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createLogger, createServer } from "vite";
 import type { ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
@@ -197,5 +198,82 @@ describe("targetsSource: a machine export named apart from its id", () => {
     expect(source).toContain(
       '"lamp": () => { const clock = VirtualClock(); const made = m0["deskLamp"].create({ clock });',
     );
+  });
+});
+
+describe("mantaqViz after a save", () => {
+  const fixtures = join(import.meta.dirname, "fixtures");
+  let root = "";
+  let dev: ViteDevServer;
+  let address = "";
+
+  function runsFile(name: string): string {
+    const steps = [{ kind: "event", event: "connect", payload: {} }];
+    return JSON.stringify({ retry: [{ name, end: "connecting", steps }] });
+  }
+
+  interface Edit {
+    from: string;
+    to: string;
+  }
+
+  function edit(file: string, options: Edit): string {
+    const path = join(root, file);
+    writeFileSync(path, readFileSync(path, "utf8").replace(options.from, options.to));
+    return path;
+  }
+
+  async function machines() {
+    const text = await (await fetch(`${address}/__mantaq/viz.json`)).text();
+    return Either.getRight(parseViz(text))?.machines ?? [];
+  }
+
+  beforeAll(async () => {
+    root = mkdtempSync(join(import.meta.dirname, "..", ".vite-save-"));
+    mkdirSync(join(root, "__runs__"));
+    writeFileSync(join(root, "retry.ts"), readFileSync(join(fixtures, "retry.ts"), "utf8"));
+    writeFileSync(join(root, "credit.ts"), readFileSync(join(fixtures, "credit.ts"), "utf8"));
+    writeFileSync(join(root, "__runs__", "retry.test.json"), runsFile("first"));
+    dev = await createServer({
+      root,
+      configFile: false,
+      logLevel: "silent",
+      server: { port: 0, host: "127.0.0.1", watch: { ignored: ["**/*"] } },
+      plugins: [mantaqViz({ machines: ["retry.ts", "credit.ts"], fuzz: false })],
+    });
+    await dev.listen();
+    const listening = dev.httpServer?.address();
+    const port = typeof listening === "object" && listening !== null ? listening.port : 0;
+    address = `http://127.0.0.1:${port}`;
+  });
+
+  afterAll(async () => {
+    await dev.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("the saved machine file is read again, a file the save did not touch is kept", async () => {
+    await machines();
+    edit("credit.ts", { from: "initial: idle", to: "initial: approved" });
+    const saved = edit("retry.ts", { from: "No connection yet.", to: "Not connected." });
+    dev.watcher.emit("all", "change", saved);
+    const [credit, retry] = await machines();
+    const seen = {
+      creditInitial: credit?.initial,
+      retryIdleDoc: retry?.states.find((state) => state.id === "idle")?.doc,
+    };
+    expect(seen).toEqual({ creditInitial: "idle", retryIdleDoc: "Not connected." });
+  });
+
+  test("a saved recorded runs file is read again", async () => {
+    const before = (await machines()).find((machine) => machine.id === "retry")?.runs;
+    const saved = join(root, "__runs__", "retry.test.json");
+    writeFileSync(saved, runsFile("second"));
+    dev.watcher.emit("all", "change", saved);
+    const after = (await machines()).find((machine) => machine.id === "retry")?.runs;
+    expect([before, after].map((runs) => runs?.map((run) => run.name))).toEqual([
+      ["first"],
+      ["second"],
+    ]);
   });
 });
