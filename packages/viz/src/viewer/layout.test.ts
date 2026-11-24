@@ -25,6 +25,9 @@ import type { PlacedState } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
 import { describe, expect, test } from "vite-plus/test";
 import { readFileSync } from "node:fs";
+import { Either } from "@mantaq/utils";
+import { documentOf } from "../validate/embed-document.ts";
+import { validateViz } from "../validate.ts";
 
 function state(name: string): VizState {
   return {
@@ -666,5 +669,87 @@ describe("state inside", () => {
     expect(placed.label.y).toBe(placed.y);
     expect(placed.label.width).toBe(textWidth("first"));
     expect(placed.chips).toEqual([]);
+  });
+});
+
+/** A box's horizontal extent: its centre and width. */
+interface Span {
+  x: number;
+  width: number;
+}
+
+function left(box: Span): number {
+  return box.x - box.width / 2;
+}
+
+function right(box: Span): number {
+  return box.x + box.width / 2;
+}
+
+describe("placeMachine machine node", () => {
+  const shop = documentOf([
+    {
+      id: "checkout",
+      states: [
+        { id: "cart", role: "initial" },
+        { id: "paying", machine: "payment" },
+        { id: "done", role: "final" },
+      ],
+      edges: [
+        { from: "cart", event: "pay", to: "paying" },
+        { from: "paying", event: "paid", to: "done" },
+        { from: "paying", event: "declined", to: "cart" },
+      ],
+    },
+    { id: "payment", states: [{ id: "charging", role: "initial" }] },
+  ]);
+  const checkout = shop.machines.find((machine) => machine.id === "checkout") ?? tight;
+
+  test("the hand-built document is a valid schema 19 document", () => {
+    expect(Either.getRight(validateViz(shop))).toEqual(shop);
+  });
+
+  test("a state that embeds a machine is one machine node, and its edges end on it", () => {
+    const checked = Either.getRight(layoutMachine(checkout));
+    expect({
+      nodes: checked?.layout.nodes.map((node) => [node.id, node.kind]),
+      edges: checked?.layout.edges.map((placed) => [placed.edge.from, placed.target]),
+      overlaps: checked?.overlaps,
+    }).toEqual({
+      nodes: [
+        ["cart", "state"],
+        ["paying", "machine"],
+        ["done", "state"],
+      ],
+      edges: [
+        ["cart", "paying"],
+        ["paying", "done"],
+        ["paying", "cart"],
+      ],
+      overlaps: [],
+    });
+  });
+
+  test("under its name: the glyph, the machine's id and enter, each LABEL_PAD apart", () => {
+    const node = placeMachine(checkout).nodes.find((each) => each.id === "paying");
+    const shown =
+      node?.kind === "machine"
+        ? {
+            machine: node.machine,
+            height: node.height,
+            nameToRow: node.name.y - node.name.height / 2 - (node.label.y + node.label.height / 2),
+            glyphToName: Math.round(left(node.name) - right(node.glyph)),
+            nameToEnter: Math.round(left(node.enter) - right(node.name)),
+            offCentre: Math.round((left(node.glyph) + right(node.enter)) / 2 - node.x),
+          }
+        : undefined;
+    expect(shown).toEqual({
+      machine: "payment",
+      height: 2 * LABEL_PAD + 18 + LABEL_PAD + 16,
+      nameToRow: LABEL_PAD,
+      glyphToName: LABEL_PAD,
+      nameToEnter: LABEL_PAD,
+      offCentre: 0,
+    });
   });
 });

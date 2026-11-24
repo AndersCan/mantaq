@@ -27,6 +27,16 @@ export interface PlacedState {
   workers?: LabelBox;
 }
 
+/** A state that embeds another machine: one node, with a row under its name for a glyph, the machine's id and an enter control. Its internals are never drawn here. */
+export interface PlacedMachine extends Omit<PlacedState, "kind"> {
+  kind: "machine";
+  /** Id of the embedded machine, in the same document. */
+  machine: string;
+  glyph: LabelBox;
+  name: LabelBox;
+  enter: LabelBox;
+}
+
 /** Placeholder target for an undetermined edge. One per edge; never shared or guessed. */
 export interface PlacedUnknown {
   kind: "unknown";
@@ -89,10 +99,12 @@ export interface PlacedMessage {
   dotGap: number;
 }
 
+export type PlacedNode = PlacedState | PlacedMachine | PlacedUnknown | PlacedAny;
+
 export interface MachineLayout {
   width: number;
   height: number;
-  nodes: Array<PlacedState | PlacedUnknown | PlacedAny>;
+  nodes: PlacedNode[];
   edges: PlacedEdge[];
   messages: PlacedMessage[];
   regions: PlacedRegion[];
@@ -147,6 +159,11 @@ const CHIP_HEIGHT = 16;
 const LABEL_HEIGHT = 16;
 /** A state name's box: tall enough for the docs font's glyphs (16.25), which edge labels never need. */
 const NAME_HEIGHT = 18;
+const MACHINE_ROW_HEIGHT = 16;
+const MACHINE_GLYPH = 12;
+/** Text of a machine node's enter control. */
+export const ENTER_TEXT = "enter";
+const ENTER_WIDTH = textWidth(ENTER_TEXT, CHIP_FONT) + 12;
 /** Label to its own arrow, and to any other arrow: strictly farther, so the nearest arrow is always its own. */
 export const LABEL_OWN = 8;
 export const LABEL_FOREIGN = 14;
@@ -211,12 +228,24 @@ function hasRow(machine: VizMachine, state: VizState): boolean {
   return hasQueue(machine);
 }
 
+/** Glyph, machine id and enter control, `LABEL_PAD` apart. */
+function machineRowWidth(machine: string): number {
+  return MACHINE_GLYPH + LABEL_PAD + textWidth(machine, CHIP_FONT) + LABEL_PAD + ENTER_WIDTH;
+}
+
+/** Height a machine node's row adds under the name; 0 for a plain state. */
+function machineRoom(state: VizState): number {
+  return state.machine === undefined ? 0 : LABEL_PAD + MACHINE_ROW_HEIGHT;
+}
+
 function stateWidth(state: VizState, worker: boolean): number {
   const chips = state.effects.map((effect) => textWidth(effect.name, CHIP_FONT) + 24);
   const frame = state.final ? 2 * FINAL_INSET : 0;
+  const row = state.machine === undefined ? 0 : machineRowWidth(state.machine) + 24;
   return Math.max(
     worker ? MAP_STATE_MIN_WIDTH : 80,
     textWidth(state.label) + 24 + frame,
+    row + frame,
     ...chips.map((chip) => chip + frame),
   );
 }
@@ -227,7 +256,10 @@ function stateHeight(state: VizState, worker: boolean): number {
     frame +
     Math.max(
       NODE_HEIGHT,
-      2 * LABEL_PAD + NAME_HEIGHT + state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
+      2 * LABEL_PAD +
+        NAME_HEIGHT +
+        machineRoom(state) +
+        state.effects.length * (LABEL_PAD + CHIP_HEIGHT),
     ) +
     (worker ? LABEL_PAD + WORKER_ROW_HEIGHT : 0)
   );
@@ -241,23 +273,26 @@ function insideOf(
 ): { label: LabelBox; chips: LabelBox[]; workers?: LabelBox } {
   const frame = state.final ? FINAL_INSET : 0;
   const top = box.y - box.height / 2 + frame;
+  const alone = state.effects.length === 0 && !worker && state.machine === undefined;
   const label = {
     x: box.x,
-    y: state.effects.length === 0 && !worker ? box.y : top + LABEL_PAD + NAME_HEIGHT / 2,
+    y: alone ? box.y : top + LABEL_PAD + NAME_HEIGHT / 2,
     width: textWidth(state.label),
     height: NAME_HEIGHT,
   };
+  const below = top + 2 * LABEL_PAD + NAME_HEIGHT + machineRoom(state);
   const chips = state.effects.map((_, index) => ({
     x: box.x,
-    y: top + 2 * LABEL_PAD + NAME_HEIGHT + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
+    y: below + index * (LABEL_PAD + CHIP_HEIGHT) + CHIP_HEIGHT / 2,
     width: box.width - 2 * (LABEL_PAD + frame),
     height: CHIP_HEIGHT,
   }));
   if (!worker) return { label, chips };
-  const above = chips.at(-1) ?? label;
+  const above = chips.at(-1);
+  const bottom = above === undefined ? below - LABEL_PAD : above.y + above.height / 2;
   const workers = {
     x: box.x,
-    y: above.y + above.height / 2 + LABEL_PAD + WORKER_ROW_HEIGHT / 2,
+    y: bottom + LABEL_PAD + WORKER_ROW_HEIGHT / 2,
     width: box.width - 2 * (LABEL_PAD + frame),
     height: WORKER_ROW_HEIGHT,
   };
@@ -1053,19 +1088,57 @@ function boxed(edge: VizEdge, centre: Point): Pick<PlacedEdge, "label" | "text">
   };
 }
 
+interface NodeSpot {
+  box: LabelBox;
+  worker: boolean;
+}
+
+/** The row under a machine node's name: glyph, machine id, then the enter control, centred as a whole. */
+function machineRowOf(
+  machine: string,
+  label: LabelBox,
+): Pick<PlacedMachine, "glyph" | "name" | "enter"> {
+  const width = machineRowWidth(machine);
+  const left = label.x - width / 2;
+  const y = label.y + label.height / 2 + LABEL_PAD + MACHINE_ROW_HEIGHT / 2;
+  const nameWidth = textWidth(machine, CHIP_FONT);
+  return {
+    glyph: { x: left + MACHINE_GLYPH / 2, y, width: MACHINE_GLYPH, height: MACHINE_GLYPH },
+    name: {
+      x: left + MACHINE_GLYPH + LABEL_PAD + nameWidth / 2,
+      y,
+      width: nameWidth,
+      height: MACHINE_ROW_HEIGHT,
+    },
+    enter: { x: left + width - ENTER_WIDTH / 2, y, width: ENTER_WIDTH, height: MACHINE_ROW_HEIGHT },
+  };
+}
+
+function placedStateOf(state: VizState, spot: NodeSpot): PlacedState | PlacedMachine {
+  const inside = insideOf(state, spot.box, spot.worker);
+  if (state.machine === undefined) {
+    return { kind: "state", id: state.id, state, ...spot.box, ...inside };
+  }
+  return {
+    kind: "machine",
+    id: state.id,
+    state,
+    machine: state.machine,
+    ...spot.box,
+    ...inside,
+    ...machineRowOf(state.machine, inside.label),
+  };
+}
+
 function placeNodes(
   machine: Drawing,
   specs: ReadonlyMap<string, Spec>,
   boxes: ReadonlyMap<string, LabelBox>,
-): Array<PlacedState | PlacedUnknown | PlacedAny> {
+): PlacedNode[] {
   const at = (id: string): LabelBox => boxes.get(id) ?? { x: 0, y: 0, width: 0, height: 0 };
-  const states: Array<PlacedState | PlacedUnknown | PlacedAny> = machine.states.map((state) => ({
-    kind: "state",
-    id: state.id,
-    state,
-    ...at(state.id),
-    ...insideOf(state, at(state.id), hasRow(machine, state)),
-  }));
+  const states: PlacedNode[] = machine.states.map((state) =>
+    placedStateOf(state, { box: at(state.id), worker: hasRow(machine, state) }),
+  );
   const anys: PlacedAny[] = anyIds(machine).map((id) => ({
     kind: "any",
     id,
