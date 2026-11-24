@@ -2,7 +2,7 @@
  * Viz document schema. Bump `VIZ_SCHEMA_VERSION` on any breaking change.
  * Everything not observable at runtime is `null`, never guessed.
  */
-export const VIZ_SCHEMA_VERSION = 18;
+export const VIZ_SCHEMA_VERSION = 19;
 
 /**
  * Edge source of an `onAny` registration: any non-final state of the machine,
@@ -53,6 +53,8 @@ export interface VizState {
   tested: VizCoverage | null;
   /** Leading JSDoc of the `state(...)` declaration. null = undocumented or AST not run. */
   doc: string | null;
+  /** Id of another machine in the same document that this state embeds. That machine stays its own entry in `machines`; its states are not copied here. Omitted = a plain state. */
+  machine?: string;
 }
 
 export interface VizEvent {

@@ -4,7 +4,7 @@ import type {
   VizComparison,
   VizExplanation,
   VizLocation,
-} from "./schema.ts";
+} from "../schema.ts";
 import {
   isRecord,
   readBoolean,

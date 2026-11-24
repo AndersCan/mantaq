@@ -3,7 +3,7 @@ import { toViz } from "../structure.ts";
 import { checkout } from "../fixtures/checkout.ts";
 import { renamedCheckout } from "../fixtures/renamed-wire.ts";
 import { inspect } from "../inspect.ts";
-import { parseViz, validateViz } from "@mantaq/viz";
+import { parseViz, validateViz, VIZ_SCHEMA_VERSION } from "@mantaq/viz";
 import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -29,7 +29,7 @@ describe("validateViz rejects", () => {
 
   test("version 9 documents and a missing outputs list", () => {
     expect(issues({ schemaVersion: 9, machines: [] })).toEqual([
-      "$.schemaVersion: expected 18, got 9",
+      "$.schemaVersion: expected 19, got 9",
     ]);
     const doc = valid() as { machines: Array<Record<string, unknown>> };
     delete doc.machines[0]?.["outputs"];
@@ -38,7 +38,7 @@ describe("validateViz rejects", () => {
 
   test("version 11 documents", () => {
     expect(issues({ schemaVersion: 11, machines: [] })).toEqual([
-      "$.schemaVersion: expected 18, got 11",
+      "$.schemaVersion: expected 19, got 11",
     ]);
   });
 
@@ -278,9 +278,9 @@ describe("validateViz refuses a recorded message that does not fit the machine",
   const entry = { from: "waitingForPayment", event: "START", to: "payment.ready" };
 
   function withMessage(change: Record<string, string>) {
-    const doc = JSON.parse(JSON.stringify({ schemaVersion: 18, machines: [wired] })) as {
-      machines: Array<{ fuzz: { messages: unknown[] } }>;
-    };
+    const doc: { machines: Array<{ fuzz: { messages: unknown[] } }> } = JSON.parse(
+      JSON.stringify({ schemaVersion: VIZ_SCHEMA_VERSION, machines: [wired] }),
+    );
     doc.machines[0]!.fuzz.messages = [{ ...entry, ...change }];
     return doc;
   }

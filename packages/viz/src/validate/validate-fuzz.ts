@@ -7,7 +7,7 @@ import type {
   VizFuzzSequence,
   VizRun,
   VizStep,
-} from "./schema.ts";
+} from "../schema.ts";
 import {
   isRecord,
   readBoolean,
