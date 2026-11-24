@@ -232,7 +232,10 @@ interface SavedFile {
 /** Whether the saved file is a recorded runs file, `<dir>/__runs__/<name>.json`, that `file` reads. */
 function readsRuns(file: string, options: SavedFile): boolean {
   const { path } = options;
-  return basename(dirname(path)) === "__runs__" && dirname(dirname(path)) === dirname(file);
+  return (
+    basename(dirname(path)) === "__runs__" &&
+    dirname(dirname(path)) === normalizePath(dirname(file))
+  );
 }
 
 /**
