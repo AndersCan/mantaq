@@ -567,6 +567,13 @@ describe("mountDriven runs by name", () => {
     (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
     expect(location.search).toBe("?machine=second");
   });
+  test("switching machine drops the payload changes made for the old one", async () => {
+    history.replaceState(undefined, "", '?machine=checkout&payload=submit={"email":"a@b.c"}');
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await withRuns(), targets: {} });
+    root.querySelectorAll<HTMLButtonElement>("nav.machines button")[1]?.click();
+    expect(location.search).toBe("?machine=second");
+  });
   test("the run the page names opens at its end", async () => {
     history.replaceState(null, "", "?");
     const root = document.createElement("div");

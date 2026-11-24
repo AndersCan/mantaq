@@ -41,12 +41,14 @@ export function sendForm(doc: Document, options: SendFormOptions): HTMLElement {
       "aria-label": field.name,
     });
     input.addEventListener("change", () => {
+      if (input.dataset["sent"] !== undefined) return;
       options.edit({ event: edge.event, field: field.name, value: parseValue(field, input.value) });
       refill();
     });
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
       input.dispatchEvent(new Event("change"));
+      input.dataset["sent"] = "";
       options.send();
     });
     return { field, input };

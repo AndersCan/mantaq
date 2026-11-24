@@ -8,3 +8,5 @@ A click on an arrow that leaves the state the walk is in sends its event. This i
 Links keep changed values as `?payload=<event>=<json>`. An old `?value=<field>=<json>` link still opens: its value goes to every event with a field of that name.
 
 Breaking: `ViewerOptions.onNavigate` reports `payloads` instead of `values`. `ViewerOptions.payloads` is new, and `ViewerOptions.values` now only reads old links.
+
+The inspect harness `send(event, payload)` types the payload into that event's send form. A key must be a field of that event, and the value stays set for later sends of the same event only.

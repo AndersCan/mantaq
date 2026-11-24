@@ -135,15 +135,16 @@ export function mountDriven(
   const id = shown.machines[0]?.id ?? "";
   const create = liveCreate(context.targets, id);
   const picker = viz.machines.length > 1;
-  const select = (machine: string) => {
+  function select(machine: string): void {
     const next = new URLSearchParams(location.search);
     next.set("machine", machine);
     next.delete("step");
     next.delete("run");
     next.delete("value");
+    next.delete("payload");
     history.replaceState(null, "", `?${next.toString()}`);
     mountDriven(root, context);
-  };
+  }
   const doc = root.ownerDocument;
   const bar = doc.createElement("nav");
   bar.className = "machines";

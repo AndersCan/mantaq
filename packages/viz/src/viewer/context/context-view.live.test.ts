@@ -129,14 +129,16 @@ describe("the Context tab", () => {
     });
   });
 
-  test("without a driver, lists the fields the machine declares", () => {
+  test("without a driver, lists the fields the machine declares, and Details stays the open tab", () => {
     const root = mount({});
     expect({
       labels: [...root.querySelectorAll("[data-tab]")].map((tab) => tab.textContent),
+      open: root.querySelector('[data-tab][aria-selected="true"]')?.textContent,
       rows: rows(root),
       kind: root.querySelector("[data-context]")?.getAttribute("data-context"),
     }).toEqual({
       labels: ["Context", "Details"],
+      open: "Details",
       rows: { total: "numberWhat the cart costs.", coupon: "string (optional)" },
       kind: "declared",
     });

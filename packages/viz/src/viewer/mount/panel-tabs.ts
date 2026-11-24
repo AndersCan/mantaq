@@ -35,7 +35,8 @@ export function panelTabs(doc: Document, context: PanelTabsOptions): HTMLElement
     { id: "details", label: "Details", content: context.details },
   ];
   const shown = all.filter((tab): tab is Tab<PanelTab> => tab !== undefined);
-  const active = shown.find((tab) => tab.id === view.tab)?.id ?? shown[0]?.id;
+  const fallback = shown.some((tab) => tab.id === "step") ? shown[0]?.id : "details";
+  const active = shown.find((tab) => tab.id === view.tab)?.id ?? fallback;
   return tabs(doc, {
     tabs: shown,
     active,
