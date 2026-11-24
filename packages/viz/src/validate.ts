@@ -242,7 +242,7 @@ export function validateViz(value: unknown): Either<VizIssue[], VizDocument> {
   const machines = readList(reader, { record: value, key: "machines", path: "$" }, (item, at) =>
     readMachine(reader, item, at),
   );
-  checkEmbeds(reader, machines);
+  if (reader.issues.length === 0) checkEmbeds(reader, machines);
   if (reader.issues.length > 0) return Either.left(reader.issues);
   const document: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines };
   return Either.right(document);

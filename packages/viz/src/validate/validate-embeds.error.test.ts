@@ -51,6 +51,13 @@ describe("validateViz rejects embedded machines", () => {
     expect(issuesOf(parsed)).toEqual(["$.machines[0].states[0].machine: expected string"]);
   });
 
+  test("nothing about embeds while the document has other read errors", () => {
+    const document = documentOf([{ id: "checkout", states: [{ id: "paying", machine: "pay" }] }]);
+    expect(issuesOf({ ...document, machines: [42, ...document.machines] })).toEqual([
+      "$.machines[0]: expected object",
+    ]);
+  });
+
   test("a version 18 document, from before states could embed a machine", () => {
     expect(issuesOf({ schemaVersion: 18, machines: [] })).toEqual([
       "$.schemaVersion: expected 19, got 18",

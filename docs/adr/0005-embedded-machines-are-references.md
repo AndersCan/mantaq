@@ -42,5 +42,9 @@ do not fill it yet.
 - Regions and returned actors stay peers inside one machine (ADR 0001, 0004). Embedded machines
   are separate machines that a state points to.
 - A reader that wants the inside of an embedded state looks the id up in `machines`.
+- A producer that writes one document per file (the Astro integration) must also add each embedded
+  machine, and the machines that it embeds, to that document.
+- The live page cuts a document down to the shown machine (`live-page.ts`). To enter an embedded
+  state, it must keep the machines that the shown one embeds.
 - The validator does not yet refuse two machines with the same id. With references, such a
   document is ambiguous. That check is a follow-up.
