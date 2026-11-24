@@ -220,7 +220,7 @@ function insetIn(box: Box, outer: Box): number {
   );
 }
 
-/** Smallest `insetIn` over the points; NaN when any point is not a number (`Math.min` keeps NaN). */
+/** Smallest `insetIn` over the points; NaN when any point is not a number (`Math.min` keeps NaN). A route's corners give the same result as its samples. */
 function insetOfPoints(points: ReadonlyArray<Point>, outer: Box): number {
   let least = Infinity;
   for (const point of points) {
@@ -398,9 +398,10 @@ function labelOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
 
 function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
   const part: Part = `path:${one.id}`;
+  const trimmed = beyondStubs(one.path);
   for (const node of rest.nodes) {
     const own = node.id === one.from || node.id === one.target;
-    const path = own ? beyondStubs(one.path) : one.path;
+    const path = own ? trimmed : one.path;
     const gap = pathToBox(path, node.box);
     if (gap < PATH_NODE_CLEAR) add("path-through-node", part, node.part, gap);
   }
@@ -415,7 +416,7 @@ function pathOverlaps(one: PlacedLabel, rest: Shapes, add: Add): void {
     );
     if (gap < PATH_NODE_CLEAR) add("path-through-node", part, region.title, gap);
   }
-  const pathInset = insetOfPoints(one.path, rest.canvas);
+  const pathInset = insetOfPoints(one.route, rest.canvas);
   if (!(pathInset >= 0)) add("outside", part, "canvas", pathInset);
   const arrowInset = insetIn(one.arrow, rest.canvas);
   if (!(arrowInset >= 0)) add("outside", `arrow:${one.id}`, "canvas", arrowInset);
@@ -609,7 +610,7 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
       const gap = pathToBox(entry.line, region.titleBox);
       if (gap < PATH_NODE_CLEAR) add("path-through-node", entry.part, region.title, gap);
     }
-    const inset = insetOfPoints(entry.line, shapes.canvas);
+    const inset = insetOfPoints(entry.route, shapes.canvas);
     if (!(inset >= 0)) add("outside", entry.part, "canvas", inset);
   }
   return found.sort(
