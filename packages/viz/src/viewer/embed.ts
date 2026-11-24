@@ -7,7 +7,7 @@ import { parseViz } from "../validate.ts";
 import type { VizIssue } from "../validate.ts";
 import { html } from "./dom.ts";
 import { mountViewer } from "./viewer.ts";
-import type { ViewerOptions } from "./viewer.ts";
+import type { ViewerOptions } from "./mount/viewer-options.ts";
 import { Either } from "@mantaq/utils";
 
 export { mountViewer };
