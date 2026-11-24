@@ -185,6 +185,81 @@ map.kill("child1");
 
 **Typing children:** `ActorMap` is untyped by design. Check children with `snapshot()` + `isIn` / `matches`, or keep your own typed references.
 
+### Embed: a state that runs another machine
+
+`embed(m, { in, machine, done, error })` runs a child machine while the parent is in one state. Use it to split a big machine into smaller ones.
+
+```ts
+import { Actor, machine, state, event } from "@mantaq/core";
+import { embed, withTimeout } from "@mantaq/sugar";
+
+const working = state("working")();
+const passed = state("passed")().final();
+const finish = event("finish")();
+
+const check = machine("check", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [],
+      internal: [finish],
+      states: [working, passed],
+      initial: working,
+      clock,
+      setup: (m) => {
+        m.effect(working, {
+          name: "wait",
+          sends: [finish],
+          fn: (input) => withTimeout(100, { input, event: () => finish.create() }),
+        });
+        m.on(working, { event: finish, to: [passed], handler: () => ({ state: passed }) });
+      },
+    }),
+});
+
+const checking = state("checking")();
+const accepted = state("accepted")();
+const broken = state("broken")();
+const checkPassed = event("checkPassed")();
+const checkBroke = event("checkBroke")();
+
+const order = machine("order", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [],
+      internal: [checkPassed, checkBroke],
+      states: [checking, accepted, broken],
+      initial: checking,
+      clock,
+      setup: (m) => {
+        embed(m, {
+          in: checking,
+          machine: check,
+          done: { passed: checkPassed },
+          error: checkBroke,
+        });
+        m.on(checking, {
+          event: checkPassed,
+          to: [accepted],
+          handler: () => ({ state: accepted }),
+        });
+        m.on(checking, { event: checkBroke, to: [broken], handler: () => ({ state: broken }) });
+      },
+    }),
+});
+```
+
+When the parent enters `checking`, embed builds the child with the clock of the parent. When the child enters the final state `passed`, the parent receives `checkPassed`. When the child enters `__error`, the parent receives `checkBroke`. When the parent leaves `checking`, embed disposes the child. The parent transitions are ordinary `m.on` calls, so the diagram shows their edges.
+
+The types require these things:
+
+- The parent has a clock. Embed never builds the child on real time.
+- `done` has one event for each final state of the child.
+- The `done` and `error` events are internal events of the parent, without a payload.
+- The parent declares each output of the child as an input, an internal event or an output. Embed forwards each child output into the parent, as `regions` do.
+- The factory of the child returns the actor, or `{ actor }` and nothing else. Embed disposes only the actor.
+
+The parent sends no events into the child. The child moves on its own effects and timers.
+
 ### Effect utilities: `withPromise` vs manual handling
 
 Use `withPromise()` to bridge a promise into events. It checks `signal.aborted` before each emit, so a promise that settles after the state exits emits nothing.
@@ -252,6 +327,26 @@ activeLeaves(snapshot); // e.g. ["on.player.playing"]
 ### `createActorMap(factory, { autoReap? })`
 
 Dynamic child actor registry: `spawn`, `ensure`, `send`, `kill`, `has`, `keys`, `snapshot`, `size`, `dispose`. See [ActorMap](#actormap-dynamic-children-by-key).
+
+### `embed(m, { in, machine, done, error })`
+
+Run `machine` while the parent is in the state `in`. The pattern above shows a full example. Embed registers one effect on `in`, named `embed:<machine id>`. Its `sends` lists the `done` and `error` events. It does not list the child outputs that embed forwards. A tool finds those in `options.outputs` of the child.
+
+The effect fn has an `embedded` property. Tools such as `@mantaq/inspect` read it from `actor.options.effects` with `Reflect.get(entry.fn, "embedded")`, so they do not import sugar. The property has this shape (the `Embedded` type):
+
+```ts
+import type { Machine } from "@mantaq/core";
+
+interface Embedded {
+  machine: Machine; // the child machine, as given to embed
+  done: Record<string, string>; // final state name of the child -> event type the parent receives
+  error: string; // event type the parent receives when the child enters __error, or a final state done does not name
+}
+```
+
+The parent receives at most one `done` or `error` event per child. The child outputs that it emits while `machine.create()` runs are not forwarded, because embed subscribes after the child exists.
+
+The effect returns `settled()` of the child, taken when the child is built. So `settled()` of the parent waits for async work that the child starts on entry. It does not wait for async work that the child starts later, for example after a timer fires on `clock.advance()`. To wait for that work, await the promise that the child effect waits on.
 
 ### `broadcast(map, event)`
 
