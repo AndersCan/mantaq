@@ -282,6 +282,43 @@
   font-size: 11px;
 }
 
+/* A state that embeds a machine: a box-in-a-box glyph, the machine's id and an enter control under the name. */
+.viz .machine-glyph rect {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 1;
+}
+
+.viz .machine-glyph .core {
+  fill: var(--fg);
+}
+
+.viz .machine-name {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.viz .machine-enter {
+  cursor: pointer;
+  outline: none;
+}
+
+.viz .machine-enter rect {
+  fill: var(--state-bg);
+  stroke: var(--fg);
+  stroke-width: 1;
+}
+
+.viz .machine-enter text {
+  font-size: 11px;
+}
+
+.viz .machine-enter:hover rect,
+.viz .machine-enter:focus-visible rect {
+  stroke: var(--select);
+  stroke-width: 2;
+}
+
 .viz .edge.undetermined path {
   stroke: var(--unknown);
   stroke-dasharray: 6 4;

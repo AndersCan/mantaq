@@ -179,6 +179,79 @@ const headings = [
     </svg>
   </div>
 
+  <h2 id="machine-node">Machine node</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: a state that embeds another machine. It is one state with its arrows in and out, a
+    box-in-a-box glyph and the embedded machine's id under its name, and an enter control. Its
+    states are not drawn here. Here <code>paying</code> embeds the <code>payment</code> machine.
+  </p>
+  <div class="viz">
+    <svg class="graph" viewBox="0 0 702 122" width="702" height="122" role="group" aria-label="machine node sample">
+    <defs>
+    <marker id="viz-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" class="arrow-head">
+    </path>
+    </marker>
+    </defs>
+    <g class="edge" data-edge-id="cart-pay-paying" data-from="cart" data-to="paying" aria-label="cart on pay to paying">
+    <path class="hit" d="M170.0,61.0 L185.0,61.0 L196.0,61.0 L270.0,61.0 L281.0,61.0 L296.0,61.0" aria-hidden="true">
+    </path>
+    <path d="M170.0,61.0 L185.0,61.0 L196.0,61.0 L270.0,61.0 L281.0,61.0 L296.0,61.0" marker-end="url(#viz-arrow)">
+    </path>
+    <text x="233" y="82" text-anchor="middle">
+    <tspan x="233" dy="0">pay</tspan>
+    </text>
+    </g>
+    <g class="edge" data-edge-id="paying-paid-done" data-from="paying" data-to="done" aria-label="paying on paid to done">
+    <path class="hit" d="M444.0,61.0 L459.0,61.0 L470.0,61.0 L548.0,61.0 L559.0,61.0 L574.0,61.0" aria-hidden="true">
+    </path>
+    <path d="M444.0,61.0 L459.0,61.0 L470.0,61.0 L548.0,61.0 L559.0,61.0 L574.0,61.0" marker-end="url(#viz-arrow)">
+    </path>
+    <text x="509" y="82" text-anchor="middle">
+    <tspan x="509" dy="0">paid</tspan>
+    </text>
+    </g>
+    <g class="entry" aria-hidden="true">
+    <circle cx="62" cy="61" r="6">
+    </circle>
+    <path d="M62,61 L90,61" marker-end="url(#viz-arrow)">
+    </path>
+    </g>
+    <g class="state initial" data-node-id="cart" aria-label="state cart">
+    <rect x="90" y="43" width="80" height="36" rx="8" class="frame">
+    </rect>
+    <text x="130" y="65" text-anchor="middle">cart</text>
+    </g>
+    <g class="machine-node" data-machine="payment">
+    <g class="state machine" data-node-id="paying" aria-label="state paying, embeds machine payment">
+    <rect x="296" y="32" width="148" height="58" rx="8" class="frame">
+    </rect>
+    <text x="370" y="53" text-anchor="middle">paying</text>
+    <g class="machine-glyph" aria-hidden="true">
+    <rect x="308" y="68" width="12" height="12" rx="2">
+    </rect>
+    <rect class="core" x="311" y="71" width="6" height="6">
+    </rect>
+    </g>
+    <text class="machine-name" x="354" y="78" text-anchor="middle">payment</text>
+    </g>
+    <g class="machine-enter" data-enter-machine="payment" aria-label="enter machine payment">
+    <rect x="388" y="66" width="44" height="16" rx="8">
+    </rect>
+    <text x="410" y="78" text-anchor="middle">enter</text>
+    </g>
+    </g>
+    <g class="state final" data-node-id="done" aria-label="state done (final)">
+    <rect x="574" y="39" width="80" height="44" rx="8" class="frame">
+    </rect>
+    <rect x="578" y="43" width="72" height="36" rx="5" class="frame inner">
+    </rect>
+    <text x="614" y="65" text-anchor="middle">done</text>
+    </g>
+    </svg>
+  </div>
+
   <h2 id="phone-width">Phone width</h2>
   <p><strong>Awaiting approval</strong></p>
   <div class="design-phone">

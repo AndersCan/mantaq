@@ -22,4 +22,6 @@ export interface ViewerOptions {
   screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
+  /** Called with the embedded machine's id when the reader clicks enter on a machine node. Unset: machine nodes draw no enter control. */
+  onEnter?: (machine: string) => void;
 }
