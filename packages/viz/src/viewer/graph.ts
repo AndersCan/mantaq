@@ -16,6 +16,7 @@ import type {
 } from "./layout.ts";
 import type { Point } from "@dagrejs/dagre";
 import { placeBoard } from "./board.ts";
+import type { Overlap } from "./overlaps.ts";
 
 export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: string };
 
@@ -353,7 +354,19 @@ function messageGroup(doc: Document, message: PlacedMessage): SVGElement {
   );
 }
 
-/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. */
+/** The row under a drawing that holds its overlap warning. */
+const WARNING_ROW = 20;
+const WARNING_INSET = 8;
+
+/** The overlap warning's text, or undefined when nothing overlaps. */
+function warningOf(overlaps: ReadonlyArray<Overlap>): string | undefined {
+  if (overlaps.length === 0) return undefined;
+  const count = overlaps.length;
+  const noun = count === 1 ? "overlap" : "overlaps";
+  return `${count} ${noun}: some labels or lines touch.`;
+}
+
+/** Static SVG for one machine. Regions first, then edges, then nodes, so nodes sit on top. An overlapping layout is drawn too, with a warning row under it. */
 export function renderGraph(
   doc: Document,
   machine: VizMachine,
@@ -363,19 +376,36 @@ export function renderGraph(
   if (Either.isLeft(layout)) {
     return html(doc, "p", { class: "load-error", role: "alert" }, [`Cannot draw ${machine.id}.`]);
   }
-  const placed = layout[1];
+  const { layout: placed, overlaps } = layout[1];
+  const warning = warningOf(overlaps);
+  const warningWidth = warning === undefined ? 0 : textWidth(warning) + 2 * WARNING_INSET;
+  const units = Math.max(placed.width, warningWidth);
+  const width = Math.ceil(units);
+  const height = Math.ceil(placed.height + (warning === undefined ? 0 : WARNING_ROW));
+  const warned =
+    warning === undefined
+      ? []
+      : [
+          svg(
+            doc,
+            "text",
+            { class: "overlap-warning", x: WARNING_INSET, y: placed.height + WARNING_ROW / 2 + 4 },
+            [warning],
+          ),
+        ];
   const root = svg(
     doc,
     "svg",
     {
       class: "graph",
-      viewBox: `0 0 ${Math.ceil(placed.width)} ${Math.ceil(placed.height)}`,
+      viewBox: `0 0 ${width} ${height}`,
       // Natural size; graphWidth clamps the drawn width.
-      width: Math.ceil(placed.width),
-      height: Math.ceil(placed.height),
-      style: graphWidth(placed.width),
+      width,
+      height,
+      style: graphWidth(units),
       role: "group",
       "aria-label": `machine ${machine.id}`,
+      ...(overlaps.length === 0 ? {} : { "data-overlaps": overlaps.length }),
     },
     [
       defs(doc),
@@ -389,6 +419,7 @@ export function renderGraph(
       ]),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
       ...placed.nodes.map((node) => nodeGroup(doc, node, callbacks)),
+      ...warned,
     ],
   );
   return root;

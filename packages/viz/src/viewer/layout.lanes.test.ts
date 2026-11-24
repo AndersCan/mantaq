@@ -5,7 +5,6 @@ import { PATH_GAP } from "./geometry.ts";
 import type { PlacedEdge } from "./layout.ts";
 import { checkedLayout, freeLane, lanePoints, laneOrder, lanesOf, placeMachine } from "./layout.ts";
 import { overlapsOf } from "./overlaps.ts";
-import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
 
 function state(id: string): VizState {
@@ -141,19 +140,19 @@ describe("freeLane", () => {
 });
 
 describe("checkedLayout", () => {
-  test("is Right when nothing overlaps", () => {
+  test("keeps the layout and lists no overlaps when nothing overlaps", () => {
     const placed = placeMachine(machineOf(["a", "b"], [edge("a", "go", "b")]));
-    expect(Either.isRight(checkedLayout(placed))).toBe(true);
+    expect(checkedLayout(placed)).toEqual({ layout: placed, overlaps: [] });
   });
 
-  test("is Left with the overlaps when two nodes share a spot", () => {
+  test("keeps the layout and lists the overlaps when two nodes share a spot", () => {
     const placed = placeMachine(machineOf(["a", "b"], [edge("a", "go", "b")]));
     const [first, second] = placed.nodes;
     if (first === undefined || second === undefined) throw new Error("two nodes");
     const clash = { ...placed, nodes: [first, { ...second, x: first.x, y: first.y }] };
     const checked = checkedLayout(clash);
-    expect(Either.isLeft(checked)).toBe(true);
-    expect(checked[0]?.length ?? 0).toBeGreaterThan(0);
+    expect(checked.layout).toBe(clash);
+    expect(checked.overlaps.length).toBeGreaterThan(0);
   });
 });
 
@@ -163,7 +162,7 @@ describe("an any-state self-loop", () => {
     const placed = placeMachine(machine);
     const loop = placed.edges.find((each) => each.edge.from === "*");
     expect(loop?.points.length).toBeGreaterThan(0);
-    expect(Either.isRight(checkedLayout(placed))).toBe(true);
+    expect(checkedLayout(placed).overlaps).toEqual([]);
   });
 });
 
