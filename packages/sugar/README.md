@@ -340,11 +340,11 @@ import type { Machine } from "@mantaq/core";
 interface Embedded {
   machine: Machine; // the child machine, as given to embed
   done: Record<string, string>; // final state name of the child -> event type the parent receives
-  error: string; // event type the parent receives when the child enters __error
+  error: string; // event type the parent receives when the child enters __error, or a final state done does not name
 }
 ```
 
-The child outputs that it emits while `machine.create()` runs are not forwarded, because embed subscribes after the child exists.
+The parent receives at most one `done` or `error` event per child. The child outputs that it emits while `machine.create()` runs are not forwarded, because embed subscribes after the child exists.
 
 ### `broadcast(map, event)`
 

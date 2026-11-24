@@ -74,7 +74,54 @@ function parentOf(clock: Clock, check: ReturnType<typeof brokenCheck>) {
   });
 }
 
+const settling = state("settling")().final();
+
+const lateFailure = machine("lateFailure", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [],
+      states: [settling],
+      initial: settling,
+      clock,
+      setup: (builder) => {
+        builder.effect(settling, {
+          name: "failLate",
+          fn: () => Promise.reject(new Error("late")),
+        });
+      },
+    }),
+});
+
 describe("embed errors", () => {
+  test("a child that fails after it ended sends no second event", async () => {
+    const received: string[] = [];
+    const actor = Actor({
+      inputs: [start],
+      internal: [checkPassed, checkBroke],
+      states: [idle, checking],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
+        embed(builder, {
+          in: checking,
+          machine: lateFailure,
+          done: { settling: checkPassed },
+          error: checkBroke,
+        });
+        for (const mapped of [checkPassed, checkBroke]) {
+          builder.on(checking, { event: mapped, handler: (sent) => void received.push(sent.type) });
+        }
+      },
+    });
+
+    actor.send(start.create());
+    await actor.settled();
+    await Promise.resolve();
+
+    expect(received).toEqual(["checkPassed"]);
+  });
+
   test("a child that enters __error sends the error event, not a done event", () => {
     const clock = VirtualClock();
     const actor = parentOf(clock, brokenCheck({ breaks: "later" }));

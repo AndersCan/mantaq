@@ -56,7 +56,7 @@ export interface Embedded {
   readonly machine: Machine;
   /** Event type the parent receives, per final state name of the child. */
   readonly done: Readonly<Record<string, string>>;
-  /** Event type the parent receives when the child enters `__error`. */
+  /** Event type the parent receives when the child enters `__error`, or a final state `done` does not name (only an untyped child can). */
   readonly error: string;
 }
 
@@ -93,7 +93,9 @@ export function embed<
   const error: VoidEvent = options.error;
   const doneEvents: Readonly<Record<string, VoidEventOf<Internal>>> = options.done;
   const done = new Map<string, VoidEvent>(Object.entries(doneEvents));
-  const sends: Array<Internal[number]> = [...Object.values(doneEvents), options.error];
+  const sends: Array<Internal[number]> = [
+    ...new Set([...Object.values(doneEvents), options.error]),
+  ];
 
   function run(input: EffectInput<ActorContext, unknown, InternalEvent>): void {
     const clock: Clock | undefined = Reflect.get(input, "clock");
@@ -104,9 +106,12 @@ export function embed<
     const child = actorOf(machine.create({ clock }));
     input.signal.addEventListener("abort", () => child.dispose());
     child.on("output", { fn: (event) => input.emit(event) });
+    let phase: "running" | "ended" = "running";
     child.on("change", {
       fn: (snapshot) => {
-        if (snapshot.done === true) input.emit(endEvent(snapshot, { done, error }).create());
+        if (phase === "ended" || snapshot.done !== true) return;
+        phase = "ended";
+        input.emit(endEvent(snapshot, { done, error }).create());
       },
     });
   }
