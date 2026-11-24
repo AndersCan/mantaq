@@ -123,7 +123,13 @@ describe("embed mutation", () => {
     }).toEqual({
       name: "embed:wrappedCheck",
       sends: ["checkPassed", "checkBroke"],
-      embedded: { machine: wrappedCheck, done: { passed: "checkPassed" }, error: "checkBroke" },
+      embedded: {
+        machine: wrappedCheck,
+        done: { passed: "checkPassed" },
+        error: "checkBroke",
+        forward: [],
+        snapshot: undefined,
+      },
     });
   });
 

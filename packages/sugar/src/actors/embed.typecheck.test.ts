@@ -1,6 +1,6 @@
 import { Actor, event, machine, state, VirtualClock } from "@mantaq/core";
+import type { AnyActor, Snapshot } from "@mantaq/core";
 import { describe, expect, expectTypeOf, test } from "vite-plus/test";
-import type { AnyActor } from "@mantaq/core";
 import { embed } from "./embed.ts";
 import type { Embedded } from "./embed.ts";
 
@@ -36,6 +36,23 @@ const checkPassed = event("checkPassed")();
 const checkFailed = event("checkFailed")();
 const checkBroke = event("checkBroke")();
 const checkScored = event("checkScored")<{ score: number }>();
+const retry = event("retry")();
+const dismiss = event("dismiss")();
+const rate = event("rate")<{ score: number }>();
+const rateWithoutScore = event("rate")();
+const checkChanged = event("checkChanged")<Snapshot>();
+const checkNamed = event("checkNamed")<{ name: string }>();
+
+const askingCheck = machine("askingCheck", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [retry, rate],
+      states: [working, passed],
+      initial: working,
+      clock,
+      setup: () => {},
+    }),
+});
 
 describe("embed types", () => {
   test("a parent with a clock, a total done map and internal void events typechecks", () => {
@@ -135,7 +152,7 @@ describe("embed types", () => {
     expect(actor.state.name).toBe("idle");
   });
 
-  test("an untyped child needs no done entries", () => {
+  test("an untyped child needs no done entries and takes every forwarded input", () => {
     const loose = machine("loose", {
       create: ({ clock }): AnyActor<unknown> => check.create({ clock }),
     });
@@ -146,7 +163,99 @@ describe("embed types", () => {
       initial: idle,
       clock: VirtualClock(),
       setup: (builder) => {
-        embed(builder, { in: idle, machine: loose, done: {}, error: checkBroke });
+        embed(builder, {
+          in: idle,
+          machine: loose,
+          done: {},
+          error: checkBroke,
+          forward: [start],
+        });
+      },
+    });
+    expect(actor.state.name).toBe("idle");
+  });
+
+  test("forward takes parent inputs that the child takes, snapshot takes an output that carries a snapshot", () => {
+    const actor = Actor({
+      inputs: [retry, rate],
+      internal: [checkPassed, checkBroke],
+      outputs: [checkChanged],
+      states: [idle, closed],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        embed(builder, {
+          in: idle,
+          machine: askingCheck,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          forward: [retry, rate],
+          snapshot: checkChanged,
+        });
+      },
+    });
+    expectTypeOf<Embedded["forward"]>().toEqualTypeOf<readonly string[]>();
+    expectTypeOf<Embedded["snapshot"]>().toEqualTypeOf<string | undefined>();
+    expect(actor.options.transitions["idle"]).toHaveProperty("retry");
+  });
+
+  test("wrong forward and snapshot options do not typecheck", () => {
+    const actor = Actor({
+      inputs: [retry, dismiss, rateWithoutScore],
+      internal: [checkPassed, checkBroke],
+      outputs: [checkNamed, progress],
+      states: [idle, closed],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        embed(builder, {
+          in: idle,
+          machine: askingCheck,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          // @ts-expect-error -- the child has no `dismiss` input
+          forward: [retry, dismiss],
+        });
+        embed(builder, {
+          in: idle,
+          machine: askingCheck,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          // @ts-expect-error -- the child `rate` input needs a score that the parent `rate` does not carry
+          forward: [rateWithoutScore],
+        });
+        embed(builder, {
+          in: idle,
+          machine: askingCheck,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          // @ts-expect-error -- only a parent input goes on to the child; `checkPassed` is internal
+          forward: [checkPassed],
+        });
+        embed(builder, {
+          in: idle,
+          machine: askingCheck,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          // @ts-expect-error -- the payload of the output must take a child snapshot
+          snapshot: checkNamed,
+        });
+        embed(builder, {
+          in: idle,
+          machine: askingCheck,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          // @ts-expect-error -- an output without a payload has no room for the snapshot
+          snapshot: progress,
+        });
+        embed(builder, {
+          in: idle,
+          machine: askingCheck,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          // @ts-expect-error -- the snapshot event is a parent output; `checkPassed` is internal
+          snapshot: checkPassed,
+        });
       },
     });
     expect(actor.state.name).toBe("idle");

@@ -74,6 +74,75 @@ function parentOf(clock: Clock, check: ReturnType<typeof brokenCheck>) {
   });
 }
 
+const retry = event("retry")();
+const dismiss = event("dismiss")();
+
+interface AskingOptions {
+  retried: "moves on" | "fails";
+}
+
+const failing = state("failing")();
+const finish = event("finish")();
+
+/** A child that ends on its own after 50 ms; `retry` ends it at once or sends it into `__error`. */
+function askingCheck(options: AskingOptions) {
+  const afterRetry = options.retried === "fails" ? failing : passed;
+  return machine("askingCheck", {
+    create: ({ clock }) =>
+      Actor({
+        inputs: [retry, dismiss],
+        internal: [finish, unhandled],
+        states: [working, failing, passed],
+        initial: working,
+        clock,
+        setup: (builder) => {
+          builder.effect(working, {
+            name: "wait",
+            sends: [finish],
+            fn: (input) => withTimeout(50, { input, event: () => finish.create() }),
+          });
+          builder.on(working, { event: finish, to: [passed], handler: () => ({ state: passed }) });
+          builder.on(working, {
+            event: retry,
+            to: [passed, failing],
+            handler: () => ({ state: afterRetry }),
+          });
+          builder.effect(failing, {
+            name: "break",
+            sends: [unhandled],
+            fn: (input) => input.emit(unhandled.create()),
+          });
+        },
+      }),
+  });
+}
+
+function askingParent(clock: Clock, options: AskingOptions) {
+  return Actor({
+    inputs: [start, retry, dismiss],
+    internal: [checkPassed, checkBroke],
+    states: [idle, checking, accepted, broken],
+    initial: idle,
+    clock,
+    setup: (builder) => {
+      builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
+      embed(builder, {
+        in: checking,
+        machine: askingCheck(options),
+        done: { passed: checkPassed },
+        error: checkBroke,
+        forward: [retry, dismiss],
+      });
+      builder.on(checking, {
+        event: checkPassed,
+        to: [accepted],
+        handler: () => ({ state: accepted }),
+      });
+      builder.on(checking, { event: checkBroke, to: [broken], handler: () => ({ state: broken }) });
+    },
+  });
+}
+
 const settling = state("settling")().final();
 
 const lateFailure = machine("lateFailure", {
@@ -206,5 +275,89 @@ describe("embed errors", () => {
     actor.send(start.create());
 
     expect({ state: actor.state.name, built }).toEqual({ state: "broken", built: 0 });
+  });
+
+  test("a forwarded input the child does not handle in its current state is dropped, and the parent stays", () => {
+    const clock = VirtualClock();
+    const actor = askingParent(clock, { retried: "moves on" });
+    actor.send(start.create());
+
+    actor.send(dismiss.create());
+    clock.advance(50);
+
+    expect(actor.state.name).toBe("accepted");
+  });
+
+  test("a forwarded input that sends the child into __error sends the error event", () => {
+    const actor = askingParent(VirtualClock(), { retried: "fails" });
+    actor.send(start.create());
+
+    actor.send(retry.create());
+
+    expect(actor.state.name).toBe("broken");
+  });
+
+  test("a forwarded input after the child ended reaches nothing", () => {
+    const received: string[] = [];
+    const actor = Actor({
+      inputs: [start, retry],
+      internal: [checkPassed, checkBroke],
+      states: [idle, checking],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
+        embed(builder, {
+          in: checking,
+          machine: askingCheck({ retried: "fails" }),
+          done: { passed: checkPassed },
+          error: checkBroke,
+          forward: [retry],
+        });
+        for (const mapped of [checkPassed, checkBroke]) {
+          builder.on(checking, { event: mapped, handler: (sent) => void received.push(sent.type) });
+        }
+      },
+    });
+    actor.send(start.create());
+    actor.send(retry.create());
+
+    actor.send(retry.create());
+
+    expect({ state: actor.state.name, received }).toEqual({
+      state: "checking",
+      received: ["checkBroke"],
+    });
+  });
+
+  test("a parent without a clock has no child, so a forwarded input changes nothing", () => {
+    const actor = Actor({
+      inputs: [start, retry],
+      internal: [checkPassed, checkBroke],
+      states: [idle, checking, accepted],
+      initial: idle,
+      setup: (builder) => {
+        builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
+        // @ts-expect-error -- a parent without a clock: the types refuse it, a JS caller can still do it
+        embed(builder, {
+          in: checking,
+          machine: askingCheck({ retried: "moves on" }),
+          done: { passed: checkPassed },
+          error: checkBroke,
+          forward: [retry],
+        });
+        builder.on(checking, { event: checkBroke, handler: () => {} });
+        builder.on(checking, {
+          event: checkPassed,
+          to: [accepted],
+          handler: () => ({ state: accepted }),
+        });
+      },
+    });
+    actor.send(start.create());
+
+    actor.send(retry.create());
+
+    expect(actor.state.name).toBe("checking");
   });
 });
