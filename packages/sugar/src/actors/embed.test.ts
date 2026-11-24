@@ -110,6 +110,45 @@ const fetched = machine("fetched", {
     }),
 });
 
+const fetching = state("fetching")();
+const fetchDone = event("fetchDone")();
+
+const waitThenFetch = machine("waitThenFetch", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [],
+      internal: [finish, fetchDone],
+      states: [working, fetching, passed],
+      initial: working,
+      clock,
+      setup: (builder) => {
+        builder.effect(working, {
+          name: "wait",
+          sends: [finish],
+          fn: (input) => withTimeout(50, { input, event: () => finish.create() }),
+        });
+        builder.on(working, {
+          event: finish,
+          to: [fetching],
+          handler: () => ({ state: fetching }),
+        });
+        builder.effect(fetching, {
+          name: "fetch",
+          sends: [fetchDone],
+          fn: (input) =>
+            new Promise((resolve) => setTimeout(resolve, 0)).then(() =>
+              input.emit(fetchDone.create()),
+            ),
+        });
+        builder.on(fetching, {
+          event: fetchDone,
+          to: [passed],
+          handler: () => ({ state: passed }),
+        });
+      },
+    }),
+});
+
 describe("embed", () => {
   test("parent settled() waits for the async work of the child", async () => {
     const actor = Actor({
@@ -138,6 +177,39 @@ describe("embed", () => {
     await actor.settled();
 
     expect(actor.state.name).toBe("accepted");
+  });
+
+  test("parent settled() does not wait for child async work that a later timer starts", async () => {
+    const clock = VirtualClock();
+    const actor = Actor({
+      inputs: [start],
+      internal: [checkPassed, checkBroke],
+      states: [idle, checking, accepted, broken],
+      initial: idle,
+      clock,
+      setup: (builder) => {
+        builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
+        embed(builder, {
+          in: checking,
+          machine: waitThenFetch,
+          done: { passed: checkPassed },
+          error: checkBroke,
+        });
+        builder.on(checking, {
+          event: checkPassed,
+          to: [accepted],
+          handler: () => ({ state: accepted }),
+        });
+      },
+    });
+    actor.send(start.create());
+    await actor.settled();
+    clock.advance(50);
+    await actor.settled();
+    const settledState = actor.state.name;
+    await new Promise((resolve) => setTimeout(resolve, 1));
+
+    expect([settledState, actor.state.name]).toEqual(["checking", "accepted"]);
   });
 
   test("a child final state sends its mapped event, after the child outputs of that step", () => {

@@ -346,6 +346,8 @@ interface Embedded {
 
 The parent receives at most one `done` or `error` event per child. The child outputs that it emits while `machine.create()` runs are not forwarded, because embed subscribes after the child exists.
 
+The effect returns `settled()` of the child, taken when the child is built. So `settled()` of the parent waits for async work that the child starts on entry. It does not wait for async work that the child starts later, for example after a timer fires on `clock.advance()`. To wait for that work, await the promise that the child effect waits on.
+
 ### `broadcast(map, event)`
 
 Send an event to every key in an `ActorMap` (or any `SendableMap`):
