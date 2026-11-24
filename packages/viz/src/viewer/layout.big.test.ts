@@ -1,11 +1,11 @@
-import whole from "./reference/justus-whole-app.json" with { type: "json" };
-import { VIZ_SCHEMA_VERSION } from "../schema.ts";
-import type { VizEdge, VizMachine, VizState } from "../schema.ts";
-import { validateViz } from "../validate.ts";
-import { isDrawn, layoutMachine } from "./layout.ts";
-import { partMachine } from "./parts.ts";
-import { Either } from "@mantaq/utils";
 import { describe, expect, test } from "vite-plus/test";
+import { isDrawn, layoutMachine } from "./layout.ts";
+import type { VizEdge, VizMachine, VizState } from "../schema.ts";
+import { Either } from "@mantaq/utils";
+import { partMachine } from "./parts.ts";
+import { validateViz } from "../validate.ts";
+import { VIZ_SCHEMA_VERSION } from "../schema.ts";
+import whole from "./reference/justus-whole-app.json" with { type: "json" };
 
 const STATES = 21;
 const ARROWS = 100;

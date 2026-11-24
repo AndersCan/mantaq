@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vite-plus/test";
-import type { VizMachine } from "../schema.ts";
-import { renderGraph } from "./graph.ts";
 import { layoutMachine, placeMachine } from "./layout.ts";
 import { Either } from "@mantaq/utils";
+import { renderGraph } from "./graph.ts";
+import type { VizMachine } from "../schema.ts";
 
 vi.mock("./overlaps.ts", async (original) => ({
   ...(await original<typeof import("./overlaps.ts")>()),
