@@ -1,4 +1,5 @@
 import { Actor, event, machine, state, VirtualClock } from "@mantaq/core";
+import type { Snapshot } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { embed } from "./embed.ts";
 import { withTimeout } from "../effects/timeout.ts";
@@ -77,7 +78,95 @@ const lateFailure = machine("lateFailure", {
     }),
 });
 
+const retry = event("retry")();
+const checkChanged = event("checkChanged")<Snapshot>();
+
+const retryable = machine("retryable", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [retry],
+      states: [working, passed],
+      initial: working,
+      clock,
+      setup: (builder) => {
+        builder.on(working, { event: retry, to: [passed], handler: () => ({ state: passed }) });
+      },
+    }),
+});
+
 describe("embed mutation", () => {
+  test("forward and snapshot: the tag names them, outputs carry each child path, retry ends the child", () => {
+    const paths: string[][] = [];
+    const actor = Actor({
+      inputs: [retry],
+      internal: [checkPassed, checkBroke],
+      outputs: [checkChanged],
+      states: [checking, accepted],
+      initial: checking,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        embed(builder, {
+          in: checking,
+          machine: retryable,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          forward: [retry],
+          snapshot: checkChanged,
+        });
+        builder.on(checking, {
+          event: checkPassed,
+          to: [accepted],
+          handler: () => ({ state: accepted }),
+        });
+      },
+    });
+    actor.on("output", {
+      fn: (output) => {
+        if (checkChanged.is(output)) paths.push(output.payload.path);
+      },
+    });
+    const [entry] = actor.options.effects["checking"] ?? [];
+    const embedded: unknown = Reflect.get(entry?.fn ?? {}, "embedded");
+
+    actor.send(retry.create());
+
+    expect({ embedded, paths, state: actor.state.name }).toEqual({
+      embedded: {
+        machine: retryable,
+        done: { passed: "checkPassed" },
+        error: "checkBroke",
+        forward: ["retry"],
+        snapshot: "checkChanged",
+      },
+      paths: [["passed"]],
+      state: "accepted",
+    });
+  });
+
+  test("a forwarded input with no child is dropped", () => {
+    const actor = Actor({
+      inputs: [retry],
+      internal: [checkPassed, checkBroke],
+      states: [checking],
+      initial: checking,
+      setup: (builder) => {
+        // @ts-expect-error -- a parent without a clock: the types refuse it, a JS caller can still do it
+        embed(builder, {
+          in: checking,
+          machine: retryable,
+          done: { passed: checkPassed },
+          error: checkBroke,
+          forward: [retry],
+        });
+        builder.on(checking, { event: checkBroke, handler: () => {} });
+      },
+    });
+
+    actor.send(retry.create());
+
+    expect(actor.state.name).toBe("checking");
+  });
+
   test("a child that fails after it ended sends no second event", async () => {
     const received: string[] = [];
     const actor = Actor({
