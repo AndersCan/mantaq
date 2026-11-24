@@ -2,7 +2,7 @@ import { Either } from "@mantaq/utils";
 import ts from "typescript";
 
 /** Builds one program when the store has none for a file. */
-export type BuildProgram = (setup: ts.CreateProgramOptions) => ts.Program;
+type BuildProgram = (setup: ts.CreateProgramOptions) => ts.Program;
 
 interface StoredProgram {
   optionsKey: string;
