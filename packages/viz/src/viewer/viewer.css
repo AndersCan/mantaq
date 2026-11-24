@@ -293,7 +293,7 @@
   fill: var(--fg);
 }
 
-.viz .machine-name {
+.viz .graph .machine-name {
   fill: var(--muted);
   font-size: 11px;
 }

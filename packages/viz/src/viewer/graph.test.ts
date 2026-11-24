@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
@@ -519,5 +521,21 @@ describe("mountViewer onEnter", () => {
     root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     root.remove();
     expect(entered).toEqual(["payment"]);
+  });
+});
+
+describe("machine node styles", () => {
+  test("the machine's id is drawn at the 11px the layout measures it with", () => {
+    const style = document.createElement("style");
+    style.textContent = readFileSync(join(import.meta.dirname, "viewer.css"), "utf8");
+    const root = document.createElement("div");
+    root.className = "viz";
+    root.append(renderGraph(document, checkout, { select: () => undefined }));
+    document.body.append(style, root);
+    const name = root.querySelector(".machine-name");
+    const shown = name === null ? undefined : getComputedStyle(name).fontSize;
+    root.remove();
+    style.remove();
+    expect(shown).toBe("11px");
   });
 });
