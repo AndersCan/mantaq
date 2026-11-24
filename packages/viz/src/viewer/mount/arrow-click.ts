@@ -1,21 +1,40 @@
 import type { GraphCallbacks, Selection } from "../graph.ts";
 import { memberAt, shareArrows } from "../shared.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
+import type { VizEdge, VizMachine } from "../../schema.ts";
 import { arrowSend } from "./arrow-send.ts";
 import type { ArrowSendContext } from "./arrow-send.ts";
 import { currentsOf } from "../compartments.ts";
 import type { EventClick } from "./event-send.ts";
-import type { VizMachine } from "../../schema.ts";
 
-/** Diagram only: the line under the board says why the selected arrow's click sent nothing. */
+/** Diagram only: the line under the board says why the selected arrow's click did not, or will not, go where it is drawn. */
 export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
   const { selection, sent } = from.view;
   const edge = from.machine.edges.find(
     (candidate) => selection?.kind === "edge" && candidate.id === selection.id,
   );
-  const decision = edge === undefined || sent?.edge === edge.id ? undefined : arrowSend(from, edge);
   const line = root.querySelector(".viz-main > .blocked-note");
-  if (line !== null) line.textContent = decision?.kind === "refuse" ? decision.text : "";
+  if (line !== null) line.textContent = edge === undefined ? "" : whyText(from, { edge, sent });
+}
+
+interface WhyTextOptions {
+  edge: VizEdge;
+  sent: ViewState["sent"];
+}
+
+function whyText(from: ArrowSendContext, options: WhyTextOptions): string {
+  const { edge, sent } = options;
+  const decision = arrowSend(from, edge);
+  switch (decision.kind) {
+    case "send":
+      return sent?.edge === edge.id ? (sent.blocked ?? "") : (decision.blocked ?? "");
+    case "refuse":
+      return decision.text;
+    case "elsewhere":
+      return sent?.edge === edge.id ? "" : decision.text;
+    case "none":
+      return "";
+  }
 }
 
 export interface DrawHandlers {
@@ -24,7 +43,7 @@ export interface DrawHandlers {
   sendEvent: (click: EventClick) => void;
 }
 
-/** A click on an arrow sends when Details would offer Send, else opens its Details. */
+/** A click on an arrow sends its event when a person can send it from here, blocked or not; else it opens the arrow's Details, which say why not. Its `?` opens Details. */
 export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): GraphCallbacks {
   const { machine, view } = from;
   const members = { machine: handlers.shown, view };

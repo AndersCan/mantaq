@@ -91,16 +91,15 @@ function docLine(doc: Document, scope: string, text: string | null): HTMLElement
   return text === null ? null : html(doc, "p", { class: "doc", "data-doc": scope }, [text]);
 }
 
-function edgePanel(
-  doc: Document,
-  edge: VizEdge,
-  context: {
-    machine: VizMachine;
-    select: (selection: Selection) => void;
-    send: ((edge: VizEdge) => HTMLElement | null) | undefined;
-  },
-): HTMLElement {
-  const { machine, select, send } = context;
+interface EdgePanelOptions {
+  edge: VizEdge;
+  machine: VizMachine;
+  select: (selection: Selection) => void;
+  send: ((edge: VizEdge) => HTMLElement | undefined) | undefined;
+}
+
+function edgePanel(doc: Document, options: EdgePanelOptions): HTMLElement {
+  const { edge, machine, select, send } = options;
   const siblings = sameEvent(machine, edge);
   return html(doc, "section", { class: "details", "data-selected-edge": edge.id }, [
     html(doc, "h2", {}, [edgeTitle(edge)]),
@@ -151,30 +150,41 @@ function statePanel(
   ]);
 }
 
+export interface RenderPanelOptions {
+  machine: VizMachine;
+  selection: Selection | null;
+  select: (selection: Selection) => void;
+  /** What Details shows under an arrow's title to send it. */
+  send?: (edge: VizEdge) => HTMLElement | undefined;
+  /** Shown when nothing is selected. */
+  hint?: string;
+}
+
+function selectedPanel(doc: Document, options: RenderPanelOptions): HTMLElement | undefined {
+  const { machine, selection, select } = options;
+  const id = selection?.id;
+  switch (selection?.kind) {
+    case "edge": {
+      const edge = machine.edges.find((candidate) => candidate.id === id);
+      if (edge) return edgePanel(doc, { edge, machine, select, send: options.send });
+      const arrow = shareArrows(machine).arrows.find((candidate) => candidate.id === id);
+      return arrow && sharedPanel(doc, arrow, select);
+    }
+    case "state": {
+      const state = machine.states.find((candidate) => candidate.id === id);
+      return state && statePanel(doc, state, { machine, select });
+    }
+    case undefined:
+      return undefined;
+  }
+}
+
 /** Side-panel body for the current selection, or a hint when nothing is selected. */
-export function renderPanel(
-  doc: Document,
-  machine: VizMachine,
-  context: {
-    selection: Selection | null;
-    select: (selection: Selection) => void;
-    send?: (edge: VizEdge) => HTMLElement | null;
-    /** Shown when nothing is selected. */
-    hint?: string;
-  },
-): HTMLElement {
-  const { selection } = context;
-  if (selection?.kind === "edge") {
-    const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-    if (edge) return edgePanel(doc, edge, { machine, select: context.select, send: context.send });
-    const arrow = shareArrows(machine).arrows.find((candidate) => candidate.id === selection.id);
-    if (arrow) return sharedPanel(doc, arrow, context.select);
-  }
-  if (selection?.kind === "state") {
-    const state = machine.states.find((candidate) => candidate.id === selection.id);
-    if (state) return statePanel(doc, state, { machine, select: context.select });
-  }
-  return html(doc, "p", { class: "muted" }, [
-    context.hint ?? "Click a state or an arrow in the diagram.",
-  ]);
+export function renderPanel(doc: Document, options: RenderPanelOptions): HTMLElement {
+  return (
+    selectedPanel(doc, options) ??
+    html(doc, "p", { class: "muted" }, [
+      options.hint ?? "Click a state or an arrow in the diagram.",
+    ])
+  );
 }

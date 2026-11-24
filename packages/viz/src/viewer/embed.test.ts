@@ -528,14 +528,14 @@ describe("mountViewer with a driver", () => {
     expect(root.querySelector(".graph g[data-node-id='done']")?.classList).toContain("current");
   });
 
-  test("the panel is tabbed: Step, then Details", () => {
+  test("the panel is tabbed: Step, Context, then Details", () => {
     const root = mountLive();
     const labels = () => [...root.querySelectorAll("[data-tab]")].map((tab) => tab.textContent);
     const shown = () =>
       [...root.querySelectorAll("[data-tab-panel]")]
         .filter((panel) => !panel.hasAttribute("hidden"))
         .map((panel) => panel.getAttribute("data-tab-panel"));
-    expect(labels()).toEqual(["Step", "Details"]);
+    expect(labels()).toEqual(["Step", "Context", "Details"]);
     expect(shown()).toEqual(["step"]);
     send(root, "go");
     root.querySelector<HTMLButtonElement>('[data-tab="details"]')?.click();

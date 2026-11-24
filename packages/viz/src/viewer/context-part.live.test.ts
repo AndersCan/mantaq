@@ -106,21 +106,18 @@ function mount(): HTMLElement {
 
 const press = (element: Element | null) =>
   element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-const fields = (root: HTMLElement) =>
-  [...root.querySelectorAll("[data-value]")].map((input) => input.getAttribute("data-value"));
+function fields(root: HTMLElement): Array<string | undefined> {
+  const boxes = [...root.querySelectorAll("[data-send-form] [data-value]")];
+  return boxes.map((input) => input.getAttribute("data-value") ?? undefined);
+}
 
-test("the Context tab lists the fields of the opened machine only", () => {
+test("in an opened machine, an arrow's send form lists its own event's fields", () => {
   const root = mount();
-  press(root.querySelector('[data-tab="context"]'));
   press(root.querySelector('g.part[data-part="p"]'));
+  press(root.querySelector('[data-details-edge="p.one-x-p.two"]'));
   expect(fields(root)).toEqual(["code"]);
   press(root.querySelector(".part-title"));
   press(root.querySelector('g.part[data-part="q"]'));
+  press(root.querySelector('[data-details-edge="q.one-y-q.two"]'));
   expect(fields(root)).toEqual(["why"]);
-});
-
-test("the board lists every field", () => {
-  const root = mount();
-  press(root.querySelector('[data-tab="context"]'));
-  expect(fields(root)).toEqual(["code", "why"]);
 });

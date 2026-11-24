@@ -17,15 +17,15 @@ export interface PanelTabsOptions {
   refresh: () => void;
 }
 
-/** The Step, Context and Details tabs; Context only live and with value fields. */
+/** The Step, Context and Details tabs; Step only live, Context only when there is a context to show. */
 export function panelTabs(doc: Document, context: PanelTabsOptions): HTMLElement {
   const { view, parts } = context;
   const all: Array<Tab<PanelTab> | undefined> = [
     context.screen === undefined
       ? undefined
       : { id: "screen", label: "Screen", content: html(doc, "div", {}, [context.screen]) },
-    parts.step === null ? undefined : { id: "step", label: "Step", content: parts.step },
-    parts.context === null
+    parts.step === undefined ? undefined : { id: "step", label: "Step", content: parts.step },
+    parts.context === undefined
       ? undefined
       : {
           id: "context",
@@ -49,7 +49,7 @@ export function panelTabs(doc: Document, context: PanelTabsOptions): HTMLElement
 /** The live driver's part of the panel context. */
 export function liveOf(
   view: ViewState,
-  handlers: Pick<LiveContext, "send" | "pick" | "setValue" | "routes">,
+  handlers: Pick<LiveContext, "send" | "pick" | "routes">,
 ): { live?: LiveContext } {
   if (view.live === null) return {};
   return {
@@ -58,7 +58,6 @@ export function liveOf(
       afters: view.afters,
       lasts: view.lasts,
       picked: view.picked,
-      values: view.values,
       ...handlers,
     },
   };

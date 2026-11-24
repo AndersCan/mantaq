@@ -11,13 +11,10 @@ import type {
 import {
   arrowCandidates,
   decodeValues,
-  defaultValue,
-  encodeValues,
   freshKeys,
   knownPayload,
   parseValue,
   payloadFor,
-  valueFields,
   valueText,
 } from "./fill.ts";
 
@@ -244,27 +241,6 @@ describe("values set in the Context tab", () => {
     expect(payloadFor(answering, "ping", { set: { code: "x" }, ...none })).toBeNull();
   });
 
-  test("one row per field name, the first event's field wins", () => {
-    expect(valueFields(answering).map((each) => each.name)).toEqual(["code", "answer"]);
-  });
-
-  test("the default shown is the latest value the walk sent under that name, else the example", () => {
-    const live = { steps: [step("ask", { code: "c1" })], children: [] } as never;
-    expect(defaultValue(code, { live, afters: [] })).toBe("c1");
-    expect(defaultValue(answer, { live, afters: [] })).toBe("accepted");
-    expect(defaultValue({ ...code, optional: true }, { live: null, afters: [] })).toBeUndefined();
-  });
-
-  test("the default for a key that started a child is the next free key, as Send sends", () => {
-    const live = {
-      steps: [step("ask", { code: "p1" })],
-      children: [{ map: "m", key: "p1", state: "s", since: 1 }],
-    } as never;
-    expect(defaultValue(code, { live, afters: [], events: ["ask"] })).toBe("p2");
-    expect(defaultValue(code, { live, afters: [] })).toBe("p1");
-    expect(defaultValue(code, { live, afters: [], events: ["other"] })).toBe("p1");
-  });
-
   test("a value the walk sent under another event's name is sent, and a set one beats it", () => {
     const live = { steps: [step("ask", { code: "c1" })], children: [] } as never;
     expect(payloadFor(answering, "answered", { set: {}, live, afters: [] })).toEqual({
@@ -291,6 +267,10 @@ describe("values set in the Context tab", () => {
     expect(payloadFor(pool, "ITEMS_FINISHED", { set: {}, live, afters })).toEqual({ worker: "w1" });
   });
 
+  test("old address values decode by name; entries with no name, no = or bad JSON are skipped", () => {
+    expect(decodeValues(["a=1", "bad", "b={", "=3", 'c="x=y"'])).toEqual({ a: 1, c: "x=y" });
+  });
+
   test("text for each kind of field, and back", () => {
     const count = field("count", "number");
     const flags = field("flags", "json");
@@ -309,29 +289,9 @@ describe("values set in the Context tab", () => {
     expect(parseValue(code, "   ")).toBeUndefined();
     expect(parseValue(flags, " ")).toBeUndefined();
   });
-
-  test("of two events with one field name, the one that requires it supplies the row", () => {
-    const optional: VizField = { ...field("code", "text"), optional: true };
-    const required = field("code", "text");
-    const other = field("code", "text");
-    const events = [
-      { id: "a", payload: [optional] },
-      { id: "b", payload: [required] },
-      { id: "c", payload: [{ ...other, sample: "later" }] },
-    ];
-    expect(valueFields({ ...answering, events } as never)).toEqual([required]);
-  });
-
-  test("values round-trip through the address; entries with no name, no = or bad JSON are skipped", () => {
-    expect(decodeValues(["a=1", "bad", "b={", "=3"])).toEqual({ a: 1 });
-    const values = { email: "a@b", count: 3, flags: { a: [1] } };
-    expect(encodeValues(values)).toEqual(['email="a@b"', "count=3", 'flags={"a":[1]}']);
-    expect(decodeValues(encodeValues(values))).toEqual(values);
-    expect(decodeValues(['a="x=y"'])).toEqual({ a: "x=y" });
-  });
 });
 
-test("an optional field with nothing set or heard is left out, as its empty box shows", () => {
+test("an optional field with nothing set or heard is left out, so its box is empty", () => {
   const note: VizField = { ...field("note", "text"), optional: true };
   const machine = {
     events: [{ id: "submit", internal: false, doc: null, payload: [note] }],
@@ -341,18 +301,7 @@ test("an optional field with nothing set or heard is left out, as its empty box 
     },
   } as unknown as VizMachine;
   const from = { set: {}, live: null, afters: [] };
-  expect(defaultValue(note, from)).toBeUndefined();
   expect(payloadFor(machine, "submit", from)).toEqual({});
-});
-
-test("of two events that both leave a field name optional, the first supplies the row", () => {
-  const first: VizField = { ...field("code", "text"), optional: true };
-  const second: VizField = { ...field("code", "number"), optional: true };
-  const events = [
-    { id: "a", payload: [first] },
-    { id: "b", payload: [second] },
-  ];
-  expect(valueFields({ events } as never)).toEqual([first]);
 });
 
 describe("arrowCandidates", () => {

@@ -1,6 +1,6 @@
 import { decodeLiveSteps, encodeLiveStep } from "../../moves.ts";
 import type { VizDriver, VizLiveState, VizLiveStep, VizMachine, VizStep } from "../../schema.ts";
-import { encodeValues } from "../fill.ts";
+import { encodePayloads } from "../send/payloads.ts";
 import type { ViewerOptions } from "./viewer-options.ts";
 import type { ViewState } from "./view-state.ts";
 
@@ -78,13 +78,13 @@ export interface NavigatedOptions {
   view: ViewState;
 }
 
-/** Tells the host where the walk and the values now are. */
+/** Tells the host where the walk and the changed payloads now are. */
 export function navigated(options: ViewerOptions, now: NavigatedOptions): void {
   const { machine, view } = now;
   options.onNavigate?.({
     machine: machine.id,
     steps: view.live?.steps.map(encodeLiveStep) ?? [],
-    values: encodeValues(view.values),
+    payloads: encodePayloads(view.payloads),
   });
 }
 

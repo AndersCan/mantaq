@@ -136,7 +136,7 @@ const arrow = (root: HTMLElement, id: string) =>
 const click = (root: HTMLElement, id: string) =>
   arrow(root, id)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-test("on a run, an arrow nothing takes is locked with the default's reason, as before", () => {
+test("on a run, an arrow nothing takes is locked, and a click sends the default its lock was tried with", () => {
   const { driver, sent } = fakeDriver();
   const root = document.createElement("div");
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] }, { driver });
@@ -145,5 +145,5 @@ test("on a run, an arrow nothing takes is locked with the default's reason, as b
   // n=1 (the default) goes to c, n=7 (the run's next step) stays: nothing takes b --> d.
   expect(arrow(root, "b-go-d")?.classList.contains("blocked")).toBe(true);
   click(root, "b-go-d");
-  expect(sent).toHaveLength(1);
+  expect(sent).toEqual([go(1), go(1)]);
 });

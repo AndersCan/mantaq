@@ -1,16 +1,23 @@
 /**
- * Options for a page that keeps `?machine=&step=&run=&value=` in the address bar so a walk can be shared (`linkOptions`).
+ * Options for a page that keeps `?machine=&step=&run=&payload=` (and reads old `?value=` links) in the address bar so a walk can be shared (`linkOptions`).
  */
 import type { ViewerOptions } from "./embed.ts";
 import "./viewer.css";
 
-function rememberWalk(where: { machine: string; steps: string[]; values: string[] }): void {
+interface Walk {
+  machine: string;
+  steps: string[];
+  payloads: string[];
+}
+
+function rememberWalk(where: Walk): void {
   const next = new URLSearchParams(location.search);
   next.set("machine", where.machine);
   next.delete("step");
   next.delete("run");
   next.delete("value");
-  for (const value of where.values) next.append("value", value);
+  next.delete("payload");
+  for (const payload of where.payloads) next.append("payload", payload);
   for (const step of where.steps) next.append("step", step);
   history.replaceState(null, "", `?${next.toString()}`);
 }
@@ -24,6 +31,7 @@ export function linkOptions(): ViewerOptions {
     ...(machine === null ? {} : { machine }),
     ...(machine !== null && run !== null ? { run } : {}),
     steps: params.getAll("step"),
+    payloads: params.getAll("payload"),
     values: params.getAll("value"),
     onNavigate: rememberWalk,
   };
