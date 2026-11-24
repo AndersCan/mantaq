@@ -730,6 +730,18 @@ describe("placeMachine machine node", () => {
     });
   });
 
+  test("a final machine node with effects keeps its chips clear of the row", () => {
+    const busy: VizMachine = {
+      ...checkout,
+      states: checkout.states.map((each) =>
+        each.id === "paying"
+          ? { ...each, final: true, effects: [{ name: "chargeCard", sends: [] }] }
+          : each,
+      ),
+    };
+    expect(Either.getRight(layoutMachine(busy))?.overlaps).toEqual([]);
+  });
+
   test("under its name: the glyph, the machine's id and enter, each LABEL_PAD apart", () => {
     const node = placeMachine(checkout).nodes.find((each) => each.id === "paying");
     const shown =
