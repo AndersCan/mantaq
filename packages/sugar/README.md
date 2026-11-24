@@ -258,7 +258,108 @@ The types require these things:
 - The parent declares each output of the child as an input, an internal event or an output. Embed forwards each child output into the parent, as `regions` do.
 - The factory of the child returns the actor, or `{ actor }` and nothing else. Embed disposes only the actor.
 
-The parent sends no events into the child. The child moves on its own effects and timers.
+#### Forward user events and watch the child
+
+A child often waits for the user, for example to retry or dismiss a failed upload. The user sends these events to the parent. `forward` lists the parent inputs that embed sends on to the running child. `snapshot` names a parent output that carries the snapshot of the child.
+
+```ts
+import { Actor, machine, state, event } from "@mantaq/core";
+import type { Snapshot } from "@mantaq/core";
+import { embed, withTimeout } from "@mantaq/sugar";
+
+const uploading = state("uploading")();
+const couldNotUpload = state("couldNotUpload")();
+const uploaded = state("uploaded")().final();
+const dismissed = state("dismissed")().final();
+const uploadFailed = event("uploadFailed")();
+const retry = event("retry")();
+const dismiss = event("dismiss")();
+
+const upload = machine("upload", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [retry, dismiss],
+      internal: [uploadFailed],
+      states: [uploading, couldNotUpload, uploaded, dismissed],
+      initial: uploading,
+      clock,
+      setup: (m) => {
+        m.effect(uploading, {
+          name: "upload",
+          sends: [uploadFailed],
+          fn: (input) => withTimeout(100, { input, event: () => uploadFailed.create() }),
+        });
+        m.on(uploading, {
+          event: uploadFailed,
+          to: [couldNotUpload],
+          handler: () => ({ state: couldNotUpload }),
+        });
+        m.on(couldNotUpload, {
+          event: retry,
+          to: [uploading],
+          handler: () => ({ state: uploading }),
+        });
+        m.on(couldNotUpload, {
+          event: dismiss,
+          to: [dismissed],
+          handler: () => ({ state: dismissed }),
+        });
+      },
+    }),
+});
+
+const editing = state("editing")();
+const saving = state("saving")();
+const saved = state("saved")();
+const save = event("save")();
+const uploadDone = event("uploadDone")();
+const uploadDismissed = event("uploadDismissed")();
+const uploadBroke = event("uploadBroke")();
+const uploadChanged = event("uploadChanged")<Snapshot>();
+
+const editor = machine("editor", {
+  create: ({ clock }) =>
+    Actor({
+      inputs: [save, retry, dismiss],
+      internal: [uploadDone, uploadDismissed, uploadBroke],
+      outputs: [uploadChanged],
+      states: [editing, saving, saved],
+      initial: editing,
+      clock,
+      setup: (m) => {
+        m.on(editing, { event: save, to: [saving], handler: () => ({ state: saving }) });
+        embed(m, {
+          in: saving,
+          machine: upload,
+          done: { uploaded: uploadDone, dismissed: uploadDismissed },
+          error: uploadBroke,
+          forward: [retry, dismiss],
+          snapshot: uploadChanged,
+        });
+        m.on(saving, { event: uploadDone, to: [saved], handler: () => ({ state: saved }) });
+        m.on(saving, {
+          event: uploadDismissed,
+          to: [editing],
+          handler: () => ({ state: editing }),
+        });
+        m.on(saving, { event: uploadBroke, to: [editing], handler: () => ({ state: editing }) });
+      },
+    }),
+});
+```
+
+While the parent is in `saving`, `editor.send(retry.create())` goes to the child. The child handles it like any input: here it leaves `couldNotUpload` and uploads again. When the child ends in `dismissed`, the parent receives `uploadDismissed`. Outside `saving` there is no child, and the parent ignores `retry` like any input that it does not handle.
+
+Embed registers a parent handler for each forwarded event in `in`. The handler keeps the parent in `in` and sends the event to the child. Do not add another handler for a forwarded event in `in`. The parent keeps one handler per state and event, so a later handler replaces the one from embed. `actor.options.targets` lists each forwarded event on `in` with no targets, and the `embedded` tag lists them in `forward`.
+
+The parent emits `uploadChanged` when the child is built and again after each change of the child. Its payload is the snapshot of the child. The UI subscribes to the parent outputs and shows the retry and dismiss buttons when the path of the child is `["couldNotUpload"]`. Dev tools read the same output.
+
+The types also require these things:
+
+- Each `forward` event is an input of the parent and an input of the child. The child input takes the payload of the parent event.
+- The `snapshot` event is an output of the parent. Its payload type takes the snapshot of the child.
+
+Events reach the child only through `forward`. Nothing else sends events into the child.
 
 ### Effect utilities: `withPromise` vs manual handling
 
@@ -328,9 +429,9 @@ activeLeaves(snapshot); // e.g. ["on.player.playing"]
 
 Dynamic child actor registry: `spawn`, `ensure`, `send`, `kill`, `has`, `keys`, `snapshot`, `size`, `dispose`. See [ActorMap](#actormap-dynamic-children-by-key).
 
-### `embed(m, { in, machine, done, error })`
+### `embed(m, { in, machine, done, error, forward?, snapshot? })`
 
-Run `machine` while the parent is in the state `in`. The pattern above shows a full example. Embed registers one effect on `in`, named `embed:<machine id>`. Its `sends` lists the `done` and `error` events. It does not list the child outputs that embed forwards. A tool finds those in `options.outputs` of the child.
+Run `machine` while the parent is in the state `in`. The pattern above shows a full example. Embed registers one effect on `in`, named `embed:<machine id>`. Its `sends` lists the `done` and `error` events. It does not list the child outputs that embed passes to the parent. A tool finds those in `options.outputs` of the child. For each `forward` event, embed also registers a handler on `in` with no targets.
 
 The effect fn has an `embedded` property. Tools such as `@mantaq/inspect` read it from `actor.options.effects` with `Reflect.get(entry.fn, "embedded")`, so they do not import sugar. The property has this shape (the `Embedded` type):
 
@@ -341,8 +442,12 @@ interface Embedded {
   machine: Machine; // the child machine, as given to embed
   done: Record<string, string>; // final state name of the child -> event type the parent receives
   error: string; // event type the parent receives when the child enters __error, or a final state done does not name
+  forward: readonly string[]; // parent input types that embed sends to the child while the parent is in `in`
+  snapshot: string | undefined; // parent output type that carries each child snapshot, or undefined
 }
 ```
+
+A live tool sends a forwarded event to the parent, as the UI does, and reads the child state from the `snapshot` output. A parent without `snapshot` shows no child state. The snapshot of the parent does not include the child.
 
 The parent receives at most one `done` or `error` event per child. The child outputs that it emits while `machine.create()` runs are not forwarded, because embed subscribes after the child exists.
 
