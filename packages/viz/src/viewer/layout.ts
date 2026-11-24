@@ -826,14 +826,57 @@ function assignPorts(
   return { ports, need, entryY };
 }
 
+/** Dagre's `customOrder` hook: it gets dagre's working graph and dagre's own `order`. */
+type CustomOrder = (graph: LayoutGraph, order: (graph: LayoutGraph) => void) => void;
+
+/** Dagre's working graph, one line per node: a state id, or a dummy's kind and rank, as dummy ids change on every run. */
+function nodeKeys(graph: LayoutGraph): string {
+  const keys: string[] = [];
+  for (const id of graph.nodes()) {
+    const { dummy, rank } = graph.node(id);
+    keys.push(dummy === undefined ? id : `${dummy}:${rank}`);
+  }
+  return keys.join("\n");
+}
+
+interface KnownOrder {
+  keys: string;
+  orders: Array<number | undefined>;
+}
+
+/**
+ * Dagre's crossing reduction, run once and replayed on the later passes.
+ * A later pass changes box heights only, and the order depends on the graph
+ * alone; when the working graph differs, it orders afresh.
+ */
+function orderOnce(): CustomOrder {
+  const known: KnownOrder = { keys: "", orders: [] };
+  const reorder: CustomOrder = (graph, order) => {
+    const ids: string[] = graph.nodes();
+    const keys = nodeKeys(graph);
+    if (keys !== known.keys) {
+      order(graph);
+      known.keys = keys;
+      known.orders = ids.map((id) => graph.node(id).order);
+      return;
+    }
+    for (const [index, id] of ids.entries()) {
+      const at = known.orders[index];
+      if (at !== undefined) graph.node(id).order = at;
+    }
+  };
+  return reorder;
+}
+
 /** Runs dagre until every node's box is tall enough for its ports (at most 3 passes). */
 function laidOut(machine: Drawing): { graph: LayoutGraph; specs: Map<string, Spec>; geo: Geo } {
   const starts = new Set(startIds(machine));
   const heights = new Map<string, number>();
+  const customOrder = orderOnce();
   for (let pass = 0; ; pass++) {
     const specs = specsOf(machine, heights);
     const graph = graphOf(machine, specs);
-    layout(graph);
+    layout(graph, { customOrder });
     const geo = geoOf(graph, machine, specs);
     const boxes = new Map(
       [...specs].map(([id, spec]) => [id, boxOf(spec, geo.nodes.get(id) ?? { x: 0, y: 0 })]),
@@ -1111,16 +1154,20 @@ function levelRoute(
   points.push({ x: clear(last, targetOf(edge)), y: last.y }, { x: last.x, y: last.y });
   return points;
 }
-/** The layout unless it overlaps itself: then the overlaps. */
-export function checkedLayout(placed: MachineLayout): Either<Overlap[], MachineLayout> {
-  const overlaps = overlapsOf(placed);
-  return overlaps.length === 0 ? Either.right(placed) : Either.left(overlaps);
+/** A layout and what overlaps in it: it is drawn either way, and the viewer warns when `overlaps` is not empty. */
+export interface CheckedLayout {
+  layout: MachineLayout;
+  overlaps: Overlap[];
 }
 
-/** The layout, or the error when dagre or a missing node spec stops it, or the overlaps when it still overlaps. */
-export function layoutMachine(machine: VizMachine): Either<unknown, MachineLayout> {
+export function checkedLayout(placed: MachineLayout): CheckedLayout {
+  return { layout: placed, overlaps: overlapsOf(placed) };
+}
+
+/** The layout and its overlaps, or the error when dagre or a missing node spec stops it. */
+export function layoutMachine(machine: VizMachine): Either<unknown, CheckedLayout> {
   const placed = Either.from(() => placeMachine(machine));
-  return Either.isLeft(placed) ? placed : checkedLayout(placed[1]);
+  return Either.isLeft(placed) ? placed : Either.right(checkedLayout(placed[1]));
 }
 
 interface Widen {

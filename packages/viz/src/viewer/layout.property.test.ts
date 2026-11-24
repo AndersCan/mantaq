@@ -1,9 +1,7 @@
 import counterexamples from "./reference/property-counterexamples.json" with { type: "json" };
 import { machineArbitrary, talkingArbitrary } from "./layout.arbitrary.ts";
-import { layoutMachine, messagesOf, placeMachine } from "./layout.ts";
-import { overlapsOf } from "./overlaps.ts";
+import { layoutMachine, messagesOf } from "./layout.ts";
 import type { VizMachine } from "../schema.ts";
-import { Either } from "@mantaq/utils";
 import fc from "fast-check";
 import { describe, expect, test } from "vite-plus/test";
 
@@ -14,8 +12,7 @@ describe("layout guarantee on generated machines", () => {
   test("P1: layoutMachine is Right and the checker finds nothing", () => {
     fc.assert(
       fc.property(machineArbitrary, (machine) => {
-        expect(overlapsOf(placeMachine(machine))).toEqual([]);
-        expect(Either.isRight(layoutMachine(machine))).toBe(true);
+        expect(layoutMachine(machine)[1]?.overlaps).toEqual([]);
       }),
       run,
     );
@@ -26,8 +23,7 @@ describe("layout guarantee on generated machines", () => {
       fc.property(
         talkingArbitrary.filter((machine) => messagesOf(machine).length > 0),
         (machine) => {
-          expect(overlapsOf(placeMachine(machine))).toEqual([]);
-          expect(Either.isRight(layoutMachine(machine))).toBe(true);
+          expect(layoutMachine(machine)[1]?.overlaps).toEqual([]);
         },
       ),
       { seed: 0x757, numRuns: 300 },

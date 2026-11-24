@@ -2,7 +2,7 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import type { VizMachine } from "../schema.ts";
 import { renderGraph } from "./graph.ts";
-import { layoutMachine } from "./layout.ts";
+import { layoutMachine, placeMachine } from "./layout.ts";
 import { Either } from "@mantaq/utils";
 
 vi.mock("./overlaps.ts", async (original) => ({
@@ -54,19 +54,25 @@ const machine = {
 } as unknown as VizMachine;
 
 describe("a layout that overlaps itself", () => {
-  test("layoutMachine is Left with the overlaps", () => {
-    const laid = layoutMachine(machine);
-    expect(Either.isLeft(laid)).toBe(true);
-    expect(laid[0]).toEqual([{ rule: "label-clear", a: "edge:x", b: "node:y", distance: 0 }]);
+  test("layoutMachine is Right with the layout and the overlaps", () => {
+    expect(layoutMachine(machine)).toEqual(
+      Either.right({
+        layout: placeMachine(machine),
+        overlaps: [{ rule: "label-clear", a: "edge:x", b: "node:y", distance: 0 }],
+      }),
+    );
   });
 
-  test("renderGraph shows the one-line load error, not a diagram", () => {
-    const shown = renderGraph(document, machine, {
-      select: () => {},
-      showDetails: () => {},
-      mode: "explore",
-    } as never);
-    expect(shown.getAttribute("class")).toBe("load-error");
-    expect(shown.textContent).toBe("Cannot draw toggle.");
+  test("renderGraph draws the machine anyway, with a warning row under it", () => {
+    const shown = renderGraph(document, machine, { select: () => undefined });
+    expect(shown.getAttribute("class")).toBe("graph");
+    expect(shown.querySelectorAll("g.state")).toHaveLength(2);
+    expect(shown.getAttribute("data-overlaps")).toBe("1");
+    const warning = shown.querySelector(".overlap-warning");
+    expect(warning?.textContent).toBe("1 overlap: some labels or lines touch.");
+    const placed = layoutMachine(machine)[1]?.layout;
+    const height = Math.ceil((placed?.height ?? 0) + 20);
+    expect(shown.getAttribute("height")).toBe(String(height));
+    expect(Number(warning?.getAttribute("y"))).toBeGreaterThan(placed?.height ?? Infinity);
   });
 });

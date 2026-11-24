@@ -21,6 +21,7 @@ const headings = [
   { depth: 2, slug: "diagram", text: "Diagram" },
   { depth: 2, slug: "tutorial-step", text: "Tutorial step: start marker and self-transitions" },
   { depth: 2, slug: "ai-page-label", text: "AI-written page label" },
+  { depth: 2, slug: "overlap-warning", text: "Overlap warning" },
   { depth: 2, slug: "phone-width", text: "Phone width" },
 ];
 ---
@@ -164,6 +165,18 @@ const headings = [
     <p class="design-label-caption">An <code>author: human</code> page</p>
     <p class="design-label-title">Guards</p>
     <p class="design-label-side">Guards</p>
+  </div>
+
+  <h2 id="overlap-warning">Overlap warning</h2>
+  <p><strong>Awaiting approval</strong></p>
+  <p>
+    New: when the layout of a machine overlaps itself, the viewer still draws it and adds one
+    line under the drawing. Before, it showed only "Cannot draw" and the machine name.
+  </p>
+  <div class="viz">
+    <svg class="graph" viewBox="0 0 300 20" width="300" height="20" role="group" aria-label="overlap warning sample">
+      <text class="overlap-warning" x="8" y="14">2 overlaps: some labels or lines touch.</text>
+    </svg>
   </div>
 
   <h2 id="phone-width">Phone width</h2>
