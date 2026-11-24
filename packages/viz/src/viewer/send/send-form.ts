@@ -67,14 +67,18 @@ export function sendForm(doc: Document, options: SendFormOptions): HTMLElement {
     lock,
     ...(whole === undefined ? [] : [whole]),
     ...boxes.map(({ field, input }) =>
-      html(doc, "label", { class: "explore-field" }, [
-        html(doc, "strong", {}, [field.name]),
-        input,
+      html(doc, "p", {}, [
+        html(doc, "label", { class: "explore-field" }, [
+          html(doc, "strong", {}, [field.name]),
+          input,
+        ]),
       ]),
     ),
-    button(doc, ["Send ", code(doc, edge.event), ...recipient], {
-      onClick: options.send,
-      attrs: { "data-send-edge": edge.id },
-    }),
+    html(doc, "p", {}, [
+      button(doc, ["Send ", code(doc, edge.event), ...recipient], {
+        onClick: options.send,
+        attrs: { "data-send-edge": edge.id },
+      }),
+    ]),
   ]);
 }

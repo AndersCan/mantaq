@@ -15,6 +15,26 @@ import { sendVia } from "./send-via.ts";
 
 const file = join(import.meta.dirname, "fixtures", "checkout.ts");
 
+interface SetFieldOptions {
+  /** How the arrow's edge id ends, e.g. `-answered-accepted`. */
+  arrow: string;
+  field: string;
+  text: string;
+}
+
+/** Opens the arrow's Details with its `?` and types into its send form, as a person does. */
+function setField(root: HTMLElement, options: SetFieldOptions): void {
+  root
+    .querySelector(`.graph [data-details-edge$="${options.arrow}"]`)
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const box = root.querySelector<HTMLInputElement>(
+    `[data-send-form] [data-value="${options.field}"]`,
+  );
+  if (box === null) throw new Error(`no ${options.field} box`);
+  box.value = options.text;
+  box.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 async function documentText(fuzz = false): Promise<string> {
   const inspected = await inspectModule(file, {
     load: async () => ({ checkout: checkoutMachine }),
@@ -223,7 +243,7 @@ describe("mountDriven timers when effects run", () => {
 });
 
 describe("mountDriven values", () => {
-  test("the answer events send the code the machine is waiting on and the value set in the Context tab", async () => {
+  test("the answer events send the code the machine is waiting on and the value changed in the send form", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
       load: async () => ({ answer: answerMachine }),
@@ -242,9 +262,7 @@ describe("mountDriven values", () => {
       },
     });
     sendVia(root, "ask");
-    const answer = root.querySelector<HTMLInputElement>('[data-value="answer"]');
-    if (answer) answer.value = "declined";
-    answer?.dispatchEvent(new Event("change", { bubbles: true }));
+    setField(root, { arrow: "-answered-accepted", field: "answer", text: "declined" });
     sendVia(root, "answered");
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("declined");
   });
@@ -281,7 +299,7 @@ describe("mountDriven arrows that land elsewhere", () => {
 });
 
 describe("mountDriven stateRouting", () => {
-  test("an arrow that stays in first is locked and says where it stays", async () => {
+  test("an arrow that stays in first is locked, says where it stays, and a click sends it", async () => {
     const inspected = await inspectModule(
       join(import.meta.dirname, "fixtures", "state-routing.ts"),
       {
@@ -306,11 +324,15 @@ describe("mountDriven stateRouting", () => {
       root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-back-${to}"]`);
     expect(arrow("second")?.querySelector(".blocked-lock")).not.toBeNull();
     arrow("second")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
-      "back stays in first, not second",
-    );
-    expect(root.querySelector("[data-send-edge]")).toBeNull();
-    expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("first");
+    expect({
+      note: root.querySelector("[data-blocked-note]")?.textContent,
+      current: root.querySelector(".explore")?.getAttribute("data-current"),
+      sent: root.querySelector("[data-details-sent]")?.textContent,
+    }).toEqual({
+      note: "back stays in first, not second",
+      current: "first",
+      sent: "Sent back: stayed in first",
+    });
     expect(arrow("first")?.querySelector(".blocked-lock")).toBeNull();
     arrow("first")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(root.querySelector(".explore")?.getAttribute("data-current")).toBe("first");
@@ -348,7 +370,7 @@ describe("mountDriven stateRouting", () => {
 });
 
 describe("mountDriven dry run payload", () => {
-  test("the dry run sends the code the walk is waiting on, as Send does, once the Context box is cleared", async () => {
+  test("the dry run sends the code the walk is waiting on, as Send does", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
       load: async () => ({ answer: answerMachine }),
@@ -367,15 +389,8 @@ describe("mountDriven dry run payload", () => {
         },
       },
     });
-    const setValue = (name: string, value: string) => {
-      const box = root.querySelector<HTMLInputElement>(`[data-value="${name}"]`);
-      if (box === null) throw new Error(`no ${name} box`);
-      box.value = value;
-      box.dispatchEvent(new Event("change", { bubbles: true }));
-    };
-    setValue("code", "zz-not-the-example");
+    setField(root, { arrow: "-ask-waitingForAnswer", field: "code", text: "zz-not-the-example" });
     sendVia(root, "ask");
-    setValue("code", "");
     const arrow = (to: string) =>
       root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
     arrow("declined")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -385,7 +400,7 @@ describe("mountDriven dry run payload", () => {
     );
   });
 
-  test("a value set in the Context tab keeps the other arrow locked", async () => {
+  test("a value changed in the send form keeps the other arrow locked", async () => {
     const answerFile = join(import.meta.dirname, "fixtures", "answer.ts");
     const inspected = await inspectModule(answerFile, {
       load: async () => ({ answer: answerMachine }),
@@ -405,18 +420,18 @@ describe("mountDriven dry run payload", () => {
       },
     });
     sendVia(root, "ask");
-    const box = root.querySelector<HTMLInputElement>('[data-value="answer"]');
-    if (box === null) throw new Error("no answer box");
-    box.value = "declined";
-    box.dispatchEvent(new Event("change", { bubbles: true }));
+    setField(root, { arrow: "-answered-accepted", field: "answer", text: "declined" });
     const arrow = (to: string) =>
       root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-answered-${to}"]`);
-    arrow("accepted")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector("[data-blocked-note]")?.textContent).toBe(
-      "answered goes to declined, not accepted",
-    );
-    expect(arrow("accepted")?.querySelector(".blocked-lock")).not.toBeNull();
-    expect(arrow("declined")?.querySelector(".blocked-lock")).toBeNull();
+    expect({
+      note: root.querySelector("[data-blocked-note]")?.textContent,
+      accepted: arrow("accepted")?.querySelector(".blocked-lock") !== null,
+      declined: arrow("declined")?.querySelector(".blocked-lock") !== null,
+    }).toEqual({
+      note: "answered goes to declined, not accepted",
+      accepted: true,
+      declined: false,
+    });
   });
 });
 

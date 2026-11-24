@@ -27,7 +27,7 @@ import { mantaqViz } from "./vite.ts";
 export interface VizHarness {
   /** The current state id. */
   state(): Promise<string>;
-  /** Open the Details of the event's arrow out of the current state and press its Send, as a person would. An event with no arrow from here is a Left naming the events that have one. A payload is typed into the Context tab's value boxes and stay set for later sends, as a person's would. */
+  /** Open the Details of the event's arrow out of the current state and press its Send, as a person would. An event with no arrow from here is a Left naming the events that have one; an arrow whose guard blocks it is a Left with the reason, and nothing is sent. A payload is typed into the arrow's send form and stays set for later sends of the event, as a person's would. */
   send(
     event: string,
     payload?: Record<string, VizJson>,
@@ -76,6 +76,7 @@ function quoted(value: string): string {
 }
 
 type Page = import("playwright").Page;
+type Locator = ReturnType<Page["locator"]>;
 type Browser = import("playwright").Browser;
 
 function pickMachine(
@@ -102,19 +103,13 @@ function pickMachine(
   return Either.left(`no machine "${wanted}" in ${name}. Found: ${ids.join(", ")}.`);
 }
 
-/** Type `values` into the Context tab's boxes (empty text clears one); returns a message when a key has no box. */
-async function setValues(
-  page: Page,
-  values: Record<string, VizJson | undefined>,
+/** Type `payload` into an arrow's send form (empty text drops a change); a message when a key has no box. */
+async function typePayload(
+  form: Locator,
+  payload: Record<string, VizJson | undefined>,
 ): Promise<string | undefined> {
-  const [first] = Object.keys(values);
-  if (first === undefined) return undefined;
-  if ((await page.locator('[data-tab="context"]').count()) === 0) {
-    return `no value box for ${first}.`;
-  }
-  await page.click('[data-tab="context"]');
-  for (const [key, value] of Object.entries(values)) {
-    const box = page.locator(`[data-value=${quoted(key)}]`);
+  for (const [key, value] of Object.entries(payload)) {
+    const box = form.locator(`[data-value=${quoted(key)}]`);
     if ((await box.count()) === 0) {
       return `no value box for ${key}.`;
     }
@@ -217,24 +212,41 @@ async function pressRow(page: Page, actor: { map: string; key: string }): Promis
   return (await page.getAttribute(row, "data-child-state")) ?? "";
 }
 
-/** Opens each arrow's Details in turn and presses the first Send that is offered; else the first reason given. */
+interface PressOptions {
+  edges: VizEdge[];
+  event: string;
+  state: () => Promise<string>;
+  payload: Record<string, VizJson> | undefined;
+}
+
+/** Opens each arrow's Details in turn, types the payload into the first send form, and presses the first Send whose arrow is not locked; else the first reason given. */
 async function pressFirstSend(
   page: Page,
-  from: { edges: VizEdge[]; event: string; state: () => Promise<string> },
+  from: PressOptions,
 ): Promise<Either<string, { state: string; outcome: VizLiveOutcome }>> {
-  let note: string | null = null;
+  let note: string | undefined;
+  let pending = from.payload ?? {};
   for (const edge of from.edges) {
     await page
       .locator(
         `.graph g[data-details-edge=${quoted(edge.id)}], .graph g.edge-help[data-members*=${quoted(quoted(edge.id))}]`,
       )
       .dispatchEvent("click");
-    const trigger = page.locator(`[data-send-edge=${quoted(edge.id)}]`);
-    if ((await trigger.count()) > 0) {
-      await trigger.click();
-      return outcomeOf(page, from.state);
+    const form = page.locator(`[data-send-form=${quoted(edge.id)}]`);
+    if ((await form.count()) === 0) {
+      note ??= (await page.locator("[data-blocked-note]").first().textContent()) ?? undefined;
+      continue;
     }
-    note ??= await page.locator("[data-blocked-note]").first().textContent();
+    const problem = await typePayload(form, pending);
+    if (problem !== undefined) return Either.left(problem);
+    pending = {};
+    const lock = form.locator("[data-blocked-note]");
+    if ((await lock.count()) > 0) {
+      note ??= (await lock.textContent()) ?? undefined;
+      continue;
+    }
+    await form.locator(`[data-send-edge=${quoted(edge.id)}]`).click();
+    return outcomeOf(page, from.state);
   }
   return Either.left(note ?? `${from.event} is blocked.`);
 }
@@ -274,11 +286,7 @@ function makeSend(
       const offered = [...new Set(edges.map((each) => each.event))].sort();
       return Either.left(`no button for ${event}: ${where}, which offers: ${offered.join(", ")}.`);
     }
-    const problem = payload === undefined ? undefined : await setValues(page, payload);
-    if (problem !== undefined) {
-      return Either.left(problem);
-    }
-    return pressFirstSend(page, { edges: offering, event, state });
+    return pressFirstSend(page, { edges: offering, event, state, payload });
   };
 }
 
