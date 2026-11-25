@@ -643,7 +643,7 @@ export function overlapsOf(layout: MachineLayout): Overlap[] {
 }
 
 /** A label of `edge` drawn at `label` (centre and size) instead of where the layout put it. */
-export interface MovedLabel {
+interface MovedLabel {
   edge: string;
   label: Box;
 }

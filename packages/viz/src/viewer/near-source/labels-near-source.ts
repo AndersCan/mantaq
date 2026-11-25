@@ -4,7 +4,10 @@ import type { LabelClashes } from "../overlaps.ts";
 import { labelClashesOf } from "../overlaps.ts";
 
 /** A point of an arrow's line. */
-type Point = PlacedEdge["points"][number];
+interface Point {
+  x: number;
+  y: number;
+}
 
 /** How far a label moves between two places it tries. */
 const STEP = 4;
