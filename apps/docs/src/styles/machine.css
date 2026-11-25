@@ -22,3 +22,13 @@
   box-shadow: var(--mq-shadow-4);
   font-size: var(--sl-text-base);
 }
+
+/* On a phone the diagram takes the full screen width, so the canvas shows a state with the arrows it sends. */
+@media (max-width: 30rem) {
+  .mantaq-machine .viz {
+    margin-inline: calc(-1 * var(--sl-content-pad-x));
+    padding: calc(var(--sl-content-pad-x) / 2);
+    border-inline: 0;
+    border-radius: 0;
+  }
+}
