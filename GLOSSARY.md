@@ -45,6 +45,7 @@ carry data alongside "where it is". Everything below describes that model.
 | **Extended state** | Data the machine carries next to its current state. The "machine" and its "data" are two different things. | `context`. Survives transitions, read and written by handlers. |
 | **Active state configuration** | The full picture of where the machine is, including nested and parallel states. | `actor.snapshot()`. The live state tree. |
 | **Compound state** | A state that contains other states. A machine inside a machine. | A child `Actor` attached to a parent. |
+| **Group** | A name for some states of one machine, so a diagram can draw them as one node. Only the drawing changes: the machine still has one walk. | `@group payment` in the JSDoc of a state declaration. The viewer folds the group into one node, and `enter` on it draws its states. |
 | **Orthogonal regions** | Parallel parts of a machine, all running at the same time. | Peer child actors in `regions`. They are always active, not tied to a parent state. |
 | **History state** | A mark that remembers the last active substate, so a return picks up where the machine left off. | Not supported. |
 | **Choice** | A branch point decided by conditions at the moment the event arrives. | Branching in a handler (`if` on the current state or data). |

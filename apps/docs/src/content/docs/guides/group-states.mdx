@@ -1,0 +1,71 @@
+---
+title: Group the states of a big machine
+description: Tag states with @group, and the viewer folds each group into one node that you can enter.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import Machine from "@mantaq/inspect/astro/Machine.astro";
+import orderSource from "../../../../../../packages/examples/order/order.ts?raw";
+
+export const declarations = orderSource.slice(0, orderSource.indexOf("export const orderMachine"));
+
+## What
+
+A group is a name that you give to some states of one machine. The viewer draws the states of a group as one node, and you can enter that node to see them.
+
+## Why
+
+A machine with more than about 12 states is hard to read as one diagram. The arrows cross, and the main path gets lost between the side paths. A group hides the inside of one step until you want to see it. The machine does not change: it is still one actor and one walk.
+
+## How
+
+<Machine src="../../packages/examples/order/order.ts" />
+
+This is an order with 12 states, drawn with its two groups folded. The walk starts in `reviewingOrder`. The `payment` node holds 3 states and the `delivery` node holds 4 states. The other states are `cancelled`, `delivered`, `returnedToShop` and `refunded`. An arrow between two states of the same group is a loop on its group node, for example `retryCard` on `payment`. In `payment`, `bankAskedToConfirm` leads to the bank, and `charged` or `confirmed` lead out to `delivery`. In `delivery`, the loops `shipped`, `arrived`, `nobodyAnswered` and `rescheduled` move the parcel. `handedOver` leaves for `delivered`, `sentBack` leaves for `returnedToShop`, and `refundBuyer` leads to `refunded`.
+
+### Tag the states
+
+Add `@group <name>` to the JSDoc comment of each state declaration in the group:
+
+<Code code={declarations} lang="ts" title="order.ts" />
+
+A state without the tag is drawn on its own. The tag changes only the drawing: handlers, effects and tests do not see it. The full machine and its tests are in [`packages/examples/order`](https://github.com/AndersCan/mantaq/tree/main/packages/examples/order).
+
+A group has these limits:
+
+- A state is in one group at most.
+- The name of a group cannot contain a `.`.
+- All the states of a group are in the same machine or region.
+- The states of an actor map cannot be in a group.
+- A state name that is used in more than one region cannot be in a group.
+
+A tag that breaks a limit is ignored, and the state is drawn on its own.
+
+### What the viewer shows
+
+A group node shows the name of the group, a box-in-a-box mark and an `enter` control. Its second row says how many states it holds. When the walk is in one of them, the node gets the thick border and the row says which state, for example `now in chargingCard`. A click on the node shows its states in Details.
+
+An arrow into or out of a group node stands for the real arrows of its states. A click on it sends the event from the state that the walk is in. Its `?` opens Details, which lists the real arrows.
+
+When you enter a group, the canvas draws the states of the group. A path of names above the canvas shows where you are: `order › payment`. The states outside the group that its arrows come from or go to are dashed boxes.
+
+### Walk into a group and out of it
+
+Do these steps on the diagram above. Click the label or the line of an arrow, and the controls that the steps name. The diagram is wider than the page: scroll it sideways to see the arrows on the right.
+
+1. Click `placeOrder`. The walk moves to `chargingCard`, and the `payment` node says `now in chargingCard`.
+2. Click `enter` on the `payment` node. The canvas draws `chargingCard`, `confirmingWithBank` and `cardDeclined`, and the path shows `order › payment`.
+3. Click the moving `declined` arrow that leaves `chargingCard`. The walk moves to `cardDeclined`.
+4. Click `retryCard`. The walk goes back to `chargingCard`.
+5. Click `charged`. The walk leaves the group to the dashed box `packingParcel`. The line under the path says `The walk is in packingParcel, outside group payment.`
+6. Click `order` in the path. The canvas draws the folded machine again, and the `delivery` node says `now in packingParcel`. Escape also goes back one level of the path.
+
+**Back** and **Reset** under the diagram undo steps. Entering a group or leaving it does not change the walk.
+
+A link can open a group: add `?focus=@payment` to the address of the page. For example, [this link](?machine=order&focus=%40payment) opens `payment` with the walk in `reviewingOrder`, outside the group.
+
+### Group, or split into machines
+
+If some states are one step of the same journey, group them. Such a step has one way in, a few ways out, and the same data as the rest of the machine. The payment step of the order is an example. The order enters it with `placeOrder`. It leaves with `charged`, `confirmed` or `cancelOrder`.
+
+If a part has a life of its own, split it into a second machine. Other code sends to it directly, it runs at the same time as the rest, or several machines use it. Then use a [region](/mantaq/getting-started/regions/) or a separate actor. Each machine has its own walk.

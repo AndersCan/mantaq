@@ -6,7 +6,10 @@
 // Then it clicks every element of every viewer on every built page that looks clickable
 // (a pointer cursor or role=button), on a fresh load each, and fails when a click changes
 // nothing; a dead button planted on one page must be caught, so a weakened sweep fails too.
+// On the group guide it replays the walk the guide describes: into the payment group,
+// enter it, click arrows inside, leave it by an arrow, and go back by the path.
 // Run after the docs build: node scripts/docs-live-check.mjs
+import { GROUP_GUIDE, groupWalkFailures } from "./lib/group-walk.mjs";
 import { clickFailures } from "./lib/viewer-sweep.mjs";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -121,7 +124,10 @@ try {
 }
 await pool.close();
 
-const clicks = await clickFailures({ browser, origin, base, dist, mustSweep: pages });
+failures.push(...(await groupWalkFailures({ browser, origin, base })));
+
+const mustSweep = [...pages, GROUP_GUIDE];
+const clicks = await clickFailures({ browser, origin, base, dist, mustSweep });
 failures.push(...clicks.failures);
 
 await browser.close();
@@ -130,5 +136,7 @@ if (failures.length > 0) {
   console.error(failures.join("\n"));
   process.exit(1);
 }
-console.log(`docs-live-check: ${pages.length} Getting started pages and the pool box run live`);
+console.log(
+  `docs-live-check: ${pages.length} Getting started pages, the pool box and the walk of /${GROUP_GUIDE} run live`,
+);
 console.log(`docs-live-check: ${clicks.summary}`);
