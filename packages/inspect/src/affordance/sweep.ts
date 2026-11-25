@@ -1,7 +1,8 @@
+import type { VizDocument, VizDriver, VizLiveState } from "@mantaq/viz";
 import { createDriver } from "../drive.ts";
 import type { FuzzTarget } from "../fuzz/run.ts";
 import { mountViewer } from "@mantaq/viz/viewer";
-import type { VizDocument } from "@mantaq/viz";
+import { SHOWN_ATTRIBUTES } from "./shown.ts";
 import { Window } from "happy-dom";
 
 /** One machine to sweep: its document, how to run it, and the walks to stand on. */
@@ -25,15 +26,15 @@ interface Stand {
   focus: string[];
 }
 
-/** An element that looks clickable, but a click on it changed nothing visible. */
-interface DeadElement {
+/** Something wrong at a stand: a click that changed nothing visible or threw, or a walk that did not replay. */
+interface Failure {
   machine: string;
   stand: Stand;
-  element: string;
+  problem: string;
 }
 
 export interface SweepReport {
-  dead: DeadElement[];
+  failures: Failure[];
   stands: number;
   clicks: number;
 }
@@ -45,22 +46,6 @@ export interface SweepOptions {
 
 /** What a reader sees as clickable: a button role, a tab stop, a link, or a button that is not disabled. */
 const CLICKABLE = '[role="button"], [tabindex], a[href], button:not([disabled])';
-
-/** Attributes that change what the reader sees; the rest (ids, roles, tab stops) do not. */
-const SHOWN = [
-  "class",
-  "hidden",
-  "disabled",
-  "open",
-  "style",
-  "transform",
-  "viewBox",
-  "aria-selected",
-  "aria-pressed",
-  "aria-expanded",
-  "aria-current",
-  "data-current",
-];
 
 /** The attributes that name an element in a report. */
 const NAMING = [
@@ -74,26 +59,32 @@ const NAMING = [
   "data-child-key",
 ];
 
-/** Clicks every element that looks clickable at every stand of `sweepCase`, each on a fresh viewer, and reports the clicks that changed nothing. */
+/** Clicks every element that looks clickable at every stand of `sweepCase`, each on a fresh viewer, and reports the clicks that changed nothing or threw. */
 export async function sweep(
   sweepCase: SweepCase,
   options: SweepOptions = {},
 ): Promise<SweepReport> {
-  const report: SweepReport = { dead: [], stands: 0, clicks: 0 };
+  const report: SweepReport = { failures: [], stands: 0, clicks: 0 };
   const queue = firstStands(sweepCase);
   const seen = new Set<string>();
   for (const stand of queue) seen.add(standKey(stand));
   for (const stand of queue) {
     report.stands += 1;
+    function fail(problem: string): void {
+      report.failures.push({ machine: sweepCase.name, stand, problem });
+    }
     let count = 1;
     for (let index = 0; index < count; index += 1) {
       const click = await clickAt(sweepCase, { stand, options, index });
       count = click.count;
+      if (click.replayed < stand.walk.length) {
+        fail(`the walk replays only ${click.replayed} of ${stand.walk.length} steps`);
+        break;
+      }
       if (click.element === undefined) continue;
       report.clicks += 1;
-      if (click.before === click.after) {
-        report.dead.push({ machine: sweepCase.name, stand, element: click.element });
-      }
+      for (const error of click.errors) fail(`${click.element} throws: ${error}`);
+      if (!click.changed) fail(`${click.element} changes nothing`);
       const moved = { ...stand, focus: click.focus };
       if (seen.has(standKey(moved))) continue;
       seen.add(standKey(moved));
@@ -103,15 +94,15 @@ export async function sweep(
   return report;
 }
 
-/** One line per dead element: the machine, the walk prefix, the stand and the element. */
-export function deadLines(report: SweepReport): string[] {
+/** One line per failure: the machine, the walk prefix, the rest of the stand, and what went wrong. */
+export function failureLines(report: SweepReport): string[] {
   const lines: string[] = [];
-  for (const dead of report.dead) {
-    const { stand } = dead;
+  for (const failure of report.failures) {
+    const { stand } = failure;
     const walk = stand.walk.join(", ");
     const focus = stand.focus.join(" > ");
     lines.push(
-      `${dead.machine}: walk [${walk}], ${stand.driving}, ${stand.layout}, focus [${focus}]: ${dead.element}`,
+      `${failure.machine}: walk [${walk}], ${stand.driving}, ${stand.layout}, focus [${focus}]: ${failure.problem}`,
     );
   }
   return lines;
@@ -159,8 +150,8 @@ interface Mounted {
   root: HTMLElement;
   /** The focus path the viewer last reported, or the stand's when it reported none. */
   focus: () => string[];
-  /** The last place the viewer reported, as text. */
-  navigated: () => string;
+  /** How many steps of the walk the driver took while the viewer opened; the walk's length without a driver. */
+  replayed: number;
 }
 
 /** A root in a window of its own: the viewer listens on its window, so a shared one would keep every swept viewer alive. Happy DOM shares its element classes between windows, so the root is an `HTMLElement` of this one too. */
@@ -170,26 +161,47 @@ function rootIn(window: Window): HTMLElement | undefined {
   return root instanceof HTMLElement ? root : undefined;
 }
 
+/** The driver, and the last state it reported, so the sweep can tell how far a walk replayed. */
+interface Watched {
+  driver: VizDriver;
+  last: () => VizLiveState | undefined;
+}
+
+function watched(driver: VizDriver): Watched {
+  let last: VizLiveState | undefined;
+  function seen(state: VizLiveState): VizLiveState {
+    last = state;
+    return state;
+  }
+  return {
+    driver: {
+      ...driver,
+      reset: () => seen(driver.reset()),
+      step: (step) => seen(driver.step(step)),
+    },
+    last: () => last,
+  };
+}
+
 function mountAt(sweepCase: SweepCase, at: MountAtOptions): Mounted {
   const { stand, root } = at;
   let focus = stand.focus;
-  let navigated = "";
-  const driver =
+  const live =
     stand.driving === "driver" && sweepCase.target !== undefined
-      ? createDriver(sweepCase.target)
+      ? watched(createDriver(sweepCase.target))
       : undefined;
   mountViewer(root, sweepCase.viz, {
-    driver,
+    driver: live?.driver,
     steps: stand.walk,
     focus: stand.focus,
     diagramOnly: stand.layout === "diagram only",
     onNavigate: (where) => {
       focus = where.focus;
-      navigated = JSON.stringify(where);
     },
   });
+  const replayed = live === undefined ? stand.walk.length : (live.last()?.steps.length ?? 0);
   at.options.afterMount?.(root);
-  return { root, focus: () => focus, navigated: () => navigated };
+  return { root, focus: () => focus, replayed };
 }
 
 interface ClickAtOptions {
@@ -203,12 +215,26 @@ interface Click {
   count: number;
   /** The element clicked; undefined when the viewer has none at the index. */
   element: string | undefined;
-  before: string;
-  after: string;
+  /** Whether the text or a shown attribute of the viewer changed. */
+  changed: boolean;
+  /** What the click threw, from the window's error events. */
+  errors: string[];
   focus: string[];
+  replayed: number;
 }
 
-const NO_CLICK: Click = { count: 0, element: undefined, before: "", after: "", focus: [] };
+const NO_CLICK: Click = {
+  count: 0,
+  element: undefined,
+  changed: false,
+  errors: [],
+  focus: [],
+  replayed: 0,
+};
+
+function errorText(event: unknown): string {
+  return event instanceof ErrorEvent ? event.message : String(event);
+}
 
 async function clickAt(sweepCase: SweepCase, at: ClickAtOptions): Promise<Click> {
   const window = new Window();
@@ -217,15 +243,17 @@ async function clickAt(sweepCase: SweepCase, at: ClickAtOptions): Promise<Click>
   const mounted = mountAt(sweepCase, { ...at, root });
   const found = clickables(mounted.root);
   const element = found[at.index];
-  const before = sight(mounted.root) + mounted.navigated();
+  const errors: string[] = [];
+  window.addEventListener("error", (event) => errors.push(errorText(event)));
+  const before = sight(mounted.root);
   element?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-  const after = sight(mounted.root) + mounted.navigated();
   const click: Click = {
     count: found.length,
     element: element === undefined ? undefined : nameOf(element),
-    before,
-    after,
+    changed: sight(mounted.root) !== before,
+    errors,
     focus: mounted.focus(),
+    replayed: mounted.replayed,
   };
   await window.happyDOM.close();
   return click;
@@ -256,7 +284,7 @@ function sight(root: Element): string {
   const parts: string[] = [];
   for (const element of [root, ...root.querySelectorAll("*")]) {
     parts.push(`<${element.tagName}`);
-    for (const name of SHOWN) {
+    for (const name of SHOWN_ATTRIBUTES) {
       const shown = element.getAttribute(name);
       if (shown !== null) parts.push(` ${name}="${shown}"`);
     }

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { Actor, event, state, VirtualClock } from "@mantaq/core";
-import { deadLines, sweep } from "./sweep.ts";
 import { expect, test } from "vite-plus/test";
+import { failureLines, sweep } from "./sweep.ts";
 import type { SweepCase } from "./sweep.ts";
 import { toViz } from "../structure.ts";
 
@@ -45,25 +45,55 @@ function deadButton(root: HTMLElement): void {
   root.querySelector(".panel")?.append(button);
 }
 
+/** A button whose click throws before it changes anything. */
+function throwingButton(root: HTMLElement): void {
+  const button = root.ownerDocument.createElement("button");
+  button.textContent = "Send";
+  button.addEventListener("click", () => {
+    throw new Error("no driver for this");
+  });
+  root.querySelector(".panel")?.append(button);
+}
+
 test("the viewer as it is has no dead element", async () => {
-  expect(deadLines(await sweep(plain))).toEqual([]);
+  expect(failureLines(await sweep(plain))).toEqual([]);
 });
 
 test("an arrow that shows as a button but sends nothing is reported with its walk", async () => {
   const report = await sweep(plain, { afterMount: everyArrowAButton });
-  expect(deadLines(report)).toEqual([
-    'plain: walk [], no driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"]',
-    'plain: walk [start], driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"]',
-    'plain: walk [], no driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"]',
-    'plain: walk [start], driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"]',
+  expect(failureLines(report)).toEqual([
+    'plain: walk [], no driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
+    'plain: walk [start], driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
+    'plain: walk [], no driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
+    'plain: walk [start], driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
   ]);
 });
 
 test("a button that does nothing is reported", async () => {
   const report = await sweep(plain, { afterMount: deadButton });
-  expect(deadLines(report)).toEqual([
-    'plain: walk [], no driver, with panel, focus []: button "Open"',
-    'plain: walk [], driver, with panel, focus []: button "Open"',
-    'plain: walk [start], driver, with panel, focus []: button "Open"',
+  expect(failureLines(report)).toEqual([
+    'plain: walk [], no driver, with panel, focus []: button "Open" changes nothing',
+    'plain: walk [], driver, with panel, focus []: button "Open" changes nothing',
+    'plain: walk [start], driver, with panel, focus []: button "Open" changes nothing',
+  ]);
+});
+
+test("a button whose click throws is reported, with the error", async () => {
+  const report = await sweep(plain, { afterMount: throwingButton });
+  expect(failureLines(report)).toEqual([
+    'plain: walk [], no driver, with panel, focus []: button "Send" throws: no driver for this',
+    'plain: walk [], no driver, with panel, focus []: button "Send" changes nothing',
+    'plain: walk [], driver, with panel, focus []: button "Send" throws: no driver for this',
+    'plain: walk [], driver, with panel, focus []: button "Send" changes nothing',
+    'plain: walk [start], driver, with panel, focus []: button "Send" throws: no driver for this',
+    'plain: walk [start], driver, with panel, focus []: button "Send" changes nothing',
+  ]);
+});
+
+test("a walk that does not replay is reported", async () => {
+  const report = await sweep({ ...plain, walks: [["start", "nope=[1"]] });
+  expect(failureLines(report)).toEqual([
+    "plain: walk [start, nope=[1], driver, with panel, focus []: the walk replays only 1 of 2 steps",
+    "plain: walk [start, nope=[1], driver, diagram only, focus []: the walk replays only 1 of 2 steps",
   ]);
 });

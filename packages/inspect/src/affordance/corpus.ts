@@ -1,19 +1,28 @@
-import { exampleTargets, handWrittenBaselines } from "../examples.ts";
-import type { VizActorRef, VizStep } from "@mantaq/viz";
+import { EXAMPLE_ROOT, exampleTargets, handWrittenBaselines } from "../examples.ts";
+import type { VizActorRef, VizDocument, VizJson, VizStep } from "@mantaq/viz";
+import { auth } from "../fixtures/auth.ts";
+import { checkout } from "../fixtures/checkout.ts";
+import { credit } from "../fixtures/credit.ts";
 import type { FuzzTarget } from "../fuzz/run.ts";
 import { grouped } from "../fixtures/grouped.ts";
+import { inspect } from "../inspect.ts";
 import { isActor } from "../fuzz/run.ts";
+import { join } from "node:path";
 import { lockedDoor } from "../fixtures/locked-door.ts";
 import type { Machine } from "@mantaq/core";
 import { parts } from "../fixtures/parts.ts";
 import { photoQueue } from "../fixtures/photo-queue.ts";
+import { retry } from "../fixtures/retry.ts";
+import { saga } from "../fixtures/saga.ts";
 import { sharedGo } from "../fixtures/shared-go.ts";
 import type { SweepCase } from "./sweep.ts";
 import { teamInbox } from "../fixtures/pool.ts";
 import { timed } from "../fixtures/timed.ts";
-import { toViz } from "../structure.ts";
 import { uploadRegions } from "../fixtures/upload-regions.ts";
 import { VirtualClock } from "@mantaq/core";
+import { VIZ_SCHEMA_VERSION } from "@mantaq/viz";
+
+const FIXTURES = join(import.meta.dirname, "..", "fixtures");
 
 /** A fixture machine, run on a clock of its own; a factory that made `{ actor, ... }` keeps the rest as `made`. */
 function fixtureTarget(machine: Machine): FuzzTarget {
@@ -29,12 +38,28 @@ function fixtureTarget(machine: Machine): FuzzTarget {
 }
 
 interface CaseOptions {
+  /** The file that registers the handlers: payload fields from the event types, as the docs read them. */
+  source: string;
+  walks: SweepCase["walks"];
+  payloads?: Readonly<Record<string, ReadonlyArray<VizJson>>>;
+}
+
+/** The document the docs would draw for `machine`: structure, handler readings, payload fields and seeded fuzz coverage. */
+function caseOf(machine: Machine, options: CaseOptions): SweepCase {
+  const source = { file: options.source, root: EXAMPLE_ROOT };
+  const inspected = inspect({ machine, source, payloads: options.payloads });
+  const viz: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [inspected.machine] };
+  return { name: machine.id, viz, target: fixtureTarget(machine), walks: options.walks };
+}
+
+interface FixtureOptions {
+  /** The fixture's file name in `src/fixtures`. */
+  file: string;
   walks: SweepCase["walks"];
 }
 
-function caseOf(target: FuzzTarget, options: CaseOptions): SweepCase {
-  const viz = toViz([{ id: target.id, ...target.create() }]);
-  return { name: target.id, viz, target, walks: options.walks };
+function fixtureCase(machine: Machine, options: FixtureOptions): SweepCase {
+  return caseOf(machine, { source: join(FIXTURES, options.file), walks: options.walks });
 }
 
 /** A step as the viewer reads it from `?step=`: `@ms`, `[actor>]event`, or `[actor>]event=<json>`. */
@@ -53,12 +78,15 @@ function actorText(actor: VizActorRef): string {
 
 /** The example machines, walked along their hand-written tests. */
 export function exampleCases(): SweepCase[] {
+  const machines: Record<string, Machine> = { checkout, auth, saga, credit, retry };
   const baselines = handWrittenBaselines();
   const cases: SweepCase[] = [];
   for (const target of exampleTargets()) {
+    const machine = machines[target.id];
+    if (machine === undefined) continue;
     const walks: string[][] = [];
     for (const walk of baselines[target.id] ?? []) walks.push(walk.map((step) => stepText(step)));
-    cases.push(caseOf(target, { walks }));
+    cases.push(caseOf(machine, { source: target.source, walks, payloads: target.payloads }));
   }
   return cases;
 }
@@ -66,13 +94,16 @@ export function exampleCases(): SweepCase[] {
 /** Fixtures that draw what the examples do not: a board, a pool's children, regions, shared arrows, groups, a timer, a guard, a queue. */
 export function fixtureCases(): SweepCase[] {
   return [
-    caseOf(fixtureTarget(parts), { walks: [["go"]] }),
-    caseOf(fixtureTarget(teamInbox), { walks: [['team.ITEM_ARRIVED={"item":"a"}']] }),
-    caseOf(fixtureTarget(uploadRegions), { walks: [['upload>photoPicked={"fileName":"a.jpg"}']] }),
-    caseOf(fixtureTarget(sharedGo), { walks: [["begin", "next"]] }),
-    caseOf(fixtureTarget(grouped), { walks: [["checkout", "charged"]] }),
-    caseOf(fixtureTarget(timed), { walks: [["start"]] }),
-    caseOf(fixtureTarget(lockedDoor), { walks: [["pushDoor"]] }),
-    caseOf(fixtureTarget(photoQueue), { walks: [['photoAdded={"photoId":"p1"}']] }),
+    fixtureCase(parts, { file: "parts.ts", walks: [["go"]] }),
+    fixtureCase(teamInbox, { file: "pool.ts", walks: [['team.ITEM_ARRIVED={"item":"a"}']] }),
+    fixtureCase(uploadRegions, {
+      file: "upload-regions.ts",
+      walks: [['upload>photoPicked={"fileName":"a.jpg"}']],
+    }),
+    fixtureCase(sharedGo, { file: "shared-go.ts", walks: [["begin", "next"]] }),
+    fixtureCase(grouped, { file: "grouped.ts", walks: [["checkout", "charged"]] }),
+    fixtureCase(timed, { file: "timed.ts", walks: [["start"]] }),
+    fixtureCase(lockedDoor, { file: "locked-door.ts", walks: [["pushDoor"]] }),
+    fixtureCase(photoQueue, { file: "photo-queue.ts", walks: [['photoAdded={"photoId":"p1"}']] }),
   ];
 }

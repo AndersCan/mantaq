@@ -1,10 +1,11 @@
 /**
  * Clicks every element of every viewer on the built docs pages that looks clickable
  * (a `pointer` cursor or role=button), each in a fresh tab, and reports the clicks
- * that changed nothing on the page: no text, mark, panel or URL moved.
+ * that changed nothing on the page (no text, mark, panel or URL moved) or threw.
  */
 import { relative, sep } from "node:path";
 import { readdirSync } from "node:fs";
+import { SHOWN_ATTRIBUTES } from "../../packages/inspect/src/affordance/shown.ts";
 
 /** How long a click may take to show, for an effect or a redraw on the next frame. */
 const SETTLE_MS = 100;
@@ -32,20 +33,7 @@ function builtPages(dist) {
  * `sight` is the page as the reader sees it, with the URL.
  */
 function inPage(options) {
-  const shown = [
-    "class",
-    "hidden",
-    "disabled",
-    "open",
-    "style",
-    "transform",
-    "viewBox",
-    "aria-selected",
-    "aria-pressed",
-    "aria-expanded",
-    "aria-current",
-    "data-current",
-  ];
+  const shown = options.shown ?? [];
   function looksClickable(element) {
     const unseen = element.closest("[disabled]") !== null || element.getClientRects().length === 0;
     if (unseen) return false;
@@ -108,9 +96,11 @@ function inPage(options) {
   }
 }
 
-/** Opens `page` in a fresh tab, waits for its `viewers` (all of them, or none when unknown), and plants the dead element. */
+/** Opens `page` in a fresh tab, waits for its `viewers` (all of them, or none when unknown), and plants the dead elements. The tab collects its page errors in `errors`. */
 async function openPage(options) {
   const tab = await options.browser.newPage();
+  const errors = [];
+  tab.on("pageerror", (error) => errors.push(error.message));
   const url = `${options.origin}${options.base}${options.page}`;
   const known = options.viewers !== undefined;
   await tab.goto(url, { waitUntil: known ? "load" : "networkidle" });
@@ -122,12 +112,12 @@ async function openPage(options) {
   }
   await tab.waitForTimeout(SETTLE_MS);
   if ((await tab.locator(VIEWER).count()) > 0) await options.plant?.(tab);
-  return tab;
+  return { tab, errors };
 }
 
 /** How many viewers `page` has and how many elements in them look clickable. */
 async function countOn(options) {
-  const tab = await openPage(options);
+  const { tab } = await openPage(options);
   const viewers = await tab.locator(VIEWER).count();
   const counted = { action: "count", viewer: VIEWER };
   const { count } = viewers === 0 ? { count: 0 } : await tab.evaluate(inPage, counted);
@@ -135,20 +125,21 @@ async function countOn(options) {
   return { page: options.page, viewers, count };
 }
 
-/** Clicks the element at `index` on a fresh load of `page`; the click is dead when the page did not change. */
+/** Clicks the element at `index` on a fresh load of `page`: a problem when the page did not change, or when the click threw. */
 async function clickOn(options) {
-  const tab = await openPage(options);
-  const before = await tab.evaluate(inPage, { action: "sight" });
+  const { tab, errors } = await openPage(options);
+  const loaded = errors.length;
+  const before = await tab.evaluate(inPage, { action: "sight", shown: SHOWN_ATTRIBUTES });
   const clicked = { action: "click", index: options.index, viewer: VIEWER };
   const { name } = await tab.evaluate(inPage, clicked);
   await tab.waitForTimeout(SETTLE_MS);
-  const after = await tab.evaluate(inPage, { action: "sight" });
+  const after = await tab.evaluate(inPage, { action: "sight", shown: SHOWN_ATTRIBUTES });
   await tab.close();
-  const where = `/${options.page}`;
-  return {
-    clicked: name !== undefined,
-    dead: before.sight === after.sight ? `${where} ${name}` : undefined,
-  };
+  const where = `/${options.page} ${name}`;
+  const problems = [];
+  for (const error of errors.slice(loaded)) problems.push(`${where} throws: ${error}`);
+  if (before.sight === after.sight) problems.push(`${where} changes nothing`);
+  return { clicked: name !== undefined, problems };
 }
 
 /** Runs `tasks` (functions that return a promise), `TABS` at a time. */
@@ -170,12 +161,13 @@ async function inBatches(tasks) {
  */
 async function sweepViewers(options) {
   const counted = await inBatches(options.pages.map((page) => () => countOn({ ...options, page })));
-  const dead = [];
-  const report = { pages: 0, viewers: 0, clicks: 0, dead };
+  const problems = [];
+  const swept = [];
+  const report = { pages: swept, viewers: 0, clicks: 0, problems };
   const clicks = [];
   for (const { page, viewers, count } of counted) {
     if (viewers === 0) continue;
-    report.pages += 1;
+    swept.push(`/${page}`);
     report.viewers += viewers;
     for (let index = 0; index < count; index += 1) {
       clicks.push(() => clickOn({ ...options, page, index, viewers }));
@@ -183,39 +175,52 @@ async function sweepViewers(options) {
   }
   for (const click of await inBatches(clicks)) {
     if (click.clicked) report.clicks += 1;
-    if (click.dead !== undefined) dead.push(click.dead);
+    if (click.clicked) problems.push(...click.problems);
   }
-  dead.sort((left, right) => left.localeCompare(right));
+  problems.sort((left, right) => left.localeCompare(right));
   return report;
 }
 
-/** A button that does nothing, put in the first viewer of a page: the sweep must report it. */
-async function plantDeadButton(tab) {
+/** Two dead elements in the first viewer of a page, one per way to look clickable: the sweep must report both. */
+async function plantDeadElements(tab) {
   await tab.evaluate(() => {
-    const dead = document.createElement("span");
-    dead.setAttribute("role", "button");
-    dead.textContent = "planted";
-    document.querySelector(".viz .canvas")?.prepend(dead);
+    const canvas = document.querySelector(".viz .canvas");
+    const button = document.createElement("span");
+    button.setAttribute("role", "button");
+    button.textContent = "planted button";
+    const pointer = document.createElement("span");
+    pointer.style.cursor = "pointer";
+    pointer.textContent = "planted pointer";
+    canvas?.prepend(button, pointer);
   });
 }
 
-/** The page the planted dead button goes on. */
+/** The page the planted dead elements go on. */
 const PLANTED_PAGE = "getting-started/events/";
 
+/** What the reader of a failure does about it. */
+const FIX = "make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks)";
+
 /**
- * Sweeps every page built into `options.dist`, then plants a dead button on one page
- * and sweeps it again: a sweep that misses it is too weak to trust. Returns one failure
- * line per dead element, and a summary of what was clicked.
+ * Sweeps every page built into `options.dist`, then plants two dead elements on one
+ * page and sweeps it again: a sweep that misses one is too weak to trust. Returns one
+ * failure line per problem, and a summary of what was clicked.
  */
 export async function clickFailures(options) {
   const site = { browser: options.browser, origin: options.origin, base: options.base };
   const swept = await sweepViewers({ ...site, pages: builtPages(options.dist) });
   const failures = [];
-  for (const dead of swept.dead) failures.push(`a click changes nothing: ${dead}`);
-  const planted = await sweepViewers({ ...site, pages: [PLANTED_PAGE], plant: plantDeadButton });
-  if (!planted.dead.some((dead) => dead.endsWith('span "planted"'))) {
-    failures.push(`the click sweep missed a dead button planted on ${PLANTED_PAGE}`);
+  for (const problem of swept.problems) failures.push(`docs-live-check: ${problem}: ${FIX}`);
+  const planted = await sweepViewers({ ...site, pages: [PLANTED_PAGE], plant: plantDeadElements });
+  for (const name of ["planted button", "planted pointer"]) {
+    const caught = planted.problems.some((problem) =>
+      problem.endsWith(`"${name}" changes nothing`),
+    );
+    if (!caught) {
+      failures.push(`docs-live-check: the click sweep missed a ${name} on ${PLANTED_PAGE}`);
+    }
   }
-  const summary = `${swept.clicks} clicks on ${swept.viewers} viewers on ${swept.pages} pages each change the page`;
+  const pages = swept.pages.join(", ");
+  const summary = `${swept.clicks} clicks on ${swept.viewers} viewers on ${swept.pages.length} pages each change the page: ${pages}`;
   return { failures, summary };
 }
