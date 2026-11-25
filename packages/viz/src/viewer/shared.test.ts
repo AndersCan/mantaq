@@ -154,7 +154,7 @@ describe("shareArrows", () => {
     });
   });
 
-  test("on a fold, a shared node counts the real states that take the event, in any edge order", () => {
+  test("on a fold, two events the same states take are one shared node, in any edge order", () => {
     const shop = groupedCheckout();
     const charging = shop.states.find((state) => state.id === "chargingCard");
     const states =
@@ -167,6 +167,6 @@ describe("shareArrows", () => {
       ...cancel.map((from) => edgeOf(from, "cancel", "inCart")),
     ];
     const nodes = shareArrows(foldGroups({ ...shop, states, edges })).nodes;
-    expect(nodes.map((node) => node.label)).toEqual(["4 states"]);
+    expect(nodes.map((node) => [node.label, node.walked.length])).toEqual([["3 states", 4]]);
   });
 });

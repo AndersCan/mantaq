@@ -145,7 +145,7 @@ export function shareArrows(machine: VizMachine): Shared {
         scope: group.scope,
         states: group.sources,
         walked: group.walked,
-        label: everyone ? ANY_LABEL : labelOf(group.walked),
+        label: everyone ? ANY_LABEL : labelOf(group.sources),
       };
       sets.set(setKey, node);
       nodes.push(node);
