@@ -233,10 +233,16 @@ describe("a grouped machine in the viewer", () => {
     click(root.querySelector('.graph g.state[data-node-id="order.@payment"]'));
     const links: string[] = [];
     for (const link of root.querySelectorAll("[data-edge-link]")) links.push(link.textContent);
+    const shared = root.querySelector(".graph g.any-node")?.getAttribute("aria-label");
+    click(root.querySelector('[data-state-link="order.confirming"]'));
     expect({
       links,
-      shared: root.querySelector(".graph g.any-node")?.getAttribute("aria-label"),
+      shared,
+      title: root.querySelector(".details h2")?.textContent,
+      ringed: root.querySelector(".graph g.selected[data-node-id]")?.getAttribute("data-node-id"),
     }).toStrictEqual({
+      title: "State confirming",
+      ringed: "order.@payment",
       links: [
         "group payment —confirmed→ paid",
         "group payment —abort→ cancelled",
@@ -244,6 +250,36 @@ describe("a grouped machine in the viewer", () => {
       ],
       shared: "these 3 states: inCart, group payment, paid",
     });
+  });
+
+  test("two parallel regions that reuse a state name keep the region in arrow names", () => {
+    const parallel = machineOf({
+      regions: ["left", "right"],
+      states: [
+        stateOf("left.idle", { initial: true }),
+        stateOf("left.done"),
+        stateOf("right.idle", { initial: true }),
+        stateOf("right.done"),
+        stateOf("right.paused"),
+      ],
+      edges: [
+        edgeOf("left.idle", { event: "go", to: "left.done" }),
+        edgeOf("right.idle", { event: "go", to: "right.done" }),
+        edgeOf("right.done", { event: "rest", to: "right.paused" }),
+      ],
+    });
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [parallel] });
+    const names: string[] = [];
+    for (const edge of root.querySelectorAll(".graph g.edge")) {
+      names.push(edge.getAttribute("aria-label") ?? "");
+    }
+    expect(names).toStrictEqual([
+      "left.idle on go to left.done",
+      "right.idle on go to right.done",
+      "right.done on rest to paused",
+    ]);
   });
 
   test("a state picked in Details of a group node rings the group node", () => {

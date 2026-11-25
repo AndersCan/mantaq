@@ -306,8 +306,8 @@ describe("mountVizText", () => {
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const links = [...root.querySelectorAll('.details dd[data-field="same event"] .link')];
     expect(links.map((link) => link.textContent)).toEqual([
-      "idle —apply [score < 600]→ rejected",
-      "idle —apply [else]→ approved",
+      "r.idle —apply [score < 600]→ rejected",
+      "r.idle —apply [else]→ approved",
     ]);
   });
 

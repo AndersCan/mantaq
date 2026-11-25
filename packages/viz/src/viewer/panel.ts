@@ -234,7 +234,7 @@ function statePanel(doc: Document, options: StatePanelOptions): HTMLElement {
   );
   const incoming = machine.edges.filter((edge) => isDrawn(edge) && edge.to === state.id);
   return html(doc, "section", { class: "details", "data-selected-state": state.id }, [
-    html(doc, "h2", {}, [`State ${state.id}`]),
+    html(doc, "h2", {}, [`State ${drawnNodeName(machine, { node: state.id })}`]),
     docLine(doc, "state", state.doc),
     list(doc, [
       ["outgoing", edgeList(doc, { edges: outgoing, machine, select, conditions: "hidden" })],

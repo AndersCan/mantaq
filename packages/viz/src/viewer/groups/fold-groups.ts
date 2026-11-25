@@ -66,12 +66,19 @@ export function groupNodeAt(machine: VizMachine, options: GroupNodeQuery): Group
   return foldedOf(machine).nodes.find((each) => each.id === options.node);
 }
 
-/** A drawn node as text names it, as the canvas draws it: a group node by its group's name, an `onAny` source as "any state", a state by its name in its region. */
+/**
+ * A drawn node as text names it, as the canvas draws it: a group node by its
+ * group's name, an `onAny` source as "any state", a state by its name in its
+ * region, or by its full id when another state of the machine has that name.
+ */
 export function drawnNodeName(machine: VizMachine, options: GroupNodeQuery): string {
   const { node } = options;
   if (isAnyState(node)) return "any state";
   const group = groupNodeAt(machine, { node });
-  return group === undefined ? localName(node) : `group ${group.name}`;
+  if (group !== undefined) return `group ${group.name}`;
+  const name = localName(node);
+  const shared = machine.states.some((state) => state.id !== node && localName(state.id) === name);
+  return shared ? node : name;
 }
 
 /** The group nodes of the real machine; its fold gives the same. */
