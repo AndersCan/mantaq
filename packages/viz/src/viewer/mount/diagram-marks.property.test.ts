@@ -165,6 +165,8 @@ function lookOf(element: Element): Look {
 
 const BUTTON: Look = { role: "button", tabindex: "0" };
 const PLAIN: Look = { role: undefined, tabindex: undefined };
+/** The current choice: Details show it already, so it keeps its tab stop and is no button. */
+const CURRENT: Look = { role: undefined, tabindex: undefined };
 
 function press(element: Element): void {
   element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -191,6 +193,8 @@ interface Met {
   id: string;
   looked: Look;
   acted: boolean;
+  /** Set on the state whose Details show before the click. */
+  current?: true;
 }
 
 /** Each drawn arrow: does it look like a button, and does a click send. */
@@ -209,12 +213,23 @@ function arrowsMet(options: ObserveOptions): Met[] {
   return met;
 }
 
-/** Each state: does it look like a button, and does a click open its Details. */
+function selectedState(root: HTMLElement): string | undefined {
+  return (
+    root.querySelector(".details[data-selected-state]")?.getAttribute("data-selected-state") ??
+    undefined
+  );
+}
+
+/** Each state: does it look like a button, and does a click open its Details. The state whose Details show already is the current choice. */
 function statesMet(options: ObserveOptions): Met[] {
   const met: Met[] = [];
   for (const state of options.root.querySelectorAll(".graph g.state")) {
     const id = state.getAttribute("data-node-id") ?? "";
     const looked = lookOf(state);
+    if (selectedState(options.root) === id) {
+      met.push({ id, looked, acted: true, current: true });
+      continue;
+    }
     press(state);
     const selected = options.root.querySelector(".details[data-selected-state]");
     met.push({ id, looked, acted: selected?.getAttribute("data-selected-state") === id });
@@ -228,11 +243,10 @@ interface ExpectedOptions {
 }
 
 function expectedOf(met: ReadonlyArray<Met>, options: ExpectedOptions): Met[] {
-  return met.map(({ id }) => ({
-    id,
-    looked: options.acts(id) ? BUTTON : PLAIN,
-    acted: options.acts(id),
-  }));
+  return met.map(({ id, current }) => {
+    if (current === true) return { id, looked: CURRENT, acted: true, current };
+    return { id, looked: options.acts(id) ? BUTTON : PLAIN, acted: options.acts(id) };
+  });
 }
 
 describe("a state or an arrow is a button exactly when a click on it acts", () => {

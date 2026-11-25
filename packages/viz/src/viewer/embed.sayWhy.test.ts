@@ -127,8 +127,8 @@ test("after a send blocks the arrow, the line says why and a second click sends 
   const first = { sent: sent.length, line: line(root) };
   click(root);
   expect({ first, second: { sent: sent.length, line: line(root) } }).toEqual({
-    first: { sent: 1, line: "take is blocked: items is 1" },
-    second: { sent: 1, line: "take is blocked: items is 1" },
+    first: { sent: 1, line: "Step 1: take: cart → cart. take is blocked: items is 1" },
+    second: { sent: 1, line: "Step 1: take: cart → cart. take is blocked: items is 1" },
   });
 });
 

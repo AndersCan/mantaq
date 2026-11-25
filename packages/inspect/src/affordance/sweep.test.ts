@@ -136,3 +136,45 @@ test("a tab stop that does nothing is reported", async () => {
     `plain: walk [start], driver, with panel, focus []: span "Focus me" changes nothing. ${fix}`,
   ]);
 });
+
+/** A button that marks itself picked: the first click shows it, a second changes nothing. */
+function pickOnce(root: HTMLElement): void {
+  const button = root.ownerDocument.createElement("button");
+  button.textContent = "Pick";
+  button.addEventListener("click", () => button.classList.add("picked"));
+  root.querySelector(".panel")?.append(button);
+}
+
+/** A button that opens a box whose close button does nothing. */
+function deadClose(root: HTMLElement): void {
+  const doc = root.ownerDocument;
+  const open = doc.createElement("button");
+  open.textContent = "Open";
+  open.addEventListener("click", () => {
+    const close = doc.createElement("button");
+    close.textContent = "Close";
+    open.after(close);
+    open.remove();
+  });
+  root.querySelector(".panel")?.append(open);
+}
+
+test("an element whose second click changes nothing is reported", async () => {
+  const report = await sweep(plain, { afterMount: pickOnce });
+  const fix = "Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).";
+  expect(failureLines(report)).toEqual([
+    `plain: walk [], no driver, with panel, focus []: button "Pick" changes nothing on a second click. ${fix}`,
+    `plain: walk [], driver, with panel, focus []: button "Pick" changes nothing on a second click. ${fix}`,
+    `plain: walk [start], driver, with panel, focus []: button "Pick" changes nothing on a second click. ${fix}`,
+  ]);
+});
+
+test("a dead element that a click brings is reported with that click", async () => {
+  const report = await sweep(plain, { afterMount: deadClose });
+  const fix = "Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).";
+  expect(failureLines(report)).toEqual([
+    `plain: walk [], no driver, with panel, focus [], after a click on button "Open": button "Close" changes nothing. ${fix}`,
+    `plain: walk [], driver, with panel, focus [], after a click on button "Open": button "Close" changes nothing. ${fix}`,
+    `plain: walk [start], driver, with panel, focus [], after a click on button "Open": button "Close" changes nothing. ${fix}`,
+  ]);
+});

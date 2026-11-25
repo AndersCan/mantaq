@@ -50,7 +50,7 @@ export function panelTabs(doc: Document, context: PanelTabsOptions): HTMLElement
 /** The live driver's part of the panel context. */
 export function liveOf(
   view: ViewState,
-  handlers: Pick<LiveContext, "send" | "pick" | "routes">,
+  handlers: Pick<LiveContext, "send" | "pick" | "routes" | "followedLook">,
 ): { live?: LiveContext } {
   if (view.live === null) return {};
   return {

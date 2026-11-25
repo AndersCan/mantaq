@@ -49,24 +49,34 @@ export function activatable(element: Element, onActivate: () => void): void {
   affordance(element, "button");
 }
 
-/** How an element shows a click: as a button (pointer, tab stop, `role=button`), or plain. */
-export type Affordance = "button" | "plain";
+/** How an element shows a click: as a button (pointer, tab stop, `role=button`), plain, or the current choice (plain, with `aria-current`). */
+export type Affordance = "button" | "plain" | "current";
 
-/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order. */
+/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order, and so does the current choice, which a click would only choose again. */
 export function affordance(element: Element, look: Affordance): void {
   switch (look) {
     case "button":
       element.setAttribute("tabindex", "0");
       element.setAttribute("role", "button");
+      element.removeAttribute("aria-current");
       return;
     case "plain":
-      element.removeAttribute("role");
-      if (element.ownerDocument.activeElement === element) element.setAttribute("tabindex", "-1");
-      else element.removeAttribute("tabindex");
+      leaveTabOrder(element);
+      element.removeAttribute("aria-current");
+      return;
+    case "current":
+      leaveTabOrder(element);
+      element.setAttribute("aria-current", "true");
       return;
     default:
       return isNever(look);
   }
+}
+
+function leaveTabOrder(element: Element): void {
+  element.removeAttribute("role");
+  if (element.ownerDocument.activeElement === element) element.setAttribute("tabindex", "-1");
+  else element.removeAttribute("tabindex");
 }
 
 export interface ButtonPressOptions {
@@ -85,6 +95,8 @@ export function onButtonPress(element: Element, options: ButtonPressOptions): vo
   element.addEventListener("keydown", (event) => {
     if (!("key" in event) || !isButton()) return;
     if (event.key !== "Enter" && event.key !== " ") return;
+    // A held key repeats: it must not press what focus moved to after the first press.
+    if ("repeat" in event && event.repeat === true) return;
     event.preventDefault();
     press();
   });
