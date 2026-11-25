@@ -41,9 +41,10 @@ function foldedOf(machine: VizMachine): Folded {
 }
 
 /**
- * The machine with each group drawn as one node: edges inside a group dropped,
- * crossing edges pointed at the group node. Every drawn edge of a handler with
- * an end in a group has no explanation; read its real edges with `arrowMembersOf`.
+ * The machine with each group drawn as one node: crossing edges pointed at the
+ * group node, and edges inside a group drawn as loops on it, so every move of
+ * the walk has an arrow. Every drawn edge of a handler with an end in a group
+ * has no explanation; read its real edges with `arrowMembersOf`.
  */
 export function foldGroups(machine: VizMachine): VizMachine {
   return foldedOf(machine).machine;
@@ -171,7 +172,6 @@ function bucketsOf(edges: ReadonlyArray<VizEdge>, options: NodeIndex): Bucket[] 
     const from = nodeOfState.get(edge.from) ?? edge.from;
     const target = edge.to === null ? null : (nodeOfState.get(edge.to) ?? edge.to);
     const moved = from !== edge.from || target !== edge.to;
-    if (moved && from === target) continue;
     const key = moved ? [from, edge.event, target ?? "", edge.kind].join("\u0000") : edge.id;
     const bucket = buckets.get(key) ?? { from, target, members: [] };
     bucket.members.push(edge);
