@@ -71,7 +71,7 @@ export function arrowSend(from: ArrowSendContext, edge: VizEdge): ArrowSend {
   return { kind: "send", actor, blocked: view.blocked.get(edge.id) };
 }
 
-/** The payload a click on `edge` sends: the one its dry run tried, else the event's default with the changed fields. Its send form shows it. */
+/** The payload a send of `edge` carries: the one its dry run tried, else the event's default with the changed fields. Its send form shows it. */
 export function arrowPayload(from: ArrowSendContext, edge: VizEdge): VizJson {
   const { machine, view } = from;
   updateBlocked(view, { machine, driver: from.driver });

@@ -19,7 +19,7 @@ export interface SendForHandlers {
   edit: (edit: PayloadEdit) => void;
 }
 
-/** The selected arrow's send form when a click on it sends (with the lock reason when blocked); else why it cannot be sent; no driver, none. */
+/** The selected arrow's send form when it leaves the walk's state (with the lock reason when blocked); else why it cannot be sent; no driver, none. */
 export function sendFor(
   from: SendForContext,
   handlers: SendForHandlers,

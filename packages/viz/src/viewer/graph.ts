@@ -22,7 +22,7 @@ import type { Point } from "@dagrejs/dagre";
 
 export type Selection = { kind: "edge"; id: string } | { kind: "state"; id: string };
 
-/** A state or an arrow is drawn plain; the diagram marks make it a button where `select` does something. */
+/** A state or an arrow is drawn plain; the diagram marks make it a button where `select` does something, and only a button calls `select`. */
 export interface GraphCallbacks {
   select(selection: Selection): void;
   /** Opens an arrow's Details without sending. Absent: no `?` is drawn (diagram-only). */
