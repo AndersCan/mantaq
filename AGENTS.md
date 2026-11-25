@@ -122,6 +122,8 @@ Never a `major` bump file: a breaking change is `minor` (0.5 → 0.6). `vp run b
 
 New docs/viz UI blocks go on `apps/docs/src/pages/design.astro` first; mark `Approved` only when the maintainer says so on the PR.
 
+When a click on a viewer element does nothing visible, the element must look plain: no pointer cursor, no tab stop, no `role=button`. A click does something visible when an arrow sends its event and the walk moves, when a control opens another machine or page, or when a panel that exists opens. Set the look with `affordance` / `onButtonPress` in `packages/viz/src/viewer/dom.ts`. The affordance tests enforce it: `packages/inspect/src/affordance/corpus.test.ts` clicks everything in the example and fixture viewers, and `scripts/docs-live-check.mjs` clicks everything in the built docs viewers.
+
 ### Docs page format
 
 Every page under `apps/docs` has `author: ai` (default) or `author: human` in its frontmatter.
