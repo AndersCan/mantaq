@@ -1,7 +1,5 @@
 export { matches } from "./actors/matches.ts";
 export { createActorMap, type ActorMap, type ActorMapChild } from "./actors/actor-map.ts";
-export { embed } from "./actors/embed.ts";
-export type { Embedded } from "./actors/embed.ts";
 export { states } from "./state.ts";
 export { events } from "./event.ts";
 export { onOutput } from "./output.ts";
