@@ -55,6 +55,16 @@ export function realMachineOf(machine: VizMachine): VizMachine {
   return foldedOf(machine).real;
 }
 
+export interface GroupNodeQuery {
+  /** A drawn node id, as `data-node-id` holds it. */
+  node: string;
+}
+
+/** The group node a drawn id names; undefined for a state. */
+export function groupNodeAt(machine: VizMachine, options: GroupNodeQuery): GroupNode | undefined {
+  return foldedOf(machine).nodes.find((each) => each.id === options.node);
+}
+
 /** The group nodes of the real machine; its fold gives the same. */
 export function groupNodesOf(machine: VizMachine): ReadonlyArray<GroupNode> {
   return foldedOf(machine).nodes;

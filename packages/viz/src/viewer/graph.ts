@@ -15,7 +15,7 @@ import type {
 } from "./layout.ts";
 import type { VizEdge, VizMachine } from "../schema.ts";
 import { Either } from "@mantaq/utils";
-import { groupNodesOf } from "./groups/fold-groups.ts";
+import { groupNodeAt } from "./groups/fold-groups.ts";
 import { isAnyState } from "../schema.ts";
 import { isSharedNode } from "./shared.ts";
 import { isNever } from "../is-never.ts";
@@ -354,7 +354,7 @@ interface AriaOptions {
 
 /** A drawn end as a sentence names it: a group node by its group's name. */
 function endText(id: string, options: AriaOptions): string {
-  const node = groupNodesOf(options.machine).find((each) => each.id === id);
+  const node = groupNodeAt(options.machine, { node: id });
   return node === undefined ? sourceText(id) : `group ${node.name}`;
 }
 
@@ -440,13 +440,13 @@ function edgeGroup(
   return group;
 }
 
-/** The `?` beside an arrow's label: opens its Details, never sends. */
 interface HelpOptions {
   placed: PlacedEdge;
   details: (id: string) => void;
   machine: VizMachine;
 }
 
+/** The `?` beside an arrow's label: opens its Details, never sends. */
 function helpGroup(doc: Document, options: HelpOptions): SVGGElement {
   const { placed, details, machine } = options;
   const aria = edgeAria(placed.edge, { machine, members: placed.members });

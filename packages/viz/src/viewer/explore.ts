@@ -1,6 +1,6 @@
 import { movesFrom } from "../moves.ts";
-import type { Move } from "../moves.ts";
 import { actorText, localName } from "./compartments.ts";
+import { actingMember } from "./groups/acting-member.ts";
 import type {
   VizActorRef,
   VizJson,
@@ -418,9 +418,7 @@ export function markExplore(
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
     const members = listOf(element.dataset["members"]) ?? [id];
-    const here =
-      memberHere(members, { moves, blocked }) ??
-      members.find((member) => currents.includes(sources.get(member) ?? ""));
+    const here = actingMember(members, { moves, blocked, currents, sources });
     element.classList.toggle(
       "next",
       members.some((member) => next.has(member)),
@@ -428,25 +426,6 @@ export function markExplore(
     markBlocked(element, blocked.get(here ?? id));
   }
   markCurrent(root, currents);
-}
-
-export interface MemberHereOptions {
-  /** The moves the walk can take now. */
-  moves: ReadonlyArray<Move>;
-  /** Edge id → why its guard blocks it. */
-  blocked: ReadonlyMap<string, string>;
-}
-
-/** The real edge of a drawn arrow that a click sends now: one the walk can take that no guard blocks, else one it can take; undefined when it takes none. */
-export function memberHere(
-  members: ReadonlyArray<string>,
-  options: MemberHereOptions,
-): string | undefined {
-  const { moves, blocked } = options;
-  const taken = new Set<string>();
-  for (const move of moves) taken.add(move.edge.id);
-  const open = members.find((member) => taken.has(member) && !blocked.has(member));
-  return open ?? members.find((member) => taken.has(member));
 }
 
 /** A JSON list written to a `data-` attribute; ids may hold spaces. */

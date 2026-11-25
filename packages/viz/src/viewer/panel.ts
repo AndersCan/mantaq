@@ -5,7 +5,7 @@ import { activatable, html } from "./dom.ts";
 import type { Selection } from "./graph.ts";
 import { edgeCondition } from "./labels.ts";
 import { isDrawn } from "./layout.ts";
-import { groupArrowsOf, groupNodesOf, realMachineOf } from "./groups/fold-groups.ts";
+import { groupArrowsOf, groupNodeAt, realMachineOf } from "./groups/fold-groups.ts";
 import type { GroupArrow, GroupNode } from "./groups/fold-groups.ts";
 import { shareArrows } from "./shared.ts";
 import type { SharedArrow } from "./shared.ts";
@@ -137,7 +137,7 @@ interface FoldOf {
 /** A drawn end of a fold as Details names it: a group node by its group's name. */
 function endName(id: string | null, options: FoldOf): string {
   if (id === null) return "?";
-  const node = groupNodesOf(options.machine).find((each) => each.id === id);
+  const node = groupNodeAt(options.machine, { node: id });
   return node === undefined ? localName(id) : `group ${node.name}`;
 }
 
@@ -236,7 +236,7 @@ function selectedPanel(doc: Document, options: RenderPanelOptions): HTMLElement 
     case "state": {
       const state = real.states.find((candidate) => candidate.id === id);
       if (state) return statePanel(doc, state, { machine: real, select });
-      const node = groupNodesOf(machine).find((candidate) => candidate.id === id);
+      const node = groupNodeAt(machine, { node: selection.id });
       return node && groupPanel(doc, { node, machine, select });
     }
     case undefined:

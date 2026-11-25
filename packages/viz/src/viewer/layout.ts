@@ -8,7 +8,8 @@ import { isNever } from "../is-never.ts";
 import { isSharedNode, shareArrows } from "./shared.ts";
 import type { Shared } from "./shared.ts";
 import type { Overlap } from "./overlaps.ts";
-import { arrowMembersOf, groupNodesOf } from "./groups/fold-groups.ts";
+import { groupNodeAt } from "./groups/fold-groups.ts";
+import { realMembersOf } from "./groups/acting-member.ts";
 import { Either } from "@mantaq/utils";
 import { Graph, layout } from "@dagrejs/dagre";
 import type { EdgeLabel, GraphLabel, NodeLabel, Point } from "@dagrejs/dagre";
@@ -243,7 +244,7 @@ function hasRow(machine: VizMachine, state: VizState): boolean {
 /** What a machine node of the drawn machine holds; undefined for a plain state. */
 function holdsOf(machine: VizMachine, state: VizState): Holds | undefined {
   if (state.machine !== undefined) return { kind: "machine", machine: state.machine };
-  const node = groupNodesOf(machine).find((each) => each.id === state.id);
+  const node = groupNodeAt(machine, { node: state.id });
   return node === undefined ? undefined : { kind: "group", group: node.name, states: node.states };
 }
 
@@ -999,17 +1000,11 @@ interface SharedIn {
  * shared arrow's members, and the members of a group arrow of a fold, so the
  * marks and a click can find the one that leaves the current state.
  */
-function realMembersOf(base: VizMachine, options: SharedIn): Map<string, string[]> {
+function drawnMembersOf(base: VizMachine, options: SharedIn): Map<string, string[]> {
   const { shared } = options;
   const members = new Map<string, string[]>();
   for (const edge of shared.edges) {
-    const arrow = shared.arrows.find((each) => each.id === edge.id);
-    const drawn = arrow === undefined ? [edge.id] : arrow.members.map((member) => member.id);
-    const real: string[] = [];
-    for (const id of drawn) {
-      const found = arrowMembersOf(base, { arrow: id });
-      real.push(...(found.length === 0 ? [id] : found.map((member) => member.id)));
-    }
+    const real = realMembersOf(base, { shared, arrow: edge.id });
     const alone = real.length === 1 && real[0] === edge.id;
     if (!alone) members.set(edge.id, real);
   }
@@ -1058,7 +1053,7 @@ export function placeMachine(base: VizMachine): MachineLayout {
     edges: [...shared.edges, ...messagesOf(base).map(messageEdge)],
     shared,
     holds,
-    members: realMembersOf(base, { shared }),
+    members: drawnMembersOf(base, { shared }),
   };
   const { specs, geo } = laidOut(machine);
   const context: Context = { machine, specs, owners: ownersOf(machine) };
