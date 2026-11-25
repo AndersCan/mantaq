@@ -484,14 +484,15 @@ describe("mountDriven with several machines", () => {
     expect(buttons.map((b) => b.disabled)).toEqual([true, false]);
   });
 
-  test("clicking a machine switches the URL and the shown machine, and drops the focus path", async () => {
+  test("clicking a machine shows it and drops the focus path, and the address stays as it was", async () => {
     history.replaceState(null, "", "?machine=checkout&step=1&focus=basicInfo");
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: await twoText(), targets: {} });
     (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
-    expect(location.search).toBe("?machine=second");
+    expect(location.search).toBe("?machine=checkout&step=1&focus=basicInfo");
     const buttons = [...root.querySelectorAll("nav.machines button")] as HTMLButtonElement[];
     expect(buttons.map((b) => b.disabled)).toEqual([false, true]);
+    expect(root.querySelector(".focus-path")).toBeNull();
   });
 });
 
@@ -503,28 +504,34 @@ describe("mountDriven walk ownership", () => {
   const current = (root: HTMLElement) =>
     root.querySelector<HTMLElement>(".explore")?.dataset["current"];
 
-  test("a walk for another machine's id is not replayed here", async () => {
-    history.replaceState(null, "", "?");
-    const text = await documentText();
-    const first = document.createElement("div");
-    mountDriven(first, { source: "test", text, targets: { checkout: create } });
-    const start = current(first);
-    sendVia(first);
-    expect(current(first)).not.toBe(start);
-    const walk = new URLSearchParams(location.search);
-    expect(walk.getAll("step").length).toBeGreaterThan(0);
+  test("a redraw on the same root replays the walk taken there, and the address stays as it was", async () => {
+    history.replaceState(undefined, "", "?machine=checkout");
+    const context = { source: "test", text: await documentText(), targets: { checkout: create } };
+    const root = document.createElement("div");
+    mountDriven(root, context);
+    sendVia(root);
+    const walked = current(root);
+    mountDriven(root, context);
+    const other = document.createElement("div");
+    mountDriven(other, context);
+    const shown = { walked, redrawn: current(root), other: current(other) };
+    expect({ shown, search: location.search }).toEqual({
+      shown: { walked: "shippingAddress", redrawn: "shippingAddress", other: "basicInfo" },
+      search: "?machine=checkout",
+    });
+  });
 
-    walk.set("machine", "somewhere-else");
-    history.replaceState(null, "", `?${walk.toString()}`);
-    const second = document.createElement("div");
-    mountDriven(second, { source: "test", text, targets: { checkout: create } });
-    expect(current(second)).toBe(start);
-
-    walk.set("machine", "checkout");
-    history.replaceState(null, "", `?${walk.toString()}`);
-    const third = document.createElement("div");
-    mountDriven(third, { source: "test", text, targets: { checkout: create } });
-    expect(current(third)).not.toBe(start);
+  test("a walk on a machine the document no longer holds gives way to the link", async () => {
+    history.replaceState(undefined, "", "?");
+    const doc = JSON.parse(await documentText());
+    const root = document.createElement("div");
+    const machines = [doc.machines[0], { ...doc.machines[0], id: "second" }];
+    const targets = { checkout: create, second: create };
+    mountDriven(root, { source: "test", text: JSON.stringify({ ...doc, machines }), targets });
+    root.querySelectorAll<HTMLButtonElement>("nav.machines button")[1]?.click();
+    sendVia(root);
+    mountDriven(root, { source: "test", text: JSON.stringify(doc), targets: { checkout: create } });
+    expect(current(root)).toBe("basicInfo");
   });
 });
 
@@ -558,28 +565,16 @@ describe("mountDriven runs by name", () => {
     expect(location.search).toBe("?machine=checkout&run=gives%20basic%20info");
   });
 
-  test("switching machine drops run", async () => {
+  test("switching machine opens the other at its start, not at the link's run", async () => {
     history.replaceState(null, "", "?machine=checkout&run=gives%20basic%20info");
     const root = document.createElement("div");
-    mountDriven(root, { source: "test", text: await withRuns(), targets: {} });
-    (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
-    expect(location.search).toBe("?machine=second");
+    const targets = { checkout: create, second: create };
+    mountDriven(root, { source: "test", text: await withRuns(), targets });
+    root.querySelectorAll<HTMLButtonElement>("nav.machines button")[1]?.click();
+    expect(current(root)).toBe("basicInfo");
+    expect(root.querySelector("[data-run-missing]")).toBeNull();
   });
 
-  test("switching machine drops the values set for the old one", async () => {
-    history.replaceState(null, "", "?machine=checkout&value=email%3D%22a%40b.c%22");
-    const root = document.createElement("div");
-    mountDriven(root, { source: "test", text: await withRuns(), targets: {} });
-    (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
-    expect(location.search).toBe("?machine=second");
-  });
-  test("switching machine drops the payload changes made for the old one", async () => {
-    history.replaceState(undefined, "", '?machine=checkout&payload=submit={"email":"a@b.c"}');
-    const root = document.createElement("div");
-    mountDriven(root, { source: "test", text: await withRuns(), targets: {} });
-    root.querySelectorAll<HTMLButtonElement>("nav.machines button")[1]?.click();
-    expect(location.search).toBe("?machine=second");
-  });
   test("the run the page names opens at its end", async () => {
     history.replaceState(null, "", "?");
     const root = document.createElement("div");
@@ -592,19 +587,14 @@ describe("mountDriven runs by name", () => {
     expect(current(root)).toBe("shippingAddress");
   });
 
-  test("a step in the address wins over the run the page names", async () => {
+  test("a step taken wins over the run the page names on a redraw", async () => {
     history.replaceState(null, "", "?");
-    const first = document.createElement("div");
-    mountDriven(first, { source: "test", text: await withRuns(), targets: { checkout: create } });
-    sendVia(first);
-    const walked = current(first);
     const root = document.createElement("div");
-    mountDriven(root, {
-      source: "test",
-      text: await withRuns(),
-      targets: { checkout: create },
-      run: "nope",
-    });
+    const context = { source: "test", text: await withRuns(), targets: { checkout: create } };
+    mountDriven(root, context);
+    sendVia(root);
+    const walked = current(root);
+    mountDriven(root, { ...context, run: "nope" });
     expect(current(root)).toBe(walked);
     expect(root.querySelector("[data-run-missing]")).toBeNull();
   });
@@ -632,7 +622,6 @@ describe("mountDriven runs by name", () => {
       run: "gives basic info",
     });
     (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
-    expect(location.search).toBe("?machine=second");
     expect(root.querySelector("[data-run-missing]")).toBeNull();
   });
 

@@ -30,7 +30,7 @@ afterAll(async () => {
   await server.close();
 });
 
-/** The drawn nodes marked current, the path above the canvas and the `?focus=` of the address bar. */
+/** The drawn nodes marked current, the path above the canvas and the address bar's query. */
 async function where(page: Page) {
   const path = page.getByRole("navigation", { name: "Path" });
   const crumbs =
@@ -42,11 +42,11 @@ async function where(page: Page) {
     }
     return ids;
   });
-  const focus = await page.evaluate(() => new URLSearchParams(location.search).getAll("focus"));
-  return { crumbs, current, focus };
+  const address = await page.evaluate(() => location.search);
+  return { crumbs, current, address };
 }
 
-test("a group is entered, walked inside by its arrows until one leaves it, left by crumb and Escape, and reopened from a link", async () => {
+test("a group is entered, walked inside by its arrows until one leaves it, left by crumb and Escape, reset by a reload, and reopened from a link", async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await page.goto(`${origin}/__mantaq/?machine=grouped`);
   await page.getByRole("button", { name: "enter group payment", exact: true }).click();
@@ -72,17 +72,27 @@ test("a group is entered, walked inside by its arrows until one leaves it, left 
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "enter group payment", exact: true }).waitFor();
   const escaped = await where(page);
+  await page.reload();
+  await page.getByRole("button", { name: "enter group payment", exact: true }).waitFor();
+  const reloaded = await where(page);
   await page.goto(`${origin}/__mantaq/?machine=grouped&step=checkout&focus=%40payment`);
   await page
     .getByRole("button", { name: "chargingCard on charged to confirming", exact: true })
     .waitFor();
-  expect({ entered, inside, left, back, escaped, linked: await where(page) }).toStrictEqual({
-    entered: { crumbs: ["grouped", "payment"], current: ["inCart"], focus: ["@payment"] },
-    inside: { crumbs: ["grouped", "payment"], current: ["confirming"], focus: ["@payment"] },
-    left: { crumbs: ["grouped", "payment"], current: ["packing"], focus: ["@payment"] },
-    back: { crumbs: [], current: ["@shipping"], focus: [] },
-    escaped: { crumbs: [], current: ["@shipping"], focus: [] },
-    linked: { crumbs: ["grouped", "payment"], current: ["chargingCard"], focus: ["@payment"] },
+  const linked = await where(page);
+  const plain = "?machine=grouped";
+  expect({ entered, inside, left, back, escaped, reloaded, linked }).toStrictEqual({
+    entered: { crumbs: ["grouped", "payment"], current: ["inCart"], address: plain },
+    inside: { crumbs: ["grouped", "payment"], current: ["confirming"], address: plain },
+    left: { crumbs: ["grouped", "payment"], current: ["packing"], address: plain },
+    back: { crumbs: [], current: ["@shipping"], address: plain },
+    escaped: { crumbs: [], current: ["@shipping"], address: plain },
+    reloaded: { crumbs: [], current: ["inCart"], address: plain },
+    linked: {
+      crumbs: ["grouped", "payment"],
+      current: ["chargingCard"],
+      address: "?machine=grouped&step=checkout&focus=%40payment",
+    },
   });
   await page.close();
 }, 60_000);
