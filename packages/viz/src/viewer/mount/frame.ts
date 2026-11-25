@@ -43,26 +43,27 @@ export interface FrameOptions {
   root: HTMLElement;
 }
 
-/** Everything the viewer draws under its root: the bar with the zoom and pan tools, then the controls and panel, or with Diagram only just the canvas. */
+/** Everything the viewer draws under its root: the bar, then the canvas with the zoom and pan tools at its bottom, then the panel, or with Diagram only a line under the canvas. */
 export function layoutOf(doc: Document, context: FrameOptions): HTMLElement[] {
   const { view } = context;
   const canvas = html(doc, "div", { class: "canvas" }, context.graph);
+  const framed = html(doc, "div", { class: "canvas-frame" }, [canvas, toolbarOf(doc)]);
   const fullscreen = fullscreenButton(doc, context.root);
   const ends = fullscreen === undefined ? [] : [fullscreen];
   if (!view.diagramOnly) {
     return [
-      html(doc, "div", { class: "viz-bar" }, [toolbarOf(doc), ...ends]),
+      html(doc, "div", { class: "viz-bar" }, ends),
       ...noticeOf(doc, view),
-      html(doc, "div", { class: "viz-main" }, [canvas, context.panel]),
+      html(doc, "div", { class: "viz-main" }, [framed, context.panel]),
     ];
   }
   const show = html(doc, "button", { type: "button", class: "show-controls" }, ["Show controls"]);
   show.setAttribute("data-show-controls", "");
   show.addEventListener("click", () => context.showControls());
   return [
-    html(doc, "div", { class: "viz-bar" }, [toolbarOf(doc), show, ...ends]),
+    html(doc, "div", { class: "viz-bar" }, [show, ...ends]),
     html(doc, "div", { class: "viz-main" }, [
-      canvas,
+      framed,
       html(doc, "p", { class: "blocked-note", role: "status" }),
     ]),
   ];

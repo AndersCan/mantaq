@@ -370,21 +370,31 @@ describe("repro: Back and Reset, and the Details hint, in a shown machine", () =
   });
 });
 
+interface RectsOptions {
+  /** The node drawn below the band. */
+  belowId?: string;
+  /** Where the zoom and pan tools start, in window pixels: past the window, they cover nothing. */
+  toolsTop?: number;
+}
+
 describe("a step inside a shown machine", () => {
-  const stubRects = (below: boolean, belowId = "p.two") => {
+  const stubRects = (below: boolean, options: RectsOptions = {}) => {
+    const { belowId = "p.two", toolsTop = 2000 } = options;
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
       this: Element,
     ) {
       const scrolled = this.closest(".canvas")?.scrollTop ?? 0;
       const top = this.classList.contains("viz-bar")
         ? 0
-        : this.classList.contains("panel")
-          ? 500
-          : this.classList.contains("canvas")
-            ? 100
-            : this.getAttribute("data-node-id") === belowId && below
-              ? 900 - scrolled
-              : 200 - scrolled;
+        : this.classList.contains("viz-tools")
+          ? toolsTop
+          : this.classList.contains("panel")
+            ? 500
+            : this.classList.contains("canvas")
+              ? 100
+              : this.getAttribute("data-node-id") === belowId && below
+                ? 900 - scrolled
+                : 200 - scrolled;
       return {
         top,
         bottom: top + 40,
@@ -456,6 +466,17 @@ describe("a step inside a shown machine", () => {
     expect(pageScrolls()).toBe(0);
   });
 
+  test("keeps the new state above the zoom and pan tools at the canvas's bottom", () => {
+    stubRects(true, { toolsTop: 420 });
+    const { tops, pageScrolls } = spy();
+    const { root, push } = mountPushable();
+    press(box(root, "p"));
+    tops.length = 0;
+    push("p.two", "q.two");
+    expect(tops).toEqual([536]);
+    expect(pageScrolls()).toBe(0);
+  });
+
   test("keeps the new state below the name bar and above a Step panel that covers the canvas", () => {
     stubRects(true);
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
@@ -464,13 +485,15 @@ describe("a step inside a shown machine", () => {
       const scrolled = this.closest(".canvas")?.scrollTop ?? 0;
       const top = this.classList.contains("viz-bar")
         ? 160
-        : this.classList.contains("panel")
-          ? 300
-          : this.classList.contains("canvas")
-            ? 100
-            : this.getAttribute("data-node-id") === "p.two"
-              ? 900 - scrolled
-              : 200 - scrolled;
+        : this.classList.contains("viz-tools")
+          ? 2000
+          : this.classList.contains("panel")
+            ? 300
+            : this.classList.contains("canvas")
+              ? 100
+              : this.getAttribute("data-node-id") === "p.two"
+                ? 900 - scrolled
+                : 200 - scrolled;
       return { top, bottom: top + 40, left: 0, right: 0, width: 0, height: 40 } as DOMRect;
     });
     const { tops, pageScrolls } = spy();
@@ -529,7 +552,7 @@ describe("a step inside a shown machine", () => {
   });
 
   test("opening on a state outside the band scrolls the canvas once, then a step in another machine does not", () => {
-    stubRects(true, "p.one");
+    stubRects(true, { belowId: "p.one" });
     const { tops: scrolled, pageScrolls } = spy();
     const { root, push } = mountPushable();
     press(box(root, "p"));

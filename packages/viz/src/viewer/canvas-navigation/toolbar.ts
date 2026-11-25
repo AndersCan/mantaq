@@ -51,7 +51,7 @@ const ICONS: Record<"select" | "hand", string> = {
   hand: "M5.5 8.5V4a1 1 0 0 1 2 0v3.5M7.5 7V3a1 1 0 0 1 2 0v4M9.5 7V4a1 1 0 0 1 2 0v3.5M11.5 7.5V6a1 1 0 0 1 2 0v3.5c0 2.75-2 5-4.75 5-2 0-3.25-1-4.25-2.75L3 9.25a1 1 0 0 1 1.75-1l.75 1.25",
 };
 
-/** The zoom and pan controls for the bar above the canvas; they act once `bindToolbar` gives them the viewport. */
+/** The zoom and pan controls that float at the bottom center of the canvas; they act once `bindToolbar` gives them the viewport. */
 export function toolbarOf(doc: Document): HTMLElement {
   const tools: HTMLElement[] = [];
   for (const tool of TOOLS) tools.push(buttonOf(doc, { text: tool, content: [iconOf(doc, tool)] }));

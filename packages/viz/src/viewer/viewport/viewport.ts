@@ -57,6 +57,10 @@ export interface ViewportOptions {
   fitBox?: () => Size;
   /** How far down the window something covers it, in client pixels: `fit` puts the drawing's top below that. Default 0. */
   coveredTop?: () => number;
+  /** How far up from the window's bottom something may cover it, in client pixels: `fit` scrolls the page so the drawing ends above that. Default 0. */
+  coveredBottom?: () => number;
+  /** How far down the window stays covered once the page scrolls, as by a bar that sticks there: that scroll keeps the drawing's top below it. Default `coveredTop`. */
+  stuckTop?: () => number;
   /** The part of the container the reader sees; zoom in, zoom out and 100% keep its center put. Default: the part inside the window. */
   shown?: () => Box;
   /** Default 100%, chosen, with the select tool. */
@@ -71,7 +75,7 @@ export interface Viewport {
   /** Zooms to the next step, at the center of the part of the container shown. */
   zoomIn: () => void;
   zoomOut: () => void;
-  /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's (below what covers it) when the container starts above it; the page scrolls for that too. */
+  /** Scales so the whole drawing fits, and scrolls its top-left toward the container's top-left, or the window's (below what covers it) when the container starts above it; the page scrolls for that too, and further, when the drawing would end in what covers the window's bottom. */
   fit: () => void;
   /** The scale that `fit` would choose now; undefined without a drawing. */
   fitScale: () => number | undefined;
@@ -177,6 +181,7 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
       y: container.scrollTop + rect.top - Math.max(visible.y, options.coveredTop?.() ?? 0),
     };
     scrollTo(wanted, { x: followed(container, { sizeBefore }).x, y: "page" });
+    liftAbove(container, { drawing, covered: options });
     lastOrigin = undefined;
     const same = target === state.scale && sizing === "chosen";
     if (!same) changed({ ...state, scale: target, sizing: "chosen" });
@@ -292,6 +297,25 @@ function followed(container: HTMLElement, options: FollowedOptions): Reach {
 function visibleOrigin(container: HTMLElement): Point {
   const rect = container.getBoundingClientRect();
   return { x: rect.left + container.clientLeft, y: rect.top + container.clientTop };
+}
+
+interface LiftOptions {
+  drawing: Element;
+  /** What covers the window's top and bottom; the drawing's top stays below the first. */
+  covered: Pick<ViewportOptions, "coveredTop" | "coveredBottom" | "stuckTop">;
+}
+
+/** Scrolls what holds the container, never the container itself, up so the drawing ends above what covers the window's bottom, as far as its top allows. */
+function liftAbove(container: HTMLElement, options: LiftOptions): void {
+  const view = container.ownerDocument.defaultView;
+  const holder = container.parentElement;
+  if (view === null || holder === null) return;
+  const { covered } = options;
+  const top = Math.max(0, covered.stuckTop?.() ?? covered.coveredTop?.() ?? 0);
+  const bottom = view.innerHeight - (covered.coveredBottom?.() ?? 0);
+  const rect = options.drawing.getBoundingClientRect();
+  const lift = Math.min(rect.bottom - bottom, rect.top - top);
+  if (lift >= 1) scrollByChained(holder, { x: 0, y: lift });
 }
 
 /** Leftover scroll under a pixel is rounding, not something to pass on. */

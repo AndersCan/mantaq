@@ -161,7 +161,7 @@ function sendableLabels(canvas: HTMLElement, options: LeavesOptions): Area[] {
   return labels;
 }
 
-/** The part of the canvas on screen, in window pixels: below the name bar, above the Step panel, inside the window. */
+/** The part of the canvas on screen, in window pixels: below the name bar, above the zoom and pan tools and the Step panel, inside the window. */
 interface Band {
   /** The canvas's own top edge. */
   top: number;
@@ -181,6 +181,20 @@ export function coveredTop(root: HTMLElement): number {
   return Math.max(page, bar.getBoundingClientRect().bottom);
 }
 
+/** How much of the window's top stays covered once the page scrolls: by the page, and by the viewer's bar where it sticks, at the place it sticks, not where it is now. */
+export function stuckTop(root: HTMLElement): number {
+  const doc = root.ownerDocument;
+  const view = doc.defaultView;
+  const style = view?.getComputedStyle(doc.documentElement);
+  const header = Number.parseFloat(style?.scrollPaddingTop ?? "") || 0;
+  const page = doc.fullscreenElement === root ? 0 : header;
+  const bar = root.querySelector<HTMLElement>(".viz-bar");
+  const barStyle = bar === null ? undefined : view?.getComputedStyle(bar);
+  if (bar === null || barStyle?.position !== "sticky") return page;
+  const stuck = (Number.parseFloat(barStyle.top) || 0) + bar.offsetHeight;
+  return Math.max(page, stuck);
+}
+
 /** The band of the canvas on screen; the whole canvas while none of it is on screen, so it still scrolls for when the reader gets there. */
 function bandOf(root: HTMLElement, canvas: HTMLElement): Band {
   const box = canvas.getBoundingClientRect();
@@ -189,8 +203,9 @@ function bandOf(root: HTMLElement, canvas: HTMLElement): Band {
   const view = root.ownerDocument.defaultView?.innerHeight ?? 0;
   const bar = root.querySelector(".viz-bar")?.getBoundingClientRect().bottom ?? 0;
   const panel = root.querySelector(".panel")?.getBoundingClientRect().top ?? view;
+  const tools = root.querySelector(".viz-tools")?.getBoundingClientRect().top ?? view;
   const start = Math.max(top, bar, coveredTop(root));
-  const end = Math.min(bottom, panel, view);
+  const end = Math.min(bottom, panel, view, tools);
   return end > start ? { top, start, end } : { top, start: top, end: bottom };
 }
 
@@ -198,7 +213,7 @@ export interface CanvasRoomOptions {
   canvas: HTMLElement;
 }
 
-/** The part of the canvas the reader sees, in window pixels: inside the window, below the name bar and above the Step panel. */
+/** The part of the canvas the reader sees, in window pixels: inside the window, below the name bar and above the zoom and pan tools and the Step panel. */
 export function shownArea(root: HTMLElement, options: CanvasRoomOptions): Area {
   const { canvas } = options;
   const band = bandOf(root, canvas);
@@ -209,13 +224,20 @@ export function shownArea(root: HTMLElement, options: CanvasRoomOptions): Area {
   return { ...shown, top: band.start, bottom: band.end };
 }
 
-/** The room a fit fills: the canvas, or, where its height follows the drawing, its width by the window's height below what the page covers. */
+/** The room the zoom and pan tools keep at the canvas's bottom, in pixels: what they may cover of the window's bottom while the canvas runs past it. */
+export function toolsRoom(canvas: HTMLElement): number {
+  const style = canvas.ownerDocument.defaultView?.getComputedStyle(canvas);
+  return Number.parseFloat(style?.paddingBottom ?? "") || 0;
+}
+
+/** The room a fit fills: the canvas, or, where its height follows the drawing, its width by the window's height below what the page covers; less the room kept for the zoom and pan tools at its bottom. */
 export function fitRoom(root: HTMLElement, options: CanvasRoomOptions): Size {
   const { canvas } = options;
   const view = root.ownerDocument.defaultView;
   const capped = view?.getComputedStyle(canvas).maxHeight !== "none";
-  if (capped || view === null) return { width: canvas.clientWidth, height: canvas.clientHeight };
-  return { width: canvas.clientWidth, height: view.innerHeight - coveredTop(root) };
+  const height =
+    capped || view === null ? canvas.clientHeight : view.innerHeight - coveredTop(root);
+  return { width: canvas.clientWidth, height: Math.max(1, height - toolsRoom(canvas)) };
 }
 
 interface TopOptions {
