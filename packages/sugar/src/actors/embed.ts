@@ -111,8 +111,8 @@ export interface Embedded {
   readonly snapshot: string | undefined;
   /** Context field of the parent where its `snapshot` handler keeps the child snapshot, or undefined when the parent does not say. */
   readonly keep: string | undefined;
-  /** The child running now, or undefined. For a tool that drives the parent and starts after the child was built, for example to hold its effects. */
-  readonly running: () => AnyActor<unknown> | undefined;
+  /** The child running now, or undefined. For tools only: a tool that drives the parent and starts after the child was built can hold its effects. */
+  readonly running: () => unknown;
 }
 
 interface EmbedOptions<

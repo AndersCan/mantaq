@@ -316,7 +316,7 @@ export interface VizLiveState {
   effectMode: "held" | "real";
   /** Held effects of the active state still waiting for an answer (their state not left), in the order they started. [] in real mode. */
   waiting: string[];
-  /** Each current state that embeds a machine: the root's own states, its regions' and its returned machines'. A child that ended is left out. Omitted: the driver does not report them. */
+  /** Each current state that embeds a machine: the root's own states, its regions' and its returned machines'. With `keep`, a child that ended is left out; without it, an entry only says the state is current. Omitted: the driver does not report them. */
   embeds?: VizLiveEmbed[];
 }
 

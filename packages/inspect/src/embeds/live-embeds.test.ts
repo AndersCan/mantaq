@@ -167,12 +167,16 @@ describe("running embeds in the driver", () => {
     const live = driver.step({ kind: "event", event: "print", payload: null });
     const tried = driver.dryRun?.([
       { kind: "event", event: "print", payload: null },
-      { kind: "advance", ms: 10 },
+      { kind: "event", event: "start", payload: null },
     ]);
-    expect({ runs: printed.runs, embeds: live.embeds, tried: tried?.length }).toEqual({
+    expect({
+      runs: printed.runs,
+      embeds: live.embeds,
+      tried: tried?.map((each) => each?.outcome),
+    }).toEqual({
       runs: 0,
       embeds: [{ state: "shipping", current: "printing" }],
-      tried: 2,
+      tried: ["stay", "ignored"],
     });
   });
 

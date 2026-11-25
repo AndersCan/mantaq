@@ -119,7 +119,7 @@ function tagged<Effect extends object>(effect: Effect, options: TaggedOptions): 
 function holdRunningChildren(actor: AnyActor<unknown>): void {
   for (const entry of actor.options?.effects?.[actor.state.name] ?? []) {
     const tag = embedTagOf(entry);
-    if (tag !== undefined && drivesChild(entry)) holdChild(tag.running());
+    if (tag !== undefined) holdChild(tag.running());
   }
 }
 

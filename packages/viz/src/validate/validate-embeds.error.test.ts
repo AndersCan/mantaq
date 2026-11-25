@@ -52,10 +52,20 @@ describe("validateViz rejects embedded machines", () => {
   });
 
   test("forwarded inputs that are not a list of strings", () => {
-    const document = documentOf([{ id: "checkout", states: [{ id: "paying" }] }]);
+    const document = documentOf([
+      { id: "checkout", states: [{ id: "paying", machine: "payment" }] },
+      { id: "payment", states: [{ id: "card" }] },
+    ]);
     const parsed = JSON.parse(JSON.stringify(document));
     parsed.machines[0].states[0].forward = "cancel";
     expect(issuesOf(parsed)).toEqual(["$.machines[0].states[0].forward: expected string[]"]);
+  });
+
+  test("forwarded inputs on a state that embeds no machine", () => {
+    const document = documentOf([
+      { id: "checkout", states: [{ id: "paying", forward: ["cancel"] }] },
+    ]);
+    expect(issuesOf(document)).toEqual(["$.machines[0].states[0].forward: forward needs machine"]);
   });
 
   test("nothing about embeds while the document has other read errors", () => {
