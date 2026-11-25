@@ -65,7 +65,7 @@ test("the panel stays below the graph, never pinned over it, and inside a path t
   expect(panel).not.toMatch(/position:/);
   expect(panel).toMatch(/background:\s*var\(--bg\)/);
   expect(listed(".viz:has(.focus-path) .canvas")).toMatch(/max-height:\s*calc\(75dvh - 5rem\)/);
-  expect(listed(".viz:has(.focus-path) .canvas")).toMatch(/scrollbar-gutter:\s*stable/);
+  expect(listed(".viz .canvas")).toMatch(/scrollbar-gutter:\s*stable/);
   const tabPanel = rule(".viz .tab-panel {");
   expect(tabPanel).toMatch(/overflow:\s*auto/);
   expect(tabPanel).toMatch(/max-height:\s*25vh/);

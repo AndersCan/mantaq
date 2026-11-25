@@ -263,7 +263,7 @@ function shownCurrents(from: KeepCurrentOptions): string[] {
   return part === undefined ? live : live.filter((id) => partOf(machine, id) === part);
 }
 
-/** Scrolls to the live state, or the group node that draws it, with the arrows a click sends from it when they fit; in a shown machine, to a state drawn there, never the page. */
+/** Scrolls to the live state, or the group node that draws it, with as many of the arrows a click sends now as fit; in a shown machine, to a state drawn there, never the page. */
 export function keepCurrentInView(root: HTMLElement, from: KeepCurrentOptions): void {
   const now = shownCurrents(from)[0];
   if (now === undefined) return;
