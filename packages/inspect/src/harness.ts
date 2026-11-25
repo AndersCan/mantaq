@@ -212,6 +212,36 @@ async function pressRow(page: Page, actor: { map: string; key: string }): Promis
   return (await page.getAttribute(row, "data-child-state")) ?? "";
 }
 
+interface CurrentsOptions {
+  /** The state of the walk, as the Step tab names it. */
+  walked: string;
+}
+
+/** The real states the drawn current nodes stand for: a state node's id, and for a folded group node the state of the walk among its states, else all of them. */
+async function drawnCurrents(page: Page, options: CurrentsOptions): Promise<string[]> {
+  const { walked } = options;
+  const nodes = await page.locator(".graph g.current[data-node-id]").evaluateAll((elements) =>
+    elements.map((element) => ({
+      id: element.getAttribute("data-node-id") ?? "",
+      states: element.getAttribute("data-states"),
+    })),
+  );
+  return nodes.flatMap((node) => {
+    if (node.states === null) return [node.id];
+    const states = parseStates(node.states);
+    return states.includes(walked) ? [walked] : states;
+  });
+}
+
+function parseStates(text: string): string[] {
+  const parsed: unknown = JSON.parse(text);
+  return isStringList(parsed) ? parsed : [];
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((each) => typeof each === "string");
+}
+
 interface PressOptions {
   edges: VizEdge[];
   event: string;
@@ -268,9 +298,7 @@ function makeSend(
     const currents =
       "map" in actor
         ? [await pressRow(page, actor)]
-        : await page
-            .locator(".graph g.current[data-node-id]")
-            .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-node-id") ?? ""));
+        : await drawnCurrents(page, { walked: await state() });
     const edges = currents
       .flatMap((current) => movesFrom(machine, current))
       .map((move) => move.edge)
