@@ -31,6 +31,6 @@ export interface ViewerOptions {
   screen?: (state: VizLiveState) => Node;
   /** Open with only the diagram and a "Show controls" button, e.g. a docs page that explains one idea. Default false. */
   diagramOnly?: boolean;
-  /** Called after the reader enters a machine node: the embedded machine's id and the state that embeds it. The viewer shows that machine itself. */
+  /** Called when the reader enters a machine node, before the viewer draws it: the embedded machine's id and the state that embeds it. The viewer shows that machine itself. */
   onEnter?: (entered: { machine: string; state: string }) => void;
 }

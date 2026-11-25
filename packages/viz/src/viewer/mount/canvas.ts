@@ -1,10 +1,10 @@
 import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../graph.ts";
 import type { EnteredMachine, GraphCallbacks, Selection } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
+import { partName, partOf } from "../parts.ts";
 import { currentsOf } from "../compartments.ts";
 import { html } from "../dom.ts";
 import { keepInView } from "../keep-in-view.ts";
-import { partOf } from "../parts.ts";
 import type { ViewState } from "./view-state.ts";
 
 /** Board width in units where the canvas has no size (not laid out). */
@@ -96,7 +96,8 @@ export function canvasOf(options: CanvasOptions): Canvas {
     moveTo(steps.slice(0, -1));
   }
   function open(part: string): void {
-    moveTo([...options.focus().steps, { kind: "part", part, name: part }]);
+    const { machine } = options.focus();
+    moveTo([...options.focus().steps, { kind: "part", part, name: partName(machine, part) }]);
   }
   function enter(entered: EnteredMachine): void {
     moveTo([...options.focus().steps, { kind: "enter", state: entered.state }]);

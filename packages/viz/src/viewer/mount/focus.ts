@@ -18,8 +18,6 @@ interface Crumb {
 export interface Focus {
   /** The steps that resolve, in order; the rest of a path is dropped. */
   steps: FocusStep[];
-  /** The root machine, then each machine entered, with the state it was entered from. */
-  machines: Array<{ machine: VizMachine; state?: string }>;
   /** Board: the boxes of `machine`. Graph: `drawn`, drawn whole. */
   canvas: "board" | "graph";
   /** The deepest machine: the root, or the last one entered. */
@@ -70,26 +68,24 @@ export function focusOf(steps: ReadonlyArray<FocusStep>, options: FocusOptions):
   const { viz, root } = options;
   let level: Level = { machine: root, part: undefined };
   const kept: FocusStep[] = [];
-  const machines: Focus["machines"] = [{ machine: root }];
+  let walk: Focus["walk"] = "live";
   const crumbs: Crumb[] = [{ label: root.id, keep: 0 }];
   for (const step of steps) {
     const next = stepInto(level, { viz, step });
     if (next === undefined) break;
     kept.push(next.step);
     crumbs.push({ label: next.label, keep: kept.length });
-    if (step.kind === "enter") machines.push({ machine: next.level.machine, state: step.state });
+    if (step.kind === "enter") walk = "static";
     level = next.level;
   }
-  const entered = machines.length > 1;
   return {
     steps: kept,
-    machines,
     canvas: isBoard(level) ? "board" : "graph",
     machine: level.machine,
     drawn: drawnOf(level),
     part: level.part,
-    walk: entered ? "static" : "live",
-    rootPart: entered ? undefined : level.part,
+    walk,
+    rootPart: walk === "static" ? undefined : level.part,
     crumbs,
   };
 }
