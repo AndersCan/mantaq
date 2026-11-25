@@ -26,8 +26,7 @@ import type { FuzzSettings, InspectedModule } from "./inspect.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { livePageHtml, serializeViz, UPDATE_EVENT } from "@mantaq/viz";
 import { normalizePath, searchForWorkspaceRoot } from "vite";
-import { modulesDocument } from "./embeds/modules-document.ts";
-import { projectRoot } from "./inspect.ts";
+import { projectRoot, vizDocument } from "./inspect.ts";
 import { analyzeModule } from "./ast/annotate.ts";
 import { Either } from "@mantaq/utils";
 import { fileURLToPath } from "node:url";
@@ -179,7 +178,7 @@ async function inspectDevFile(server: ViteDevServer, options: DevFile): Promise<
   const { file, fuzz, programs } = options;
   const run = runOf(await server.ssrLoadModule(entryId(file)));
   return run === null
-    ? { machines: [], embedded: [], warnings: [`${file}: could not load the inspector`] }
+    ? { machines: [], warnings: [`${file}: could not load the inspector`] }
     : run({ fuzz, programs });
 }
 
@@ -214,10 +213,9 @@ async function documentText(
   const results = await Promise.all(
     options.files.map((file) => fileDocument(server, { ...options, file })),
   );
-  const merged = modulesDocument(results);
   return {
-    text: serializeViz(merged.document),
-    warnings: [...results.flatMap((result) => result.warnings), ...merged.warnings],
+    text: serializeViz(vizDocument(results.flatMap((result) => result.machines))),
+    warnings: results.flatMap((result) => result.warnings),
   };
 }
 
@@ -329,11 +327,10 @@ function siteBuild(context: SiteBuildContext): Plugin {
         results.push(inspected[1]);
       }
       context.shared.programs = createProgramStore();
-      const merged = modulesDocument(results);
-      for (const warning of [...results.flatMap((result) => result.warnings), ...merged.warnings]) {
+      for (const warning of results.flatMap((result) => result.warnings)) {
         this.warn(`[mantaq-viz] ${warning}`);
       }
-      const text = serializeViz(merged.document);
+      const text = serializeViz(vizDocument(results.flatMap((result) => result.machines)));
       const dir = context.base.replace(/^\//, "");
       const entry = Object.values(bundle).find(
         (chunk) => chunk.type === "chunk" && chunk.isEntry && chunk.name === "mantaq-live",

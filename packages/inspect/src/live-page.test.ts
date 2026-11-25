@@ -478,43 +478,14 @@ describe("mountDriven with several machines", () => {
     expect(buttons.map((b) => b.disabled)).toEqual([true, false]);
   });
 
-  test("clicking a machine switches the URL and the shown machine", async () => {
-    history.replaceState(null, "", "?machine=checkout&step=1");
+  test("clicking a machine switches the URL and the shown machine, and drops the focus path", async () => {
+    history.replaceState(null, "", "?machine=checkout&step=1&focus=basicInfo");
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: await twoText(), targets: {} });
     (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
     expect(location.search).toBe("?machine=second");
     const buttons = [...root.querySelectorAll("nav.machines button")] as HTMLButtonElement[];
     expect(buttons.map((b) => b.disabled)).toEqual([false, true]);
-  });
-});
-
-describe("mountDriven with an embedded machine", () => {
-  /** checkout, then `inner`, which only `second` embeds (in its first state), then `second`. */
-  async function embedText(): Promise<string> {
-    const doc = JSON.parse(await documentText());
-    const [checkout] = doc.machines;
-    const [first, ...rest] = checkout.states;
-    const second = { ...checkout, id: "second", states: [{ ...first, machine: "inner" }, ...rest] };
-    doc.machines = [checkout, { ...checkout, id: "inner" }, second];
-    return JSON.stringify(doc);
-  }
-
-  test("the picker lists the machines a walk starts from; entering reaches the embedded one", async () => {
-    history.replaceState(undefined, "", "?machine=second");
-    const root = document.createElement("div");
-    mountDriven(root, { source: "test", text: await embedText(), targets: {} });
-    const picked = [...root.querySelectorAll("nav.machines button")].map((b) => b.textContent);
-    root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect({
-      picked,
-      drawn: root.querySelector(".canvas svg")?.getAttribute("aria-label"),
-      focus: new URLSearchParams(location.search).getAll("focus"),
-    }).toStrictEqual({
-      picked: ["checkout", "second"],
-      drawn: "machine inner",
-      focus: ["basicInfo"],
-    });
   });
 });
 

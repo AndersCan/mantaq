@@ -28,7 +28,7 @@ export default defineConfig({
 });
 ```
 
-Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the string in `machine("<id>", …)`. The picker lists the machines that no other machine embeds; enter a machine node to reach the others.
+Start the dev server (`npx vite`, or your `npm run dev` script) and open `http://localhost:5173/__mantaq/`. `?machine=<id>` selects one machine; the id is the string in `machine("<id>", …)`.
 
 The live page runs the real actor, built by `create({ clock })` on a virtual clock the page owns. A machine whose actor runs on another clock shows the diagram and Details, with no Send.
 
@@ -104,17 +104,15 @@ const cart = defineMachine("cart", {
     }),
 });
 
-const { machine, embedded, warnings } = inspect({
+const { machine, warnings } = inspect({
   machine: cart, // inspect builds a fresh actor on its own virtual clock every call
   source: { file: "/abs/src/cart.ts", root: "/abs" }, // optional: explanations + payloads from types
   tests: [
     { name: "add an item", steps: [{ kind: "event", event: "addItem", payload: { sku: "A1" } }] },
   ], // optional: named runs for "example tests" coverage
 });
-const json = serializeViz(vizDocument([machine, ...embedded]));
+const json = serializeViz(vizDocument([machine]));
 ```
-
-`embedded` holds the machines that the states of `machine` embed with `embed` from `@mantaq/sugar`. Each one is inspected and fuzzed as if a file exported it. Put them in the same document: a state's `machine` must name a machine in the document. `inspectModule` returns them as `embedded` too. `toVizMachine` and `fuzzedMachine` also set `machine` on such a state, but they do not build the embedded machine. In a custom pipeline, use `toViz` or `inspect` to get it.
 
 `inspectFile(file)` / `inspectModule(file, { load })` do the discovery the Vite plugin does, and read recorded runs from `__runs__/*.json` next to the machine file (`{ [machineId]: { name, end, steps }[] }`). A run is replayed on a fresh actor; internal events the replay already produces (timers, synchronous emits) are dropped, and a run that replays to a different state than `end` is dropped with a warning. The building blocks (`toVizMachine`, `annotateMachine`, `fuzz`, `fuzzedMachine`, `withTestCoverage`, `guidance`) stay exported for custom pipelines.
 

@@ -131,7 +131,6 @@ export async function inspectFile(
   if (load.config !== undefined && !existsSync(load.config)) {
     return {
       machines: [],
-      embedded: [],
       warnings: [`${file}: Vite config not found: ${load.config}`],
       failed: true,
     };
@@ -149,17 +148,12 @@ export async function inspectFile(
         Either.left((error instanceof Error ? error.message : String(error)).replace(ANSI, "")),
     );
   if (Either.isLeft(loaded)) {
-    return { machines: [], embedded: [], warnings: [`${file}: ${loaded[0]}`], failed: true };
+    return { machines: [], warnings: [`${file}: ${loaded[0]}`], failed: true };
   }
   const { module } = loaded[1];
   const run = runOf(module);
   if (run === null) {
-    return {
-      machines: [],
-      embedded: [],
-      warnings: [`${file}: could not load the inspector`],
-      failed: true,
-    };
+    return { machines: [], warnings: [`${file}: could not load the inspector`], failed: true };
   }
   return { ...(await run(options)), failed: false };
 }

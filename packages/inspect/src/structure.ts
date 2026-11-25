@@ -1,5 +1,9 @@
-import type { AnyActor, Machine } from "@mantaq/core";
-import type { BuiltEmbedding, Embedding } from "./embeds/embedded-machines.ts";
+import { VIZ_SCHEMA_VERSION } from "@mantaq/viz";
+import type { VizDocument, VizEdge, VizEvent, VizMachine, VizState } from "@mantaq/viz";
+import type { AnyActor } from "@mantaq/core";
+import { actorMapsOf } from "./maps.ts";
+import type { ActorMapLike } from "./maps.ts";
+import { Either } from "@mantaq/utils";
 import { eventTypes, isActor, otherActorsOf, regionActors } from "./fuzz/run.ts";
 import {
   INITIAL_NODE_ID,
@@ -9,15 +13,6 @@ import {
   type GraphEdge,
   type GraphNode,
 } from "@mantaq/traversal";
-import type { VizDocument, VizEdge, VizEvent, VizMachine, VizState } from "@mantaq/viz";
-import type { ActorMapLike } from "./maps.ts";
-import { actorMapsOf } from "./maps.ts";
-import { Either } from "@mantaq/utils";
-import { freshActor } from "./embeds/fresh-actor.ts";
-import type { StateEmbed } from "./embeds/state-embeds.ts";
-import { stateEmbeds } from "./embeds/state-embeds.ts";
-import { VIZ_SCHEMA_VERSION } from "@mantaq/viz";
-import { withEmbedded } from "./embeds/embedded-machines.ts";
 
 export interface VizInput {
   id: string;
@@ -43,15 +38,10 @@ function regionOf(nodeId: string): string | null {
 interface StateContext {
   initialIds: ReadonlySet<string>;
   effects: ReadonlyArray<GraphEdge>;
-  /** The first embed of each state that embeds a machine. */
-  embedded: ReadonlyMap<string, StateEmbed>;
 }
 
 function toState(node: GraphNode, context: StateContext): VizState {
-  const embed = context.embedded.get(node.id);
-  const forward = embed?.forward === undefined ? {} : { forward: [...embed.forward] };
   return {
-    ...(embed === undefined ? {} : { machine: embed.machine.id, ...forward }),
     id: node.id,
     label: node.label,
     region: regionOf(node.id),
@@ -101,7 +91,6 @@ interface MapChild {
   internal: Set<string>;
   inputs: string[];
   outputs: string[];
-  embeds: StateEmbed[];
 }
 
 /** What one map's probe child looks like, or why it cannot be drawn. */
@@ -138,7 +127,6 @@ function partOf(name: string, actor: AnyActor<unknown>): MapChild {
     internal: parseInternalEventIds(actor.options),
     inputs: eventTypes(actor.options, "inputs"),
     outputs: eventTypes(actor.options, "outputs"),
-    embeds: stateEmbeds(actor, { prefix: `${name}.` }),
   };
 }
 
@@ -175,17 +163,8 @@ function prefixedGraph(child: MapChild): { nodes: GraphNode[]; edges: GraphEdge[
   };
 }
 
-/** The first machine each state embeds, by state id: a state names one machine. */
-function embeddedByState(embeds: ReadonlyArray<StateEmbed>): Map<string, StateEmbed> {
-  const byState = new Map<string, StateEmbed>();
-  for (const embed of embeds) {
-    if (!byState.has(embed.state)) byState.set(embed.state, embed);
-  }
-  return byState;
-}
-
-/** One machine and the embeds of its states, the parts' states included. */
-export function structureOf(input: VizInput): Embedding {
+/** One machine; `toViz` is this plus sorting into a document. */
+export function toVizMachine(input: VizInput): VizMachine {
   const own = buildGraph(input.actor);
   const children = Object.entries(actorMapsOf(input.made).maps).flatMap(([name, map]) => {
     const probed = probeChild(name, map);
@@ -220,17 +199,11 @@ export function structureOf(input: VizInput): Embedding {
   const mapNames = new Set(children.map((each) => each.name));
   const actorNames = new Set(otherActors.map((each) => each.name));
 
-  const embeds = [
-    ...stateEmbeds(input.actor),
-    ...regionActorList.flatMap((each) => stateEmbeds(each.actor, { prefix: `${each.path}.` })),
-    ...[...children, ...otherActors].flatMap((each) => each.embeds),
-  ];
-  const embedded = embeddedByState(embeds);
   const effectEdges = graph.edges.filter((edge) => edgeKind(edge) === "effect");
   const states: VizState[] = [];
   for (const node of graph.nodes) {
     const shown = node.id !== INITIAL_NODE_ID && node.isAny !== true;
-    if (shown) states.push(toState(node, { initialIds, effects: effectEdges, embedded }));
+    if (shown) states.push(toState(node, { initialIds, effects: effectEdges }));
   }
   states.sort(byId);
   const edges = graph.edges.map((edge) => toEdge(edge));
@@ -267,7 +240,7 @@ export function structureOf(input: VizInput): Embedding {
       .filter(([, list]) => list.length > 0)
       .map(([name, list]) => [name, [...list].sort()]),
   );
-  const machine: VizMachine = {
+  return {
     id: input.id,
     initial,
     regions,
@@ -282,28 +255,11 @@ export function structureOf(input: VizInput): Embedding {
     fuzz: null,
     runs: [],
   };
-  return { machine, embeds };
 }
 
-/** One machine; its states name the machines they embed, which `toViz` adds to the document. */
-export function toVizMachine(input: VizInput): VizMachine {
-  return structureOf(input).machine;
-}
-
-/** The structure of a machine that the walk reached through an embed. */
-function embeddedStructure(machine: Machine): Either<string, BuiltEmbedding> {
-  const created = freshActor(machine);
-  if (Either.isLeft(created)) return created;
-  return Either.right({ ...structureOf({ id: machine.id, ...created[1] }), warnings: [] });
-}
-
-/** The machines sorted by id, then every machine their states embed, also sorted by id. Structure only. */
+/** The machines sorted by id. Structure only. */
 export function toViz(inputs: ReadonlyArray<VizInput>): VizDocument {
-  const roots = [];
-  for (const input of inputs) roots.push(structureOf(input));
-  const drawn = withEmbedded(roots, { build: embeddedStructure });
-  return {
-    schemaVersion: VIZ_SCHEMA_VERSION,
-    machines: [...drawn.roots.sort(byId), ...drawn.embedded.sort(byId)],
-  };
+  const machines: VizMachine[] = [];
+  for (const input of inputs) machines.push(toVizMachine(input));
+  return { schemaVersion: VIZ_SCHEMA_VERSION, machines: machines.sort(byId) };
 }
