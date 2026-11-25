@@ -94,9 +94,11 @@ export function canvasOf(options: CanvasOptions): Canvas {
   function landOn(state: string): void {
     const id = drawnNodeOf(options.focus().drawn, { state });
     keepInView(root, id);
-    root
-      .querySelector<SVGGElement>(`.graph g[data-node-id="${CSS.escape(id)}"]`)
-      ?.focus({ preventScroll: true });
+    const node = root.querySelector<SVGGElement>(`.graph g[data-node-id="${CSS.escape(id)}"]`);
+    if (node === null) return;
+    // A plain node takes focus only with a tabindex; -1 keeps it out of the tab order, as a plain node that has focus is.
+    if (!node.hasAttribute("tabindex")) node.setAttribute("tabindex", "-1");
+    node.focus({ preventScroll: true });
   }
   function shownIn(): void {
     const at =

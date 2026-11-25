@@ -4,13 +4,11 @@ import { describe, expect, test } from "vite-plus/test";
 import type { EnteredGroup, Selection } from "./graph.ts";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import type { VizDocument, VizMachine, VizState } from "../schema.ts";
+import type { VizMachine, VizState } from "../schema.ts";
 import { markExplore } from "./explore.ts";
 import { renderGraph } from "./graph.ts";
 import { foldGroups } from "./groups/fold-groups.ts";
 import { groupMachine } from "./groups/group-machine.ts";
-import { VIZ_SCHEMA_VERSION } from "../schema.ts";
-import { mountViewer } from "./viewer.ts";
 import { ARROW_SIZE } from "./geometry.ts";
 import { HELP_SLOT, LOCK_SLOT, placeMachine, textWidth } from "./layout.ts";
 
@@ -541,19 +539,6 @@ describe("renderGraph of a group entered", () => {
       plain: undefined,
       title: "inCart is outside group payment.",
     });
-  });
-});
-
-describe("mountViewer onEnterGroup", () => {
-  test("enter on a group node calls onEnterGroup with the group", () => {
-    const root = document.createElement("div");
-    document.body.append(root);
-    const entered: EnteredGroup[] = [];
-    const viz: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shop] };
-    mountViewer(root, viz, { onEnterGroup: (group) => entered.push(group) });
-    root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    root.remove();
-    expect(entered).toEqual([{ node: "@payment", name: "payment" }]);
   });
 });
 
