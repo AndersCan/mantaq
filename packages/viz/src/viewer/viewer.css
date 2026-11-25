@@ -677,7 +677,8 @@
 }
 
 .viz:fullscreen .canvas:not([data-sizing="chosen"]) .graph {
-  width: max(var(--graph-floor), 100%);
+  /* Not past 800%, the largest zoom, so the percent and the zoom buttons hold. */
+  width: min(max(var(--graph-floor), 100%), calc(8 * var(--graph-natural)));
 }
 
 .viz .blocked-note {

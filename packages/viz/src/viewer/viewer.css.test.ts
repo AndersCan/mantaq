@@ -105,9 +105,9 @@ test("an arrow's hit path is a wide transparent stroke that takes the pointer", 
   expect(Number(/stroke-width: (\d+)/.exec(rule)?.[1])).toBeGreaterThanOrEqual(10);
 });
 
-test("in full screen the diagram widens to fill the screen but keeps its label floor, until a zoom", () => {
+test("in full screen the diagram widens to fill the screen but keeps its label floor and stays within 800%, until a zoom", () => {
   expect(rule('.viz:fullscreen .canvas:not([data-sizing="chosen"]) .graph')).toMatch(
-    /width:\s*max\(var\(--graph-floor\),\s*100%\);/,
+    /width:\s*min\(max\(var\(--graph-floor\),\s*100%\),\s*calc\(8 \* var\(--graph-natural\)\)\);/,
   );
   expect(rule('.viz .canvas[data-sizing="chosen"] .graph')).toMatch(
     /width:\s*calc\(var\(--viz-zoom\) \* var\(--graph-natural\)\);/,

@@ -169,14 +169,15 @@ interface Band {
   end: number;
 }
 
-/** How much of the window's top is covered: by the page, as with a sticky header (its `scroll-padding-top`), or in full screen by the viewer's bar, which sticks there. */
+/** How much of the window's top is covered: by the page, as with a sticky header (its `scroll-padding-top`), and by the viewer's bar where it sticks (in full screen, or with a path). */
 export function coveredTop(root: HTMLElement): number {
   const doc = root.ownerDocument;
-  if (doc.fullscreenElement === root) {
-    return Math.max(root.querySelector(".viz-bar")?.getBoundingClientRect().bottom ?? 0, 0);
-  }
-  const style = doc.defaultView?.getComputedStyle(doc.documentElement);
-  return Number.parseFloat(style?.scrollPaddingTop ?? "") || 0;
+  const view = doc.defaultView;
+  const style = view?.getComputedStyle(doc.documentElement);
+  const page = Number.parseFloat(style?.scrollPaddingTop ?? "") || 0;
+  const bar = root.querySelector(".viz-bar");
+  if (bar === null || view?.getComputedStyle(bar).position !== "sticky") return page;
+  return Math.max(page, bar.getBoundingClientRect().bottom);
 }
 
 /** The band of the canvas on screen; the whole canvas while none of it is on screen, so it still scrolls for when the reader gets there. */

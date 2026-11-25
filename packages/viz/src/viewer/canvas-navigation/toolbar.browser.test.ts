@@ -47,7 +47,8 @@ const VIEWER = `
 import { mountViewer } from "/viewer.ts";
 import { edgeOf, machineOf, stateOf } from "/groups/shop-machines.ts";
 import { walkDriver } from "/groups/walk-driver.ts";
-const names = ["cart", "address", "shipping", "payment", "review", "paid", "picked", "packed", "shipped", "delivered"];
+const single = new URLSearchParams(location.search).has("single");
+const names = single ? ["cart"] : ["cart", "address", "shipping", "payment", "review", "paid", "picked", "packed", "shipped", "delivered"];
 const states = names.map((name, index) => stateOf(name, { initial: index === 0 }));
 const edges = [edgeOf("__initial__", { event: "", to: "cart", kind: "initial" })];
 const tall = new URLSearchParams(location.search).has("tall");
@@ -62,15 +63,17 @@ window.sent = sent;
 interface ViewerPageOptions {
   /** "diagram": the viewer opens with Diagram only, so Show controls draws it all again. */
   shows?: "all" | "diagram";
-  /** "tall": every arrow leaves `cart`, so the drawing runs down, not across. */
-  drawing?: "wide" | "tall";
+  /** "tall": every arrow leaves `cart`, so the drawing runs down, not across. "single": one state. */
+  drawing?: "wide" | "tall" | "single";
 }
 
 async function viewerPage(options: ViewerPageOptions = {}): Promise<Page> {
-  const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
+  const size = options.drawing === "single" ? { width: 1920, height: 1080 } : undefined;
+  const page = await browser.newPage({ viewport: size ?? { width: 900, height: 700 } });
   const query = new URLSearchParams();
   if (options.shows === "diagram") query.set("diagram-only", "");
-  if (options.drawing === "tall") query.set("tall", "");
+  const drawing = options.drawing ?? "wide";
+  if (drawing !== "wide") query.set(drawing, "");
   const search = query.toString();
   await page.goto(`${origin}?${search}`);
   await page.setContent(
@@ -374,5 +377,32 @@ test("in full screen, Fit puts the whole drawing below the bar", async () => {
     };
   });
   expect(placed).toEqual({ belowBar: true, inWindow: true });
+  await page.close();
+}, 60_000);
+
+test("in full screen a small drawing opens at 800% at most, with Zoom in off", async () => {
+  const page = await viewerPage({ drawing: "single" });
+  await page.getByRole("button", { name: "Full screen" }).click();
+  await page.getByRole("button", { name: "Exit full screen" }).waitFor();
+  const opened = await shownOf(page);
+  expect({
+    percent: opened.percent,
+    drawn: opened.drawn,
+    zoomInOff: await page.getByRole("button", { name: "Zoom in" }).isDisabled(),
+  }).toEqual({ percent: "800%", drawn: 800, zoomInOff: true });
+  await page.close();
+}, 60_000);
+
+test("Fit turns on again when a new window height changes what it would do", async () => {
+  const page = await viewerPage({ drawing: "tall" });
+  const fit = page.getByRole("button", { name: "Zoom to fit" });
+  await fit.click();
+  const fitted = await fit.isDisabled();
+  await page.setViewportSize({ width: 900, height: 450 });
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-viz-tool="fit"]');
+    return button?.getAttribute("aria-disabled") !== "true";
+  });
+  expect({ fitted, after: await fit.isDisabled() }).toEqual({ fitted: true, after: false });
   await page.close();
 }, 60_000);

@@ -189,10 +189,10 @@ function showState(toolbar: HTMLElement, options: ShowStateOptions): void {
         pressed(button, { on: state.tool === action });
         break;
       case "zoomOut":
-        turnedOff(button, { off: zoomOutFrom(state.scale) === state.scale });
+        turnedOff(button, { off: zoomOutFrom(state.scale) >= state.scale });
         break;
       case "zoomIn":
-        turnedOff(button, { off: zoomInFrom(state.scale) === state.scale });
+        turnedOff(button, { off: zoomInFrom(state.scale) <= state.scale });
         break;
       case "fit":
         turnedOff(button, { off: fitted });

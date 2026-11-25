@@ -108,9 +108,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     root.querySelector(".viz-bar-start")?.remove();
     const shown = [...pathOf(), ...noticeLines(doc, { root, view })];
     if (shown.length === 0) return;
-    const bar = root.querySelector(".viz-bar") ?? html(doc, "div", { class: "viz-bar" });
-    if (!bar.isConnected) root.prepend(bar);
-    bar.prepend(html(doc, "div", { class: "viz-bar-start" }, shown));
+    root.querySelector(".viz-bar")?.prepend(html(doc, "div", { class: "viz-bar-start" }, shown));
   }
   function pathOf(): HTMLElement[] {
     const focus = options.focus();

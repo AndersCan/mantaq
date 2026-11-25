@@ -63,6 +63,18 @@ function pageUrl(dir: string, file: string, base: string): string {
   return `${base}${rel}`;
 }
 
+/** Whether the viewer draws a diagram on its canvas within ten seconds. */
+function drawingOf(root: PwLocator): Promise<"drawn" | "missing"> {
+  return root
+    .locator(".canvas svg")
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .then(
+      (): "drawn" | "missing" => "drawn",
+      (): "drawn" | "missing" => "missing",
+    );
+}
+
 /** The file a path under the base maps to, or undefined when none is built. */
 export function fileFor(dir: string, base: string, urlPath: string): string | undefined {
   if (!urlPath.startsWith(base)) {
@@ -195,11 +207,12 @@ async function checkPage(
     }
     const found = await scan(page);
     const roots = page.locator(".mantaq-machine");
+    const drawings = await Promise.all(
+      found.viewers.map((_, index) => drawingOf(roots.nth(index))),
+    );
     for (const [index, viewer] of found.viewers.entries()) {
       const root = roots.nth(index);
-      try {
-        await root.locator("svg").first().waitFor({ timeout: 10_000 });
-      } catch {
+      if (drawings[index] === "missing") {
         failures.push(`${url}: ${viewer.label} draws no diagram`);
         continue;
       }
@@ -318,7 +331,7 @@ async function checkWalkLink(
         return `${name} opens ${path}, but no viewer there holds ${id}`;
       }
       for (const root of held) {
-        await root.locator("svg").first().waitFor({ timeout: 10_000 });
+        await root.locator(".canvas svg").first().waitFor({ timeout: 10_000 });
         const notice = root.locator("[data-run-missing]");
         if ((await notice.count()) > 0) {
           return `${name}: ${((await notice.first().textContent()) ?? "").trim()}`;
