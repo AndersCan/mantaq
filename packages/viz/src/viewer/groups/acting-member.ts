@@ -56,7 +56,7 @@ export function actingMember(
 }
 
 /** Where the walk is now, as the viewer holds it. */
-export interface WalkNow {
+interface WalkNow {
   /** Unset without a driver: no walk. */
   live: VizLiveState | null;
   picked: { map: string; key: string } | null;
