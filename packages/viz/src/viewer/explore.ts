@@ -449,7 +449,7 @@ function markCurrent(root: HTMLElement, currents: ReadonlyArray<string>): void {
 const LOCK_WIDTH = 8;
 const LOCK_HEIGHT = 10;
 
-/** A blocked arrow: grey lock left of the label's first line, and the reason as its accessible description (a click still sends it). */
+/** A blocked arrow: grey lock left of the label's first line, and the reason as its accessible description. */
 function markBlocked(element: SVGGElement, reason: string | undefined): void {
   element.classList.toggle("blocked", reason !== undefined);
   element.querySelector(":scope > .blocked-lock")?.remove();

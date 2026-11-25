@@ -64,7 +64,10 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
     },
   };
   if (view.diagramOnly) return callbacks;
-  callbacks.details = (id) => handlers.openDetails(memberSelection({ kind: "edge", id }, members));
+  callbacks.details = (id) => {
+    const drawn: Selection = { kind: "edge", id };
+    handlers.openDetails(handlers.walk === "static" ? drawn : memberSelection(drawn, members));
+  };
   return callbacks;
 }
 
@@ -85,19 +88,26 @@ export interface DrawnArrowClick {
   click: ArrowClick;
 }
 
+/** Why an arrow of an entered machine sends nothing: the walk runs only at the root. */
+const STATIC_WHY =
+  "This machine is shown without the walk, so its arrows send nothing. Go back to send events.";
+
 /** The one answer the marks and a click share for a drawn arrow. */
 export function drawnArrowClick(
   from: ArrowSendContext,
   options: DrawnArrowOptions,
 ): DrawnArrowClick {
   const { view, machine } = from;
+  if (options.walk === "static") {
+    const selection: Selection = { kind: "edge", id: options.id };
+    return { selection, edge: undefined, click: { kind: "plain", why: STATIC_WHY } };
+  }
   const selection = memberSelection(
     { kind: "edge", id: options.id },
     { machine: options.shown, view },
   );
   const edge = machine.edges.find((candidate) => candidate.id === selection.id);
-  const still = edge === undefined || options.walk === "static";
-  if (still) return { selection, edge, click: { kind: "plain", why: undefined } };
+  if (edge === undefined) return { selection, edge, click: { kind: "plain", why: undefined } };
   return { selection, edge, click: arrowClick(from, edge) };
 }
 
