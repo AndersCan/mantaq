@@ -73,7 +73,13 @@ function docs(overrides: Partial<SourceDocs>): SourceDocs {
   };
 }
 
-function other(file: string, overrides: Partial<SourceDocs>, depth = 1) {
+/** What another file supplies, and its import distance from the machine file (default 1). */
+interface OtherFile extends Partial<SourceDocs> {
+  depth?: number;
+}
+
+function other(file: string, options: OtherFile) {
+  const { depth = 1, ...overrides } = options;
   const { sites, stateDocs, stateGroups, eventDocs, effectDocs } = docs(overrides);
   return { file, depth, sites, stateDocs, stateGroups, eventDocs, effectDocs };
 }
@@ -99,8 +105,8 @@ test("of two other files registering the same state and event, the one nearer by
   const result = annotate(
     docs({
       elsewhere: [
-        other("far.ts", { sites: [site("Far")] }, 3),
-        other("near.ts", { sites: [site("Near")] }, 1),
+        other("far.ts", { sites: [site("Far")], depth: 3 }),
+        other("near.ts", { sites: [site("Near")], depth: 1 }),
       ],
     }),
   );
