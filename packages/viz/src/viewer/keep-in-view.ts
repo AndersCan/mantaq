@@ -133,13 +133,15 @@ interface LeavesOptions {
   node: string;
 }
 
-/** True for an arrow that leaves `node`, or a shared node that stands for it now. */
+/** True for an arrow that leaves `node`, the `onAny` node that stands for every state, or a shared node that stands for the current state. */
 function leaves(arrow: Element, options: LeavesOptions): boolean {
   const from = arrow.getAttribute("data-from") ?? "";
   if (from === options.node) return true;
-  const shared = `g.any-node.current[data-node-id="${CSS.escape(from)}"]`;
-  const graph = arrow.closest(".graph");
-  return graph !== null && graph.querySelector(shared) !== null;
+  const shared = arrow
+    .closest(".graph")
+    ?.querySelector(`g.any-node[data-node-id="${CSS.escape(from)}"]`);
+  if (shared === null || shared === undefined) return false;
+  return !shared.hasAttribute("data-states") || shared.classList.contains("current");
 }
 
 /** The label of each arrow from `node` that a click sends now: what the reader clicks. Another current state, as in a region, has its own. */

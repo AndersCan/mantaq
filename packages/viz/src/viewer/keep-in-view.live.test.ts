@@ -146,12 +146,14 @@ function place(element: Element | null, options: PlacedOptions): void {
   element.getBoundingClientRect = () => new DOMRect(left - canvas.scrollLeft, 0, width, 40);
 }
 
-test("the canvas scrolls to the arrows that leave the state it shows, not to another state's", () => {
+test("the canvas scrolls to the arrows that leave the state it shows or any state, not to another state's", () => {
   const root = document.createElement("div");
   root.innerHTML = `<div class="canvas"><svg class="graph">
     <g data-node-id="here"></g>
     <g class="edge next" role="button" data-from="here"><text>go</text></g>
     <g class="edge next" role="button" data-from="there"><text>stop</text></g>
+    <g class="any-node" data-node-id="*"></g>
+    <g class="edge next" role="button" data-from="*"><text>reset</text></g>
   </svg></div>`;
   document.body.append(root);
   const canvas = root.querySelector<HTMLElement>(".canvas") ?? root;
@@ -160,7 +162,8 @@ test("the canvas scrolls to the arrows that leave the state it shows, not to ano
   place(canvas.querySelector('[data-node-id="here"]'), { left: 1000, width: 120, canvas });
   place(canvas.querySelector('[data-from="here"] text'), { left: 1130, width: 50, canvas });
   place(canvas.querySelector('[data-from="there"] text'), { left: 850, width: 50, canvas });
+  place(canvas.querySelector('[data-from="*"] text'), { left: 1190, width: 50, canvas });
   keepInView(root, { node: "here", with: "sendable" });
-  expect(canvas.scrollLeft).toBe(1130 + 50 + 16 - 300);
+  expect(canvas.scrollLeft).toBe(1190 + 50 + 16 - 300);
   root.remove();
 });
