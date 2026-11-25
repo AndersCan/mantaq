@@ -1,11 +1,12 @@
 import type { AnalysisSource, FileRead, LoadedSource, LoadSourceOptions } from "./program.ts";
-import type { VizEdge, VizExplanation, VizField, VizJson, VizMachine } from "@mantaq/viz";
+import type { VizEdge, VizExplanation, VizField, VizJson, VizMachine, VizState } from "@mantaq/viz";
 import { machineExports } from "./discover.ts";
 import type { MachineExport } from "./discover.ts";
 import { explainRegistration } from "./handler.ts";
 import { payloadFields, payloadSamples } from "./payloads.ts";
 import { loadSource } from "./program.ts";
 import { Either } from "@mantaq/utils";
+import { scopeOf } from "@mantaq/viz";
 
 /** One explained registration, keyed the way runtime edges are: state + event. */
 export interface HandlerSite {
@@ -26,6 +27,7 @@ export interface HandlerSite {
 interface FileDocs {
   sites: HandlerSite[];
   stateDocs: ReadonlyMap<string, string>;
+  stateGroups: ReadonlyMap<string, string>;
   eventDocs: ReadonlyMap<string, string>;
   effectDocs: ReadonlyMap<string, ReadonlyArray<string>>;
 }
@@ -68,6 +70,7 @@ function fileDocs(loaded: LoadedSource, read: FileRead): FileDocs {
   return {
     sites: sitesOf({ loaded, read }),
     stateDocs: read.stateDocs,
+    stateGroups: read.stateGroups,
     eventDocs: read.eventDocs,
     effectDocs: read.effectDocs,
   };
@@ -227,6 +230,39 @@ export function annotateMachine(machine: VizMachine, source: AnalysisSource): Vi
   return annotateWith(machine, { analysis, source });
 }
 
+/** The files a machine's state notes come from: its own first, then those that lent it handlers. */
+interface StateNotes {
+  own: FileDocs;
+  lent: ReadonlyArray<FileDocs>;
+  maps: ReadonlyArray<string>;
+}
+
+/** What a declaration's JSDoc says about a state, by the state's name. */
+interface StateNote {
+  notes: StateNotes;
+  kind: "stateDocs" | "stateGroups";
+}
+
+function noteOf(name: string, options: StateNote): string | undefined {
+  const { notes, kind } = options;
+  const supplier = [notes.own, ...notes.lent].find((docs) => docs[kind].has(name));
+  return supplier?.[kind].get(name);
+}
+
+/**
+ * The state with the doc and `@group` of its declaration. A state in an actor map
+ * keeps no group: the viewer folds groups of the machine's own regions only.
+ */
+function annotateState(state: VizState, notes: StateNotes): VizState {
+  const name = localState(state.id);
+  const annotated: VizState = { ...state, doc: noteOf(name, { notes, kind: "stateDocs" }) ?? null };
+  const group = noteOf(name, { notes, kind: "stateGroups" });
+  const scope = scopeOf(state.id);
+  const inMap = notes.maps.some((map) => scope === map || scope.startsWith(`${map}.`));
+  if (group !== undefined && !inMap) annotated.group = group;
+  return annotated;
+}
+
 /** `annotateMachine` with the analysis already done (one program for many machines). */
 export function annotateWith(
   machine: VizMachine,
@@ -249,19 +285,13 @@ export function annotateWith(
   });
   if (Either.isLeft(analysis)) return { ...machine, edges };
   const drawn = edges.filter((edge) => !explainedStay(edge));
-  const { stateDocs, eventDocs, eventPayloads } = analysis[1];
+  const { eventDocs, eventPayloads } = analysis[1];
   const lent = [...suppliers];
   return {
     ...machine,
-    states: machine.states.map((state) => ({
-      ...state,
-      doc:
-        stateDocs.get(localState(state.id)) ??
-        lent
-          .find((other) => other.stateDocs.has(localState(state.id)))
-          ?.stateDocs.get(localState(state.id)) ??
-        null,
-    })),
+    states: machine.states.map((state) =>
+      annotateState(state, { own: analysis[1], lent, maps: machine.maps }),
+    ),
     events: machine.events.map((event) => ({
       ...event,
       doc:

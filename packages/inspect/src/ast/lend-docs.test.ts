@@ -64,6 +64,7 @@ function docs(overrides: Partial<SourceDocs>): SourceDocs {
   return {
     sites: [],
     stateDocs: new Map(),
+    stateGroups: new Map(),
     eventDocs: new Map(),
     effectDocs: new Map(),
     eventPayloads: new Map(),
@@ -73,8 +74,8 @@ function docs(overrides: Partial<SourceDocs>): SourceDocs {
 }
 
 function other(file: string, overrides: Partial<SourceDocs>, depth = 1) {
-  const { sites, stateDocs, eventDocs, effectDocs } = docs(overrides);
-  return { file, depth, sites, stateDocs, eventDocs, effectDocs };
+  const { sites, stateDocs, stateGroups, eventDocs, effectDocs } = docs(overrides);
+  return { file, depth, sites, stateDocs, stateGroups, eventDocs, effectDocs };
 }
 
 function annotate(analysis: SourceDocs) {
@@ -148,4 +149,30 @@ test("a file that supplied no handler lends no event description", () => {
     }),
   );
   expect(result.events[0]?.doc).toBe(null);
+});
+
+test("a supplier's state group lends to a state, and the machine file's own group wins", () => {
+  const lent = other("a.ts", { sites: [site("A")], stateGroups: new Map([["idle", "lent"]]) });
+  function groupOf(stateGroups: Map<string, string>): string | undefined {
+    return annotate(docs({ stateGroups, elsewhere: [lent] })).states[0]?.group;
+  }
+  expect([groupOf(new Map()), groupOf(new Map([["idle", "own"]]))]).toEqual(["lent", "own"]);
+});
+
+test("a state in an actor map gets no group, a state in a plain region does", () => {
+  const [idle] = machine.states;
+  const regioned = {
+    ...machine,
+    regions: ["orders", "payment"],
+    maps: ["orders"],
+    states: idle
+      ? [
+          { ...idle, id: "orders.idle" },
+          { ...idle, id: "payment.idle" },
+        ]
+      : [],
+  };
+  const analysis = docs({ stateGroups: new Map([["idle", "waiting"]]) });
+  const result = annotateWith(regioned, { analysis: Either.right(analysis), source: SOURCE });
+  expect(result.states.map((state) => state.group)).toEqual([undefined, "waiting"]);
 });

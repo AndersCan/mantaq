@@ -35,8 +35,10 @@ export interface Registration {
 /** What one source file contributes: its handler registrations and descriptions. */
 export interface FileRead {
   registrations: Registration[];
-  /** Leading JSDoc by state name, from `const x = state("x")()` declarations. */
+  /** Leading JSDoc by state name, from `const x = state("x")()` declarations, without its `@group` tag. */
   stateDocs: Map<string, string>;
+  /** Name of the `@group` tag by state name, from the same declarations. */
+  stateGroups: Map<string, string>;
   /** Leading JSDoc by event type, from `const x = event("X")()` declarations. */
   eventDocs: Map<string, string>;
   /** JSDoc above each `m.effect(state, ...)` call by state name, in registration order. */
@@ -299,35 +301,57 @@ function declaredName(init: ts.Expression): { builder: string; name: string } | 
   return { builder: builder.text, name: name.text };
 }
 
-function collectDeclarationDocs(
-  statement: ts.VariableStatement,
-  docs: { stateDocs: Map<string, string>; eventDocs: Map<string, string> },
-): void {
+/** What one variable statement's JSDoc says about the states and events it declares. */
+interface DeclarationDocs {
+  stateDocs: Map<string, string>;
+  stateGroups: Map<string, string>;
+  eventDocs: Map<string, string>;
+}
+
+/** First word of the statement's `@group` tag; undefined without a tag or a name. */
+function groupOf(statement: ts.VariableStatement): string | undefined {
+  const tag = ts.getJSDocTags(statement).find((each) => each.tagName.text === "group");
+  const [name] = (ts.getTextOfJSDocComment(tag?.comment) ?? "").trim().split(/\s+/);
+  return name === "" ? undefined : name;
+}
+
+/** The doc without its `@group name` text; undefined when nothing else is left. */
+function withoutGroup(doc: string | null): string | undefined {
+  const prose = doc?.replace(/\s*@group(?![\w-])[^\S\n]*[^\s@]*/g, "").trim();
+  return prose === "" ? undefined : prose;
+}
+
+function collectDeclarationDocs(statement: ts.VariableStatement, docs: DeclarationDocs): void {
   const doc = docOf(statement);
-  if (doc === null) return;
+  const stateDoc = withoutGroup(doc);
+  const group = groupOf(statement);
   for (const declaration of statement.declarationList.declarations) {
     const declared = declaration.initializer && declaredName(declaration.initializer);
     if (!declared) continue;
-    if (declared.builder === "state") docs.stateDocs.set(declared.name, doc);
-    if (declared.builder === "event") docs.eventDocs.set(declared.name, doc);
+    const { builder, name } = declared;
+    if (builder === "state" && stateDoc !== undefined) docs.stateDocs.set(name, stateDoc);
+    if (builder === "state" && group !== undefined) docs.stateGroups.set(name, group);
+    if (builder === "event" && doc !== null) docs.eventDocs.set(name, doc);
   }
 }
 
 function readFile(checker: ts.TypeChecker, sourceFile: ts.SourceFile): FileRead {
   const registrations: Registration[] = [];
   const stateDocs = new Map<string, string>();
+  const stateGroups = new Map<string, string>();
   const eventDocs = new Map<string, string>();
   const effectDocs = new Map<string, string[]>();
-  const visit = (node: ts.Node): void => {
+  const declarationDocs = { stateDocs, stateGroups, eventDocs };
+  function visit(node: ts.Node): void {
     const found = ts.isCallExpression(node) ? toRegistration(checker, node) : null;
     if (found) registrations.push(found);
-    if (ts.isVariableStatement(node)) collectDeclarationDocs(node, { stateDocs, eventDocs });
+    if (ts.isVariableStatement(node)) collectDeclarationDocs(node, declarationDocs);
     ts.forEachChild(node, visit);
     // After the children, so a chained `.effect` link follows the links before it.
     if (ts.isCallExpression(node)) collectEffectDoc(checker, node, effectDocs);
-  };
+  }
   visit(sourceFile);
-  return { registrations, stateDocs, eventDocs, effectDocs };
+  return { registrations, stateDocs, stateGroups, eventDocs, effectDocs };
 }
 
 export interface LoadSourceOptions {
