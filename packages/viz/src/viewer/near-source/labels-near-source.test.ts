@@ -38,8 +38,9 @@ test("the label of a long arrow sits beside the state it leaves, either way it r
   const nodes = new Map<string, Across>();
   for (const node of laid?.layout.nodes ?? []) nodes.set(node.id, acrossOf(node));
   const labels = new Map<string, Across>();
-  for (const placed of laid?.layout.edges ?? [])
+  for (const placed of laid?.layout.edges ?? []) {
     labels.set(placed.edge.event, acrossOf(placed.label));
+  }
   const cancel = labels.get("cancel");
   const restart = labels.get("restart");
   const fillingRight = nodes.get("filling")?.right ?? 0;
