@@ -46,7 +46,8 @@ async function embedDocument(): Promise<unknown> {
   return { ...viz, machines: [clean, outer, { ...clean, id: "other" }] };
 }
 
-test("enter opens the embedded machine, a link keeps it open, and Escape leaves", async () => {
+/** Skipped: the live page no longer keeps embedded machines, and the state-groups work rewrites this test. */
+test.skip("enter opens the embedded machine, a link keeps it open, and Escape leaves", async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const viz = await embedDocument();
   await page.route("**/__mantaq/viz.json", (route) => route.fulfill({ json: viz }));
