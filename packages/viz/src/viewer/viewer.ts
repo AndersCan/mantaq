@@ -1,6 +1,6 @@
-import { canvasOf, keepCurrentInView, listenWidth, staticCallbacks } from "./mount/canvas.ts";
+import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
+import { clickCallbacks, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { decodeFocus, enteredBy, focusReader, startOf } from "./mount/focus.ts";
-import { drawCallbacks, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
 import type { GraphCallbacks, Selection } from "./graph.ts";
@@ -9,9 +9,13 @@ import { liveOf, panelTabs, replaceKeepingSteps, screenOf } from "./mount/panel-
 import { navigated, openInitial, rewindView, watchDriver } from "./mount/walk.ts";
 import type { PickedChild, ViewState } from "./mount/view-state.ts";
 import type { VizDocument, VizMachine } from "../schema.ts";
+import { enteredReader } from "./mount/entered/entered-reader.ts";
+import { enteredText } from "./mount/entered/entered-walk.ts";
+import type { EventClick } from "./mount/event-send.ts";
 import { explorePanel } from "./explore.ts";
 import type { FocusMove } from "./mount/focus.ts";
 import { html } from "./dom.ts";
+import { keepInView } from "./keep-in-view.ts";
 import { markDiagram } from "./mount/diagram-marks.ts";
 import { renderPanel } from "./panel.ts";
 import { sendFor } from "./mount/send-details.ts";
@@ -28,7 +32,7 @@ export function mountViewer(
 ): void {
   const doc = root.ownerDocument;
   const first = viz.machines.find((machine) => machine.id === options.machine) ?? startOf(viz);
-  const view = initialView(options, { events: viz.machines.flatMap((machine) => machine.events) });
+  const view = initialView(options, { machines: viz.machines, shown: first?.id ?? "" });
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
   if (first) view.focus = decodeFocus(options.focus ?? [], { viz, root: first });
@@ -83,13 +87,17 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   function shown(): VizMachine {
     return focus().drawn;
   }
+  const { walk: walkNow, arrows, running } = enteredReader({ focus, root: machine, view, driver });
   // Walking and selecting only swap the panel and marks; the SVG stays put so keyboard focus survives.
   let shownSteps = 0;
   function refresh(): void {
     dropGonePick(view);
+    const entered = enteredText(walkNow(), machine);
+    const sender = arrows();
     const stepTab = explorePanel(doc, {
       machine,
       rewind,
+      ...(entered === undefined ? {} : { entered }),
       ...liveOf(view, { send, pick: pickRow, routes: options.routes }),
     });
     const details = renderPanel(doc, {
@@ -97,9 +105,9 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
       selection: view.selection,
       select: showDetails,
       ...(focus().canvas === "board" ? { hint: "Click a machine to see its states." } : {}),
-      ...(focus().walk === "live"
-        ? { send: sendFor({ root, doc, machine, view, driver }, { sendEvent, edit }) }
-        : {}),
+      ...(sender === undefined
+        ? {}
+        : { send: sendFor({ root, doc, ...sender }, { sendEvent, edit }) }),
     });
     const screenView = focus().walk === "live" ? view : { ...view, selection: null };
     const screen = screenOf(doc, { options, machine, view: screenView, driver });
@@ -112,11 +120,12 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     if (view.diagramOnly) whyNot();
     mark();
   }
-  /** Diagram only: the line under the drawing says why the root's selected arrow sent nothing; an entered machine sends nothing, so it is empty. */
+  /** Diagram only: the line under the drawing says why the selected arrow sent nothing, or why the entered machine is drawn without its state. */
   function whyNot(): void {
-    if (focus().walk === "live") return sayWhy(root, { machine, view, driver });
+    const sender = arrows();
+    if (sender !== undefined) return sayWhy(root, sender);
     const line = root.querySelector(".viz-main > .blocked-note");
-    if (line !== null) line.textContent = "";
+    if (line !== null) line.textContent = enteredText(walkNow(), machine)?.note ?? "";
   }
   function pickRow(child: PickedChild): void {
     pickChild(child, { root, view, refresh, source: "row" });
@@ -125,11 +134,15 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     pickChild(child, { root, view, refresh, source: "chip" });
   }
   function mark(): void {
-    markDiagram(root, { machine, view, driver, pick: pickChip, walk: focus().walk });
+    const entered = running();
+    const marks = { machine, view, driver, pick: pickChip, walk: focus().walk };
+    markDiagram(root, entered === undefined ? marks : { ...marks, entered });
   }
   function follow(): void {
     refresh();
-    keepCurrentInView(root, { focus: focus(), view });
+    const entered = running();
+    if (entered === undefined) keepCurrentInView(root, { focus: focus(), view });
+    else keepInView(root, entered.current);
   }
   context.redraws.redraw = follow;
   function walked(sent?: ViewState["sent"]): void {
@@ -140,7 +153,10 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   }
   const edit = payloadSetter({ options, machine, view, mark });
   const send = stepSender({ view, driver, walked });
-  const sendEvent = eventSender({ machine, view, driver, send });
+  function sendEvent(click: EventClick): void {
+    const sender = arrows();
+    if (sender !== undefined) eventSender({ ...sender, send })(click);
+  }
   function rewind(length: number): void {
     rewindView(view, { driver, length });
     walked();
@@ -158,11 +174,11 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     }
   }
   function callbacks(): GraphCallbacks {
-    if (focus().walk === "static") return staticCallbacks(view, { openDetails });
-    return drawCallbacks({ machine, view, driver }, { shown: shown(), openDetails, sendEvent });
+    return clickCallbacks({ arrows, view, shown, openDetails, sendEvent });
   }
   function moved(move: FocusMove): void {
     if (move.before.machine !== move.after.machine) view.selection = null;
+    if (move.before.machine !== move.after.machine) view.sent = undefined;
     navigated(options, { machine, view });
     const entered = enteredBy(move);
     if (entered !== undefined) options.onEnter?.(entered);

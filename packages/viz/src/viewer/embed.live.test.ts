@@ -985,8 +985,8 @@ describe("field forms and the context table", () => {
     const step = { kind: "event", event: "submit", payload: { amount: 7.5, label: "hi" } };
     expect({ prefilled, changed, sent, afterBack, log: live.log }).toEqual({
       prefilled: "1",
-      changed: ['submit={"amount":7.5}'],
-      sent: ['submit={"amount":7.5}'],
+      changed: ['checkout:submit={"amount":7.5}'],
+      sent: ['checkout:submit={"amount":7.5}'],
       afterBack: "7.5",
       log: [[step], [step]],
     });
@@ -1030,7 +1030,7 @@ describe("field forms and the context table", () => {
     });
     setBox(root, { field: "amount", text: "1" });
     expect({ seen: seen.at(-1), amount: valueBox(root, { field: "amount" })?.value }).toEqual({
-      seen: ['submit={"amount":1}'],
+      seen: ['checkout:submit={"amount":1}'],
       amount: "1",
     });
   });

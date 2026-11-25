@@ -45,7 +45,24 @@ export function whyNotHere(
     who = scope;
   }
   if (current === undefined) return null;
-  if (movesFrom(machine, current).some((move) => move.edge.id === edge.id)) return null;
+  return leavesElsewhere(machine, { edge, current, who }) ?? null;
+}
+
+export interface ElsewhereOptions {
+  edge: VizEdge;
+  /** The state the part is in now. */
+  current: string;
+  /** How the sentence names the part. */
+  who: string;
+}
+
+/** Why `edge` cannot be sent from `current`; undefined when it leaves `current`. */
+export function leavesElsewhere(
+  machine: VizMachine,
+  options: ElsewhereOptions,
+): string | undefined {
+  const { edge, current, who } = options;
+  if (movesFrom(machine, current).some((move) => move.edge.id === edge.id)) return undefined;
   const source = isAnyState(edge.from) ? "any state" : localName(edge.from);
   return `${edge.event} can't be sent: ${who} is in ${localName(current)}, this arrow leaves ${source}.`;
 }

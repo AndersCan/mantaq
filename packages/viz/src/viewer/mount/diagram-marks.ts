@@ -1,11 +1,12 @@
 import { drawChildMarkers, drawQueue } from "../markers.ts";
 import { listOf, markExplore } from "../explore.ts";
+import { notForwarded, updateBlocked } from "./arrow-send.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizDriver, VizMachine } from "../../schema.ts";
 import { currentsOf } from "../compartments.ts";
+import type { EnteredRun } from "./entered/entered-walk.ts";
 import { queueOf } from "../queue.ts";
 import type { Selection } from "../graph.ts";
-import { updateBlocked } from "./arrow-send.ts";
 
 export interface MarkDiagramContext {
   machine: VizMachine;
@@ -14,12 +15,27 @@ export interface MarkDiagramContext {
   pick: (child: PickedChild) => void;
   /** Static: an entered machine, drawn without the walk; only the selection is marked. */
   walk: "live" | "static";
+  /** An entered machine that runs: its current state is marked, and each arrow out of it that the parent does not forward is locked with the reason. */
+  entered?: EnteredRun;
 }
 
 /** Everything drawn over the graph: walk marks and selection. */
 export function markDiagram(root: HTMLElement, context: MarkDiagramContext): void {
-  const { machine, view } = context;
-  if (context.walk === "static") return markSelection(root, { selection: view.selection });
+  const { machine, view, entered } = context;
+  if (entered !== undefined) {
+    const { current } = entered;
+    markExplore(root, {
+      machine: entered.machine,
+      currents: [current],
+      blocked: notForwarded(entered),
+    });
+    return markSelection(root, { selection: view.selection });
+  }
+  if (context.walk === "static") {
+    // A machine that stopped running keeps no mark of where it was.
+    markExplore(root, { machine, currents: [] });
+    return markSelection(root, { selection: view.selection });
+  }
   updateBlocked(view, { machine, driver: context.driver });
   markExplore(root, { machine, blocked: view.blocked, ...liveState(view) });
   const graph = root.querySelector<SVGSVGElement>(".graph");

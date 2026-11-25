@@ -1,11 +1,12 @@
-import type { VizActorRef, VizDriver, VizEdge, VizMachine, VizStep } from "../../schema.ts";
+import { arrowLock, arrowPayload } from "./arrow-send.ts";
+import { changedFields, withEdit } from "../send/payloads.ts";
 import { navigated, stepInto } from "./walk.ts";
+import type { VizActorRef, VizDriver, VizEdge, VizMachine, VizStep } from "../../schema.ts";
+import type { ArrowSendContext } from "./arrow-send.ts";
 import type { PayloadEdit } from "../send/payloads.ts";
+import { payloadFor } from "../fill.ts";
 import type { ViewerOptions } from "./viewer-options.ts";
 import type { ViewState } from "./view-state.ts";
-import { arrowPayload } from "./arrow-send.ts";
-import { payloadFor } from "../fill.ts";
-import { withEdit } from "../send/payloads.ts";
 
 export interface PayloadSetterContext {
   options: ViewerOptions;
@@ -39,10 +40,7 @@ interface StepSendOptions {
 
 export type StepSend = (step: VizStep, options?: StepSendOptions) => void;
 
-export interface EventSenderContext {
-  machine: VizMachine;
-  view: ViewState;
-  driver: VizDriver | undefined;
+export interface EventSenderContext extends ArrowSendContext {
   send: StepSend;
 }
 
@@ -52,7 +50,8 @@ export function eventSender(context: EventSenderContext): (click: EventClick) =>
   return (click) => {
     const { event, actor, edge } = click;
     const step = eventStep(context, click);
-    const blocked = edge === undefined ? undefined : context.view.blocked.get(edge);
+    const arrow = context.machine.edges.find((each) => each.id === edge);
+    const blocked = arrow === undefined ? undefined : arrowLock(context, arrow);
     send(step, {
       sent: {
         event,
@@ -93,10 +92,10 @@ function eventStep(
   const payload =
     edge === undefined
       ? payloadFor(machine, event, {
-          set: view.payloads[event] ?? {},
+          set: changedFields(view.payloads, { machine: machine.id, event }),
           live: view.live,
           afters: view.afters,
         })
-      : arrowPayload({ machine, view, driver: context.driver }, edge);
+      : arrowPayload(context, edge);
   return { kind: "event", event, payload, ...(actor ? { actor } : {}) };
 }

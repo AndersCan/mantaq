@@ -26,7 +26,7 @@ export interface Focus {
   drawn: VizMachine;
   /** The board machine shown alone (`""` for the machine's own); undefined when none is. */
   part: string | undefined;
-  /** The root's live state is drawn only at the root; an entered machine is drawn static. */
+  /** "live" at the root, "static" in any entered machine; whether an entered machine runs is `enteredWalk`'s answer. */
   walk: "live" | "static";
   /** The root's machine shown alone while the root is shown; undefined otherwise. */
   rootPart: string | undefined;

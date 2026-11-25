@@ -14,8 +14,21 @@ import { activatable, html, svg } from "./dom.ts";
 import { contextView } from "./context/context-view.ts";
 import { LOCK_SLOT, textWidth } from "./layout.ts";
 
+/** What the Step tab says inside an entered machine. */
+export interface EnteredText {
+  /** The line shown before the first step. */
+  empty: string;
+  /** Why the entered machine is drawn without its state; undefined when it runs. */
+  note: string | undefined;
+}
+
+const ROOT_EMPTY =
+  "No steps yet. Click an arrow on the board to send its event. Its ? opens Details, where you can change what it sends.";
+
 export interface ExploreContext {
   machine: VizMachine;
+  /** Set inside an entered machine; the root's walk is still the one shown. */
+  entered?: EnteredText;
   /** Keep the first `length` steps. */
   rewind: (length: number) => void;
   /** Set when a driver runs the actor: the panel shows its outcome and sends steps to it. */
@@ -315,7 +328,7 @@ function stepItem(
 function runList(
   doc: Document,
   machine: VizMachine,
-  live: NonNullable<ExploreContext["live"]>,
+  live: NonNullable<ExploreContext["live"]> & { empty: string },
 ): HTMLElement {
   const { state, routes, lasts } = live;
   const total = state.steps.length;
@@ -330,9 +343,7 @@ function runList(
   // A driver that threw reports an entry that no step of the walk owns.
   return html(doc, "div", { class: "explore-live" }, [
     total === 0
-      ? html(doc, "p", { class: "muted", "data-live-empty": "" }, [
-          "No steps yet. Click an arrow on the board to send its event. Its ? opens Details, where you can change what it sends.",
-        ])
+      ? html(doc, "p", { class: "muted", "data-live-empty": "" }, [live.empty])
       : html(doc, "ol", { class: "explore-run" }, items),
     state.last !== null && state.last !== lasts[total - 1] ? errorLine(doc, state.last) : null,
   ]);
@@ -345,20 +356,24 @@ export interface ExploreParts {
   context: HTMLElement | undefined;
 }
 
+interface LivePartsOptions {
+  machine: VizMachine;
+  live: NonNullable<ExploreContext["live"]>;
+  final: boolean;
+  entered: EnteredText | undefined;
+}
+
 /** Live Step tab, below the root's state: regions, held effects, outcome, time. */
-function liveParts(
-  doc: Document,
-  machine: VizMachine,
-  context: {
-    live: NonNullable<ExploreContext["live"]>;
-    final: boolean;
-  },
-): Array<HTMLElement | null> {
-  const { live, final } = context;
+function liveParts(doc: Document, options: LivePartsOptions): Array<HTMLElement | null> {
+  const { machine, live, final, entered } = options;
   const { state } = live;
   const moves: LiveMoves = { state, picked: live.picked ?? null, pick: live.pick };
+  const note = entered?.note;
+  const noted =
+    note === undefined ? [] : [html(doc, "p", { class: "muted", "data-entered-note": "" }, [note])];
   return [
-    runList(doc, machine, live),
+    ...noted,
+    runList(doc, machine, { ...live, empty: entered?.empty ?? ROOT_EMPTY }),
     ...childrenSections(doc, machine, moves),
     final ? null : timersSection(doc, { state, send: live.send }),
   ];
@@ -382,7 +397,7 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
       "data-done": final ? "" : null,
     },
     [
-      ...liveParts(doc, machine, { live, final }),
+      ...liveParts(doc, { machine, live, final, entered: context.entered }),
       html(doc, "div", { class: "explore-controls" }, [
         button(doc, ["Back"], {
           onClick: () => context.rewind(length - 1),
