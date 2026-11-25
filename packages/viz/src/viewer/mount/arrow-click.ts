@@ -1,35 +1,37 @@
-import { actingMember, realMembersOf } from "../groups/acting-member.ts";
-import { affordance } from "../dom.ts";
-import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
-import { whyNoneHere } from "../blocked.ts";
+import { actingMemberOf, realMembersOf } from "../groups/acting-member.ts";
+import { arrowClick, updateBlocked } from "./arrow-send.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
-import { realMachineOf } from "../groups/fold-groups.ts";
 import type { GraphCallbacks, Selection } from "../graph.ts";
-import { movesFrom } from "../../moves.ts";
-import { shareArrows } from "../shared.ts";
-import type { Shared } from "../shared.ts";
 import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
-import { currentsOf } from "../compartments.ts";
+import { affordance } from "../dom.ts";
 import type { EventClick } from "./event-send.ts";
 import { outcomeText } from "../explore.ts";
+import { sharedArrowsOf } from "../shared.ts";
+import { whyNoneHere } from "../blocked.ts";
+
+export interface SayWhyOptions {
+  from: ArrowSendContext;
+  /** The machine the canvas draws. */
+  shown: VizMachine;
+}
 
 /** Diagram only: the line under the board says what the send of the selected arrow did, by its step number, and why the arrow sends nothing now; empty when there is neither. */
-export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
+export function sayWhy(root: HTMLElement, options: SayWhyOptions): void {
+  const { from } = options;
   const { selection, sent } = from.view;
-  const edge = from.machine.edges.find(
-    (candidate) => selection?.kind === "edge" && candidate.id === selection.id,
-  );
   const line = root.querySelector(".viz-main > .blocked-note");
   if (line === null) return;
-  if (edge === undefined) {
+  if (selection?.kind !== "edge") {
     line.replaceChildren();
     return;
   }
-  const why = whyText(from, { edge, sent });
-  const step = sent?.edge === edge.id ? stepLine(root.ownerDocument, from) : [];
-  const gap = step.length > 0 && why !== "" ? ". " : "";
-  line.replaceChildren(...step, gap, why);
+  const { edge, click } = drawnArrowClick(from, { shown: options.shown, id: selection.id });
+  const justSent = edge !== undefined && sent?.edge === edge.id;
+  const step = justSent ? stepLine(root.ownerDocument, from) : [];
+  const why = justSent ? from.view.blocked.get(edge.id) : whyOf(click);
+  const gap = step.length > 0 && why !== undefined ? ". " : "";
+  line.replaceChildren(...step, gap, why ?? "");
 }
 
 /** What the newest step did: `Step 3: take: stayed in cart`. The number tells one send from the next. A handler that threw: the line adds what it threw, in the words Details use. */
@@ -44,24 +46,14 @@ function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
   return last.error ? [...step, `. It threw: ${last.error}`] : step;
 }
 
-interface WhyTextOptions {
-  edge: VizEdge;
-  sent: ViewState["sent"];
+/** Why a click on an arrow sends nothing: the one reason text the hover title, the line under the board and its `?` share. */
+export function whyOf(click: ArrowClick): string | undefined {
+  return click.kind === "plain" ? click.why : undefined;
 }
 
-function whyText(from: ArrowSendContext, options: WhyTextOptions): string {
-  const { edge, sent } = options;
-  const decision = arrowSend(from, edge);
-  switch (decision.kind) {
-    case "send":
-      return decision.blocked ?? "";
-    case "refuse":
-      return decision.text;
-    case "elsewhere":
-      return sent?.edge === edge.id ? "" : decision.text;
-    case "none":
-      return "";
-  }
+/** Why a click on the drawn arrow sends nothing now: the panel's line under an arrow's title. */
+export function drawnWhy(from: ArrowSendContext, options: DrawnArrowOptions): string | undefined {
+  return whyOf(drawnArrowClick(from, options).click);
 }
 
 export interface DrawHandlers {
@@ -71,11 +63,11 @@ export interface DrawHandlers {
   sendEvent: (click: EventClick) => void;
 }
 
-/** A click on an arrow sends its event; the diagram marks make only such an arrow a button. A click on a state, and an arrow's `?`, open Details. */
+/** A click on an arrow sends its event; the diagram marks make only such an arrow a button. A click on a state, and an arrow's `?`, open Details; without a panel, the `?` of an arrow that sends nothing puts why in the line under the board. */
 export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): GraphCallbacks {
   const { view } = from;
   const members = { machine: handlers.shown, view };
-  const callbacks: GraphCallbacks = {
+  return {
     select: (clicked) => {
       if (clicked.kind === "state") return handlers.openDetails(clicked);
       const { selection, edge, click } = drawnArrowClick(from, {
@@ -87,12 +79,11 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
       handlers.sendEvent({ event: edge.event, actor: click.actor, edge: edge.id });
       focusOnAfterSend(handlers.root, { arrow: clicked.id });
     },
+    details: (id) => {
+      if (view.diagramOnly) view.sent = undefined;
+      handlers.openDetails(memberSelection({ kind: "edge", id }, members));
+    },
   };
-  if (view.diagramOnly) return callbacks;
-  callbacks.details = (id) => {
-    handlers.openDetails(memberSelection({ kind: "edge", id }, members));
-  };
-  return callbacks;
 }
 
 interface SentArrow {
@@ -144,20 +135,20 @@ export function drawnArrowClick(
   const edge = machine.edges.find((candidate) => candidate.id === selection.id);
   if (edge !== undefined) return { selection, edge, click: arrowClick(from, edge) };
   const ids = realMembersOf(options.shown, {
-    shared: sharedArrows(options.shown),
+    shared: sharedArrowsOf(options.shown),
     arrow: options.id,
   });
   const members = machine.edges.filter((candidate) => ids.includes(candidate.id));
   return { selection, edge, click: { kind: "plain", why: membersWhy(from, { members }) } };
 }
 
-export interface MembersWhyOptions {
+interface MembersWhyOptions {
   /** The real edges one drawn arrow stands for. */
   members: ReadonlyArray<VizEdge>;
 }
 
 /** Why a click on a drawn arrow sends none of its real edges: the walk is elsewhere; undefined with no walk. */
-export function membersWhy(from: ArrowSendContext, options: MembersWhyOptions): string | undefined {
+function membersWhy(from: ArrowSendContext, options: MembersWhyOptions): string | undefined {
   const { machine, view } = from;
   if (view.live === null) return undefined;
   return whyNoneHere(machine, { edges: options.members, live: view.live, picked: view.picked });
@@ -168,27 +159,11 @@ interface MemberOptions {
   view: ViewState;
 }
 
-/** Shared arrows by machine: the marks ask for each arrow after every step. */
-const sharedOf = new WeakMap<VizMachine, Shared>();
-
-function sharedArrows(machine: VizMachine): Shared {
-  const known = sharedOf.get(machine);
-  if (known !== undefined) return known;
-  const shared = shareArrows(machine);
-  sharedOf.set(machine, shared);
-  return shared;
-}
-
 /** A shared or group arrow acts as its real member that leaves the current state; with none, it is its own Details. */
 export function memberSelection(selection: Selection, options: MemberOptions): Selection {
   const { machine, view } = options;
-  if (selection.kind !== "edge" || view.live === null) return selection;
-  const walked = realMachineOf(machine);
-  const currents = currentsOf(view.live, view.picked);
-  const moves = currents.flatMap((current) => movesFrom(walked, current));
-  const members = realMembersOf(machine, { shared: sharedArrows(machine), arrow: selection.id });
-  const sources = new Map(walked.edges.map((edge) => [edge.id, edge.from]));
-  const member = actingMember(members, { moves, blocked: view.blocked, currents, sources });
+  if (selection.kind !== "edge") return selection;
+  const member = actingMemberOf(machine, { walk: view, arrow: selection.id });
   return member === undefined ? selection : { kind: "edge", id: member };
 }
 

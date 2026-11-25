@@ -568,13 +568,43 @@ describe("live controls", () => {
     root.remove();
   });
 
-  test("diagramOnlyNoHelp: no ? is drawn, and an arrow click still sends", () => {
+  test("diagramOnlyWhy: only an arrow that sends nothing has a ?, and it puts why under the board", () => {
     const { root, live } = mount({ diagramOnly: true });
-    expect(root.querySelector("[data-details-edge]")).toBeNull();
+    function helps(): string[] {
+      const shown: string[] = [];
+      for (const help of root.querySelectorAll('[data-details-edge][role="button"]')) {
+        shown.push(help.getAttribute("data-details-edge") ?? "");
+      }
+      return shown;
+    }
+    function timeoutHelp(): Element | null {
+      return root.querySelector('[data-details-edge="paying-paymentTimeout-error"]');
+    }
+    const before = { helps: helps(), sendHasHelp: helps().includes("idle-submit-paying") };
+    clickEdge(root, "paying-paymentTimeout-error");
+    const why = root.querySelector(".viz-main > .blocked-note")?.textContent;
+    const look = {
+      current: timeoutHelp()?.getAttribute("aria-current"),
+      label: timeoutHelp()?.getAttribute("aria-label"),
+    };
+    const arrow = root.querySelector('[data-edge-id="paying-paymentTimeout-error"]');
+    const arrowButton = arrow?.hasAttribute("role");
     clickArrow(root, "idle-submit-paying");
-    expect(live.log).toHaveLength(1);
-    clickArrow(root, "idle-submit-paying");
-    expect(live.log).toHaveLength(1);
+    expect({
+      sendHasHelp: before.sendHasHelp,
+      some: before.helps.length > 0,
+      why,
+      look,
+      arrowButton,
+      sent: live.log.length,
+    }).toEqual({
+      sendHasHelp: false,
+      some: true,
+      why: "paymentTimeout can't be sent: the walk is in idle, this arrow leaves paying.",
+      look: { current: "true", label: `Why ${arrow?.getAttribute("aria-label")} sends nothing` },
+      arrowButton: false,
+      sent: 1,
+    });
   });
 
   test.each([[[]], [["submit"]]] as const)(

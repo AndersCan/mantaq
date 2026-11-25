@@ -1,7 +1,10 @@
-import { arrowMembersOf } from "./fold-groups.ts";
+import { arrowMembersOf, realMachineOf } from "./fold-groups.ts";
+import type { VizLiveState, VizMachine } from "../../schema.ts";
+import { currentsOf } from "../compartments.ts";
 import type { Move } from "../../moves.ts";
+import { movesFrom } from "../../moves.ts";
 import type { Shared } from "../shared.ts";
-import type { VizMachine } from "../../schema.ts";
+import { sharedArrowsOf } from "../shared.ts";
 
 export interface RealMembersOptions {
   /** The shared arrows of the drawn machine. */
@@ -50,4 +53,31 @@ export function actingMember(
   const takenMember = members.find((member) => taken.has(member));
   const leaving = members.find((member) => currents.includes(sources.get(member) ?? ""));
   return open ?? takenMember ?? leaving;
+}
+
+/** Where the walk is now, as the viewer holds it. */
+interface WalkNow {
+  /** Unset without a driver: no walk. */
+  live: VizLiveState | null;
+  picked: { map: string; key: string } | null;
+  /** Edge id → why its guard blocks it. */
+  blocked: ReadonlyMap<string, string>;
+}
+
+export interface ActingNowOptions {
+  walk: WalkNow;
+  /** The drawn arrow's id. */
+  arrow: string;
+}
+
+/** The real edge a drawn arrow of `drawn` acts as now (see `actingMember`); undefined without a walk, or when none of its members leaves a current state. The marks, a click and a `?` ask this one function. */
+export function actingMemberOf(drawn: VizMachine, options: ActingNowOptions): string | undefined {
+  const { walk, arrow } = options;
+  if (walk.live === null) return undefined;
+  const real = realMachineOf(drawn);
+  const currents = currentsOf(walk.live, walk.picked);
+  const moves = currents.flatMap((current) => movesFrom(real, current));
+  const members = realMembersOf(drawn, { shared: sharedArrowsOf(drawn), arrow });
+  const sources = new Map(real.edges.map((edge) => [edge.id, edge.from]));
+  return actingMember(members, { moves, blocked: walk.blocked, currents, sources });
 }

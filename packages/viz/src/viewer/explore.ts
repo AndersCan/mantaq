@@ -1,6 +1,5 @@
 import { movesFrom } from "../moves.ts";
 import { actorText, localName } from "./compartments.ts";
-import { actingMember } from "./groups/acting-member.ts";
 import type {
   VizActorRef,
   VizJson,
@@ -407,27 +406,27 @@ export function explorePanel(doc: Document, context: ExploreContext): ExplorePar
   return { step, context: contextView(doc, { machine, live: live.state.context }) };
 }
 
+export interface MarkExploreOptions {
+  machine: VizMachine;
+  currents?: string[];
+  /** Edge id → why its guard blocks it; these are not next steps and reach nothing. */
+  blocked?: ReadonlyMap<string, string>;
+  /** The real edge a drawn arrow acts as now; a blocked one locks the arrow. Unset: each arrow is its own edge. */
+  actingOf?: (arrow: string) => string | undefined;
+}
+
 /** Mark the walk on the drawn graph: current state and possible next steps. */
-export function markExplore(
-  root: HTMLElement,
-  context: {
-    machine: VizMachine;
-    currents?: string[];
-    /** Edge id → why its guard blocks it; these are not next steps and reach nothing. */
-    blocked?: ReadonlyMap<string, string>;
-  },
-): void {
-  const { machine } = context;
-  const blocked = context.blocked ?? new Map<string, string>();
-  const currents = context.currents ?? [];
+export function markExplore(root: HTMLElement, options: MarkExploreOptions): void {
+  const { machine } = options;
+  const blocked = options.blocked ?? new Map<string, string>();
+  const currents = options.currents ?? [];
   const moves = currents.flatMap((current) => movesFrom(machine, current));
   const open = moves.filter((move) => !blocked.has(move.edge.id));
   const next = new Set(open.filter((move) => move.targets.length > 0).map((move) => move.edge.id));
-  const sources = new Map(machine.edges.map((edge) => [edge.id, edge.from]));
   for (const element of root.querySelectorAll<SVGGElement>(".graph g[data-edge-id]")) {
     const id = element.dataset["edgeId"] ?? "";
     const members = listOf(element.dataset["members"]) ?? [id];
-    const here = actingMember(members, { moves, blocked, currents, sources });
+    const here = options.actingOf?.(id);
     element.classList.toggle(
       "next",
       members.some((member) => next.has(member)),

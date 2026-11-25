@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
+import { groupedCheckout, edgeOf as shopEdge } from "./groups/shop-machines.ts";
 import { VIZ_SCHEMA_VERSION } from "../schema.ts";
 import type { VizDriver, VizEdge, VizLiveState, VizMachine, VizState, VizStep } from "../schema.ts";
 import { mountViewer } from "./embed.ts";
+import { walkDriver } from "./groups/walk-driver.ts";
 
 const stateOf = (id: string): VizState => ({
   id,
@@ -232,5 +234,80 @@ describe("an arrow three states share", () => {
     ).toBe(false);
     press(root.querySelector('g.edge[data-edge-id="idle-begin-a"]'));
     expect(root.querySelector("g.any-node")?.classList.contains("selected")).toBe(false);
+  });
+});
+
+describe("a shared arrow with no member at the current state", () => {
+  test("says why on hover, and without a panel its ? puts why under the board", () => {
+    const why = "go can't be sent: the walk is in idle, this arrow leaves a or b or c.";
+    const hover = mount().root;
+    const { driver } = fakeDriver();
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver, diagramOnly: true },
+    );
+    press(help(root));
+    expect({
+      title: shared(hover)?.querySelector(":scope > title.why")?.textContent,
+      line: root.querySelector(".viz-main > .blocked-note")?.textContent,
+      button: shared(root)?.getAttribute("role") ?? "plain",
+    }).toEqual({ title: why, line: why, button: "plain" });
+  });
+
+  test("its open Details say the same why as its hover title after the walk moves", () => {
+    const { driver } = fakeDriver(true);
+    const listeners: Array<(state: VizLiveState) => void> = [];
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [machine] },
+      { driver: { ...driver, listen: (onChange) => listeners.push(onChange) } },
+    );
+    press(help(root));
+    const moved = driver.step({ kind: "event", event: "begin", payload: {} });
+    for (const onChange of listeners) onChange(moved);
+    const title = shared(root)?.querySelector(":scope > title.why")?.textContent;
+    expect({ title, line: details(root)?.querySelector(".blocked-note")?.textContent }).toEqual({
+      title: "go goes to idle, not home",
+      line: "go goes to idle, not home",
+    });
+  });
+});
+
+describe("a shared node over a folded group", () => {
+  /** `abort` leaves inCart, chargingCard and packing, but not confirming. */
+  function mountShop(steps: string[]): HTMLElement {
+    const shop = groupedCheckout();
+    const edges = [...shop.edges];
+    for (const from of ["inCart", "chargingCard", "packing"]) {
+      edges.push(shopEdge(from, { event: "abort", to: "inCart" }));
+    }
+    const grouped = { ...shop, edges };
+    const root = document.createElement("div");
+    const { driver } = walkDriver(grouped, { guarded: new Set() });
+    mountViewer(
+      root,
+      { schemaVersion: VIZ_SCHEMA_VERSION, machines: [grouped] },
+      { driver, steps },
+    );
+    return root;
+  }
+
+  test("names its count, and is current only in a state that takes the event", () => {
+    function node(root: HTMLElement) {
+      const any = root.querySelector(".graph g.any-node");
+      return { label: any?.textContent, current: any?.classList.contains("current") };
+    }
+    expect({
+      charging: node(mountShop(["checkout"])),
+      confirming: node(mountShop(["checkout", "charged"])),
+    }).toEqual({
+      charging: { label: "3 states", current: true },
+      confirming: { label: "3 states", current: false },
+    });
   });
 });

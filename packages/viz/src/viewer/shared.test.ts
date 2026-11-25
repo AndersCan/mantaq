@@ -2,6 +2,8 @@ import { describe, expect, test } from "vite-plus/test";
 import reference from "./reference/justus-whole-app.json" with { type: "json" };
 import type { VizEdge, VizMachine, VizState } from "../schema.ts";
 import { isSharedNode, shareArrows } from "./shared.ts";
+import { foldGroups } from "./groups/fold-groups.ts";
+import { groupedCheckout } from "./groups/shop-machines.ts";
 
 const stateOf = (id: string, final = false): VizState => ({
   id,
@@ -59,16 +61,23 @@ describe("shareArrows", () => {
       ["a", "b", "c"].map((from) => edgeOf(from, "go", "done")),
     );
     const shared = shareArrows(m);
-    expect(shared.nodes).toEqual([
-      { id: "*", scope: "", states: ["a", "b", "c"], label: "any state" },
-    ]);
-    expect(shared.arrows).toHaveLength(1);
-    expect(shared.arrows[0]?.members.map((edge) => edge.id)).toEqual([
-      "a-go-done",
-      "b-go-done",
-      "c-go-done",
-    ]);
-    expect(shared.edges.map((edge) => edge.from)).toEqual(["*"]);
+    expect({
+      nodes: shared.nodes,
+      arrows: shared.arrows.map((arrow) => arrow.members.map((edge) => edge.id)),
+      from: shared.edges.map((edge) => edge.from),
+    }).toEqual({
+      nodes: [
+        {
+          id: "*",
+          scope: "",
+          states: ["a", "b", "c"],
+          walked: ["a", "b", "c"],
+          label: "any state",
+        },
+      ],
+      arrows: [["a-go-done", "b-go-done", "c-go-done"]],
+      from: ["*"],
+    });
   });
 
   test("a shared node reads the count of its states", () => {
@@ -121,5 +130,43 @@ describe("shareArrows", () => {
     expect(shared.arrows).toHaveLength(55);
     const labels = shared.nodes.filter((node) => node.scope === "join").map((node) => node.label);
     expect(labels.sort()).toEqual(["14 states", "3 states", "3 states", "4 states"]);
+  });
+
+  test("on a fold, a group node only some of whose states take the event reads its count, and stands for those states", () => {
+    const shop = groupedCheckout();
+    const edges = [...shop.edges];
+    for (const from of ["inCart", "chargingCard", "packing"]) {
+      edges.push(edgeOf(from, "abort", "inCart"));
+    }
+    const partly = foldGroups({ ...shop, edges });
+    const every = [...edges, edgeOf("confirming", "abort", "inCart")];
+    const whole = foldGroups({ ...shop, edges: every });
+    function node(machine: VizMachine) {
+      const [first] = shareArrows(machine).nodes;
+      return { label: first?.label, walked: first?.walked };
+    }
+    expect({ partly: node(partly), whole: node(whole) }).toEqual({
+      partly: { label: "3 states", walked: ["inCart", "chargingCard", "packing"] },
+      whole: {
+        label: "any state",
+        walked: ["inCart", "chargingCard", "confirming", "packing"],
+      },
+    });
+  });
+
+  test("on a fold, two events the same states take are one shared node, in any edge order", () => {
+    const shop = groupedCheckout();
+    const charging = shop.states.find((state) => state.id === "chargingCard");
+    const states =
+      charging === undefined ? shop.states : [...shop.states, { ...charging, id: "retrying" }];
+    const abort = ["inCart", "chargingCard", "retrying", "packing"];
+    const cancel = ["inCart", "retrying", "chargingCard", "packing"];
+    const edges = [
+      ...shop.edges,
+      ...abort.map((from) => edgeOf(from, "abort", "inCart")),
+      ...cancel.map((from) => edgeOf(from, "cancel", "inCart")),
+    ];
+    const nodes = shareArrows(foldGroups({ ...shop, states, edges })).nodes;
+    expect(nodes.map((node) => [node.label, node.walked.length])).toEqual([["3 states", 4]]);
   });
 });

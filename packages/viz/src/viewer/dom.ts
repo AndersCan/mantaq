@@ -52,7 +52,7 @@ export function activatable(element: Element, onActivate: () => void): void {
 /** How an element shows a click: as a button (pointer, tab stop, `role=button`), plain, or the current choice (plain, with `aria-current`). */
 export type Affordance = "button" | "plain" | "current";
 
-/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order, and so does the current choice, which a click would only choose again. */
+/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order, and so does the current choice, which a click would only choose again. The current choice gets `aria-current` first: the CSS hides an `edge-help` that is neither, and a hidden element loses focus. */
 export function affordance(element: Element, look: Affordance): void {
   switch (look) {
     case "button":
@@ -65,8 +65,8 @@ export function affordance(element: Element, look: Affordance): void {
       element.removeAttribute("aria-current");
       return;
     case "current":
-      leaveTabOrder(element);
       element.setAttribute("aria-current", "true");
+      leaveTabOrder(element);
       return;
     default:
       return isNever(look);
