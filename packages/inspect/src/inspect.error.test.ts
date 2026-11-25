@@ -29,7 +29,6 @@ describe("inspect: what cannot be done is a warning, never a guess", () => {
     const file = join(FIXTURES, "no-machines.ts");
     expect(await inspectModule(file, { load })).toEqual({
       machines: [],
-      embedded: [],
       warnings: [`${file}: no exported machine(...) found`],
     });
   });
@@ -38,7 +37,6 @@ describe("inspect: what cannot be done is a warning, never a guess", () => {
     const file = join(FIXTURES, "instance.ts");
     expect(await inspectModule(file, { load })).toEqual({
       machines: [],
-      embedded: [],
       warnings: [`${file}: no exported machine(...) found`],
     });
   });
