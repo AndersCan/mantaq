@@ -11,9 +11,12 @@ export interface EscapeOptions {
   opened: "claim" | "plain";
 }
 
-function isTyping(target: EventTarget | null): boolean {
+/** True for a key meant for something else: a text field, or the host's own screen in the Screen tab. */
+function isElsewhere(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+  const typing =
+    target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+  return typing || target.closest('[data-tab-panel="screen"]') !== null;
 }
 
 /** True on a page where nothing has focus and `root` is the viewer that owns Escape there. */
@@ -30,7 +33,8 @@ function answer(root: HTMLElement, event: KeyboardEvent): void {
 }
 
 /**
- * Escape anywhere in the viewer calls its handler, except in a text field.
+ * Escape anywhere in the viewer calls its handler, except in a text field or
+ * the Screen tab.
  * With nothing focused, as after a click on text or a link opening the page,
  * it calls the handler of the viewer last touched, or of the one a link opened.
  * Listens once per root.
@@ -49,7 +53,7 @@ export function listenEscape(root: HTMLElement, options: EscapeOptions): void {
   root.addEventListener("pointerdown", claim);
   root.addEventListener("focusin", claim);
   root.addEventListener("keydown", (event) => {
-    if (!isTyping(event.target)) answer(root, event);
+    if (!isElsewhere(event.target)) answer(root, event);
   });
   doc.addEventListener("keydown", (event) => {
     if (ownsUnfocusedEscape(root)) answer(root, event);

@@ -83,7 +83,10 @@ export function dropGonePick(view: ViewState): void {
   if (picked !== null && there !== true) view.picked = null;
 }
 
+/** A walk clears both notices: why a run did not open, and what a link's path named that is not there. */
 export function noticeCleared(root: HTMLElement, view: ViewState): void {
   view.notice = undefined;
+  view.focusNotice = undefined;
   root.querySelector("[data-run-missing]")?.remove();
+  root.querySelector(".viz-bar .focus-notice")?.remove();
 }

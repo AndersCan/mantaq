@@ -144,7 +144,9 @@ export function unknownFocusText(
 
 /** What a link's next step can name at this level: the machines of a board, or the group nodes of the machine drawn. */
 function namesHere(focus: Focus): string[] {
-  if (focus.canvas === "board") return [focus.machine.id, ...focus.machine.actors];
+  if (focus.canvas === "board") {
+    return partsOf(focus.machine).map((part) => partName(focus.machine, part));
+  }
   if (focus.groupNode !== undefined) return [];
   const names: string[] = [];
   for (const node of groupNodesOf(focus.drawn)) names.push(node.id);

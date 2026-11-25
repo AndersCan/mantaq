@@ -145,8 +145,6 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   function walked(sent?: ViewState["sent"]): void {
     view.sent = sent;
     noticeCleared(root, view);
-    view.focusNotice = undefined;
-    root.querySelector(".viz-bar .focus-notice")?.remove();
     navigated(options, { machine, view });
     follow();
   }

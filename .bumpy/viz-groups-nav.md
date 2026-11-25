@@ -2,7 +2,7 @@
 "@mantaq/viz": patch
 ---
 
-Escape goes back one level of the path from anywhere in the viewer, not only from the canvas or the path. If a Details panel with a selection is open, Escape closes it first. When nothing on the page has focus, for example after a click on text or after a `?focus=` link opens the page, Escape goes to the viewer that was last clicked or focused, or else to the viewer that the link opened on a path. Escape in a text field does nothing.
+Escape goes back one level of the path from anywhere in the viewer, not only from the canvas or the path. If a Details panel with a selection is open, Escape closes it first. When nothing on the page has focus, for example after a click on text or after a `?focus=` link opens the page, Escape goes to the viewer that was last clicked or focused, or else to the viewer that the link opened on a path. Escape in a text field or in the Screen tab does nothing.
 
 The current crumb of the path is plain text: it has no frame and no focus ring, but focus still lands on it so that a screen reader says where the reader is.
 
