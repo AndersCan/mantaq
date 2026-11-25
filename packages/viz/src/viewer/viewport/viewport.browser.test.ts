@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "vite-plus/test";
 import type { Browser, Page } from "playwright";
+import { browserTestEnv } from "./env.ts";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import type { Point } from "./zoom.ts";
@@ -26,7 +27,10 @@ beforeAll(async () => {
   await server.listen();
   origin = server.resolvedUrls?.local[0] ?? "";
   // Classic scrollbars, as desktop Chrome on Windows and Linux draws them: they take room from the canvas.
-  browser = await chromium.launch({ ignoreDefaultArgs: ["--hide-scrollbars"] });
+  browser = await chromium.launch({
+    executablePath: browserTestEnv().chromiumPath,
+    ignoreDefaultArgs: ["--hide-scrollbars"],
+  });
 }, 60_000);
 
 afterAll(async () => {

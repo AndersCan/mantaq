@@ -85,30 +85,28 @@ export interface Viewport {
   subscribe: (listener: (state: Readonly<ViewportState>) => void) => () => void;
 }
 
-/** Where the last zoom scrolled the container to, and where it wanted to: the browser rounds the offset. */
-interface ScrollRest {
-  applied: Point;
-  wanted: Point;
+/** Where the last zoom put the drawing's top-left, and where it wanted it: the browser rounds each scroll offset. */
+interface OriginRest {
+  actual: Point;
+  ideal: Point;
 }
 
 /** The CSS custom property on the container that holds the scale. */
 const ZOOM_PROPERTY = "--viz-zoom";
-
-const NO_OFFSET: Point = { x: 0, y: 0 };
 
 const CHOSEN_AT_ACTUAL_SIZE: HeldViewport = { scale: 1, tool: "select", sizing: "chosen" };
 
 /** A viewport over `container`, by default at 100% with the select tool. */
 export function viewportOf(container: HTMLElement, options: ViewportOptions): Viewport {
   let state: ViewportState = { ...(options.initial ?? CHOSEN_AT_ACTUAL_SIZE), pan: "none" };
-  let lastScroll: ScrollRest | undefined;
+  let lastOrigin: OriginRest | undefined;
   const listeners = new Set<(state: ViewportState) => void>();
-  container.style.setProperty(ZOOM_PROPERTY, String(state.scale));
   container.dataset["tool"] = state.tool;
   container.dataset["sizing"] = state.sizing;
   if (state.sizing === "fitted") {
     state = { ...state, scale: fittedScale(options.drawing()) ?? state.scale };
   }
+  container.style.setProperty(ZOOM_PROPERTY, String(state.scale));
 
   /** Draws at `scale` times the natural width from now on. */
   function choose(scale: number): void {
@@ -134,19 +132,27 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
     const sizeBefore = outerSize(container);
     const drawing = options.drawing();
     const before = drawingBox(container, { drawing });
-    const carried = zoom.kind === "pinch" ? roundedOff(container, { last: lastScroll }) : NO_OFFSET;
+    const origin =
+      zoom.kind === "pinch" ? idealOrigin(before.origin, { last: lastOrigin }) : before.origin;
     choose(target);
     const after = drawingBox(container, { drawing });
     const measured = before.width > 0 && after.width > 0;
+    const ratio = measured ? after.width / before.width : target / state.scale;
     const wanted = anchoredScroll({
       scroll: { x: container.scrollLeft, y: container.scrollTop },
       pointer: point,
-      origin: { x: before.origin.x + carried.x, y: before.origin.y + carried.y },
+      origin,
       originAfter: after.origin,
-      ratio: measured ? after.width / before.width : target / state.scale,
+      ratio,
     });
     scrollTo(wanted, followed(container, { sizeBefore }));
-    lastScroll = { applied: { x: container.scrollLeft, y: container.scrollTop }, wanted };
+    lastOrigin = {
+      actual: drawingBox(container, { drawing }).origin,
+      ideal: {
+        x: point.x - (point.x - origin.x) * ratio,
+        y: point.y - (point.y - origin.y) * ratio,
+      },
+    };
     changed({ ...state, scale: target, sizing: "chosen" });
   }
   function fit(): void {
@@ -165,12 +171,12 @@ export function viewportOf(container: HTMLElement, options: ViewportOptions): Vi
       y: container.scrollTop + rect.top - Math.max(visible.y, 0),
     };
     scrollTo(wanted, { x: followed(container, { sizeBefore }).x, y: "page" });
-    lastScroll = undefined;
+    lastOrigin = undefined;
     const same = target === state.scale && sizing === "chosen";
     if (!same) changed({ ...state, scale: target, sizing: "chosen" });
   }
   function redrawn(): void {
-    lastScroll = undefined;
+    lastOrigin = undefined;
     if (state.sizing === "chosen") return;
     const scale = fittedScale(options.drawing());
     if (scale === undefined || scale === state.scale) return;
@@ -217,18 +223,22 @@ function fittedScale(drawing: Element | undefined): number | undefined {
   return width / natural.width;
 }
 
-interface RoundedOffOptions {
-  last: ScrollRest | undefined;
+/** How far rounding can put the drawing from where a zoom wanted it: under a pixel each for the container and the page. */
+const ROUNDING = 2;
+
+interface IdealOriginOptions {
+  last: OriginRest | undefined;
 }
 
-/** What rounding took off the last zoom's scroll, while the container still sits where it left it; zero after any other scroll. */
-function roundedOff(container: HTMLElement, options: RoundedOffOptions): Point {
+/** Where the last zoom wanted the drawing's top-left, while it still sits where that zoom left it and rounding is all that differs; else where it is. */
+function idealOrigin(origin: Point, options: IdealOriginOptions): Point {
   const { last } = options;
-  if (last === undefined) return NO_OFFSET;
-  const still = container.scrollLeft === last.applied.x && container.scrollTop === last.applied.y;
-  if (!still) return NO_OFFSET;
-  const offset = { x: last.applied.x - last.wanted.x, y: last.applied.y - last.wanted.y };
-  return { x: Math.abs(offset.x) < 1 ? offset.x : 0, y: Math.abs(offset.y) < 1 ? offset.y : 0 };
+  if (last === undefined) return origin;
+  const moved = last.actual.x !== origin.x || last.actual.y !== origin.y;
+  if (moved) return origin;
+  const near =
+    Math.abs(last.ideal.x - origin.x) < ROUNDING && Math.abs(last.ideal.y - origin.y) < ROUNDING;
+  return near ? last.ideal : origin;
 }
 
 interface DrawingBoxOptions {

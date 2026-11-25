@@ -1,7 +1,9 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
+import type { Canvas } from "./mount/canvas.ts";
 import { decodeFocus, enteredBy, focusReader, unknownFocusText } from "./mount/focus.ts";
 import { drawCallbacks, drawnWhy, followedLook, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { listenEscape } from "./mount/escape.ts";
+import { listenNavigation } from "./viewport/navigate.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
 import type { GraphCallbacks, Selection } from "./graph.ts";
@@ -43,13 +45,14 @@ export function mountViewer(
   }
   const redraws: Redraws = {
     redraw: () => undefined,
-    refit: () => undefined,
+    canvas: { refit: () => undefined, viewport: () => undefined },
     escape: () => false,
     follow: () => undefined,
   };
   const opened = view.focus.length > 0 ? "claim" : "plain";
   listenEscape(root, { escape: () => redraws.escape(), opened });
   listenFullscreen(root);
+  listenNavigation(root, { viewport: () => redraws.canvas.viewport() });
   watchDriver(view, { driver, redraw: () => redraws.redraw() });
   const mount = {};
   mounts.set(root, mount);
@@ -82,13 +85,13 @@ export function mountViewer(
   }
 
   render();
-  listenWidth(root, { refit: () => redraws.refit() });
+  listenWidth(root, { refit: () => redraws.canvas.refit() });
 }
 
-/** What a driver event, a width change, Escape or a link's path does; the last drawn machine sets them. */
+/** What a driver event, a width change, Escape or a link's path does, and the viewport that zoom and pan act on; the last drawn machine sets them. */
 interface Redraws {
   redraw: () => void;
-  refit: () => void;
+  canvas: Pick<Canvas, "refit" | "viewport">;
   escape: () => boolean;
   follow: (tokens: string[]) => void;
 }
@@ -215,7 +218,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     mark,
     choose,
   });
-  context.redraws.refit = canvas.refit;
+  context.redraws.canvas = canvas;
   context.redraws.escape = () => closeSelection(panel, { view, refresh }) || canvas.back();
   context.redraws.follow = (tokens) => canvas.follow(decodeFocus(tokens, { root: machine }));
   root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));

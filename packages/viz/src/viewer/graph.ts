@@ -518,16 +518,16 @@ const LABEL_FLOOR_REM = 0.6;
 const LABEL_CAP_EM = 1.4;
 
 /**
- * Sizes the drawing against its canvas: labels never drop under 0.6rem (about
- * 10px) nor grow past 1.4em; between those the drawing fills the canvas. A
- * machine too wide for the floor scrolls sideways by the reader's hand. A
- * drawing that runs down stays at the floor: growing it would grow its height.
+ * The sizes the drawn width reads (viewer.css): labels never drop under 0.6rem
+ * (about 10px) nor grow past 1.4em, and between those the drawing fills the
+ * canvas. A machine too wide for the floor scrolls sideways by the reader's
+ * hand. A drawing that runs down stays at the floor: growing it would grow its
+ * height. A zoom draws it at `--viz-zoom` times its natural width.
  */
-function graphWidth(units: number, options: FlowChoice): string {
+function graphWidth(units: number): string {
   const size = (scale: number) => ((units * scale) / LABEL_UNITS).toFixed(2);
-  const floor = `--graph-floor: ${size(LABEL_FLOOR_REM)}rem`;
-  if (options.flow === "down") return `${floor}; width: var(--graph-floor)`;
-  return `${floor}; width: clamp(var(--graph-floor), 100%, ${size(LABEL_CAP_EM)}em)`;
+  const natural = Math.ceil(units);
+  return `--graph-floor: ${size(LABEL_FLOOR_REM)}rem; --graph-cap: ${size(LABEL_CAP_EM)}em; --graph-natural: ${natural}px`;
 }
 
 function messageGroup(doc: Document, message: PlacedMessage): SVGElement {
@@ -626,10 +626,10 @@ export function renderGraph(
     {
       class: "graph",
       viewBox: `0 0 ${width} ${height}`,
-      // Natural size; graphWidth clamps the drawn width.
+      // Natural size; viewer.css sets the drawn width from graphWidth.
       width,
       height,
-      style: graphWidth(units, { flow }),
+      style: graphWidth(units),
       role: "group",
       "aria-label": `machine ${machine.id}`,
       "data-flow": flow,
@@ -711,7 +711,7 @@ export function renderBoard(
       viewBox: `0 0 ${Math.ceil(board.width)} ${Math.ceil(board.height)}`,
       width: Math.ceil(board.width),
       height: Math.ceil(board.height),
-      style: graphWidth(board.width, { flow: "across" }),
+      style: graphWidth(board.width),
       role: "group",
       "aria-label": `machine ${machine.id}: ${board.parts.length} machines`,
     },
