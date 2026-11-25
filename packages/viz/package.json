@@ -61,6 +61,7 @@
     "@typescript/native-preview": "catalog:",
     "fast-check": "catalog:",
     "happy-dom": "catalog:",
+    "playwright": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }
