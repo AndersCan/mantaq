@@ -1,5 +1,13 @@
 import { actorMapOf, groupNameProblem, scopeOf } from "../../schema.ts";
-import type { VizCoverage, VizEdge, VizFuzzMessage, VizMachine, VizState } from "../../schema.ts";
+import type {
+  VizBranch,
+  VizCoverage,
+  VizEdge,
+  VizFuzzMessage,
+  VizMachine,
+  VizState,
+} from "../../schema.ts";
+import { localName } from "../compartments.ts";
 
 /** A group drawn as one node: `<scope>.@<name>`, or `@<name>` at the root, so `scopeOf` stays the members' scope. */
 export interface GroupNode {
@@ -15,7 +23,7 @@ export interface GroupArrow {
   id: string;
   /** The real edges, in document order. */
   members: VizEdge[];
-  /** What is drawn: the first member, pointed at the group nodes. */
+  /** What is drawn: the first member, pointed at the group nodes, with no handler reading that only one member has. */
   drawn: VizEdge;
 }
 
@@ -43,11 +51,12 @@ export function foldGroups(machine: VizMachine): VizMachine {
   return foldedOf(machine).machine;
 }
 
+/** The group nodes of the real machine, not of a fold or a view. */
 export function groupNodesOf(machine: VizMachine): ReadonlyArray<GroupNode> {
   return foldedOf(machine).nodes;
 }
 
-/** Arrows of the fold that stand for more than one real edge. */
+/** Arrows of the fold of the real machine that stand for more than one real edge. */
 export function groupArrowsOf(machine: VizMachine): ReadonlyArray<GroupArrow> {
   return foldedOf(machine).arrows;
 }
@@ -56,7 +65,7 @@ interface StateQuery {
   state: string;
 }
 
-/** The node that draws a real state in the fold: its group node, or the state itself. */
+/** The node that draws a state of the real machine in its fold: its group node, or the state itself. */
 export function drawnNodeOf(machine: VizMachine, options: StateQuery): string {
   return foldedOf(machine).nodeOfState.get(options.state) ?? options.state;
 }
@@ -65,7 +74,7 @@ interface ArrowQuery {
   arrow: string;
 }
 
-/** The real edges a drawn edge of the fold stands for; empty for an id the fold does not draw. */
+/** The real edges a drawn edge of the real machine's fold stands for; empty for an id the fold does not draw. */
 export function arrowMembersOf(machine: VizMachine, options: ArrowQuery): ReadonlyArray<VizEdge> {
   return foldedOf(machine).membersOfEdge.get(options.arrow) ?? [];
 }
@@ -81,9 +90,10 @@ function groupIdOf(state: VizState, machine: VizMachine): string | undefined {
 
 function nodesOf(machine: VizMachine): GroupNode[] {
   const nodes = new Map<string, GroupNode>();
+  const taken = new Set(machine.states.map((state) => state.id));
   for (const state of machine.states) {
     const id = groupIdOf(state, machine);
-    if (id === undefined) continue;
+    if (id === undefined || taken.has(id)) continue;
     const node = nodes.get(id) ?? {
       id,
       name: state.group ?? id,
@@ -119,7 +129,6 @@ function nodeState(node: GroupNode, options: Members): VizState {
     coverage: summed(members.map((member) => member.coverage)),
     tested: summed(members.map((member) => member.tested)),
     doc: null,
-    group: node.name,
   };
 }
 
@@ -172,22 +181,77 @@ interface FirstMember {
   first: VizEdge;
 }
 
-function arrowOf(bucket: Bucket, options: FirstMember): GroupArrow {
+interface Arrowing extends FirstMember {
+  nodes: ReadonlyArray<GroupNode>;
+}
+
+interface DrawnId extends Arrowing {
+  id: string;
+}
+
+interface Renames {
+  names: ReadonlyMap<string, string>;
+}
+
+/** A branch that went to a member goes to its group node instead. */
+function renamedBranch(branch: VizBranch, options: Renames): VizBranch {
+  if (branch.target.kind !== "state") return branch;
+  const state = options.names.get(branch.target.state);
+  return state === undefined ? branch : { ...branch, target: { kind: "state", state } };
+}
+
+interface EdgeEnds {
+  nodes: ReadonlyArray<GroupNode>;
+  ends: ReadonlyArray<string>;
+}
+
+/** The edge with its handler reading pointed at the group nodes of its ends, so its condition label holds. */
+function renamedEdge(edge: VizEdge, options: EdgeEnds): VizEdge {
+  const { explanation } = edge;
+  if (explanation === null || explanation.status !== "analyzed") return edge;
+  const names = new Map<string, string>();
+  for (const node of options.nodes) {
+    if (!options.ends.includes(node.id)) continue;
+    for (const state of node.states) names.set(localName(state), localName(node.id));
+  }
+  const branches = explanation.branches.map((branch) => renamedBranch(branch, { names }));
+  return { ...edge, explanation: { ...explanation, branches } };
+}
+
+/**
+ * The edge drawn for a bucket. Several members have several handlers, so a
+ * merged arrow drops the reading and the doc, and sums the coverage.
+ */
+function drawnEdge(bucket: Bucket, options: DrawnId): VizEdge {
+  const { first, id } = options;
+  const { from, target, members } = bucket;
+  if (from === first.from && target === first.to) return first;
+  const moved = { ...first, id, from, to: target };
+  const ends = [from, target ?? ""];
+  if (members.length === 1) return renamedEdge(moved, { nodes: options.nodes, ends });
+  return {
+    ...moved,
+    explanation: null,
+    doc: null,
+    coverage: summed(members.map((member) => member.coverage)),
+    tested: summed(members.map((member) => member.tested)),
+  };
+}
+
+function arrowOf(bucket: Bucket, options: Arrowing): GroupArrow {
   const { first } = options;
   const { from, target, members } = bucket;
   const shown = target ?? "?";
   const merged = `group:${from}>${first.event}>${shown}:${first.kind}`;
   const id = members.length === 1 ? first.id : merged;
-  const unmoved = from === first.from && target === first.to;
-  const drawn = unmoved ? first : { ...first, id, from, to: target };
-  return { id, members, drawn };
+  return { id, members, drawn: drawnEdge(bucket, { ...options, id }) };
 }
 
 function drawnArrows(edges: ReadonlyArray<VizEdge>, options: NodeIndex): GroupArrow[] {
   const arrows: GroupArrow[] = [];
   for (const bucket of bucketsOf(edges, options)) {
     const [first] = bucket.members;
-    if (first !== undefined) arrows.push(arrowOf(bucket, { first }));
+    if (first !== undefined) arrows.push(arrowOf(bucket, { first, nodes: options.nodes }));
   }
   return arrows;
 }

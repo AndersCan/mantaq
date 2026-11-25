@@ -92,6 +92,25 @@ function coverage(machine: VizMachine): string[] {
       if (!from || !target) problems.push(`${edge.id} leaves the view`);
     }
   }
+  return problems.concat(missingFromViews(machine));
+}
+
+/** Real edges from or to a group's states, or onAny in its scope, that the entered group leaves out; and views that would fold again. */
+function missingFromViews(machine: VizMachine): string[] {
+  const problems: string[] = [];
+  for (const node of groupNodesOf(machine)) {
+    const view = groupMachine(machine, { group: node.id });
+    const again = view !== undefined && groupNodesOf(view).length > 0;
+    if (view === undefined) problems.push(`${node.id} has no view`);
+    if (again) problems.push(`${node.id} folds again`);
+    for (const edge of machine.edges) {
+      const anyHere = isAnyState(edge.from) && scopeOf(edge.from) === node.scope;
+      const member = [edge.from, edge.to].some((end) => end !== null && node.states.includes(end));
+      const missed = (anyHere || member) && view?.edges.includes(edge) !== true;
+      if (missed) problems.push(`${node.id} misses ${edge.id}`);
+    }
+  }
+  if (groupNodesOf(foldGroups(machine)).length > 0) problems.push("the fold folds again");
   return problems;
 }
 
@@ -114,7 +133,7 @@ describe("groups on generated machines", () => {
     );
   });
 
-  test("G3: the fold and the entered groups together draw every edge", () => {
+  test("G3: the fold and the entered groups together draw every edge, and neither folds again", () => {
     fc.assert(
       fc.property(groupedArbitrary, (machine) => {
         expect(coverage(machine)).toEqual([]);

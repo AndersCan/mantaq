@@ -6,8 +6,9 @@ import {
   groupNodesOf,
 } from "./fold-groups.ts";
 import { describe, expect, test } from "vite-plus/test";
-import { edgeOf, groupedCheckout, machineOf, stateOf } from "./shop-machines.ts";
+import { edgeOf, groupedCheckout, machineOf, readEdge, stateOf } from "./shop-machines.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
+import { edgeLines } from "../labels.ts";
 import { scopeOf } from "../../schema.ts";
 
 const grouped = groupedCheckout();
@@ -37,7 +38,6 @@ describe("foldGroups on the grouped checkout", () => {
         coverage: { hits: 3 },
         tested: null,
         doc: null,
-        group: "payment",
       },
       {
         id: "@shipping",
@@ -49,7 +49,6 @@ describe("foldGroups on the grouped checkout", () => {
         coverage: null,
         tested: null,
         doc: null,
-        group: "shipping",
       },
     ]);
   });
@@ -167,7 +166,50 @@ describe("foldGroups merges crossing edges", () => {
   });
 });
 
+describe("foldGroups labels", () => {
+  test("a merged arrow shows no guard that only one member has", () => {
+    const guarded = readEdge(edgeOf("listing", { event: "pay", to: "paying" }), {
+      branches: [
+        { conditions: ["total > 0"], target: { kind: "state", state: "paying" } },
+        { conditions: ["!(total > 0)"], target: { kind: "stay" } },
+      ],
+    });
+    const merged = machineOf({
+      states: [
+        stateOf("listing", { group: "review" }),
+        stateOf("editing", { group: "review" }),
+        stateOf("paying"),
+      ],
+      edges: [guarded, edgeOf("editing", { event: "pay", to: "paying" })],
+    });
+    expect(foldGroups(merged).edges.map((edge) => edgeLines(edge))).toEqual([["pay"]]);
+  });
+
+  test("an arrow into a group keeps its condition beside its else", () => {
+    const branches = [
+      { conditions: ["ready"], target: { kind: "state" as const, state: "listing" } },
+      { conditions: ["!(ready)"], target: { kind: "state" as const, state: "paying" } },
+    ];
+    const split = machineOf({
+      states: [stateOf("empty"), stateOf("listing", { group: "review" }), stateOf("paying")],
+      edges: [
+        readEdge(edgeOf("empty", { event: "pay", to: "listing" }), { branches }),
+        readEdge(edgeOf("empty", { event: "pay", to: "paying" }), { branches }),
+      ],
+    });
+    expect(foldGroups(split).edges.map((edge) => edgeLines(edge))).toEqual([
+      ["pay", "ready"],
+      ["pay", "else"],
+    ]);
+  });
+});
+
 describe("foldGroups keeps the validator's rules", () => {
+  test("a group whose node id is a real state id is not folded", () => {
+    const clash = machineOf({ states: [stateOf("@g"), stateOf("a", { group: "g" })], edges: [] });
+    expect(groupNodesOf(clash)).toEqual([]);
+  });
+
   test("states of an actor map stay ungrouped", () => {
     const mapped = machineOf({
       regions: ["seats"],

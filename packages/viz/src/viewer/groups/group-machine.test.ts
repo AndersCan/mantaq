@@ -11,9 +11,9 @@ describe("groupMachine", () => {
       initial: null,
       states: [
         stateOf("inCart"),
-        grouped.states[1],
-        grouped.states[2],
-        stateOf("packing", { group: "shipping" }),
+        stateOf("chargingCard", { hits: 2 }),
+        stateOf("confirming", { hits: 1 }),
+        stateOf("packing"),
       ],
       edges: grouped.edges.slice(1, 4),
     });
@@ -27,7 +27,10 @@ describe("groupMachine", () => {
         edgeOf("a", { event: "go", to: "b" }),
       ],
     });
-    expect(groupMachine(started, { group: "@g" })).toEqual(started);
+    expect(groupMachine(started, { group: "@g" })).toEqual({
+      ...started,
+      states: [stateOf("a", { initial: true }), stateOf("b")],
+    });
   });
 
   test("an onAny edge of the group's region is taken from inside it", () => {
@@ -47,8 +50,32 @@ describe("groupMachine", () => {
     expect(groupMachine(anywhere, { group: "cart.@g" })).toEqual({
       ...anywhere,
       regions: ["cart"],
-      states: anywhere.states.slice(0, 2),
+      states: [stateOf("cart.open"), stateOf("cart.closed")],
       edges: anywhere.edges.slice(0, 1),
+    });
+  });
+
+  test("a view keeps the messages between its states and to its onAny sources", () => {
+    const talking = machineOf({
+      regions: ["cart", "seats"],
+      maps: ["seats"],
+      states: [stateOf("cart.open", { group: "g" }), stateOf("seats.free"), stateOf("seats.taken")],
+      edges: [
+        edgeOf("cart.open", { event: "book", to: "seats.free" }),
+        edgeOf("cart.*", { event: "reset", to: "cart.open" }),
+      ],
+    });
+    const messages = [
+      { from: "cart.open", event: "hold", to: "seats.free" },
+      { from: "seats.free", event: "reset", to: "cart.*" },
+      { from: "cart.open", event: "sit", to: "seats.taken" },
+    ];
+    const fuzz = { seed: 0, iterations: 0, corpus: [], errors: [], failedExpectations: [] };
+    const machine = { ...talking, fuzz: { ...fuzz, expectations: [], messages } };
+    expect(groupMachine(machine, { group: "cart.@g" })).toEqual({
+      ...machine,
+      states: [stateOf("cart.open"), stateOf("seats.free")],
+      fuzz: { ...machine.fuzz, messages: messages.slice(0, 2) },
     });
   });
 

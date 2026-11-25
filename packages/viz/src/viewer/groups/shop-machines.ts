@@ -1,4 +1,4 @@
-import type { VizEdge, VizMachine, VizState } from "../../schema.ts";
+import type { VizBranch, VizEdge, VizMachine, VizState } from "../../schema.ts";
 import { scopeOf } from "../../schema.ts";
 
 interface StateShape {
@@ -49,6 +49,29 @@ export function edgeOf(from: string, shape: EdgeShape): VizEdge {
     doc: null,
     coverage: null,
     tested: null,
+  };
+}
+
+interface Reading {
+  branches: VizBranch[];
+}
+
+/** The edge with an analyzed handler that has these branches. */
+export function readEdge(edge: VizEdge, options: Reading): VizEdge {
+  return {
+    ...edge,
+    explanation: {
+      status: "analyzed",
+      location: { file: "cart.ts", line: 1, column: 1 },
+      registration: "on",
+      branches: options.branches,
+      payloadReads: [],
+      contextReads: [],
+      contextWrites: [],
+      readsActorState: false,
+      comparisons: [],
+      literals: [],
+    },
   };
 }
 

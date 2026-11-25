@@ -13,8 +13,8 @@ interface GroupQuery {
 
 /**
  * The view inside a group: its own states, the outside states its edges come
- * from or reach as stubs, and the real edges unchanged. Undefined for an
- * unknown group.
+ * from or reach as stubs, and the real edges unchanged. Takes the real
+ * machine, not a fold or a view. Undefined for an unknown group.
  */
 export function groupMachine(machine: VizMachine, options: GroupQuery): VizMachine | undefined {
   const views = enteredGroups.get(machine) ?? new Map<string, VizMachine>();
@@ -45,6 +45,13 @@ interface Reached {
   edges: ReadonlyArray<VizEdge>;
 }
 
+/** A copy without `group`, so the view never folds again. */
+function withoutGroup(state: VizState): VizState {
+  const copy = { ...state };
+  delete copy.group;
+  return copy;
+}
+
 function viewStates(machine: VizMachine, options: Reached): VizState[] {
   const { node, edges } = options;
   const ends = new Set<string>();
@@ -54,8 +61,9 @@ function viewStates(machine: VizMachine, options: Reached): VizState[] {
   }
   const states: VizState[] = [];
   for (const state of machine.states) {
-    if (node.states.includes(state.id)) states.push(state);
-    else if (ends.has(state.id)) states.push({ ...state, initial: false, effects: [] });
+    const stub = { ...withoutGroup(state), initial: false, effects: [] };
+    if (node.states.includes(state.id)) states.push(withoutGroup(state));
+    else if (ends.has(state.id)) states.push(stub);
   }
   return states;
 }
@@ -74,6 +82,7 @@ function enter(machine: VizMachine, options: Entering): VizMachine {
   const edges = machine.edges.filter((edge) => touches(edge, options));
   const states = viewStates(machine, { node, edges });
   const ids = new Set(states.map((state) => state.id));
+  for (const edge of edges) if (isAnyState(edge.from)) ids.add(edge.from);
   const kept = { states };
   const { initial, fuzz } = machine;
   return {
