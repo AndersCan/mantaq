@@ -208,7 +208,9 @@ describe("entering a machine node", () => {
   });
 
   test("a state clicked inside opens its Details, not the root's Screen", () => {
-    const screen = (live: VizLiveState) => document.createTextNode(`screen of ${live.state}`);
+    function screen(live: VizLiveState): Node {
+      return document.createTextNode(`screen of ${live.state}`);
+    }
     const root = mount({ driver: checkoutDriver(), screen });
     enter(root, { from: "paying" });
     press(root.querySelector('.canvas g.state[data-node-id="settled"]'));
