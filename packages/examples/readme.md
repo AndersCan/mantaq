@@ -6,7 +6,7 @@ recovery, by reimplementing familiar state-machine patterns (multi-step forms,
 async workflows, auth sessions, caches, undo/redo, event sourcing, and more) in
 Mantaq.
 
-Every file is a self-contained `*.test.ts`. Each one both **demonstrates**
+Every file is a self-contained `*.test.ts`, except `membership.ts`, which keeps its machine in its own file. Each one both **demonstrates**
 an idiom and **proves** it: the assertions in the file are part of the suite, so
 the example doubles as a test. Run the package and the examples self-verify.
 
