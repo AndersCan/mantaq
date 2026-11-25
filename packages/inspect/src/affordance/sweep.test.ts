@@ -178,3 +178,24 @@ test("a dead element that a click brings is reported with that click", async () 
     `plain: walk [start], driver, with panel, focus [], after a click on button "Open": button "Close" changes nothing. ${fix}`,
   ]);
 });
+
+/** The tool in use made to look clickable again: a click on it changes nothing. */
+function pressedToolClickable(root: HTMLElement): void {
+  const pressed = root.querySelector('.viz-tools [aria-pressed="true"]');
+  pressed?.removeAttribute("aria-current");
+  pressed?.removeAttribute("tabindex");
+}
+
+test("the zoom and pan tools are swept: a pressed tool that still looks clickable is reported", async () => {
+  const report = await sweep(plain, { afterMount: pressedToolClickable });
+  const fix = "Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).";
+  const tool = 'button.viz-tool[data-viz-tool="select"]';
+  expect(failureLines(report)).toEqual([
+    `plain: walk [], no driver, with panel, focus []: ${tool} changes nothing. ${fix}`,
+    `plain: walk [], driver, with panel, focus []: ${tool} changes nothing. ${fix}`,
+    `plain: walk [start], driver, with panel, focus []: ${tool} changes nothing. ${fix}`,
+    `plain: walk [], no driver, diagram only, focus []: ${tool} changes nothing. ${fix}`,
+    `plain: walk [], driver, diagram only, focus []: ${tool} changes nothing. ${fix}`,
+    `plain: walk [start], driver, diagram only, focus []: ${tool} changes nothing. ${fix}`,
+  ]);
+});

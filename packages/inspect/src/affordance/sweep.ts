@@ -69,6 +69,7 @@ const NAMING = [
   "data-explore-action",
   "data-child-map",
   "data-child-key",
+  "data-viz-tool",
 ];
 
 /** Clicks every element that looks clickable at every stand of `sweepCase`, each on a fresh viewer, and reports the clicks that changed nothing or threw. */

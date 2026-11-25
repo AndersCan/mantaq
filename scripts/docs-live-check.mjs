@@ -11,7 +11,8 @@
 // back by the path and by the browser's Back. No click needs a sideways scroll first, and
 // after each step the labels of the next arrows show in the canvas. The checkout of the
 // visualizer guide is walked the same way, at both widths, the back arrows included.
-// The click sweep also opens the guide with a group entered, by a link.
+// The click sweep also opens the guide with a group entered, by a link, and must click the
+// Move, Zoom in and Zoom out tools. On events, Zoom in and then Fit each change the percent.
 // Run after the docs build: node scripts/docs-live-check.mjs
 import { GROUP_GUIDE, GROUP_GUIDE_ENTERED, groupWalkFailures } from "./lib/group-walk.mjs";
 import { VISUALIZER_GUIDE, visualizerWalkFailures } from "./lib/next-labels.mjs";
@@ -109,6 +110,30 @@ for (const page of pages) {
   await tab.close();
 }
 
+/** On events, Zoom in and then Fit each change the percent the toolbar shows, and Fit then has nothing left to do. */
+async function fitFailures() {
+  const tab = await browser.newPage();
+  await tab.goto(`${origin}${base}getting-started/events/`);
+  const viewer = tab.locator(".mantaq-tutorial").first();
+  await viewer.locator(".zoom-percent").waitFor({ timeout: 10_000 });
+  function percent() {
+    return viewer.locator(".zoom-percent").textContent();
+  }
+  const opened = await percent();
+  await viewer.getByRole("button", { name: "Zoom in" }).click();
+  const zoomed = await percent();
+  const fit = viewer.getByRole("button", { name: "Zoom to fit" });
+  await fit.click();
+  const fitted = await percent();
+  const done = await fit.isDisabled();
+  await tab.close();
+  const changed = zoomed !== opened && fitted !== zoomed;
+  if (changed && done) return [];
+  return [
+    `events: the percent reads ${opened}, ${zoomed} after Zoom in and ${fitted} after Fit (Fit off: ${done}); each must change it and Fit must turn off`,
+  ];
+}
+
 const pool = await browser.newPage();
 await pool.goto(
   `${origin}${base}sugar/pool/?machine=teamInbox&run=Four%20items%2C%20three%20workers`,
@@ -129,11 +154,13 @@ try {
 }
 await pool.close();
 
+failures.push(...(await fitFailures()));
 failures.push(...(await groupWalkFailures({ browser, origin, base })));
 failures.push(...(await visualizerWalkFailures({ browser, origin, base })));
 
 const mustSweep = [...pages, GROUP_GUIDE, ...GROUP_GUIDE_ENTERED];
-const clicks = await clickFailures({ browser, origin, base, dist, mustSweep });
+const mustClick = ["hand", "zoomIn", "zoomOut"].map((tool) => `button.viz-tool "${tool}"`);
+const clicks = await clickFailures({ browser, origin, base, dist, mustSweep, mustClick });
 failures.push(...clicks.failures);
 
 await browser.close();
