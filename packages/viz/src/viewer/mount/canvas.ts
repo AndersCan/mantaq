@@ -16,6 +16,7 @@ import { enteredGroupOf } from "../groups/group-machine.ts";
 import { html } from "../dom.ts";
 import { keepInView } from "../keep-in-view.ts";
 import type { ViewState } from "./view-state.ts";
+import type { VizMachine } from "../../schema.ts";
 
 /** Board width in units where the canvas has no size (not laid out). */
 const BOARD_UNITS_UNMEASURED = 800;
@@ -62,6 +63,12 @@ function graphRoom(root: HTMLElement): { room?: number } {
   const style = doc.defaultView?.getComputedStyle(doc.documentElement);
   const rem = Number.parseFloat(style?.fontSize ?? "") || 16;
   return width > 0 ? { room: roomAtFloor(width, { rem }) } : {};
+}
+
+/** True when the graph drawn should run the other way at the canvas's width now. */
+function turnsAt(root: HTMLElement, shown: VizMachine): boolean {
+  const flow = root.querySelector(".canvas .graph")?.getAttribute("data-flow");
+  return typeof flow === "string" && flowFor(shown, graphRoom(root)) !== flow;
 }
 
 /** What the canvas draws for the focus path (a board of boxes, one machine or a group entered), and every move along the path. */
@@ -127,7 +134,9 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (typeof id === "string") keepInView(root, { node: id, with: "sendable" });
     root.querySelector<HTMLElement>(".focus-path [aria-current]")?.focus({ preventScroll: true });
   }
+  /** Shows the current state, and puts focus back on the control of the level left. */
   function returnTo(left: FocusStep | undefined): void {
+    keepCurrentInView(root, { focus: options.focus(), view });
     if (left === undefined) return;
     const selector =
       left.kind === "part"
@@ -172,14 +181,13 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (focus.part !== undefined) graph.setAttribute("data-zoom", focus.part);
     return [graph];
   }
-  /** Draws again when the drawing no longer suits the canvas width: a board laid out for another width, or a graph whose ranks should run the other way. */
+  /** After a width change: draws again when the drawing no longer suits the width (a board laid out for another width, or a graph whose ranks should run the other way), then shows the current state. */
   function refit(): void {
     const { canvas, drawn: shown } = options.focus();
-    const flow = root.querySelector(".canvas .graph")?.getAttribute("data-flow");
-    const turned = typeof flow === "string" && flowFor(shown, graphRoom(root)) !== flow;
-    if (canvas === "board" ? canvasUnits() === drawnUnits : !turned) return;
-    swap();
-    options.mark();
+    if (canvas === "board" ? canvasUnits() !== drawnUnits : turnsAt(root, shown)) {
+      swap();
+      options.mark();
+    }
     keepCurrentInView(root, { focus: options.focus(), view });
   }
   return { drawn, refit, framed: titled, walked, back, follow };

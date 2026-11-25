@@ -82,7 +82,8 @@
 }
 /* Panel always below the graph, so the graph keeps the full width; it is
    never pinned over the canvas. Inside a machine or a group the canvas is
-   capped, so the path, the graph and the panel fit one window together. */
+   capped, so the path, the graph and the panel fit one window together; its
+   scrollbar's room is kept, so the width a drawing is chosen for holds. */
 .viz .viz-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -96,6 +97,7 @@
 
 .viz:has(.focus-path) .canvas {
   max-height: calc(75dvh - 5rem);
+  scrollbar-gutter: stable;
 }
 
 .viz .panel {

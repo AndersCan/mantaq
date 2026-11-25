@@ -1,8 +1,8 @@
 /**
  * Replays the walk of the group guide on the built docs, clicking each button by its
  * label, then Back, Forward and a reload. Each button is in the canvas's view before
- * its click. After each step the viewer shows what the guide says, and only a move along
- * the path adds a history entry. Half on screen, the panel does not cover the canvas.
+ * its click, and the current state after each step. The viewer shows what the guide
+ * says, and only a move along the path adds a history entry. Half on screen, the panel does not cover the canvas.
  */
 
 /** The page of the guide, under the site's base. */
@@ -213,6 +213,10 @@ async function screenWalk(options) {
     if (shown !== wanted) {
       failures.push(`${where}: after "${done}" the viewer shows ${shown}, not ${wanted}`);
       break;
+    }
+    const current = tab.locator(".viz .graph g.current").first();
+    if (!(await current.evaluate(inCanvasView))) {
+      failures.push(`${where}: the state the walk is in is out of the canvas's view`);
     }
     const entered = step.shows.path.length > 0 && screen.groupFits === "fits";
     if (entered && (await tab.evaluate(scrollsSideways))) {

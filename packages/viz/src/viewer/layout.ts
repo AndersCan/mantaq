@@ -212,6 +212,8 @@ export const NODE_SEPARATION = 24;
 const RANK_SEPARATION = 70;
 const MARGIN_X = 48;
 const MARGIN_Y = 32;
+/** The margin left and right of a layout that runs down: small, as a narrow canvas is why it runs down. */
+const SIDE_MARGIN = 2 * LABEL_PAD;
 const MIN_DOT_GAP = 3;
 const MAX_DOT_GAP = 12;
 const DOT_GAP_PER_LENGTH = 1 / 24;
@@ -620,7 +622,7 @@ function graphOf(machine: Drawing, specs: ReadonlyMap<string, Spec>): LayoutGrap
     ranksep: RANK_SEPARATION,
     edgesep: 14 + 3 * LABEL_PAD,
     marginx: MARGIN_X,
-    marginy: MARGIN_Y,
+    marginy: machine.flow === "down" ? SIDE_MARGIN : MARGIN_Y,
   });
   for (const region of machine.regions)
     graph.setNode(regionNodeId(region), { width: 0, height: 0 });
@@ -1245,7 +1247,7 @@ function turnedBack(laid: MachineLayout, machine: Drawing): MachineLayout {
   }
   let width = laid.height;
   for (const placed of edges) {
-    width = Math.max(width, placed.label.x + placed.label.width / 2 + MARGIN_Y);
+    width = Math.max(width, placed.label.x + placed.label.width / 2 + SIDE_MARGIN);
   }
   return { ...laid, width, height: laid.width, nodes, edges, entries };
 }

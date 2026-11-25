@@ -55,8 +55,8 @@ test.each([
     "a tie: the view that moves the least",
     { left: 500, right: 560 },
     [
-      { left: 300, right: 360 },
-      { left: 900, right: 960 },
+      { left: 290, right: 300 },
+      { left: 760, right: 775 },
     ],
     276,
   ],
