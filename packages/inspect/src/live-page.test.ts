@@ -478,8 +478,8 @@ describe("mountDriven with several machines", () => {
     expect(buttons.map((b) => b.disabled)).toEqual([true, false]);
   });
 
-  test("clicking a machine switches the URL and the shown machine", async () => {
-    history.replaceState(null, "", "?machine=checkout&step=1");
+  test("clicking a machine switches the URL and the shown machine, and drops the focus path", async () => {
+    history.replaceState(null, "", "?machine=checkout&step=1&focus=basicInfo");
     const root = document.createElement("div");
     mountDriven(root, { source: "test", text: await twoText(), targets: {} });
     (root.querySelectorAll("nav.machines button")[1] as HTMLButtonElement).click();
