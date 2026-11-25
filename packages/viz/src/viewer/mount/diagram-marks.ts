@@ -1,3 +1,4 @@
+import { drawnNodeOf } from "../groups/fold-groups.ts";
 import { affordance, svg } from "../dom.ts";
 import { drawChildMarkers, drawQueue } from "../markers.ts";
 import { listOf, markExplore } from "../explore.ts";
@@ -35,7 +36,8 @@ export function markDiagram(root: HTMLElement, context: MarkDiagramContext): voi
       picked: view.picked,
       onPick: context.pick,
     });
-    drawQueue(graph, { state: view.live.state, queue: queueOf(machine, view.live.context) });
+    const state = drawnNodeOf(context.shown, { state: view.live.state });
+    drawQueue(graph, { state, queue: queueOf(machine, view.live.context) });
   }
   markSelection(root, { selection: view.selection });
 }

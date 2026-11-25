@@ -104,3 +104,31 @@ test("pills and +N stay inside the state's row", () => {
   const moreRight = Number(more?.getAttribute("x")) + textWidth(more?.textContent ?? "", 10);
   expect(moreRight).toBeLessThanOrEqual(right);
 });
+
+test("a waiting state folded into a group draws its queue on the group node", () => {
+  const states: VizMachine["states"] = [];
+  for (const state of pool.states) {
+    const busy = state.id === "workWaiting" || state.id === "workersBusy";
+    states.push(busy ? { ...state, group: "busy" } : state);
+  }
+  const grouped: VizMachine = { ...pool, states };
+  const live: VizLiveState = {
+    state: "workWaiting",
+    steps: [],
+    last: null,
+    after: [],
+    timers: [],
+    context: { waiting: ["job1", "job2"], free: [], workers: [], size: 3 },
+    payload: null,
+    regions: {},
+    children: [],
+    effectMode: "real",
+    waiting: [],
+  };
+  const driver: VizDriver = { reset: () => live, step: () => live };
+  const root = document.createElement("div");
+  mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [grouped] }, { driver });
+  expect(root.querySelector(".graph g.queue")?.getAttribute("aria-label")).toBe(
+    "2 waiting, first goes next: job1, job2",
+  );
+});
