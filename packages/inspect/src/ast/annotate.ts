@@ -307,6 +307,7 @@ function annotateStates(states: ReadonlyArray<VizState>, notes: StateNotes): Viz
   return states.map((state) => {
     const doc = noteOf(localState(state.id), { notes, kind: "stateDocs" }) ?? null;
     const annotated: VizState = { ...state, doc };
+    delete annotated.group;
     const group = groups.get(state.id);
     if (group !== undefined) annotated.group = group;
     return annotated;
