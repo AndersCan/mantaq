@@ -43,7 +43,7 @@ The viewer can draw a machine at more than one level. The path above the canvas 
 
 A move along the path does not change the walk or the Step log. An arrow from the state that the walk is in sends at every level, because the machine has one walk. Inside a group, a dashed box is a state outside the group. Click it to go back one level and show that state there.
 
-The address keeps the path in `?focus=`: the name of a machine on a board, then the id of a group node, such as `@payment`. A link with `?focus=` opens the same level. For example, `?machine=order&focus=@payment` opens the group `payment` of the machine `order`.
+The address keeps the path in `?focus=`: the name of a machine on a board, then the id of a group node, such as `@payment`. A link with `?focus=` opens the same level. For example, `?machine=order&focus=@payment` opens the group `payment` of the machine `order`. Repeat `focus` for each level: `?focus=till&focus=@payment` opens the machine `till` of a board, then its group `payment`.
 
 ### Nodes
 

@@ -7,10 +7,7 @@ import { Code } from "@astrojs/starlight/components";
 import Machine from "@mantaq/inspect/astro/Machine.astro";
 import orderSource from "../../../../../../packages/examples/order/order.ts?raw";
 
-export const declarations = orderSource.slice(
-  orderSource.indexOf("/** The shop checks"),
-  orderSource.indexOf("/** The shop accepts"),
-);
+export const declarations = orderSource.slice(0, orderSource.indexOf("export const orderMachine"));
 
 ## What
 
@@ -47,7 +44,7 @@ A group node shows the name of the group, a box-in-a-box mark and an `enter` con
 
 An arrow into or out of a group node stands for the real arrows of its states. A click on it sends the event from the state that the walk is in. Its `?` opens Details, which lists the real arrows.
 
-When you enter a group, the canvas draws the states of the group. A path of names above the canvas shows where you are: `order › payment`. The states outside the group that its arrows go to are dashed boxes.
+When you enter a group, the canvas draws the states of the group. A path of names above the canvas shows where you are: `order › payment`. The states outside the group that its arrows come from or go to are dashed boxes.
 
 ### Walk into a group and out of it
 
@@ -55,14 +52,14 @@ Do these steps on the diagram above. Click the label or the line of an arrow, an
 
 1. Click `placeOrder`. The walk moves to `chargingCard`, and the `payment` node says `now in chargingCard`.
 2. Click `enter` on the `payment` node. The canvas draws `chargingCard`, `confirmingWithBank` and `cardDeclined`, and the path shows `order › payment`.
-3. Click `declined`. The walk moves to `cardDeclined`.
+3. Click the moving `declined` arrow that leaves `chargingCard`. The walk moves to `cardDeclined`.
 4. Click `retryCard`. The walk goes back to `chargingCard`.
 5. Click `charged`. The walk leaves the group to the dashed box `packingParcel`. The line under the path says `The walk is in packingParcel, outside group payment.`
 6. Click `order` in the path. The canvas draws the folded machine again, and the `delivery` node says `now in packingParcel`. Escape also goes back one level of the path.
 
 **Back** and **Reset** under the diagram undo steps. Entering a group or leaving it does not change the walk.
 
-A link can open a group: add `?focus=@payment` to the address of the page. For example, [this link](?machine=order&step=placeOrder&focus=%40payment) opens `payment` with the walk in `chargingCard`.
+A link can open a group: add `?focus=@payment` to the address of the page. For example, [this link](?machine=order&focus=%40payment) opens `payment` with the walk in `reviewingOrder`, outside the group.
 
 ### Group, or split into machines
 
