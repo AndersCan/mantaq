@@ -17,7 +17,6 @@ import type { VizEdge, VizMachine } from "../schema.ts";
 import { Either } from "@mantaq/utils";
 import { groupNodeAt } from "./groups/fold-groups.ts";
 import { isAnyState } from "../schema.ts";
-import { isSharedNode } from "./shared.ts";
 import { isNever } from "../is-never.ts";
 import { localName } from "./compartments.ts";
 import { placeBoard } from "./board.ts";
@@ -99,6 +98,8 @@ function regionGroup(doc: Document, placed: PlacedRegion, isMap: boolean): SVGGE
 interface NodeOptions {
   doc: Document;
   callbacks: GraphCallbacks;
+  /** The drawn machine, so a node can name a group by its name. */
+  drawn: VizMachine;
 }
 
 function chipGroups(placed: PlacedState | PlacedMachine, options: NodeOptions): SVGGElement[] {
@@ -186,21 +187,30 @@ function unknownGroup(doc: Document, placed: PlacedUnknown): SVGGElement {
   );
 }
 
-function anyAria(placed: PlacedAny): string {
+function anyAria(placed: PlacedAny, options: NodeOptions): string {
   if (placed.states.length === 0) return "any non-final state (onAny handlers)";
   if (placed.label === "any state") return "any state";
-  return `these ${placed.states.length} states: ${placed.states.map(localName).join(", ")}`;
+  const names: string[] = [];
+  for (const id of placed.states) {
+    const group = groupNodeAt(options.drawn, { node: id });
+    names.push(group === undefined ? localName(id) : `group ${group.name}`);
+  }
+  const listed = names.join(", ");
+  return `these ${placed.states.length} states: ${listed}`;
 }
 
-function anyGroup(doc: Document, placed: PlacedAny): SVGGElement {
+function anyGroup(placed: PlacedAny, options: NodeOptions): SVGGElement {
+  const { doc } = options;
+  const walked: Record<string, string> =
+    placed.walked.length === 0 ? {} : { "data-states": JSON.stringify(placed.walked) };
   return svg(
     doc,
     "g",
     {
       class: "any-node",
       "data-node-id": placed.id,
-      "data-states": placed.states.length === 0 ? null : JSON.stringify(placed.states),
-      "aria-label": anyAria(placed),
+      ...walked,
+      "aria-label": anyAria(placed, options),
     },
     [
       svg(doc, "rect", {
@@ -337,7 +347,7 @@ function nodeGroup(node: PlacedNode, options: NodeOptions): SVGGElement {
     case "machine":
       return machineGroup(node, options);
     case "any":
-      return anyGroup(options.doc, node);
+      return anyGroup(node, options);
     case "unknown":
       return unknownGroup(options.doc, node);
     default:
@@ -349,7 +359,8 @@ const LINE_HEIGHT = 16;
 
 interface AriaOptions {
   machine: VizMachine;
-  members: ReadonlyArray<string> | undefined;
+  /** How many drawn states a shared arrow leaves; undefined for any other arrow. */
+  sources: number | undefined;
 }
 
 /** A drawn end as a sentence names it: a group node by its group's name. */
@@ -362,8 +373,8 @@ function edgeAria(edge: VizEdge, options: AriaOptions): string {
   const text = edge.event;
   const target = edge.to === null ? "undetermined" : endText(edge.to, options);
   const when = whenText(edge);
-  if (options.members !== undefined && isSharedNode(edge.from)) {
-    return `${options.members.length} states on ${text} to ${target}${when}`;
+  if (options.sources !== undefined) {
+    return `${options.sources} states on ${text} to ${target}${when}`;
   }
   const from = endText(edge.from, options);
   if (edge.kind === "stay") return `${from} on ${text} stays`;
@@ -421,7 +432,7 @@ function edgeGroup(
       "data-members": placed.members === undefined ? null : JSON.stringify(placed.members),
       "data-from": edge.from,
       "data-to": placed.target,
-      "aria-label": edgeAria(edge, { machine: context.machine, members: placed.members }),
+      "aria-label": edgeAria(edge, { machine: context.machine, sources: placed.sources }),
     },
     [
       svg(doc, "path", { class: "hit", d: placed.path, "aria-hidden": "true" }),
@@ -449,7 +460,7 @@ interface HelpOptions {
 /** The `?` beside an arrow's label: opens its Details, never sends. */
 function helpGroup(doc: Document, options: HelpOptions): SVGGElement {
   const { placed, details, machine } = options;
-  const aria = edgeAria(placed.edge, { machine, members: placed.members });
+  const aria = edgeAria(placed.edge, { machine, sources: placed.sources });
   const lines = edgeLines(placed.edge);
   const cx = placed.text.x + textWidth(lines[0] ?? "", 12) / 2 + 2 + HELP_SLOT / 2;
   const cy = placed.text.y - ((lines.length - 1) * LINE_HEIGHT) / 2;
@@ -581,7 +592,7 @@ export function renderGraph(
           : [helpGroup(doc, { placed: edge, details: callbacks.details, machine })]),
       ]),
       ...placed.entries.map((entry) => entryArrow(doc, entry)),
-      ...placed.nodes.map((node) => nodeGroup(node, { doc, callbacks })),
+      ...placed.nodes.map((node) => nodeGroup(node, { doc, callbacks, drawn: machine })),
     ],
   );
   return root;

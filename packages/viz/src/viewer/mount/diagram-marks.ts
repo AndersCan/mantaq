@@ -94,7 +94,7 @@ function markSelection(root: HTMLElement, options: MarkSelectionOptions): void {
       selection !== null &&
         (element.dataset[attribute] === selection.id ||
           (selection.kind === "edge" && members.includes(selection.id)) ||
-          (element.dataset["states"] !== undefined && arrowNodes.has(element.dataset["nodeId"]))),
+          (element.classList.contains("any-node") && arrowNodes.has(element.dataset["nodeId"]))),
     );
   }
 }

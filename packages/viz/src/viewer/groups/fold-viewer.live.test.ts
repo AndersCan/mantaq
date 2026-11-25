@@ -244,6 +244,30 @@ describe("a grouped machine in the viewer", () => {
     });
   });
 
+  test("a node that shares an arrow out of a group is current while the walk is inside the group", () => {
+    const states = [...shop.states, stateOf("refunding"), stateOf("cancelled", { final: true })];
+    const edges = [...shop.edges];
+    for (const from of ["inCart", "chargingCard", "confirming", "packing"]) {
+      edges.push(edgeOf(from, { event: "abort", to: "cancelled" }));
+    }
+    const aborting = machineOf({ states, edges });
+    const root = document.createElement("div");
+    document.body.append(root);
+    const { driver } = walkDriver(aborting, { guarded: new Set() });
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [aborting] }, { driver });
+    click(arrow(root, { id: "inCart-checkout-chargingCard" }));
+    const node = root.querySelector(".graph g.any-node");
+    expect({
+      current: marks(root).current,
+      aria: node?.getAttribute("aria-label"),
+      arrow: root.querySelector(".graph g.edge[data-from='*1']")?.getAttribute("aria-label"),
+    }).toEqual({
+      current: ["@payment", "*1"],
+      aria: "these 3 states: inCart, group payment, group shipping",
+      arrow: "3 states on abort to cancelled",
+    });
+  });
+
   test("the canvas scrolls to the group node that draws the current state", () => {
     const { root, arrive } = mount();
     const canvas = root.querySelector<HTMLElement>(".canvas");

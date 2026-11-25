@@ -63,8 +63,10 @@ export interface PlacedAny {
   id: string;
   /** `any state`, or the first source states of a shared arrow. */
   label: string;
-  /** The states a shared node stands for; empty for an `onAny` node. */
+  /** The drawn states a shared node stands for, a group by its node; empty for an `onAny` node. */
   states: string[];
+  /** The real states it stands for, a group node by its states, so the walk marks it current. */
+  walked: string[];
   x: number;
   y: number;
   width: number;
@@ -83,8 +85,10 @@ export interface PlacedEdge {
   label: LabelBox;
   /** Centre of the text lines: the label centre, shifted right by half the lock slot for transitions. */
   text: Point;
-  /** Ids of the edges a shared arrow stands for; absent when it is one edge. */
+  /** Ids of the real edges a shared or group arrow stands for; absent when it is one edge. */
   members?: string[];
+  /** How many drawn states a shared arrow leaves, as its node counts them; absent for any other arrow. */
+  sources?: number;
   /** Gap between the dots of a dotted edge: grows with the edge so dots never merge into a line. */
   dotGap: number;
 }
@@ -223,6 +227,16 @@ function anyIds(machine: VizMachine): string[] {
 
 function anyLabel(machine: Drawing, id: string): string {
   return machine.shared.nodes.find((node) => node.id === id)?.label ?? ANY_LABEL;
+}
+
+interface SourcesQuery {
+  /** A shared node's id. */
+  node: string;
+}
+
+/** The drawn states a shared node stands for; empty for an `onAny` node. */
+function sourcesOf(machine: Drawing, options: SourcesQuery): string[] {
+  return machine.shared.nodes.find((node) => node.id === options.node)?.states ?? [];
 }
 
 function unknownNodeId(edge: VizEdge): string {
@@ -1110,7 +1124,9 @@ function assemble(
     if (!isDrawn(edge)) continue;
     const placed = routedOf(edge, { specs, boxes, geo, ports, columns });
     const members = machine.members.get(edge.id);
-    edges.push(members === undefined ? placed : { ...placed, members });
+    const arrow = machine.shared.arrows.find((each) => each.id === edge.id);
+    const sources = arrow === undefined ? {} : { sources: sourcesOf(machine, arrow).length };
+    edges.push(members === undefined ? placed : { ...placed, members, ...sources });
   }
   const laned = lanesOf(
     edges,
@@ -1244,7 +1260,11 @@ function placeNodes(
     kind: "any",
     id,
     label: anyLabel(machine, id),
-    states: machine.shared.nodes.find((node) => node.id === id)?.states ?? [],
+    states: sourcesOf(machine, { node: id }),
+    walked: sourcesOf(machine, { node: id }).flatMap((source) => {
+      const held = machine.holds.get(source);
+      return held?.kind === "group" ? held.states : [source];
+    }),
     ...at(id),
   }));
   const unknowns: PlacedUnknown[] = machine.edges

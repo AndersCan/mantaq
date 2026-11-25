@@ -130,6 +130,24 @@ describe("an arrow three states share", () => {
     );
   });
 
+  test("from every open state of the machine, it still counts its states", () => {
+    const states: VizState[] = [];
+    for (const id of ["a", "b", "c", "home"]) {
+      states.push({ ...stateOf(id), initial: id === "a", final: id === "home" });
+    }
+    const edges = ["a", "b", "c"].map((from) => edgeOf(from, "go", "home"));
+    const { root } = mount({ ...machine, initial: "a", states, edges });
+    expect({
+      node: root.querySelector("g.any-node")?.getAttribute("data-node-id"),
+      arrow: shared(root)?.getAttribute("aria-label"),
+      help: help(root)?.getAttribute("aria-label"),
+    }).toEqual({
+      node: "*",
+      arrow: "3 states on go to home",
+      help: "Details of 3 states on go to home",
+    });
+  });
+
   test("from another state, the arrow is plain and its ? opens the details listing every source", () => {
     const { root, sent } = mount();
     press(shared(root));
