@@ -412,7 +412,7 @@ describe("the path in the address bar", () => {
     const told: string[][] = [];
     const { root } = mount({
       steps: ["checkout"],
-      followFocus: (follow) => follows.push(follow),
+      followFocus: (follower) => follows.push(follower.follow),
       onNavigate: (where) => told.push([where.by, ...where.steps, "|", ...where.focus]),
     });
     const follow = follows[0];

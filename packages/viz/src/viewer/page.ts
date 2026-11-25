@@ -1,7 +1,7 @@
 /**
  * Options for a page that keeps `?machine=&step=&run=&payload=&focus=` (and reads old `?value=` links) in the address bar so a walk and the machine opened can be shared (`linkOptions`).
  */
-import type { FocusLink, NavigatedBy, ViewerOptions } from "./embed.ts";
+import type { FocusFollower, FocusLink, NavigatedBy, ViewerOptions } from "./embed.ts";
 import "./viewer.css";
 
 interface Walk {
@@ -38,9 +38,24 @@ function linkedFocus(): FocusLink {
   return machine === null ? { focus } : { machine, focus };
 }
 
-/** Browser Back and Forward: the viewer moves along its path to the one the address names. */
-function followFocus(follow: (link: FocusLink) => void): void {
-  addEventListener("popstate", () => follow(linkedFocus()));
+/** The viewers that follow Back and Forward; one `popstate` listener serves them all while any is mounted. */
+const followers = new Set<FocusFollower>();
+
+function dropUnmounted(): void {
+  for (const follower of followers) if (!follower.mounted()) followers.delete(follower);
+  if (followers.size === 0) removeEventListener("popstate", followAddress);
+}
+
+function followAddress(): void {
+  dropUnmounted();
+  for (const follower of followers) follower.follow(linkedFocus());
+}
+
+/** Browser Back and Forward: the viewer moves along its path to the one the address names. A viewer gone, as on a page that mounts again after a save, is dropped. */
+function followFocus(follower: FocusFollower): void {
+  dropUnmounted();
+  followers.add(follower);
+  addEventListener("popstate", followAddress);
 }
 
 /** Options that open the walk named in the address bar and keep it there. */

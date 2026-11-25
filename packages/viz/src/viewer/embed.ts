@@ -3,7 +3,12 @@
  * Kept apart from the root entry so bundles skip the fuzzer and the AST
  * annotator (TypeScript compiler).
  */
-import type { FocusLink, NavigatedBy, ViewerOptions } from "./mount/viewer-options.ts";
+import type {
+  FocusFollower,
+  FocusLink,
+  NavigatedBy,
+  ViewerOptions,
+} from "./mount/viewer-options.ts";
 import { parseViz } from "../validate.ts";
 import type { VizIssue } from "../validate.ts";
 import { html } from "./dom.ts";
@@ -11,7 +16,7 @@ import { mountViewer } from "./viewer.ts";
 import { Either } from "@mantaq/utils";
 
 export { mountViewer };
-export type { FocusLink, NavigatedBy, ViewerOptions };
+export type { FocusFollower, FocusLink, NavigatedBy, ViewerOptions };
 export type { EnteredGroup, Selection as ViewerSelection } from "./graph.ts";
 
 /** Replace `root` with a list of reasons `source` cannot be shown. */

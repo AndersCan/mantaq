@@ -1,7 +1,21 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
+import { edgeOf, machineOf, stateOf } from "./groups/shop-machines.ts";
 import type { FocusLink } from "./embed.ts";
 import { linkOptions } from "./page.ts";
+import { mountViewer } from "./embed.ts";
+import { VIZ_SCHEMA_VERSION } from "../schema.ts";
+import type { VizDocument } from "../schema.ts";
+
+const oneState: VizDocument = {
+  schemaVersion: VIZ_SCHEMA_VERSION,
+  machines: [
+    machineOf({
+      states: [stateOf("open", { initial: true })],
+      edges: [edgeOf("__initial__", { event: "", to: "open", kind: "initial" })],
+    }),
+  ],
+};
 
 describe("the address bar", () => {
   test("opens on the payloads in the address and writes them back with the walk", () => {
@@ -79,11 +93,31 @@ describe("the address bar", () => {
   test("Back and Forward hand the viewer the path and the machine the address names", () => {
     history.replaceState(undefined, "", "?machine=order");
     const links: FocusLink[] = [];
-    linkOptions().followFocus?.((link) => links.push(link));
+    let mounted = true;
+    linkOptions().followFocus?.({ follow: (link) => links.push(link), mounted: () => mounted });
     history.replaceState(undefined, "", "?machine=order&focus=%40payment");
     dispatchEvent(new PopStateEvent("popstate"));
     history.replaceState(undefined, "", "?");
     dispatchEvent(new PopStateEvent("popstate"));
+    mounted = false;
+    dispatchEvent(new PopStateEvent("popstate"));
     expect(links).toEqual([{ machine: "order", focus: ["@payment"] }, { focus: [] }]);
+  });
+
+  test("a page that mounts its viewer again hands Back to the new viewer only", () => {
+    history.replaceState(undefined, "", "?machine=order");
+    const told: string[] = [];
+    const root = document.createElement("div");
+    document.body.append(root);
+    for (const name of ["first", "second"]) {
+      mountViewer(root, oneState, {
+        followFocus: (follower) =>
+          linkOptions().followFocus?.({ ...follower, follow: () => told.push(name) }),
+      });
+    }
+    dispatchEvent(new PopStateEvent("popstate"));
+    root.remove();
+    dispatchEvent(new PopStateEvent("popstate"));
+    expect(told).toEqual(["second"]);
   });
 });

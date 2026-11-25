@@ -7,6 +7,12 @@ export interface FocusLink {
   focus: string[];
 }
 
+/** What a viewer hands the host to follow a link's path: `mounted` turns false once the viewer is gone or drawn again on its root, and then `follow` does nothing. */
+export interface FocusFollower {
+  follow: (link: FocusLink) => void;
+  mounted: () => boolean;
+}
+
 /** Why the viewer tells the host where it is. */
 export type NavigatedBy = "path" | "walk" | "link";
 
@@ -37,8 +43,8 @@ export interface ViewerOptions {
     payloads: string[];
     focus: string[];
   }) => void;
-  /** Hands the viewer a way to move along its path to a link's, e.g. on the browser's Back and Forward. It never changes the walk. */
-  followFocus?: (follow: (link: FocusLink) => void) => void;
+  /** Takes the viewer's way to move along its path to a link's, e.g. on the browser's Back and Forward. It never changes the walk. The host drops a follower that is no longer `mounted`. */
+  followFocus?: (follower: FocusFollower) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
   /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state, or, while a state is selected, for that state as a throwaway copy reaches it. */

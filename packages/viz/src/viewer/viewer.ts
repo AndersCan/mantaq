@@ -19,6 +19,9 @@ import { renderPanel } from "./panel.ts";
 import { sendFor } from "./mount/send-details.ts";
 import type { ViewerOptions } from "./mount/viewer-options.ts";
 
+/** The latest mount on each root: a viewer drawn again on the same root replaces the one before. */
+const mounts = new WeakMap<HTMLElement, object>();
+
 /**
  * Mount a viewer for an viz document into `root`. With a `driver` the walk runs
  * the real actor; without one the viewer draws the diagram and Details only.
@@ -48,9 +51,17 @@ export function mountViewer(
   listenEscape(root, { escape: () => redraws.escape(), opened });
   listenFullscreen(root);
   watchDriver(view, { driver, redraw: () => redraws.redraw() });
-  options.followFocus?.((link) => {
-    const other = link.machine !== undefined && link.machine !== first?.id;
-    if (root.isConnected && !other) redraws.follow(link.focus);
+  const mount = {};
+  mounts.set(root, mount);
+  function mounted(): boolean {
+    return root.isConnected && mounts.get(root) === mount;
+  }
+  options.followFocus?.({
+    follow: (link) => {
+      const other = link.machine !== undefined && link.machine !== first?.id;
+      if (mounted() && !other) redraws.follow(link.focus);
+    },
+    mounted,
   });
   function showControls(): void {
     view.diagramOnly = false;
