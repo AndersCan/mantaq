@@ -20,7 +20,7 @@ export function payloadSetter(context: PayloadSetterContext): (edit: PayloadEdit
   return (edit) => {
     view.payloads = withEdit(view.payloads, edit);
     view.blockedFor = undefined;
-    navigated(options, { machine, view });
+    navigated(options, { machine, view, by: "walk" });
     mark();
   };
 }
