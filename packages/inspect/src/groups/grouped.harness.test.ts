@@ -3,7 +3,7 @@ import { Either } from "@mantaq/utils";
 import { join } from "node:path";
 import { openViz } from "../harness.ts";
 
-test("walks a grouped machine through a group by the arrows of its folded diagram", async () => {
+test("the harness sends from a folded group node: into a group, inside it and out", async () => {
   const opened = await openViz({ file: join(import.meta.dirname, "../fixtures/grouped.ts") });
   const viz = Either.getRight(opened);
   if (viz === undefined) throw new Error(String(Either.getLeft(opened)));
