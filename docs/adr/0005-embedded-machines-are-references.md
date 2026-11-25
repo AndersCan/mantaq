@@ -1,6 +1,7 @@
 # 0005. Embedded machines are references, not inlined parts
 
-Status: accepted. Part of the nested-machines work (split a big machine into several machines).
+Status: superseded. Embedded machines were removed before release; replaced by viewer-only state groups.
+It was part of the nested-machines work (split a big machine into several machines).
 
 ## Context
 
