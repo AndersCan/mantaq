@@ -156,13 +156,13 @@ function stateOrArrowParts(selector: string): string[] {
   return selector.split(/[\s>+~]+/).filter((part) => /\.(state|edge)(?![\w-])/.test(part));
 }
 
-test("a pointer or a hover style on a state or an arrow needs it to be a button", () => {
+test("a pointer, a hover style or the march on a state or an arrow needs it to be a button", () => {
   const offending: string[] = [];
   for (const block of bare.split("}")) {
     const parts = block.split("{");
     const body = parts.at(-1) ?? "";
     const head = parts.at(-2) ?? "";
-    const pointer = /cursor:\s*pointer/.test(body);
+    const pointer = /cursor:\s*pointer|animation:\s*viz-march/.test(body);
     for (const selector of head.split(",").map((each) => each.trim())) {
       const looksClickable = pointer || selector.includes(":hover");
       const parts = stateOrArrowParts(selector);
