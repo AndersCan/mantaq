@@ -143,13 +143,16 @@ describe("live actor map children", () => {
     expect(rows.map((row) => row.getAttribute("data-child-key"))).toEqual(["p1", "p2"]);
     expect(root.querySelectorAll("[data-child-key][data-followed]")).toHaveLength(0);
     expect(rows[0]?.querySelector(".explore-child-now")?.textContent).toBe("p1: in sendingPhoto");
-    expect(rows[0]?.getAttribute("aria-pressed")).toBe("false");
+    expect(rows[0]?.getAttribute("role")).toBe("button");
     expect(root.querySelector("[data-send]")).toBeNull();
     root.querySelector<HTMLElement>('li[data-child-key="p2"]')?.click();
     expect(sent).toEqual([]);
     const p2 = root.querySelector('li[data-child-key="p2"]');
     expect(p2?.hasAttribute("data-followed")).toBe(true);
-    expect(p2?.getAttribute("aria-pressed")).toBe("true");
+    expect({ role: p2?.hasAttribute("role"), current: p2?.getAttribute("aria-current") }).toEqual({
+      role: false,
+      current: "true",
+    });
     expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
     expect(root.querySelector("[data-selected-edge]")).toBeNull();
   });
@@ -352,7 +355,7 @@ describe("live actor map children", () => {
     expect(walkedKey(root)).toBe("p2");
     expect(root.querySelector('[data-tab="step"]')?.getAttribute("aria-selected")).toBe("true");
     expect(
-      root.querySelector('g.child-marker[data-marker-key="p2"]')?.getAttribute("aria-pressed"),
+      root.querySelector('g.child-marker[data-marker-key="p2"]')?.getAttribute("aria-current"),
     ).toBe("true");
     pick(root, "p2");
     expect(walkedKey(root)).toBe("p2");

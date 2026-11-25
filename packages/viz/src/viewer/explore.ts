@@ -11,7 +11,7 @@ import type {
   VizOutputRoutes,
   VizStep,
 } from "../schema.ts";
-import { activatable, html, svg } from "./dom.ts";
+import { affordance, html, onButtonPress, svg } from "./dom.ts";
 import { contextView } from "./context/context-view.ts";
 import { LOCK_SLOT, textWidth } from "./layout.ts";
 import { markGroupState } from "./graph.ts";
@@ -132,8 +132,8 @@ function childrenSections(
             ]),
           ],
         );
-        li.setAttribute("aria-pressed", child.key === followed ? "true" : "false");
-        activatable(li, () => live.pick({ map, key: child.key }));
+        onButtonPress(li, { press: () => live.pick({ map, key: child.key }) });
+        affordance(li, child.key === followed ? "current" : "button");
         return li;
       });
     if (rows.length === 0) return null;

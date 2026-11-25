@@ -24,6 +24,18 @@ interface Stand {
   walk: string[];
   /** The focus path, as `?focus=` tokens. */
   focus: string[];
+  /** Set on a stand that one click reached: the viewer is mounted, that click is made, and the sweep clicks one element it brought. */
+  reached?: Reached;
+}
+
+/** A view one click reached, and the one element the sweep clicks there. */
+interface Reached {
+  /** The first click, by its index among the clickables of the fresh viewer. */
+  index: number;
+  /** The element of the first click, as reports name it. */
+  name: string;
+  /** The key of the element to click: one the first click brought. */
+  only: string;
 }
 
 /** Something wrong at a stand: a click that changed nothing visible or threw, or a walk that did not replay. */
@@ -82,16 +94,53 @@ export async function sweep(
         break;
       }
       if (click.element === undefined) continue;
-      report.clicks += 1;
-      for (const error of click.errors) fail(`${click.element} throws: ${error}`);
-      if (!click.changed) fail(`${click.element} changes nothing`);
-      const moved = { ...stand, focus: click.focus };
-      if (seen.has(standKey(moved))) continue;
-      seen.add(standKey(moved));
-      queue.push(moved);
+      for (const problem of problemsOf(click, { name: click.element })) fail(problem);
+      report.clicks += click.again === "none" ? 1 : 2;
+      for (const next of nextStands(stand, { click, index })) {
+        if (seen.has(standKey(next))) continue;
+        seen.add(standKey(next));
+        queue.push(next);
+      }
     }
   }
   return report;
+}
+
+interface ClickedOptions {
+  /** The element clicked, as reports name it. */
+  name: string;
+}
+
+/** What went wrong with one click: what it threw, and a click, or a second click, that changed nothing. */
+function problemsOf(click: Click, options: ClickedOptions): string[] {
+  const { name } = options;
+  const problems: string[] = [];
+  for (const error of click.errors) problems.push(`${name} throws: ${error}`);
+  if (!click.changed) problems.push(`${name} changes nothing`);
+  if (click.again === "unchanged") problems.push(`${name} changes nothing on a second click`);
+  return problems;
+}
+
+interface NextOptions {
+  click: Click;
+  index: number;
+}
+
+/** Where a click leads the sweep: a new focus path or layout is a stand of its own. After a first click that changed the view, each element it brought is clicked from there. */
+function nextStands(stand: Stand, options: NextOptions): Stand[] {
+  const { click, index } = options;
+  const moved = click.focus.join("\n") !== stand.focus.join("\n");
+  if (moved || click.layout !== stand.layout) {
+    return [{ ...stand, focus: click.focus, layout: click.layout, reached: undefined }];
+  }
+  const firstClick = stand.reached === undefined && click.changed;
+  const name = click.element;
+  if (!firstClick || name === undefined) return [];
+  const stands: Stand[] = [];
+  for (const key of click.after) {
+    if (!click.before.includes(key)) stands.push({ ...stand, reached: { index, name, only: key } });
+  }
+  return stands;
 }
 
 /** What the reader of a failure does about it. */
@@ -104,8 +153,9 @@ export function failureLines(report: SweepReport): string[] {
     const { stand } = failure;
     const walk = stand.walk.join(", ");
     const focus = stand.focus.join(" > ");
+    const after = stand.reached === undefined ? "" : `, after a click on ${stand.reached.name}`;
     lines.push(
-      `${failure.machine}: walk [${walk}], ${stand.driving}, ${stand.layout}, focus [${focus}]: ${failure.problem}. ${FIX}`,
+      `${failure.machine}: walk [${walk}], ${stand.driving}, ${stand.layout}, focus [${focus}]${after}: ${failure.problem}. ${FIX}`,
     );
   }
   return lines;
@@ -139,8 +189,9 @@ function walkPrefixes(walks: SweepCase["walks"]): string[][] {
   return prefixes;
 }
 
+/** Stands that click the same brought element, whichever first click brought it, are one. */
 function standKey(stand: Stand): string {
-  return JSON.stringify(stand);
+  return JSON.stringify({ ...stand, reached: stand.reached?.only });
 }
 
 interface MountAtOptions {
@@ -220,19 +271,30 @@ interface Click {
   element: string | undefined;
   /** Whether the text or a shown attribute of the viewer changed. */
   changed: boolean;
+  /** What a second click on the same element did, when the first changed the view and left the focus path: "none" when it was not made. */
+  again: "changed" | "unchanged" | "none";
   /** What the click threw, from the window's error events. */
   errors: string[];
   focus: string[];
+  layout: Stand["layout"];
   replayed: number;
+  /** The keys of the elements that looked clickable before the click. */
+  before: string[];
+  /** The keys of the elements that looked clickable after it. */
+  after: string[];
 }
 
 const NO_CLICK: Click = {
   count: 0,
   element: undefined,
   changed: false,
+  again: "none",
   errors: [],
   focus: [],
+  layout: "with panel",
   replayed: 0,
+  before: [],
+  after: [],
 };
 
 function errorText(event: unknown): string {
@@ -244,26 +306,78 @@ async function clickAt(sweepCase: SweepCase, at: ClickAtOptions): Promise<Click>
   const root = rootIn(window);
   if (root === undefined) return NO_CLICK;
   const mounted = mountAt(sweepCase, { ...at, root });
-  const found = clickables(mounted.root);
-  const element = found[at.index];
   const errors: string[] = [];
   window.addEventListener("error", (event) => errors.push(errorText(event)));
+  const found = reach(mounted.root, { reached: at.stand.reached });
+  const element = found[at.index];
   const before = sight(mounted.root);
   const name = element === undefined ? undefined : nameOf(element);
-  element?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  const keys = keysOf(found);
+  clickOn(element);
+  const changed = sight(mounted.root) !== before;
+  const focus = mounted.focus();
+  const after = keysOf(clickables(mounted.root));
+  const layout = mounted.root.classList.contains("diagram-only") ? "diagram only" : "with panel";
+  const samePath = focus.join("\n") === at.stand.focus.join("\n");
+  const stayed = changed && samePath && layout === at.stand.layout;
+  const key = keys[at.index];
+  const again = stayed && key !== undefined ? clickAgain(mounted.root, { key }) : "none";
   const click: Click = {
     count: found.length,
     element: name,
-    changed: sight(mounted.root) !== before,
+    changed,
+    again,
     errors,
-    focus: mounted.focus(),
+    focus,
+    layout,
     replayed: mounted.replayed,
+    before: keys,
+    after,
   };
   await window.happyDOM.close();
   return click;
 }
 
-/** The elements that look clickable. The open tab is left out: it is the current choice, like the current crumb, and shows no pointer. */
+function keysOf(elements: ReadonlyArray<Element>): string[] {
+  const keys: string[] = [];
+  for (const element of elements) keys.push(keyOf(element));
+  return keys;
+}
+
+interface AgainOptions {
+  key: string;
+}
+
+/** Clicks the element with `key` once more, when it still looks clickable. */
+function clickAgain(root: HTMLElement, options: AgainOptions): Click["again"] {
+  const element = clickables(root).find((each) => keyOf(each) === options.key);
+  if (element === undefined) return "none";
+  const before = sight(root);
+  clickOn(element);
+  return sight(root) === before ? "unchanged" : "changed";
+}
+
+interface ReachOptions {
+  reached: Reached | undefined;
+}
+
+function clickOn(element: Element | undefined): void {
+  element?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+}
+
+/** The elements to click at a stand: every clickable one, or, after the stand's first click, the one element it brought. */
+function reach(root: HTMLElement, options: ReachOptions): Element[] {
+  const { reached } = options;
+  if (reached === undefined) return clickables(root);
+  clickOn(clickables(root)[reached.index]);
+  const found: Element[] = [];
+  for (const element of clickables(root)) {
+    if (keyOf(element) === reached.only) found.push(element);
+  }
+  return found;
+}
+
+/** The elements that look clickable. The current choice is left out: the open tab, the current crumb, and an element marked `aria-current` that is no button. Each keeps its tab stop but shows no pointer. */
 function clickables(root: HTMLElement): Element[] {
   const found: Element[] = [];
   for (const element of root.querySelectorAll(CLICKABLE)) {
@@ -275,9 +389,10 @@ function clickables(root: HTMLElement): Element[] {
 
 function looksClickable(element: Element): boolean {
   const tabindex = element.getAttribute("tabindex");
-  const openTab =
-    element.getAttribute("role") === "tab" && element.getAttribute("aria-selected") === "true";
-  if (openTab) return false;
+  const role = element.getAttribute("role");
+  const openTab = role === "tab" && element.getAttribute("aria-selected") === "true";
+  const current = element.hasAttribute("aria-current") && role !== "button";
+  if (openTab || current) return false;
   if (element.getAttribute("role") === "button") return true;
   if (tabindex !== null && Number(tabindex) >= 0) return true;
   return element.matches("a[href], button:not([disabled])");
@@ -309,6 +424,19 @@ function sight(root: Element): string {
     }
   }
   return parts.join("");
+}
+
+/** What names an element across a click, which may change its classes: the tag and the naming attributes, else the text. */
+function keyOf(element: Element): string {
+  const labels: string[] = [element.tagName.toLowerCase()];
+  for (const name of NAMING) {
+    const label = element.getAttribute(name);
+    if (label !== null) labels.push(`[${name}="${label}"]`);
+  }
+  const selector = labels.join("");
+  if (labels.length > 1) return selector;
+  const text = (element.textContent ?? "").trim();
+  return `${selector} "${text}"`;
 }
 
 /** The tag, the classes and the naming attributes; the text only when no attribute names the element. */

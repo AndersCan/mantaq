@@ -455,14 +455,18 @@ describe("live controls", () => {
     expect(root.querySelector("[data-details-sent]")).not.toBeNull();
   });
 
-  test("a keyboard Enter on a next arrow sends and focus stays on it", () => {
+  test("a keyboard Enter on a next arrow sends, and focus goes on to an arrow that sends now", () => {
     const { root, live } = mount();
     document.body.append(root);
     const arrow = root.querySelector<SVGElement>('[data-edge-id="idle-submit-paying"]');
     arrow?.focus();
     arrow?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(live.log).toHaveLength(1);
-    expect(document.activeElement?.getAttribute("data-edge-id")).toBe("idle-submit-paying");
+    const next = root.querySelector('.graph g.edge[role="button"]');
+    expect({
+      sent: live.log.length,
+      focused: document.activeElement === next,
+      next: next?.getAttribute("data-edge-id")?.startsWith("paying-"),
+    }).toEqual({ sent: 1, focused: true, next: true });
     root.remove();
   });
 

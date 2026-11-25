@@ -3,24 +3,24 @@ import { exampleCases, fixtureCases } from "./corpus.ts";
 import { expect, test } from "vite-plus/test";
 import { failureLines, sweep } from "./sweep.ts";
 
-/** The whole corpus takes about 20 s; a case gets room for a loaded CI runner. */
+/** The whole corpus takes about 40 s; a case gets room for a loaded CI runner. */
 const CASE_TIMEOUT_MS = 120_000;
 
 /** What each case sweeps today, at least: a sweep that loses stands (focus, walks) or clicks fails. Raise a floor when the viewer offers more; lower it when a fix makes a dead element plain. */
 const FLOORS: Record<string, { stands: number; clicks: number }> = {
-  checkout: { stands: 18, clicks: 197 },
-  auth: { stands: 28, clicks: 304 },
-  saga: { stands: 36, clicks: 592 },
-  credit: { stands: 10, clicks: 105 },
-  retry: { stands: 10, clicks: 65 },
-  parts: { stands: 24, clicks: 112 },
-  teamInbox: { stands: 6, clicks: 111 },
-  uploadRegions: { stands: 6, clicks: 51 },
-  sharedGo: { stands: 8, clicks: 51 },
-  grouped: { stands: 8, clicks: 45 },
-  timed: { stands: 6, clicks: 26 },
-  lockedDoor: { stands: 6, clicks: 24 },
-  photoQueue: { stands: 6, clicks: 38 },
+  checkout: { stands: 170, clicks: 355 },
+  auth: { stands: 268, clicks: 593 },
+  saga: { stands: 554, clicks: 1155 },
+  credit: { stands: 120, clicks: 232 },
+  retry: { stands: 47, clicks: 106 },
+  parts: { stands: 74, clicks: 162 },
+  teamInbox: { stands: 141, clicks: 284 },
+  uploadRegions: { stands: 36, clicks: 81 },
+  sharedGo: { stands: 44, clicks: 88 },
+  grouped: { stands: 118, clicks: 272 },
+  timed: { stands: 21, clicks: 41 },
+  lockedDoor: { stands: 24, clicks: 42 },
+  photoQueue: { stands: 32, clicks: 82 },
 };
 
 for (const sweepCase of [...exampleCases(), ...fixtureCases()]) {

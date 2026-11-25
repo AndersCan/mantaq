@@ -1,4 +1,5 @@
 import { actingMember, realMembersOf } from "../groups/acting-member.ts";
+import { affordance } from "../dom.ts";
 import { arrowClick, arrowSend, updateBlocked } from "./arrow-send.ts";
 import { whyNoneHere } from "../blocked.ts";
 import type { ArrowClick, ArrowSendContext } from "./arrow-send.ts";
@@ -11,15 +12,33 @@ import type { PickedChild, ViewState } from "./view-state.ts";
 import type { VizEdge, VizMachine } from "../../schema.ts";
 import { currentsOf } from "../compartments.ts";
 import type { EventClick } from "./event-send.ts";
+import { outcomeText } from "../explore.ts";
 
-/** Diagram only: the line under the board says why the selected arrow sends nothing now; empty just after it moved the walk away. */
+/** Diagram only: the line under the board says what the send of the selected arrow did, by its step number, and why the arrow sends nothing now; empty when there is neither. */
 export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
   const { selection, sent } = from.view;
   const edge = from.machine.edges.find(
     (candidate) => selection?.kind === "edge" && candidate.id === selection.id,
   );
   const line = root.querySelector(".viz-main > .blocked-note");
-  if (line !== null) line.textContent = edge === undefined ? "" : whyText(from, { edge, sent });
+  if (line === null) return;
+  if (edge === undefined) {
+    line.replaceChildren();
+    return;
+  }
+  const why = whyText(from, { edge, sent });
+  const step = sent?.edge === edge.id ? stepLine(root.ownerDocument, from) : [];
+  const gap = step.length > 0 && why !== "" ? ". " : "";
+  line.replaceChildren(...step, gap, why);
+}
+
+/** What the newest step did: `Step 3: take: stayed in cart`. The number tells one send from the next. */
+function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
+  const { live } = from.view;
+  const last = live?.last;
+  if (!live || !last) return [];
+  const number = live.steps.length;
+  return [`Step ${number}: `, ...outcomeText(doc, from.machine, last)];
 }
 
 interface WhyTextOptions {
@@ -43,6 +62,7 @@ function whyText(from: ArrowSendContext, options: WhyTextOptions): string {
 }
 
 export interface DrawHandlers {
+  root: HTMLElement;
   shown: VizMachine;
   openDetails: (selection: Selection) => void;
   sendEvent: (click: EventClick) => void;
@@ -62,6 +82,7 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
       if (edge === undefined || click.kind !== "send") return;
       view.selection = selection;
       handlers.sendEvent({ event: edge.event, actor: click.actor, edge: edge.id });
+      focusOnAfterSend(handlers.root, { arrow: clicked.id });
     },
   };
   if (view.diagramOnly) return callbacks;
@@ -69,6 +90,26 @@ export function drawCallbacks(from: ArrowSendContext, handlers: DrawHandlers): G
     handlers.openDetails(memberSelection({ kind: "edge", id }, members));
   };
   return callbacks;
+}
+
+interface SentArrow {
+  /** The `data-edge-id` of the drawn arrow sent. */
+  arrow: string;
+}
+
+/** Keyboard traversal goes on after a send: an arrow that had focus and sends nothing now hands it to the first arrow that sends, else to the node of the current state. */
+function focusOnAfterSend(root: HTMLElement, options: SentArrow): void {
+  const arrow = root.querySelector(`.graph g.edge[data-edge-id="${CSS.escape(options.arrow)}"]`);
+  const focused = arrow !== null && root.ownerDocument.activeElement === arrow;
+  if (!focused || arrow.getAttribute("role") === "button") return;
+  const next =
+    root.querySelector<SVGGElement>('.graph g.edge[role="button"]') ??
+    root.querySelector<SVGGElement>(".graph g.state.current[data-node-id]");
+  if (next === null) return;
+  // A plain node takes focus only with a tabindex; -1 keeps it out of the tab order.
+  if (!next.hasAttribute("tabindex")) next.setAttribute("tabindex", "-1");
+  next.focus({ preventScroll: true });
+  affordance(arrow, "plain");
 }
 
 export interface DrawnArrowOptions {

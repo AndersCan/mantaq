@@ -204,13 +204,16 @@ describe("with only the diagram shown", () => {
     });
   });
 
-  test("a click that sends leaves the line empty", () => {
+  test("a click that sends says the step it took, so a second send of a loop shows too", () => {
     const { driver, sent } = fakeDriver();
     const root = mountDiagram(driver);
     clickArrow(root, "cart-addItem-cart");
-    expect({ sent: sent.map(eventName), line: line(root)?.textContent }).toEqual({
-      sent: ["addItem"],
-      line: "",
+    const first = line(root)?.textContent;
+    clickArrow(root, "cart-addItem-cart");
+    expect({ sent: sent.map(eventName), first, second: line(root)?.textContent }).toEqual({
+      sent: ["addItem", "addItem"],
+      first: "Step 1: addItem: cart → cart",
+      second: "Step 2: addItem: cart → cart",
     });
   });
 

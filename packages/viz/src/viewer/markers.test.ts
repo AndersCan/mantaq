@@ -95,9 +95,16 @@ describe("drawChildMarkers", () => {
       root,
       context([child("w1", "s0"), child("w2", "s0")], { picked: picked[0] ?? null }),
     );
-    expect(markers(root).map((each) => each.getAttribute("aria-pressed"))).toEqual([
-      "false",
-      "true",
+    const looks: Array<{ button: boolean; current: boolean }> = [];
+    for (const marker of markers(root)) {
+      looks.push({
+        button: marker.getAttribute("role") === "button",
+        current: marker.getAttribute("aria-current") === "true",
+      });
+    }
+    expect(looks).toEqual([
+      { button: true, current: false },
+      { button: false, current: true },
     ]);
   });
 

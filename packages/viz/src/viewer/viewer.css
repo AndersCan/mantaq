@@ -236,8 +236,11 @@
 }
 
 .viz .edge-help {
-  cursor: pointer;
   outline: none;
+}
+
+.viz .edge-help[role="button"] {
+  cursor: pointer;
 }
 
 .viz .edge-help .ring {
@@ -583,8 +586,11 @@
 }
 
 .viz .child-marker {
-  cursor: pointer;
   outline: none;
+}
+
+.viz .child-marker[role="button"] {
+  cursor: pointer;
 }
 
 .viz .child-marker .marker-hit {
@@ -604,7 +610,7 @@
   stroke: none;
 }
 
-.viz .child-marker[aria-pressed="true"] rect:not(.marker-hit) {
+.viz .child-marker[aria-current="true"] rect:not(.marker-hit) {
   stroke: var(--select);
   stroke-width: 2;
 }

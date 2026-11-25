@@ -171,7 +171,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     }
   }
   function callbacks(): GraphCallbacks {
-    const handlers = { shown: shown(), openDetails, sendEvent };
+    const handlers = { root, shown: shown(), openDetails, sendEvent };
     return drawCallbacks({ machine, view, driver }, handlers);
   }
   function moved(move: FocusMove): void {

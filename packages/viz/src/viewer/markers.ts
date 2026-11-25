@@ -1,8 +1,8 @@
-import type { VizLiveChild } from "../schema.ts";
+import { affordance, svg } from "./dom.ts";
 import { compareKeys, localName } from "./compartments.ts";
-import { svg } from "./dom.ts";
-import { textWidth } from "./layout.ts";
 import type { Queue } from "./queue.ts";
+import { textWidth } from "./layout.ts";
+import type { VizLiveChild } from "../schema.ts";
 
 export interface MarkerContext {
   children: ReadonlyArray<VizLiveChild>;
@@ -119,11 +119,11 @@ function shapeOf(doc: Document, item: Item): SVGElement[] {
 }
 
 function wire(marker: SVGGElement, live: Live): void {
-  const act = () => {
+  function act(): void {
     const item = live.kept.get(marker);
-    if (item === undefined) return;
+    if (item === undefined || marker.getAttribute("role") !== "button") return;
     live.context.onPick({ map: item.child.map, key: item.child.key });
-  };
+  }
   marker.addEventListener("click", (event) => {
     event.stopPropagation();
     act();
@@ -183,8 +183,7 @@ function drawMarker(live: Live, layer: SVGGElement, item: Item): void {
   const doc = layer.ownerDocument;
   const id = idOf(item.child);
   const existing = live.elements.get(id);
-  const marker =
-    existing instanceof SVGGElement ? existing : svg(doc, "g", { role: "button", tabindex: "0" });
+  const marker = existing instanceof SVGGElement ? existing : svg(doc, "g");
   if (existing === undefined) {
     wire(marker, live);
     live.elements.set(id, marker);
@@ -196,10 +195,8 @@ function drawMarker(live: Live, layer: SVGGElement, item: Item): void {
   marker.setAttribute("data-marker-map", item.child.map);
   marker.setAttribute("data-marker-key", item.child.key);
   marker.setAttribute("data-marker-state", item.state);
-  marker.setAttribute(
-    "aria-pressed",
-    String(context.picked?.map === item.child.map && context.picked.key === item.child.key),
-  );
+  const followed = context.picked?.map === item.child.map && context.picked.key === item.child.key;
+  affordance(marker, followed ? "current" : "button");
   marker.setAttribute("aria-label", `${named}, in ${localName(item.state)}`);
   place(marker, item);
   marker.replaceChildren(svg(doc, "title", {}, [named]), ...shapeOf(doc, item));

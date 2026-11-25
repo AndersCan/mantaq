@@ -49,20 +49,27 @@ export function activatable(element: Element, onActivate: () => void): void {
   affordance(element, "button");
 }
 
-/** How an element shows a click: as a button (pointer, tab stop, `role=button`), or plain. */
-export type Affordance = "button" | "plain";
+/** How an element shows a click: as a button (pointer, tab stop, `role=button`), plain, or the current choice (a tab stop, `aria-current`, no pointer). */
+export type Affordance = "button" | "plain" | "current";
 
-/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order. */
+/** Shows an element as a button only where a click on it does something visible. A plain element that has focus keeps it, but leaves the tab order. The current choice, which a click would only choose again, keeps its tab stop like the open tab. */
 export function affordance(element: Element, look: Affordance): void {
   switch (look) {
     case "button":
       element.setAttribute("tabindex", "0");
       element.setAttribute("role", "button");
+      element.removeAttribute("aria-current");
       return;
     case "plain":
       element.removeAttribute("role");
+      element.removeAttribute("aria-current");
       if (element.ownerDocument.activeElement === element) element.setAttribute("tabindex", "-1");
       else element.removeAttribute("tabindex");
+      return;
+    case "current":
+      element.setAttribute("tabindex", "0");
+      element.removeAttribute("role");
+      element.setAttribute("aria-current", "true");
       return;
     default:
       return isNever(look);
