@@ -299,7 +299,7 @@ describe("mountDriven arrows that land elsewhere", () => {
 });
 
 describe("mountDriven stateRouting", () => {
-  test("an arrow that stays in first is locked, says where it stays, and a click sends it", async () => {
+  test("an arrow that stays in first is locked, says where it stays, and a click sends nothing", async () => {
     const inspected = await inspectModule(
       join(import.meta.dirname, "fixtures", "state-routing.ts"),
       {
@@ -324,14 +324,20 @@ describe("mountDriven stateRouting", () => {
       root.querySelector<SVGGElement>(`.graph g[data-edge-id$="-back-${to}"]`);
     expect(arrow("second")?.querySelector(".blocked-lock")).not.toBeNull();
     arrow("second")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const id = arrow("second")?.getAttribute("data-edge-id") ?? "";
+    root
+      .querySelector(`[data-details-edge="${id}"]`)
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect({
       note: root.querySelector("[data-blocked-note]")?.textContent,
+      title: arrow("second")?.querySelector(":scope > title")?.textContent,
       current: root.querySelector(".explore")?.getAttribute("data-current"),
-      sent: root.querySelector("[data-details-sent]")?.textContent,
+      steps: root.querySelectorAll(".explore-run > li").length,
     }).toEqual({
       note: "back stays in first, not second",
+      title: "back stays in first, not second",
       current: "first",
-      sent: "Sent back: stayed in first",
+      steps: 0,
     });
     expect(arrow("first")?.querySelector(".blocked-lock")).toBeNull();
     arrow("first")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));

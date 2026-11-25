@@ -144,7 +144,8 @@ describe("viewer: checkout", () => {
 
   test("an undetermined arrow's Details title says ?, never a guessed target", () => {
     const root = mount(undeterminedBack(checkout()));
-    root.querySelector(".edge.undetermined")?.dispatchEvent(new Event("click"));
+    const id = root.querySelector(".edge.undetermined")?.getAttribute("data-edge-id") ?? "";
+    root.querySelector(`[data-details-edge="${id}"]`)?.dispatchEvent(new Event("click"));
     expect(root.querySelector(".details h2")?.textContent).toMatch(/—back→ \?$/);
   });
 

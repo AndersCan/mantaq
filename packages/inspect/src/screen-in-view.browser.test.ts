@@ -61,7 +61,7 @@ test("the Screen tab is exempt from the Step panel's quarter-window cap", async 
   await page.close();
 }, 60_000);
 
-test("an arrow's ? and a refused arrow click leave the page where it is", async () => {
+test("an arrow's ? and a click on an arrow that cannot be sent leave the page where it is", async () => {
   const page = await browser.newPage({ viewport: { width: 1400, height: 800 } });
   await page.goto(`${origin}/__mantaq/?machine=tall`);
   const scrollY = () => page.evaluate(() => window.scrollY);
@@ -96,6 +96,10 @@ test("an arrow's ? and a refused arrow click leave the page where it is", async 
   await page.mouse.click(refused.x, refused.y);
   await page.waitForTimeout(300);
   expect(await scrollY()).toBe(refusedBefore);
-  expect(await page.locator("[data-blocked-note]").innerText()).toContain("can't be sent");
+  const label = { name: "hub on go15 to leaf15", exact: true };
+  expect({
+    arrows: await page.getByLabel(label.name, { exact: true }).count(),
+    buttons: await page.getByRole("button", label).count(),
+  }).toEqual({ arrows: 1, buttons: 0 });
   await page.close();
 }, 60_000);
