@@ -150,15 +150,24 @@ interface Band {
   end: number;
 }
 
+/** How much of the window's top the page covers, as with a sticky header: its `scroll-padding-top`. */
+function coveredTop(root: HTMLElement): number {
+  const doc = root.ownerDocument;
+  const style = doc.defaultView?.getComputedStyle(doc.documentElement);
+  return Number.parseFloat(style?.scrollPaddingTop ?? "") || 0;
+}
+
+/** The band of the canvas on screen; the whole canvas while none of it is on screen, so it still scrolls for when the reader gets there. */
 function bandOf(root: HTMLElement, canvas: HTMLElement): Band {
   const box = canvas.getBoundingClientRect();
   const top = canvas.clientTop + box.top;
+  const bottom = top + canvas.clientHeight;
   const view = root.ownerDocument.defaultView?.innerHeight ?? 0;
   const bar = root.querySelector(".viz-bar")?.getBoundingClientRect().bottom ?? 0;
   const panel = root.querySelector(".panel")?.getBoundingClientRect().top ?? view;
-  const start = Math.max(top, bar, 0);
-  const end = Math.min(top + canvas.clientHeight, panel, view);
-  return { top, start, end };
+  const start = Math.max(top, bar, coveredTop(root));
+  const end = Math.min(bottom, panel, view);
+  return end > start ? { top, start, end } : { top, start: top, end: bottom };
 }
 
 interface TopOptions {

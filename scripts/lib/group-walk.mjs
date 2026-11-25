@@ -101,14 +101,17 @@ function framing() {
 /** What `framing` must find. */
 const FRAMED = JSON.stringify({ panel: "below the canvas", fullScreen: 1 });
 
-/** Runs in the page: whether the reader sees `element` without scrolling the canvas it is drawn in. */
+/** Runs in the page: whether the reader sees `element` without scrolling the canvas it is drawn in, and not under the page's sticky header (its `scroll-padding-top`). */
 function inCanvasView(element) {
   const canvas = element.closest(".canvas");
   if (canvas === null) return true;
   const box = canvas.getBoundingClientRect();
   const rect = element.getBoundingClientRect();
+  const covered =
+    Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
   const across = rect.left >= box.left && rect.right <= box.left + canvas.clientWidth;
-  return across && rect.top >= box.top && rect.bottom <= box.top + canvas.clientHeight;
+  const below = rect.top >= Math.max(box.top, covered);
+  return across && below && rect.bottom <= box.top + canvas.clientHeight;
 }
 
 /** Runs in the page: whether the canvas scrolls sideways. */
