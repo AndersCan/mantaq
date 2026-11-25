@@ -3,7 +3,11 @@
 // diagram has arrows, on events a click on `eat` moves the walk to `full`, and on guards the
 // blocked `eat` arrow at 0 plates is no button and its hover title says why, on timers
 // `cook`, then the `overcooked` arrow (a click sends it now), brings the walk back to `hungry`.
+// Then it clicks every element of every viewer on every built page that looks clickable
+// (a pointer cursor or role=button), on a fresh load each, and fails when a click changes
+// nothing; a dead button planted on one page must be caught, so a weakened sweep fails too.
 // Run after the docs build: node scripts/docs-live-check.mjs
+import { clickFailures } from "./lib/viewer-sweep.mjs";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -117,6 +121,9 @@ try {
 }
 await pool.close();
 
+const clicks = await clickFailures({ browser, origin, base, dist, mustSweep: pages });
+failures.push(...clicks.failures);
+
 await browser.close();
 server.close();
 if (failures.length > 0) {
@@ -124,3 +131,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(`docs-live-check: ${pages.length} Getting started pages and the pool box run live`);
+console.log(`docs-live-check: ${clicks.summary}`);

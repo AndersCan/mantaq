@@ -135,6 +135,11 @@
   color: var(--fg);
   border-bottom-color: var(--fg);
   font-weight: 600;
+  cursor: default;
+}
+
+.viz .tab-strip [role="tab"][aria-selected="true"]:hover {
+  background: none;
 }
 
 .viz .tab-panel {
