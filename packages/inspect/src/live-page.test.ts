@@ -489,6 +489,35 @@ describe("mountDriven with several machines", () => {
   });
 });
 
+describe("mountDriven with an embedded machine", () => {
+  /** checkout, then `inner`, which only `second` embeds (in its first state), then `second`. */
+  async function embedText(): Promise<string> {
+    const doc = JSON.parse(await documentText());
+    const [checkout] = doc.machines;
+    const [first, ...rest] = checkout.states;
+    const second = { ...checkout, id: "second", states: [{ ...first, machine: "inner" }, ...rest] };
+    doc.machines = [checkout, { ...checkout, id: "inner" }, second];
+    return JSON.stringify(doc);
+  }
+
+  test("the picker lists the machines a walk starts from; entering reaches the embedded one", async () => {
+    history.replaceState(undefined, "", "?machine=second");
+    const root = document.createElement("div");
+    mountDriven(root, { source: "test", text: await embedText(), targets: {} });
+    const picked = [...root.querySelectorAll("nav.machines button")].map((b) => b.textContent);
+    root.querySelector(".machine-enter")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect({
+      picked,
+      drawn: root.querySelector(".canvas svg")?.getAttribute("aria-label"),
+      focus: new URLSearchParams(location.search).getAll("focus"),
+    }).toStrictEqual({
+      picked: ["checkout", "second"],
+      drawn: "machine inner",
+      focus: ["basicInfo"],
+    });
+  });
+});
+
 describe("mountDriven walk ownership", () => {
   const create = () => {
     const clock = VirtualClock();

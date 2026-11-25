@@ -1,7 +1,7 @@
 /**
  * The live page of the Vite plugin: the served document, with each machine
  * that has a target running for real behind the viewer. The walk lives in the
- * address bar (`?machine=&step=`), so a redraw after a save replays it on the
+ * address bar (`?machine=&step=&focus=`), so a redraw after a save replays it on the
  * new code.
  */
 import { mountViewer, showIssues } from "@mantaq/viz/viewer";
@@ -16,9 +16,27 @@ import type { ViewerOptions } from "@mantaq/viz/viewer";
 
 export type LiveTargets = Readonly<Record<string, FuzzTarget["create"]>>;
 
-/** A document holding `machine` and the machines it embeds, so the viewer shows the machine its driver runs. */
+/** The machines a state of another machine embeds. */
+function embeddedIds(viz: VizDocument): Set<string> {
+  const ids = new Set<string>();
+  for (const machine of viz.machines) {
+    for (const state of machine.states) {
+      if (state.machine !== undefined) ids.add(state.machine);
+    }
+  }
+  return ids;
+}
+
+/** The machines a walk starts from: those no other machine embeds. Entering reaches the rest. */
+function startable(viz: VizDocument): VizDocument["machines"] {
+  const embedded = embeddedIds(viz);
+  return viz.machines.filter((machine) => !embedded.has(machine.id));
+}
+
+/** A document holding `machine` and the machines it embeds, so the viewer shows the machine its driver runs and entering finds the rest. */
 function only(viz: VizDocument, machine: string | null): VizDocument {
-  const chosen = viz.machines.find((each) => each.id === machine) ?? viz.machines[0];
+  const chosen =
+    viz.machines.find((each) => each.id === machine) ?? startable(viz)[0] ?? viz.machines[0];
   return {
     ...viz,
     machines: chosen === undefined ? [] : machineWithEmbeds(viz, { machine: chosen }),
@@ -109,6 +127,32 @@ function screenOption(context: {
     : {};
 }
 
+interface PickerOptions {
+  listed: VizDocument["machines"];
+  /** The machine shown; its button is disabled. */
+  id: string;
+  select: (machine: string) => void;
+}
+
+/** The machines a walk starts from, one button each; none when only the shown one is listed. */
+function pickerOf(doc: Document, options: PickerOptions): HTMLElement[] {
+  const { listed, id } = options;
+  if (listed.length === 1 && listed[0]?.id === id) return [];
+  if (listed.length === 0) return [];
+  const bar = doc.createElement("nav");
+  bar.className = "machines";
+  bar.setAttribute("aria-label", "Machines");
+  for (const machine of listed) {
+    const button = doc.createElement("button");
+    button.type = "button";
+    button.textContent = machine.id;
+    button.disabled = machine.id === id;
+    button.addEventListener("click", () => options.select(machine.id));
+    bar.append(button);
+  }
+  return [bar];
+}
+
 /** Mount the document at `text`; machines with a target run live, the rest show the diagram and Details only. */
 export function mountDriven(
   root: HTMLElement,
@@ -138,7 +182,7 @@ export function mountDriven(
   const shown = only(viz, options.machine ?? null);
   const id = shown.machines[0]?.id ?? "";
   const create = liveCreate(context.targets, id);
-  const picker = viz.machines.length > 1;
+  const listed = startable(viz);
   function select(machine: string): void {
     const next = new URLSearchParams(location.search);
     next.set("machine", machine);
@@ -146,24 +190,13 @@ export function mountDriven(
     next.delete("run");
     next.delete("value");
     next.delete("payload");
+    next.delete("focus");
     history.replaceState(null, "", `?${next.toString()}`);
     mountDriven(root, context);
   }
   const doc = root.ownerDocument;
-  const bar = doc.createElement("nav");
-  bar.className = "machines";
-  if (picker) {
-    for (const machine of viz.machines) {
-      const button = doc.createElement("button");
-      button.type = "button";
-      button.textContent = machine.id;
-      button.disabled = machine.id === id;
-      button.addEventListener("click", () => select(machine.id));
-      bar.append(button);
-    }
-  }
   const viewer = doc.createElement("div");
-  root.replaceChildren(...(picker ? [bar] : []), viewer);
+  root.replaceChildren(...pickerOf(doc, { listed, id, select }), viewer);
   const driver = liveDriver(id, create, context.effectMode);
   mountViewer(viewer, shown, {
     ...options,
@@ -171,7 +204,7 @@ export function mountDriven(
     ...(driver === undefined ? {} : { driver }),
     ...screenOption({ doc, preview: context.preview, id }),
     ...(context.diagramOnly === true ? { diagramOnly: true } : {}),
-    ...(id === viz.machines[0]?.id ? pageRun(context.run, options) : {}),
+    ...(id === listed[0]?.id ? pageRun(context.run, options) : {}),
   });
 }
 
