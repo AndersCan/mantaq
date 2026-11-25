@@ -496,4 +496,63 @@ describe("embed forward", () => {
       },
     });
   });
+
+  test("a forwarded input keeps its payload", () => {
+    const waiting = state("waiting")();
+    const rated = state("rated")().final();
+    const rate = event("rate")<{ score: number }>();
+    const ratingDone = event("ratingDone")();
+    const ratingBroke = event("ratingBroke")();
+    const ratingChanged = event("ratingChanged")<Snapshot>();
+    const rating = machine("rating", {
+      create: ({ clock }) =>
+        Actor({
+          inputs: [rate],
+          states: [waiting, rated],
+          initial: waiting,
+          context: { score: 0 },
+          clock,
+          setup: (builder) => {
+            builder.on(waiting, {
+              event: rate,
+              to: [rated],
+              handler: (sent, { context }) => {
+                context.set({ score: sent.payload.score });
+                return { state: rated };
+              },
+            });
+          },
+        }),
+    });
+    const kept: unknown[] = [];
+    const actor = Actor({
+      inputs: [rate],
+      internal: [ratingDone, ratingBroke, ratingChanged],
+      states: [saving, saved],
+      initial: saving,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        embed(builder, {
+          in: saving,
+          machine: rating,
+          done: { rated: ratingDone },
+          error: ratingBroke,
+          forward: [rate],
+          snapshot: ratingChanged,
+        });
+        builder.on(saving, {
+          event: ratingChanged,
+          handler: (changed) => void kept.push(changed.payload.context),
+        });
+        builder.on(saving, { event: ratingDone, to: [saved], handler: () => ({ state: saved }) });
+      },
+    });
+
+    actor.send(rate.create({ score: 3 }));
+
+    expect({ state: actor.state.name, kept }).toEqual({
+      state: "saved",
+      kept: [{ score: 0 }, { score: 3 }],
+    });
+  });
 });

@@ -76,7 +76,7 @@ type ForwardFits<Forward extends readonly AnyEventRef[], Built> = [
   ? unknown
   : { readonly inputsTheChildDoesNotTake: RefusedInputOf<Forward, Built> };
 
-/** A `never`-shaped field asks for an output whose payload takes every child snapshot. */
+/** A `never`-shaped field asks for an internal event whose payload takes every child snapshot. */
 type SnapshotFits<Changed, Built> =
   Changed extends EventRef<string, infer Payload>
     ? [ChildSnapshotOf<Built>] extends [Payload]
@@ -162,7 +162,7 @@ export function embed<
     const child = actorOf(machine.create({ clock }));
     running = child;
     input.signal.addEventListener("abort", () => {
-      running = undefined;
+      if (running === child) running = undefined;
       child.dispose();
     });
     child.on("output", { fn: (event) => input.emit(event) });

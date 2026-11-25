@@ -364,7 +364,7 @@ Embed registers a parent handler for each forwarded event in `in`. The handler k
 
 The child handles a forwarded event before the parent handler returns. So when the child ends on a forwarded event, the parent handles the `done` event first. Transition subscribers of the parent see the `done` transition first, then the forwarded event, with `to` set to the state that the `done` event entered.
 
-Embed sends `uploadChanged` to the parent when the child is built and again after each change of the child. Its payload is the snapshot of the child. The parent must handle it in `in`, as for any internal event. Here the handler keeps the snapshot in the context of the parent. So `editor.snapshot().context.upload` always holds the last child snapshot, also for a subscriber that starts late. The UI shows the retry and dismiss buttons when its path is `["couldNotUpload"]`. Dev tools read the same field. After the parent leaves `saving`, the field keeps the last snapshot of the child.
+Embed sends `uploadChanged` to the parent when the child is built and again after each change of the child. Its payload is the snapshot of the child. The parent must handle it in `in`, as for any internal event. Here the handler keeps the snapshot in the context of the parent. So `editor.snapshot().context.upload` always holds the last child snapshot, also for a subscriber that starts late. The UI shows the retry and dismiss buttons when the parent is in `saving` and the path of the child is `["couldNotUpload"]`. After the parent leaves `saving`, the field keeps the last snapshot of the child, so the UI must also check the state of the parent.
 
 The types also require these things:
 
@@ -459,7 +459,7 @@ interface Embedded {
 }
 ```
 
-A live tool sends a forwarded event to the parent, as the UI does. It reads the child state where the parent keeps the `snapshot` event, usually in the context of the parent. A parent without `snapshot` shows no child state, because the snapshot of the parent does not include the child.
+A live tool sends a forwarded event to the parent, as the UI does. To read the child state, it watches the `transition` subscribers of the parent for events whose type is `snapshot` from the tag, and reads their payload. When `in` is the initial state of the parent, the first snapshot event runs inside `Actor()`, before a tool can subscribe. The child state is then in the snapshot of the parent, but the tag does not say in which field. A parent without `snapshot` shows no child state, because the snapshot of the parent does not include the child.
 
 The parent receives at most one `done` or `error` event per child. The child outputs that it emits while `machine.create()` runs are not forwarded, because embed subscribes after the child exists.
 

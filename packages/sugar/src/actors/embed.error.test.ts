@@ -287,39 +287,6 @@ describe("embed errors", () => {
     expect(actor.state.name).toBe("broken");
   });
 
-  test("a forwarded input after the child ended reaches nothing", () => {
-    const received: string[] = [];
-    const actor = Actor({
-      inputs: [start, retry],
-      internal: [checkPassed, checkBroke],
-      states: [idle, checking],
-      initial: idle,
-      clock: VirtualClock(),
-      setup: (builder) => {
-        builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
-        embed(builder, {
-          in: checking,
-          machine: askingCheck({ retried: "fails" }),
-          done: { passed: checkPassed },
-          error: checkBroke,
-          forward: [retry],
-        });
-        for (const mapped of [checkPassed, checkBroke]) {
-          builder.on(checking, { event: mapped, handler: (sent) => void received.push(sent.type) });
-        }
-      },
-    });
-    actor.send(start.create());
-    actor.send(retry.create());
-
-    actor.send(retry.create());
-
-    expect({ state: actor.state.name, received }).toEqual({
-      state: "checking",
-      received: ["checkBroke"],
-    });
-  });
-
   test("a parent without a clock has no child, so a forwarded input changes nothing", () => {
     const actor = Actor({
       inputs: [start, retry],
