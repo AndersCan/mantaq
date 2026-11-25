@@ -1,20 +1,8 @@
 import type { EnteredGroup } from "../graph.ts";
 import type { VizDriver, VizLiveState, VizOutputRoutes } from "../../schema.ts";
 
-/** The path an address names: a value per step, as in `focus`, for the viewer of `machine` (every viewer when unset). */
-export interface FocusLink {
-  machine?: string;
-  focus: string[];
-}
-
-/** What a viewer hands the host to follow a link's path: `mounted` turns false once the viewer is gone or drawn again on its root, and then `follow` does nothing. */
-export interface FocusFollower {
-  follow: (link: FocusLink) => void;
-  mounted: () => boolean;
-}
-
 /** Why the viewer tells the host where it is. */
-export type NavigatedBy = "path" | "walk" | "link";
+export type NavigatedBy = "path" | "walk";
 
 export interface ViewerOptions {
   /** Machine to show; defaults to the first. */
@@ -34,17 +22,15 @@ export interface ViewerOptions {
   values?: ReadonlyArray<string>;
   /** Where to open from the root, one value per step (from `?focus=`): a machine's name on a board, else a group node's id (`@payment`) to enter that group. Values that do not resolve are dropped. */
   focus?: ReadonlyArray<string>;
-  /** Called after every walk, payload change or move along the focus path, e.g. to keep the URL shareable. */
+  /** Called after every walk, payload change or move along the focus path, e.g. to replay the walk after a redraw. */
   onNavigate?: (where: {
-    /** "path": the reader moved along the path; "walk": a step or a payload change; "link": the viewer followed `followFocus`. */
+    /** "path": the reader moved along the path; "walk": a step or a payload change. */
     by: NavigatedBy;
     machine: string;
     steps: string[];
     payloads: string[];
     focus: string[];
   }) => void;
-  /** Takes the viewer's way to move along its path to a link's, e.g. on the browser's Back and Forward. It never changes the walk. The host drops a follower that is no longer `mounted`. */
-  followFocus?: (follower: FocusFollower) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
   /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state, or, while a state is selected, for that state as a throwaway copy reaches it. */

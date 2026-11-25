@@ -58,9 +58,9 @@ Do these steps on the diagram above. Click the label or the line of an arrow, an
 3. Click the moving `declined` arrow that leaves `chargingCard`. The walk moves to `cardDeclined`.
 4. Click `retryCard`. The walk goes back to `chargingCard`.
 5. Click `charged`. The walk leaves the group to the dashed box `packingParcel`. The line under the path says `The walk is in packingParcel, outside group payment.`
-6. Click `order` in the path. The canvas draws the folded machine again, and the `delivery` node says `now in packingParcel`. Instead of a click on `order`, you can press Escape or the Back button of the browser. The Back button of the browser does not change the walk.
+6. Click `order` in the path. The canvas draws the folded machine again, and the `delivery` node says `now in packingParcel`. Instead of a click on `order`, you can press Escape.
 
-**Back** and **Reset** under the diagram undo steps. Entering a group or leaving it does not change the walk.
+**Back** and **Reset** under the diagram undo steps. Entering a group or leaving it does not change the walk. A reload opens the page as its link says: a plain link opens the walk at its start.
 
 A link can open a group: add `?focus=@payment` to the address of the page. For example, [this link](?machine=order&focus=%40payment) opens `payment` with the walk in `reviewingOrder`, outside the group.
 

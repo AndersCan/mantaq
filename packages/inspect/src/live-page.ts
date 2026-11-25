@@ -1,8 +1,8 @@
 /**
  * The live page of the Vite plugin: the served document, with each machine
- * that has a target running for real behind the viewer. The walk lives in the
- * address bar (`?machine=&step=&focus=`), so a redraw after a save replays it on the
- * new code.
+ * that has a target running for real behind the viewer. It opens the walk the
+ * link names (`?machine=&step=&focus=`) and keeps the walk since then in memory, so a
+ * redraw after a save replays it on the new code and a reload starts again.
  */
 import { mountViewer, showIssues } from "@mantaq/viz/viewer";
 import type { VizDocument, VizDriver, VizOutputRoutes } from "@mantaq/viz";
@@ -12,6 +12,13 @@ import type { FuzzTarget } from "./fuzz/run.ts";
 import { linkOptions } from "@mantaq/viz/page";
 import { parseViz } from "@mantaq/viz";
 import type { ViewerOptions } from "@mantaq/viz/viewer";
+
+type WalkOptions = ReturnType<typeof linkOptions>;
+
+/** Where the reader took each root's viewer since the page loaded: the machine, the walk and the path, as the viewer reports them. */
+type Walked = Omit<Parameters<NonNullable<ViewerOptions["onNavigate"]>>[0], "by">;
+
+const walked = new WeakMap<HTMLElement, Walked>();
 
 export type LiveTargets = Readonly<Record<string, FuzzTarget["create"]>>;
 
@@ -25,24 +32,29 @@ function only(viz: VizDocument, machine: string | null): VizDocument {
  * The walk in the address bar, only when it names a machine of this document.
  * A link naming several machines opens the first one this document holds.
  */
-function ownWalk(viz: VizDocument): ReturnType<typeof linkOptions> {
+function linkedWalk(viz: VizDocument): WalkOptions {
   const linked = linkOptions();
-  const { onNavigate, followFocus } = linked;
-  const kept: ReturnType<typeof linkOptions> = {};
-  if (onNavigate) kept.onNavigate = onNavigate;
-  if (followFocus) kept.followFocus = followFocus;
   const named = [...new Set(new URLSearchParams(location.search).getAll("machine"))];
   if (named.length < 2) {
     const own =
       linked.machine === undefined || viz.machines.some((each) => each.id === linked.machine);
-    return own ? linked : kept;
+    return own ? linked : {};
   }
   const held = named.find((id) => viz.machines.some((each) => each.id === id));
-  return held === undefined ? kept : { ...linked, machine: held };
+  return held === undefined ? {} : { ...linked, machine: held };
 }
 
-/** The run the page names, unless the address already holds a run or steps. */
-function pageRun(run: string | undefined, walk: ReturnType<typeof linkOptions>): { run?: string } {
+/** The walk the reader took on `root` when its machine is still in the document, else the link's. */
+function ownWalk(root: HTMLElement, viz: VizDocument): WalkOptions {
+  const last = walked.get(root);
+  if (last === undefined || !viz.machines.some((each) => each.id === last.machine)) {
+    return linkedWalk(viz);
+  }
+  return { ...last };
+}
+
+/** The run the page names, unless the walk it opens already holds a run or steps. */
+function pageRun(run: string | undefined, walk: WalkOptions): { run?: string } {
   const walked = walk.run !== undefined || (walk.steps ?? []).length > 0;
   return run === undefined || walked ? {} : { run };
 }
@@ -159,19 +171,12 @@ export function mountDriven(
     return;
   }
   const viz = parsed[1];
-  const options = ownWalk(viz);
+  const options = ownWalk(root, viz);
   const shown = only(viz, options.machine ?? null);
   const id = shown.machines[0]?.id ?? "";
   const create = liveCreate(context.targets, id);
   function select(machine: string): void {
-    const next = new URLSearchParams(location.search);
-    next.set("machine", machine);
-    next.delete("step");
-    next.delete("run");
-    next.delete("value");
-    next.delete("payload");
-    next.delete("focus");
-    history.replaceState(null, "", `?${next.toString()}`);
+    walked.set(root, { machine, steps: [], payloads: [], focus: [] });
     mountDriven(root, context);
   }
   const doc = root.ownerDocument;
@@ -180,6 +185,9 @@ export function mountDriven(
   const driver = liveDriver(id, create, context.effectMode);
   mountViewer(viewer, shown, {
     ...options,
+    onNavigate: ({ machine, steps, payloads, focus }) => {
+      walked.set(root, { machine, steps, payloads, focus });
+    },
     ...(id === "" ? {} : { machine: id }),
     ...routesOf(context),
     ...(driver === undefined ? {} : { driver }),
@@ -189,7 +197,7 @@ export function mountDriven(
   });
 }
 
-/** Fetch the document from `source` and mount it; call again to redraw, keeping the walk. */
+/** Fetch the document from `source` and mount it; call again to redraw, keeping the walk the reader took. */
 export async function mountLiveDriven(
   root: HTMLElement,
   context: {

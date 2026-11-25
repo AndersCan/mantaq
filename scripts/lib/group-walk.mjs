@@ -1,9 +1,9 @@
 /**
  * Replays the walk of the group guide on the built docs, clicking each button by its
- * label, then Back, Forward and a reload. Each button is in the canvas's view before
- * its click, and the current state and the labels of the next arrows after each step.
- * The viewer shows what the guide says, and only a move along the path adds a history
- * entry. Half on screen, the panel does not cover the canvas.
+ * label, then a reload. Each button is in the canvas's view before its click, and the
+ * current state and the labels of the next arrows after each step. The viewer shows
+ * what the guide says, adds no history entry, and a reload opens the walk's start.
+ * Half on screen, the panel does not cover the canvas.
  */
 import { unseenLabels } from "./next-labels.mjs";
 
@@ -28,37 +28,30 @@ const OUTSIDE = {
 /** What the viewer shows back at the top, with the walk in the delivery group. */
 const TOP = { current: ["@delivery"], path: [], row: "now in packingParcel", line: "" };
 
-/**
- * The steps of "Walk into a group and out of it", then Back, Forward and a reload: what
- * each does, what the viewer shows after it, and how many history entries the walk added.
- */
+/** What the viewer shows on a fresh load: the walk at its start, at the top. */
+const START = { current: ["reviewingOrder"], path: [], row: "", line: "" };
+
+/** The steps of "Walk into a group and out of it", then a reload: what each does and what the viewer shows after it. */
 const STEPS = [
   {
     click: "reviewingOrder on placeOrder to group payment",
     shows: { current: ["@payment"], path: [], row: "now in chargingCard", line: "" },
-    entries: 0,
   },
   {
     click: "enter group payment",
     shows: { current: ["chargingCard"], path: ["order", "payment"], row: "", line: "" },
-    entries: 1,
   },
   {
     click: "chargingCard on declined to cardDeclined",
     shows: { current: ["cardDeclined"], path: ["order", "payment"], row: "", line: "" },
-    entries: 1,
   },
   {
     click: "cardDeclined on retryCard to chargingCard",
     shows: { current: ["chargingCard"], path: ["order", "payment"], row: "", line: "" },
-    entries: 1,
   },
-  { click: "chargingCard on charged to packingParcel", shows: OUTSIDE, entries: 1 },
-  { click: "order", shows: TOP, entries: 2 },
-  { go: "back", shows: OUTSIDE, entries: 2 },
-  { go: "forward", shows: TOP, entries: 2 },
-  { go: "back", shows: OUTSIDE, entries: 2 },
-  { go: "reload", shows: OUTSIDE, entries: 2 },
+  { click: "chargingCard on charged to packingParcel", shows: OUTSIDE },
+  { click: "order", shows: TOP },
+  { go: "reload", shows: START },
 ];
 
 /** How long a step may take to show. */
@@ -162,7 +155,7 @@ async function clickButton(options) {
   return target.click({ timeout: STEP_MS }).then(() => "clicked", firstLine);
 }
 
-/** Clicks the step's button, or goes back, forward or reloads as the browser does. Returns `"done"`, or why it could not. */
+/** Clicks the step's button, or reloads as the browser does. Returns `"done"`, or why it could not. */
 async function takeStep(options) {
   const { tab, step } = options;
   switch (step.go) {
@@ -170,10 +163,6 @@ async function takeStep(options) {
       const clicked = await clickButton({ tab, name: step.click });
       return clicked === "clicked" ? "done" : clicked;
     }
-    case "back":
-      return tab.goBack({ timeout: STEP_MS }).then(() => "done", firstLine);
-    case "forward":
-      return tab.goForward({ timeout: STEP_MS }).then(() => "done", firstLine);
     case "reload": {
       const reloaded = await tab.reload({ timeout: MOUNT_MS }).then(() => "done", firstLine);
       if (reloaded !== "done") return reloaded;
@@ -246,7 +235,7 @@ async function screenWalk(options) {
       failures.push(`${where}: cannot do "${done}": ${moved}`);
       break;
     }
-    const wanted = JSON.stringify({ ...step.shows, entries: start + step.entries });
+    const wanted = JSON.stringify({ ...step.shows, entries: start });
     const shown = await shownAfter({ tab, wanted });
     if (shown !== wanted) {
       failures.push(`${where}: after "${done}" the viewer shows ${shown}, not ${wanted}`);

@@ -25,11 +25,11 @@ The viewer keeps a cursor on one state, starting at the initial one. Moving acce
 
 In an actor map the diagram shows the child machine once. Live, each child is a chip with its key on the state it is in, and the Step tab lists every child with its state. Click a chip or a row to follow that child: its row is marked, and a click on an arrow in the map that the child can take sends to it.
 
-The selected arrow's Details has a send form when the arrow leaves the state the walk is in, also when a guard blocks it: one box per payload field and a **Send** button. The boxes hold the values that a click sends: the values last sent, else the examples. A change stays for every later send of that event. The lock on a blocked arrow is worked out with the same values. If the arrow can't be sent, one line says why. After a send, Details say what was sent, with its values, and where it went. Links keep the changed values in `?payload=`, and old `?value=` links still open with their values. An arrow responds wherever its line is clicked, dashed and dotted ones included.
+The selected arrow's Details has a send form when the arrow leaves the state the walk is in, also when a guard blocks it: one box per payload field and a **Send** button. The boxes hold the values that a click sends: the values last sent, else the examples. A change stays for every later send of that event. The lock on a blocked arrow is worked out with the same values. If the arrow can't be sent, one line says why. After a send, Details say what was sent, with its values, and where it went. A link with `?payload=` opens with the changed values, and old `?value=` links still open with their values. An arrow responds wherever its line is clicked, dashed and dotted ones included.
 
 Effects do not run on the live page: the answers of `submitting` (`paymentOk`, `paymentFail`, `paymentTimeout`) are the arrows out of it. The initial state's effects run while the machine is built.
 
-A final state ends the walk. **Back** and **Reset** undo steps. `?machine=checkout&run=<name>` opens a recorded run by name; use it for links in docs and issues.
+A final state ends the walk. **Back** and **Reset** undo steps. `?machine=checkout&run=<name>` opens a recorded run by name; use it for links in docs and issues. The viewer does not write the walk to the address, so a reload opens the page as its link says: a plain link opens the walk at its start.
 
 On the live page (the Vite plugin) each step runs the real actor, so guards are evaluated.
 
@@ -43,7 +43,7 @@ The viewer can draw a machine at more than one level. When you open a machine on
 
 A move along the path does not change the walk or the Step log. An arrow from the state that the walk is in sends at every level, because the machine has one walk. Inside a group, a dashed box is a state outside the group. Click it to go back one level and show that state there.
 
-The address keeps the path in `?focus=`: the name of a machine on a board, then the id of a group node, such as `@payment`. A link with `?focus=` opens the same level. For example, `?machine=order&focus=@payment` opens the group `payment` of the machine `order`. Repeat `focus` for each level: `?focus=till&focus=@payment` opens the machine `till` of a board, then its group `payment`.
+A link with `?focus=` opens a level: the name of a machine on a board, then the id of a group node, such as `@payment`. For example, `?machine=order&focus=@payment` opens the group `payment` of the machine `order`. Repeat `focus` for each level: `?focus=till&focus=@payment` opens the machine `till` of a board, then its group `payment`.
 
 ### Navigation
 

@@ -10,7 +10,6 @@ import { drawnNodeName, drawnNodeOf } from "../groups/fold-groups.ts";
 import type { EnteredGroup, GraphCallbacks, Selection } from "../graph.ts";
 import { keepInView } from "../keep-in-view.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
-import { focusTokens } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
 import { currentsOf } from "../compartments.ts";
 import { enteredGroupOf } from "../groups/group-machine.ts";
@@ -47,16 +46,12 @@ export interface Canvas {
   back: () => boolean;
   /** Says in the bar where the walk is while it is outside the group entered. */
   walked: () => void;
-  /** Moves along the path to `steps`, as a link names it; nothing when the canvas shows them already. */
-  follow: (steps: FocusStep[]) => void;
 }
 
-/** Where focus lands after a move, and who made it. */
+/** Where focus lands after a move. */
 interface Landing {
   /** A state of the machine drawn now: focus goes to the node that draws it. Unset: the control that led here. */
   onto?: string;
-  /** Default "path": the reader. "link": the host, following an address. */
-  by?: FocusMove["by"];
 }
 
 interface RoomOptions {
@@ -122,12 +117,12 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (line !== null) line.textContent = outsideText({ focus: options.focus(), view }) ?? "";
   }
   function moveTo(steps: FocusStep[], landing: Landing = {}): void {
-    const { onto, by = "path" } = landing;
+    const { onto } = landing;
     const before = options.focus();
     view.focus = steps;
     view.focusNotice = undefined;
     const after = options.focus();
-    options.moved({ before, after, by });
+    options.moved({ before, after });
     swap();
     options.afterSwap();
     if (onto !== undefined) landOn(root, { drawn: after.drawn, state: onto });
@@ -157,10 +152,6 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (steps.length === 0) return false;
     moveTo(steps.slice(0, -1));
     return true;
-  }
-  function follow(steps: FocusStep[]): void {
-    const shown = focusTokens(options.focus().steps).join("\n");
-    if (focusTokens(steps).join("\n") !== shown) moveTo(steps, { by: "link" });
   }
   function open(part: string): void {
     const { machine } = options.focus();
@@ -198,7 +189,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     } else viewport?.redrawn();
     keepCurrentInView(root, { focus: options.focus(), view });
   }
-  return { drawn, refit, framed, viewport: () => viewport, walked, back, follow };
+  return { drawn, refit, framed, viewport: () => viewport, walked, back };
 }
 
 interface LandOnOptions {
