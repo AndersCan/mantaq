@@ -1,6 +1,6 @@
 import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../graph.ts";
 import { currentsOf, localName } from "../compartments.ts";
-import type { EnteredGroup, GraphCallbacks } from "../graph.ts";
+import type { EnteredGroup, GraphCallbacks, Selection } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
 import { drawnNodeOf } from "../groups/fold-groups.ts";
@@ -22,6 +22,8 @@ export interface CanvasOptions {
   moved: (move: FocusMove) => void;
   afterSwap: () => void;
   mark: () => void;
+  /** Selects what a move lands on, so the next draw rings it and shows its Details. */
+  choose: (selection: Selection) => void;
 }
 
 export interface Canvas {
@@ -131,6 +133,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     moveTo([...options.focus().steps, { kind: "enter", node, name }]);
   }
   function leave(state: string): void {
+    options.choose({ kind: "state", id: state });
     moveTo(options.focus().steps.slice(0, -1), { onto: state });
   }
   function drawn(): Node[] {

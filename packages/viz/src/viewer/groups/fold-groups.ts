@@ -1,4 +1,4 @@
-import { actorMapOf, groupNameProblem, scopeOf } from "../../schema.ts";
+import { actorMapOf, groupNameProblem, isAnyState, scopeOf } from "../../schema.ts";
 import type { VizCoverage, VizEdge, VizFuzzMessage, VizMachine, VizState } from "../../schema.ts";
 
 /** A group drawn as one node: `<scope>.@<name>`, or `@<name>` at the root, so `scopeOf` stays the members' scope. */
@@ -63,6 +63,14 @@ export interface GroupNodeQuery {
 /** The group node a drawn id names; undefined for a state. */
 export function groupNodeAt(machine: VizMachine, options: GroupNodeQuery): GroupNode | undefined {
   return foldedOf(machine).nodes.find((each) => each.id === options.node);
+}
+
+/** A drawn node as text names it: a group node by its group's name, an `onAny` source as "any state", a state by its id. */
+export function drawnNodeName(machine: VizMachine, options: GroupNodeQuery): string {
+  const { node } = options;
+  if (isAnyState(node)) return "any state";
+  const group = groupNodeAt(machine, { node });
+  return group === undefined ? node : `group ${group.name}`;
 }
 
 /** The group nodes of the real machine; its fold gives the same. */

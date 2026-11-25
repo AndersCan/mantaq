@@ -191,6 +191,39 @@ describe("a grouped machine in the viewer", () => {
     });
   });
 
+  test("Details of a group node names each arrow end as the canvas does, and lists a move inside the group once", () => {
+    const { root } = mount();
+    click(root.querySelector('.graph g.state[data-node-id="@payment"]'));
+    const rows: Record<string, string[]> = {};
+    for (const row of root.querySelectorAll(".details dd")) {
+      const links: string[] = [];
+      for (const link of row.querySelectorAll("[data-edge-link], [data-state-link]")) {
+        links.push(link.textContent);
+      }
+      rows[row.getAttribute("data-field") ?? ""] = links;
+    }
+    expect(rows).toStrictEqual({
+      states: ["chargingCard", "confirming"],
+      outgoing: ["group payment —cancel→ inCart", "group payment —confirmed→ group shipping"],
+      incoming: ["inCart —checkout→ group payment"],
+      inside: ["group payment —charged→ group payment"],
+    });
+  });
+
+  test("a state picked in Details of a group node rings the group node", () => {
+    const { root } = mount();
+    click(root.querySelector('.graph g.state[data-node-id="@payment"]'));
+    click(root.querySelector('[data-state-link="confirming"]'));
+    const ringed: string[] = [];
+    for (const node of root.querySelectorAll(".graph g.selected[data-node-id]")) {
+      ringed.push(node.getAttribute("data-node-id") ?? "");
+    }
+    expect({
+      ringed,
+      details: root.querySelector("[data-selected-state]")?.getAttribute("data-selected-state"),
+    }).toStrictEqual({ ringed: ["@payment"], details: "confirming" });
+  });
+
   test("a node that shares an arrow out of a group is current while the walk is inside the group", () => {
     const states = [...shop.states, stateOf("refunding"), stateOf("cancelled", { final: true })];
     const edges = [...shop.edges];
