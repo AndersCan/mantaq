@@ -419,7 +419,8 @@
 }
 
 /* Above a drawing that overlaps itself: drawn anyway, and it says so. */
-.viz .overlap-warning {
+.viz .overlap-warning,
+.viz .focus-notice {
   margin: 0;
   color: var(--unknown);
 }
@@ -685,23 +686,23 @@
   color: var(--muted);
 }
 
-.viz .focus-path button,
-.viz .focus-path [aria-current] {
+.viz .focus-path button {
   padding: 2px 8px;
   font: inherit;
   color: var(--fg);
   background: var(--bg);
   border: 1px solid var(--muted);
   border-radius: 8px;
-}
-
-.viz .focus-path button {
   cursor: pointer;
 }
 
+/* The crumb shown now is plain text: focus lands on it so a screen reader says where the reader is, but it draws no ring. */
 .viz .focus-path [aria-current] {
   font-weight: 600;
-  border-color: transparent;
+}
+
+.viz .focus-path [aria-current]:focus-visible {
+  outline: none;
 }
 
 .viz .focus-path button:hover,

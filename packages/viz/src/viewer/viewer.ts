@@ -1,5 +1,5 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
-import { decodeFocus, enteredBy, focusReader } from "./mount/focus.ts";
+import { decodeFocus, enteredBy, focusReader, unknownFocusText } from "./mount/focus.ts";
 import { drawCallbacks, membersWhy, pickChild, sayWhy } from "./mount/arrow-click.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
@@ -32,7 +32,10 @@ export function mountViewer(
   const view = initialView(options, { events: viz.machines.flatMap((machine) => machine.events) });
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
-  if (first) view.focus = decodeFocus(options.focus ?? [], { root: first });
+  if (first) {
+    view.focus = decodeFocus(options.focus ?? [], { root: first });
+    view.focusNotice = unknownFocusText(options.focus ?? [], { root: first });
+  }
   const redraws: Redraws = { redraw: () => undefined, refit: () => undefined };
   listenFullscreen(root);
   listenWidth(root, { refit: () => redraws.refit() });

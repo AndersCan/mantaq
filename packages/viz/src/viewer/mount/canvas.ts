@@ -53,10 +53,10 @@ export function canvasOf(options: CanvasOptions): Canvas {
     root.querySelector(".canvas")?.replaceChildren(...drawn());
     titled();
   }
-  /** The start of the bar above the canvas: the path while a machine is opened or a group entered, and the overlap warning of the drawing. */
+  /** The start of the bar above the canvas: the path while a machine is opened or a group entered, then its notices. */
   function titled(): void {
     root.querySelector(".viz-bar-start")?.remove();
-    const shown = [...pathOf(), ...warningLine()];
+    const shown = [...pathOf(), ...noticeLines(doc, { root, view })];
     if (shown.length === 0) return;
     const bar = root.querySelector(".viz-bar") ?? html(doc, "div", { class: "viz-bar" });
     if (!bar.isConnected) root.prepend(bar);
@@ -74,16 +74,11 @@ export function canvasOf(options: CanvasOptions): Canvas {
     const line = root.querySelector(".viz-bar .walk-outside");
     if (line !== null) line.textContent = outsideText({ focus: options.focus(), view }) ?? "";
   }
-  function warningLine(): HTMLElement[] {
-    const count = root.querySelector(".canvas .graph")?.getAttribute("data-overlaps");
-    const warning = overlapWarning(Number(count ?? 0));
-    if (warning === undefined) return [];
-    return [html(doc, "p", { class: "overlap-warning" }, [warning])];
-  }
   function moveTo(steps: FocusStep[], landing: Landing = {}): void {
     const { onto } = landing;
     const before = options.focus();
     view.focus = steps;
+    view.focusNotice = undefined;
     const after = options.focus();
     options.moved({ before, after });
     swap();
@@ -156,6 +151,25 @@ export function canvasOf(options: CanvasOptions): Canvas {
     titled();
   }
   return { drawn, refit, framed, walked };
+}
+
+interface NoticeOptions {
+  root: HTMLElement;
+  view: ViewState;
+}
+
+/** The notices in the bar: a part of a link's path that is not there, and the overlap warning of the drawing. */
+function noticeLines(doc: Document, options: NoticeOptions): HTMLElement[] {
+  const { root, view } = options;
+  const lines: HTMLElement[] = [];
+  const notice = view.focusNotice;
+  if (notice !== undefined) {
+    lines.push(html(doc, "p", { class: "focus-notice", role: "status" }, [notice]));
+  }
+  const count = root.querySelector(".canvas .graph")?.getAttribute("data-overlaps");
+  const warning = overlapWarning(Number(count ?? 0));
+  if (warning !== undefined) lines.push(html(doc, "p", { class: "overlap-warning" }, [warning]));
+  return lines;
 }
 
 interface BreadcrumbOptions {

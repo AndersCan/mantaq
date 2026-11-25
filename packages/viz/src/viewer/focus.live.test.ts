@@ -298,8 +298,16 @@ describe("the path in the address bar", () => {
     );
   });
 
-  test("a link whose path does not resolve opens as far as it does", () => {
+  test("a link whose path does not resolve opens as far as it does, and the bar says so until the next move", () => {
     const { root } = mount({ focus: ["@nowhere", "@payment"] });
-    expect(shown(root)).toStrictEqual(atShop);
+    const opened = shown(root);
+    const said = root.querySelector('.viz-bar [role="status"].focus-notice')?.textContent;
+    enter(root, { id: "@payment" });
+    const after = root.querySelectorAll(".focus-notice").length;
+    expect({ opened, said, after }).toStrictEqual({
+      opened: atShop,
+      said: 'No group "@nowhere" in shop. The link opens shop.',
+      after: 0,
+    });
   });
 });

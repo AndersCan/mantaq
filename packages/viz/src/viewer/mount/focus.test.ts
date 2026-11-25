@@ -1,4 +1,4 @@
-import { decodeFocus, focusOf, focusTokens } from "./focus.ts";
+import { decodeFocus, focusOf, focusTokens, unknownFocusText } from "./focus.ts";
 import { describe, expect, test } from "vite-plus/test";
 import { edgeOf, groupedCheckout, machineOf, stateOf } from "../groups/shop-machines.ts";
 import { foldGroups } from "../groups/fold-groups.ts";
@@ -52,6 +52,18 @@ describe("the path in the address bar on a board", () => {
         ],
         group: "till.@payment",
       },
+    });
+  });
+
+  test("a link that names a machine or a group not there says what it opens instead", () => {
+    expect({
+      machine: unknownFocusText(["kitchen"], { root }),
+      group: unknownFocusText(["till", "till.@refund"], { root }),
+      whole: unknownFocusText(["till", "till.@payment"], { root }),
+    }).toStrictEqual({
+      machine: 'No machine "kitchen" in app. The link opens app.',
+      group: 'No group "till.@refund" in till. The link opens till.',
+      whole: undefined,
     });
   });
 

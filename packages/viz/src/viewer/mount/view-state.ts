@@ -34,6 +34,8 @@ export interface ViewState {
   sent: SentEvent | undefined;
   /** Why the requested run did not open; cleared by the next walk. */
   notice: string | undefined;
+  /** What the bar says about a `?focus=` path that names something not there; cleared by the next move along the path. */
+  focusNotice: string | undefined;
   /** Live: edge id → why its guard blocks it now (see `blocked.ts`). */
   blocked: Map<string, string>;
   /** Live: edge id → the payload a click on that arrow sends, the one its dry run tried (see `blockedEdges`); none = the default. Its send form shows it. */
@@ -61,6 +63,7 @@ export function initialView(options: ViewerOptions, document: InitialViewOptions
     diagramOnly: options.diagramOnly ?? false,
     sent: undefined,
     notice: undefined,
+    focusNotice: undefined,
     blocked: new Map(),
     chosen: new Map(),
     payloads: {
