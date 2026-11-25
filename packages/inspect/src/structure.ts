@@ -296,13 +296,13 @@ function embeddedStructure(machine: Machine): Either<string, BuiltEmbedding> {
   return Either.right({ ...structureOf({ id: machine.id, ...created[1] }), warnings: [] });
 }
 
-/** The machines and every machine their states embed, structure only, sorted by id. */
+/** The machines sorted by id, then every machine their states embed, also sorted by id. Structure only. */
 export function toViz(inputs: ReadonlyArray<VizInput>): VizDocument {
   const roots = [];
   for (const input of inputs) roots.push(structureOf(input));
   const drawn = withEmbedded(roots, { build: embeddedStructure });
   return {
     schemaVersion: VIZ_SCHEMA_VERSION,
-    machines: [...drawn.roots, ...drawn.embedded].sort(byId),
+    machines: [...drawn.roots.sort(byId), ...drawn.embedded.sort(byId)],
   };
 }

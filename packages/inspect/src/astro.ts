@@ -109,7 +109,7 @@ async function documentsSource(
     }
     reported.push({
       rel: relative(context.root, file).split(sep).join("/"),
-      machines: loaded.machines,
+      machines: [...loaded.machines, ...loaded.embedded],
       warnings: loaded.warnings,
     });
     for (const warning of loaded.warnings) plugin.warn(`[mantaq-viz] ${warning}`);
@@ -124,7 +124,7 @@ async function documentsSource(
       all.push({ file, machine });
     }
     documents[file] = {
-      text: serializeViz(modulesDocument([loaded])),
+      text: serializeViz(modulesDocument([loaded]).document),
       machines: loaded.machines.map((machine) => machine.id),
     };
   }

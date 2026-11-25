@@ -214,9 +214,10 @@ async function documentText(
   const results = await Promise.all(
     options.files.map((file) => fileDocument(server, { ...options, file })),
   );
+  const merged = modulesDocument(results);
   return {
-    text: serializeViz(modulesDocument(results)),
-    warnings: results.flatMap((result) => result.warnings),
+    text: serializeViz(merged.document),
+    warnings: [...results.flatMap((result) => result.warnings), ...merged.warnings],
   };
 }
 
@@ -328,10 +329,11 @@ function siteBuild(context: SiteBuildContext): Plugin {
         results.push(inspected[1]);
       }
       context.shared.programs = createProgramStore();
-      for (const warning of results.flatMap((result) => result.warnings)) {
+      const merged = modulesDocument(results);
+      for (const warning of [...results.flatMap((result) => result.warnings), ...merged.warnings]) {
         this.warn(`[mantaq-viz] ${warning}`);
       }
-      const text = serializeViz(modulesDocument(results));
+      const text = serializeViz(merged.document);
       const dir = context.base.replace(/^\//, "");
       const entry = Object.values(bundle).find(
         (chunk) => chunk.type === "chunk" && chunk.isEntry && chunk.name === "mantaq-live",
