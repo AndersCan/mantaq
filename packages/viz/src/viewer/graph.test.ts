@@ -59,17 +59,18 @@ describe("renderGraph arrowheads", () => {
 });
 
 describe("renderGraph width", () => {
-  test("floors labels at 0.6rem and caps them at 1.4em", () => {
+  test("floors labels at 0.6rem, caps them at 1.4em, and gives the natural width for a zoom", () => {
     const graph = renderGraph(document, machine, {
       select: () => undefined,
     });
     const match =
-      /^--graph-floor: ([\d.]+)rem; width: clamp\(var\(--graph-floor\), 100%, ([\d.]+)em\)$/.exec(
+      /^--graph-floor: ([\d.]+)rem; --graph-cap: ([\d.]+)em; --graph-natural: (\d+)px$/.exec(
         graph.getAttribute("style") ?? "",
       );
     const units = Number(graph.getAttribute("viewBox")?.split(" ")[2]);
     expect(Number(match?.[1])).toBeCloseTo((units * 0.6) / 12, 0);
     expect(Number(match?.[2])).toBeCloseTo((units * 1.4) / 12, 0);
+    expect(Number(match?.[3])).toBe(units);
   });
 
   test("a machine with no overlaps has no warning row", () => {

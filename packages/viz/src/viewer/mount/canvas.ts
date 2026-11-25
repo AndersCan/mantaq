@@ -8,13 +8,15 @@ import {
 } from "../graph.ts";
 import { drawnNodeName, drawnNodeOf } from "../groups/fold-groups.ts";
 import type { EnteredGroup, GraphCallbacks, Selection } from "../graph.ts";
+import { keepInView } from "../keep-in-view.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
 import { focusTokens } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
 import { currentsOf } from "../compartments.ts";
 import { enteredGroupOf } from "../groups/group-machine.ts";
 import { html } from "../dom.ts";
-import { keepInView } from "../keep-in-view.ts";
+import type { Viewport } from "../viewport/viewport.ts";
+import { viewportOnCanvas } from "../canvas-navigation/canvas-viewport.ts";
 import type { ViewState } from "./view-state.ts";
 
 /** Board width in units where the canvas has no size (not laid out). */
@@ -37,8 +39,10 @@ export interface CanvasOptions {
 export interface Canvas {
   drawn: () => Node[];
   refit: () => void;
-  /** Draws the path above the canvas; call once the canvas is on the page. */
+  /** Draws the path above the canvas and mounts the viewport on it; call once the canvas is on the page. */
   framed: () => void;
+  /** The viewport on the canvas, once framed: zoom, pan and the tool. */
+  viewport: () => Viewport | undefined;
   /** Goes back one level of the path; false at the top. */
   back: () => boolean;
   /** Says in the bar where the walk is while it is outside the group entered. */
@@ -85,6 +89,7 @@ function turnsAt(root: HTMLElement, options: RoomOptions): boolean {
 export function canvasOf(options: CanvasOptions): Canvas {
   const { doc, root, view } = options;
   let drawnUnits = 0;
+  let viewport: Viewport | undefined;
   function canvasUnits(): number {
     const canvas = root.querySelector<HTMLElement>(".canvas");
     return (canvas ?? root).clientWidth / BOARD_PX_PER_UNIT || BOARD_UNITS_UNMEASURED;
@@ -92,6 +97,11 @@ export function canvasOf(options: CanvasOptions): Canvas {
   function swap(): void {
     root.querySelector(".canvas")?.replaceChildren(...drawn());
     titled();
+    viewport?.redrawn();
+  }
+  function framed(): void {
+    titled();
+    viewport = viewportOnCanvas(root, { view });
   }
   /** The start of the bar above the canvas: the path while a machine is opened or a group entered, then its notices. */
   function titled(): void {
@@ -122,19 +132,9 @@ export function canvasOf(options: CanvasOptions): Canvas {
     options.moved({ before, after, by });
     swap();
     options.afterSwap();
-    if (onto !== undefined) landOn(onto);
+    if (onto !== undefined) landOn(root, { drawn: after.drawn, state: onto });
     else if (after.steps.length > before.steps.length) shownIn();
     else returnTo(before.steps[after.steps.length]);
-  }
-  /** Focuses the node that draws `state` now: the state, or its group node. */
-  function landOn(state: string): void {
-    const id = drawnNodeOf(options.focus().drawn, { state });
-    keepInView(root, { node: id, with: "alone" });
-    const node = root.querySelector<SVGGElement>(`.graph g[data-node-id="${CSS.escape(id)}"]`);
-    if (node === null) return;
-    // A plain node takes focus only with a tabindex; -1 keeps it out of the tab order, as a plain node that has focus is.
-    if (!node.hasAttribute("tabindex")) node.setAttribute("tabindex", "-1");
-    node.focus({ preventScroll: true });
   }
   function shownIn(): void {
     const at =
@@ -197,10 +197,26 @@ export function canvasOf(options: CanvasOptions): Canvas {
     if (focus.canvas === "board" ? canvasUnits() !== drawnUnits : turnsAt(root, { focus })) {
       swap();
       options.mark();
-    }
+    } else viewport?.redrawn();
     keepCurrentInView(root, { focus: options.focus(), view });
   }
-  return { drawn, refit, framed: titled, walked, back, follow };
+  return { drawn, refit, framed, viewport: () => viewport, walked, back, follow };
+}
+
+interface LandOnOptions {
+  drawn: Focus["drawn"];
+  state: string;
+}
+
+/** Focuses the node that draws `state` now: the state, or its group node. */
+function landOn(root: HTMLElement, options: LandOnOptions): void {
+  const id = drawnNodeOf(options.drawn, { state: options.state });
+  keepInView(root, { node: id, with: "alone" });
+  const node = root.querySelector<SVGGElement>(`.graph g[data-node-id="${CSS.escape(id)}"]`);
+  if (node === null) return;
+  // A plain node takes focus only with a tabindex; -1 keeps it out of the tab order, as a plain node that has focus is.
+  if (!node.hasAttribute("tabindex")) node.setAttribute("tabindex", "-1");
+  node.focus({ preventScroll: true });
 }
 
 interface NoticeOptions {

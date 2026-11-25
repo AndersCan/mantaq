@@ -180,8 +180,42 @@
   cursor: pointer;
 }
 
+/* Between the label floor and cap the drawing fills the canvas; one that
+   runs down stays at the floor. A zoom draws it at its scale times its
+   natural width, so the zoom percent is what is drawn. */
 .viz .graph {
+  width: clamp(var(--graph-floor), 100%, var(--graph-cap));
   height: auto;
+}
+
+.viz .graph[data-flow="down"] {
+  width: var(--graph-floor);
+}
+
+.viz .canvas[data-sizing="chosen"] .graph {
+  width: calc(var(--viz-zoom) * var(--graph-natural));
+}
+
+/* The Hand tool and a held Space pan by a drag. The drawing takes no
+   pointer then, so nothing in it acts, lights up or looks clickable. */
+.viz .canvas:is([data-tool="hand"], [data-pan]) {
+  cursor: grab;
+}
+
+.viz .canvas[data-pan="dragging"] {
+  cursor: grabbing;
+}
+
+.viz .canvas:is([data-tool="hand"], [data-pan]) .graph,
+.viz .canvas:is([data-tool="hand"], [data-pan]) .graph *,
+.viz .canvas:is([data-tool="hand"], [data-pan]) .graph .edge path.hit {
+  pointer-events: none;
+}
+
+/* A zoom out keeps the height the canvas opened with, so the canvas does
+   not shrink from under the pointer and the page below it stays put. */
+.viz .canvas[data-sizing="chosen"] {
+  min-height: var(--viz-canvas-floor, 0);
 }
 
 .viz .graph text {
@@ -580,8 +614,8 @@
   padding: 16px;
 }
 
-.viz:fullscreen .graph {
-  width: max(var(--graph-floor), 100%) !important;
+.viz:fullscreen .canvas:not([data-sizing="chosen"]) .graph {
+  width: max(var(--graph-floor), 100%);
 }
 
 .viz .blocked-note {

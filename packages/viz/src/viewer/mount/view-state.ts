@@ -2,6 +2,7 @@ import { decodePayloads, legacyPayloads } from "../send/payloads.ts";
 import type { VizEvent, VizJson, VizLiveState, VizLiveStep } from "../../schema.ts";
 import { decodeValues } from "../fill.ts";
 import type { FocusStep } from "./focus.ts";
+import type { HeldViewport } from "../viewport/viewport.ts";
 import type { Payloads } from "../send/payloads.ts";
 import type { Selection } from "../graph.ts";
 import type { SentEvent } from "../explore.ts";
@@ -44,6 +45,10 @@ export interface ViewState {
   payloads: Payloads;
   /** What `blocked` was computed for; it is recomputed when any of it changes. */
   blockedFor: { live: VizLiveState; picked: ViewState["picked"]; payloads: Payloads } | undefined;
+  /** The canvas's scale and tool, kept across steps, moves along the path and redraws; not saved. Fitted until the reader zooms. */
+  viewport: HeldViewport;
+  /** The canvas height at the fitted width, in CSS pixels, where the height follows the drawing; a zoom out keeps at least this. Unset inside a capped canvas. */
+  canvasFloor: number | undefined;
 }
 
 export interface InitialViewOptions {
@@ -71,6 +76,8 @@ export function initialView(options: ViewerOptions, document: InitialViewOptions
       ...decodePayloads(options.payloads ?? []),
     },
     blockedFor: undefined,
+    viewport: { scale: 1, tool: "select", sizing: "fitted" },
+    canvasFloor: undefined,
   };
 }
 

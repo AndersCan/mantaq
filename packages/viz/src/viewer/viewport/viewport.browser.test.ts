@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "vite-plus/test";
 import type { Browser, Page } from "playwright";
+import { browserTestEnv } from "./env.ts";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import type { Point } from "./zoom.ts";
@@ -26,7 +27,10 @@ beforeAll(async () => {
   await server.listen();
   origin = server.resolvedUrls?.local[0] ?? "";
   // Classic scrollbars, as desktop Chrome on Windows and Linux draws them: they take room from the canvas.
-  browser = await chromium.launch({ ignoreDefaultArgs: ["--hide-scrollbars"] });
+  browser = await chromium.launch({
+    executablePath: browserTestEnv().chromiumPath,
+    ignoreDefaultArgs: ["--hide-scrollbars"],
+  });
 }, 60_000);
 
 afterAll(async () => {
@@ -143,6 +147,38 @@ test("zoomAt keeps the point of a centered drawing that grows past the canvas", 
     { scale: 1, put: true },
     { scale: 2, put: true },
   ]);
+}, 60_000);
+
+test("a long pinch of small steps keeps the first point under the pointer within a pixel", async () => {
+  const page = await pageWith(
+    "#canvas { width: 400px; height: 300px; overflow: auto; } #canvas svg { margin: 0 auto; }",
+  );
+  const drift = await page.evaluate(() => {
+    const create = window.viewportOf;
+    const canvas = document.querySelector<HTMLElement>("#canvas");
+    const drawing = canvas?.querySelector("svg") ?? undefined;
+    if (create === undefined || canvas === null || drawing === undefined) return Infinity;
+    const viewport = create(canvas, { drawing: () => drawing });
+    const pointer = { x: 173.3, y: 151.7 };
+    viewport.zoomAt(pointer, { scale: 0.5 });
+    function rect(): DOMRect {
+      return drawing?.getBoundingClientRect() ?? new DOMRect();
+    }
+    const start = { x: (pointer.x - rect().left) / 0.5, y: (pointer.y - rect().top) / 0.5 };
+    let largest = 0;
+    for (const factor of [
+      ...Array.from({ length: 80 }, () => 1.03),
+      ...Array.from({ length: 80 }, () => 1 / 1.03),
+    ]) {
+      viewport.zoomAt(pointer, { scale: viewport.state().scale * factor, kind: "pinch" });
+      const { scale } = viewport.state();
+      const shown = { x: rect().left + start.x * scale, y: rect().top + start.y * scale };
+      largest = Math.max(largest, Math.abs(shown.x - pointer.x), Math.abs(shown.y - pointer.y));
+    }
+    return largest;
+  });
+  expect(drift).toBeLessThan(1);
+  await page.close();
 }, 60_000);
 
 test("panBy scrolls the page for what a canvas with no height limit cannot", async () => {

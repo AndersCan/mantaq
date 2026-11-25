@@ -1,3 +1,5 @@
+import type { Size } from "./viewport/zoom.ts";
+
 const MARGIN = 16;
 
 /** A stretch of content pixels along one axis. */
@@ -185,6 +187,30 @@ function bandOf(root: HTMLElement, canvas: HTMLElement): Band {
   const start = Math.max(top, bar, coveredTop(root));
   const end = Math.min(bottom, panel, view);
   return end > start ? { top, start, end } : { top, start: top, end: bottom };
+}
+
+export interface CanvasRoomOptions {
+  canvas: HTMLElement;
+}
+
+/** The part of the canvas the reader sees, in window pixels: inside the window, below the name bar and above the Step panel. */
+export function shownArea(root: HTMLElement, options: CanvasRoomOptions): Area {
+  const { canvas } = options;
+  const band = bandOf(root, canvas);
+  const left = canvas.getBoundingClientRect().left + canvas.clientLeft;
+  const view = root.ownerDocument.defaultView?.innerWidth ?? left + canvas.clientWidth;
+  const across = { left: Math.max(left, 0), right: Math.min(left + canvas.clientWidth, view) };
+  const shown = across.right > across.left ? across : { left, right: left + canvas.clientWidth };
+  return { ...shown, top: band.start, bottom: band.end };
+}
+
+/** The room a fit fills: the canvas, or, where its height follows the drawing, its width by the window's height below what the page covers. */
+export function fitRoom(root: HTMLElement, options: CanvasRoomOptions): Size {
+  const { canvas } = options;
+  const view = root.ownerDocument.defaultView;
+  const capped = view?.getComputedStyle(canvas).maxHeight !== "none";
+  if (capped || view === null) return { width: canvas.clientWidth, height: canvas.clientHeight };
+  return { width: canvas.clientWidth, height: view.innerHeight - coveredTop(root) };
 }
 
 interface TopOptions {
