@@ -16,7 +16,6 @@ import { enteredGroupOf } from "../groups/group-machine.ts";
 import { html } from "../dom.ts";
 import { keepInView } from "../keep-in-view.ts";
 import type { ViewState } from "./view-state.ts";
-import type { VizMachine } from "../../schema.ts";
 
 /** Board width in units where the canvas has no size (not laid out). */
 const BOARD_UNITS_UNMEASURED = 800;
@@ -56,19 +55,30 @@ interface Landing {
   by?: FocusMove["by"];
 }
 
-/** Layout units a graph has across the canvas at the smallest label size; unset while the canvas has no width. */
-function graphRoom(root: HTMLElement): { room?: number } {
+interface RoomOptions {
+  focus: Focus;
+}
+
+/**
+ * Layout units a graph has across the canvas at the smallest label size, inside
+ * a machine opened or a group entered, where the canvas is capped in height and
+ * a tall drawing scrolls in it. Unset at the top, so a graph there keeps running
+ * across, and while the canvas has no width.
+ */
+function graphRoom(root: HTMLElement, options: RoomOptions): { room?: number } {
   const doc = root.ownerDocument;
   const width = (root.querySelector<HTMLElement>(".canvas") ?? root).clientWidth;
+  if (options.focus.steps.length === 0) return {};
   const style = doc.defaultView?.getComputedStyle(doc.documentElement);
   const rem = Number.parseFloat(style?.fontSize ?? "") || 16;
   return width > 0 ? { room: roomAtFloor(width, { rem }) } : {};
 }
 
 /** True when the graph drawn should run the other way at the canvas's width now. */
-function turnsAt(root: HTMLElement, shown: VizMachine): boolean {
+function turnsAt(root: HTMLElement, options: RoomOptions): boolean {
   const flow = root.querySelector(".canvas .graph")?.getAttribute("data-flow");
-  return typeof flow === "string" && flowFor(shown, graphRoom(root)) !== flow;
+  const room = graphRoom(root, options);
+  return typeof flow === "string" && flowFor(options.focus.drawn, room) !== flow;
 }
 
 /** What the canvas draws for the focus path (a board of boxes, one machine or a group entered), and every move along the path. */
@@ -176,15 +186,15 @@ export function canvasOf(options: CanvasOptions): Canvas {
       ...options.callbacks(),
       enter,
       leave,
-      ...graphRoom(root),
+      ...graphRoom(root, { focus }),
     });
     if (focus.part !== undefined) graph.setAttribute("data-zoom", focus.part);
     return [graph];
   }
   /** After a width change: draws again when the drawing no longer suits the width (a board laid out for another width, or a graph whose ranks should run the other way), then shows the current state. */
   function refit(): void {
-    const { canvas, drawn: shown } = options.focus();
-    if (canvas === "board" ? canvasUnits() !== drawnUnits : turnsAt(root, shown)) {
+    const focus = options.focus();
+    if (focus.canvas === "board" ? canvasUnits() !== drawnUnits : turnsAt(root, { focus })) {
       swap();
       options.mark();
     }

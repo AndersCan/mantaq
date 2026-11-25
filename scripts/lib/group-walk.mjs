@@ -114,6 +114,11 @@ function inCanvasView(element) {
   return across && below && rect.bottom <= box.top + canvas.clientHeight;
 }
 
+/** Runs in the page: whether the drawing is taller than the window. */
+function tallerThanWindow() {
+  return document.querySelector(".viz .graph").getBoundingClientRect().height > innerHeight;
+}
+
 /** Runs in the page: whether the canvas scrolls sideways. */
 function scrollsSideways() {
   const canvas = document.querySelector(".viz .canvas");
@@ -192,6 +197,25 @@ export async function groupWalkFailures(options) {
   return walks.flat();
 }
 
+/** What the reader would have to scroll for after `options.step`: the current state out of the canvas's view, a machine at the top taller than the window, or an entered group wider than the canvas at a docs-column width. */
+async function viewFailures(options) {
+  const { tab, step, screen } = options;
+  const failures = [];
+  const current = tab.locator(".viz .graph g.current").first();
+  if (!(await current.evaluate(inCanvasView))) {
+    failures.push("the state the walk is in is out of the canvas's view");
+  }
+  const top = step.shows.path.length === 0;
+  if (top && (await tab.evaluate(tallerThanWindow))) {
+    failures.push("the machine is drawn taller than the window");
+  }
+  const entered = !top && screen.groupFits === "fits";
+  if (entered && (await tab.evaluate(scrollsSideways))) {
+    failures.push("the group drawn is wider than the canvas");
+  }
+  return failures;
+}
+
 /** The walk in one tab sized as `options.screen`. */
 async function screenWalk(options) {
   const { screen } = options;
@@ -217,14 +241,8 @@ async function screenWalk(options) {
       failures.push(`${where}: after "${done}" the viewer shows ${shown}, not ${wanted}`);
       break;
     }
-    const current = tab.locator(".viz .graph g.current").first();
-    if (!(await current.evaluate(inCanvasView))) {
-      failures.push(`${where}: the state the walk is in is out of the canvas's view`);
-    }
-    const entered = step.shows.path.length > 0 && screen.groupFits === "fits";
-    if (entered && (await tab.evaluate(scrollsSideways))) {
-      failures.push(`${where}: the group drawn is wider than the canvas`);
-    }
+    const unseen = await viewFailures({ tab, step, screen });
+    for (const said of unseen) failures.push(`${where}: ${said}`);
     if (step.shows !== OUTSIDE) continue;
     const framed = JSON.stringify(await tab.evaluate(framing));
     if (framed !== FRAMED) {
