@@ -68,7 +68,7 @@ test("after Enter sends an arrow, focus goes to the first arrow that sends, then
   });
 });
 
-test("without a panel, a send the driver throws on says what it threw, not a step", () => {
+test("without a panel, a send that throws says what it threw", () => {
   const root = document.createElement("div");
   document.body.append(root);
   const { driver } = walkDriver(shop, { guarded: new Set() });
@@ -85,6 +85,6 @@ test("without a panel, a send the driver throws on says what it threw, not a ste
     .querySelector('.graph g.edge[data-edge-id="paying-paid-done"]')
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   expect(root.querySelector(".viz-main > .blocked-note")?.textContent).toBe(
-    "Handler threw: card declined",
+    "Step 1: paid: stayed in paying. It threw: card declined",
   );
 });

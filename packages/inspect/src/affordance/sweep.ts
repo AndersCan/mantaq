@@ -306,9 +306,9 @@ async function clickAt(sweepCase: SweepCase, at: ClickAtOptions): Promise<Click>
   const root = rootIn(window);
   if (root === undefined) return NO_CLICK;
   const mounted = mountAt(sweepCase, { ...at, root });
+  const found = reach(mounted.root, { reached: at.stand.reached });
   const errors: string[] = [];
   window.addEventListener("error", (event) => errors.push(errorText(event)));
-  const found = reach(mounted.root, { reached: at.stand.reached });
   const element = found[at.index];
   const before = sight(mounted.root);
   const name = element === undefined ? undefined : nameOf(element);

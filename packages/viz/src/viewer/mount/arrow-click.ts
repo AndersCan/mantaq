@@ -32,14 +32,14 @@ export function sayWhy(root: HTMLElement, from: ArrowSendContext): void {
   line.replaceChildren(...step, gap, why);
 }
 
-/** What the newest step did: `Step 3: take: stayed in cart`. The number tells one send from the next. A step the driver threw on took no step: the line says what it threw. */
+/** What the newest step did: `Step 3: take: stayed in cart`. The number tells one send from the next. A handler that threw: the line adds what it threw, in the words Details use. */
 function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
   const { live } = from.view;
   const last = live?.last;
   if (!live || !last) return [];
-  if (last.error) return [`Handler threw: ${last.error}`];
   const number = live.steps.length;
-  return [`Step ${number}: `, ...outcomeText(doc, from.machine, last)];
+  const step = [`Step ${number}: `, ...outcomeText(doc, from.machine, last)];
+  return last.error ? [...step, `. It threw: ${last.error}`] : step;
 }
 
 interface WhyTextOptions {

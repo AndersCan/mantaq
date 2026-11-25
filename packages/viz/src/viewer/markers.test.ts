@@ -30,7 +30,7 @@ function child(key: string, state: string): VizLiveChild {
 }
 
 function context(children: VizLiveChild[], over: Partial<MarkerContext> = {}): MarkerContext {
-  return { children, picked: null, onPick: () => undefined, ...over };
+  return { children, followedLook: "current", onPick: () => undefined, ...over };
 }
 
 const markers = (root: SVGSVGElement) =>
