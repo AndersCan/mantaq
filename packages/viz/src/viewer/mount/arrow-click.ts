@@ -26,9 +26,8 @@ export function sayWhy(root: HTMLElement, options: SayWhyOptions): void {
     line.replaceChildren();
     return;
   }
-  const answer = drawnArrowClick(from, { shown: options.shown, id: selection.id });
-  const { edge, click } = answer;
-  const justSent = edge !== undefined && isJustSent(answer, { view: from.view });
+  const { edge, click } = drawnArrowClick(from, { shown: options.shown, id: selection.id });
+  const justSent = edge !== undefined && isJustSent(edge, { view: from.view });
   const step = justSent ? stepLine(root.ownerDocument, from) : [];
   const why = justSent ? from.view.blocked.get(edge.id) : whyOf(click);
   const gap = step.length > 0 && why !== undefined ? ". " : "";
@@ -47,22 +46,13 @@ function stepLine(doc: Document, from: ArrowSendContext): Array<Node | string> {
   return last.error ? [...step, `. It threw: ${last.error}`] : step;
 }
 
-interface JustSentOptions {
+export interface JustSentOptions {
   view: ViewState;
 }
 
-/** True while the arrow of `answer` is the one the newest click sent: the line under the board says its step, and the arrow keeps the selected look. */
-export function isJustSent(answer: DrawnArrowClick, options: JustSentOptions): boolean {
-  const { edge } = answer;
+/** True while `edge` is the arrow the newest click sent: the line under the board and Details say what it did, and the arrow keeps the selected look. */
+export function isJustSent(edge: VizEdge | undefined, options: JustSentOptions): boolean {
   return edge !== undefined && options.view.sent?.edge === edge.id;
-}
-
-/** True when the canvas draws the selected arrow of `answer` as selected: the arrow just sent, and, with a panel, an arrow whose Details show, unless a guard blocks it, so its lock stays in sight. */
-export function marksSelected(answer: DrawnArrowClick, options: JustSentOptions): boolean {
-  const { view } = options;
-  if (isJustSent(answer, { view })) return true;
-  const blocked = answer.edge !== undefined && view.blocked.has(answer.edge.id);
-  return !view.diagramOnly && !blocked;
 }
 
 /** Why a click on an arrow sends nothing: the one reason text the hover title, the line under the board and its `?` share. */

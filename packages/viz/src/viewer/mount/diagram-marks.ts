@@ -1,8 +1,8 @@
 import { drawnNodeOf } from "../groups/fold-groups.ts";
 import { actingMemberOf } from "../groups/acting-member.ts";
 import { affordance, svg } from "../dom.ts";
-import { drawnArrowClick, followedLook, isJustSent, marksSelected, whyOf } from "./arrow-click.ts";
-import type { DrawnArrowClick } from "./arrow-click.ts";
+import { drawnArrowClick, followedLook, isJustSent, whyOf } from "./arrow-click.ts";
+import type { DrawnArrowClick, JustSentOptions } from "./arrow-click.ts";
 import type { Affordance } from "../dom.ts";
 import { drawChildMarkers, drawQueue } from "../markers.ts";
 import { listOf, markExplore } from "../explore.ts";
@@ -58,6 +58,14 @@ function drawnSelection(
   return { kind: "state", id: drawnNodeOf(options.shown, { state: selection.id }) };
 }
 
+/** True when the canvas draws the selected arrow of `answer` as selected: the arrow just sent, and, with a panel, an arrow whose Details show, unless a guard blocks it, so its lock stays in sight. */
+function marksSelected(answer: DrawnArrowClick, options: JustSentOptions): boolean {
+  const { view } = options;
+  if (isJustSent(answer.edge, { view })) return true;
+  const blocked = answer.edge !== undefined && view.blocked.has(answer.edge.id);
+  return !view.diagramOnly && !blocked;
+}
+
 /** The selection as the canvas marks it: a selected arrow only while `marksSelected` says so; the `?` of a blocked arrow marks itself, not the arrow. */
 function markedSelection(context: MarkDiagramContext): Selection | undefined {
   const { machine, view, driver, shown } = context;
@@ -105,7 +113,7 @@ function markHelp(help: SVGGElement, options: HelpOptions): void {
     return;
   }
   help.setAttribute("aria-label", `Why ${arrowName} sends nothing`);
-  const sentNow = isJustSent(answer, { view });
+  const sentNow = isJustSent(answer.edge, { view });
   if (why === undefined) affordance(help, "plain");
   else affordance(help, selected && !sentNow ? "current" : "button");
 }
