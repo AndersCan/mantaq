@@ -1,7 +1,10 @@
 import { decodeFocus, focusOf, focusTokens } from "./focus.ts";
 import { describe, expect, test } from "vite-plus/test";
 import type { VizDocument, VizMachine } from "../../schema.ts";
+import { VIZ_SCHEMA_VERSION } from "../../schema.ts";
 import { documentOf } from "../../validate/embed-document.ts";
+import { foldGroups } from "../groups/fold-groups.ts";
+import { groupedCheckout } from "../groups/shop-machines.ts";
 
 /** A board: the app's own `idle`, and the machines `stock` and `till` beside it; `till.paying` embeds `payment`. */
 function boardDocument(): VizDocument {
@@ -65,5 +68,19 @@ describe("the path in the address bar on a board", () => {
   test("a state cannot be entered from the board, only from its machine", () => {
     if (root === undefined) return;
     expect(decodeFocus(["till.paying"], { viz, root })).toStrictEqual([]);
+  });
+});
+
+describe("the machine the canvas draws", () => {
+  test("is the machine itself without groups, and its fold with them", () => {
+    const plain = boardDocument().machines[1];
+    const checkout = groupedCheckout();
+    if (plain === undefined) return;
+    const plainFocus = focusOf([], { viz: { ...boardDocument(), machines: [plain] }, root: plain });
+    const viz: VizDocument = { schemaVersion: VIZ_SCHEMA_VERSION, machines: [checkout] };
+    expect({
+      plain: plainFocus.drawn === plain,
+      grouped: focusOf([], { viz, root: checkout }).drawn === foldGroups(checkout),
+    }).toEqual({ plain: true, grouped: true });
   });
 });

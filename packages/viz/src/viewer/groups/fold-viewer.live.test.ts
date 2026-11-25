@@ -35,6 +35,7 @@ interface WalkOptions {
 /** A hand-written driver that walks the machine's own edges: an event takes the first unguarded edge from the current state, or stays. */
 function walkDriver(machine: VizMachine, options: WalkOptions) {
   const sent: VizStep[] = [];
+  let listener: ((state: VizLiveState) => void) | undefined;
   function stepFrom(state: string, step: VizStep): VizLiveStep {
     const event = step.kind === "event" ? step.event : "advance";
     const edge = machine.edges.find(
@@ -84,16 +85,24 @@ function walkDriver(machine: VizMachine, options: WalkOptions) {
       return run(sent);
     },
     dryRun: (steps) => steps.map((step) => stepFrom(run(sent).state, step)),
+    listen: (callback) => {
+      listener = callback;
+    },
   };
-  return { driver, sent };
+  /** The actor moved by itself, as an effect result does: the viewer hears `events` sent. */
+  function arrive(events: ReadonlyArray<string>): void {
+    for (const event of events) sent.push({ kind: "event", event, payload: null });
+    listener?.(run(sent));
+  }
+  return { driver, sent, arrive };
 }
 
 function mount(guarded: ReadonlySet<string> = new Set()) {
   const root = document.createElement("div");
   document.body.append(root);
-  const { driver, sent } = walkDriver(shop, { guarded });
+  const { driver, sent, arrive } = walkDriver(shop, { guarded });
   mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [shop] }, { driver });
-  return { root, sent };
+  return { root, sent, arrive };
 }
 
 interface ArrowQuery {
@@ -233,5 +242,18 @@ describe("a grouped machine in the viewer", () => {
       states: ["chargingCard", "confirming"],
       state: "confirming",
     });
+  });
+
+  test("the canvas scrolls to the group node that draws the current state", () => {
+    const { root, arrive } = mount();
+    const canvas = root.querySelector<HTMLElement>(".canvas");
+    const shipping = root.querySelector('.graph g.state[data-node-id="@shipping"]');
+    if (canvas === null || shipping === null) return;
+    Object.defineProperty(canvas, "clientWidth", { value: 300 });
+    Object.defineProperty(canvas, "scrollWidth", { value: 6000 });
+    shipping.getBoundingClientRect = () =>
+      DOMRect.fromRect({ x: 3000, y: 0, width: 120, height: 40 });
+    arrive(["checkout", "charged", "confirmed"]);
+    expect(canvas.scrollLeft).toBe(3000 + 120 + 16 - 300);
   });
 });
