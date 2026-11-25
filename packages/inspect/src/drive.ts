@@ -9,7 +9,7 @@ import type {
   VizRemovedChild,
   VizStep,
 } from "@mantaq/viz";
-import { isEmbedEffect, runningEmbeds } from "./embeds/live-embeds.ts";
+import { drivesChild, runningEmbeds } from "./embeds/live-embeds.ts";
 import { actorMapsOf } from "./maps.ts";
 import type { ActorMapLike } from "./maps.ts";
 import type { EmbedPart } from "./embeds/live-embeds.ts";
@@ -87,11 +87,36 @@ function hasSignal(value: unknown): value is { signal: AbortSignal } {
   );
 }
 
-/** Swap each effect body for a stub that only records its signal; recurse into regions. An embed effect keeps running: a held one builds no child, so `forward` would reach nothing. */
+interface HeldEmbedOptions {
+  /** The embed's own effect fn; its `embedded` tag goes on the new one, so tools still find the child. */
+  effect: unknown;
+  held: HeldEffect[];
+}
+
+/** An embed that forwards inputs or keeps its child snapshot still builds its child, so forwarded inputs reach it; the child's effects are held in turn. */
+function heldEmbed(options: HeldEmbedOptions): (input: unknown) => unknown {
+  const { effect, held } = options;
+  function childBuilt(child: unknown): void {
+    if (isActor(child)) holdEffects(child, held);
+  }
+  function runHeld(input: unknown): unknown {
+    if (typeof effect !== "function") return undefined;
+    const given = typeof input === "object" && input !== null ? input : {};
+    return Reflect.apply(effect, undefined, [{ ...given, childBuilt }]);
+  }
+  const tag: unknown = typeof effect === "function" ? Reflect.get(effect, "embedded") : undefined;
+  return Object.assign(runHeld, { embedded: tag });
+}
+
+/** Swap each effect body for a stub that only records its signal; recurse into regions. An embed that drives its child keeps running, with the child's effects held. */
 function holdEffects(actor: AnyActor<unknown>, held: HeldEffect[]): void {
   for (const list of Object.values(actor.options?.effects ?? {})) {
     for (const [index, entry] of list.entries()) {
-      if (!isEffectEntry(entry) || isEmbedEffect(entry)) continue;
+      if (!isEffectEntry(entry)) continue;
+      if (drivesChild(entry)) {
+        list[index] = { ...entry, fn: heldEmbed({ effect: entry.fn, held }) };
+        continue;
+      }
       list[index] = {
         ...entry,
         fn: (input: unknown) => {
@@ -104,7 +129,10 @@ function holdEffects(actor: AnyActor<unknown>, held: HeldEffect[]): void {
 }
 
 export interface DriverOptions {
-  /** `held` (default): effect bodies do not run and the viewer asks what they report; first-state effects still run, because core runs them while the actor is built. `real`: they run. */
+  /**
+   * `held` (default): effect bodies do not run and the viewer asks what they report; first-state effects still run, because core runs them while the actor is built.
+   * An embed that forwards inputs or keeps its child snapshot still builds its child, whose effects are held the same way. `real`: they run.
+   */
   effectMode?: "held" | "real";
 }
 
@@ -537,11 +565,8 @@ function embedParts(
   actors: Readonly<Record<string, AnyActor<unknown>>>,
 ): EmbedPart[] {
   const parts: EmbedPart[] = [{ actor, prefix: "" }];
-  for (const region of regionActors(actor)) {
-    parts.push({ actor: region.actor, prefix: `${region.path}.` });
-  }
-  for (const [name, part] of Object.entries(actors)) {
-    parts.push({ actor: part, prefix: `${name}.` });
+  for (const part of withActors(regionActors(actor), actors)) {
+    parts.push({ actor: part.actor, prefix: `${part.path}.` });
   }
   return parts;
 }

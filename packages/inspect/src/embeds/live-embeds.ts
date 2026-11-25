@@ -10,18 +10,26 @@ export interface EmbedPart {
   prefix: string;
 }
 
-/** True when `effect` is an embed effect: holding it would leave no child to forward events to. */
-export function isEmbedEffect(effect: unknown): boolean {
-  return embedTagOf(effect) !== undefined;
+/** True for an embed effect that forwards inputs or keeps its child snapshot: holding it would leave no child to forward to or to show. */
+export function drivesChild(effect: unknown): boolean {
+  const tag = embedTagOf(effect);
+  return tag !== undefined && (tag.forward.length > 0 || tag.keep !== undefined);
 }
 
-/** The state name a snapshot holds; undefined when the value is not a snapshot. */
-function snapshotState(value: unknown): string | undefined {
+/** What a kept child snapshot says: the child's state and whether it ended. */
+interface KeptChild {
+  state: string;
+  done: boolean;
+}
+
+/** The state a snapshot holds; undefined when the value is not a snapshot. */
+function keptChild(value: unknown): KeptChild | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const path: unknown = Reflect.get(value, "path");
   if (!Array.isArray(path)) return undefined;
   const [name]: unknown[] = path;
-  return typeof name === "string" ? name : undefined;
+  const done = Reflect.get(value, "done") === true;
+  return typeof name === "string" ? { state: name, done } : undefined;
 }
 
 interface KeptOptions {
@@ -29,34 +37,41 @@ interface KeptOptions {
   tag: EmbedTag;
 }
 
-/** The child state in the context field that the tag's `keep` names; undefined without `keep`. */
-function keptState(options: KeptOptions): string | undefined {
+/** The child in the context field that the tag's `keep` names; undefined without `keep`. */
+function keptOf(options: KeptOptions): KeptChild | undefined {
   const { actor, tag } = options;
   if (tag.keep === undefined) return undefined;
   const context: unknown = actor.snapshot().context;
   if (typeof context !== "object" || context === null) return undefined;
-  return snapshotState(Reflect.get(context, tag.keep));
+  return keptChild(Reflect.get(context, tag.keep));
+}
+
+/** The first embed of a state, as the diagram draws it: a state names one machine. */
+function firstTag(entries: ReadonlyArray<unknown>): EmbedTag | undefined {
+  for (const entry of entries) {
+    const tag = embedTagOf(entry);
+    if (tag !== undefined) return tag;
+  }
+  return undefined;
 }
 
 /**
- * The embeds of `parts` whose state is current. Each child state comes from the parent's context field
- * that the embed's `keep` names, so it is what the parent's own snapshot holds.
+ * The embeds of the current states of `parts`, leaving out a child that ended. Each child state comes from
+ * the parent's context field that the embed's `keep` names, so it is what the parent's own snapshot holds.
  */
 export function runningEmbeds(parts: ReadonlyArray<EmbedPart>): VizLiveEmbed[] {
   const running: VizLiveEmbed[] = [];
   for (const { actor, prefix } of parts) {
     const local = actor.state.name;
-    for (const entry of actor.options?.effects?.[local] ?? []) {
-      const tag = embedTagOf(entry);
-      if (tag === undefined) continue;
-      const current = keptState({ actor, tag });
-      running.push({
-        state: `${prefix}${local}`,
-        machine: tag.machine.id,
-        forward: [...tag.forward],
-        ...(current === undefined ? {} : { current }),
-      });
-    }
+    const tag = firstTag(actor.options?.effects?.[local] ?? []);
+    const kept = tag === undefined ? undefined : keptOf({ actor, tag });
+    if (tag === undefined || kept?.done === true) continue;
+    running.push({
+      state: `${prefix}${local}`,
+      machine: tag.machine.id,
+      forward: [...tag.forward],
+      ...(kept === undefined ? {} : { current: kept.state }),
+    });
   }
   return running;
 }

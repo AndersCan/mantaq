@@ -397,6 +397,11 @@ function editorOf(upload: ReturnType<typeof uploadMachine>, options?: EditorOpti
   return { actor, clock, snapshots };
 }
 
+/** What the test reads of a child that `childBuilt` gets. */
+interface NamedChild {
+  state: { name: string };
+}
+
 describe("embed forward", () => {
   test("a forwarded input moves the child, and the child end moves the parent", () => {
     const { actor, clock } = editorOf(uploadMachine({ failures: 1 }));
@@ -497,6 +502,22 @@ describe("embed forward", () => {
         uploadBroke: ["broken"],
       },
     });
+  });
+
+  test("an effect input with childBuilt gets each child before the child gets an event", () => {
+    const { actor } = editorOf(uploadMachine({ failures: 0 }));
+    const [entry] = actor.options.effects["saving"] ?? [];
+    const built: string[] = [];
+    const abort = new AbortController();
+    const input = {
+      signal: abort.signal,
+      clock: VirtualClock(),
+      emit: () => undefined,
+      childBuilt: (child: NamedChild) => built.push(child.state.name),
+    };
+    Reflect.apply(entry?.fn ?? (() => undefined), undefined, [input]);
+    abort.abort();
+    expect(built).toEqual(["uploading"]);
   });
 
   test("a forwarded input keeps its payload", () => {

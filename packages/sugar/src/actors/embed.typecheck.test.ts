@@ -218,6 +218,8 @@ describe("embed types", () => {
         embed(builder, { in: idle, ...endings, snapshot: checkChanged, keep: "attempts" });
         // @ts-expect-error -- the context has no `missing` field
         embed(builder, { in: idle, ...endings, snapshot: checkChanged, keep: "missing" });
+        // @ts-expect-error -- without a snapshot event, no handler writes the field
+        embed(builder, { in: idle, ...endings, keep: "check" });
       },
     });
     expectTypeOf<Embedded["keep"]>().toEqualTypeOf<string | undefined>();

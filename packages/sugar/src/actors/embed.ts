@@ -133,7 +133,7 @@ interface EmbedOptions<
   /** A parent internal event that carries the child snapshot, once on entry and then after each child change. The parent handles it in `in`. */
   snapshot?: Changed & SnapshotFits<Changed, Built>;
   /** The context field where the parent's `snapshot` handler keeps the child snapshot. Embed does not write it; tools read the child state from it. */
-  keep?: SnapshotFieldOf<ActorContext, Built>;
+  keep?: [Changed] extends [never] ? never : SnapshotFieldOf<ActorContext, Built>;
 }
 
 /**
@@ -173,6 +173,7 @@ export function embed<
       return;
     }
     const child = actorOf(machine.create({ clock }));
+    tellBuilt(input, { child });
     running = child;
     input.signal.addEventListener("abort", () => {
       if (running === child) running = undefined;
@@ -212,6 +213,16 @@ export function embed<
   for (const event of forward) {
     builder.on(options.in, { event, handler: (sent) => running?.send(sent) });
   }
+}
+
+interface BuiltChild {
+  child: AnyActor<unknown>;
+}
+
+/** A tool that drives the parent, such as the live viewer's driver, can pass `childBuilt` on the effect input: it gets each child before the child gets any event, for example to hold the child's effects. */
+function tellBuilt(input: object, built: BuiltChild): void {
+  const childBuilt: unknown = Reflect.get(input, "childBuilt");
+  if (typeof childBuilt === "function") Reflect.apply(childBuilt, undefined, [built.child]);
 }
 
 function actorOf(built: Made): AnyActor<unknown> {

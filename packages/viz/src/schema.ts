@@ -285,7 +285,7 @@ export interface VizRemovedChild extends VizLiveChild {
   until: number;
 }
 
-/** A machine that a current state embeds, running now. */
+/** A machine that a current state embeds. */
 export interface VizLiveEmbed {
   /** Id of the state that embeds it, as the diagram names it ("pickingUp", "upload.saving"). */
   state: string;
@@ -293,7 +293,7 @@ export interface VizLiveEmbed {
   machine: string;
   /** Inputs of the embedding machine that embed sends on to the child, in the order `forward` lists them. */
   forward: string[];
-  /** The child's current state id, from the last snapshot event the parent took; omitted when the embed has no `snapshot` event or none arrived yet. */
+  /** The child's current state id, from the context field that the embed's `keep` names; omitted without `keep`, or while that field holds no snapshot. */
   current?: string;
 }
 
@@ -318,7 +318,7 @@ export interface VizLiveState {
   effectMode: "held" | "real";
   /** Held effects of the active state still waiting for an answer (their state not left), in the order they started. [] in real mode. */
   waiting: string[];
-  /** Machines the current states embed, running now: the root's own states, its regions' and its returned machines'. Omitted: the driver does not report them. */
+  /** The machine each current state embeds: the root's own states, its regions' and its returned machines'. A child that ended is left out. Omitted: the driver does not report them. */
   embeds?: VizLiveEmbed[];
 }
 
