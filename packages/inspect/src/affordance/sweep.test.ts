@@ -64,6 +64,14 @@ function everyStateAButton(root: HTMLElement): void {
   }
 }
 
+/** A tab stop with no handler: it looks clickable to the keyboard and does nothing. */
+function deadTabStop(root: HTMLElement): void {
+  const stop = root.ownerDocument.createElement("span");
+  stop.setAttribute("tabindex", "0");
+  stop.textContent = "Focus me";
+  root.querySelector(".panel")?.append(stop);
+}
+
 test("the viewer as it is has no dead element", async () => {
   expect(failureLines(await sweep(plain))).toEqual([]);
 });
@@ -71,50 +79,60 @@ test("the viewer as it is has no dead element", async () => {
 test("an arrow that shows as a button but sends nothing is reported with its walk", async () => {
   const report = await sweep(plain, { afterMount: everyArrowAButton });
   expect(failureLines(report)).toEqual([
-    'plain: walk [], no driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
-    'plain: walk [start], driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
-    'plain: walk [], no driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
-    'plain: walk [start], driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing',
+    'plain: walk [], no driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [start], driver, with panel, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], no driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [start], driver, diagram only, focus []: g.edge[data-edge-id="idle-start-busy"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
   ]);
 });
 
 test("a button that does nothing is reported", async () => {
   const report = await sweep(plain, { afterMount: deadButton });
   expect(failureLines(report)).toEqual([
-    'plain: walk [], no driver, with panel, focus []: button "Open" changes nothing',
-    'plain: walk [], driver, with panel, focus []: button "Open" changes nothing',
-    'plain: walk [start], driver, with panel, focus []: button "Open" changes nothing',
+    'plain: walk [], no driver, with panel, focus []: button "Open" changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], driver, with panel, focus []: button "Open" changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [start], driver, with panel, focus []: button "Open" changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
   ]);
 });
 
 test("a button whose click throws is reported, with the error", async () => {
   const report = await sweep(plain, { afterMount: throwingButton });
   expect(failureLines(report)).toEqual([
-    'plain: walk [], no driver, with panel, focus []: button "Send" throws: no driver for this',
-    'plain: walk [], no driver, with panel, focus []: button "Send" changes nothing',
-    'plain: walk [], driver, with panel, focus []: button "Send" throws: no driver for this',
-    'plain: walk [], driver, with panel, focus []: button "Send" changes nothing',
-    'plain: walk [start], driver, with panel, focus []: button "Send" throws: no driver for this',
-    'plain: walk [start], driver, with panel, focus []: button "Send" changes nothing',
+    'plain: walk [], no driver, with panel, focus []: button "Send" throws: no driver for this. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], no driver, with panel, focus []: button "Send" changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], driver, with panel, focus []: button "Send" throws: no driver for this. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], driver, with panel, focus []: button "Send" changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [start], driver, with panel, focus []: button "Send" throws: no driver for this. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [start], driver, with panel, focus []: button "Send" changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
   ]);
 });
 
 test("a walk that does not replay is reported", async () => {
   const report = await sweep({ ...plain, walks: [["start", "nope=[1"]] });
   expect(failureLines(report)).toEqual([
-    "plain: walk [start, nope=[1], driver, with panel, focus []: the walk replays only 1 of 2 steps",
-    "plain: walk [start, nope=[1], driver, diagram only, focus []: the walk replays only 1 of 2 steps",
+    "plain: walk [start, nope=[1], driver, with panel, focus []: the walk replays only 1 of 2 steps. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).",
+    "plain: walk [start, nope=[1], driver, diagram only, focus []: the walk replays only 1 of 2 steps. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).",
   ]);
 });
 
 test("a state that only gets outlined, with no panel to open, is reported", async () => {
   const report = await sweep(plain, { afterMount: everyStateAButton });
   expect(failureLines(report)).toEqual([
-    'plain: walk [], no driver, diagram only, focus []: g.state[data-node-id="busy"] changes nothing',
-    'plain: walk [], no driver, diagram only, focus []: g.state.initial[data-node-id="idle"] changes nothing',
-    'plain: walk [], driver, diagram only, focus []: g.state[data-node-id="busy"] changes nothing',
-    'plain: walk [], driver, diagram only, focus []: g.state.initial.current[data-node-id="idle"] changes nothing',
-    'plain: walk [start], driver, diagram only, focus []: g.state.current[data-node-id="busy"] changes nothing',
-    'plain: walk [start], driver, diagram only, focus []: g.state.initial[data-node-id="idle"] changes nothing',
+    'plain: walk [], no driver, diagram only, focus []: g.state[data-node-id="busy"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], no driver, diagram only, focus []: g.state.initial[data-node-id="idle"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], driver, diagram only, focus []: g.state[data-node-id="busy"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [], driver, diagram only, focus []: g.state.initial.current[data-node-id="idle"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [start], driver, diagram only, focus []: g.state.current[data-node-id="busy"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+    'plain: walk [start], driver, diagram only, focus []: g.state.initial[data-node-id="idle"] changes nothing. Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).',
+  ]);
+});
+
+test("a tab stop that does nothing is reported", async () => {
+  const report = await sweep(plain, { afterMount: deadTabStop });
+  const fix = "Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).";
+  expect(failureLines(report)).toEqual([
+    `plain: walk [], no driver, with panel, focus []: span "Focus me" changes nothing. ${fix}`,
+    `plain: walk [], driver, with panel, focus []: span "Focus me" changes nothing. ${fix}`,
+    `plain: walk [start], driver, with panel, focus []: span "Focus me" changes nothing. ${fix}`,
   ]);
 });

@@ -28,12 +28,15 @@ for (const sweepCase of [...exampleCases(), ...fixtureCases()]) {
     `every element of ${sweepCase.name} that looks clickable changes the view`,
     async () => {
       const report = await sweep(sweepCase);
-      const floor = FLOORS[sweepCase.name] ?? { stands: 1, clicks: 1 };
+      const floor = FLOORS[sweepCase.name];
       const covered = {
         stands: Math.min(report.stands, floor.stands),
         clicks: Math.min(report.clicks, floor.clicks),
       };
-      expect({ failures: failureLines(report), covered }).toEqual({ failures: [], covered: floor });
+      expect({ failures: failureLines(report), covered }).toEqual({
+        failures: [],
+        covered: floor ?? "a floor in FLOORS",
+      });
     },
     CASE_TIMEOUT_MS,
   );

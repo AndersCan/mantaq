@@ -94,6 +94,9 @@ export async function sweep(
   return report;
 }
 
+/** What the reader of a failure does about it. */
+const FIX = "Make it plain, or make the click do something (AGENTS.md, Docs and viz UI blocks).";
+
 /** One line per failure: the machine, the walk prefix, the rest of the stand, and what went wrong. */
 export function failureLines(report: SweepReport): string[] {
   const lines: string[] = [];
@@ -102,7 +105,7 @@ export function failureLines(report: SweepReport): string[] {
     const walk = stand.walk.join(", ");
     const focus = stand.focus.join(" > ");
     lines.push(
-      `${failure.machine}: walk [${walk}], ${stand.driving}, ${stand.layout}, focus [${focus}]: ${failure.problem}`,
+      `${failure.machine}: walk [${walk}], ${stand.driving}, ${stand.layout}, focus [${focus}]: ${failure.problem}. ${FIX}`,
     );
   }
   return lines;

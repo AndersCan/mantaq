@@ -3,9 +3,9 @@
  * (a `pointer` cursor or role=button), each in a fresh tab, and reports the clicks
  * that changed nothing on the page (no text, mark, panel or URL moved) or threw.
  */
+import { join, relative, sep } from "node:path";
 import { OUTLINE_ONLY, SHOWN_ATTRIBUTES } from "../../packages/inspect/src/affordance/shown.ts";
-import { relative, sep } from "node:path";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 /** How long a click may take to show, for an effect or a redraw on the next frame. */
 const SETTLE_MS = 100;
@@ -18,6 +18,12 @@ const SIGHT = { action: "sight", shown: SHOWN_ATTRIBUTES, outlineOnly: OUTLINE_O
 
 /** Tabs open at the same time. */
 const TABS = 6;
+
+/** How many viewers the built HTML of `options.page` holds: one `data-mantaq-viz` host each. */
+function viewerHosts(options) {
+  const html = readFileSync(join(options.dist, options.page, "index.html"), "utf8");
+  return html.split("data-mantaq-viz").length - 1;
+}
 
 /** Every built page, as a path under the site's base: `getting-started/events/`. */
 function builtPages(dist) {
@@ -180,11 +186,12 @@ async function sweepViewers(options) {
   const counted = await inBatches(options.pages.map((page) => () => countOn({ ...options, page })));
   const problems = [];
   const swept = [];
-  const report = { pages: swept, viewers: 0, clicks: 0, problems };
+  const report = { pages: swept, viewers: 0, viewersOn: {}, clicks: 0, problems };
   const clicks = [];
   for (const { page, viewers, count } of counted) {
     if (viewers === 0) continue;
     swept.push(`/${page}`);
+    report.viewersOn[page] = viewers;
     report.viewers += viewers;
     for (let index = 0; index < count; index += 1) {
       clicks.push(() => clickOn({ ...options, page, index, viewers }));
@@ -242,6 +249,15 @@ export async function clickFailures(options) {
   for (const { name, says } of caught) {
     if (!planted.problems.some((problem) => problem.includes(says))) {
       failures.push(`docs-live-check: the click sweep missed a ${name} on ${PLANTED_PAGE}`);
+    }
+  }
+  for (const page of builtPages(options.dist)) {
+    const hosts = viewerHosts({ dist: options.dist, page });
+    const mounted = swept.viewersOn[page] ?? 0;
+    if (mounted < hosts) {
+      failures.push(
+        `docs-live-check: /${page} has ${hosts} viewers but the sweep found ${mounted} mounted`,
+      );
     }
   }
   for (const page of options.mustSweep) {
