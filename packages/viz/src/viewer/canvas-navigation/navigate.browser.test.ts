@@ -432,18 +432,22 @@ test("on a page the reader has not touched, Space scrolls the page and Ctrl+= is
   await page.waitForFunction(() => scrollY > 0);
   await page.keyboard.press("Control+Equal");
   const untouched = await drawn(page);
-  const now = await emptySpot(page);
-  await page.mouse.click(now.x, now.y);
-  await page.keyboard.press("Control+Equal");
-  const touched = await drawn(page);
+  await page.close();
+  // A fresh page: no smooth scroll from Space is still running there.
+  const fresh = await viewerPage();
+  const now = await emptySpot(fresh);
+  await fresh.mouse.click(now.x, now.y);
+  await fresh.keyboard.press("Control+Equal");
+  const touched = await drawn(fresh);
+  await fresh.evaluate(() => scrollTo({ top: 2000, behavior: "instant" }));
+  await fresh.keyboard.press("Control+Equal");
+  const away = await drawn(fresh);
   expect({
     untouched: untouched.scale === opened.scale,
     touched: touched.scale > opened.scale,
-  }).toEqual({
-    untouched: true,
-    touched: true,
-  });
-  await page.close();
+    away: away.scale === touched.scale,
+  }).toEqual({ untouched: true, touched: true, away: true });
+  await fresh.close();
 }, 60_000);
 
 test("a pinch out from low on the canvas keeps the canvas under the pointer and every step in the viewer", async () => {
@@ -474,5 +478,37 @@ test("a pinch out from low on the canvas keeps the canvas under the pointer and 
     kept: true,
     smaller: true,
   });
+  await page.close();
+}, 60_000);
+
+test("Space and a drag pan on the first try while a button outside the drawing has focus, and the middle button pans too", async () => {
+  const page = await viewerPage();
+  await zoomTo300(page);
+  const tab = page.getByRole("tab", { name: "Details" });
+  await tab.focus();
+  // Focus scrolled the tab into view; the corner of the canvas must be on screen again.
+  await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+  const spot = await emptySpot(page);
+  await page.mouse.move(spot.x + 200, spot.y + 40);
+  const before = await drawn(page);
+  await page.keyboard.down("Space");
+  await page.mouse.down();
+  await page.mouse.move(spot.x + 100, spot.y + 40, { steps: 4 });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  const spaced = await drawn(page);
+  const pressed = await tab.getAttribute("aria-selected");
+  await page.mouse.move(spot.x + 200, spot.y + 40);
+  await page.mouse.down({ button: "middle" });
+  await page.mouse.move(spot.x + 150, spot.y + 40, { steps: 4 });
+  await page.mouse.up({ button: "middle" });
+  const middled = await drawn(page);
+  const sent = await page.evaluate(() => window.sent?.length);
+  expect({
+    spaced: spaced.scroll.x - before.scroll.x,
+    pressed,
+    middled: Math.abs(middled.scroll.x - spaced.scroll.x - 50) <= 3,
+    sent,
+  }).toEqual({ spaced: 100, pressed: "false", middled: true, sent: 0 });
   await page.close();
 }, 60_000);

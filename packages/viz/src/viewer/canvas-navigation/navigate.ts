@@ -77,6 +77,7 @@ export function listenNavigation(root: HTMLElement, options: NavigationOptions):
     "wheel",
     (event) => {
       const viewport = current();
+      if (event.defaultPrevented) return;
       const onCanvas = canvasUnder(root, { target: event.target }) !== undefined;
       const going = event.timeStamp - keys.lastZoom < PINCH_GAP_MS;
       if (viewport === undefined || !(onCanvas || going)) return;
@@ -108,13 +109,14 @@ export function listenNavigation(root: HTMLElement, options: NavigationOptions):
     "keydown",
     (event) => {
       const viewport = current();
-      const space = isPlainSpace(event) && keysHere(root, { event, keys });
-      const free = space && overCanvas(root) && !takesSpace(root, { target: event.target });
-      if (viewport === undefined || !free) return;
-      event.preventDefault();
-      event.stopPropagation();
+      const space = isPlainSpace(event) && keysHere(root, { event, keys }) && overCanvas(root);
+      if (viewport === undefined || !space) return;
       keys.spaceDown = true;
       if (viewport.state().pan === "none") viewport.setPan("held");
+      // A focused control keeps its press for a tap; a drag blurs it, which cancels the press.
+      if (takesSpace(root, { target: event.target })) return;
+      event.preventDefault();
+      event.stopPropagation();
     },
     { capture: true },
   );
@@ -225,13 +227,22 @@ interface KeysHereOptions {
   keys: KeyState;
 }
 
-/** True for a key from inside the viewer, outside a text field and the host's own screen; or from a page where nothing has focus and the reader last touched this viewer. */
+/** True for a key from inside the viewer, outside a text field and the host's own screen; or from a page where nothing has focus, the reader last touched this viewer, and it is on screen. */
 function keysHere(root: HTMLElement, options: KeysHereOptions): boolean {
   const { target } = options.event;
   if (target instanceof Element && root.contains(target)) return !typesHere(target);
   const doc = root.ownerDocument;
   const unfocused = doc.activeElement === null || doc.activeElement === doc.body;
-  return unfocused && options.keys.touched;
+  return unfocused && options.keys.touched && onScreen(root);
+}
+
+/** Some of the canvas is inside the window: a viewer scrolled out of sight leaves the keys to the page. */
+function onScreen(root: HTMLElement): boolean {
+  const rect = root.querySelector(".canvas")?.getBoundingClientRect();
+  const view = root.ownerDocument.defaultView;
+  if (rect === undefined || view === null) return false;
+  const across = rect.right > 0 && rect.left < view.innerWidth;
+  return across && rect.bottom > 0 && rect.top < view.innerHeight;
 }
 
 function overCanvas(root: HTMLElement): boolean {
