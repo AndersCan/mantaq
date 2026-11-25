@@ -41,8 +41,14 @@ function mount(options: ViewerOptions = {}) {
   return { root, sent };
 }
 
+/** A click as a browser sends it: the pointer goes down first. */
 function press(element: Element | null | undefined): void {
+  element?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
   element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+}
+
+function blur(): void {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 }
 
 function escape(element: Element | null | undefined): void {
@@ -235,14 +241,49 @@ describe("entering a group", () => {
     });
   });
 
-  test("with two viewers in a group and nothing focused, Escape moves neither", () => {
+  test("with nothing focused, Escape moves only the viewer a link opened, or the one last touched", () => {
     const first = mount({ focus: ["@payment"] });
     const second = mount({ focus: ["@shipping"] });
     escape(document.body);
-    expect([shown(first.root).path, shown(second.root).path]).toStrictEqual([
-      ["shop", "payment"],
-      ["shop", "shipping"],
-    ]);
+    const opened = [shown(first.root).path, shown(second.root).path];
+    enter(first.root, { id: "@payment" });
+    second.root.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    blur();
+    escape(document.body);
+    expect({ opened, touched: [shown(first.root).path, shown(second.root).path] }).toStrictEqual({
+      opened: [[], ["shop", "shipping"]],
+      touched: [["shop", "payment"], []],
+    });
+  });
+
+  test("at the top level, with focus lost after a Details link, Escape closes Details", () => {
+    const { root } = mount();
+    press(node(root, { id: "@payment" }));
+    press(root.querySelector('[data-state-link="confirming"]'));
+    const lost = document.activeElement === document.body;
+    escape(document.body);
+    expect({ lost, details: root.querySelectorAll(".details").length }).toStrictEqual({
+      lost: true,
+      details: 0,
+    });
+  });
+
+  test("Escape in a text field does nothing, and closing Details moves focus from the panel to its tab", () => {
+    const { root } = mount();
+    enter(root, { id: "@payment" });
+    press(node(root, { id: "confirming" }));
+    const field = document.createElement("input");
+    root.querySelector(".panel")?.append(field);
+    escape(field);
+    const typed = root.querySelectorAll(".details").length;
+    root.querySelector<HTMLElement>('[data-tab="details"]')?.focus();
+    escape(document.activeElement);
+    expect({
+      typed,
+      closed: root.querySelectorAll(".details").length,
+      focused: document.activeElement?.getAttribute("data-tab"),
+      path: shown(root).path,
+    }).toStrictEqual({ typed: 1, closed: 0, focused: "details", path: ["shop", "payment"] });
   });
 
   test("a stub goes back, onto the node that draws its state, selected with its Details open", () => {
@@ -333,16 +374,27 @@ describe("the path in the address bar", () => {
     );
   });
 
-  test("a link whose path does not resolve opens as far as it does, and the bar says so until the next move", () => {
+  test("a link whose path does not resolve opens as far as it does, and the bar says so until the next move or step", () => {
     const { root } = mount({ focus: ["@nowhere", "@payment"] });
     const opened = shown(root);
     const said = root.querySelector('.viz-bar [role="status"].focus-notice')?.textContent;
     enter(root, { id: "@payment" });
-    const after = root.querySelectorAll(".focus-notice").length;
-    expect({ opened, said, after }).toStrictEqual({
+    const entered = root.querySelectorAll(".focus-notice").length;
+    const walked = mount({ focus: ["@nowhere"] }).root;
+    press(arrow(walked, { id: "inCart-checkout-chargingCard" }));
+    const empty = mount({ focus: [""] }).root;
+    expect({
+      opened,
+      said,
+      entered,
+      walked: walked.querySelectorAll(".focus-notice").length,
+      empty: empty.querySelectorAll(".focus-notice").length,
+    }).toStrictEqual({
       opened: atShop,
-      said: 'No group "@nowhere" in shop. The link opens shop.',
-      after: 0,
+      said: 'No group "@nowhere" in shop. The link opens shop. Groups here: @payment, @shipping.',
+      entered: 0,
+      walked: 0,
+      empty: 0,
     });
   });
 });

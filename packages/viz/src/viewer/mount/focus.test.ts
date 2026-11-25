@@ -61,8 +61,8 @@ describe("the path in the address bar on a board", () => {
       group: unknownFocusText(["till", "till.@refund"], { root }),
       whole: unknownFocusText(["till", "till.@payment"], { root }),
     }).toStrictEqual({
-      machine: 'No machine "kitchen" in app. The link opens app.',
-      group: 'No group "till.@refund" in till. The link opens till.',
+      machine: 'No machine "kitchen" in app. The link opens app. Machines here: app, stock, till.',
+      group: 'No group "till.@refund" in till. The link opens till. Groups here: till.@payment.',
       whole: undefined,
     });
   });

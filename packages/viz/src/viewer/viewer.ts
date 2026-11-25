@@ -33,16 +33,18 @@ export function mountViewer(
   const view = initialView(options, { events: viz.machines.flatMap((machine) => machine.events) });
   const { driver } = options;
   openInitial(view, { machine: first, driver, options });
+  const tokens = (options.focus ?? []).filter((token) => token !== "");
   if (first) {
-    view.focus = decodeFocus(options.focus ?? [], { root: first });
-    view.focusNotice = unknownFocusText(options.focus ?? [], { root: first });
+    view.focus = decodeFocus(tokens, { root: first });
+    view.focusNotice = unknownFocusText(tokens, { root: first });
   }
   const redraws: Redraws = {
     redraw: () => undefined,
     refit: () => undefined,
     escape: () => false,
   };
-  listenEscape(root, { escape: () => redraws.escape() });
+  const opened = view.focus.length > 0 ? "claim" : "plain";
+  listenEscape(root, { escape: () => redraws.escape(), opened });
   listenFullscreen(root);
   listenWidth(root, { refit: () => redraws.refit() });
   watchDriver(view, { driver, redraw: () => redraws.redraw() });
@@ -143,6 +145,8 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   function walked(sent?: ViewState["sent"]): void {
     view.sent = sent;
     noticeCleared(root, view);
+    view.focusNotice = undefined;
+    root.querySelector(".viz-bar .focus-notice")?.remove();
     navigated(options, { machine, view });
     follow();
   }

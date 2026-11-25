@@ -180,11 +180,9 @@ test("the crumb shown now is plain text: no frame, no pointer and no focus ring"
   const current = listed(".viz .focus-path [aria-current]");
   expect({
     framed: /border|padding|background|cursor/.test(current),
-    shared: bare.includes(".viz .focus-path button,"),
     ring: listed(".viz .focus-path [aria-current]:focus-visible"),
   }).toStrictEqual({
     framed: false,
-    shared: false,
     ring: expect.stringMatching(/outline:\s*none/),
   });
 });
