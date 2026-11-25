@@ -29,8 +29,10 @@ export interface CanvasOptions {
 export interface Canvas {
   drawn: () => Node[];
   refit: () => void;
-  /** Draws the path above the canvas and listens for Escape; call once the canvas is on the page. */
+  /** Draws the path above the canvas; call once the canvas is on the page. */
   framed: () => void;
+  /** Goes back one level of the path; false at the top. */
+  back: () => boolean;
   /** Says in the bar where the walk is while it is outside the group entered. */
   walked: () => void;
 }
@@ -66,7 +68,6 @@ export function canvasOf(options: CanvasOptions): Canvas {
     const focus = options.focus();
     if (focus.steps.length === 0) return [];
     const path = breadcrumbOf(doc, { focus, moveTo: (keep) => moveTo(focus.steps.slice(0, keep)) });
-    path.addEventListener("keydown", leaveOnEscape);
     if (focus.groupNode === undefined) return [path];
     return [path, html(doc, "p", { class: "walk-outside muted", role: "status" })];
   }
@@ -113,11 +114,11 @@ export function canvasOf(options: CanvasOptions): Canvas {
         : `.graph g.machine-enter[data-enter-group="${CSS.escape(left.node)}"]`;
     root.querySelector<SVGGElement>(selector)?.focus({ preventScroll: true });
   }
-  function leaveOnEscape(event: KeyboardEvent): void {
+  function back(): boolean {
     const { steps } = options.focus();
-    if (event.key !== "Escape" || steps.length === 0) return;
-    event.preventDefault();
+    if (steps.length === 0) return false;
     moveTo(steps.slice(0, -1));
+    return true;
   }
   function open(part: string): void {
     const { machine } = options.focus();
@@ -146,11 +147,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     swap();
     options.mark();
   }
-  function framed(): void {
-    root.querySelector<HTMLElement>(".canvas")?.addEventListener("keydown", leaveOnEscape);
-    titled();
-  }
-  return { drawn, refit, framed, walked };
+  return { drawn, refit, framed: titled, walked, back };
 }
 
 interface NoticeOptions {

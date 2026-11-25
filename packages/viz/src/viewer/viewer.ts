@@ -1,6 +1,7 @@
 import { canvasOf, keepCurrentInView, listenWidth } from "./mount/canvas.ts";
 import { decodeFocus, enteredBy, focusReader, unknownFocusText } from "./mount/focus.ts";
 import { drawCallbacks, membersWhy, pickChild, sayWhy } from "./mount/arrow-click.ts";
+import { listenEscape } from "./mount/escape.ts";
 import { dropGonePick, initialView, noticeCleared } from "./mount/view-state.ts";
 import { eventSender, payloadSetter, stepSender } from "./mount/event-send.ts";
 import type { GraphCallbacks, Selection } from "./graph.ts";
@@ -36,7 +37,12 @@ export function mountViewer(
     view.focus = decodeFocus(options.focus ?? [], { root: first });
     view.focusNotice = unknownFocusText(options.focus ?? [], { root: first });
   }
-  const redraws: Redraws = { redraw: () => undefined, refit: () => undefined };
+  const redraws: Redraws = {
+    redraw: () => undefined,
+    refit: () => undefined,
+    escape: () => false,
+  };
+  listenEscape(root, { escape: () => redraws.escape() });
   listenFullscreen(root);
   listenWidth(root, { refit: () => redraws.refit() });
   watchDriver(view, { driver, redraw: () => redraws.redraw() });
@@ -61,10 +67,11 @@ export function mountViewer(
   render();
 }
 
-/** What a driver event or a width change redraws; the last drawn machine sets them. */
+/** What a driver event, a width change or Escape does; the last drawn machine sets them. */
 interface Redraws {
   redraw: () => void;
   refit: () => void;
+  escape: () => boolean;
 }
 
 interface DrawContext {
@@ -185,10 +192,29 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
     choose,
   });
   context.redraws.refit = canvas.refit;
+  context.redraws.escape = () => closeDetails(panel, { view, refresh }) || canvas.back();
   root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
   canvas.framed();
   canvas.refit();
   follow();
+}
+
+interface CloseDetailsOptions {
+  view: ViewState;
+  refresh: () => void;
+}
+
+/** Escape first closes the Details of a selection while the Details tab shows; focus that was in it moves to the tab. False when none is open. */
+function closeDetails(panel: HTMLElement, options: CloseDetailsOptions): boolean {
+  const { view } = options;
+  const tab = panel.querySelector('[data-tab-panel="details"]:not([hidden])');
+  const open = !view.diagramOnly && tab !== null && view.selection !== undefined;
+  if (!open) return false;
+  const focused = panel.contains(panel.ownerDocument.activeElement);
+  view.selection = undefined;
+  options.refresh();
+  if (focused) panel.querySelector<HTMLElement>('[data-tab="details"]')?.focus();
+  return true;
 }
 
 interface DrawsSelectionOptions {

@@ -210,6 +210,41 @@ describe("entering a group", () => {
     });
   });
 
+  test("Escape anywhere in the viewer closes an open Details first, then goes back one level", () => {
+    const { root } = mount();
+    enter(root, { id: "@payment" });
+    press(node(root, { id: "confirming" }));
+    const opened = root.querySelector("[data-selected-state]")?.getAttribute("data-selected-state");
+    escape(root.querySelector('[data-tab="details"]'));
+    const closed = { path: shown(root).path, details: root.querySelectorAll(".details").length };
+    escape(root.querySelector('[data-tab-panel="details"]'));
+    expect({ opened, closed, back: shown(root) }).toStrictEqual({
+      opened: "confirming",
+      closed: { path: ["shop", "payment"], details: 0 },
+      back: atShop,
+    });
+  });
+
+  test("after a link opens a group, Escape with nothing focused goes back one level", () => {
+    const { root } = mount({ focus: ["@payment"] });
+    const before = shown(root).path;
+    escape(document.body);
+    expect({ before, after: shown(root).path }).toStrictEqual({
+      before: ["shop", "payment"],
+      after: [],
+    });
+  });
+
+  test("with two viewers in a group and nothing focused, Escape moves neither", () => {
+    const first = mount({ focus: ["@payment"] });
+    const second = mount({ focus: ["@shipping"] });
+    escape(document.body);
+    expect([shown(first.root).path, shown(second.root).path]).toStrictEqual([
+      ["shop", "payment"],
+      ["shop", "shipping"],
+    ]);
+  });
+
   test("a stub goes back, onto the node that draws its state, selected with its Details open", () => {
     const { root } = mount();
     enter(root, { id: "@payment" });
