@@ -1,6 +1,12 @@
 import type { EnteredGroup } from "../graph.ts";
 import type { VizDriver, VizLiveState, VizOutputRoutes } from "../../schema.ts";
 
+/** The path an address names: a value per step, as in `focus`, for the viewer of `machine` (every viewer when unset). */
+export interface FocusLink {
+  machine?: string;
+  focus: string[];
+}
+
 export interface ViewerOptions {
   /** Machine to show; defaults to the first. */
   machine?: string;
@@ -26,6 +32,8 @@ export interface ViewerOptions {
     payloads: string[];
     focus: string[];
   }) => void;
+  /** Hands the viewer a way to move along its path to a link's, e.g. on the browser's Back and Forward. It never changes the walk. */
+  followFocus?: (follow: (link: FocusLink) => void) => void;
   /** Live: where each machine's outputs go, so a step can name the machine it told. Unset: output names only. */
   routes?: VizOutputRoutes;
   /** Live only (ignored without `driver`): a first "Screen" tab, open by default, holding what this returns for the cursor's state, or, while a state is selected, for that state as a throwaway copy reaches it. */

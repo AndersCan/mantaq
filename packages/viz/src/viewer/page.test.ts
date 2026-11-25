@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vite-plus/test";
+import type { FocusLink } from "./embed.ts";
 import { linkOptions } from "./page.ts";
 
 describe("the address bar", () => {
@@ -40,5 +41,34 @@ describe("the address bar", () => {
     history.replaceState(undefined, "", "?machine=answer&payload=ask%3D%7B%7D");
     linkOptions().onNavigate?.({ machine: "answer", steps: [], payloads: [], focus: [] });
     expect(new URLSearchParams(location.search).has("payload")).toBe(false);
+  });
+
+  test("a move along the path adds a history entry, and a step replaces the entry it is on", () => {
+    history.replaceState(undefined, "", "?machine=order&step=placeOrder");
+    const options = linkOptions();
+    const before = history.length;
+    const walk = { machine: "order", payloads: [] };
+    options.onNavigate?.({ ...walk, steps: ["placeOrder"], focus: ["@payment"] });
+    const entered = history.length - before;
+    options.onNavigate?.({ ...walk, steps: ["placeOrder", "declined"], focus: ["@payment"] });
+    const stepped = history.length - before;
+    const params = new URLSearchParams(location.search);
+    expect({
+      entered,
+      stepped,
+      steps: params.getAll("step"),
+      focus: params.getAll("focus"),
+    }).toEqual({ entered: 1, stepped: 1, steps: ["placeOrder", "declined"], focus: ["@payment"] });
+  });
+
+  test("Back and Forward hand the viewer the path and the machine the address names", () => {
+    history.replaceState(undefined, "", "?machine=order");
+    const links: FocusLink[] = [];
+    linkOptions().followFocus?.((link) => links.push(link));
+    history.replaceState(undefined, "", "?machine=order&focus=%40payment");
+    dispatchEvent(new PopStateEvent("popstate"));
+    history.replaceState(undefined, "", "?");
+    dispatchEvent(new PopStateEvent("popstate"));
+    expect(links).toEqual([{ machine: "order", focus: ["@payment"] }, { focus: [] }]);
   });
 });

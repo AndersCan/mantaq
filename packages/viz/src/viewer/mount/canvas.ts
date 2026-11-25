@@ -2,6 +2,7 @@ import { BOARD_PX_PER_UNIT, overlapWarning, renderBoard, renderGraph } from "../
 import { drawnNodeName, drawnNodeOf } from "../groups/fold-groups.ts";
 import type { EnteredGroup, GraphCallbacks, Selection } from "../graph.ts";
 import type { Focus, FocusMove, FocusStep } from "./focus.ts";
+import { focusTokens } from "./focus.ts";
 import { partName, partOf } from "../parts.ts";
 import { currentsOf } from "../compartments.ts";
 import { enteredGroupOf } from "../groups/group-machine.ts";
@@ -35,6 +36,8 @@ export interface Canvas {
   back: () => boolean;
   /** Says in the bar where the walk is while it is outside the group entered. */
   walked: () => void;
+  /** Moves along the path to `steps`, as a link names it; nothing when the canvas shows them already. */
+  follow: (steps: FocusStep[]) => void;
 }
 
 /** Where focus lands after a move. */
@@ -120,6 +123,10 @@ export function canvasOf(options: CanvasOptions): Canvas {
     moveTo(steps.slice(0, -1));
     return true;
   }
+  function follow(steps: FocusStep[]): void {
+    const shown = focusTokens(options.focus().steps).join("\n");
+    if (focusTokens(steps).join("\n") !== shown) moveTo(steps);
+  }
   function open(part: string): void {
     const { machine } = options.focus();
     moveTo([...options.focus().steps, { kind: "part", part, name: partName(machine, part) }]);
@@ -147,7 +154,7 @@ export function canvasOf(options: CanvasOptions): Canvas {
     swap();
     options.mark();
   }
-  return { drawn, refit, framed: titled, walked, back };
+  return { drawn, refit, framed: titled, walked, back, follow };
 }
 
 interface NoticeOptions {

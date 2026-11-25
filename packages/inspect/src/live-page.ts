@@ -27,14 +27,18 @@ function only(viz: VizDocument, machine: string | null): VizDocument {
  */
 function ownWalk(viz: VizDocument): ReturnType<typeof linkOptions> {
   const linked = linkOptions();
+  const { onNavigate, followFocus } = linked;
+  const kept: ReturnType<typeof linkOptions> = {};
+  if (onNavigate) kept.onNavigate = onNavigate;
+  if (followFocus) kept.followFocus = followFocus;
   const named = [...new Set(new URLSearchParams(location.search).getAll("machine"))];
   if (named.length < 2) {
     const own =
       linked.machine === undefined || viz.machines.some((each) => each.id === linked.machine);
-    return own ? linked : { onNavigate: linked.onNavigate };
+    return own ? linked : kept;
   }
   const held = named.find((id) => viz.machines.some((each) => each.id === id));
-  return held === undefined ? { onNavigate: linked.onNavigate } : { ...linked, machine: held };
+  return held === undefined ? kept : { ...linked, machine: held };
 }
 
 /** The run the page names, unless the address already holds a run or steps. */

@@ -42,12 +42,17 @@ export function mountViewer(
     redraw: () => undefined,
     refit: () => undefined,
     escape: () => false,
+    follow: () => undefined,
   };
   const opened = view.focus.length > 0 ? "claim" : "plain";
   listenEscape(root, { escape: () => redraws.escape(), opened });
   listenFullscreen(root);
   listenWidth(root, { refit: () => redraws.refit() });
   watchDriver(view, { driver, redraw: () => redraws.redraw() });
+  options.followFocus?.((link) => {
+    const other = link.machine !== undefined && link.machine !== first?.id;
+    if (root.isConnected && !other) redraws.follow(link.focus);
+  });
   function showControls(): void {
     view.diagramOnly = false;
     view.tab = "step";
@@ -69,11 +74,12 @@ export function mountViewer(
   render();
 }
 
-/** What a driver event, a width change or Escape does; the last drawn machine sets them. */
+/** What a driver event, a width change, Escape or a link's path does; the last drawn machine sets them. */
 interface Redraws {
   redraw: () => void;
   refit: () => void;
   escape: () => boolean;
+  follow: (tokens: string[]) => void;
 }
 
 interface DrawContext {
@@ -200,6 +206,7 @@ function drawMachine(machine: VizMachine, context: DrawContext): void {
   });
   context.redraws.refit = canvas.refit;
   context.redraws.escape = () => closeDetails(panel, { view, refresh }) || canvas.back();
+  context.redraws.follow = (tokens) => canvas.follow(decodeFocus(tokens, { root: machine }));
   root.append(...layoutOf(doc, { view, showControls, graph: canvas.drawn(), panel, root }));
   canvas.framed();
   canvas.refit();
