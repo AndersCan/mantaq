@@ -68,6 +68,16 @@ function branchText(
   return isElse ? `else if ${joined}` : joined;
 }
 
+/** Copies of edges drawn without the other side of their handler, so their label never says "else". */
+const ownConditionCopies = new WeakSet<VizEdge>();
+
+/** A copy of `edge` whose label states its own condition, never "else": for a drawing that leaves out the arrow of the other side. */
+export function ownConditionOnly(edge: VizEdge): VizEdge {
+  const copy = { ...edge };
+  ownConditionCopies.add(copy);
+  return copy;
+}
+
 /**
  * When one event can lead to several states, what sets this arrow apart:
  * its own conditions, `else` for the side the others rule out. Null when the
@@ -91,7 +101,8 @@ export function edgeCondition(edge: VizEdge): string | null {
   const shared = (condition: string): boolean =>
     targets.size >= 2 && reaching.every((branch) => branch.conditions.includes(condition));
   const others = reaching.filter((branch) => !goes(branch, to));
-  const texts = going.map((branch) => branchText(branch, others, shared, going.length === 1));
+  const allowElse = going.length === 1 && !ownConditionCopies.has(edge);
+  const texts = going.map((branch) => branchText(branch, others, shared, allowElse));
   if (texts.some((text) => text === null)) return null;
   return texts.join(" || ");
 }

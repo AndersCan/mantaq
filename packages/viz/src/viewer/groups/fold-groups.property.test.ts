@@ -110,7 +110,8 @@ function missingFromViews(machine: VizMachine): string[] {
     for (const edge of machine.edges) {
       const anyHere = isAnyState(edge.from) && scopeOf(edge.from) === node.scope;
       const member = [edge.from, edge.to].some((end) => end !== null && node.states.includes(end));
-      const missed = (anyHere || member) && view?.edges.includes(edge) !== true;
+      const drawn = view?.edges.some((each) => each.id === edge.id) === true;
+      const missed = (anyHere || member) && !drawn;
       if (missed) problems.push(`${node.id} misses ${edge.id}`);
     }
   }
@@ -130,6 +131,24 @@ function labelProblems(machine: VizMachine): string[] {
     );
     const unchanged = handler.every((edge) => folded.edges.includes(edge));
     if (!handler.includes(drawn) || !unchanged) problems.push(`${drawn.id} reads a moved handler`);
+  }
+  return problems;
+}
+
+/** Arrows of an entered group that read "else" while a partner of their handler is not drawn there. */
+function elseProblems(machine: VizMachine): string[] {
+  const problems: string[] = [];
+  for (const node of groupNodesOf(machine)) {
+    const view = groupMachine(machine, { group: node.id });
+    const drawn = new Set(view?.edges.map((edge) => edge.id));
+    for (const edge of view?.edges ?? []) {
+      if (!edgeCondition(edge)?.startsWith("else")) continue;
+      const partners = machine.edges.filter(
+        (other) => other.from === edge.from && other.event === edge.event && other.to !== null,
+      );
+      const gone = partners.filter((other) => other.kind === "transition" && !drawn.has(other.id));
+      if (gone.length > 0) problems.push(`${node.id} reads else on ${edge.id}`);
+    }
   }
   return problems;
 }
@@ -166,6 +185,15 @@ describe("groups on generated machines", () => {
     fc.assert(
       fc.property(groupedArbitrary, (machine) => {
         expect(labelProblems(machine)).toEqual([]);
+      }),
+      run,
+    );
+  });
+
+  test("G6: an entered group draws an else only with every partner of its handler", () => {
+    fc.assert(
+      fc.property(groupedArbitrary, (machine) => {
+        expect(elseProblems(machine)).toEqual([]);
       }),
       run,
     );

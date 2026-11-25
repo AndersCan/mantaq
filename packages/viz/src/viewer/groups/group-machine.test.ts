@@ -1,9 +1,20 @@
 import { describe, expect, test } from "vite-plus/test";
-import { edgeOf, groupedCheckout, machineOf, stateOf } from "./shop-machines.ts";
+import { edgeOf, groupedCheckout, machineOf, readEdge, stateOf } from "./shop-machines.ts";
+import { edgeLines } from "../labels.ts";
+import { layoutMachine } from "../layout.ts";
+import type { VizBranch } from "../../schema.ts";
 import { foldGroups } from "./fold-groups.ts";
 import { groupMachine } from "./group-machine.ts";
 
 const grouped = groupedCheckout();
+
+interface BranchTarget {
+  state: string;
+}
+
+function branch(conditions: string[], options: BranchTarget): VizBranch {
+  return { conditions, target: { kind: "state", state: options.state } };
+}
 
 describe("groupMachine", () => {
   test("the payment group keeps its states, stubs its neighbours and its real edges", () => {
@@ -84,6 +95,42 @@ describe("groupMachine", () => {
     expect(groupMachine(foldGroups(grouped), { group: "@shipping" })).toBe(
       groupMachine(grouped, { group: "@shipping" }),
     );
+  });
+
+  test("an arrow whose partner branch the view leaves out shows its own condition, not else", () => {
+    const review = [
+      branch(["score < 600"], { state: "review" }),
+      branch(["!(score < 600)"], { state: "paying" }),
+    ];
+    const paid = [branch(["ok"], { state: "free" }), branch(["!(ok)"], { state: "browsing" })];
+    const checkout = machineOf({
+      regions: ["cart", "seats"],
+      maps: ["seats"],
+      states: [
+        stateOf("cart.browsing", { initial: true }),
+        stateOf("cart.review"),
+        stateOf("cart.paying", { group: "payment" }),
+        stateOf("seats.free"),
+      ],
+      edges: [
+        readEdge(edgeOf("cart.browsing", { event: "checkout", to: "cart.review" }), {
+          branches: review,
+        }),
+        readEdge(edgeOf("cart.browsing", { event: "checkout", to: "cart.paying" }), {
+          branches: review,
+        }),
+        readEdge(edgeOf("cart.paying", { event: "pay", to: "seats.free" }), { branches: paid }),
+        readEdge(edgeOf("cart.paying", { event: "pay", to: "cart.browsing" }), { branches: paid }),
+      ],
+    });
+    const view = groupMachine(checkout, { group: "cart.@payment" });
+    const labels: string[] = [];
+    for (const edge of view?.edges ?? []) labels.push(edgeLines(edge).join(" "));
+    const laid = view === undefined ? undefined : layoutMachine(view);
+    expect({ labels, overlaps: laid?.[1]?.overlaps }).toStrictEqual({
+      labels: ["checkout score >= 600", "pay ok", "pay else"],
+      overlaps: [],
+    });
   });
 
   test("an unknown group has no view", () => {
