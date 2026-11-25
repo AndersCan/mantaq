@@ -334,7 +334,8 @@
   stroke-linecap: round;
 }
 
-.viz .edge.next path {
+/* Only a next arrow that a click sends marches; one that a part sends stays still. */
+.viz .edge.next[role="button"] path {
   stroke-dasharray: 8 5;
   stroke-linecap: butt;
   animation: viz-march 0.8s linear infinite;
@@ -347,7 +348,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .viz .edge.next path {
+  .viz .edge.next[role="button"] path {
     animation: none;
   }
 }
@@ -683,7 +684,6 @@
 .viz .focus-path [aria-current] {
   font-weight: 600;
   border-color: transparent;
-  outline: none;
 }
 
 .viz .focus-path button:hover,
