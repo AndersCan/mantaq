@@ -194,7 +194,8 @@ function groupPanel(doc: Document, options: GroupPanelOptions): HTMLElement {
   const { node, machine, select } = options;
   const links: HTMLLIElement[] = [];
   for (const id of node.states) {
-    const link = html(doc, "span", { class: "link", "data-state-link": id }, [localName(id)]);
+    const name = drawnNodeName(machine, { node: id });
+    const link = html(doc, "span", { class: "link", "data-state-link": id }, [name]);
     activatable(link, () => select({ kind: "state", id }));
     links.push(html(doc, "li", {}, [link]));
   }

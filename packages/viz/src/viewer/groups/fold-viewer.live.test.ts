@@ -257,7 +257,8 @@ describe("a grouped machine in the viewer", () => {
       regions: ["left", "right"],
       states: [
         stateOf("left.idle", { initial: true }),
-        stateOf("left.done"),
+        stateOf("left.done", { group: "finish" }),
+        stateOf("left.idle2", { group: "finish" }),
         stateOf("right.idle", { initial: true }),
         stateOf("right.done"),
         stateOf("right.paused"),
@@ -266,6 +267,7 @@ describe("a grouped machine in the viewer", () => {
         edgeOf("left.idle", { event: "go", to: "left.done" }),
         edgeOf("right.idle", { event: "go", to: "right.done" }),
         edgeOf("right.done", { event: "rest", to: "right.paused" }),
+        edgeOf("right.paused", { event: "wake", to: "right.idle" }),
       ],
     });
     const root = document.createElement("div");
@@ -275,11 +277,20 @@ describe("a grouped machine in the viewer", () => {
     for (const edge of root.querySelectorAll(".graph g.edge")) {
       names.push(edge.getAttribute("aria-label") ?? "");
     }
-    expect(names).toStrictEqual([
-      "left.idle on go to left.done",
-      "right.idle on go to right.done",
-      "right.done on rest to paused",
-    ]);
+    click(
+      root.querySelector(
+        '.graph g.edge[data-edge-id="right.paused-wake-right.idle"] ~ g.edge-help',
+      ),
+    );
+    expect({ names, title: root.querySelector(".details h2")?.textContent }).toStrictEqual({
+      names: [
+        "left.idle on go to group finish",
+        "right.idle on go to right.done",
+        "right.done on rest to paused",
+        "paused on wake to right.idle",
+      ],
+      title: "paused —wake→ right.idle",
+    });
   });
 
   test("a state picked in Details of a group node rings the group node", () => {
