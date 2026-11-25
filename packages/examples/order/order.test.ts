@@ -40,6 +40,11 @@ function screen(actor: ReturnType<typeof startOrder>["actor"]) {
   return { order: path, payment: context.payment?.path };
 }
 
+/** Where the delivery machine was when the parent last heard from it. */
+function delivery(actor: ReturnType<typeof startOrder>["actor"]) {
+  return actor.snapshot().context.delivery?.path;
+}
+
 describe("an order split into payment and delivery", () => {
   test("an accepted card ships the order, and a signature at the door delivers it", async () => {
     const { actor, clock } = startOrder(["accepted"]);
@@ -47,10 +52,13 @@ describe("an order split into payment and delivery", () => {
     await actor.settled();
     const paid = screen(actor);
     clock.advance(3000);
+    const atDoor = delivery(actor);
     actor.send(signForParcel.create());
-    expect({ paid, end: screen(actor) }).toStrictEqual({
+    expect({ paid, atDoor, end: screen(actor), handedOver: delivery(actor) }).toStrictEqual({
       paid: { order: ["shippingOrder"], payment: ["paymentTaken"] },
+      atDoor: ["waitingAtDoor"],
       end: { order: ["orderDelivered"], payment: ["paymentTaken"] },
+      handedOver: ["parcelHandedOver"],
     });
   });
 
