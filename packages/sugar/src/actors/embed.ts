@@ -99,7 +99,7 @@ export interface Embedded {
   readonly error: string;
   /** Parent input types that embed sends on to the running child while the parent is in the embedding state. */
   readonly forward: readonly string[];
-  /** Parent output type that carries each child snapshot, or undefined when the parent does not ask for one. */
+  /** Parent internal event type that carries each child snapshot, or undefined when the parent does not ask for one. */
   readonly snapshot: string | undefined;
 }
 
@@ -110,7 +110,7 @@ interface EmbedOptions<
   Outputs extends readonly AnyEventRef[],
   Built extends Made,
   Forward extends ReadonlyArray<Inputs[number]>,
-  Changed extends Outputs[number],
+  Changed extends Internal[number],
 > {
   in: NonFinalStateRef<[...States]>;
   machine: Machine<string, object, Built> &
@@ -119,7 +119,7 @@ interface EmbedOptions<
   error: VoidEventOf<Internal>;
   /** Parent inputs that go on to the running child. Each one must be an input of the child. */
   forward?: Forward & ForwardFits<Forward, Built>;
-  /** A parent output that carries the child snapshot: once on entry, then on each child change. */
+  /** A parent internal event that carries the child snapshot, once on entry and then after each child change. The parent handles it in `in`. */
   snapshot?: Changed & SnapshotFits<Changed, Built>;
 }
 
@@ -136,7 +136,7 @@ export function embed<
   ActorContext,
   Built extends Made,
   const Forward extends ReadonlyArray<Inputs[number]> = readonly [],
-  Changed extends Outputs[number] = never,
+  Changed extends Internal[number] = never,
 >(
   builder: ActorBuilder<States, Inputs, Internal, Outputs, ActorContext, Clock>,
   options: EmbedOptions<States, Inputs, Internal, Outputs, Built, Forward, Changed>,
@@ -150,6 +150,7 @@ export function embed<
   const sends: Array<Internal[number]> = [
     ...new Set([...Object.values(doneEvents), options.error]),
   ];
+  if (options.snapshot !== undefined) sends.push(options.snapshot);
   let running: AnyActor<unknown> | undefined;
 
   function run(input: EffectInput<ActorContext, unknown, InternalEvent>): Promise<void> | void {
@@ -185,7 +186,7 @@ export function embed<
     forward: forward.map((event) => event.type),
     snapshot: snapshotEvent?.type,
   };
-  /** `sends` lists the mapped events; typed as maybe-undeclared so `emit` also takes the forwarded child outputs. */
+  /** `sends` lists the mapped events and the snapshot event; typed as maybe-undeclared so `emit` also takes the forwarded child outputs. */
   builder.effect<NonFinalStateRef<[...States]>, ReadonlyArray<Internal[number]> | undefined>(
     options.in,
     {

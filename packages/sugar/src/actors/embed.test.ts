@@ -344,15 +344,24 @@ const uploadDismissed = event("uploadDismissed")();
 const uploadBroke = event("uploadBroke")();
 const uploadChanged = event("uploadChanged")<Snapshot>();
 
-function editorOf(upload: ReturnType<typeof uploadMachine>) {
+interface EditorContext {
+  upload: Snapshot | undefined;
+}
+
+interface EditorOptions {
+  initial: "editing" | "saving";
+}
+
+function editorOf(upload: ReturnType<typeof uploadMachine>, options?: EditorOptions) {
   const clock = VirtualClock();
   const snapshots: string[][] = [];
+  const context: EditorContext = { upload: undefined };
   const actor = Actor({
     inputs: [save, retry, dismiss],
-    internal: [uploadDone, uploadDismissed, uploadBroke],
-    outputs: [uploadChanged],
+    internal: [uploadDone, uploadDismissed, uploadBroke, uploadChanged],
     states: [editing, saving, saved, broken],
-    initial: editing,
+    initial: options?.initial === "saving" ? saving : editing,
+    context,
     clock,
     setup: (builder) => {
       builder.on(editing, { event: save, to: [saving], handler: () => ({ state: saving }) });
@@ -363,6 +372,13 @@ function editorOf(upload: ReturnType<typeof uploadMachine>) {
         error: uploadBroke,
         forward: [retry, dismiss],
         snapshot: uploadChanged,
+      });
+      builder.on(saving, {
+        event: uploadChanged,
+        handler: (changed, { context: editor }) => {
+          snapshots.push(changed.payload.path);
+          editor.set({ upload: changed.payload });
+        },
       });
       builder.on(saving, { event: uploadDone, to: [saved], handler: () => ({ state: saved }) });
       builder.on(saving, {
@@ -375,11 +391,6 @@ function editorOf(upload: ReturnType<typeof uploadMachine>) {
         to: [broken],
         handler: () => ({ state: broken }),
       });
-    },
-  });
-  actor.on("output", {
-    fn: (output) => {
-      if (uploadChanged.is(output)) snapshots.push(output.payload.path);
     },
   });
   return { actor, clock, snapshots };
@@ -410,7 +421,7 @@ describe("embed forward", () => {
     });
   });
 
-  test("the snapshot output carries the child path on entry and on each change", () => {
+  test("the snapshot event carries the child path on entry and on each change", () => {
     const { actor, clock, snapshots } = editorOf(uploadMachine({ failures: 1 }));
     actor.send(save.create());
     clock.advance(50);
@@ -418,6 +429,17 @@ describe("embed forward", () => {
     clock.advance(50);
 
     expect(snapshots).toEqual([["uploading"], ["couldNotUpload"], ["uploading"], ["uploaded"]]);
+  });
+
+  test("a parent that starts in the embedding state holds the child snapshot in its own snapshot", () => {
+    const { actor, clock } = editorOf(uploadMachine({ failures: 1 }), { initial: "saving" });
+    const built = actor.snapshot().context.upload?.path;
+    clock.advance(50);
+
+    expect([built, actor.snapshot().context.upload?.path]).toEqual([
+      ["uploading"],
+      ["couldNotUpload"],
+    ]);
   });
 
   test("a forwarded input outside the embedding state reaches no child", () => {
@@ -446,15 +468,17 @@ describe("embed forward", () => {
     expect([failedAgain, actor.state.name]).toEqual(["saving", "saved"]);
   });
 
-  test("the tag lists the forwarded inputs and the snapshot output", () => {
+  test("the tag lists the forwarded inputs and the snapshot event, and sends lists the snapshot event", () => {
     const upload = uploadMachine({ failures: 0 });
     const { actor } = editorOf(upload);
     const [entry] = actor.options.effects["saving"] ?? [];
 
     expect({
+      sends: entry?.sends,
       embedded: Reflect.get(entry?.fn ?? {}, "embedded"),
       targets: actor.options.targets["saving"],
     }).toEqual({
+      sends: ["uploadDone", "uploadDismissed", "uploadBroke", "uploadChanged"],
       embedded: {
         machine: upload,
         done: { uploaded: "uploadDone", dismissed: "uploadDismissed" },
@@ -465,6 +489,7 @@ describe("embed forward", () => {
       targets: {
         retry: [],
         dismiss: [],
+        uploadChanged: [],
         uploadDone: ["saved"],
         uploadDismissed: ["editing"],
         uploadBroke: ["broken"],

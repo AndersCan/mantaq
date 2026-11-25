@@ -175,11 +175,10 @@ describe("embed types", () => {
     expect(actor.state.name).toBe("idle");
   });
 
-  test("forward takes parent inputs that the child takes, snapshot takes an output that carries a snapshot", () => {
+  test("forward takes parent inputs that the child takes, snapshot takes an internal event that carries a snapshot", () => {
     const actor = Actor({
       inputs: [retry, rate],
-      internal: [checkPassed, checkBroke],
-      outputs: [checkChanged],
+      internal: [checkPassed, checkBroke, checkChanged],
       states: [idle, closed],
       initial: idle,
       clock: VirtualClock(),
@@ -202,10 +201,10 @@ describe("embed types", () => {
   test("wrong forward and snapshot options do not typecheck", () => {
     const actor = Actor({
       inputs: [retry, dismiss, rateWithoutScore],
-      internal: [checkPassed, checkBroke],
-      outputs: [checkNamed, progress],
+      internal: [checkPassed, checkBroke, checkNamed],
+      outputs: [checkChanged],
       states: [idle, closed],
-      initial: idle,
+      initial: closed,
       clock: VirtualClock(),
       setup: (builder) => {
         embed(builder, {
@@ -237,7 +236,7 @@ describe("embed types", () => {
           machine: askingCheck,
           done: { passed: checkPassed },
           error: checkBroke,
-          // @ts-expect-error -- the payload of the output must take a child snapshot
+          // @ts-expect-error -- the payload of the snapshot event must take a child snapshot
           snapshot: checkNamed,
         });
         embed(builder, {
@@ -245,19 +244,19 @@ describe("embed types", () => {
           machine: askingCheck,
           done: { passed: checkPassed },
           error: checkBroke,
-          // @ts-expect-error -- an output without a payload has no room for the snapshot
-          snapshot: progress,
+          // @ts-expect-error -- an event without a payload has no room for the snapshot
+          snapshot: checkPassed,
         });
         embed(builder, {
           in: idle,
           machine: askingCheck,
           done: { passed: checkPassed },
           error: checkBroke,
-          // @ts-expect-error -- the snapshot event is a parent output; `checkPassed` is internal
-          snapshot: checkPassed,
+          // @ts-expect-error -- the snapshot event is internal, so the parent records it; an output would only pass by
+          snapshot: checkChanged,
         });
       },
     });
-    expect(actor.state.name).toBe("idle");
+    expect(actor.state.name).toBe("closed");
   });
 });

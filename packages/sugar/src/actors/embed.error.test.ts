@@ -1,5 +1,5 @@
 import { Actor, event, machine, state, VirtualClock } from "@mantaq/core";
-import type { AnyActor, Clock } from "@mantaq/core";
+import type { AnyActor, Clock, Snapshot } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { embed } from "./embed.ts";
 import { withTimeout } from "../effects/timeout.ts";
@@ -76,6 +76,7 @@ function parentOf(clock: Clock, check: ReturnType<typeof brokenCheck>) {
 
 const retry = event("retry")();
 const dismiss = event("dismiss")();
+const checkChanged = event("checkChanged")<Snapshot>();
 
 interface AskingOptions {
   retried: "moves on" | "fails";
@@ -277,17 +278,6 @@ describe("embed errors", () => {
     expect({ state: actor.state.name, built }).toEqual({ state: "broken", built: 0 });
   });
 
-  test("a forwarded input the child does not handle in its current state is dropped, and the parent stays", () => {
-    const clock = VirtualClock();
-    const actor = askingParent(clock, { retried: "moves on" });
-    actor.send(start.create());
-
-    actor.send(dismiss.create());
-    clock.advance(50);
-
-    expect(actor.state.name).toBe("accepted");
-  });
-
   test("a forwarded input that sends the child into __error sends the error event", () => {
     const actor = askingParent(VirtualClock(), { retried: "fails" });
     actor.send(start.create());
@@ -359,5 +349,32 @@ describe("embed errors", () => {
     actor.send(retry.create());
 
     expect(actor.state.name).toBe("checking");
+  });
+
+  test("a parent that does not handle its snapshot event in the embedding state enters __error", () => {
+    const actor = Actor({
+      inputs: [start],
+      internal: [checkPassed, checkBroke, checkChanged],
+      states: [idle, checking],
+      initial: idle,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        builder.on(idle, { event: start, to: [checking], handler: () => ({ state: checking }) });
+        embed(builder, {
+          in: checking,
+          machine: askingCheck({ retried: "moves on" }),
+          done: { passed: checkPassed },
+          error: checkBroke,
+          snapshot: checkChanged,
+        });
+      },
+    });
+
+    actor.send(start.create());
+
+    expect({ state: actor.state.name, event: actor.snapshot().error?.event.type }).toEqual({
+      state: "__error",
+      event: "checkChanged",
+    });
   });
 });

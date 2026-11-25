@@ -95,12 +95,11 @@ const retryable = machine("retryable", {
 });
 
 describe("embed mutation", () => {
-  test("forward and snapshot: the tag names them, outputs carry each child path, retry ends the child", () => {
+  test("forward and snapshot: the tag names them, the snapshot event carries each child path, retry ends the child", () => {
     const paths: string[][] = [];
     const actor = Actor({
       inputs: [retry],
-      internal: [checkPassed, checkBroke],
-      outputs: [checkChanged],
+      internal: [checkPassed, checkBroke, checkChanged],
       states: [checking, accepted],
       initial: checking,
       clock: VirtualClock(),
@@ -114,15 +113,14 @@ describe("embed mutation", () => {
           snapshot: checkChanged,
         });
         builder.on(checking, {
+          event: checkChanged,
+          handler: (changed) => void paths.push(changed.payload.path),
+        });
+        builder.on(checking, {
           event: checkPassed,
           to: [accepted],
           handler: () => ({ state: accepted }),
         });
-      },
-    });
-    actor.on("output", {
-      fn: (output) => {
-        if (checkChanged.is(output)) paths.push(output.payload.path);
       },
     });
     const [entry] = actor.options.effects["checking"] ?? [];
@@ -130,7 +128,8 @@ describe("embed mutation", () => {
 
     actor.send(retry.create());
 
-    expect({ embedded, paths, state: actor.state.name }).toEqual({
+    expect({ sends: entry?.sends, embedded, paths, state: actor.state.name }).toEqual({
+      sends: ["checkPassed", "checkBroke", "checkChanged"],
       embedded: {
         machine: retryable,
         done: { passed: "checkPassed" },
@@ -138,7 +137,7 @@ describe("embed mutation", () => {
         forward: ["retry"],
         snapshot: "checkChanged",
       },
-      paths: [["passed"]],
+      paths: [["working"], ["passed"]],
       state: "accepted",
     });
   });
