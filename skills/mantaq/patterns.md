@@ -199,10 +199,12 @@ export const order = machine("order", {
           error: paymentBroke,
           forward: [retryPayment],
           snapshot: paymentChanged,
+          keep: "payment",
         });
         m.on(payingForOrder, {
           event: paymentChanged,
-          handler: (changed, { context }) => context.set({ payment: changed.payload }),
+          handler: (changed, { context }) =>
+            context.set({ ...context.get(), payment: changed.payload }),
         });
         m.on(payingForOrder, {
           event: paymentWentThrough,
@@ -221,7 +223,9 @@ export const order = machine("order", {
 
 - `done` maps each final state of the child to a parent internal event without a payload. `error` is the parent event for a child in `__error`. Handle them with plain `m.on` in the embedding state, so the diagram draws the arrows.
 - The app sends only to the parent. `forward` lists the parent inputs that go on to the running child (a retry button). Never add a second handler for a forwarded event in that state: the last one replaces the other.
-- `snapshot` names a parent internal event that carries the child snapshot on entry and after each change. Keep it in context so the screen can read the child state (`context.payment.path`). After the parent leaves, the field keeps the last snapshot: check the parent state too.
+- `snapshot` names a parent internal event that carries the child snapshot on entry and after each change. Keep it in context so the screen can read the child state (`context.payment.path`). After the parent leaves, the field keeps the last snapshot: check the parent state too. `context.set` replaces the whole context, so spread `context.get()` when the context has other fields.
+- `keep` names that context field (it needs `snapshot`; embed never writes it). Always set it: the live page of `@mantaq/inspect` reads the child state from it. With `keep`, the reader enters the machine node while the parent is in that state and sees the child's current state; a click on a child arrow whose event the state forwards sends it to the parent as one step. Other child arrows are locked. Without `keep`, the entered child is drawn without its state.
+- The live page holds effects (default) but cannot report a held child effect yet, and a child's first-state effects always run. To step through a child on a docs page, put `runEffects` on the Astro `<Machine>`.
 - The parent needs a clock, even when no child has a timer. Embed builds the child with the parent clock only. A child that needs a port: build its machine in the parent `create` with that port (`paymentMachine({ port })`).
 - Test through the parent with a `VirtualClock` and fake ports, as the app uses it. `settled()` also waits for the child effects.
 - Keep a group in the parent when its handlers read and write the parent context: the child cannot read it. Always-on parallel parts are `regions`; a run-time count of children is `createActorMap`.

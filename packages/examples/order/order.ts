@@ -38,10 +38,14 @@ const parcelDelivered = event("parcelDelivered")();
 const parcelReturned = event("parcelReturned")();
 /** The delivery machine broke. */
 const deliveryBroke = event("deliveryBroke")();
+/** The delivery machine changed; the payload is its snapshot. */
+const deliveryChanged = event("deliveryChanged")<Snapshot>();
 
 interface OrderContext {
   /** The last snapshot of the payment machine, so the screen knows when to show the retry button. */
   payment: Snapshot | undefined;
+  /** The last snapshot of the delivery machine, so the screen knows when the courier waits at the door. */
+  delivery: Snapshot | undefined;
 }
 
 interface OrderOptions {
@@ -49,7 +53,7 @@ interface OrderOptions {
   port?: PaymentPort;
 }
 
-const noPaymentYet: OrderContext = { payment: undefined };
+const nothingYet: OrderContext = { payment: undefined, delivery: undefined };
 
 const acceptEveryCard: PaymentPort = {
   chargeCard: () => Promise.resolve(Either.right({ receiptId: "receipt-1" })),
@@ -68,6 +72,7 @@ export const order = machine("order", {
         parcelDelivered,
         parcelReturned,
         deliveryBroke,
+        deliveryChanged,
       ],
       states: [
         reviewingOrder,
@@ -79,7 +84,7 @@ export const order = machine("order", {
         couldNotCompleteOrder,
       ],
       initial: reviewingOrder,
-      context: noPaymentYet,
+      context: nothingYet,
       clock,
       setup: (builder) => {
         builder.on(reviewingOrder, {
@@ -94,10 +99,12 @@ export const order = machine("order", {
           error: paymentBroke,
           forward: [retryPayment],
           snapshot: paymentChanged,
+          keep: "payment",
         });
         builder.on(payingForOrder, {
           event: paymentChanged,
-          handler: (changed, { context }) => context.set({ payment: changed.payload }),
+          handler: (changed, { context }) =>
+            context.set({ ...context.get(), payment: changed.payload }),
         });
         builder.on(payingForOrder, {
           event: paymentWentThrough,
@@ -122,6 +129,13 @@ export const order = machine("order", {
           done: { parcelHandedOver: parcelDelivered, parcelTakenBack: parcelReturned },
           error: deliveryBroke,
           forward: [signForParcel],
+          snapshot: deliveryChanged,
+          keep: "delivery",
+        });
+        builder.on(shippingOrder, {
+          event: deliveryChanged,
+          handler: (changed, { context }) =>
+            context.set({ ...context.get(), delivery: changed.payload }),
         });
         builder.on(shippingOrder, {
           event: parcelDelivered,
