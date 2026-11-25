@@ -6,19 +6,32 @@ import type { InternalEvent } from "@mantaq/core";
 import { withTimeout } from "../effects/timeout.ts";
 
 type Outcome = "passed" | "failed" | "broken" | "starts passed";
-type Step = { kind: "start" } | { kind: "cancel" } | { kind: "advance"; ms: number };
+type Step =
+  | { kind: "start" }
+  | { kind: "cancel" }
+  | { kind: "retry" }
+  | { kind: "hurry" }
+  | { kind: "advance"; ms: number };
 type ParentState = "idle" | "checking" | "accepted" | "rejected" | "broken";
 
 const anyStep: fc.Arbitrary<Step> = fc.oneof(
-  fc.constant<Step>({ kind: "start" }),
-  fc.constant<Step>({ kind: "cancel" }),
-  fc.record({ kind: fc.constant("advance" as const), ms: fc.integer({ min: 0, max: 60 }) }),
+  { arbitrary: fc.constant<Step>({ kind: "start" }), weight: 2 },
+  { arbitrary: fc.constant<Step>({ kind: "cancel" }), weight: 1 },
+  { arbitrary: fc.constant<Step>({ kind: "retry" }), weight: 3 },
+  { arbitrary: fc.constant<Step>({ kind: "hurry" }), weight: 1 },
+  {
+    arbitrary: fc.record({
+      kind: fc.constant("advance" as const),
+      ms: fc.integer({ min: 0, max: 30 }),
+    }),
+    weight: 4,
+  },
 );
 
 const anyRun = fc.record({
   outcome: fc.constantFrom<Outcome>("passed", "failed", "broken", "starts passed"),
-  waitMs: fc.integer({ min: 1, max: 100 }),
-  steps: fc.array(anyStep, { maxLength: 25 }),
+  waitMs: fc.integer({ min: 20, max: 100 }),
+  steps: fc.array(anyStep, { maxLength: 40, size: "max" }),
 });
 
 const working = state("working")();
@@ -27,6 +40,8 @@ const failed = state("failed")().final();
 const finish = event("finish")();
 const unhandled = event("unhandled")();
 const progress = event("progress")();
+const retry = event("retry")();
+const hurry = event("hurry")();
 
 interface CheckOptions {
   outcome: Outcome;
@@ -40,7 +55,7 @@ function checkMachine(options: CheckOptions) {
   return machine("check", {
     create: ({ clock }) =>
       Actor({
-        inputs: [],
+        inputs: [retry, hurry],
         internal: [finish, unhandled],
         outputs: [progress],
         states: [working, passed, failed],
@@ -52,11 +67,14 @@ function checkMachine(options: CheckOptions) {
             sends: [finish, unhandled],
             fn: (input) => withTimeout(waitMs, { input, event: () => raised.create() }),
           });
-          builder.on(working, {
-            event: finish,
-            to: [passed, failed],
-            handler: () => ({ state: ending, emit: [progress.create()] }),
-          });
+          for (const ends of [finish, hurry]) {
+            builder.on(working, {
+              event: ends,
+              to: [passed, failed],
+              handler: () => ({ state: ending, emit: [progress.create()] }),
+            });
+          }
+          builder.on(working, { event: retry, to: [working], handler: () => ({ state: working }) });
         },
       }),
   });
@@ -77,7 +95,7 @@ function parentOf(options: CheckOptions) {
   const clock = VirtualClock();
   const outputs: InternalEvent[] = [];
   const actor = Actor({
-    inputs: [start, cancel],
+    inputs: [start, cancel, retry, hurry],
     internal: [checkPassed, checkFailed, checkBroke],
     outputs: [progress],
     states: [idle, checking, accepted, rejected, broken],
@@ -92,6 +110,7 @@ function parentOf(options: CheckOptions) {
         machine: checkMachine(options),
         done: { passed: checkPassed, failed: checkFailed },
         error: checkBroke,
+        forward: [retry, hurry],
       });
       builder.on(checking, {
         event: checkPassed,
@@ -114,6 +133,10 @@ function parentOf(options: CheckOptions) {
         return actor.send(start.create());
       case "cancel":
         return actor.send(cancel.create());
+      case "retry":
+        return actor.send(retry.create());
+      case "hurry":
+        return actor.send(hurry.create());
       case "advance":
         return clock.advance(step.ms);
       default:
@@ -130,7 +153,7 @@ const endingOf: Record<Outcome, ParentState> = {
   "starts passed": "accepted",
 };
 
-/** The parent as plain data: one state, the time the child finishes, and the outputs so far. */
+/** The parent as plain data: one state, the time the child finishes, and the outputs so far. `retry` restarts the child wait, `hurry` ends it now as if it passed or failed. */
 function reference(options: CheckOptions) {
   let current: ParentState = "idle";
   let now = 0;
@@ -140,6 +163,10 @@ function reference(options: CheckOptions) {
   function end(): void {
     current = endingOf[options.outcome];
     if (options.outcome === "passed" || options.outcome === "failed") outputs += 1;
+  }
+  function endNow(): void {
+    current = options.outcome === "failed" ? "rejected" : "accepted";
+    outputs += 1;
   }
   return {
     step(step: Step): void {
@@ -152,6 +179,12 @@ function reference(options: CheckOptions) {
           return;
         case "cancel":
           if (current === "checking") current = "idle";
+          return;
+        case "retry":
+          if (current === "checking") finishesAt = now + options.waitMs;
+          return;
+        case "hurry":
+          if (current === "checking") endNow();
           return;
         case "advance":
           now += step.ms;
@@ -169,17 +202,19 @@ function reference(options: CheckOptions) {
 }
 
 describe("embed property tests", () => {
-  test("the parent matches a one-state model: the child ends once, leaves no timers, leaks no mapped event", () => {
+  test("the parent matches a one-state model: forwarded inputs move the child, it ends once, leaves no timers, leaks no mapped event", () => {
     runProperty(anyRun, ({ steps, ...options }) => {
       const { actor, clock, outputs, drive } = parentOf(options);
       const model = reference(options);
+      const seen: unknown[] = [];
+      const expected: Array<ReturnType<typeof model.view>> = [];
       for (const step of steps) {
         model.step(step);
         drive(step);
+        expected.push(model.view());
+        seen.push({ state: actor.state.name, pending: clock.hasPending(), outputs: [...outputs] });
       }
-      expect({ state: actor.state.name, pending: clock.hasPending(), outputs }).toEqual(
-        model.view(),
-      );
+      expect(seen).toEqual(expected);
     });
   });
 });

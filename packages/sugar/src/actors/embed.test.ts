@@ -1,7 +1,7 @@
 import { Actor, event, machine, state, VirtualClock } from "@mantaq/core";
+import type { InternalEvent, Snapshot } from "@mantaq/core";
 import { describe, expect, test } from "vite-plus/test";
 import { embed } from "./embed.ts";
-import type { InternalEvent } from "@mantaq/core";
 import { withTimeout } from "../effects/timeout.ts";
 
 const working = state("working")();
@@ -275,7 +275,284 @@ describe("embed", () => {
         machine: check,
         done: { passed: "checkPassed", failed: "checkFailed" },
         error: "checkBroke",
+        forward: [],
+        snapshot: undefined,
       },
+    });
+  });
+});
+
+const uploading = state("uploading")();
+const couldNotUpload = state("couldNotUpload")();
+const uploaded = state("uploaded")().final();
+const dismissed = state("dismissed")().final();
+const uploadSettled = event("uploadSettled")();
+const retry = event("retry")();
+const dismiss = event("dismiss")();
+
+interface UploadOptions {
+  failures: number;
+}
+
+/** Each attempt takes 50 ms. The first `failures` attempts of each child fail; the user retries or dismisses. */
+function uploadMachine(options: UploadOptions) {
+  return machine("upload", {
+    create: ({ clock }) => {
+      let attempts = 0;
+      return Actor({
+        inputs: [retry, dismiss],
+        internal: [uploadSettled],
+        states: [uploading, couldNotUpload, uploaded, dismissed],
+        initial: uploading,
+        clock,
+        setup: (builder) => {
+          builder.effect(uploading, {
+            name: "upload",
+            sends: [uploadSettled],
+            fn: (input) => withTimeout(50, { input, event: () => uploadSettled.create() }),
+          });
+          builder.on(uploading, {
+            event: uploadSettled,
+            to: [uploaded, couldNotUpload],
+            handler: () => {
+              attempts += 1;
+              return { state: attempts > options.failures ? uploaded : couldNotUpload };
+            },
+          });
+          builder.on(couldNotUpload, {
+            event: retry,
+            to: [uploading],
+            handler: () => ({ state: uploading }),
+          });
+          builder.on(couldNotUpload, {
+            event: dismiss,
+            to: [dismissed],
+            handler: () => ({ state: dismissed }),
+          });
+        },
+      });
+    },
+  });
+}
+
+const editing = state("editing")();
+const saving = state("saving")();
+const saved = state("saved")();
+const save = event("save")();
+const uploadDone = event("uploadDone")();
+const uploadDismissed = event("uploadDismissed")();
+const uploadBroke = event("uploadBroke")();
+const uploadChanged = event("uploadChanged")<Snapshot>();
+
+interface EditorContext {
+  upload: Snapshot | undefined;
+}
+
+interface EditorOptions {
+  initial: "editing" | "saving";
+}
+
+function editorOf(upload: ReturnType<typeof uploadMachine>, options?: EditorOptions) {
+  const clock = VirtualClock();
+  const snapshots: string[][] = [];
+  const context: EditorContext = { upload: undefined };
+  const actor = Actor({
+    inputs: [save, retry, dismiss],
+    internal: [uploadDone, uploadDismissed, uploadBroke, uploadChanged],
+    states: [editing, saving, saved, broken],
+    initial: options?.initial === "saving" ? saving : editing,
+    context,
+    clock,
+    setup: (builder) => {
+      builder.on(editing, { event: save, to: [saving], handler: () => ({ state: saving }) });
+      embed(builder, {
+        in: saving,
+        machine: upload,
+        done: { uploaded: uploadDone, dismissed: uploadDismissed },
+        error: uploadBroke,
+        forward: [retry, dismiss],
+        snapshot: uploadChanged,
+      });
+      builder.on(saving, {
+        event: uploadChanged,
+        handler: (changed, { context: editor }) => {
+          snapshots.push(changed.payload.path);
+          editor.set({ upload: changed.payload });
+        },
+      });
+      builder.on(saving, { event: uploadDone, to: [saved], handler: () => ({ state: saved }) });
+      builder.on(saving, {
+        event: uploadDismissed,
+        to: [editing],
+        handler: () => ({ state: editing }),
+      });
+      builder.on(saving, {
+        event: uploadBroke,
+        to: [broken],
+        handler: () => ({ state: broken }),
+      });
+    },
+  });
+  return { actor, clock, snapshots };
+}
+
+describe("embed forward", () => {
+  test("a forwarded input moves the child, and the child end moves the parent", () => {
+    const { actor, clock } = editorOf(uploadMachine({ failures: 1 }));
+    actor.send(save.create());
+    clock.advance(50);
+    actor.send(retry.create());
+    const retrying = actor.state.name;
+    clock.advance(50);
+
+    expect([retrying, actor.state.name]).toEqual(["saving", "saved"]);
+  });
+
+  test("dismiss reaches the child, and its dismissed state sends its done event", () => {
+    const { actor, clock } = editorOf(uploadMachine({ failures: 1 }));
+    actor.send(save.create());
+    clock.advance(50);
+
+    actor.send(dismiss.create());
+
+    expect({ state: actor.state.name, pending: clock.hasPending() }).toEqual({
+      state: "editing",
+      pending: false,
+    });
+  });
+
+  test("the snapshot event carries the child path on entry and on each change", () => {
+    const { actor, clock, snapshots } = editorOf(uploadMachine({ failures: 1 }));
+    actor.send(save.create());
+    clock.advance(50);
+    actor.send(retry.create());
+    clock.advance(50);
+
+    expect(snapshots).toEqual([["uploading"], ["couldNotUpload"], ["uploading"], ["uploaded"]]);
+  });
+
+  test("a parent that starts in the embedding state holds the child snapshot in its own snapshot", () => {
+    const { actor, clock } = editorOf(uploadMachine({ failures: 1 }), { initial: "saving" });
+    const built = actor.snapshot().context.upload?.path;
+    clock.advance(50);
+
+    expect([built, actor.snapshot().context.upload?.path]).toEqual([
+      ["uploading"],
+      ["couldNotUpload"],
+    ]);
+  });
+
+  test("a forwarded input outside the embedding state reaches no child", () => {
+    const { actor, clock, snapshots } = editorOf(uploadMachine({ failures: 1 }));
+    actor.send(retry.create());
+    actor.send(save.create());
+    clock.advance(50);
+
+    expect({ state: actor.state.name, snapshots }).toEqual({
+      state: "saving",
+      snapshots: [["uploading"], ["couldNotUpload"]],
+    });
+  });
+
+  test("entering the state again forwards to the fresh child", () => {
+    const { actor, clock } = editorOf(uploadMachine({ failures: 1 }));
+    actor.send(save.create());
+    clock.advance(50);
+    actor.send(dismiss.create());
+    actor.send(save.create());
+    clock.advance(50);
+    const failedAgain = actor.state.name;
+    actor.send(retry.create());
+    clock.advance(50);
+
+    expect([failedAgain, actor.state.name]).toEqual(["saving", "saved"]);
+  });
+
+  test("the tag lists the forwarded inputs and the snapshot event, and sends lists the snapshot event", () => {
+    const upload = uploadMachine({ failures: 0 });
+    const { actor } = editorOf(upload);
+    const [entry] = actor.options.effects["saving"] ?? [];
+
+    expect({
+      sends: entry?.sends,
+      embedded: Reflect.get(entry?.fn ?? {}, "embedded"),
+      targets: actor.options.targets["saving"],
+    }).toEqual({
+      sends: ["uploadDone", "uploadDismissed", "uploadBroke", "uploadChanged"],
+      embedded: {
+        machine: upload,
+        done: { uploaded: "uploadDone", dismissed: "uploadDismissed" },
+        error: "uploadBroke",
+        forward: ["retry", "dismiss"],
+        snapshot: "uploadChanged",
+      },
+      targets: {
+        retry: [],
+        dismiss: [],
+        uploadChanged: [],
+        uploadDone: ["saved"],
+        uploadDismissed: ["editing"],
+        uploadBroke: ["broken"],
+      },
+    });
+  });
+
+  test("a forwarded input keeps its payload", () => {
+    const waiting = state("waiting")();
+    const rated = state("rated")().final();
+    const rate = event("rate")<{ score: number }>();
+    const ratingDone = event("ratingDone")();
+    const ratingBroke = event("ratingBroke")();
+    const ratingChanged = event("ratingChanged")<Snapshot>();
+    const rating = machine("rating", {
+      create: ({ clock }) =>
+        Actor({
+          inputs: [rate],
+          states: [waiting, rated],
+          initial: waiting,
+          context: { score: 0 },
+          clock,
+          setup: (builder) => {
+            builder.on(waiting, {
+              event: rate,
+              to: [rated],
+              handler: (sent, { context }) => {
+                context.set({ score: sent.payload.score });
+                return { state: rated };
+              },
+            });
+          },
+        }),
+    });
+    const kept: unknown[] = [];
+    const actor = Actor({
+      inputs: [rate],
+      internal: [ratingDone, ratingBroke, ratingChanged],
+      states: [saving, saved],
+      initial: saving,
+      clock: VirtualClock(),
+      setup: (builder) => {
+        embed(builder, {
+          in: saving,
+          machine: rating,
+          done: { rated: ratingDone },
+          error: ratingBroke,
+          forward: [rate],
+          snapshot: ratingChanged,
+        });
+        builder.on(saving, {
+          event: ratingChanged,
+          handler: (changed) => void kept.push(changed.payload.context),
+        });
+        builder.on(saving, { event: ratingDone, to: [saved], handler: () => ({ state: saved }) });
+      },
+    });
+
+    actor.send(rate.create({ score: 3 }));
+
+    expect({ state: actor.state.name, kept }).toEqual({
+      state: "saved",
+      kept: [{ score: 0 }, { score: 3 }],
     });
   });
 });
