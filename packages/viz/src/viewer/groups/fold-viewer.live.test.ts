@@ -210,6 +210,42 @@ describe("a grouped machine in the viewer", () => {
     });
   });
 
+  test("in a region, Details and the shared node name each state as the canvas draws it", () => {
+    const states = [
+      stateOf("order.inCart", { initial: true }),
+      stateOf("order.chargingCard", { group: "payment" }),
+      stateOf("order.confirming", { group: "payment" }),
+      stateOf("order.paid"),
+      stateOf("order.shipped"),
+      stateOf("order.cancelled", { final: true }),
+    ];
+    const edges = [
+      edgeOf("order.inCart", { event: "checkout", to: "order.chargingCard" }),
+      edgeOf("order.confirming", { event: "confirmed", to: "order.paid" }),
+    ];
+    for (const from of ["order.inCart", "order.chargingCard", "order.confirming", "order.paid"]) {
+      edges.push(edgeOf(from, { event: "abort", to: "order.cancelled" }));
+    }
+    const order = machineOf({ regions: ["order"], states, edges });
+    const root = document.createElement("div");
+    document.body.append(root);
+    mountViewer(root, { schemaVersion: VIZ_SCHEMA_VERSION, machines: [order] });
+    click(root.querySelector('.graph g.state[data-node-id="order.@payment"]'));
+    const links: string[] = [];
+    for (const link of root.querySelectorAll("[data-edge-link]")) links.push(link.textContent);
+    expect({
+      links,
+      shared: root.querySelector(".graph g.any-node")?.getAttribute("aria-label"),
+    }).toStrictEqual({
+      links: [
+        "group payment —confirmed→ paid",
+        "group payment —abort→ cancelled",
+        "inCart —checkout→ group payment",
+      ],
+      shared: "these 3 states: inCart, group payment, paid",
+    });
+  });
+
   test("a state picked in Details of a group node rings the group node", () => {
     const { root } = mount();
     click(root.querySelector('.graph g.state[data-node-id="@payment"]'));

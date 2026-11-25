@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { edgeOf, groupedCheckout, machineOf, readEdge, stateOf } from "./shop-machines.ts";
 import { edgeLines } from "../labels.ts";
 import { layoutMachine } from "../layout.ts";
+import { shareArrows } from "../shared.ts";
 import type { VizBranch } from "../../schema.ts";
 import { foldGroups } from "./fold-groups.ts";
 import { groupMachine } from "./group-machine.ts";
@@ -131,6 +132,24 @@ describe("groupMachine", () => {
       labels: ["checkout score >= 600", "pay ok", "pay else"],
       overlaps: [],
     });
+  });
+
+  test("an arrow that several outside states share keeps its own condition", () => {
+    const lost = [branch(["ok"], { state: "lost" }), branch(["!(ok)"], { state: "paying" })];
+    const sources = ["a", "b", "c"];
+    const edges = [];
+    for (const from of sources) {
+      edges.push(readEdge(edgeOf(from, { event: "go", to: "lost" }), { branches: lost }));
+      edges.push(readEdge(edgeOf(from, { event: "go", to: "paying" }), { branches: lost }));
+    }
+    const states = [stateOf("paying", { group: "payment" }), stateOf("lost")];
+    for (const id of sources) states.push(stateOf(id));
+    const view = groupMachine(machineOf({ states, edges }), { group: "@payment" });
+    const labels: string[] = [];
+    for (const edge of shareArrows(view ?? machineOf({ states, edges })).edges) {
+      labels.push(edgeLines(edge).join(" "));
+    }
+    expect(labels).toStrictEqual(["go !ok"]);
   });
 
   test("an unknown group has no view", () => {

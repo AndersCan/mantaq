@@ -13,6 +13,7 @@ import fc from "fast-check";
 import { groupedArbitrary } from "./grouped.arbitrary.ts";
 import { groupMachine } from "./group-machine.ts";
 import { layoutMachine } from "../layout.ts";
+import { shareArrows } from "../shared.ts";
 
 const run = { seed: 0x6a0, numRuns: 1000 };
 
@@ -135,19 +136,25 @@ function labelProblems(machine: VizMachine): string[] {
   return problems;
 }
 
-/** Arrows of an entered group that read "else" while a partner of their handler is not drawn there. */
+/** Arrows an entered group draws that read "else" while a partner of a handler they stand for is not drawn there. */
 function elseProblems(machine: VizMachine): string[] {
   const problems: string[] = [];
   for (const node of groupNodesOf(machine)) {
     const view = groupMachine(machine, { group: node.id });
-    const drawn = new Set(view?.edges.map((edge) => edge.id));
-    for (const edge of view?.edges ?? []) {
-      if (!edgeCondition(edge)?.startsWith("else")) continue;
-      const partners = machine.edges.filter(
-        (other) => other.from === edge.from && other.event === edge.event && other.to !== null,
+    if (view === undefined) continue;
+    const drawn = new Set(view.edges.map((edge) => edge.id));
+    const shared = shareArrows(view);
+    for (const arrow of shared.edges) {
+      if (!edgeCondition(arrow)?.startsWith("else")) continue;
+      const members = shared.arrows.find((each) => each.id === arrow.id)?.members ?? [arrow];
+      const gone = machine.edges.filter(
+        (other) =>
+          other.kind === "transition" &&
+          other.to !== null &&
+          !drawn.has(other.id) &&
+          members.some((member) => member.from === other.from && member.event === other.event),
       );
-      const gone = partners.filter((other) => other.kind === "transition" && !drawn.has(other.id));
-      if (gone.length > 0) problems.push(`${node.id} reads else on ${edge.id}`);
+      if (gone.length > 0) problems.push(`${node.id} reads else on ${arrow.id}`);
     }
   }
   return problems;

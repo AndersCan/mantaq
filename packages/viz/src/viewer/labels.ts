@@ -68,14 +68,16 @@ function branchText(
   return isElse ? `else if ${joined}` : joined;
 }
 
-/** Copies of edges drawn without the other side of their handler, so their label never says "else". */
-const ownConditionCopies = new WeakSet<VizEdge>();
+/** Handler readings of edges drawn without the other side of their handler, so their label never says "else". A copy of such an edge shares its reading, so the mark stays on every copy. */
+const ownConditionReadings = new WeakSet<object>();
 
 /** A copy of `edge` whose label states its own condition, never "else": for a drawing that leaves out the arrow of the other side. */
 export function ownConditionOnly(edge: VizEdge): VizEdge {
-  const copy = { ...edge };
-  ownConditionCopies.add(copy);
-  return copy;
+  const { explanation } = edge;
+  if (explanation === null) return edge;
+  const reading = { ...explanation };
+  ownConditionReadings.add(reading);
+  return { ...edge, explanation: reading };
 }
 
 /**
@@ -101,7 +103,7 @@ export function edgeCondition(edge: VizEdge): string | null {
   const shared = (condition: string): boolean =>
     targets.size >= 2 && reaching.every((branch) => branch.conditions.includes(condition));
   const others = reaching.filter((branch) => !goes(branch, to));
-  const allowElse = going.length === 1 && !ownConditionCopies.has(edge);
+  const allowElse = going.length === 1 && !ownConditionReadings.has(explanation);
   const texts = going.map((branch) => branchText(branch, others, shared, allowElse));
   if (texts.some((text) => text === null)) return null;
   return texts.join(" || ");

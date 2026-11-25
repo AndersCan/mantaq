@@ -1,4 +1,4 @@
-import { groupNodesOf, realMachineOf } from "./fold-groups.ts";
+import { groupNodesOf, handlerKey, realMachineOf } from "./fold-groups.ts";
 import { isAnyState, scopeOf } from "../../schema.ts";
 import type { VizEdge, VizMachine, VizState } from "../../schema.ts";
 import type { GroupNode } from "./fold-groups.ts";
@@ -97,11 +97,6 @@ interface Kept {
 /** True when a state of the view sits in the region or below it. */
 function holds(region: string, options: Kept): boolean {
   return options.states.some((state) => state.id.startsWith(`${region}.`));
-}
-
-/** The real source and event of an edge: one handler. */
-function handlerKey(edge: VizEdge): string {
-  return `${edge.from}\u0000${edge.event}`;
 }
 
 /** The edges that touch the group; one whose handler also moves to a state by an edge the view leaves out labels its own condition, since an "else" needs its partner drawn. */
