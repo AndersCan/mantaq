@@ -35,13 +35,12 @@ function regionOf(nodeId: string): string | null {
   return cut === -1 ? null : nodeId.slice(0, cut);
 }
 
-function toState(
-  node: GraphNode,
-  context: {
-    initialIds: ReadonlySet<string>;
-    effects: ReadonlyArray<GraphEdge>;
-  },
-): VizState {
+interface StateContext {
+  initialIds: ReadonlySet<string>;
+  effects: ReadonlyArray<GraphEdge>;
+}
+
+function toState(node: GraphNode, context: StateContext): VizState {
   return {
     id: node.id,
     label: node.label,
@@ -201,10 +200,12 @@ export function toVizMachine(input: VizInput): VizMachine {
   const actorNames = new Set(otherActors.map((each) => each.name));
 
   const effectEdges = graph.edges.filter((edge) => edgeKind(edge) === "effect");
-  const states = graph.nodes
-    .filter((node) => node.id !== INITIAL_NODE_ID && node.isAny !== true)
-    .map((node) => toState(node, { initialIds, effects: effectEdges }))
-    .sort(byId);
+  const states: VizState[] = [];
+  for (const node of graph.nodes) {
+    const shown = node.id !== INITIAL_NODE_ID && node.isAny !== true;
+    if (shown) states.push(toState(node, { initialIds, effects: effectEdges }));
+  }
+  states.sort(byId);
   const edges = graph.edges.map((edge) => toEdge(edge));
   edges.sort(byId);
   const declaredInputs = [
@@ -256,9 +257,9 @@ export function toVizMachine(input: VizInput): VizMachine {
   };
 }
 
+/** The machines sorted by id. Structure only. */
 export function toViz(inputs: ReadonlyArray<VizInput>): VizDocument {
-  return {
-    schemaVersion: VIZ_SCHEMA_VERSION,
-    machines: inputs.map(toVizMachine).sort(byId),
-  };
+  const machines: VizMachine[] = [];
+  for (const input of inputs) machines.push(toVizMachine(input));
+  return { schemaVersion: VIZ_SCHEMA_VERSION, machines: machines.sort(byId) };
 }
